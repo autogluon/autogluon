@@ -1,118 +1,120 @@
 """ TabTransformer model """
 import time, logging
 
+from autogluon import try_import_torch
 from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION, MULTICLASS
-from torch.autograd import Variable
 
 from ..abstract.abstract_model import AbstractModel
 from ....ml.utils import infer_problem_type
 from ....utils.loaders import load_pkl
 
 from autogluon.utils.tabular.ml.models.tab_transformer import utils
-from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformer import TabTransformer, TabTransformer_fix_attention
+from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformer import TabTransformer
 from autogluon.utils.tabular.ml.models.tab_transformer import pretexts
 from autogluon.utils.tabular.ml.models.tab_transformer.hyperparameters.kwargs import get_kwargs
 
-from tqdm import tqdm
-import torch.nn as nn
-import torch.optim as optim
-import torch
 import pandas as pd
 import os
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
-class TabNet(nn.Module):
-    def __init__(self, num_class, kwargs, cat_feat_origin_cards):
-        super(TabNet, self).__init__()
-        self.kwargs=kwargs
-        self.kwargs['cat_feat_origin_cards']=cat_feat_origin_cards
+class TabNetClass:
+    try_import_torch()
+    import torch.nn as nn
 
-        if self.kwargs['fix_attention'] is True:
-            self.embed=TabTransformer_fix_attention(**self.kwargs['tab_kwargs'], **self.kwargs)
-        else:
+    class TabNet(nn.Module):
+        def __init__(self, num_class, kwargs, cat_feat_origin_cards):
+            super(TabNetClass.TabNet, self).__init__()
+            try_import_torch()
+            import torch.nn as nn
+            self.kwargs=kwargs
+            self.kwargs['cat_feat_origin_cards']=cat_feat_origin_cards
             self.embed=TabTransformer(**self.kwargs['tab_kwargs'], **self.kwargs)
 
-        relu, lin = nn.ReLU(), nn.Linear(2*self.kwargs['feature_dim'] , num_class, bias=True)
-        self.fc = nn.Sequential(*[relu,lin])
+            relu, lin = nn.ReLU(), nn.Linear(2*self.kwargs['feature_dim'] , num_class, bias=True)
+            self.fc = nn.Sequential(*[relu,lin])
 
-    def forward(self, data):
-        features = self.embed(data)
-        out = features.mean(dim=1)
-        out = self.fc(out)
-        return out, features
+        def forward(self, data):
+            features = self.embed(data)
+            out = features.mean(dim=1)
+            out = self.fc(out)
+            return out, features
 
-    def fit(self, trainloader, valloader=None, state=None, time_limit=None):
-        """
-        Main training function for TabTransformer
-        "state" must be one of [None, 'pretrain', 'finetune']
-        None: corresponds to purely supervised learning
-        pretrain: discirminative task will be a pretext task
-        finetune: same as superised learning except that the model base has
-                  exponentially decaying learning rate.
-        """
-        start_time = time.time()
-        pretext_tasks=pretexts.__dict__
-        optimizers=[]
-        lr=self.kwargs['tab_kwargs']['lr']
-        weight_decay=self.kwargs['tab_kwargs']['weight_decay']
-        if state==None:
-            optimizers = [optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)]
-            pretext=pretext_tasks['SUPERVISED_pretext'](self.kwargs)
-        elif state=='pretrain':
-            optimizers = [optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)]
-            pretext=pretext_tasks['BERT_pretext'](self.kwargs)
-        elif state=='finetune':
-            base_exp_decay=self.kwargs['tab_kwargs']['base_exp_decay']
-            optimizer_fc    = optim.Adam(self.fc.parameters(), lr=lr, weight_decay=weight_decay)
-            optimizer_embeds = optim.Adam(self.embed.parameters(), lr=lr, weight_decay=weight_decay)
-            scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds,gamma=base_exp_decay)
-            optimizers.append(optimizer_fc)
-            optimizers.append(optimizer_embeds)
+        def fit(self, trainloader, valloader=None, state=None, time_limit=None):
+            """
+            Main training function for TabTransformer
+            "state" must be one of [None, 'pretrain', 'finetune']
+            None: corresponds to purely supervised learning
+            pretrain: discirminative task will be a pretext task
+            finetune: same as superised learning except that the model base has
+                      exponentially decaying learning rate.
+            """
+            try_import_torch()
+            import torch
+            import torch.nn as nn
+            import torch.optim as optim
 
-            pretext=pretext_tasks['SUPERVISED_pretext'](self.kwargs)
+            start_time = time.time()
+            pretext_tasks=pretexts.PretextClass.__dict__
+            optimizers=[]
+            lr=self.kwargs['tab_kwargs']['lr']
+            weight_decay=self.kwargs['tab_kwargs']['weight_decay']
+            if state==None:
+                optimizers = [optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)]
+                pretext=pretext_tasks['SUPERVISED_pretext'](self.kwargs)
+            elif state=='pretrain':
+                optimizers = [optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)]
+                pretext=pretext_tasks['BERT_pretext'](self.kwargs)
+            elif state=='finetune':
+                base_exp_decay=self.kwargs['tab_kwargs']['base_exp_decay']
+                optimizer_fc    = optim.Adam(self.fc.parameters(), lr=lr, weight_decay=weight_decay)
+                optimizer_embeds = optim.Adam(self.embed.parameters(), lr=lr, weight_decay=weight_decay)
+                scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds,gamma=base_exp_decay)
+                optimizers.append(optimizer_fc)
+                optimizers.append(optimizer_embeds)
 
-        else:
-            raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
+                pretext=pretext_tasks['SUPERVISED_pretext'](self.kwargs)
 
-        if self.kwargs['problem_type']=='regression':
-            loss_criterion = nn.MSELoss()
-        else:
-            loss_criterion = nn.CrossEntropyLoss()
+            else:
+                raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
 
-        old_val_accuracy = 0.0
+            if self.kwargs['problem_type']=='regression':
+                loss_criterion = nn.MSELoss()
+            else:
+                loss_criterion = nn.CrossEntropyLoss()
 
-        epochs = self.kwargs['pretrain_epochs'] if state=='pretrain' else self.kwargs['epochs']
-        freq   = self.kwargs['pretrain_freq'] if state=='pretrain' else self.kwargs['freq']
+            old_val_accuracy = 0.0
 
-        for e in range(1,epochs+1):
-            _ = utils.epoch(self, trainloader, optimizers, loss_criterion=loss_criterion, \
-                                pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, aug_kwargs=self.kwargs['augmentation']) #returns train_loss, train_acc@1, train_acc@5
+            epochs = self.kwargs['pretrain_epochs'] if state=='pretrain' else self.kwargs['epochs']
+            freq   = self.kwargs['pretrain_freq'] if state=='pretrain' else self.kwargs['freq']
+
+            for e in range(1,epochs+1):
+                _ = utils.epoch(self, trainloader, optimizers, loss_criterion=loss_criterion, \
+                                    pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, aug_kwargs=self.kwargs['augmentation']) #returns train_loss, train_acc@1, train_acc@5
+
+                if valloader is not None:
+                    if e % freq == 0:
+                        _, val_accuracy = utils.epoch(self, valloader, optimizers=None, \
+                            loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1, aug_kwargs=self.kwargs['augmentation'])
+
+                        # TODO: Replace this whole section with self.score() call.
+                        #val_metric = self.score(X)
+                        if val_accuracy>old_val_accuracy:
+                            torch.save(self,'tab_trans_temp.pth')
+
+                if time_limit:
+                    time_elapsed = time.time() - start_time
+                    time_left = time_limit - time_elapsed
+                    if time_left <= 0:
+                        logger.log(20, "\tRan out of time, stopping training early.")
+                        break
 
             if valloader is not None:
-                if e % freq == 0:
-                    _, val_accuracy = utils.epoch(self, valloader, optimizers=None, \
-                        loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1, aug_kwargs=self.kwargs['augmentation'])
-
-                    # TODO: Replace this whole section with self.score() call.
-                    #val_metric = self.score(X)
-                    if val_accuracy>old_val_accuracy:
-                        torch.save(self,'tab_trans_temp.pth')
-
-            if time_limit:
-                time_elapsed = time.time() - start_time
-                time_left = time_limit - time_elapsed
-                if time_left <= 0:
-                    logger.log(20, "\tRan out of time, stopping training early.")
-                    break
-
-        if valloader is not None:
-            try:
-                self=torch.load('tab_trans_temp.pth')
-                os.remove('tab_trans_temp.pth')
-            except:
-                pass
+                try:
+                    self=torch.load('tab_trans_temp.pth')
+                    os.remove('tab_trans_temp.pth')
+                except:
+                    pass
 
             
 class TabTransformerModel(AbstractModel):
@@ -160,6 +162,8 @@ class TabTransformerModel(AbstractModel):
     
 
     def set_default_params(self, y_train):
+        try_import_torch() # TODO: This might be able to go away after re-factoring num_gpu's
+        import torch
         if self.problem_type is None:
             self.problem_type = infer_problem_type(y=y_train)  # Infer problem type (or else specify directly)
         if self.problem_type==REGRESSION:
@@ -179,7 +183,9 @@ class TabTransformerModel(AbstractModel):
         self.kwargs=get_kwargs(**{'problem_type': self.problem_type, 'n_classes': self.num_class, 'device': device})
 
     def get_model(self):
-        self.model=TabNet(self.num_class, self.kwargs, self.cat_feat_origin_cards)
+        try_import_torch()
+        import torch
+        self.model=TabNetClass.TabNet(self.num_class, self.kwargs, self.cat_feat_origin_cards)
         # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
         if torch.cuda.is_available():
             self.model = self.model.cuda()
@@ -207,27 +213,27 @@ class TabTransformerModel(AbstractModel):
 
         self._get_types_of_features(X)
         
-        data = utils.TabTransformerDataset(X, col_info=self.types_of_features, **self.kwargs)
+        data = utils.TabTransformerDatasetClass.TabTransformerDataset(X, col_info=self.types_of_features, **self.kwargs)
         self.fe=fe
         if self.fe is not None:
             if X_unlabeled is None:
                 unlab_data=None
             elif X_unlabeled is not None:
-                unlab_data = utils.TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.kwargs)
+                unlab_data = utils.TabTransformerDatasetClass.TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.kwargs)
         if self.fe is None:
             if X_unlabeled is None:
                 data.fit_feat_encoders()
                 self.fe = data.feature_encoders
                 unlab_data=None
             elif X_unlabeled is not None:
-                unlab_data = utils.TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.kwargs)
+                unlab_data = utils.TabTransformerDatasetClass.TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.kwargs)
                 unlab_data.fit_feat_encoders()
                 self.fe = unlab_data.feature_encoders
 
         data.encode(self.fe)
 
         if X_val is not None:
-            val_data = utils.TabTransformerDataset(X_val, col_info=self.types_of_features, **self.kwargs)
+            val_data = utils.TabTransformerDatasetClass.TabTransformerDataset(X_val, col_info=self.types_of_features, **self.kwargs)
             val_data.encode(self.fe)
         else:
             val_data=None
@@ -239,6 +245,8 @@ class TabTransformerModel(AbstractModel):
 
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, **kwargs):
+        try_import_torch()
+        import torch
         self.set_default_params(y_train)
 
         train, val, unlab = self.preprocess(X_train, X_val, X_unlabeled)
@@ -273,6 +281,10 @@ class TabTransformerModel(AbstractModel):
         X (torch.tensor or pd.dataframe): data for model to give prediction probabilities
         returns: np.array of k-probabilities for each of the k classes. If k=2 we drop the second probability.
         """
+        try_import_torch()
+        import torch
+        import torch.nn as nn
+        from torch.autograd import Variable
         if preprocess or isinstance(X, pd.DataFrame):
             X, _, _ =self.preprocess(X, fe=self.fe)
         else:
@@ -312,6 +324,8 @@ class TabTransformerModel(AbstractModel):
         directory (str): if unspecified, use self.path as directory
         return_filename (bool): return the file-name corresponding to this save
         """
+        try_import_torch()
+        import torch
         if directory is not None:
             path = directory+file_prefix
         else:
@@ -337,6 +351,8 @@ class TabTransformerModel(AbstractModel):
         file_prefix (str): Appended to beginning of file-name.
         If you want to load files with given prefix, can also pass arg: path = directory+file_prefix
         """
+        try_import_torch()
+        import torch
         path = path + file_prefix
         obj: TabTransformerModel = load_pkl.load(path=path+cls.model_file_name, verbose=verbose)
         if reset_paths:
