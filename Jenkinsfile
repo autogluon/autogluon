@@ -10,6 +10,20 @@ stage("Unit Test") {
         set -ex
         conda env update -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
+        python3 -m pip uninstall -y autogluon
+        python3 -m pip uninstall -y autogluon-contrib-nlp
+        python3 -m pip uninstall -y autogluon-core
+        python3 -m pip uninstall -y autogluon-extra
+        python3 -m pip uninstall -y autogluon-mxnet
+        python3 -m pip uninstall -y autogluon-tabular
+        python3 -m pip uninstall -y autogluon-text
+        python3 -m pip uninstall -y autogluon-vision
+        python3 -m pip uninstall -y autogluon.vision
+        python3 -m pip uninstall -y autogluon.text
+        python3 -m pip uninstall -y autogluon.mxnet
+        python3 -m pip uninstall -y autogluon.extra
+        python3 -m pip uninstall -y autogluon.tabular
+        python3 -m pip uninstall -y autogluon.core
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
