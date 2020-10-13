@@ -83,7 +83,7 @@ stage("Build Docs") {
         if (env.BRANCH_NAME.startsWith("PR-")) {
             bucket = 'autogluon-staging'
             path = "${env.BRANCH_NAME}/${env.BUILD_NUMBER}/"
-            site = "${bucket}.s3-website-us-west-2.amazonaws.com/${path}/index.html"
+            site = "${bucket}.s3-website-us-west-2.amazonaws.com/${path}index.html"
             flags = '--delete'
             cacheControl = ''
         } else {
