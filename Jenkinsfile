@@ -59,6 +59,13 @@ stage("Build Docs") {
         python3 -m pip uninstall -y autogluon-tabular
         python3 -m pip uninstall -y autogluon-text
         python3 -m pip uninstall -y autogluon-vision
+        python3 -m pip uninstall -y autogluon.vision
+        python3 -m pip uninstall -y autogluon.text
+        python3 -m pip uninstall -y autogluon.mxnet
+        python3 -m pip uninstall -y autogluon.extra
+        python3 -m pip uninstall -y autogluon.tabular
+        python3 -m pip uninstall -y autogluon.core
+
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
