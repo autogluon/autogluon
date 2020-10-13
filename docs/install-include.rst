@@ -152,3 +152,12 @@ Select your preferences below and run the corresponding install commands:
               .. note::
 
                  GPU usage is not yet supported on Mac OSX , please use Linux to utilize GPUs in AutoGluon.
+
+
+AutoGluon is modularized into sub-modules specialized in tabular, text and image tasks. Specific sub-modules can be
+installed separately through `python3 -m pip install <submodule>` using the following packages:
+
+- `autogluon.tabular` - tabular prediction tasks
+- `autogluon.image` - image classification and object detection tasks
+- `autogluon.text` - text prediction
+- `autogluon.core` - core components including `autogluon.core.*` packages
