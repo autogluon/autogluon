@@ -24,6 +24,13 @@ stage("Unit Test") {
         pip uninstall -y autogluon.extra
         pip uninstall -y autogluon.tabular
         pip uninstall -y autogluon.core
+        pip uninstall -y autogluon-contrib-nlp
+        pip uninstall -y autogluon-core
+        pip uninstall -y autogluon-extra
+        pip uninstall -y autogluon-mxnet
+        pip uninstall -y autogluon-tabular
+        pip uninstall -y autogluon-text
+        pip uninstall -y autogluon-vision
 
         cd core/
         python3 -m pip install --upgrade -e .
@@ -115,6 +122,13 @@ stage("Build Docs") {
         pip uninstall -y autogluon.extra
         pip uninstall -y autogluon.tabular
         pip uninstall -y autogluon.core
+        pip uninstall -y autogluon-contrib-nlp
+        pip uninstall -y autogluon-core
+        pip uninstall -y autogluon-extra
+        pip uninstall -y autogluon-mxnet
+        pip uninstall -y autogluon-tabular
+        pip uninstall -y autogluon-text
+        pip uninstall -y autogluon-vision
 
         cd core/
         python3 -m pip install --upgrade -e .
@@ -144,6 +158,7 @@ stage("Build Docs") {
         python3 -m pip install --upgrade -e .
         cd ..
 
+        cd docs && bash build_doc.sh
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
         echo "Uploaded doc to http://${site}"
         """
