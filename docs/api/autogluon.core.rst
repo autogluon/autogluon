@@ -10,7 +10,7 @@ Decorators for customizing AutoGluon to apply hyperparameter-tuning on arbitrary
 
    Create class and function with searchable spaces for hyperparameters `name` and `idx`:
 
-   >>> import autogluon as ag
+   >>> import autogluon.core as ag
    >>> @ag.obj(
    ...     name=ag.space.Categorical('auto', 'gluon'),
    ...     idx = ag.space.Int(0, 100),
@@ -49,8 +49,8 @@ Decorators for customizing AutoGluon to apply hyperparameter-tuning on arbitrary
 Core APIs
 ---------
 
-.. automodule:: autogluon
-.. currentmodule:: autogluon
+.. automodule:: autogluon.core
+.. currentmodule:: autogluon.core
 
 .. autosummary::
    :nosignatures:

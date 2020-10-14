@@ -1,10 +1,11 @@
 import torch
 from torch import nn
 
-import autogluon as ag
-from autogluon.contrib.torch import *
-from autogluon import Dict, Categorical
-from autogluon.model_zoo.models.utils import _update_input_size
+from autogluon.core import Dict, Categorical
+from autogluon.extra import *
+from autogluon.extra.contrib.enas import *
+from autogluon.extra.model_zoo.models.utils import _update_input_size
+
 
 @enas_unit()
 class ENAS_MBConv(MBConvBlock):

@@ -18,7 +18,7 @@ np.random.seed(123)
 We consider a Paraphrase Identification task for illustration. Given a pair of sentences, the goal is to predict whether or not one sentence is a restatement of the other (a binary classification task). Here we train models on the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398) dataset.
 
 ```{.python .input}
-from autogluon.utils.tabular.utils.loaders import load_pd
+from autogluon.core.utils.loaders import load_pd
 
 train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/train.parquet')
 dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/dev.parquet')
@@ -56,8 +56,8 @@ In this example, we search for good values of the following hyperparameters:
 - number of task-specific layers
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import TextPrediction as task
+import autogluon.core as ag
+from autogluon.text import TextPrediction as task
 
 hyperparameters = {
     'models': {

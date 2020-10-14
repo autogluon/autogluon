@@ -79,7 +79,7 @@ Select your preferences below and run the corresponding install commands:
 
                  python3 -m pip install --upgrade "mxnet<2.0.0"
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python3 setup.py develop
+                 cd autogluon && ./full_install.sh
 
            .. container:: gpu
 
@@ -89,7 +89,7 @@ Select your preferences below and run the corresponding install commands:
                  # according to your own CUDA version (e.g. mxnet_cu102 for CUDA 10.2).
                  python3 -m pip install --upgrade "mxnet_cu101<2.0.0"
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python3 setup.py develop
+                 cd autogluon && ./full_install.sh
 
      .. container:: mac
 
@@ -140,7 +140,7 @@ Select your preferences below and run the corresponding install commands:
 
                  python3 -m pip install --upgrade "mxnet<2.0.0"
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python3 setup.py develop
+                 cd autogluon && ./full_install.sh
 
               .. note::
               
@@ -152,3 +152,12 @@ Select your preferences below and run the corresponding install commands:
               .. note::
 
                  GPU usage is not yet supported on Mac OSX , please use Linux to utilize GPUs in AutoGluon.
+
+
+AutoGluon is modularized into sub-modules specialized in tabular, text and image tasks. Specific sub-modules can be
+installed separately through `python3 -m pip install <submodule>` using the following packages:
+
+- `autogluon.tabular` - tabular prediction tasks
+- `autogluon.image` - image classification and object detection tasks
+- `autogluon.text` - text prediction
+- `autogluon.core` - core components including `autogluon.core.*` packages

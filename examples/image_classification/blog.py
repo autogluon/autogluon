@@ -1,11 +1,11 @@
 import os
-import autogluon as ag
-from autogluon import ImageClassification as task
+import autogluon.core as ag
+from autogluon.vision import ImageClassification as task
 from mxnet import optimizer as optim
 
 def task_dog_breed_identification(data_path, dataset):
     images_path = os.path.join(data_path, dataset, 'images_all')
-    label_path =  os.path.join(data_path, dataset, 'labels.csv')
+    label_path = os.path.join(data_path, dataset, 'labels.csv')
     test_path = os.path.join(data_path, dataset, 'test')
     load_dataset = task.Dataset(images_path, label_file=label_path)
 

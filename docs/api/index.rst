@@ -14,7 +14,7 @@ describing what they are and what they do. The APIs are grouped into the followi
 
    .. card::
       :title: Search Space
-      :link: autogluon.space.html
+      :link: autogluon.core.space.html
 
       Hyperparameter search spaces describing candidate hyperparameter values.
 
@@ -26,13 +26,13 @@ describing what they are and what they do. The APIs are grouped into the followi
 
    .. card::
       :title: Schedulers
-      :link: autogluon.scheduler.html
+      :link: autogluon.core.scheduler.html
 
       Schedulers for managing computation resources and distributed training.
 
    .. card::
       :title: searchers
-      :link: autogluon.searcher.html
+      :link: autogluon.core.searcher.html
 
       Search algorithms that automatically suggest which hyperparameter values to try out.
 
@@ -40,9 +40,9 @@ describing what they are and what they do. The APIs are grouped into the followi
    :maxdepth: 2
    :hidden:
 
-   autogluon.space
-   autogluon.core
    autogluon.task
-   autogluon.scheduler
-   autogluon.searcher
-   autogluon.utils
+   autogluon.core
+   autogluon.core.space
+   autogluon.core.scheduler
+   autogluon.core.searcher
+   autogluon.core.utils

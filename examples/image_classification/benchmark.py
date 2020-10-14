@@ -1,8 +1,8 @@
 import os
 import argparse
 import logging
-import autogluon as ag
-from autogluon import ImageClassification as task
+from autogluon.core.utils import generate_csv_submission
+from autogluon.vision import ImageClassification as task
 from kaggle_configuration import config_choice
 
 def parse_args():
@@ -75,7 +75,7 @@ def main():
     if opt.submission:
         test_dataset = task.Dataset(os.path.join(opt.data_dir, opt.dataset, 'test'), train=False)
         inds, probs, probs_all, value = predict_details(test_dataset, classifier, load_dataset)
-        ag.utils.generate_csv_submission(dataset_path, opt.dataset, local_path, inds, probs_all, value, opt.custom)
+        generate_csv_submission(dataset_path, opt.dataset, local_path, inds, probs_all, value, opt.custom)
 
 if __name__ == '__main__':
     main()
