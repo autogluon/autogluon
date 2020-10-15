@@ -178,41 +178,6 @@ def test_mixed_column_type():
                           plot_results=False)
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
     dev_prediction = predictor1.predict(dev_data)
-
-
-def test_serialization_nlp():
-    train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
-                              'glue/sts/train.parquet')
-    dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
-                            'glue/sts/dev.parquet')
-    rng_state = np.random.RandomState(123)
-    train_perm = rng_state.permutation(len(train_data))
-    valid_perm = rng_state.permutation(len(dev_data))
-    train_data = train_data.iloc[train_perm[:100]]
-    dev_data = dev_data.iloc[valid_perm[:10]]
-    train_data = pd.DataFrame({'sentence1': train_data['sentence1'],
-                               'sentence2': train_data['sentence2'],
-                               'sentence3': train_data['sentence2'],
-                               'categorical0': train_data['genre'],
-                               'numerical0': train_data['score'],
-                               'genre': train_data['genre'],
-                               'score': train_data['score']})
-    dev_data = pd.DataFrame({'sentence1': dev_data['sentence1'],
-                             'sentence2': dev_data['sentence2'],
-                             'sentence3': dev_data['sentence2'],
-                             'categorical0': dev_data['genre'],
-                             'numerical0': dev_data['score'],
-                             'genre': dev_data['genre'],
-                             'score': dev_data['score']})
-
-    predictor1 = task.fit(train_data,
-                          hyperparameters=test_hyperparameters,
-                          label='score', num_trials=1,
-                          verbosity=4,
-                          ngpus_per_trial=1,
-                          output_directory='./sts_score',
-                          plot_results=False)
-    dev_prediction = predictor1.predict(dev_data)
     model_path = 'saved_model'
     predictor1.save(model_path)
     loaded_predictor = task.load(model_path)
