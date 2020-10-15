@@ -237,7 +237,7 @@ class NumericalColumnProperty(ColumnProperty):
         val = column_data[idx]
         inferred_shape = np.array(val).shape
         if self._shape is not None:
-            assert self._shape == inferred_shape, 'Shape mismatch!. Expected shape={},' \
+            assert tuple(self._shape) == tuple(inferred_shape), 'Shape mismatch!. Expected shape={},' \
                                      ' shape in the dataset is {}'.format(self._shape,
                                                                           inferred_shape)
         else:
