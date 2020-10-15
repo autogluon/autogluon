@@ -13,9 +13,9 @@ with open(os.path.join('..', 'VERSION')) as version_file:
     version = version_file.read().strip()
 
 """
-This namespace package is added to enable `pip install autogluon` with all the dependencies included.
-For local installations other modules are needed to be built separately - see `full_install.sh` script. 
-This setup.py file will NOT install the full autogluon package and all it’s dependencies.
+This namespace package is added to enable `pip install autogluon` which will install the full AutoGluon package with all the dependencies included.
+For local installations, other modules must be built separately via the `full_install.sh` script. 
+This `setup.py` file will NOT install the full autogluon package and all its dependencies.
 
 To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
 a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
