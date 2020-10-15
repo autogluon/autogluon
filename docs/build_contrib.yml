@@ -15,4 +15,3 @@ dependencies:
   - bokeh
   - openml
   - awscli>=1.18.140
-  - neotime

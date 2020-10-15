@@ -334,11 +334,11 @@ class TabTransformerModel(AbstractModel):
         if self.model is not None:
             torch.save(self.model, params_filepath)
 
+        self.model = None # Avoiding pickling the weights.
         modelobj_filepath = super().save(path=path, verbose=verbose)
 
         if return_filename:
             return modelobj_filepath
-
 
 
     @classmethod

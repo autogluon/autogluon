@@ -12,7 +12,6 @@ from typing import List, Union, Iterable
 
 import numpy as np
 import pandas as pd
-from neotime import Date
 from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import RobustScaler, PowerTransformer, QuantileTransformer, KBinsDiscretizer
@@ -309,8 +308,6 @@ class DatetimeScalarEnc(EncBase):
         try_import_torch()
         import torch
         datetimes = self.clean_data(datetimes)
-        if type(datetimes[0]) == Date:
-            datetimes = [datetime(year=d.year, month=d.month, day=d.day) for d in datetimes]
         df = pd.DataFrame({'dt': datetimes})
         add_datepart(df, field_name='dt', prefix='', drop=False)
         df = add_cyclic_datepart(df, field_name='dt', prefix='', drop=False)
@@ -355,8 +352,6 @@ class DatetimeOrdinalEnc(EncBase):
         import torch
         # todo: add support for missing values, which should get encoded as 1.
         datetimes = self.clean_data(datetimes)
-        if type(datetimes[0]) == Date:
-            datetimes = [datetime(year=d.year, month=d.month, day=d.day) for d in datetimes]
         df = pd.DataFrame({'dt': datetimes})
         add_datepart(df, field_name='dt', prefix='', drop=False)
         feats = []

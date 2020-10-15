@@ -13,4 +13,3 @@ dependencies:
   - flake8
   - awscli>=1.18.140
   - torch
-  - neotime
