@@ -1,16 +1,16 @@
-import pytest
-import pandas as pd
 import numpy as np
-from autogluon.text import TextPrediction as task
+import pandas as pd
+import pytest
 from autogluon.core.utils.loaders import load_pd
+from autogluon.text import TextPrediction as task
 
 test_hyperparameters = {
     'models': {
-            'BertForTextPredictionBasic': {
-                'search_space': {
-                    'optimization.num_train_epochs': 1
-                }
+        'BertForTextPredictionBasic': {
+            'search_space': {
+                'optimization.num_train_epochs': 1
             }
+        }
     }
 }
 
@@ -79,7 +79,7 @@ def test_sts():
 
 def test_no_text_column_raise():
     data = [('😁😁😁😁😁😁', 'grin')] * 20 + [('😃😃😃😃😃😃😃😃', 'smile')] * 50 + [
-            ('😉😉😉', 'wink')] * 30
+        ('😉😉😉', 'wink')] * 30
 
     df = pd.DataFrame(data, columns=['data', 'label'])
     with pytest.raises(NotImplementedError):
@@ -178,3 +178,8 @@ def test_mixed_column_type():
                           plot_results=False)
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
     dev_prediction = predictor1.predict(dev_data)
+    model_path = 'saved_model'
+    predictor1.save(model_path)
+    loaded_predictor = task.load(model_path)
+    loaded_predictions = loaded_predictor.predict(dev_data)
+    np.testing.assert_array_almost_equal(dev_prediction, loaded_predictions)
