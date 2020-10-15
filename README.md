@@ -27,6 +27,10 @@ test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/
 predictor = task.fit(train_data=train_data, label='class')
 performance = predictor.evaluate(test_data)
 ```
+## News
+
+**Announcement for previous users:** The AutoGluon codebase has been modularized into [namespace packages](https://packaging.python.org/guides/packaging-namespace-packages/), which means you now only need those dependencies relevant to your prediction task of interest! For example, you can now work with tabular data without having to [install](https://autogluon.mxnet.io/install.html) dependencies required for AutoGluon's computer vision tasks (and vice versa). Unfortunately this improvement required a minor API change (eg. instead of `from autogluon import TabularPrediction`, you should now do: `from autogluon.tabular import TabularPrediction`), for all versions newer than v0.0.14. Documentation/tutorials under the old API may still be viewed [for version 0.0.14](https://autogluon.mxnet.io/v0.0.14/index.html) which is the last released version under the old API.
+
 
 ## Resources
 
