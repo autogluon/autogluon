@@ -44,4 +44,4 @@
 * While running AutoGluon, I get error message "Check failed: e == cudaSuccess: CUDA: initialization error".
 
   You may have the wrong version of MXNet installed for your CUDA version.
-  Match the CUDA version carefully when following the installation instructions.
+  Match the CUDA version carefully when following the installation instructions (`nvcc --version`).
