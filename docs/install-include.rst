@@ -154,10 +154,10 @@ Select your preferences below and run the corresponding install commands:
                  GPU usage is not yet supported on Mac OSX , please use Linux to utilize GPUs in AutoGluon.
 
 
-AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/packaging-namespace-packages/) specialized for tabular, text, or image data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:
+AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/packaging-namespace-packages/>`_ specialized for tabular, text, or image data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:
 
 - `autogluon.tabular` - only functionality for tabular data (TabularPrediction)
 - `autogluon.image` - only functionality for computer vision (ImageClassification, ObjectDetection)
 - `autogluon.text` - only functionality for natural language processing (TextPrediction)
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
-- `autogluon.extra` - miscellaneous extra functionality such as [Efficient Neural Architecture Search](https://autogluon.mxnet.io/tutorials/nas/enas_proxylessnas.html)
+- `autogluon.extra` - miscellaneous extra functionality such as `Efficient Neural Architecture Search <tutorials/nas/enas_proxylessnas.html>`_
