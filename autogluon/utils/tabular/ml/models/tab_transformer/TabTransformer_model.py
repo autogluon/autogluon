@@ -90,12 +90,14 @@ class TabNetClass:
 
             for e in range(1,epochs+1):
                 _ = utils.epoch(self, trainloader, optimizers, loss_criterion=loss_criterion, \
-                                    pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, aug_kwargs=self.kwargs['augmentation']) #returns train_loss, train_acc@1, train_acc@5
+                                pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs,
+                                device=self.kwargs['device'], aug_kwargs=self.kwargs['augmentation']) #returns train_loss, train_acc@1, train_acc@5
 
                 if valloader is not None:
                     if e % freq == 0:
                         _, val_accuracy = utils.epoch(self, valloader, optimizers=None, \
-                            loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1, aug_kwargs=self.kwargs['augmentation'])
+                            loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1,
+                            device=self.kwargs['device'], aug_kwargs=self.kwargs['augmentation'])
 
                         # TODO: Replace this whole section with self.score() call.
                         #val_metric = self.score(X)
@@ -173,7 +175,7 @@ class TabTransformerModel(AbstractModel):
         elif self.problem_type==MULTICLASS:
             self.num_class=y_train.nunique()
 
-        # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
+        # TODO: Take in num_gpu's as a param. Currently this is hard-coded upon detection of cuda.
         if torch.cuda.is_available():
             device = torch.device("cuda")
         else:
@@ -183,11 +185,8 @@ class TabTransformerModel(AbstractModel):
         self.kwargs=get_kwargs(**{'problem_type': self.problem_type, 'n_classes': self.num_class, 'device': device})
 
     def get_model(self):
-        try_import_torch()
-        import torch
         self.model=TabNetClass.TabNet(self.num_class, self.kwargs, self.cat_feat_origin_cards)
-        # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
-        if torch.cuda.is_available():
+        if self.kwargs['device'].type == "cuda":
             self.model = self.model.cuda()
 
     def _get_no_period_columns(self, X): 
@@ -202,8 +201,6 @@ class TabTransformerModel(AbstractModel):
         return rename_columns
 
     def preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
-        #X = X.select_dtypes(['category', 'object'])
-
         X = X.rename(columns = self._get_no_period_columns(X))
 
         if X_val is not None:
@@ -300,8 +297,7 @@ class TabTransformerModel(AbstractModel):
 
         iter = 0
         for data, _ in loader:
-            # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
-            if torch.cuda.is_available():
+            if self.kwargs['device'].type == "cuda":
                 data = data.cuda()
             with torch.no_grad():
                 data = Variable(data)

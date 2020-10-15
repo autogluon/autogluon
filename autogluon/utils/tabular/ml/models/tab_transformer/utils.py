@@ -17,7 +17,7 @@ def augmentation(data, target, mask_prob=0.4, num_augs=1):
     return cat_data, target
 
 
-def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, aug_kwargs=None):
+def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, device, aug_kwargs=None):
     try_import_torch()
     import torch
     is_train = (optimizers is not None)
@@ -33,8 +33,7 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
         for data, target in data_bar:
             data, target = pretext.get(data, target)
 
-            # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
-            if torch.cuda.is_available():
+            if device.type == "cuda":
                 data, target = data.cuda(), target.cuda()
                 pretext = pretext.cuda()
 
