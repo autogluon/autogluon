@@ -217,4 +217,4 @@ def test_serialization_nlp():
     predictor1.save(model_path)
     loaded_predictor = task.load(model_path)
     loaded_predictions = loaded_predictor.predict(dev_data)
-    np.assert_array_equal(dev_prediction, loaded_predictions)
+    np.testing.assert_array_almost_equal(dev_prediction, loaded_predictions)
