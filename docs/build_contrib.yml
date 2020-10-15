@@ -12,6 +12,5 @@ dependencies:
   - mu-notedown
   - torch
   - torchvision
-  - bokeh
   - openml
   - awscli>=1.18.140
