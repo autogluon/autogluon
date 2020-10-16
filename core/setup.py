@@ -93,5 +93,8 @@ if __name__ == '__main__':
             'LICENSE',
         ]},
         entry_points={
+            'console_scripts': [
+                'agremote = autogluon.core.scheduler.remote.cli:main',
+            ]
         },
     )
