@@ -1,7 +1,13 @@
-# Documents for AutoGluon
+# How to locally build AutoGluon docs
 
-How to build
+First make sure the package and all dependencies have been locally installed. Then run:
 
-1. Assume you have AutoGluon installed.
-2. `pip install git+https://github.com/d2l-ai/d2l-book`
-3. `bash build_doc.sh`
+```
+cd autogluon/
+python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+python3 -m pip install --force-reinstall ipython==7.16
+pip install jupyter_sphinx
+pip install docutils\<0.16
+cd docs/
+bash build_doc.sh
+```
