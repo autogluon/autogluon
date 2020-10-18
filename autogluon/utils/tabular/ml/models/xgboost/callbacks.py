@@ -1,7 +1,9 @@
 import time
 import psutil
-from xgboost import rabit
+import logging
 from xgboost.core import EarlyStopException
+
+logger = logging.getLogger(__name__)
 
 
 def _fmt_metric(value, show_stdv=True):
@@ -13,6 +15,32 @@ def _fmt_metric(value, show_stdv=True):
             return  '{0}:{1:.5f}+{2:.5f}'.format(value[0], value[1], value[2])
         return '{0}:{1:.5f}'.format(value[0], value[1])
     raise ValueError("wrong metric value")
+
+
+def print_evaluation(period=1, show_stdv=True):
+    """Create a callback that print evaluation result.
+    We print the evaluation results every **period** iterations
+    and on the first and the last iterations.
+    Parameters
+    ----------
+    period : int
+        The period to log the evaluation results
+    show_stdv : bool, optional
+         Whether show stdv if provided
+    Returns
+    -------
+    callback : function
+        A callback that print evaluation every period iterations.
+    """
+    def callback(env):
+        """internal function"""
+        if env.rank != 0 or (not env.evaluation_result_list) or period is False or period == 0:
+            return
+        i = env.iteration
+        if i % period == 0 or i + 1 == env.begin_iteration or i + 1 == env.end_iteration:
+            msg = '\t'.join([_fmt_metric(x, show_stdv) for x in env.evaluation_result_list])
+            logger.log(20, '[%d]\t%s\n' % (i, msg))
+    return callback
 
 
 def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximize=False, verbose=True):
@@ -59,7 +87,7 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
         if len(env.evaluation_result_list) > 1 and verbose:
             msg = ("Multiple eval metrics have been passed: "
                    "'{0}' will be used for early stopping.\n\n")
-            rabit.tracker_print(msg.format(env.evaluation_result_list[-1][0]))
+            logger.log(20, msg.format(env.evaluation_result_list[-1][0]))
         maximize_metrics = ('auc', 'aucpr', 'map', 'ndcg')
         maximize_at_n_metrics = ('auc@', 'aucpr@', 'map@', 'ndcg@')
         maximize_score = maximize
@@ -74,7 +102,7 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
 
         if verbose and env.rank == 0:
             msg = "Will train until {} hasn't improved in {} rounds.\n"
-            rabit.tracker_print(msg.format(metric_label, stopping_rounds))
+            logger.log(20, msg.format(metric_label, stopping_rounds))
 
         state['maximize_score'] = maximize_score
         state['best_iteration'] = 0
@@ -124,14 +152,12 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
             best_msg = state['best_msg']
             if verbose and env.rank == 0:
                 msg = "Stopping. Best iteration:\n{}\n\n"
-                rabit.tracker_print(msg.format(best_msg))
+                logger.log(15, msg.format(best_msg))
             raise EarlyStopException(best_iteration)
 
         if env.iteration % 10 == 0:
             available = psutil.virtual_memory().available
             cur_rss = mem_status.memory_info().rss
-            # rabit.tracker_print(f"{state}\n")
-            # rabit.tracker_print(f"CUR_RSS: {cur_rss}\n")
             if cur_rss < state['init_mem_rss']:
                 state['init_mem_rss'] = cur_rss
             estimated_model_size_mb = (cur_rss - state['init_mem_rss']) >> 20
@@ -139,20 +165,20 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
 
             model_size_memory_ratio = estimated_model_size_mb / available_mb
             if verbose and (model_size_memory_ratio > 0.25):
-                rabit.tracker_print(f'Available Memory: {available_mb} MB\n')
-                rabit.tracker_print(f'Estimated XGB model size: {estimated_model_size_mb} MB\n')
+                logger.debug(15, f'Available Memory: {available_mb} MB\n')
+                logger.debug(15, f'Estimated XGB model size: {estimated_model_size_mb} MB\n')
 
             early_stop = False
             if (model_size_memory_ratio > 1.0) or (available_mb < 512):
-                rabit.tracker_print('Warning: Large XGB model size may cause OOM error if training continues\n')
-                rabit.tracker_print(f'Available Memory: {available_mb} MB\n')
-                rabit.tracker_print(f'Estimated XGB model size: {estimated_model_size_mb} MB\n')
+                logger.warning('Warning: Large XGB model size may cause OOM error if training continues\n')
+                logger.warning(f'Available Memory: {available_mb} MB\n')
+                logger.warning(f'Estimated XGB model size: {estimated_model_size_mb} MB\n')
                 early_stop = True
             
             if early_stop:
                 if verbose and env.rank == 0:
-                    rabit.tracker_print(f'Warning: Early stopped GBM model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.\n')
-                    rabit.tracker_print(f'Early stopping. best iteration is:\n[{best_iteration}]\t{best_score}')
+                    logger.warning(f'Warning: Early stopped GBM model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.\n')
+                    logger.warning(f'Early stopping. best iteration is:\n[{best_iteration}]\t{best_score}')
                 raise EarlyStopException(best_iteration)
         
         if time_limit:
@@ -160,8 +186,8 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
             time_left = time_limit - time_elapsed
             if time_left <= 0:
                 if verbose and env.rank == 0:
-                    rabit.tracker_print(f"Ran out of time, early stopping on iteration {env.iteration}. Best iteration is:\n\t[{best_iteration}]\t{best_score}")
-                    rabit.tracker_print(state['best_msg'])
+                    logger.log(20, f"Ran out of time, early stopping on iteration {env.iteration}. Best iteration is:\n\t[{best_iteration}]\t{best_score}")
+                    logger.log(20, state['best_msg'])
                 raise EarlyStopException(best_iteration)
 
     return callback
