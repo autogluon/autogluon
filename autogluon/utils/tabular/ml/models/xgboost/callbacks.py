@@ -152,7 +152,7 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
             if early_stop:
                 if verbose and env.rank == 0:
                     rabit.tracker_print(f'Warning: Early stopped GBM model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.\n')
-                    rabit.tracker_print(f'Early stopping. best iteration is:\n[{env.iteration}]\t{best_score}')
+                    rabit.tracker_print(f'Early stopping. best iteration is:\n[{best_iteration}]\t{best_score}')
                 raise EarlyStopException(best_iteration)
         
         if time_limit:
