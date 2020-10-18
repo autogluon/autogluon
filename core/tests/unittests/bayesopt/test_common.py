@@ -1,20 +1,20 @@
 from typing import List, Set
 import pytest
 
-from autogluon.core.searcher import Candidate, \
+from autogluon.core.searcher.bayesopt.datatypes.common import Candidate, \
     CandidateEvaluation, PendingEvaluation
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRanges_Impl, HyperparameterRangeInteger, \
     HyperparameterRangeCategorical, HyperparameterRangeContinuous
-from autogluon.core.searcher import LinearScaling
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.datatypes.scaling import LinearScaling
+from autogluon.core.searcher.bayesopt.datatypes.tuning_job_state import \
     TuningJobState
-from autogluon.core.searcher.bayesopt.tuning_algorithms import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.common import \
     compute_blacklisted_candidates, generate_unique_candidates, \
     RandomCandidateGenerator
-from autogluon.core.searcher.bayesopt.tuning_algorithms import \
-    dictionarize_objective
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm \
+    import dictionarize_objective
+from autogluon.core.searcher.bayesopt.utils.test_objects import \
     RepeatedCandidateGenerator
 
 

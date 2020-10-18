@@ -1,7 +1,9 @@
 import ConfigSpace as CS
 import multiprocessing as mp
 
-from .bayesopt.autogluon.searcher_factory import gp_fifo_searcher_factory, gp_multifidelity_searcher_factory, gp_fifo_searcher_defaults, gp_multifidelity_searcher_defaults
+from .bayesopt.autogluon.searcher_factory import gp_fifo_searcher_factory, \
+    gp_multifidelity_searcher_factory, gp_fifo_searcher_defaults, \
+    gp_multifidelity_searcher_defaults
 from .searcher import BaseSearcher
 from ..utils.default_arguments import check_and_merge_defaults
 
@@ -212,8 +214,8 @@ class GPMultiFidelitySearcher(BaseSearcher):
     model is selected by `gp_resource_kernel`. More details about the supported
     kernels is in:
 
-        Tiao, Klein, Archambeau, Seeger (2020)
-        Model-based Asynchronous Hyperparameter Optimization
+        Tiao, Klein, Lienart, Archambeau, Seeger (2020)
+        Model-based Asynchronous Hyperparameter and Neural Architecture Search
         https://arxiv.org/abs/2003.10865
 
     The acquisition function (EI) which is optimized in `get_config`, is obtained
@@ -312,9 +314,10 @@ class GPMultiFidelitySearcher(BaseSearcher):
     --------
     GPFIFOSearcher
     """
-    def __init__(self, **kwargs):
+    def __init__(self, configspace, **kwargs):
         _gp_searcher = kwargs.get('_gp_searcher')
         if _gp_searcher is None:
+            kwargs['configspace'] = configspace
             _kwargs = check_and_merge_defaults(
                 kwargs, *gp_multifidelity_searcher_defaults(),
                 dict_name='search_options')

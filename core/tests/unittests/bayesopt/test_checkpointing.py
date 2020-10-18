@@ -1,12 +1,12 @@
 import numpy as np
 import pickle
 
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.autogluon.searcher_factory import \
     gp_fifo_searcher_factory, gp_fifo_searcher_defaults
-from autogluon.core.searcher.bayesopt.gpmxnet.comparison_gpy import Ackley, \
-    sample_data, assert_equal_candidates, assert_equal_randomstate
-from autogluon.core.searcher.bayesopt.tuning_algorithms import \
-    DEFAULT_METRIC
+from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm \
+    import DEFAULT_METRIC
+from autogluon.core.searcher.bayesopt.utils.comparison_gpy import \
+    Ackley, sample_data, assert_equal_candidates, assert_equal_randomstate
 
 
 def test_pickle_gp_fifo_searcher():

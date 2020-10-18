@@ -1,12 +1,13 @@
-from mxnet import gluon
-
-from ..gpmxnet.kernel import KernelFunction, Matern52, ExponentialDecayResourcesKernelFunction, ExponentialDecayResourcesMeanFunction
-from ..gpmxnet.warping import WarpedKernel, Warping
+from ..gpautograd.kernel import KernelFunction, Matern52, \
+    ExponentialDecayResourcesKernelFunction, \
+    ExponentialDecayResourcesMeanFunction
+from ..gpautograd.warping import WarpedKernel, Warping
+from ..gpautograd.mean import MeanFunction
 
 
 def resource_kernel_factory(
-        name: str, kernel_x: KernelFunction, mean_x: gluon.HybridBlock,
-        max_metric_value: float) -> (KernelFunction, gluon.HybridBlock):
+        name: str, kernel_x: KernelFunction, mean_x: MeanFunction,
+        max_metric_value: float) -> (KernelFunction, MeanFunction):
     """
     Given kernel function kernel_x and mean function mean_x over config x,
     create kernel and mean functions over (x, r), where r is the resource

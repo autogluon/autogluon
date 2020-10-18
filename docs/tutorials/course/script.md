@@ -138,7 +138,7 @@ print(myscheduler)
 
 ```{.python .input}
 # myscheduler.run()
-# myscheduler.join_tasks()
+# myscheduler.join_jobs()
 ```
 
 Plot the results.

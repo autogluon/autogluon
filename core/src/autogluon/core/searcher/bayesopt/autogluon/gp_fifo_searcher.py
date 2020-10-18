@@ -10,14 +10,16 @@ from .hp_ranges import HyperparameterRanges_CS
 from ..datatypes.common import CandidateEvaluation, Candidate, candidate_for_print, PendingEvaluation
 from ..datatypes.hp_ranges import HyperparameterRanges
 from ..datatypes.tuning_job_state import TuningJobState
-from ..models.gpmxnet import GPModel, GPMXNetModel
-from ..models.gpmxnet_skipopt import SkipOptimizationPredicate
-from ..models.gpmxnet_transformers import GPMXNetPendingCandidateStateTransformer, GPMXNetModelArgs
+from ..models.gp_model import GaussProcSurrogateModel, GPModel
+from ..models.gpmodel_skipopt import SkipOptimizationPredicate
+from ..models.gpmodel_transformers import GPModelPendingCandidateStateTransformer, GPModelArgs
 from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction, ScoringFunction
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
 from ..tuning_algorithms.bo_algorithm_components import IndependentThompsonSampling
 from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, compute_blacklisted_candidates
-from ..tuning_algorithms.default_algorithm import dictionarize_objective, DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
+from ..tuning_algorithms.default_algorithm import dictionarize_objective, \
+    DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, \
+    DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
 from ..utils.duplicate_detector import DuplicateDetectorIdentical
 
 logger = logging.getLogger(__name__)
@@ -62,7 +64,7 @@ DEFAULT_INITIAL_SCORING = 'thompson_indep'
 
 
 def create_initial_candidates_scorer(
-        initial_scoring: str, model: GPMXNetModel,
+        initial_scoring: str, model: GaussProcSurrogateModel,
         acquisition_class: Type[AcquisitionFunction],
         random_state: np.random.RandomState) -> ScoringFunction:
     if initial_scoring == 'thompson_indep':
@@ -89,7 +91,7 @@ class GPFIFOSearcher(object):
     """
     def __init__(
             self, hp_ranges: HyperparameterRanges, random_seed: int,
-            gpmodel: GPModel, model_args: GPMXNetModelArgs,
+            gpmodel: GPModel, model_args: GPModelArgs,
             map_reward: MapReward,
             acquisition_class: Type[AcquisitionFunction],
             init_state: TuningJobState = None,
@@ -102,7 +104,7 @@ class GPFIFOSearcher(object):
             first_is_default: bool = True,
             debug_log: Optional[DebugLogPrinter] = None):
         """
-        Note that the GPMXNetModel is created on demand (by the state
+        Note that the SurrogateModel is created on demand (by the state
         transformer) in get_config, along with components needed for the BO
         algorithm.
 
@@ -152,7 +154,7 @@ class GPFIFOSearcher(object):
         else:
             assert hp_ranges is init_state.hp_ranges, \
                 "hp_ranges and init_state.hp_ranges must be same object"
-        self.state_transformer = GPMXNetPendingCandidateStateTransformer(
+        self.state_transformer = GPModelPendingCandidateStateTransformer(
             gpmodel=gpmodel,
             init_state=init_state,
             model_args=model_args,
@@ -270,7 +272,7 @@ class GPFIFOSearcher(object):
                 if self.do_profile:
                     self.profiler.stop('random')
         else:
-            # Obtain current GPMXNetModel from state transformer. Based on
+            # Obtain current SurrogateModel from state transformer. Based on
             # this, the BO algorithm components can be constructed
             state = self.state_transformer.state
             if self.do_profile:

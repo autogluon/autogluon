@@ -7,11 +7,11 @@ import pytest
 from numpy.testing import assert_allclose, assert_almost_equal
 from pytest import approx
 
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRangeContinuous, HyperparameterRangeInteger, \
     HyperparameterRangeCategorical, HyperparameterRanges_Impl
-from autogluon.core.searcher import LinearScaling, \
-    LogScaling, ReverseLogScaling
+from autogluon.core.searcher.bayesopt.datatypes.scaling import \
+    LinearScaling, LogScaling, ReverseLogScaling
 
 
 @pytest.mark.parametrize('lower,upper,external_hp,internal_ndarray,scaling', [

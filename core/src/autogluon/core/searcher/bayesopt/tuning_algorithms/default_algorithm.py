@@ -1,5 +1,6 @@
 from .bo_algorithm_components import LBFGSOptimizeAcquisition
-from ..models.nphead_acqfunc import EIAcquisitionFunction
+from ..models.meanstd_acqfunc import EIAcquisitionFunction
+
 
 DEFAULT_ACQUISITION_FUNCTION = EIAcquisitionFunction
 DEFAULT_LOCAL_OPTIMIZER_CLASS = LBFGSOptimizeAcquisition

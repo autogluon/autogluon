@@ -6,18 +6,22 @@ import logging
 
 from .config_ext import ExtendedConfiguration
 from .debug_log import DebugLogPrinter
-from .gp_fifo_searcher import GET_CONFIG_RANDOM_RETRIES, accumulate_profiling_record, MapReward, check_initial_candidates_scorer, create_initial_candidates_scorer, encode_state, decode_state
+from .gp_fifo_searcher import GET_CONFIG_RANDOM_RETRIES, \
+    accumulate_profiling_record, MapReward, check_initial_candidates_scorer, \
+    create_initial_candidates_scorer, encode_state, decode_state
 from .gp_profiling import GPMXNetSimpleProfiler
 from .hp_ranges import HyperparameterRanges_CS
 from ..datatypes.common import CandidateEvaluation, PendingEvaluation, candidate_for_print
 from ..datatypes.tuning_job_state import TuningJobState
-from ..models.gpmxnet import GPModel
-from ..models.gpmxnet_skipopt import SkipOptimizationPredicate
-from ..models.gpmxnet_transformers import GPMXNetPendingCandidateStateTransformer, GPMXNetModelArgs
+from ..models.gp_model import GPModel
+from ..models.gpmodel_skipopt import SkipOptimizationPredicate
+from ..models.gpmodel_transformers import GPModelPendingCandidateStateTransformer, GPModelArgs
 from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
 from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, compute_blacklisted_candidates
-from ..tuning_algorithms.default_algorithm import dictionarize_objective, DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
+from ..tuning_algorithms.default_algorithm import dictionarize_objective, \
+    DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, \
+    DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
 from ..utils.duplicate_detector import DuplicateDetectorIdentical
 
 logger = logging.getLogger(__name__)
@@ -35,7 +39,7 @@ class GPMultiFidelitySearcher(object):
             resource_attr_key: str,
             resource_attr_range: Tuple[int, int],
             random_seed: int,
-            gpmodel: GPModel, model_args: GPMXNetModelArgs,
+            gpmodel: GPModel, model_args: GPModelArgs,
             map_reward: MapReward,
             acquisition_class: Type[AcquisitionFunction],
             resource_for_acquisition: Callable[..., int],
@@ -127,7 +131,7 @@ class GPMultiFidelitySearcher(object):
                 candidate_evaluations=[],
                 failed_candidates=[],
                 pending_evaluations=[])
-        self.state_transformer = GPMXNetPendingCandidateStateTransformer(
+        self.state_transformer = GPModelPendingCandidateStateTransformer(
             gpmodel=gpmodel,
             init_state=init_state,
             model_args=model_args,
@@ -271,7 +275,7 @@ class GPMultiFidelitySearcher(object):
                 if self.do_profile:
                     self.profiler.stop('random')
         else:
-            # Obtain current GPMXNetModel from state transformer. Based on
+            # Obtain current SurrogateModel from state transformer. Based on
             # this, the BO algorithm components can be constructed
             state = self.state_transformer.state
             if self.do_profile:
@@ -290,8 +294,6 @@ class GPMultiFidelitySearcher(object):
                 self.random_state)
             local_optimizer = self.local_minimizer_class(
                 state, model, self.acquisition_class)
-            # Make sure not to use the same random seed for each call:
-            #random_seed = compute_random_seed({'0': state}, self.random_seed)
             bo_algorithm = BayesianOptimizationAlgorithm(
                 initial_candidates_generator=self.random_generator,
                 initial_candidates_scorer=initial_candidates_scorer,

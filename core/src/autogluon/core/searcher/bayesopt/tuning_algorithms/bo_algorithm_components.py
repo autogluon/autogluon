@@ -35,7 +35,9 @@ class IndependentThompsonSampling(ScoringFunction):
         # If the model supports fantasizing, posterior_means is a matrix. In
         # that case, samples are drawn for every column, then averaged (why
         # we need np.mean)
-        for posterior_means, posterior_stds in predictions_list:
+        for predictions in predictions_list:
+            posterior_means = predictions['mean']
+            posterior_stds = predictions['std']
             new_score = [
                 np.mean(self.random_state.normal(m, s))
                 for m, s in zip(posterior_means, posterior_stds)]
@@ -65,16 +67,12 @@ class LBFGSOptimizeAcquisition(LocalOptimizer):
         # unwrap 2d arrays
         def f_df(x):
             n_evaluations[0] += 1
-            f, df = acquisition_function.compute_acq_with_gradients(x)
-            assert len(f) == 1
-            assert len(df) == 1
-            return f[0], df[0]
+            return acquisition_function.compute_acq_with_gradient(x)
 
         res = fmin_l_bfgs_b(f_df, x0=x0, bounds=bounds, maxiter=1000)
         self.num_evaluations = n_evaluations[0]
         if res[2]['task'] == b'ABNORMAL_TERMINATION_IN_LNSRCH':
             # this condition was copied from the old GPyOpt code
-            # this condition was silently ignored in the old code
             logger.warning(
                 f"ABNORMAL_TERMINATION_IN_LNSRCH in lbfgs after {n_evaluations[0]} evaluations, "
                 "returning original candidate"

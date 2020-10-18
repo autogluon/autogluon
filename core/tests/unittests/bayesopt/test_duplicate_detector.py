@@ -1,10 +1,10 @@
 import pytest
 
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRanges_Impl, HyperparameterRangeInteger, \
     HyperparameterRangeContinuous, HyperparameterRangeCategorical
-from autogluon.core.searcher import LinearScaling
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.datatypes.scaling import LinearScaling
+from autogluon.core.searcher.bayesopt.utils.duplicate_detector import \
     DuplicateDetectorEpsilon, DuplicateDetectorIdentical, \
     DuplicateDetectorNoDetection
 
