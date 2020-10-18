@@ -53,7 +53,6 @@ class XGBoostModel(AbstractModel):
             if invalid in self.params:
                 self.params.pop(invalid)
         params = self.params.copy()
-        params['n_jobs'] = -1
         
         verbosity = kwargs.get('verbosity', 2)
         if verbosity <= 2:
