@@ -3,7 +3,6 @@ import time
 import logging
 
 from . import xgboost_utils
-from .callbacks import early_stop_custom
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
@@ -57,8 +56,12 @@ class XGBoostModel(AbstractModel):
         verbosity = kwargs.get('verbosity', 2)
         if verbosity <= 2:
             verbose = False
-        elif verbosity >= 3:
+        elif verbosity == 3:
             verbose = True
+            verbose_eval = 50
+        else:
+            vervose = True
+            verbose_eval = 1
         
         X_train = self.preprocess(X_train, is_train=True)
         num_rows_train = X_train.shape[0]
@@ -75,6 +78,12 @@ class XGBoostModel(AbstractModel):
             X_val = self.preprocess(X_val, is_train=False)
             eval_set.append((X_val, y_val))
 
+        from .callbacks import print_evaluation, early_stop_custom
+        callbacks = []
+        if verbose:
+            callbacks.append(print_evaluation(verbose_eval))
+        callbacks.append(early_stop_custom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
+
         from xgboost import XGBClassifier, XGBRegressor
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
         self.model = model_type(**params)
@@ -83,8 +92,8 @@ class XGBoostModel(AbstractModel):
             y=y_train,
             eval_set=eval_set,
             eval_metric=eval_metric,
-            verbose=verbose,
-            callbacks=[early_stop_custom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose)]
+            verbose=False,
+            callbacks=callbacks
         )
 
         bst = self.model.get_booster()
