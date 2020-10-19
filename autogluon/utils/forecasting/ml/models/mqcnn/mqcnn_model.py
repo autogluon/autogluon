@@ -14,8 +14,10 @@ class MQCNNModel(AbstractModel):
     def __init__(self, hyperparameters=None, model=None):
         super().__init__(hyperparameters, model)
         self.set_default_parameters()
+        self.name = "mqcnn"
         if hyperparameters is not None:
             self.params.update(hyperparameters)
+        self.best_configs = self.params.copy()
 
     def set_default_parameters(self):
         self.params = get_default_parameters()
@@ -32,8 +34,8 @@ class MQCNNModel(AbstractModel):
         # self.model = self.model.predict(test_ds)
         from gluonts.evaluation.backtest import make_evaluation_predictions
         forecast_it, ts_it = make_evaluation_predictions(dataset=test_ds,
-                                                   predictor=self.model,
-                                                   num_samples=num_samples)
+                                                         predictor=self.model,
+                                                         num_samples=num_samples)
         return list(tqdm(forecast_it, total=len(test_ds))), list(tqdm(ts_it, total=len(test_ds)))
 
     def score(self, y, quantiles=[0.9]):
@@ -46,50 +48,23 @@ class MQCNNModel(AbstractModel):
 
         # print(json.dumps(agg_metrics, indent=4))
         return agg_metrics["mean_wQuantileLoss"]
-    #
-    # def hyperparameter_tune(self, train_data, test_data, scheduler_options, **kwargs):
-    #     # verbosity = kwargs.get('verbosity', 2)
-    #     time_start = time.time()
-    #     # logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
-    #     # self._set_default_searchspace()
-    #     params_copy = self.params.copy()
-    #     # directory = self.path  # also create model directory if it doesn't exist
-    #     # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
-    #     scheduler_func, scheduler_options = scheduler_options  # Unpack tuple
-    #     if scheduler_func is None or scheduler_options is None:
-    #         raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
-    #     params_copy['num_threads'] = scheduler_options['resource'].get('num_cpus', None)
-    #     params_copy['num_gpus'] = scheduler_options['resource'].get('num_gpus', None)
-    #     # dataset_train_filename = 'dataset_train.p'
-    #     # train_path = directory + dataset_train_filename
-    #     # save_pkl.save(path=train_path, object=(X_train, y_train))
-    #     #
-    #     # dataset_val_filename = 'dataset_val.p'
-    #     # val_path = directory + dataset_val_filename
-    #     # save_pkl.save(path=val_path, object=(X_val, y_val))
-    #
-    #     # if not any(isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy):
-    #     #     logger.warning(
-    #     #         "Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
-    #     # else:
-    #     #     logger.log(15, "Hyperparameter search space for %s model: " % self.name)
-    #     #     for hyperparam in params_copy:
-    #     #         if isinstance(params_copy[hyperparam], Space):
-    #     #             logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
-    #
-    #     util_args = dict(
-    #         dataset_train_filename=train_data,
-    #         dataset_val_filename=test_data,
-    #         model=self,
-    #         time_start=time_start,
-    #         time_limit=scheduler_options['time_out']
-    #     )
-    #
-    #     model_trial.register_args(util_args=util_args, **params_copy)
-    #     scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_options)
-    #
-    #     scheduler.run()
-    #     scheduler.join_jobs()
-    #
-    #     return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options,
-    #                                  time_start=time_start)
+
+    def hyperparameter_tune(self, train_data, test_data, **kwargs):
+        params_copy = self.params.copy()
+        util_args = dict(
+            train_ds=train_data,
+            test_ds=test_data,
+            model=self,
+        )
+
+        model_trial.register_args(util_args=util_args, **params_copy)
+        scheduler = FIFOScheduler(model_trial,
+                                  searcher="random",
+                                  resource={'num_cpus': 1, 'num_gpus': 0},
+                                  num_trials=10,
+                                  reward_attr='validation_performance',
+                                  time_attr='epoch')
+        scheduler.run()
+        scheduler.join_jobs()
+        self.best_configs.update(scheduler.get_best_config())
+        return scheduler.get_best_config(), scheduler.get_best_reward()

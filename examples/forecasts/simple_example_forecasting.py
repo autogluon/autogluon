@@ -28,13 +28,26 @@ def train_fn(args, reporter):
         reporter(epoch=e + 1, wQuantileLoss=train_score, context_length=context_length)
 
 
-scheduler = ag.scheduler.FIFOScheduler(train_fn,
-                                       searcher="random",
-                                       resource={'num_cpus': 1, 'num_gpus': 0},
-                                       num_trials=5,
-                                       reward_attr='wQuantileLoss',
-                                       time_attr='epoch')
-scheduler.run()
-scheduler.join_jobs()
-scheduler.get_training_curves(plot=True)
-print(scheduler.get_best_config(), scheduler.get_best_reward())
+def basic_hp():
+    scheduler = ag.scheduler.FIFOScheduler(train_fn,
+                                           searcher="random",
+                                           resource={'num_cpus': 1, 'num_gpus': 0},
+                                           num_trials=5,
+                                           reward_attr='wQuantileLoss',
+                                           time_attr='epoch')
+    scheduler.run()
+    scheduler.join_jobs()
+    scheduler.get_training_curves(plot=True)
+    print(scheduler.get_best_config(), scheduler.get_best_reward())
+    print(scheduler.training_history)
+
+
+# basic_hp()
+def advanced_hp():
+    model = MQCNNModel(hyperparameters={"context_length": ag.Int(1, 20)})
+    results = model.hyperparameter_tune(train_data=dataset.train_ds, test_data=dataset.test_ds)
+    print(results)
+
+
+# basic_hp()
+advanced_hp()

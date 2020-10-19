@@ -6,6 +6,6 @@ def get_default_parameters():
             "prediction_length": 19,
             "quantiles": [0.9],
             "epochs": 3,
-            "num_batches_per_epoch": 3,
+            "num_batches_per_epoch": 32,
         }
         return hps
