@@ -20,7 +20,7 @@ def get_param_binary_baseline():
     params = {
         'n_estimators': DEFAULT_NUM_BOOST_ROUND,
         'learning_rate': 0.03,
-        'n_jobs': -1,
+        'n_jobs': 0,
         'objective': 'binary:logistic',
         'booster': 'gbtree',
     }
@@ -31,7 +31,7 @@ def get_param_multiclass_baseline(num_classes):
     params = {
         'n_estimators': DEFAULT_NUM_BOOST_ROUND,
         'learning_rate': 0.03,
-        'n_jobs': -1,
+        'n_jobs': 0,
         'objective': 'multi:softmax',
         'booster': 'gbtree',
         'num_class': num_classes,
