@@ -25,6 +25,8 @@ class PretextClass:
 
 
         def forward(self, out, target):
+            #print(target.shape)
+            #target = target.unsqueeze(1) # TODO: "Fix" regression
             loss = self.loss_funct(out,target)
             pred    = out.max(dim=1, keepdim=True)[1]
             correct = pred.eq(target.view_as(pred)).sum()
