@@ -18,8 +18,7 @@ class GPRegressionMCMC(GaussianProcessModel):
     def __init__(self,
                  build_kernel: Callable[[], KernelFunction],
                  mcmc_config: MCMCConfig = DEFAULT_MCMC_CONFIG,
-                 random_seed: int = None,
-                 ctx = None):
+                 random_seed: int = None):
 
         self.mcmc_config = mcmc_config
 
@@ -27,19 +26,14 @@ class GPRegressionMCMC(GaussianProcessModel):
             anp.random.seed(random_seed)
             self.random_seed = random_seed
 
-        self.likelihood = _create_likelihood(build_kernel, ctx)
+        self.likelihood = _create_likelihood(build_kernel)
         self._states = None
         self.samples = None
         self.build_kernel = build_kernel
-        self._ctx = ctx
 
     @property
     def states(self) -> Optional[List[GaussProcPosteriorState]]:
         return self._states
-
-    @property
-    def ctx(self):
-        return self._ctx
 
     def fit(self, X, Y, **kwargs):
         X = self._check_and_format_input(X)
@@ -91,7 +85,7 @@ class GPRegressionMCMC(GaussianProcessModel):
     def _create_posterior_states(self, samples, X, Y):
         states = []
         for sample in samples:
-            likelihood = _create_likelihood(self.build_kernel, self._ctx)
+            likelihood = _create_likelihood(self.build_kernel)
             _set_gp_hps(sample, likelihood)
             state = GaussProcPosteriorState(
                 X, Y, likelihood.mean, likelihood.kernel,
@@ -124,7 +118,7 @@ def _set_gp_hps(params_numpy: anp.ndarray, likelihood: MarginalLikelihood):
         pos += dim
 
 
-def _create_likelihood(build_kernel, ctx) -> MarginalLikelihood:
+def _create_likelihood(build_kernel) -> MarginalLikelihood:
     """Create a MarginalLikelihood object with default initial GP hyperparameters."""
 
     likelihood = MarginalLikelihood(
@@ -132,6 +126,6 @@ def _create_likelihood(build_kernel, ctx) -> MarginalLikelihood:
         mean=ScalarMeanFunction(),
         initial_noise_variance=None
     )
-    likelihood.initialize(ctx=ctx, force_reinit=True)
+    likelihood.initialize(force_reinit=True)
 
     return likelihood

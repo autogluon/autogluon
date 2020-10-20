@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import pytest
+import tempfile
 
 from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm import \
     DEFAULT_METRIC
@@ -142,11 +143,11 @@ def plot_predictions(
 
 
 SRC_URL = 'https://autogluon.s3.amazonaws.com'
-TRG_PATH = os.path.join('tests', 'unittests', 'bayesopt', 'gpautograd')
 
 
 def download_pickle_file(fname):
-    trg_fname = os.path.join(TRG_PATH, 'numcomp', fname)
+    trg_path = tempfile.mkdtemp()
+    trg_fname = os.path.join(trg_path, 'numcomp', fname)
     if not os.path.exists(trg_fname):
         download(os.path.join(SRC_URL, 'numcomp', fname), path=trg_fname)
     with open(trg_fname, 'rb') as handle:

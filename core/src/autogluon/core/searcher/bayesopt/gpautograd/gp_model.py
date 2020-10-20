@@ -13,11 +13,6 @@ class GaussianProcessModel(ABC):
     def states(self) -> Optional[List[GaussProcPosteriorState]]:
         pass
 
-    @property
-    @abstractmethod
-    def ctx(self):
-        pass
-
     @abstractmethod
     def fit(self, X: anp.array, Y: anp.array):
         """Train GP on the data and set a list of posterior states to be used by predict function"""

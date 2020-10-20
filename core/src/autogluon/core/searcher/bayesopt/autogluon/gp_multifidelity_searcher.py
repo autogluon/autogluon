@@ -11,14 +11,17 @@ from .gp_fifo_searcher import GET_CONFIG_RANDOM_RETRIES, \
     create_initial_candidates_scorer, encode_state, decode_state
 from .gp_profiling import GPMXNetSimpleProfiler
 from .hp_ranges import HyperparameterRanges_CS
-from ..datatypes.common import CandidateEvaluation, PendingEvaluation, candidate_for_print
+from ..datatypes.common import CandidateEvaluation, PendingEvaluation, \
+    candidate_for_print
 from ..datatypes.tuning_job_state import TuningJobState
 from ..models.gp_model import GPModel
 from ..models.gpmodel_skipopt import SkipOptimizationPredicate
-from ..models.gpmodel_transformers import GPModelPendingCandidateStateTransformer, GPModelArgs
+from ..models.gpmodel_transformers import \
+    GPModelPendingCandidateStateTransformer, GPModelArgs
 from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
-from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, compute_blacklisted_candidates
+from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, \
+    compute_blacklisted_candidates
 from ..tuning_algorithms.default_algorithm import dictionarize_objective, \
     DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, \
     DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS

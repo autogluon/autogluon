@@ -47,7 +47,6 @@ class GaussianProcessRegression(GaussianProcessModel):
     :param optimization_config: Configuration that specifies the behavior of
         the optimization of the marginal likelihood.
     :param random_seed: Random seed to be used (optional)
-    :param ctx: execution context (CPU or GPU)
     :param fit_reset_params: Reset parameters to initial values before running
         'fit'? If False, 'fit' starts from the current values
 
@@ -56,8 +55,7 @@ class GaussianProcessRegression(GaussianProcessModel):
             self, kernel: KernelFunction, mean: MeanFunction = None,
             initial_noise_variance: float = None,
             optimization_config: OptimizationConfig = None,
-            random_seed=None, ctx=None,
-            fit_reset_params: bool = True,
+            random_seed=None, fit_reset_params: bool = True,
             test_intermediates: Optional[dict] = None,
             debug_writer: Optional[DebugGPRegression] = None):
         
@@ -70,7 +68,6 @@ class GaussianProcessRegression(GaussianProcessModel):
             anp.random.seed(random_seed)
 
         self._states = None
-        self._ctx = ctx
         self.fit_reset_params = fit_reset_params
         self.optimization_config = optimization_config
         self._test_intermediates = test_intermediates
@@ -84,10 +81,6 @@ class GaussianProcessRegression(GaussianProcessModel):
     def states(self) -> Optional[List[GaussProcPosteriorState]]:
         return self._states
 
-    @property
-    def ctx(self):
-        return self._ctx
-    
     def _create_lbfgs_arguments(self, X, Y):
         """
         Creates SciPy optimizer objective and param_dict for criterion
