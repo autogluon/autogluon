@@ -2,7 +2,7 @@ import numpy as np
 from pandas import DataFrame
 from scipy.stats import mode
 from sklearn.utils.extmath import weighted_mode
-from autogluon.tabular.try_import import try_import_faiss
+from ...try_import import try_import_faiss
 
 import logging
 

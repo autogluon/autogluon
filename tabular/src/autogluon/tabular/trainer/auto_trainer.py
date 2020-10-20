@@ -3,7 +3,7 @@ import pandas as pd
 
 from .abstract_trainer import AbstractTrainer
 from .model_presets.presets import get_preset_models
-from autogluon.tabular.utils import generate_train_test_split
+from ..utils import generate_train_test_split
 
 logger = logging.getLogger(__name__)
 

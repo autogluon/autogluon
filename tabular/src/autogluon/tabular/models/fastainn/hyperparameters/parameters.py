@@ -1,4 +1,4 @@
-from autogluon.tabular.constants import BINARY, MULTICLASS, REGRESSION
+from ....constants import BINARY, MULTICLASS, REGRESSION
 
 # TODO this method is generalizable and potentially should be moved out into framework
 def get_param_baseline(problem_type, num_classes=None):

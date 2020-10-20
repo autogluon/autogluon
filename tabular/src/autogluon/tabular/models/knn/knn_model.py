@@ -10,7 +10,7 @@ from ..abstract import model_trial
 from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
-from autogluon.tabular.features.feature_metadata import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
+from ...features.feature_metadata import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
 
 logger = logging.getLogger(__name__)
 

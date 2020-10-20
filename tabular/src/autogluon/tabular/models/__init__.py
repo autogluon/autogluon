@@ -1,1 +1,1 @@
-from autogluon.tabular.models.abstract.abstract_model import *
+from .abstract.abstract_model import *

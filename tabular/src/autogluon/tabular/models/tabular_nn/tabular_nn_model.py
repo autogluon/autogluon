@@ -29,8 +29,8 @@ from .tabular_nn_trial import tabular_nn_trial
 from ..abstract.abstract_model import AbstractModel
 from ..utils import fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.tabular.features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
-from autogluon.tabular.metrics import log_loss, roc_auc
+from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from ...metrics import log_loss, roc_auc
 from autogluon.core import Space
 from autogluon.core.utils.try_import import try_import_mxboard
 

@@ -1,7 +1,7 @@
 import logging
 
 from ...constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.tabular.metrics import mean_squared_error
+from ...metrics import mean_squared_error
 from .presets import get_preset_models, get_preset_models_softclass
 
 logger = logging.getLogger(__name__)

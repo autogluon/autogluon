@@ -20,7 +20,7 @@ from ..abstract.abstract_model import AbstractModel
 from ..utils import fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.utils.savers import save_pkl
-from autogluon.tabular.try_import import try_import_lightgbm
+from ...try_import import try_import_lightgbm
 from autogluon.core import Int, Space
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning

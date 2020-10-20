@@ -1,2 +1,2 @@
-from autogluon.tabular.features.feature_metadata import *
-from autogluon.tabular.features.generators import *
+from .feature_metadata import *
+from .generators import *

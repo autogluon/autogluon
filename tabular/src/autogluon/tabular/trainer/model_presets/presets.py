@@ -15,7 +15,7 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
-from autogluon.tabular.metrics import soft_log_loss, mean_squared_error
+from ...metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
 

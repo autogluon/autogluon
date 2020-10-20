@@ -19,11 +19,11 @@ from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
 from ..utils import get_pred_from_proba, infer_problem_type
-from autogluon.tabular.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from autogluon.tabular.features.generators import PipelineFeatureGenerator
+from ..data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from ..features.generators import PipelineFeatureGenerator
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.tabular.metrics import confusion_matrix
+from ..metrics import confusion_matrix
 
 
 logger = logging.getLogger(__name__)
