@@ -1,11 +1,3 @@
-"""
-optimization_utils
-==================
-
-Wrapper of SciPy L-BFGS-B optimizer minimizing objectives given by autograd.numpy (np) 
-executors. The main issue is to map between parameter dictionaries of np.ndarray 
-(executor side) and a single flat np.ndarray (optimizer side).
-"""
 import numpy as np
 from scipy import optimize
 from autograd import value_and_grad

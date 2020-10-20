@@ -72,7 +72,7 @@ class SquaredDistance(Block):
     """
     def __init__(self, dimension, ARD=False, encoding_type=DEFAULT_ENCODING, **kwargs):
         super().__init__(**kwargs)
-        self.ARD = ARD # refer to the paper
+        self.ARD = ARD
         inverse_bandwidths_dimension = 1 if not ARD else dimension
         self.encoding = create_encoding(
             encoding_type, INITIAL_INVERSE_BANDWIDTHS,

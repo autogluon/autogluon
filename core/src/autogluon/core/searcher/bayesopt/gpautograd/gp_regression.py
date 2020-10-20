@@ -124,7 +124,7 @@ class GaussianProcessRegression(GaussianProcessModel):
         parameters are not changed.
 
         :param X: data matrix X of size (n, d)
-        :param Y: matrix of targets of size (n, m)
+        :param Y: matrix of targets of size (n, 1)
         """
         X = self._check_and_format_input(X)
         Y = self._check_and_format_input(Y)

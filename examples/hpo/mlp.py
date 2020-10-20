@@ -1,3 +1,10 @@
+# Demonstrates hyperparameter optimization (HPO), with FIFO or
+# multi-fidelity (successive halving) scheduler, and random or model based
+# searcher. The problem is classification on a tabular OpenML dataset, based
+# on a multi-layer perceptron with two hidden layers. HPO is running over
+# 8 hyperparameters.
+# The MLP model is written in MXNet.
+
 import time
 import multiprocessing # to count the number of CPUs available
 import mxnet as mx
