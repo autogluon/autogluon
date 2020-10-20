@@ -2,8 +2,8 @@
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.tabular.utils.features import R_INT, R_FLOAT
-from autogluon.tabular.utils.features import AsTypeFeatureGenerator, FillNaFeatureGenerator, BulkFeatureGenerator, IdentityFeatureGenerator, CategoryFeatureGenerator, DatetimeFeatureGenerator, TextSpecialFeatureGenerator, TextNgramFeatureGenerator, DropUniqueFeatureGenerator
+from autogluon.tabular.features import R_INT, R_FLOAT
+from autogluon.tabular.features import AsTypeFeatureGenerator, FillNaFeatureGenerator, BulkFeatureGenerator, IdentityFeatureGenerator, CategoryFeatureGenerator, DatetimeFeatureGenerator, TextSpecialFeatureGenerator, TextNgramFeatureGenerator, DropUniqueFeatureGenerator
 
 
 def test_bulk_feature_generator(generator_helper, data_helper):

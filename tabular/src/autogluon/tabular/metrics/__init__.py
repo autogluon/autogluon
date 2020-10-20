@@ -10,7 +10,7 @@ from . import classification_metrics, softclass_metrics
 from .util import sanitize_array
 from autogluon.tabular.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.utils.miscs import warning_filter
-
+from .classification_metrics import *
 
 class Scorer(object, metaclass=ABCMeta):
     def __init__(self, name, score_func, optimum, sign, kwargs):

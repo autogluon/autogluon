@@ -13,7 +13,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
 from ...constants import BINARY, REGRESSION
 from autogluon.tabular.models.abstract.abstract_model import AbstractModel
-from autogluon.tabular.utils.features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from autogluon.tabular.features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
 logger = logging.getLogger(__name__)
 

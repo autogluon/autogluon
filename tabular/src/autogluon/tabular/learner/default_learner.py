@@ -10,8 +10,8 @@ from .abstract_learner import AbstractLearner
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.auto_trainer import AutoTrainer
 from autogluon.core.utils.utils import augment_rare_classes
-from autogluon.tabular.utils.data.cleaner import Cleaner
-from autogluon.tabular.utils.data.label_cleaner import LabelCleaner
+from autogluon.tabular.data.cleaner import Cleaner
+from autogluon.tabular.data.label_cleaner import LabelCleaner
 
 logger = logging.getLogger(__name__)
 

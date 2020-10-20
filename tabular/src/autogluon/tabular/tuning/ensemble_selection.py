@@ -3,7 +3,7 @@ import numpy as np
 from collections import Counter
 
 from ..constants import PROBLEM_TYPES
-from autogluon.tabular.utils.metrics import calculate_score, _ProbaScorer, _ThresholdScorer
+from autogluon.tabular.metrics import calculate_score, _ProbaScorer, _ThresholdScorer
 from autogluon.tabular.utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)

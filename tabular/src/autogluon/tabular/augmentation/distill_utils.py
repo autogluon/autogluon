@@ -1,12 +1,12 @@
-import copy, time, traceback, logging, os, gc
+import logging, gc
 import numpy as np
 import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 
-from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
-from autogluon.tabular.utils.features.feature_metadata import FeatureMetadata
-from autogluon.tabular.utils.metrics import mean_squared_error
+from autogluon.tabular.features.feature_metadata import FeatureMetadata
+from autogluon.tabular.metrics import mean_squared_error
 
 logger = logging.getLogger(__name__)
 

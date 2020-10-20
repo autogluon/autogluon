@@ -14,7 +14,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryEr
 from autogluon.core.utils import dd_list, shuffle_df_rows, default_holdout_frac
 from autogluon.tabular.utils import get_pred_from_proba, generate_train_test_split, infer_eval_metric
 from ..models.abstract.abstract_model import AbstractModel
-from autogluon.tabular.utils.metrics import log_loss, scorer_expects_y_pred
+from autogluon.tabular.metrics import log_loss, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_models
 from ..trainer.model_presets.presets_custom import get_preset_custom

@@ -17,8 +17,8 @@ from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJ
 from ...tuning.feature_pruner import FeaturePruner
 from autogluon.core.utils import shuffle_df_rows
 from autogluon.tabular.utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
-from autogluon.tabular.utils import metrics
-from autogluon.tabular.utils.features.feature_metadata import FeatureMetadata
+from ... import metrics
+from autogluon.tabular.features.feature_metadata import FeatureMetadata
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
