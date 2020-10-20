@@ -53,7 +53,7 @@ requirements = [
     'fastparquet==0.4.1',
     'scikit-optimize',
     'catboost>=0.23.0,<0.25',
-    'xgboost==1.2',
+    'xgboost>=1.2,<1.3',
     'pyarrow<=1.0.0',
     'boto3',
     'lightgbm>=3.0,<4.0',

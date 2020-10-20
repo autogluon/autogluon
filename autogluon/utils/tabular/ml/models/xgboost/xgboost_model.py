@@ -31,11 +31,11 @@ class XGBoostModel(AbstractModel):
             eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)
         return eval_metric
 
-    def preprocess(self, X, is_train=False):
+    def preprocess(self, X, is_train=False, max_category_levels=None):
         X = super().preprocess(X=X)
 
         if self._ohe_generator is None:
-            self._ohe_generator = xgboost_utils.OheFeatureGenerator()
+            self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
 
         if is_train:
             self._ohe_generator.fit(X)
@@ -52,7 +52,8 @@ class XGBoostModel(AbstractModel):
             if invalid in self.params:
                 self.params.pop(invalid)
         params = self.params.copy()
-        
+        max_category_levels = params.get('proc.max_category_levels', 100)
+
         verbosity = kwargs.get('verbosity', 2)
         if verbosity <= 2:
             verbose = False
@@ -63,7 +64,7 @@ class XGBoostModel(AbstractModel):
             vervose = True
             verbose_eval = 1
         
-        X_train = self.preprocess(X_train, is_train=True)
+        X_train = self.preprocess(X_train, is_train=True, max_category_levels=max_category_levels)
         num_rows_train = X_train.shape[0]
 
         eval_set = []

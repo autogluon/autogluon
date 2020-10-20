@@ -1,7 +1,9 @@
 import numpy as np
+from collections import OrderedDict
 from scipy.sparse import hstack, csr_matrix
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder
+from ..tabular_nn.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder
 
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
@@ -91,49 +93,50 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):
 
 
 class OheFeatureGenerator(BaseEstimator, TransformerMixin):
-    null_category_str = '__NaN__'
+    null_category_str = '!missing!'
 
-    def __init__(self):
-        self._feature_map = {}  # key: feature_name, value: feature_type
+    def __init__(self, max_levels=None):
+        self._feature_map = OrderedDict()  # key: feature_name, value: feature_type
+        self.labels = OrderedDict()
         self.cat_cols = []
         self.other_cols = []
         self.ohe_encs = None
-        self.labels = None
+        self.max_levels=max_levels
 
     def fit(self, X, y=None):
         self.cat_cols = list(X.select_dtypes(include='category').columns)
         self.other_cols = list(X.select_dtypes(exclude='category').columns)
+        self.ohe_encs = OneHotMergeRaresHandleUnknownEncoder(max_levels=self.max_levels)
 
-        self.ohe_encs = {f: OneHotEncoder(handle_unknown='ignore') for f in self.cat_cols}
-        self.labels = {}
+        if self.cat_cols:
+            self.ohe_encs.fit(self._normalize(X[self.cat_cols]))
+            assert len(self.cat_cols) == len(self.ohe_encs.categories_)
+            
+            for cat_col, categories in zip(self.cat_cols, self.ohe_encs.categories_):
+                categories_ = categories.tolist()
+                self.labels[cat_col] = categories_
+                # Update feature map ({name: type})
+                for category in categories_:
+                    self._feature_map[f"{cat_col}_{category}"] = 'i'  # one-hot encoding data type is boolean
 
-        for c in self.cat_cols:
-            self.ohe_encs[c].fit(self._normalize(X[c]))
-            self.labels[c] = self.ohe_encs[c].categories_
-
-        # Update feature map ({name: type})
-        for k, v in self.labels.items():
-            for f in k + '_' + v[0]:
-                self._feature_map[f] = 'i'  # one-hot encoding data type is boolean
-
-        for c in self.other_cols:
-            if X[c].dtypes == int:
-                self._feature_map[c] = 'int'
-            else:
-                self._feature_map[c] = 'float'
-
+        if self.other_cols:
+            for c in self.other_cols:
+                if X[c].dtypes == int:
+                    self._feature_map[c] = 'int'
+                else:
+                    self._feature_map[c] = 'float'
         return self
 
     def transform(self, X, y=None):
         X_list = []
         if self.cat_cols:
-            X_list = [csr_matrix(self.ohe_encs[c].transform(self._normalize(X[c]))) for c in self.cat_cols]
+            X_list.append(self.ohe_encs.transform(self._normalize(X[self.cat_cols])))
         if self.other_cols:
             X_list.append(csr_matrix(X[self.other_cols]))
         return hstack(X_list, format="csr")
 
-    def _normalize(self, col):
-        return col.astype(str).fillna(self.null_category_str).values.reshape(-1, 1)
+    def _normalize(self, X):
+        return X.replace(np.nan, self.null_category_str)
 
     def get_feature_names(self):
         return list(self._feature_map.keys())
@@ -142,4 +145,4 @@ class OheFeatureGenerator(BaseEstimator, TransformerMixin):
         return list(self._feature_map.values())
 
     def get_original_feature_names(self):
-        return self.other_cols + self.cat_cols
+        return self.cat_cols + self.other_cols
