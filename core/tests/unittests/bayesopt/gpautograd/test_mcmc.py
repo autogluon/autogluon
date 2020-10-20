@@ -117,7 +117,7 @@ def test_get_gp_hps():
     warping = Warping(dimension=1, index_to_range={0: (-4., 4.)})
     warped_kernel = WarpedKernel(kernel=kernel, warping=warping)
     likelihood = MarginalLikelihood(kernel=warped_kernel, mean=mean, initial_noise_variance=1e-6)
-    likelihood.initialize(ctx=None, force_reinit=True)
+    likelihood.initialize(force_reinit=True)
     likelihood.hybridize()
     hp_values = _get_gp_hps(likelihood)
     # the oder of hps are noise, mean, covariance scale, bandwidth, warping a, warping b
@@ -130,7 +130,7 @@ def test_set_gp_hps():
     warping = Warping(dimension=1, index_to_range={0: (-4., 4.)})
     warped_kernel = WarpedKernel(kernel=kernel, warping=warping)
     likelihood = MarginalLikelihood(kernel=warped_kernel, mean=mean, initial_noise_variance=1e-6)
-    likelihood.initialize(ctx=None, force_reinit=True)
+    likelihood.initialize(force_reinit=True)
     likelihood.hybridize()
     hp_values = anp.array([1e-2, 1.0, 0.5, 0.3, 0.2, 1.1])
     _set_gp_hps(hp_values, likelihood)
@@ -142,8 +142,8 @@ def test_create_likelihood():
         kernel = Matern52(dimension=1)
         warping = Warping(dimension=1, index_to_range={0: (-4., 4.)})
         return WarpedKernel(kernel=kernel, warping=warping)
-    likelihood1 = _create_likelihood(build_kernel, ctx=None)
-    likelihood2 = _create_likelihood(build_kernel, ctx=None)
+    likelihood1 = _create_likelihood(build_kernel)
+    likelihood2 = _create_likelihood(build_kernel)
     numpy.testing.assert_array_almost_equal(_get_gp_hps(likelihood1), _get_gp_hps(likelihood2))
 
 
