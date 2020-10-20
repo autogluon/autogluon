@@ -8,7 +8,7 @@ from sklearn.utils.multiclass import type_of_target
 
 from . import classification_metrics, softclass_metrics
 from .util import sanitize_array
-from ..ml.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.tabular.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.utils.miscs import warning_filter
 
 

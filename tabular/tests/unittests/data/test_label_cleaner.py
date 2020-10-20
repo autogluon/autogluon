@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from autogluon.tabular.utils.data.label_cleaner import LabelCleaner, LabelCleanerBinary, LabelCleanerMulticlass, LabelCleanerMulticlassToBinary, LabelCleanerDummy
-from autogluon.tabular.utils.ml import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.tabular import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 
 def test_label_cleaner_binary():

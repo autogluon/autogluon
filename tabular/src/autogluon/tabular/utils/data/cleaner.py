@@ -1,7 +1,7 @@
 import logging
 from pandas import DataFrame
 
-from ..ml.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.tabular.constants import BINARY, MULTICLASS, REGRESSION
 
 logger = logging.getLogger(__name__)
 
