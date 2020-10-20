@@ -6,13 +6,13 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from numpy.testing import assert_allclose
 
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.autogluon.hp_ranges import \
     HyperparameterRanges_CS
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRanges_Impl, HyperparameterRangeCategorical, \
     HyperparameterRangeContinuous, HyperparameterRangeInteger
-from autogluon.core.searcher import LinearScaling, \
-    LogScaling
+from autogluon.core.searcher.bayesopt.datatypes.scaling import \
+    LinearScaling, LogScaling
 
 
 def test_to_ndarray():

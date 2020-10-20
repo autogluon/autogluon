@@ -3,9 +3,10 @@ import logging
 import numpy as np
 import time
 
-from autogluon.core.searcher.bayesopt.gpmxnet.comparison_gpy import Branin
-from autogluon.core.searcher import _to_config_cs
-from autogluon.core.searcher import HyperparameterRanges_CS
+from autogluon.core.searcher.bayesopt.autogluon.hp_ranges import \
+    HyperparameterRanges_CS
+from autogluon.core.searcher.bayesopt.utils.comparison_gpy import Branin
+from autogluon.core.searcher.gp_searcher import _to_config_cs
 from autogluon.core import Task
 
 logger = logging.getLogger(__name__)

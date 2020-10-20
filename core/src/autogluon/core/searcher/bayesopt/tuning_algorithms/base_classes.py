@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import List, Iterator, Iterable, Tuple, Type, Optional
-import mxnet as mx
+from typing import List, Iterator, Iterable, Tuple, Type, Optional, Set, Dict
 import numpy as np
-from mxnet.ndarray import NDArray
 
 from ..datatypes.common import Candidate
 from ..datatypes.tuning_job_state import TuningJobState
@@ -35,84 +33,87 @@ class SurrogateModel(ABC):
         self.random_seed = random_seed
         self.active_metric = active_metric
 
-    @abstractmethod
-    def predict_nd(self, x_nd: NDArray) -> List[Tuple[NDArray, NDArray]]:
+    @staticmethod
+    def keys_predict() -> Set[str]:
         """
-        Given a (n, d) matrix x_nd of test input points, return predictive means
-        and predictive stddevs, as (n,) vectors.
+        Keys of signals returned by 'predict'.
+        Note: In order to work with 'AcquisitionFunction' implementations,
+        the following signals are required:
 
-        Note: Different to state passed at construction, the input points in
-        x_nd must be encoded already. See also 'predict_candidates'.
+        - 'mean': Predictive mean
+        - 'std': Predictive standard deviation
 
-        If the model supports fantasizing (see FantasizingSurrogateModel), and
-        the state passed at construction contains pending evaluations with
-        fantasized target values, then pred_mean will be a matrix of shape
-        (n, num_fantasy_samples), one column per fantasy sample, while pred_std
-        remains a vector (the same for each sample).
-
-        When using GP with marginal likelihood estimation, the returned list
-        will be of length 1. When using GP with MCMC, the returned list will have
-        one entry per MCMC sample.
-
-        :param x_nd: Test input points
-        :return: A list of (pred_mean, pred_std)
+        :return:
         """
-        pass
+        return {'mean', 'std'}
 
     @abstractmethod
-    def predict(self, X: np.ndarray) -> List[Tuple[np.ndarray, np.ndarray]]:
+    def predict(self, inputs: np.ndarray) -> List[Dict[str, np.ndarray]]:
         """
-        Wrapper around predict_nd, where inputs and returns are np.ndarray.
+        Given (n, d) matrix of encoded input points, returns signals which are
+        statistics of the predictive distribution at these inputs. By default,
+        signals are:
 
-        Note: Different to state passed at construction, the input points in
-        X must be encoded already. See also 'predict_candidates'.
+        - 'mean': Predictive means. If the model supports fantasizing with a
+            number nf of fantasies, this has shape (n, nf), otherwise (n,)
+        - 'std': Predictive stddevs, shape (n,)
+
+        If the hyperparameters of the surrogate model are being optimized (e.g.,
+        by empirical Bayes), the returned list has length 1. If its
+        hyperparameters are averaged over by MCMC, the returned list has one
+        entry per MCMC sample.
         """
         pass
 
     def predict_candidates(self, candidates: Iterable[Candidate]) -> \
-            List[Tuple[np.ndarray, np.ndarray]]:
+            List[Dict[str, np.ndarray]]:
         """
-        Convenience function to get a list of means and standard deviations
-        of candidates.
+        Convenience variant of 'predict', where the input is a list of n
+        candidates, which are encoded to input points here.
         """
         return self.predict(self.state.hp_ranges.to_ndarray_matrix(candidates))
 
     @abstractmethod
-    def current_best(self) -> np.ndarray:
+    def current_best(self) -> List[np.ndarray]:
         """
         Returns the so-called incumbent, to be used in acquisition functions
         such as expected improvement. This is the minimum of predictive means
-        at all current candidate locations (both state.candidate_evaluations
-        and state.pending_evaluations).
+        (signal with key 'mean') at all current candidate locations (both
+        state.candidate_evaluations and state.pending_evaluations).
         Normally, a scalar is returned, but if the model supports fantasizing
         and the state contains pending evaluations, there is one incumbent
         per fantasy sample, so a vector is returned.
 
-        NOTE: When using MCMC, we should really maintain one incumbent per MCMC
-        sample (for the same reason as we do that for fantasies). This is
-        currently not done.
+        If the hyperparameters of the surrogate model are being optimized (e.g.,
+        by empirical Bayes), the returned list has length 1. If its
+        hyperparameters are averaged over by MCMC, the returned list has one
+        entry per MCMC sample.
 
         :return: Incumbent
         """
         pass
 
     @abstractmethod
-    def context_for_nd(self) -> mx.Context:
+    def backward_gradient(
+            self, input: np.ndarray,
+            head_gradients: List[Dict[str, np.ndarray]]) -> List[np.ndarray]:
         """
-        :return: Context for mx.nd input/output arguments
+        Computes the gradient nabla_x f of an acquisition function f(x),
+        where x is a single input point. This is using reverse mode
+        differentiation, the head gradients are passed by the acquisition
+        function.
+
+        If p = p(x) denotes the output of 'predict' for a single input point,
+        'head_gradients' contains the head gradients nabla_p f. Its shape is
+        that of p (where n=1).
+
+        Lists have >1 entry if MCMC is used, otherwise they are all size 1.
+
+        :param input: Single input point x, shape (d,)
+        :param head_gradients: See above
+        :return: Gradient nabla_x f (several if MCMC is used)
         """
         pass
-
-    @abstractmethod
-    def dtype_for_nd(self):
-        """
-        :return: Datatype for mx.nd input/output arguments
-        """
-        pass
-
-    def convert_np_to_nd(self, x: np.ndarray) -> NDArray:
-        return mx.nd.array(
-            x, ctx=self.context_for_nd(), dtype=self.dtype_for_nd())
 
 
 class ScoringFunction(ABC):
@@ -139,23 +140,38 @@ class AcquisitionFunction(ScoringFunction):
         self.model = model
 
     @abstractmethod
-    def compute_acq(self, x: np.ndarray,
+    def compute_acq(self, inputs: np.ndarray,
                     model: Optional[SurrogateModel] = None) -> np.ndarray:
+        """
+        Note: If inputs has shape (d,), it is taken to be (1, d)
+
+        :param inputs: Encoded input points, shape (n, d)
+        :param model: If given, overrides self.model
+        :return: Acquisition function values, shape (n,)
+        """
         pass
 
     @abstractmethod
-    def compute_acq_with_gradients(
-            self, x: np.ndarray,
+    def compute_acq_with_gradient(
+            self, input: np.ndarray,
             model: Optional[SurrogateModel] = None) -> \
-            Tuple[np.ndarray, np.ndarray]:
+            Tuple[float, np.ndarray]:
+        """
+        For a single input point x, compute acquisition function value f(x)
+        and gradient nabla_x f.
+
+        :param input: Single input point x, shape (d,)
+        :param model: If given, overrides self.model
+        :return: f(x), nabla_x f
+        """
         pass
 
     def score(self, candidates: Iterable[Candidate],
               model: Optional[SurrogateModel] = None) -> List[float]:
         if model is None:
             model = self.model
-        x = model.state.hp_ranges.to_ndarray_matrix(candidates)
-        return list(self.compute_acq(x, model=model))
+        inputs = model.state.hp_ranges.to_ndarray_matrix(candidates)
+        return list(self.compute_acq(inputs, model=model))
 
 
 class LocalOptimizer(ABC):

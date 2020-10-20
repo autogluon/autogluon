@@ -2,21 +2,24 @@ from typing import Set
 import numpy as np
 
 from .debug_log import DebugLogPrinter
-from .gp_fifo_searcher import GPFIFOSearcher, map_reward, MapReward, DEFAULT_INITIAL_SCORING, SUPPORTED_INITIAL_SCORING
-from .gp_multifidelity_searcher import GPMultiFidelitySearcher, resource_for_acquisition_bohb, resource_for_acquisition_first_milestone
+from .gp_fifo_searcher import GPFIFOSearcher, map_reward, MapReward, \
+    DEFAULT_INITIAL_SCORING, SUPPORTED_INITIAL_SCORING
+from .gp_multifidelity_searcher import GPMultiFidelitySearcher, \
+    resource_for_acquisition_bohb, resource_for_acquisition_first_milestone
 from .gp_profiling import GPMXNetSimpleProfiler
 from .hp_ranges import HyperparameterRanges_CS
 from .model_factories import resource_kernel_factory
 from ..datatypes.hp_ranges import HyperparameterRanges
-from ..gpmxnet.constants import OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
-from ..gpmxnet.debug_gp_regression import DebugGPRegression
-from ..gpmxnet.gp_regression import GaussianProcessRegression
-from ..gpmxnet.kernel import Matern52
-from ..gpmxnet.mean import ScalarMeanFunction
-from ..models.gpmxnet_skipopt import SkipNoMaxResourcePredicate, SkipPeriodicallyPredicate
-from ..models.gpmxnet_transformers import GPMXNetModelArgs
-from ..models.nphead_acqfunc import EIAcquisitionFunction
-from ..tuning_algorithms.default_algorithm import DEFAULT_METRIC, DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
+from ..gpautograd.constants import OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
+from ..gpautograd.debug_gp_regression import DebugGPRegression
+from ..gpautograd.gp_regression import GaussianProcessRegression
+from ..gpautograd.kernel import Matern52
+from ..gpautograd.mean import ScalarMeanFunction
+from ..models.gpmodel_skipopt import SkipNoMaxResourcePredicate, SkipPeriodicallyPredicate
+from ..models.gpmodel_transformers import GPModelArgs
+from ..models.meanstd_acqfunc import EIAcquisitionFunction
+from ..tuning_algorithms.default_algorithm import DEFAULT_METRIC, \
+    DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
 from ....utils.default_arguments import Integer, Categorical, Boolean
 
 __all__ = ['gp_fifo_searcher_factory',
@@ -103,7 +106,7 @@ def _create_common_objects(**kwargs):
         optimization_config=optimization_config,
         fit_reset_params=not opt_warmstart,
         debug_writer=debug_writer)
-    model_args = GPMXNetModelArgs(
+    model_args = GPModelArgs(
         num_fantasy_samples=kwargs['num_fantasy_samples'],
         random_seed=random_seed,
         active_metric=DEFAULT_METRIC,

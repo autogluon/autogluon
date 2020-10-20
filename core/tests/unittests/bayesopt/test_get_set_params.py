@@ -1,9 +1,9 @@
 import numpy as np
 
-from autogluon.core.searcher import \
+from autogluon.core.searcher.bayesopt.autogluon.searcher_factory import \
     gp_multifidelity_searcher_factory, gp_multifidelity_searcher_defaults
-from autogluon.core.searcher.bayesopt.gpmxnet.comparison_gpy import Ackley, \
-    sample_data
+from autogluon.core.searcher.bayesopt.utils.comparison_gpy import \
+    Ackley, sample_data
 
 
 def test_params_gp_multifidelity():

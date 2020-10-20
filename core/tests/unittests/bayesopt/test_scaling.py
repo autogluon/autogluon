@@ -4,8 +4,8 @@
 import pytest
 from numpy.testing import assert_almost_equal
 
-from autogluon.core.searcher import LinearScaling, \
-    LogScaling, ReverseLogScaling
+from autogluon.core.searcher.bayesopt.datatypes.scaling import \
+    LinearScaling, LogScaling, ReverseLogScaling
 
 
 @pytest.mark.parametrize('value, expected, scaling', [

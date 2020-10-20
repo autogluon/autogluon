@@ -81,7 +81,7 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
     debug_log: Optional[DebugLogPrinter] = None
 
     # Note: For greedy batch selection (num_outer_iterations > 1), the
-    # underlying GPMXNetModel changes with each new pending candidate. The
+    # underlying SurrrogateModel changes with each new pending candidate. The
     # model changes are managed by pending_candidate_state_transformer. The
     # model has to be passed to both initial_candidates_scorer and
     # local_optimizer.
@@ -98,7 +98,7 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
         assert num_outer_iterations == 1 or self.pending_candidate_state_transformer, \
             "Need pending_candidate_state_transformer for greedy batch selection"
         candidates = []
-        model = None  # GPMXNetModel, if num_outer_iterations > 1
+        model = None  # SurrogateModel, if num_outer_iterations > 1
         for outer_iter in range(num_outer_iterations):
             inner_candidates = self._get_next_candidates(
                 num_inner_candidates, model=model)

@@ -4,14 +4,81 @@
 Object definitions that are used for testing.
 """
 
-from typing import Iterator
+from typing import Iterator, Tuple, Dict
 import numpy as np
 
 from ..datatypes.common import StateIdAndCandidate
-from ..datatypes.hp_ranges import HyperparameterRanges_Impl, HyperparameterRangeContinuous, HyperparameterRangeInteger, HyperparameterRangeCategorical
+from ..datatypes.hp_ranges import HyperparameterRanges_Impl, \
+    HyperparameterRangeContinuous, HyperparameterRangeInteger, \
+    HyperparameterRangeCategorical, HyperparameterRanges
 from ..datatypes.scaling import LogScaling, LinearScaling
+from ..datatypes.tuning_job_state import TuningJobState
+from ..gpautograd.constants import MCMCConfig, OptimizationConfig
+from ..gpautograd.gp_regression import GaussianProcessRegression
+from ..gpautograd.gpr_mcmc import GPRegressionMCMC
+from ..gpautograd.kernel import Matern52, KernelFunction
+from ..gpautograd.warping import WarpedKernel, Warping
 from ..tuning_algorithms.base_classes import CandidateGenerator
 from ..tuning_algorithms.default_algorithm import dictionarize_objective
+
+
+def build_kernel(state: TuningJobState,
+                 do_warping: bool = False) -> KernelFunction:
+    dims, warping_ranges = dimensionality_and_warping_ranges(state.hp_ranges)
+    kernel = Matern52(dims, ARD=True)
+    if do_warping:
+        return WarpedKernel(
+            kernel=kernel, warping=Warping(dims, warping_ranges))
+    else:
+        return kernel
+
+
+def default_gpmodel(
+        state: TuningJobState, random_seed: int,
+        optimization_config: OptimizationConfig) -> GaussianProcessRegression:
+    return GaussianProcessRegression(
+        kernel=build_kernel(state),
+        optimization_config=optimization_config,
+        random_seed=random_seed
+    )
+
+
+def default_gpmodel_mcmc(
+        state: TuningJobState, random_seed: int,
+        mcmc_config: MCMCConfig) -> GPRegressionMCMC:
+    return GPRegressionMCMC(
+        build_kernel=lambda: build_kernel(state),
+        mcmc_config=mcmc_config,
+        random_seed=random_seed
+    )
+
+
+def dimensionality_and_warping_ranges(hp_ranges: HyperparameterRanges) -> \
+        Tuple[int, Dict[int, Tuple[float, float]]]:
+    dims = 0
+    warping_ranges = dict()
+    # NOTE: This explicit loop over hp_ranges will fail if
+    # HyperparameterRanges.hp_ranges is not implemented! Needs to be fixed if
+    # it becomes an issue, either by moving the functionality here into
+    # HyperparameterRanges, or by converting hp_ranges to
+    # HyperparameterRanges_Impl, which supports the hp_ranges property.
+    for hp_range in hp_ranges.hp_ranges:
+        if not isinstance(hp_range, HyperparameterRangeCategorical):
+            if isinstance(hp_range, HyperparameterRangeInteger):
+                lower = int(round(hp_range.lower_bound))
+                upper = int(round(hp_range.upper_bound))
+            else:
+                assert isinstance(hp_range, HyperparameterRangeContinuous)
+                lower = float(hp_range.lower_bound)
+                upper = float(hp_range.upper_bound)
+            lower_internal = hp_range.to_ndarray(lower).item()
+            upper_internal = hp_range.to_ndarray(upper).item()
+            if upper_internal > lower_internal:  # exclude cases where max equal to min
+                warping_ranges[dims] = (lower_internal, upper_internal)
+            else:
+                assert upper_internal == lower_internal
+        dims += hp_range.ndarray_size()
+    return dims, warping_ranges
 
 
 class RepeatedCandidateGenerator(CandidateGenerator):
