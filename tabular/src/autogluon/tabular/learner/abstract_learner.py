@@ -62,7 +62,7 @@ class AbstractLearner:
         self.reset_paths = False
 
         try:
-            from ....version import __version__
+            from ..version import __version__
             self.version = __version__
         except:
             self.version = None
