@@ -2,7 +2,7 @@
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.tabular.utils.features import TextNgramFeatureGenerator
+from autogluon.tabular.features import TextNgramFeatureGenerator
 
 
 def test_text_ngram_feature_generator(generator_helper, data_helper):

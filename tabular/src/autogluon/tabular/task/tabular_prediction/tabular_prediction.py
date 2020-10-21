@@ -11,10 +11,10 @@ from .presets_configs import set_presets, unpack
 from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
-from ...utils.features import AutoMLPipelineFeatureGenerator
-from ...utils.metrics import get_metric
-from ...utils.ml.learner import DefaultLearner as Learner
-from ...utils.ml.trainer import AutoTrainer
+from ...features import AutoMLPipelineFeatureGenerator
+from ...metrics import get_metric
+from ...learner import DefaultLearner as Learner
+from ...trainer import AutoTrainer
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 
 __all__ = ['TabularPrediction']

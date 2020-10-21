@@ -29,7 +29,7 @@ import pytest
 
 import autogluon.core as ag
 from autogluon.tabular import TabularPrediction as task
-from autogluon.tabular.utils.ml import BINARY, MULTICLASS, REGRESSION
+from autogluon.tabular.utils import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular.task.tabular_prediction.predictor import TabularPredictor
 
 

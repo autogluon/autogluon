@@ -1,7 +1,7 @@
 import itertools
 import pytest
 
-from autogluon.tabular.utils.features import FeatureMetadata
+from autogluon.tabular.features import FeatureMetadata
 
 
 def test_feature_metadata(data_helper):
