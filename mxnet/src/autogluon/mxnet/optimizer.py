@@ -1,5 +1,5 @@
 from mxnet import optimizer as optim
-from . import obj
+from core.src.autogluon.core import obj
 
 __all__ = ['Adam', 'NAG', 'SGD']
 

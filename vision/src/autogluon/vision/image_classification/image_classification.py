@@ -9,8 +9,8 @@ from autogluon.mxnet.task.nets import *
 from .pipeline import train_image_classification
 from autogluon.mxnet.task.utils import *
 from autogluon.core.task.base import BaseTask, compile_scheduler_options, create_scheduler
-from autogluon.core.loss import *
-from autogluon.core.optimizer import *
+from autogluon.mxnet.loss import SoftmaxCrossEntropyLoss
+from autogluon.mxnet.optimizer import NAG
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
 from autogluon.core.utils import update_params
 import autogluon.core as ag

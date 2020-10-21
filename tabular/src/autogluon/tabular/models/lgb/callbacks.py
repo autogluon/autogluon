@@ -3,7 +3,7 @@ from operator import gt, lt
 
 from autogluon.core.utils.savers import save_pointer
 from autogluon.core.utils.savers import save_pkl
-from ...try_import import try_import_lightgbm
+from autogluon.core.utils import try_import_lightgbm
 
 logger = logging.getLogger(__name__)
 

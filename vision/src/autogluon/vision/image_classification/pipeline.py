@@ -9,7 +9,7 @@ from .processing_params import Sample_params, Getmodel_kwargs
 from autogluon.mxnet.task.utils import *
 from autogluon.core.utils import tqdm
 from ..utils.learning_rate import LR_params
-from autogluon.core.utils.mxutils import collect_params
+from autogluon.mxnet.utils import collect_params
 import autogluon.core as ag
 
 __all__ = ['train_image_classification']
