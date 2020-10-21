@@ -35,8 +35,9 @@ def get_fixed_params():
                     'freq': 1,
                     'pretrain_freq': 100,
                     'feature_dim': 64,
-                    'epochs': 50,
-                    'pretrain_epochs': 200}
+                    'epochs': 100,
+                    'pretrain_epochs': 200,
+                    'epochs_wo_improve': 10}
 
     return fixed_params
 

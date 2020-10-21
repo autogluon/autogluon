@@ -3,6 +3,7 @@ import time, logging
 
 from autogluon.utils.tabular.ml.models.tab_transformer.hyperparameters.parameters import get_default_param
 
+from tqdm import tqdm
 from autogluon import try_import_torch
 from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION
 
@@ -15,6 +16,7 @@ from autogluon.utils.tabular.ml.models.tab_transformer import pretexts
 
 import pandas as pd
 import os
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -40,90 +42,13 @@ class TabNetClass:
             out = self.fc(out)
             return out, features
 
-        def fit(self, trainloader, valloader=None, state=None, time_limit=None):
-            """
-            Main training function for TabTransformer
-            "state" must be one of [None, 'pretrain', 'finetune']
-            None: corresponds to purely supervised learning
-            pretrain: discirminative task will be a pretext task
-            finetune: same as superised learning except that the model base has
-                      exponentially decaying learning rate.
-            """
-            try_import_torch()
-            import torch
-            import torch.nn as nn
-            import torch.optim as optim
-
-            start_time = time.time()
-            pretext_tasks=pretexts.PretextClass.__dict__
-            optimizers=[]
-            lr=self.params['tab_kwargs']['lr']
-            weight_decay=self.params['tab_kwargs']['weight_decay']
-            if state==None:
-                optimizers = [optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)]
-                pretext=pretext_tasks['SUPERVISED_pretext'](self.params)
-            elif state=='pretrain':
-                optimizers = [optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)]
-                pretext=pretext_tasks['BERT_pretext'](self.params)
-            elif state=='finetune':
-                base_exp_decay=self.params['tab_kwargs']['base_exp_decay']
-                optimizer_fc    = optim.Adam(self.fc.parameters(), lr=lr, weight_decay=weight_decay)
-                optimizer_embeds = optim.Adam(self.embed.parameters(), lr=lr, weight_decay=weight_decay)
-                scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds,gamma=base_exp_decay)
-                optimizers.append(optimizer_fc)
-                optimizers.append(optimizer_embeds)
-
-                pretext=pretext_tasks['SUPERVISED_pretext'](self.params)
-
-            else:
-                raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
-
-            if self.params['problem_type']==REGRESSION:
-                loss_criterion = nn.MSELoss()
-            else:
-                loss_criterion = nn.CrossEntropyLoss()
-
-            old_val_accuracy = 0.0
-
-            epochs = self.params['pretrain_epochs'] if state=='pretrain' else self.params['epochs']
-            freq   = self.params['pretrain_freq'] if state=='pretrain' else self.params['freq']
-
-            for e in range(1,epochs+1):
-                _ = utils.epoch(self, trainloader, optimizers, loss_criterion=loss_criterion, \
-                                pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs,
-                                device=self.params['device'], aug_kwargs=self.params['augmentation']) #returns train_loss, train_acc@1, train_acc@5
-
-                if valloader is not None:
-                    if e % freq == 0:
-                        _, val_accuracy = utils.epoch(self, valloader, optimizers=None, \
-                            loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1,
-                            device=self.params['device'], aug_kwargs=self.params['augmentation'])
-
-                        # TODO: Replace this whole section with self.score() call.
-                        #val_metric = self.score(X)
-                        if val_accuracy>old_val_accuracy:
-                            torch.save(self,'tab_trans_temp.pth')
-
-                if time_limit:
-                    time_elapsed = time.time() - start_time
-                    time_left = time_limit - time_elapsed
-                    if time_left <= 0:
-                        logger.log(20, "\tRan out of time, stopping training early.")
-                        break
-
-            if valloader is not None:
-                try:
-                    self=torch.load('tab_trans_temp.pth')
-                    os.remove('tab_trans_temp.pth')
-                except:
-                    pass
-
             
 class TabTransformerModel(AbstractModel):
     params_file_name="tab_trans_params.pth"
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.types_of_features=None
+        self.verbosity = None
 
 
     def _get_types_of_features(self, df):
@@ -195,7 +120,7 @@ class TabTransformerModel(AbstractModel):
 
         return rename_columns
 
-    def preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
+    def _tt_preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
         X = X.rename(columns = self._get_no_period_columns(X))
 
         if X_val is not None:
@@ -235,13 +160,176 @@ class TabTransformerModel(AbstractModel):
 
         return data, val_data, unlab_data
 
+    def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, print_update, device, aug_kwargs=None):
+        try_import_torch()
+        import torch
+        is_train = (optimizers is not None)
+        net.train() if is_train else net.eval()
+        total_loss, total_correct, total_num, data_bar = 0.0, 0.0, 0, tqdm(trainloader) if is_train else tqdm(valloader)
+
+        # TODO: data_bar triggered only every n epochs? according to print_update flag...
+        if aug_kwargs is None:
+            aug_kwargs={'mask_prob': 0.4,
+                        'num_augs': 1}
+
+        with (torch.enable_grad() if is_train else torch.no_grad()):
+            for data, target in data_bar:
+                data, target = pretext.get(data, target)
+
+                if device.type == "cuda":
+                    data, target = data.cuda(), target.cuda()
+                    pretext = pretext.cuda()
+
+                if state in [None, 'finetune']:
+                    data, target = utils.augmentation(data,target, **aug_kwargs)
+                    out, _    = net(data)
+                elif state=='pretrain':
+                    _, out    = net(data)
+                else:
+                    raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
+
+                loss, correct = pretext(out, target)
+
+                if is_train:
+                    for optimizer in optimizers:
+                        optimizer.zero_grad()
+                    loss.backward()
+                    for optimizer in optimizers:
+                        optimizer.step()
+
+                total_num += 1
+                total_loss += loss.item()
+
+                if epochs==1:
+                    train_test = 'Test'
+                else:
+                    train_test = 'Train'
+
+                val_metric = None
+                if valloader is not None:
+                    val_metric = self.score(X=valloader, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+
+                if print_update is True:
+                    if correct is not None:
+                        total_correct += correct.mean().cpu().numpy()
+                        data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
+                    else:
+                        data_bar.set_description('{} Epoch: [{}/{}] Loss: {:.4f}'.format(train_test, epoch, epochs, total_loss / total_num))
+
+            return total_loss / total_num, val_metric
+
+        if scheduler is not None:
+            scheduler.step()
+        return total_loss / total_num
+
+    def tt_fit(self, trainloader, valloader=None, y_val=None, state=None, time_limit=None):
+        """
+        Main training function for TabTransformer
+        "state" must be one of [None, 'pretrain', 'finetune']
+        None: corresponds to purely supervised learning
+        pretrain: discriminative task will be a pretext task
+        finetune: same as supervised learning except that the model base has
+                  exponentially decaying learning rate.
+        """
+        try_import_torch()
+        import torch
+        import torch.nn as nn
+        import torch.optim as optim
+
+        start_time = time.time()
+        pretext_tasks=pretexts.PretextClass.__dict__
+        optimizers=[]
+        lr=self.params['tab_kwargs']['lr']
+        weight_decay=self.params['tab_kwargs']['weight_decay']
+        epochs = self.params['pretrain_epochs'] if state=='pretrain' else self.params['epochs']
+        freq   = self.params['pretrain_freq'] if state=='pretrain' else self.params['freq'] # TODO: What is this for?
+        epochs_wo_improve = self.params['epochs_wo_improve']
+
+        if state is None:
+            optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
+            pretext=pretext_tasks['SUPERVISED_pretext'](self.params)
+        elif state=='pretrain':
+            optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
+            pretext=pretext_tasks['BERT_pretext'](self.params)
+        elif state=='finetune':
+            base_exp_decay=self.params['tab_kwargs']['base_exp_decay']
+            optimizer_fc    = optim.Adam(self.model.fc.parameters(), lr=lr, weight_decay=weight_decay)
+            optimizer_embeds = optim.Adam(self.model.embed.parameters(), lr=lr, weight_decay=weight_decay)
+            scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds,gamma=base_exp_decay)
+            optimizers.append(optimizer_fc)
+            optimizers.append(optimizer_embeds)
+
+            pretext=pretext_tasks['SUPERVISED_pretext'](self.params)
+
+        else:
+            raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
+
+        if self.params['problem_type']==REGRESSION:
+            loss_criterion = nn.MSELoss()
+        else:
+            loss_criterion = nn.CrossEntropyLoss()
+
+        best_val_metric = -np.inf # higher = better
+        val_metric = None
+        best_val_epoch = 0
+        val_improve_epoch = 0
+
+        self.verbosity = self.params.get('verbosity', 2)
+        if self.verbosity <= 1:
+            verbose_eval = -1
+        elif self.verbosity == 2:
+            verbose_eval = 50
+        elif self.verbosity == 3:
+            verbose_eval = 10
+        else:
+            verbose_eval = 1
+
+        for e in range(epochs):
+            if e == 0:
+                logger.log(15, "TabTransformer architecture:")
+                logger.log(15, str(self.model))
+
+            print_update = True if e % verbose_eval == 0 else False
+
+            train_loss, val_metric = self._epoch(self.model, trainloader=trainloader, valloader=valloader, y_val=y_val, optimizers=optimizers, loss_criterion=loss_criterion, \
+                            pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, print_update=print_update,
+                            device=self.params['device'], aug_kwargs=self.params['augmentation'])
+
+            if val_metric >= best_val_metric or e == 0:
+                if valloader is not None:
+                    if not np.isnan(val_metric):
+                        if val_metric > best_val_metric:
+                            val_improve_epoch = e
+                        best_val_metric = val_metric
+
+                best_val_epoch = e
+                torch.save(self.model, 'tab_trans_temp.pth') # TODO: Look at load_parameters, save_parameters.
+
+            # If time limit has exceeded or we haven't improved in some number of epochs, early stop.
+            if e - val_improve_epoch > epochs_wo_improve:
+                break
+            if time_limit:
+                time_elapsed = time.time() - start_time
+                time_left = time_limit - time_elapsed
+                if time_left <= 0:
+                    logger.log(20, "\tRan out of time, stopping training early.")
+                    break
+
+        if valloader is not None:
+            try:
+                self.model=torch.load('tab_trans_temp.pth')
+                os.remove('tab_trans_temp.pth')
+            except:
+                pass
+            logger.log(15, "Best model found in epoch %d" % best_val_epoch)
+
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, **kwargs):
         try_import_torch()
         import torch
         self.set_default_params(y_train)
 
-        train, val, unlab = self.preprocess(X_train, X_val, X_unlabeled)
+        train, val, unlab = self._tt_preprocess(X_train, X_val, X_unlabeled)
 
         if self.problem_type=='regression':
             train.targets = torch.FloatTensor(list(y_train))
@@ -250,25 +338,20 @@ class TabTransformerModel(AbstractModel):
             train.targets = torch.LongTensor(list(y_train))
             val.targets   = torch.LongTensor(list(y_val))
 
-        trainloader, valloader, unlabloader = train.build_loader(), val.build_loader(), unlab.build_loader() if unlab is not None else None
+        trainloader, valloader, unlabloader = train.build_loader(shuffle=True), val.build_loader(), unlab.build_loader() if unlab is not None else None
    
-        self.cat_feat_origin_cards=trainloader.cat_feat_origin_cards
-       
+        self.cat_feat_origin_cards = trainloader.cat_feat_origin_cards
+
         self.get_model()
 
         if X_unlabeled is not None:
-            self.model.fit(unlabloader, valloader, state='pretrain', time_limit=time_limit)
-            self.model.fit(trainloader, valloader, state='finetune', time_limit=time_limit)
+            self.tt_fit(unlabloader, valloader, y_val, state='pretrain', time_limit=time_limit)
+            self.tt_fit(trainloader, valloader, y_val, state='finetune', time_limit=time_limit)
         else:
-            self.model.fit(trainloader, valloader, time_limit=time_limit)
+            self.tt_fit(trainloader, valloader, y_val, time_limit=time_limit)
 
-        """
-        #TODO: If no X_train is passed, but X_unlabeled is, assume that the user wants to 
-        pretrain and save a base model. (see todo list at bottom of script for more info)
-        """
-         
 
-    def predict_proba(self, X, preprocess=False):
+    def _predict_proba(self, X, preprocess=False):
         """
         X (torch.tensor or pd.dataframe): data for model to give prediction probabilities
         returns: np.array of k-probabilities for each of the k classes. If k=2 we drop the second probability.
@@ -276,19 +359,28 @@ class TabTransformerModel(AbstractModel):
         try_import_torch()
         import torch
         import torch.nn as nn
+        from torch.utils.data import DataLoader
         from torch.autograd import Variable
-        if preprocess or isinstance(X, pd.DataFrame):
-            X, _, _ =self.preprocess(X, fe=self.fe)
-        else:
-            # Need to remove periods on test data columns.
-            X = X.rename(columns = self._get_no_period_columns(X))
 
-        loader = X.build_loader()
+        if isinstance(X, pd.DataFrame):
+            if preprocess:
+                X = self.preprocess(X)
+            # Internal preprocessing, renaming col names, tt specific.
+            X, _, _ =self._tt_preprocess(X, fe=self.fe)
+            loader = X.build_loader()
+        elif isinstance(X, DataLoader):
+            loader = X
+        elif isinstance(X, torch.Tensor):
+            X = X.rename(columns = self._get_no_period_columns(X))
+            loader = X.build_loader()
+
+        else:
+            raise("Bad type into fit.") # TODO: Better error
 
         self.model.eval()
         softmax=nn.Softmax(dim=1)
 
-        outputs = torch.zeros([len(X), self.num_classes])
+        outputs = torch.zeros([len(loader.dataset), self.num_classes])
 
         iter = 0
         for data, _ in loader:
@@ -354,30 +446,26 @@ class TabTransformerModel(AbstractModel):
         return obj
 
         """
-        ################# list of features to add / known limitations #################
-
-            - doesn't properly work for regression problems yet - due to discretization datapreprocessing TabTransformers
-                                                                may inherantly be unsuitable for regression problems.
-            
-            - Allowing for saving of pretrained model for later use. Currently pretrainig and finetuning happen automatically 
-            immidiately after one another.
-
-            - training of TabTransformer currently saves intermediate model simply to 'tab_trans_temp.pth'
-            Should move this to be saved in the directory corresponding to the specific training job.
-
-            - Not connected to HPO functionaity yet. Hyperparameters are all hardcoded in the file hyperparameters/kwargs.py
+        Updated list of future features to add (Updated by Anthony Galczak 10-20-20):
         
-            - Improve robustness of unlabeled data argument in task.fit API. Specifically, the current code EXACTLY REQUIRES that unlabeled_data 
-            is a dataframe with exactly the exam columns as train_data, except that the label column is not there. Improved robustness could
-            include allowing for the user to pass and unlabeled dataframe that includes the label column but filled with NaNs etc. Even more
-            advanced, allow the user to pass and unlabeled dataframe that shares only some of the same columns with train_data. 
-
-            - although custom save and load methods are defined for this class that use torch.save, sometimes there is still 
-            a warning that pickle is being used to save the model! 
-
+        1) "Fix regression"
+        Currently, regression has a dimensionality issue (e.g. dims [400] passed instead of [400,1]) inside the TT model.
+        It also appears that the loss criterion for regression isn't actually being used.
+        
+        Joshs' comment on regression:
+        " doesn't properly work for regression problems yet - due to discretization datapreprocessing TabTransformers
+                                                                may inherantly be unsuitable for regression problems."
+        
+        2) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
+        "pretrain API change".
+        
+        3) Save intermediate model to "directory corresponding to specific training job". In other words, put
+        'tab_trans_temp.pth' in the correct location when saving off the model.
+        
+        4) Investigate options for when the unlabeled schema does not match the training schema. Currently,
+        we do not allow such mismatches and the schemas must match exactly. We can investigate ways to use
+        less or more columns from the unlabeled data. This will likely require a design meeting.
+        
+        5) Enable hyperparameter tuning/searching. This will be done in a future PR.  
         """
-
-
-
-
 

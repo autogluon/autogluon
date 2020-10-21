@@ -2,6 +2,7 @@ from copy import deepcopy
 import numpy as np
 
 from autogluon import try_import_torch
+from autogluon.task.text_prediction.constants import REGRESSION
 
 """
 possible TODO: although there is a supervised pretext option below, i.e. pretrain using
@@ -21,7 +22,7 @@ class PretextClass:
             try_import_torch()
             import torch.nn as nn
             self.kwargs    = kwargs
-            self.loss_funct = nn.MSELoss() if kwargs['problem_type']=='regression' else nn.CrossEntropyLoss()
+            self.loss_funct = nn.MSELoss() if kwargs['problem_type']==REGRESSION else nn.CrossEntropyLoss()
 
 
         def forward(self, out, target):

@@ -1,5 +1,3 @@
-from tqdm import tqdm
-
 from autogluon import try_import_torch
 from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformerEncoder import WontEncodeError, NullEnc
 from autogluon.utils.tabular.ml.models.tab_transformer import TabTransformerEncoder
@@ -15,65 +13,6 @@ def augmentation(data, target, mask_prob=0.4, num_augs=1):
     cat_data[locs_to_mask] = 0 
     cat_data=cat_data.view(-1,shape[-1])
     return cat_data, target
-
-
-def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, device, aug_kwargs=None):
-    try_import_torch()
-    import torch
-    is_train = (optimizers is not None)
-    net.train() if is_train else net.eval()
-    total_loss, total_correct, total_num, data_bar = 0.0, 0.0, 0, tqdm(data_loader)
-
-    if aug_kwargs is None:
-        aug_kwargs={'mask_prob': 0.4,
-                    'num_augs': 1}
-
-
-    with (torch.enable_grad() if is_train else torch.no_grad()):
-        for data, target in data_bar:
-            data, target = pretext.get(data, target)
-
-            if device.type == "cuda":
-                data, target = data.cuda(), target.cuda()
-                pretext = pretext.cuda()
-
-            if state in [None, 'finetune']:
-                data, target = augmentation(data,target, **aug_kwargs)
-                out, _    = net(data)
-              
-            elif state=='pretrain':
-                _, out    = net(data)
-            else:
-                raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
-        
-            loss, correct  = pretext(out, target)
-
-            if is_train:
-                for optimizer in optimizers:
-                    optimizer.zero_grad()
-                loss.backward()
-                for optimizer in optimizers:
-                    optimizer.step()
-
-            total_num += 1
-            total_loss += loss.item() 
-
-            if epochs==1:
-                train_test = 'Test'
-            else:
-                train_test = 'Train'
-
-            if correct is not None:
-                total_correct += correct.mean().cpu().numpy() 
-                data_bar.set_description('{} Epoch: [{}/{}] Loss: {:.4f} Acc: {:.2f}%'.format(train_test, epoch, epochs, total_loss / total_num, total_correct / total_num * 100))
-            else:
-                data_bar.set_description('{} Epoch: [{}/{}] Loss: {:.4f}'.format(train_test, epoch, epochs, total_loss / total_num))
-        return total_loss / total_num, total_correct / total_num * 100
-
-    if scheduler is not None:
-        scheduler.step()
-    return total_loss / total_num
-
 
 def get_col_info(X):
     cols=list(X.columns)
@@ -122,7 +61,6 @@ class TabTransformerDatasetClass:
             self.cat_feat_origin_cards = None
             self.cont_feat_origin = None
             self.feature_encoders = None
-
 
         @property
         def n_cont_features(self):
@@ -178,11 +116,12 @@ class TabTransformerDatasetClass:
                     self.cont_data = None
 
 
-        def build_loader(self):
+        # TODO: Add num_workers as hyperparameter in parameters.py
+        def build_loader(self, shuffle=False):
             try_import_torch()
             from torch.utils.data import DataLoader
             loader = DataLoader(self, batch_size=self.kwargs['batch_size'],
-                                shuffle=False, num_workers=16,
+                                shuffle=shuffle, num_workers=16,
                                 pin_memory=True)
 
             loader.cat_feat_origin_cards=self.cat_feat_origin_cards
