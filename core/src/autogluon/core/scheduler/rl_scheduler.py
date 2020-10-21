@@ -7,15 +7,13 @@ import threading
 import multiprocessing as mp
 from collections import OrderedDict
 
-import mxnet as mx
-
+from .fifo import FIFOScheduler
+from .reporter import DistStatusReporter
 from .resource import DistributedResource
-from ..utils import (load, tqdm)
 from .. import Task
 from ..decorator import _autogluon_method
 from ..searcher import RLSearcher
-from .fifo import FIFOScheduler
-from .reporter import DistStatusReporter
+from ..utils import load, tqdm, try_import_mxnet
 from ..utils.default_arguments import check_and_merge_defaults, \
     Integer, Boolean, Float, String, filter_by_key
 
@@ -98,6 +96,9 @@ class RLScheduler(FIFOScheduler):
     >>> scheduler.get_training_curves(plot=True)
     """
     def __init__(self, train_fn, **kwargs):
+        try_import_mxnet()
+        import mxnet as mx
+
         assert isinstance(train_fn, _autogluon_method), 'Please use @ag.args ' + \
                 'to decorate your training script.'
         # Check values and impute default values (only for arguments new to
@@ -170,6 +171,9 @@ class RLScheduler(FIFOScheduler):
             self._run_async()
 
     def _run_sync(self):
+        try_import_mxnet()
+        import mxnet as mx
+
         decay = self.ema_baseline_decay
         for i in tqdm(range(self.num_trials // self.controller_batch_size + 1)):
             with mx.autograd.record():
@@ -201,6 +205,9 @@ class RLScheduler(FIFOScheduler):
             logger.debug('controller loss: {}'.format(loss.asscalar()))
 
     def _run_async(self):
+        try_import_mxnet()
+        import mxnet as mx
+
         def _async_run_trial():
             self.mp_count.value += 1
             self.mp_seed.value += 1
