@@ -3,13 +3,10 @@ import copy
 import time
 from abc import abstractmethod
 
-import mxnet as mx
-
 from ...scheduler import *
-from ...utils import in_ipynb
+from ...utils import in_ipynb, try_import_mxnet
 
 __all__ = [
-    'BaseDataset',
     'BaseTask',
     'compile_scheduler_options',
     'create_scheduler']
@@ -37,15 +34,15 @@ def create_scheduler(train_fn, search_strategy, scheduler_options):
     return scheduler_cls(train_fn, **scheduler_options)
 
 
-class BaseDataset(mx.gluon.data.Dataset):
-    # put any sharable dataset methods here
-    pass
-
-
 class BaseTask(object):
     """BaseTask for AutoGluon applications
     """
-    Dataset = BaseDataset
+    @property
+    @staticmethod
+    def Dataset():
+        try_import_mxnet()
+        from autogluon.mxnet.utils.dataset import BaseDataset
+        return BaseDataset
 
     @classmethod
     def run_fit(cls, train_fn, search_strategy, scheduler_options,
