@@ -1,5 +1,6 @@
 from ....constants import BINARY, MULTICLASS, REGRESSION
 
+
 def get_fixed_params():
     """ Parameters that currently cannot be searched during HPO
     TODO: HPO NOT CURRENTLY IMPLEMENTED FOR TABTRANSFORMER

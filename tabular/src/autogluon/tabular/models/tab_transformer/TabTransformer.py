@@ -6,10 +6,8 @@ import copy
 from .TabModelBase import TabModelBaseClass
 from .TabTransformerEncoder import EmbeddingInitializerClass
 from .modified_transformer import TransformerClass
-from .....utils.try_import import try_import_torch
-#from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformerEncoder import EmbeddingInitializerClass
-#from autogluon.utils.tabular.ml.models.tab_transformer.TabModelBase import TabModelBaseClass
-#from autogluon.utils.tabular.ml.models.tab_transformer.modified_transformer import TransformerClass
+from ...try_import import try_import_torch
+
 class TabTransformer(TabModelBaseClass.TabModelBase):
     """
     Transformer model for tabular data

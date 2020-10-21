@@ -1,8 +1,8 @@
 from copy import deepcopy
 import numpy as np
 
-from .....utils.try_import import try_import_torch
-from ....ml.constants import REGRESSION
+from ...constants import REGRESSION
+from ...try_import import try_import_torch
 
 """
 possible TODO: although there is a supervised pretext option below, i.e. pretrain using

@@ -1,9 +1,6 @@
 from . import TabTransformerEncoder
 from .TabTransformerEncoder import WontEncodeError, NullEnc
-from .....utils.try_import import try_import_torch
-#from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformerEncoder import WontEncodeError, NullEnc
-#from autogluon.utils.tabular.ml.models.tab_transformer import TabTransformerEncoder
-
+from ...try_import import try_import_torch
 
 def augmentation(data, target, mask_prob=0.4, num_augs=1):
     try_import_torch()

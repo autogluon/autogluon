@@ -17,7 +17,6 @@ from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
 from ...metrics import soft_log_loss, mean_squared_error
 from ...models.tab_transformer.TabTransformer_model import TabTransformerModel
-from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
 

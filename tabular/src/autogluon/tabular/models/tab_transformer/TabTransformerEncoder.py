@@ -16,7 +16,7 @@ from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import RobustScaler, PowerTransformer, QuantileTransformer, KBinsDiscretizer
 
-from .....utils.try_import import try_import_torch
+from ...try_import import try_import_torch
 
 
 class WontEncodeError(Exception):

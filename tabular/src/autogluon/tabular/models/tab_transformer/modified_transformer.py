@@ -8,7 +8,7 @@ The modification allows the option of fixing the attention map
 import math
 from typing import Tuple, Optional
 
-from .....utils.try_import import try_import_torch
+from ...try_import import try_import_torch
 
 class TransformerClass:
     try_import_torch()

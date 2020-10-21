@@ -1,30 +1,17 @@
 """ TabTransformer model """
 import time, logging
 
-#from autogluon.autogluon.tabular.utils.ml.models.tab_transformer.hyperparameters.parameters import get_default_param
-#from autogluon.utils.tabular.utils.loaders import load_pkl
-#from autogluon import try_import_torch
 from autogluon.core.utils.loaders import load_pkl
 
 from . import pretexts
 from .utils import TabTransformerDatasetClass, augmentation
-from .....utils.try_import import try_import_torch
+from ...try_import import try_import_torch
 
-#from autogluon import try_import_torch
 from tqdm import tqdm
-#from autogluon import try_import_torch
-#from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION
 
-#from core.src.autogluon.core.utils.loaders import load_pkl
-from ....ml.constants import BINARY, REGRESSION
+from ...constants import BINARY, REGRESSION
 from .TabTransformer import TabTransformer
 from .hyperparameters.parameters import get_default_param
-#from ..abstract.abstract_model import AbstractModel
-#from ....utils.loaders import load_pkl
-
-#from autogluon.utils.tabular.ml.models.tab_transformer import utils
-#from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformer import TabTransformer
-#from autogluon.utils.tabular.ml.models.tab_transformer import pretexts
 
 import pandas as pd
 import os
@@ -252,7 +239,7 @@ class TabTransformerModel(AbstractModel):
         import torch.optim as optim
 
         start_time = time.time()
-        pretext_tasks=pretexts.PretextClass.__dict__
+        pretext_tasks= pretexts.PretextClass.__dict__
         optimizers=[]
         lr=self.params['tab_kwargs']['lr']
         weight_decay=self.params['tab_kwargs']['weight_decay']
