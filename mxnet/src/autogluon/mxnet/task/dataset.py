@@ -20,9 +20,11 @@ from ..utils.pil_transforms import *
 _is_osx = platform.system() == "Darwin"
 
 __all__ = [
-    'get_dataset', 'get_built_in_dataset',
-    'ImageFolderDataset', 'RecordDataset', 'NativeImageFolderDataset'
-]
+    'get_dataset',
+    'get_built_in_dataset',
+    'ImageFolderDataset',
+    'RecordDataset',
+    'NativeImageFolderDataset']
 
 logger = logging.getLogger(__name__)
 
