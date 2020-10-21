@@ -7,7 +7,8 @@ __all__ = [
     'try_import_faiss',
     'try_import_fastai_v1',
     'try_import_cv2',
-    'try_import_gluonnlp']
+    'try_import_gluonnlp',
+    'try_import_torch']
 
 
 def try_import_mxboard():
@@ -110,3 +111,11 @@ def try_import_gluonnlp():
             "without installing gluonnlp. "
             "A quick tip is to install via `pip install gluonnlp==0.8.1`. ")
     return gluonnlp
+
+
+def try_import_torch():
+    try:
+        import torch
+    except ValueError as e:
+        raise ImportError("Unable to import dependency torch"
+                          "A quick tip is to install via `pip install torch`.")

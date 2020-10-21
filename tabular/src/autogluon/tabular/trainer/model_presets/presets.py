@@ -16,6 +16,8 @@ from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
 from ...metrics import soft_log_loss, mean_squared_error
+from ...models.tab_transformer.TabTransformer_model import TabTransformerModel
+from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     GBM=70,
     CAT=60,
     NN=50,
+    Transf=50,
     FASTAI=45,
     LR=40,
     custom=0,
@@ -60,6 +63,7 @@ MODEL_TYPES = dict(
     NN=TabularNeuralNetModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
+    Transf=TabTransformerModel,
 )
 
 DEFAULT_MODEL_NAMES = {
@@ -71,6 +75,7 @@ DEFAULT_MODEL_NAMES = {
     TabularNeuralNetModel: 'NeuralNet',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'FastAINeuralNet',
+    TabTransformerModel: 'Transformer',
 }
 
 
