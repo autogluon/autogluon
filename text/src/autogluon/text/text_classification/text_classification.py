@@ -1,14 +1,11 @@
 import logging
-
 import mxnet as mx
-from ..utils import try_import_gluonnlp
-
 import copy
 
 import autogluon.core as ag
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
 from autogluon.core.task.base import BaseTask, compile_scheduler_options
-from autogluon.core.utils import update_params
+from autogluon.core.utils import update_params, try_import_gluonnlp
 
 from .network import get_network
 from .dataset import get_dataset

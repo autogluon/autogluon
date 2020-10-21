@@ -7,8 +7,6 @@ from autogluon.core import AutoGluonObject
 
 __all__ = ['TextClassificationPredictor']
 
-from ..utils import try_import_gluonnlp
-
 
 class TextClassificationPredictor(Classifier):
     """Trained Text Classifier returned by `fit()` that can be used to make predictions on new text data.

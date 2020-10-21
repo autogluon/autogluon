@@ -13,11 +13,10 @@
 # limitations under the License.
 """BERT dataset transform."""
 
+import numpy as np
+from autogluon.core.utils import try_import_gluonnlp
 
 __all__ = ['BERTDatasetTransform']
-
-import numpy as np
-from ..utils import try_import_gluonnlp
 
 
 class BERTDatasetTransform:

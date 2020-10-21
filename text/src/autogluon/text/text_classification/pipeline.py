@@ -6,13 +6,12 @@ import numpy as np
 
 import mxnet as mx
 from mxnet import gluon, autograd
-from ..utils import try_import_gluonnlp
 import autogluon.core as ag
 
 from .network import get_network
 from .transforms import BERTDatasetTransform
-from autogluon.core.utils import tqdm
-from autogluon.core.utils.mxutils import collect_params
+from autogluon.core.utils import tqdm, try_import_gluonnlp
+from autogluon.mxnet.utils import collect_params
 
 __all__ = ['train_text_classification', 'preprocess_data']
 
