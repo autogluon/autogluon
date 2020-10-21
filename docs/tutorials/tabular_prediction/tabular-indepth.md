@@ -331,7 +331,7 @@ where `MAX_NGRAM = 1000` say (try various values under 10000 to reduce the numbe
 
 ```
 from sklearn.feature_extraction.text import CountVectorizer
-from autogluon.tabular.utils.features import AutoMLPipelineFeatureGenerator
+from autogluon.tabular.features import AutoMLPipelineFeatureGenerator
 ```
 
 In addition to reducing memory usage, many of the above strategies can also be used to reduce training times.

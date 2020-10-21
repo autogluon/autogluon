@@ -40,7 +40,7 @@ This means you'll need to run the above steps with `[COMPETITION]` replaced by `
 import pandas as pd
 import numpy as np
 from autogluon.tabular import TabularPrediction as task
-from autogluon.tabular.utils.metrics import roc_auc
+from autogluon.tabular.metrics import roc_auc
 
 directory = '~/IEEEfraud/'  # directory where you have downloaded the data CSV files from the competition
 label_column = 'isFraud'  # name of target variable to predict in this competition
