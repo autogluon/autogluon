@@ -16,7 +16,7 @@ from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
 from ...metrics import soft_log_loss, mean_squared_error
-from ...models.tab_transformer.TabTransformer_model import TabTransformerModel
+from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,9 @@
-from . import TabTransformerEncoder
-from .TabTransformerEncoder import WontEncodeError, NullEnc
+from . import tab_transformer_encoder
+from .tab_transformer_encoder import WontEncodeError, NullEnc
 from ...try_import import try_import_torch
 
 
-def augmentation(data, target, params):
+def augmentation(data, target, **params):
     try_import_torch()
     import torch
     shape=data.shape
@@ -74,11 +74,11 @@ class TabTransformerDatasetClass:
                 self.feature_encoders = {}
                 for c in self.columns:
                     col = self.raw_data[c['name']]
-                    enc = TabTransformerEncoder.__dict__[self.encoders[c['type']]]()
+                    enc = tab_transformer_encoder.__dict__[self.encoders[c['type']]]()
 
                     if c['type'] == 'SCALAR' and col.nunique() < 32:
                         print(f"Column {c['name']} shouldn't be encoded as SCALAR. Switching to CATEGORICAL.")
-                        enc = TabTransformerEncoder.__dict__[self.encoders['CATEGORICAL']]()
+                        enc = tab_transformer_encoder.__dict__[self.encoders['CATEGORICAL']]()
                     try:
                         enc.fit(col)
                     except WontEncodeError as e:

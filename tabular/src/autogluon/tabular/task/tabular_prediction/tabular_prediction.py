@@ -59,7 +59,6 @@ class TabularPrediction(BaseTask):
     def fit(train_data,
             label,
             tuning_data=None,
-            unlabeled_data=None,
             time_limits=None,
             output_directory=None,
             presets=None,
@@ -487,6 +486,7 @@ class TabularPrediction(BaseTask):
             'dist_ip_addrs',
             'visualizer',
             '_feature_generator_kwargs',
+            'unlabeled_data',
         }
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
@@ -505,6 +505,7 @@ class TabularPrediction(BaseTask):
         ngpus_per_trial = kwargs.get('ngpus_per_trial', None)
         dist_ip_addrs = kwargs.get('dist_ip_addrs', None)
         visualizer = kwargs.get('visualizer', None)
+        unlabeled_data = kwargs.get('unlabeled_data', None)
 
         if isinstance(train_data, str):
             train_data = TabularDataset(file_path=train_data)

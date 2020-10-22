@@ -3,8 +3,8 @@
 
 import copy
 
-from .TabModelBase import TabModelBaseClass
-from .TabTransformerEncoder import EmbeddingInitializerClass
+from .tab_model_base import TabModelBaseClass
+from .tab_transformer_encoder import EmbeddingInitializerClass
 from .modified_transformer import TransformerClass
 from ...try_import import try_import_torch
 

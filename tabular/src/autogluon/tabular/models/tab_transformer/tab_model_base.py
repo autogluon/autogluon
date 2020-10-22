@@ -1,5 +1,5 @@
 from ...try_import import try_import_torch
-from .TabTransformerEncoder import EmbeddingInitializerClass
+from .tab_transformer_encoder import EmbeddingInitializerClass
 
 class TabModelBaseClass:
     try_import_torch()

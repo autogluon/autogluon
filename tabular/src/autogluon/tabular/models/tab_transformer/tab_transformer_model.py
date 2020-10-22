@@ -10,7 +10,7 @@ from ...try_import import try_import_torch
 from tqdm import tqdm
 
 from ...constants import BINARY, REGRESSION
-from .TabTransformer import TabTransformer
+from .tab_transformer import TabTransformer
 from .hyperparameters.parameters import get_default_param
 
 import pandas as pd
