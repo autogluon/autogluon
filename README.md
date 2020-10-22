@@ -4,7 +4,7 @@
   <img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="350">
 </div>
 
-## AutoML Toolkit for Tabular, Text, and Vision
+## AutoML Toolkit for Text, Image, and Tabular Data
 
 [![Build Status](http://ci.mxnet.io/view/all/job/autogluon/job/master/badge/icon)](http://ci.mxnet.io/view/all/job/autogluon/job/master/)
 [![Pypi Version](https://img.shields.io/pypi/v/autogluon.svg)](https://pypi.org/project/autogluon/#history)

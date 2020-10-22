@@ -1,5 +1,5 @@
-AutoGluon: AutoML Toolkit for Tabular, Text, and Vision
-=======================================================
+AutoGluon: AutoML Toolkit for Text, Image, and Tabular Data
+===========================================================
 
 `AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning tabular, text, and image data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
 
