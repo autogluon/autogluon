@@ -4,13 +4,13 @@
   <img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="350">
 </div>
 
-## AutoML Toolkit for Deep Learning
+## AutoML Toolkit for Tabular, Text, and Vision
 
 [![Build Status](http://ci.mxnet.io/view/all/job/autogluon/job/master/badge/icon)](http://ci.mxnet.io/view/all/job/autogluon/job/master/)
 [![Pypi Version](https://img.shields.io/pypi/v/autogluon.svg)](https://pypi.org/project/autogluon/#history)
 ![Upload Python Package](https://github.com/awslabs/autogluon/workflows/Upload%20Python%20Package/badge.svg)
 
-AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy deep learning models on tabular, image, and text data.
+AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on tabular, text, and image data.
 
 ## Example
 
@@ -19,7 +19,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # python3 -m pip install --upgrade pip
 # python3 -m pip install --upgrade setuptools
 # python3 -m pip install --upgrade "mxnet<2.0.0"
-# python3 -m pip install autogluon
+# python3 -m pip install --pre autogluon
 
 from autogluon.tabular import TabularPrediction as task
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
