@@ -83,7 +83,7 @@ is a list of classes whose order corresponds to columns of `predict_proba()` out
 
 See ["Interpretability (feature importance)" in the In Depth Tutorial](tabular-indepth.html#interpretability-feature-importance), which allows you to quantify how much each feature contributes to AutoGluon's predictive accuracy.
 
-Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/slundberg/shap/). Notebooks demonstrating this are provided at: [https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret](https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret)
+Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/slundberg/shap/). Notebooks demonstrating this are provided at: [https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret](https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret). Handling of multiclass classification tasks and data with categorical features are demonstrated in the notebook "SHAP with AutoGluon-Tabular and Categorical Features" contained in this folder.
 
 
 
