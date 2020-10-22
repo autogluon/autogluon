@@ -45,8 +45,8 @@ requirements = [
     'tqdm>=4.38.0',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',
-    'autogluon.core',
-    'autogluon.mxnet'
+    f'autogluon.core=={version}',
+    f'autogluon.mxnet=={version}'
 ]
 
 text_requirements = [

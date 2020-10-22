@@ -44,12 +44,12 @@ long_description = open(os.path.join('..', 'README.md')).read()
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
-    'autogluon.core',
-    'autogluon.tabular',
-    'autogluon.mxnet',
-    'autogluon.extra',
-    'autogluon.text',
-    'autogluon.vision'
+    f'autogluon.core=={version}',
+    f'autogluon.tabular=={version}',
+    f'autogluon.mxnet=={version}',
+    f'autogluon.extra=={version}',
+    f'autogluon.text=={version}',
+    f'autogluon.vision=={version}'
 ]
 
 test_requirements = [
