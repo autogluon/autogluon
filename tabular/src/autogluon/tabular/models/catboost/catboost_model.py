@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
 # TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatboostModel(AbstractModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._category_features = None
+
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type)
         for param, val in default_params.items():
@@ -37,10 +41,11 @@ class CatboostModel(AbstractModel):
 
     def preprocess(self, X):
         X = super().preprocess(X)
-        categoricals = list(X.select_dtypes(include='category').columns)
-        if categoricals:
+        if self._category_features is None:
+            self._category_features = list(X.select_dtypes(include='category').columns)
+        if self._category_features:
             X = X.copy()
-            for category in categoricals:
+            for category in self._category_features:
                 current_categories = X[category].cat.categories
                 if '__NaN__' in current_categories:
                     X[category] = X[category].fillna('__NaN__')
