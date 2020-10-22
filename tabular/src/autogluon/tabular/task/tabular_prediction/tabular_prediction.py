@@ -459,8 +459,6 @@ class TabularPrediction(BaseTask):
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
             'feature_generator',
-            'feature_generator_type',  # TODO: Remove on v0.1 release
-            'feature_generator_kwargs',  # TODO: Remove on v0.1 release
             'trainer_type',
             'AG_args_fit',
             'excluded_model_types',
@@ -473,7 +471,6 @@ class TabularPrediction(BaseTask):
             'cache_data',
             'refit_full',
             'random_seed',
-            'enable_fit_continuation',  # TODO: Remove on v0.1 release
             'feature_prune',
             'scheduler_options',
             'search_options',
@@ -523,11 +520,6 @@ class TabularPrediction(BaseTask):
 
         cache_data = kwargs.get('cache_data', True)
         refit_full = kwargs.get('refit_full', False)
-        # TODO: Remove on 0.1.0 release
-        if 'enable_fit_continuation' in kwargs.keys():
-            logger.log(30, 'Warning: `enable_fit_continuation` is a deprecated parameter. It has been renamed to `cache_data`. Starting from AutoGluon 0.1.0, specifying `enable_fit_continuation` as a parameter will cause an exception.')
-            logger.log(30, 'Setting `cache_data` value equal to `enable_fit_continuation` value.')
-            cache_data = kwargs['enable_fit_continuation']
         if not cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
             if refit_full:
@@ -555,14 +547,8 @@ class TabularPrediction(BaseTask):
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory)  # Format directory name
-        if 'feature_generator_type' in kwargs or 'feature_generator_kwargs' in kwargs:
-            logger.log(30, 'Warning: `feature_generator_type` and `feature_generator_kwargs` are deprecated arguments. Use `feature_generator` instead. Starting from AutoGluon 0.1.0, specifying these arguments will cause an exception.')
-            feature_generator_type = kwargs.get('feature_generator_type', AutoMLPipelineFeatureGenerator)
-            feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
-            feature_generator = feature_generator_type(**feature_generator_kwargs)  # instantiate FeatureGenerator object
-        else:
-            feature_generator = kwargs.get('feature_generator', AutoMLPipelineFeatureGenerator())
 
+        feature_generator = kwargs.get('feature_generator', AutoMLPipelineFeatureGenerator())
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         ag_args_fit = kwargs.get('AG_args_fit', {})
