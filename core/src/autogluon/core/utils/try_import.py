@@ -116,6 +116,6 @@ def try_import_gluonnlp():
 def try_import_torch():
     try:
         import torch
-    except ValueError as e:
+    except ImportError as e:
         raise ImportError("Unable to import dependency torch"
                           "A quick tip is to install via `pip install torch`.")

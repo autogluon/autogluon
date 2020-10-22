@@ -32,7 +32,7 @@ class TabNetClass:
             import torch.nn as nn
             self.params = params
             self.params['cat_feat_origin_cards']=cat_feat_origin_cards
-            self.embed=TabTransformer(**self.params['tab_kwargs'], **params)
+            self.embed=TabTransformer(**self.params)
 
             relu, lin = nn.ReLU(), nn.Linear(2*self.params['feature_dim'] , num_class, bias=True)
             self.fc = nn.Sequential(*[relu,lin])
@@ -161,7 +161,7 @@ class TabTransformerModel(AbstractModel):
 
         return data, val_data, unlab_data
 
-    def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, databar_disable, device, aug_kwargs=None):
+    def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, databar_disable, params):
         try_import_torch()
         import torch
         is_train = (optimizers is not None)
@@ -169,9 +169,9 @@ class TabTransformerModel(AbstractModel):
         total_loss, total_correct, total_num, data_bar = 0.0, 0.0, 0, tqdm(trainloader) if is_train else tqdm(valloader)
 
         # TODO: data_bar triggered only every n epochs? according to print_update flag...
-        if aug_kwargs is None:
-            aug_kwargs={'mask_prob': 0.4,
-                        'num_augs': 1}
+        #if aug_kwargs is None:
+        #    aug_kwargs={'mask_prob': 0.4,
+        #                'num_augs': 1}
 
         data_bar.disable = databar_disable
 
@@ -179,12 +179,12 @@ class TabTransformerModel(AbstractModel):
             for data, target in data_bar:
                 data, target = pretext.get(data, target)
 
-                if device.type == "cuda":
+                if params['device'].type == "cuda":
                     data, target = data.cuda(), target.cuda()
                     pretext = pretext.cuda()
 
                 if state in [None, 'finetune']:
-                    data, target = augmentation(data,target, **aug_kwargs)
+                    data, target = augmentation(data, target, **params)
                     out, _    = net(data)
                 elif state=='pretrain':
                     _, out    = net(data)
@@ -241,8 +241,8 @@ class TabTransformerModel(AbstractModel):
         start_time = time.time()
         pretext_tasks= pretexts.PretextClass.__dict__
         optimizers=[]
-        lr=self.params['tab_kwargs']['lr']
-        weight_decay=self.params['tab_kwargs']['weight_decay']
+        lr=self.params['lr']
+        weight_decay=self.params['weight_decay']
         epochs = self.params['pretrain_epochs'] if state=='pretrain' else self.params['epochs']
         freq   = self.params['pretrain_freq'] if state=='pretrain' else self.params['freq'] # TODO: What is this for?
         epochs_wo_improve = self.params['epochs_wo_improve']
@@ -254,7 +254,7 @@ class TabTransformerModel(AbstractModel):
             optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
             pretext=pretext_tasks['BERT_pretext'](self.params)
         elif state=='finetune':
-            base_exp_decay=self.params['tab_kwargs']['base_exp_decay']
+            base_exp_decay=self.params['base_exp_decay']
             optimizer_fc    = optim.Adam(self.model.fc.parameters(), lr=lr, weight_decay=weight_decay)
             optimizer_embeds = optim.Adam(self.model.embed.parameters(), lr=lr, weight_decay=weight_decay)
             scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds,gamma=base_exp_decay)
@@ -294,8 +294,7 @@ class TabTransformerModel(AbstractModel):
             databar_disable = False if e % verbose_eval == 0 else True
 
             train_loss, val_metric = self._epoch(self.model, trainloader=trainloader, valloader=valloader, y_val=y_val, optimizers=optimizers, loss_criterion=loss_criterion, \
-                            pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, databar_disable=databar_disable,
-                            device=self.params['device'], aug_kwargs=self.params['augmentation'])
+                            pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, databar_disable=databar_disable, params=self.params)
 
             if val_metric >= best_val_metric or e == 0:
                 if valloader is not None:

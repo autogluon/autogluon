@@ -2,10 +2,13 @@ from . import TabTransformerEncoder
 from .TabTransformerEncoder import WontEncodeError, NullEnc
 from ...try_import import try_import_torch
 
-def augmentation(data, target, mask_prob=0.4, num_augs=1):
+
+def augmentation(data, target, params):
     try_import_torch()
     import torch
     shape=data.shape
+    mask_prob = params['aug_mask_prob']
+    num_augs = params['num_augs']
     cat_data=torch.cat([data for _ in range(num_augs)])
     target=torch.cat([target for _ in range(num_augs)]).view(-1)
     locs_to_mask = torch.empty_like(cat_data, dtype=float).uniform_() < mask_prob
@@ -19,6 +22,7 @@ def get_col_info(X):
     for c in cols:
         col_info.append({"name": c, "type": "CATEGORICAL"})
     return col_info
+
 
 class TabTransformerDatasetClass:
     try_import_torch()
@@ -82,7 +86,6 @@ class TabTransformerDatasetClass:
                         enc = NullEnc()
                     self.feature_encoders[c['name']] = enc
 
-
         def encode(self, feature_encoders):
             try_import_torch()
             import torch
@@ -113,7 +116,6 @@ class TabTransformerDatasetClass:
                     self.cont_data = torch.cat(cont_features, dim=1)
                 else:
                     self.cont_data = None
-
 
         def build_loader(self, shuffle=False):
             try_import_torch()

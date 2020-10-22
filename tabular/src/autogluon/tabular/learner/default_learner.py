@@ -33,7 +33,7 @@ class DefaultLearner(AbstractLearner):
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
 
-    def fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None,scheduler_options=None, hyperparameter_tune=False,
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
             hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
         """ Arguments:

@@ -28,7 +28,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     GBM=70,
     CAT=60,
     NN=50,
-    Transf=50,
+    TRANSF=50,
     FASTAI=45,
     LR=40,
     custom=0,
@@ -62,7 +62,7 @@ MODEL_TYPES = dict(
     NN=TabularNeuralNetModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
-    Transf=TabTransformerModel,
+    TRANSF=TabTransformerModel,
 )
 
 DEFAULT_MODEL_NAMES = {

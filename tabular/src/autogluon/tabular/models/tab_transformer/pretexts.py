@@ -76,7 +76,7 @@ class PretextClass:
 
             number_devices = torch.cuda.device_count()
             for col in range(self.n_cat_feats):
-                lin = nn.Linear(kwargs['tab_kwargs']['hidden_dim'], 2)
+                lin = nn.Linear(kwargs['hidden_dim'], 2)
                 self.predicters.append(lin)
 
         def forward(self, out, target):
