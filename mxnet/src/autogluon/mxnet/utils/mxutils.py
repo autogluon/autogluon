@@ -6,7 +6,11 @@ import mxnet as mx
 
 mx_ver = mx.__version__[:3]
 
-__all__ = ['update_params', 'collect_params', 'get_data_rec', 'read_remote_ips']
+__all__ = [
+    'update_params',
+    'collect_params',
+    'get_data_rec',
+    'read_remote_ips']
 
 
 def update_params(net, params, multi_precision=False, ctx=mx.cpu(0)):
@@ -15,10 +19,12 @@ def update_params(net, params, multi_precision=False, ctx=mx.cpu(0)):
     for k, v in param_dict.items():
         param_dict[k]._load_init(params[k], **kwargs)
 
+
 def collect_params(net):
     params = net._collect_params_with_prefix()
     param_dict = {key : val._reduce() for key, val in params.items()}
     return param_dict
+
 
 def get_data_rec(input_size, crop_ratio,
                  rec_file, rec_file_idx,
@@ -43,7 +49,6 @@ def get_data_rec(input_size, crop_ratio,
             preprocess_threads  = num_workers,
             shuffle             = True,
             batch_size          = batch_size,
-
             data_shape          = (3, input_size, input_size),
             mean_r              = mean_rgb[0],
             mean_g              = mean_rgb[1],
@@ -70,7 +75,6 @@ def get_data_rec(input_size, crop_ratio,
             preprocess_threads  = num_workers,
             shuffle             = False,
             batch_size          = batch_size,
-
             resize              = resize,
             data_shape          = (3, input_size, input_size),
             mean_r              = mean_rgb[0],
@@ -81,6 +85,7 @@ def get_data_rec(input_size, crop_ratio,
             std_b               = std_rgb[2],
         )
     return data_loader
+
 
 def read_remote_ips(filename):
     ip_addrs = []
