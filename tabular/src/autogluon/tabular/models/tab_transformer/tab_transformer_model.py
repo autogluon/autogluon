@@ -139,7 +139,6 @@ class TabTransformerModel(AbstractModel):
         return data, val_data, unlab_data
 
     def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, databar_disable, params):
-        #try_import_torch()
         import torch
         from .utils import augmentation
         is_train = (optimizers is not None)
@@ -206,7 +205,6 @@ class TabTransformerModel(AbstractModel):
         finetune: same as supervised learning except that the model base has
                   exponentially decaying learning rate.
         """
-        try_import_torch()
         import torch
         import torch.nn as nn
         import torch.optim as optim
@@ -299,7 +297,6 @@ class TabTransformerModel(AbstractModel):
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, **kwargs):
-        try_import_torch()
         import torch
         self.set_default_params(y_train)
 
@@ -329,7 +326,6 @@ class TabTransformerModel(AbstractModel):
         X (torch.tensor or pd.dataframe): data for model to give prediction probabilities
         returns: np.array of k-probabilities for each of the k classes. If k=2 we drop the second probability.
         """
-        try_import_torch()
         import torch
         import torch.nn as nn
         from torch.utils.data import DataLoader
@@ -378,7 +374,6 @@ class TabTransformerModel(AbstractModel):
         directory (str): if unspecified, use self.path as directory
         return_filename (bool): return the file-name corresponding to this save
         """
-        try_import_torch()
         import torch
         if directory is not None:
             path = directory+file_prefix
@@ -404,7 +399,6 @@ class TabTransformerModel(AbstractModel):
         file_prefix (str): Appended to beginning of file-name.
         If you want to load files with given prefix, can also pass arg: path = directory+file_prefix
         """
-        try_import_torch()
         import torch
         path = path + file_prefix
         obj: TabTransformerModel = load_pkl.load(path=path+cls.model_file_name, verbose=verbose)
