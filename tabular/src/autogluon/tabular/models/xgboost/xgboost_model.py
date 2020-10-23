@@ -52,7 +52,7 @@ class XGBoostModel(AbstractModel):
             if invalid in self.params:
                 self.params.pop(invalid)
         params = self.params.copy()
-        max_category_levels = params.get('proc.max_category_levels', 100)
+        max_category_levels = params.pop('proc.max_category_levels', 100)
 
         verbosity = kwargs.get('verbosity', 2)
         if verbosity <= 2:
