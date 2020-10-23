@@ -92,16 +92,6 @@ class TabularPredictor(BasePredictor):
         self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
         self.class_labels_internal_map = self._learner.label_cleaner.inv_map
 
-    @property
-    def model_names(self):
-        logger.warning('WARNING: `predictor.model_names` is a deprecated `predictor` variable. Use `predictor.get_model_names()` instead. Use of `predictor.model_names` will result in an exception starting in autogluon==0.1')
-        return self.get_model_names()
-
-    @property
-    def model_performance(self):
-        logger.warning('WARNING: `predictor.model_performance` is a deprecated `predictor` variable. Use `predictor.leaderboard()` instead. Use of `predictor.model_performance` will result in an exception starting in autogluon==0.1')
-        return self._trainer.get_models_attribute_dict(attribute='val_score')
-
     def predict(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
 
