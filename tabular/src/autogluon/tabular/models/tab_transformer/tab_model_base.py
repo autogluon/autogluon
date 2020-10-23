@@ -1,6 +1,25 @@
 import torch.nn as nn
 
 
+class TabNet(nn.Module):
+    def __init__(self, num_class, params, cat_feat_origin_cards):
+        super(TabNet, self).__init__()
+        import torch.nn as nn
+        from .tab_transformer import TabTransformer
+        self.params = params
+        self.params['cat_feat_origin_cards']=cat_feat_origin_cards
+        self.embed=TabTransformer(**self.params)
+
+        relu, lin = nn.ReLU(), nn.Linear(2*self.params['feature_dim'] , num_class, bias=True)
+        self.fc = nn.Sequential(*[relu,lin])
+
+    def forward(self, data):
+        features = self.embed(data)
+        out = features.mean(dim=1)
+        out = self.fc(out)
+        return out, features
+
+
 class TabModelBase(nn.Module):
     """
     Base class for all tabular models

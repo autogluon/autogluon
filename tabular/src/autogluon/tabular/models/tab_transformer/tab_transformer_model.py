@@ -18,36 +18,13 @@ from ..abstract.abstract_model import AbstractModel
 
 logger = logging.getLogger(__name__)
 
-class TabNetClass:
-    import torch.nn as nn
 
-    class TabNet(nn.Module):
-        def __init__(self, num_class, params, cat_feat_origin_cards):
-            super(TabNetClass.TabNet, self).__init__()
-            import torch.nn as nn
-            from .tab_transformer import TabTransformer
-            self.params = params
-            self.params['cat_feat_origin_cards']=cat_feat_origin_cards
-            self.embed=TabTransformer(**self.params)
-
-            relu, lin = nn.ReLU(), nn.Linear(2*self.params['feature_dim'] , num_class, bias=True)
-            self.fc = nn.Sequential(*[relu,lin])
-
-        def forward(self, data):
-            features = self.embed(data)
-            out = features.mean(dim=1)
-            out = self.fc(out)
-            return out, features
-
-            
 class TabTransformerModel(AbstractModel):
     params_file_name="tab_trans_params.pth"
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.types_of_features=None
         self.verbosity = None
-
-        # TODO: Put imports in-line where I need them.
         try_import_torch()
 
 
@@ -104,7 +81,8 @@ class TabTransformerModel(AbstractModel):
         self.params['device'] = device
 
     def get_model(self):
-        self.model=TabNetClass.TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
+        from .tab_model_base import TabNet
+        self.model=TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
         if self.params['device'].type == "cuda":
             self.model = self.model.cuda()
 
