@@ -36,10 +36,12 @@ def get_fixed_params():
                     'freq': 1,
                     'pretrain_freq': 100,
                     'feature_dim': 64,
-                    'epochs': 100,
-                    'pretrain_epochs': 200,
-                    'epochs_wo_improve': 10,
-                    'num_workers': 16}
+                    'epochs': 100, # How many epochs to train on with labeled data.
+                    'pretrain_epochs': 200, # How many epochs to pretrain on with unlabeled data.
+                    'epochs_wo_improve': 10, # How many epochs to continue running without improving on metric.
+                    'num_workers': 16, # How many workers to use for torch DataLoader.
+                    'max_columns': 500, # Maximum number of columns TabTransformer will accept as input. This is to combat huge memory requirements/errors.
+                    }
 
     return fixed_params
 

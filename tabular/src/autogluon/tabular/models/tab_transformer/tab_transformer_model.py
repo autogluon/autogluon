@@ -299,6 +299,10 @@ class TabTransformerModel(AbstractModel):
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, **kwargs):
         import torch
         self.set_default_params(y_train)
+        num_cols = X_train.shape[1]
+        if num_cols > self.params['max_columns']:
+            raise NotImplementedError(f"This dataset has {num_cols} columns and exceeds 'max_columns' == {self.params['max_columns']}.\n"
+                                      f"If you are confident you will have enough memory, set 'max_columns' higher and try again.")
 
         train, val, unlab = self._tt_preprocess(X_train, X_val, X_unlabeled)
 
