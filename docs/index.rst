@@ -1,11 +1,11 @@
-AutoGluon: AutoML Toolkit for Deep Learning
-===========================================
+AutoGluon: AutoML Toolkit for Text, Image, and Tabular Data
+===========================================================
 
-`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on deep learning and real-world applications spanning image, text, or tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
+`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning tabular, text, and image data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
 
-- Quickly prototype deep learning solutions for your data with few lines of code.
+- Quickly prototype classical and deep learning solutions for your data with a few lines of code.
+- Automatically utilize state-of-the-art techniques without expert knowledge.
 - Leverage automatic hyperparameter tuning, model selection / architecture search, and data processing.
-- Automatically utilize state-of-the-art deep learning techniques without expert knowledge.
 - Easily improve existing bespoke models and data pipelines, or customize `AutoGluon` for your use-case.
 
 .. note::
