@@ -156,7 +156,6 @@ def download_pickle_file(fname):
 
 
 # Main testing function
-@pytest.mark.skip(reason="Pickle files not yet uploaded")
 def test_comparison_gpy():
     optimization_config = DEFAULT_OPTIMIZATION_CONFIG
     fname_msk = '{}_{}_{}.pickle'
