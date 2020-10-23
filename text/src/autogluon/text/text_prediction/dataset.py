@@ -220,8 +220,10 @@ def normalize_df(df, convert_text_to_numerical=True, remove_none=True):
         idx = col.first_valid_index()
         if idx is not None:
             val = col[idx]
+            print('idx=', idx, 'val=', val)
             if isinstance(val, str):
                 num_missing = col.isnull().sum().sum().item()
+                print('num_missing=', num_missing)
                 if num_missing > 0 and remove_none:
                     col = col.fillna('')
                     conversion_cols[col_name] = col
@@ -304,19 +306,26 @@ class TabularDataset:
             if not isinstance(columns, list):
                 columns = [columns]
             df = df[columns]
+        print('Normalize df')
+        print('Categories:', df['label'].astype('category').cat.categories)
         df = normalize_df(df)
+        print('After normalize df')
+        print('Categories:', df['label'].astype('category').cat.categories)
         if column_metadata is None:
             column_metadata = dict()
         elif isinstance(column_metadata, str):
             with open(column_metadata, 'r') as f:
                 column_metadata = json.load(f)
         # Inference the column properties
+        print('Before inference column_properties')
         column_properties = get_column_properties(
             df,
             metadata=column_metadata,
             label_columns=label_columns,
             provided_column_properties=column_properties,
             categorical_default_handle_missing_value=categorical_default_handle_missing_value)
+        print('After column_properties')
+        print('Categories:', df['label'].astype('category').cat.categories)
         self._table = df
         self._column_properties = column_properties
 

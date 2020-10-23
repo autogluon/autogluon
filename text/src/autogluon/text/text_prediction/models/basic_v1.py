@@ -754,9 +754,9 @@ class BertForTextPredictionBasic:
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=self._label_shapes[0],
                                     cfg=cfg.model.network)
-        # Here, we cannot use GPU due to https://github.com/awslabs/autogluon/issues/602
+        ctx_l = get_mxnet_available_ctx()
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
-                            ctx=mx.cpu())
+                            ctx=ctx_l[0])
         self._net = net
         mx.npx.waitall()
 
@@ -923,8 +923,9 @@ class BertForTextPredictionBasic:
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=label_shapes[0],
                                     cfg=loaded_config.model.network)
+        ctx_l = get_mxnet_available_ctx()
         net.load_parameters(os.path.join(dir_path, 'net.params'),
-                            ctx=mx.cpu())
+                            ctx=ctx_l[0])
         model = cls(column_properties=column_properties,
                     label_columns=label_columns,
                     feature_columns=feature_columns,

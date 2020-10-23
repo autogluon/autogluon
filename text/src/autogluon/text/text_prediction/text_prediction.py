@@ -14,7 +14,6 @@ from . import constants as _C
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type,\
     get_column_properties
 from .models.basic_v1 import BertForTextPredictionBasic
-from autogluon.tabular.task import tabular_prediction
 from autogluon.core.task.base import BaseTask
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
 from autogluon.core import space
@@ -189,7 +188,6 @@ def infer_eval_stop_log_metrics(problem_type,
 @use_np
 class TextPrediction(BaseTask):
     """AutoGluon Task for classification/regression with text data."""
-    Dataset = tabular_prediction.TabularDataset
 
     @classmethod
     def fit(cls, train_data,
@@ -339,6 +337,7 @@ class TextPrediction(BaseTask):
                 holdout_frac = default_holdout_frac(len(train_data), True)
             train_data, tuning_data = random_split_train_val(train_data,
                                                              valid_ratio=holdout_frac)
+
         else:
             if not isinstance(tuning_data, pd.DataFrame):
                 tuning_data = load_pd.load(tuning_data)
@@ -350,9 +349,14 @@ class TextPrediction(BaseTask):
             label_columns=label_columns,
             provided_column_properties=None,
             categorical_default_handle_missing_value=True)
+        # Before Parse to TabularDataset
+        print('Before parse to TabularDataset:',
+              train_data['label'].astype('category').cat.categories)
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)
+        print('After parse to TabularDataset:',
+              train_data.table['label'].astype('category').cat.categories)
         tuning_data = TabularDataset(tuning_data,
                                      column_properties=train_data.column_properties,
                                      label_columns=label_columns)
