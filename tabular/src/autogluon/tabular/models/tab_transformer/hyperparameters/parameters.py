@@ -15,21 +15,21 @@ def get_fixed_params():
                     'column_embedding': True,
                     'shared_embedding': False,
                     #'n_shared_embs': 8,
-                    'p_dropout': 0.1,
+                    'p_dropout': 0.1, # dropout probability, = 0 turns off Dropout.
                     'orig_emb_resid': False,
                     'one_hot_embeddings': False,
                     'drop_whole_embeddings': False,
                     'max_emb_dim': 8,
-                    'lr': 1e-3,
-                    'weight_decay': 1e-6,
-                    'base_exp_decay': 0.95,
+                    'lr': 1e-3, # Learning rate
+                    'weight_decay': 1e-6, # Rate of linear weight decay for learning rate
+                    'base_exp_decay': 0.95, # Rate of exponential decay for learning rate
                     'encoders':  {'CATEGORICAL': 'CategoricalOrdinalEnc',
                                   'DATETIME'   : 'DatetimeOrdinalEnc',
                                   'LATLONG'    : 'LatLongQuantileOrdinalEnc',
                                   'SCALAR'     : 'ScalarQuantileOrdinalEnc',
                                   'TEXT'       : 'TextSummaryScalarEnc'},
-                    'aug_mask_prob' : 0.4,
-                    'num_augs' : 1,
+                    'aug_mask_prob' : 0.4, # What percentage of values to apply augmentation to.
+                    'num_augs' : 1, # Number of augmentations to add.
                     'pretext': 'BERT_pretext',
                     'n_cont_features': 8,
                     'fix_attention': False,
@@ -38,7 +38,7 @@ def get_fixed_params():
                     'feature_dim': 64,
                     'epochs': 100, # How many epochs to train on with labeled data.
                     'pretrain_epochs': 200, # How many epochs to pretrain on with unlabeled data.
-                    'epochs_wo_improve': 10, # How many epochs to continue running without improving on metric.
+                    'epochs_wo_improve': 25, # How many epochs to continue running without improving on metric.
                     'num_workers': 16, # How many workers to use for torch DataLoader.
                     'max_columns': 500, # Maximum number of columns TabTransformer will accept as input. This is to combat huge memory requirements/errors.
                     }

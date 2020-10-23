@@ -181,11 +181,8 @@ class TabTransformerModel(AbstractModel):
                     train_test = 'Train'
 
                 val_metric = None
-                if valloader is not None:
+                if valloader is not None and state != 'pretrain':
                     val_metric = self.score(X=valloader, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
-
-                if correct is not None:
-                    total_correct += correct.mean().cpu().numpy()
                     data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
                 else:
                     data_bar.set_description('{} Epoch: [{}/{}] Loss: {:.4f}'.format(train_test, epoch, epochs, total_loss / total_num))
@@ -247,6 +244,8 @@ class TabTransformerModel(AbstractModel):
         best_val_epoch = 0
         val_improve_epoch = 0
 
+        best_loss = np.inf
+
         self.verbosity = self.params.get('verbosity', 5)
         if self.verbosity <= 1:
             verbose_eval = -1
@@ -268,18 +267,23 @@ class TabTransformerModel(AbstractModel):
             train_loss, val_metric = self._epoch(self.model, trainloader=trainloader, valloader=valloader, y_val=y_val, optimizers=optimizers, loss_criterion=loss_criterion, \
                             pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, databar_disable=databar_disable, params=self.params)
 
-            if val_metric >= best_val_metric or e == 0:
-                if valloader is not None:
-                    if not np.isnan(val_metric):
-                        if val_metric > best_val_metric:
-                            val_improve_epoch = e
-                        best_val_metric = val_metric
+            # Early stopping for pretrain'ing based on loss.
+            if state == 'pretrain':
+                if train_loss < best_loss or e == 0:
+                    if train_loss < best_loss:
+                        best_loss = train_loss
+                    best_val_epoch = e
+            else:
+                if val_metric >= best_val_metric or e == 0:
+                    if valloader is not None:
+                        if not np.isnan(val_metric):
+                            best_val_metric = val_metric
 
-                best_val_epoch = e
-                torch.save(self.model, 'tab_trans_temp.pth')
+                    best_val_epoch = e
+                    torch.save(self.model, 'tab_trans_temp.pth')
 
             # If time limit has exceeded or we haven't improved in some number of epochs, stop early.
-            if e - val_improve_epoch > epochs_wo_improve:
+            if e - best_val_epoch > epochs_wo_improve:
                 break
             if time_limit:
                 time_elapsed = time.time() - start_time
