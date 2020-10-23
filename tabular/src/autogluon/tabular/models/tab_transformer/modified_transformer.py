@@ -9,43 +9,43 @@ import math
 from typing import Tuple, Optional
 
 import torch
-from torch.nn import Module
-from torch._overrides import has_torch_function, handle_torch_function
-from torch.nn.functional import linear, softmax, dropout
-from torch.nn.parameter import Parameter
-from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
 import torch.nn.functional as F
-from torch.nn.modules.normalization import LayerNorm
-from torch.nn.modules.dropout import Dropout
+from torch._overrides import has_torch_function, handle_torch_function
+from torch.nn import Module
 from torch.nn import init
+from torch.nn.functional import linear, softmax, dropout
+from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
+from torch.nn.modules.dropout import Dropout
+from torch.nn.modules.normalization import LayerNorm
+from torch.nn.parameter import Parameter
 
 
 def multi_head_attention_forward(self,
-                                 query,                           # type: Tensor
-                                 key,                             # type: Tensor
-                                 value,                           # type: Tensor
-                                 embed_dim_to_check,              # type: int
-                                 num_heads,                       # type: int
-                                 in_proj_weight,                  # type: Tensor
-                                 in_proj_bias,                    # type: Tensor
-                                 bias_k,                          # type: Optional[Tensor]
-                                 bias_v,                          # type: Optional[Tensor]
-                                 add_zero_attn,                   # type: bool
-                                 dropout_p,                       # type: float
-                                 out_proj_weight,                 # type: Tensor
+                                 query,  # type: Tensor
+                                 key,  # type: Tensor
+                                 value,  # type: Tensor
+                                 embed_dim_to_check,  # type: int
+                                 num_heads,  # type: int
+                                 in_proj_weight,  # type: Tensor
+                                 in_proj_bias,  # type: Tensor
+                                 bias_k,  # type: Optional[Tensor]
+                                 bias_v,  # type: Optional[Tensor]
+                                 add_zero_attn,  # type: bool
+                                 dropout_p,  # type: float
+                                 out_proj_weight,  # type: Tensor
                                  out_proj_bias,
-                                 fixed_k=None,                    # type: Tensor
-                                 fixed_q=None,                    # type: Tensor
-                                 training=True,                   # type: bool
-                                 key_padding_mask=None,           # type: Optional[Tensor]
-                                 need_weights=True,               # type: bool
-                                 attn_mask=None,                  # type: Optional[Tensor]
+                                 fixed_k=None,  # type: Tensor
+                                 fixed_q=None,  # type: Tensor
+                                 training=True,  # type: bool
+                                 key_padding_mask=None,  # type: Optional[Tensor]
+                                 need_weights=True,  # type: bool
+                                 attn_mask=None,  # type: Optional[Tensor]
                                  use_separate_proj_weight=False,  # type: bool
-                                 q_proj_weight=None,              # type: Optional[Tensor]
-                                 k_proj_weight=None,              # type: Optional[Tensor]
-                                 v_proj_weight=None,              # type: Optional[Tensor]
-                                 static_k=None,                   # type: Optional[Tensor]
-                                 static_v=None                    # type: Optional[Tensor]
+                                 q_proj_weight=None,  # type: Optional[Tensor]
+                                 k_proj_weight=None,  # type: Optional[Tensor]
+                                 v_proj_weight=None,  # type: Optional[Tensor]
+                                 static_k=None,  # type: Optional[Tensor]
+                                 static_v=None  # type: Optional[Tensor]
                                  ):
     # type: (...) -> Tuple[Tensor, Optional[Tensor]]
     r"""
@@ -102,7 +102,6 @@ def multi_head_attention_forward(self,
           L is the target sequence length, S is the source sequence length.
     """
 
-
     if not torch.jit.is_scripting():
         tens_ops = (query, key, value, in_proj_weight, in_proj_bias, bias_k, bias_v,
                     out_proj_weight, out_proj_bias)
@@ -127,16 +126,16 @@ def multi_head_attention_forward(self,
     scaling = float(head_dim) ** -0.5
 
     # self-attention
-    #q = linear(query, in_proj_weight, in_proj_bias) #.chunk(1, dim=-1)
-    #we assume we are in the case key==value==query
-    v = linear(query, in_proj_weight, in_proj_bias) #.chunk(2, dim=-1)
+    # q = linear(query, in_proj_weight, in_proj_bias) #.chunk(1, dim=-1)
+    # we assume we are in the case key==value==query
+    v = linear(query, in_proj_weight, in_proj_bias)  # .chunk(2, dim=-1)
 
-    k = torch.cat([fixed_k.unsqueeze(1) for _ in range(key.shape[1])],dim=1)
-    q = torch.cat([fixed_q.unsqueeze(1) for _ in range(key.shape[1])],dim=1)
+    k = torch.cat([fixed_k.unsqueeze(1) for _ in range(key.shape[1])], dim=1)
+    q = torch.cat([fixed_q.unsqueeze(1) for _ in range(key.shape[1])], dim=1)
     q = q * scaling
-    #print(q.shape)
-    #print(tgt_len)
-    #aaadddsdss
+    # print(q.shape)
+    # print(tgt_len)
+    # aaadddsdss
 
     q = q.contiguous().view(tgt_len, bsz * num_heads, head_dim).transpose(0, 1)
     k = k.contiguous().view(-1, bsz * num_heads, head_dim).transpose(0, 1)
@@ -197,7 +196,8 @@ class MultiheadAttention(Module):
         'bias_v': torch._jit_internal.Optional[torch.Tensor],
     }
 
-    def __init__(self, embed_dim, n_cat_embeddings, num_heads, dropout=0., bias=True, add_bias_kv=False, add_zero_attn=False, kdim=None, vdim=None):
+    def __init__(self, embed_dim, n_cat_embeddings, num_heads, dropout=0., bias=True, add_bias_kv=False,
+                 add_zero_attn=False, kdim=None, vdim=None):
         super(MultiheadAttention, self).__init__()
 
         self.embed_dim = embed_dim
@@ -218,9 +218,9 @@ class MultiheadAttention(Module):
             self.register_parameter('fixed_k', None)
         else:
             self.in_proj_weight = Parameter(torch.empty(embed_dim, embed_dim))
-            #self.in_proj_weight = Parameter(torch.empty(2 * embed_dim, embed_dim))
-            self.fixed_k        = Parameter(torch.empty(n_cat_embeddings,embed_dim))
-            self.fixed_q        = Parameter(torch.empty(n_cat_embeddings,embed_dim))
+            # self.in_proj_weight = Parameter(torch.empty(2 * embed_dim, embed_dim))
+            self.fixed_k = Parameter(torch.empty(n_cat_embeddings, embed_dim))
+            self.fixed_q = Parameter(torch.empty(n_cat_embeddings, embed_dim))
             self.register_parameter('q_proj_weight', None)
             self.register_parameter('k_proj_weight', None)
             self.register_parameter('v_proj_weight', None)
@@ -321,7 +321,6 @@ class MultiheadAttention(Module):
             attn_mask=attn_mask)
 
 
-
 class Linear(Module):
     r"""Applies a linear transformation to the incoming data: :math:`y = xA^T + b`
     Args:
@@ -387,7 +386,6 @@ class Linear(Module):
 # This class exists solely for Transformer; it has an annotation stating
 # that bias is never None, which appeases TorchScript
 class _LinearWithBias(Linear):
-
     bias: torch.Tensor
 
     def __init__(self, in_features: int, out_features: int) -> None:
@@ -433,12 +431,12 @@ class TransformerEncoderLayer_modified(Module):
         self.activation = self._get_activation_fn(activation)
 
     def __setstate__(self, state):
-
         if 'activation' not in state:
             state['activation'] = F.relu
         super(TransformerEncoderLayer_modified, self).__setstate__(state)
 
-    def forward(self, src: torch.Tensor, src_mask: Optional[torch.Tensor] = None, src_key_padding_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(self, src: torch.Tensor, src_mask: Optional[torch.Tensor] = None,
+                src_key_padding_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Pass the input through the encoder layer.
 
         Args:
@@ -458,6 +456,7 @@ class TransformerEncoderLayer_modified(Module):
         src = self.norm2(src)
         return src
 
+
 def _get_activation_fn(activation):
     if activation == "relu":
         return F.relu
@@ -465,5 +464,3 @@ def _get_activation_fn(activation):
         return F.gelu
 
     raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
-
-

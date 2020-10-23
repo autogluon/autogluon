@@ -7,11 +7,11 @@ class TabNet(nn.Module):
         import torch.nn as nn
         from .tab_transformer import TabTransformer
         self.params = params
-        self.params['cat_feat_origin_cards']=cat_feat_origin_cards
-        self.embed=TabTransformer(**self.params)
+        self.params['cat_feat_origin_cards'] = cat_feat_origin_cards
+        self.embed = TabTransformer(**self.params)
 
-        relu, lin = nn.ReLU(), nn.Linear(2*self.params['feature_dim'] , num_class, bias=True)
-        self.fc = nn.Sequential(*[relu,lin])
+        relu, lin = nn.ReLU(), nn.Linear(2 * self.params['feature_dim'], num_class, bias=True)
+        self.fc = nn.Sequential(*[relu, lin])
 
     def forward(self, data):
         features = self.embed(data)
@@ -50,13 +50,11 @@ class TabModelBase(nn.Module):
                                                                        one_hot=one_hot_embeddings)
             self.init_feat_dim = sum(i.emb_dim for i in self.cat_initializers.values()) + self.n_cont_features
 
-
     def forward(self, input):
         raise NotImplementedError
 
     def get_norm(self, num_feats):
         return self.norm_class(num_feats)
-
 
     def pred_from_output(self, output):
         return output.max(dim=1, keepdim=True)[1]

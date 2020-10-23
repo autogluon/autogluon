@@ -1,32 +1,29 @@
 """ TabTransformer model """
-import time, logging
+import logging
+import os
+import time
 
+import numpy as np
+import pandas as pd
 from autogluon.core.utils.loaders import load_pkl
-
-from ...try_import import try_import_torch
-
 from tqdm import tqdm
 
-from ...constants import BINARY, REGRESSION
 from .hyperparameters.parameters import get_default_param
-
-import pandas as pd
-import os
-import numpy as np
-
 from ..abstract.abstract_model import AbstractModel
+from ...constants import BINARY, REGRESSION
+from ...try_import import try_import_torch
 
 logger = logging.getLogger(__name__)
 
 
 class TabTransformerModel(AbstractModel):
-    params_file_name="tab_trans_params.pth"
-    def __init__(self,**kwargs):
+    params_file_name = "tab_trans_params.pth"
+
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.types_of_features=None
+        self.types_of_features = None
         self.verbosity = None
         try_import_torch()
-
 
     def _get_types_of_features(self, df):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
@@ -39,8 +36,9 @@ class TabTransformerModel(AbstractModel):
         feature_types = self.feature_metadata.get_type_group_map_raw()
 
         categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
-        continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
-        language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
+        continuous_featnames = feature_types['float'] + feature_types[
+            'int']  # + self.__get_feature_type_if_present('datetime')
+        language_featnames = []  # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
 
         # TODO: Making an assumption that "feature_types_raw" above isn't used elsewhere, since feature_types_raw will
@@ -53,17 +51,16 @@ class TabTransformerModel(AbstractModel):
             df = df.drop(columns=unknown_features)
             self.features = list(df.columns)
 
-        self.types_of_features=[]
+        self.types_of_features = []
         for feature in valid_features:
             if feature in categorical_featnames:
-                type='CATEGORICAL'
+                type = 'CATEGORICAL'
             elif feature in continuous_featnames:
-                type='SCALAR'
+                type = 'SCALAR'
             elif feature in language_featnames:
-                type='TEXT'
-  
-            self.types_of_features.append({"name": feature, "type": type})               
-    
+                type = 'TEXT'
+
+            self.types_of_features.append({"name": feature, "type": type})
 
     def set_default_params(self, y_train):
         import torch
@@ -82,11 +79,11 @@ class TabTransformerModel(AbstractModel):
 
     def get_model(self):
         from .tab_model_base import TabNet
-        self.model=TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
+        self.model = TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
         if self.params['device'].type == "cuda":
             self.model = self.model.cuda()
 
-    def _get_no_period_columns(self, X): 
+    def _get_no_period_columns(self, X):
         # Latest pytorch does not support . in module names. Therefore, we must replace the . with some other symbol
         # that hopefully doesn't collide with other column names.
         rename_columns = dict()
@@ -99,27 +96,27 @@ class TabTransformerModel(AbstractModel):
 
     def _tt_preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
         from .utils import TabTransformerDataset
-        X = X.rename(columns = self._get_no_period_columns(X))
+        X = X.rename(columns=self._get_no_period_columns(X))
 
         if X_val is not None:
-            X_val = X_val.rename(columns = self._get_no_period_columns(X_val))
+            X_val = X_val.rename(columns=self._get_no_period_columns(X_val))
         if X_unlabeled is not None:
-            X_unlabeled = X_unlabeled.rename(columns = self._get_no_period_columns(X_unlabeled))
+            X_unlabeled = X_unlabeled.rename(columns=self._get_no_period_columns(X_unlabeled))
 
         self._get_types_of_features(X)
-        
+
         data = TabTransformerDataset(X, col_info=self.types_of_features, **self.params)
-        self.fe=fe
+        self.fe = fe
         if self.fe is not None:
             if X_unlabeled is None:
-                unlab_data=None
+                unlab_data = None
             elif X_unlabeled is not None:
                 unlab_data = TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.params)
         if self.fe is None:
             if X_unlabeled is None:
                 data.fit_feat_encoders()
                 self.fe = data.feature_encoders
-                unlab_data=None
+                unlab_data = None
             elif X_unlabeled is not None:
                 unlab_data = TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.params)
                 unlab_data.fit_feat_encoders()
@@ -131,14 +128,15 @@ class TabTransformerModel(AbstractModel):
             val_data = TabTransformerDataset(X_val, col_info=self.types_of_features, **self.params)
             val_data.encode(self.fe)
         else:
-            val_data=None
+            val_data = None
 
         if unlab_data is not None:
             unlab_data.encode(self.fe)
 
         return data, val_data, unlab_data
 
-    def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, databar_disable, params):
+    def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch,
+               epochs, databar_disable, params):
         import torch
         from .utils import augmentation
         is_train = (optimizers is not None)
@@ -157,9 +155,9 @@ class TabTransformerModel(AbstractModel):
 
                 if state in [None, 'finetune']:
                     data, target = augmentation(data, target, **params)
-                    out, _    = net(data)
-                elif state=='pretrain':
-                    _, out    = net(data)
+                    out, _ = net(data)
+                elif state == 'pretrain':
+                    _, out = net(data)
                 else:
                     raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
 
@@ -175,17 +173,20 @@ class TabTransformerModel(AbstractModel):
                 total_num += 1
                 total_loss += loss.item()
 
-                if epochs==1:
+                if epochs == 1:
                     train_test = 'Test'
                 else:
                     train_test = 'Train'
 
                 val_metric = None
                 if valloader is not None and state != 'pretrain':
-                    val_metric = self.score(X=valloader, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
-                    data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
+                    val_metric = self.score(X=valloader, y=y_val, eval_metric=self.stopping_metric,
+                                            metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+                    data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(
+                        train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
                 else:
-                    data_bar.set_description('{} Epoch: [{}/{}] Loss: {:.4f}'.format(train_test, epoch, epochs, total_loss / total_num))
+                    data_bar.set_description(
+                        '{} Epoch: [{}/{}] Loss: {:.4f}'.format(train_test, epoch, epochs, total_loss / total_num))
 
             return total_loss / total_num, val_metric
 
@@ -208,39 +209,39 @@ class TabTransformerModel(AbstractModel):
         from . import pretexts
 
         start_time = time.time()
-        pretext_tasks= pretexts.__dict__
-        optimizers=[]
-        lr=self.params['lr']
-        weight_decay=self.params['weight_decay']
-        epochs = self.params['pretrain_epochs'] if state=='pretrain' else self.params['epochs']
-        freq   = self.params['pretrain_freq'] if state=='pretrain' else self.params['freq'] # TODO: What is this for?
+        pretext_tasks = pretexts.__dict__
+        optimizers = []
+        lr = self.params['lr']
+        weight_decay = self.params['weight_decay']
+        epochs = self.params['pretrain_epochs'] if state == 'pretrain' else self.params['epochs']
+        freq = self.params['pretrain_freq'] if state == 'pretrain' else self.params['freq']  # TODO: What is this for?
         epochs_wo_improve = self.params['epochs_wo_improve']
 
         if state is None:
             optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
-            pretext=pretext_tasks['SUPERVISED_pretext'](self.params)
-        elif state=='pretrain':
+            pretext = pretext_tasks['SUPERVISED_pretext'](self.params)
+        elif state == 'pretrain':
             optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
-            pretext=pretext_tasks['BERT_pretext'](self.params)
-        elif state=='finetune':
-            base_exp_decay=self.params['base_exp_decay']
-            optimizer_fc    = optim.Adam(self.model.fc.parameters(), lr=lr, weight_decay=weight_decay)
+            pretext = pretext_tasks['BERT_pretext'](self.params)
+        elif state == 'finetune':
+            base_exp_decay = self.params['base_exp_decay']
+            optimizer_fc = optim.Adam(self.model.fc.parameters(), lr=lr, weight_decay=weight_decay)
             optimizer_embeds = optim.Adam(self.model.embed.parameters(), lr=lr, weight_decay=weight_decay)
-            scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds,gamma=base_exp_decay)
+            scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds, gamma=base_exp_decay)
             optimizers.append(optimizer_fc)
             optimizers.append(optimizer_embeds)
 
-            pretext=pretext_tasks['SUPERVISED_pretext'](self.params)
+            pretext = pretext_tasks['SUPERVISED_pretext'](self.params)
 
         else:
             raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
 
-        if self.params['problem_type']==REGRESSION:
+        if self.params['problem_type'] == REGRESSION:
             loss_criterion = nn.MSELoss()
         else:
             loss_criterion = nn.CrossEntropyLoss()
 
-        best_val_metric = -np.inf # higher = better
+        best_val_metric = -np.inf  # higher = better
         best_val_epoch = 0
         val_improve_epoch = 0
 
@@ -264,8 +265,10 @@ class TabTransformerModel(AbstractModel):
             # Whether or not we want to suppress output based on our verbosity.
             databar_disable = False if e % verbose_eval == 0 else True
 
-            train_loss, val_metric = self._epoch(self.model, trainloader=trainloader, valloader=valloader, y_val=y_val, optimizers=optimizers, loss_criterion=loss_criterion, \
-                            pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, databar_disable=databar_disable, params=self.params)
+            train_loss, val_metric = self._epoch(self.model, trainloader=trainloader, valloader=valloader, y_val=y_val,
+                                                 optimizers=optimizers, loss_criterion=loss_criterion, \
+                                                 pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs,
+                                                 databar_disable=databar_disable, params=self.params)
 
             # Early stopping for pretrain'ing based on loss.
             if state == 'pretrain':
@@ -294,7 +297,7 @@ class TabTransformerModel(AbstractModel):
 
         if valloader is not None:
             try:
-                self.model=torch.load('tab_trans_temp.pth')
+                self.model = torch.load('tab_trans_temp.pth')
                 os.remove('tab_trans_temp.pth')
             except:
                 pass
@@ -305,20 +308,22 @@ class TabTransformerModel(AbstractModel):
         self.set_default_params(y_train)
         num_cols = X_train.shape[1]
         if num_cols > self.params['max_columns']:
-            raise NotImplementedError(f"This dataset has {num_cols} columns and exceeds 'max_columns' == {self.params['max_columns']}.\n"
-                                      f"If you are confident you will have enough memory, set 'max_columns' higher and try again.")
+            raise NotImplementedError(
+                f"This dataset has {num_cols} columns and exceeds 'max_columns' == {self.params['max_columns']}.\n"
+                f"If you are confident you will have enough memory, set 'max_columns' higher and try again.")
 
         train, val, unlab = self._tt_preprocess(X_train, X_val, X_unlabeled)
 
-        if self.problem_type=='regression':
+        if self.problem_type == 'regression':
             train.targets = torch.FloatTensor(list(y_train))
-            val.targets   = torch.FloatTensor(list(y_val))
+            val.targets = torch.FloatTensor(list(y_val))
         else:
             train.targets = torch.LongTensor(list(y_train))
-            val.targets   = torch.LongTensor(list(y_val))
+            val.targets = torch.LongTensor(list(y_val))
 
-        trainloader, valloader, unlabloader = train.build_loader(shuffle=True), val.build_loader(), unlab.build_loader() if unlab is not None else None
-   
+        trainloader, valloader, unlabloader = train.build_loader(
+            shuffle=True), val.build_loader(), unlab.build_loader() if unlab is not None else None
+
         self.cat_feat_origin_cards = trainloader.cat_feat_origin_cards
 
         self.get_model()
@@ -343,18 +348,19 @@ class TabTransformerModel(AbstractModel):
             if preprocess:
                 X = self.preprocess(X)
             # Internal preprocessing, renaming col names, tt specific.
-            X, _, _ =self._tt_preprocess(X, fe=self.fe)
+            X, _, _ = self._tt_preprocess(X, fe=self.fe)
             loader = X.build_loader()
         elif isinstance(X, DataLoader):
             loader = X
         elif isinstance(X, torch.Tensor):
-            X = X.rename(columns = self._get_no_period_columns(X))
+            X = X.rename(columns=self._get_no_period_columns(X))
             loader = X.build_loader()
         else:
-            raise NotImplementedError("Attempting to predict against a non-supported data type. \nNeeds to be a pandas DataFrame, torch DataLoader or torch Tensor.")
+            raise NotImplementedError(
+                "Attempting to predict against a non-supported data type. \nNeeds to be a pandas DataFrame, torch DataLoader or torch Tensor.")
 
         self.model.eval()
-        softmax=nn.Softmax(dim=1)
+        softmax = nn.Softmax(dim=1)
 
         outputs = torch.zeros([len(loader.dataset), self.num_classes])
 
@@ -368,11 +374,11 @@ class TabTransformerModel(AbstractModel):
                 batch_size = len(out)
                 prob = softmax(out)
 
-            outputs[iter:(iter+batch_size)] = prob
+            outputs[iter:(iter + batch_size)] = prob
             iter += batch_size
 
         if self.problem_type == BINARY:
-            return outputs[:,1].cpu().numpy()
+            return outputs[:, 1].cpu().numpy()
 
         return outputs.cpu().numpy()
 
@@ -384,18 +390,18 @@ class TabTransformerModel(AbstractModel):
         """
         import torch
         if directory is not None:
-            path = directory+file_prefix
+            path = directory + file_prefix
         else:
-            path = self.path+file_prefix
+            path = self.path + file_prefix
 
-        params_filepath = path+self.params_file_name
-        
+        params_filepath = path + self.params_file_name
+
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
         if self.model is not None:
             torch.save(self.model, params_filepath)
 
-        self.model = None # Avoiding pickling the weights.
+        self.model = None  # Avoiding pickling the weights.
         modelobj_filepath = super().save(path=path, verbose=verbose)
 
         if return_filename:
@@ -409,11 +415,11 @@ class TabTransformerModel(AbstractModel):
         """
         import torch
         path = path + file_prefix
-        obj: TabTransformerModel = load_pkl.load(path=path+cls.model_file_name, verbose=verbose)
+        obj: TabTransformerModel = load_pkl.load(path=path + cls.model_file_name, verbose=verbose)
         if reset_paths:
             obj.set_contexts(path)
 
-        obj.model=torch.load(path+cls.params_file_name)
+        obj.model = torch.load(path + cls.params_file_name)
 
         return obj
 
@@ -440,4 +446,3 @@ class TabTransformerModel(AbstractModel):
         
         5) Enable hyperparameter tuning/searching. This will be done in a future PR.  
         """
-

@@ -1,18 +1,21 @@
-#Code in this script based on work by Milan Cvitkovic, 
-#Xin Huang, Ashish Khetan and Zohar Karnin.
+# Code in this script based on work by Milan Cvitkovic,
+# Xin Huang, Ashish Khetan and Zohar Karnin.
 
 import copy
-from .tab_model_base import TabModelBase
 
 import torch
 import torch.nn as nn
+
+from .tab_model_base import TabModelBase
+
 
 class TabTransformer(TabModelBase):
     """
     Transformer model for tabular data
     """
 
-    def __init__(self, n_cont_embeddings, n_layers, n_heads, hidden_dim, tab_readout, column_embedding, orig_emb_resid, fix_attention, n_shared_embs=8,
+    def __init__(self, n_cont_embeddings, n_layers, n_heads, hidden_dim, tab_readout, column_embedding, orig_emb_resid,
+                 fix_attention, n_shared_embs=8,
                  shared_embedding_added=False, **kwargs):
         super().__init__(**kwargs)
 
@@ -22,7 +25,7 @@ class TabTransformer(TabModelBase):
         self.hidden_dim = hidden_dim
         self.readout = tab_readout
         self.orig_emb_resid = orig_emb_resid
-        
+
         # Overwriting some TabModelBase options
 
         self.cat_initializers = nn.ModuleDict()
@@ -30,7 +33,7 @@ class TabTransformer(TabModelBase):
             self.n_embeddings = len(self.cat_feat_origin_cards) + (n_cont_embeddings if self.n_cont_features else 0)
         else:
             self.n_embeddings = None
-     
+
         self.cat_initializers = nn.ModuleDict()
 
         from .tab_transformer_encoder import EmbeddingInitializer
@@ -73,7 +76,6 @@ class TabTransformer(TabModelBase):
                                                                          dropout=self.p_dropout,
                                                                          activation='gelu') for _ in
                                               range(n_layers)])
-   
 
     def init_input(self, input):
         feats = [init(input[:, i]) for i, init in enumerate(self.cat_initializers.values())]
@@ -123,8 +125,8 @@ class TabTransformer(TabModelBase):
             out = self.fc_out(out)
         elif self.readout == 'concat_pool_add':
             orig_feat_embs_cp = copy.deepcopy(orig_feat_embs.detach())
-            #ce_dim = orig_feat_embs_cp.shape[-1]//8
-            #orig_feat_embs_cp[:, :, ce_dim:] = 0
+            # ce_dim = orig_feat_embs_cp.shape[-1]//8
+            # orig_feat_embs_cp[:, :, ce_dim:] = 0
 
             last_layer = feat_embs.transpose(0, 1).reshape(feat_embs.shape[1], -1)
             last_layer += orig_feat_embs_cp.transpose(0, 1).reshape(orig_feat_embs_cp.shape[1], -1)
@@ -142,7 +144,7 @@ class TabTransformer(TabModelBase):
             out = feat_embs.mean(dim=0)
 
         elif self.readout == 'none':
-            out = feat_embs.transpose(1,0)
+            out = feat_embs.transpose(1, 0)
 
         return out
 

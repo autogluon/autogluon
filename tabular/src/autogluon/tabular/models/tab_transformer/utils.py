@@ -1,23 +1,23 @@
-from . import tab_transformer_encoder
-from .tab_transformer_encoder import WontEncodeError, NullEnc
-
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+from . import tab_transformer_encoder
+from .tab_transformer_encoder import WontEncodeError, NullEnc
+
 
 def augmentation(data, target, **params):
-    shape=data.shape
-    cat_data=torch.cat([data for _ in range(params['num_augs'])])
-    target=torch.cat([target for _ in range(params['num_augs'])]).view(-1)
+    shape = data.shape
+    cat_data = torch.cat([data for _ in range(params['num_augs'])])
+    target = torch.cat([target for _ in range(params['num_augs'])]).view(-1)
     locs_to_mask = torch.empty_like(cat_data, dtype=float).uniform_() < params['aug_mask_prob']
-    cat_data[locs_to_mask] = 0 
-    cat_data=cat_data.view(-1,shape[-1])
+    cat_data[locs_to_mask] = 0
+    cat_data = cat_data.view(-1, shape[-1])
     return cat_data, target
 
 
 def get_col_info(X):
-    cols=list(X.columns)
-    col_info=[]
+    cols = list(X.columns)
+    col_info = []
     for c in cols:
         col_info.append({"name": c, "type": "CATEGORICAL"})
     return col_info
@@ -25,29 +25,28 @@ def get_col_info(X):
 
 class TabTransformerDataset(Dataset):
     def __init__(
-        self,
-        X,
-        y=None,
-        col_info=None,
-        **params):
+            self,
+            X,
+            y=None,
+            col_info=None,
+            **params):
         self.encoders = params['encoders']
-        self.params   = params
+        self.params = params
         self.col_info = col_info
 
         self.raw_data = X
 
         if y is None:
             self.targets = None
-        elif self.params['problem_type']=='regression':
+        elif self.params['problem_type'] == 'regression':
             self.targets = torch.FloatTensor(y)
         else:
             self.targets = torch.LongTensor(y)
 
         if col_info is None:
-            self.columns = get_col_info(X) #this is a stop-gap -- it just sets all feature types to CATEGORICAL.
+            self.columns = get_col_info(X)  # this is a stop-gap -- it just sets all feature types to CATEGORICAL.
         else:
             self.columns = self.col_info
-
 
         """must be a list of dicts, each dict is of the form {"name": col_name, "type": col_type} 
         where col_name is obtained from the df X, and col_type is CATEGORICAL, TEXT or SCALAR
@@ -93,7 +92,7 @@ class TabTransformerDataset(Dataset):
                 cat_feats = enc.enc_cat(col)
                 if cat_feats is not None:
                     self.cat_feat_origin_cards += [(f'{c["name"]}_{i}_{c["type"]}', card) for i, card in
-                                                                                    enumerate(enc.cat_cards)]
+                                                   enumerate(enc.cat_cards)]
                     cat_features.append(cat_feats)
                 cont_feats = enc.enc_cont(col)
                 if cont_feats is not None:
@@ -113,7 +112,7 @@ class TabTransformerDataset(Dataset):
                             shuffle=shuffle, num_workers=self.params['num_workers'],
                             pin_memory=True)
 
-        loader.cat_feat_origin_cards=self.cat_feat_origin_cards
+        loader.cat_feat_origin_cards = self.cat_feat_origin_cards
         return loader
 
     def __len__(self):
@@ -121,9 +120,8 @@ class TabTransformerDataset(Dataset):
 
     def __getitem__(self, idx):
         target = self.targets[idx] if self.targets is not None else []
-        input   = self.cat_data[idx]  if self.cat_data is not None else []
+        input = self.cat_data[idx] if self.cat_data is not None else []
         return input, target
 
     def data(self):
         return self.raw_data
-

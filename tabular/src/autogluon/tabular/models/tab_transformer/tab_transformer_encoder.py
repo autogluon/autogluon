@@ -1,6 +1,5 @@
-
-#Credits for code in this script to Milan Cvitkovic, 
-#Xin Huang, Ashish Khetan and Zohar Karnin
+# Credits for code in this script to Milan Cvitkovic,
+# Xin Huang, Ashish Khetan and Zohar Karnin
 
 import calendar
 import datetime
@@ -12,12 +11,11 @@ from typing import List, Union, Iterable
 
 import numpy as np
 import pandas as pd
+import torch
+import torch.nn as nn
 from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import RobustScaler, PowerTransformer, QuantileTransformer, KBinsDiscretizer
-
-import torch
-import torch.nn as nn
 
 
 class WontEncodeError(Exception):
@@ -86,7 +84,7 @@ class CategoricalOrdinalEnc(EncBase):
         data = super().fit(data)
         distinct_vals = [i for i in pd.unique(data) if i is not None]
         sorted_vals = sorted(distinct_vals)
-        #print(data)
+        # print(data)
         if len(sorted_vals) >= 0.5 * len(data) or max(Counter(data).values()) < 10:  # sorry for hardcoding this...
             raise WontEncodeError("Too many unique values to bother embedding")
         self.init_with_sorted_values(sorted_vals)
