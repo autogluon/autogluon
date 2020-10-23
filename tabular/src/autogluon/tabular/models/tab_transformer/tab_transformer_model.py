@@ -3,14 +3,11 @@ import time, logging
 
 from autogluon.core.utils.loaders import load_pkl
 
-from . import pretexts
-from .utils import TabTransformerDatasetClass, augmentation
 from ...try_import import try_import_torch
 
 from tqdm import tqdm
 
 from ...constants import BINARY, REGRESSION
-from .tab_transformer import TabTransformer
 from .hyperparameters.parameters import get_default_param
 
 import pandas as pd
@@ -22,14 +19,13 @@ from ..abstract.abstract_model import AbstractModel
 logger = logging.getLogger(__name__)
 
 class TabNetClass:
-    try_import_torch()
     import torch.nn as nn
 
     class TabNet(nn.Module):
         def __init__(self, num_class, params, cat_feat_origin_cards):
             super(TabNetClass.TabNet, self).__init__()
-            try_import_torch()
             import torch.nn as nn
+            from .tab_transformer import TabTransformer
             self.params = params
             self.params['cat_feat_origin_cards']=cat_feat_origin_cards
             self.embed=TabTransformer(**self.params)
@@ -50,6 +46,9 @@ class TabTransformerModel(AbstractModel):
         super().__init__(**kwargs)
         self.types_of_features=None
         self.verbosity = None
+
+        # TODO: Put imports in-line where I need them.
+        try_import_torch()
 
 
     def _get_types_of_features(self, df):
@@ -90,7 +89,6 @@ class TabTransformerModel(AbstractModel):
     
 
     def set_default_params(self, y_train):
-        try_import_torch()
         import torch
 
         default_params = get_default_param(self.problem_type, y_train.nunique())
@@ -122,6 +120,7 @@ class TabTransformerModel(AbstractModel):
         return rename_columns
 
     def _tt_preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
+        from .utils import TabTransformerDataset
         X = X.rename(columns = self._get_no_period_columns(X))
 
         if X_val is not None:
@@ -131,27 +130,27 @@ class TabTransformerModel(AbstractModel):
 
         self._get_types_of_features(X)
         
-        data = TabTransformerDatasetClass.TabTransformerDataset(X, col_info=self.types_of_features, **self.params)
+        data = TabTransformerDataset(X, col_info=self.types_of_features, **self.params)
         self.fe=fe
         if self.fe is not None:
             if X_unlabeled is None:
                 unlab_data=None
             elif X_unlabeled is not None:
-                unlab_data = TabTransformerDatasetClass.TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.params)
+                unlab_data = TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.params)
         if self.fe is None:
             if X_unlabeled is None:
                 data.fit_feat_encoders()
                 self.fe = data.feature_encoders
                 unlab_data=None
             elif X_unlabeled is not None:
-                unlab_data = TabTransformerDatasetClass.TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.params)
+                unlab_data = TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.params)
                 unlab_data.fit_feat_encoders()
                 self.fe = unlab_data.feature_encoders
 
         data.encode(self.fe)
 
         if X_val is not None:
-            val_data = TabTransformerDatasetClass.TabTransformerDataset(X_val, col_info=self.types_of_features, **self.params)
+            val_data = TabTransformerDataset(X_val, col_info=self.types_of_features, **self.params)
             val_data.encode(self.fe)
         else:
             val_data=None
@@ -162,16 +161,12 @@ class TabTransformerModel(AbstractModel):
         return data, val_data, unlab_data
 
     def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, databar_disable, params):
-        try_import_torch()
+        #try_import_torch()
         import torch
+        from .utils import augmentation
         is_train = (optimizers is not None)
         net.train() if is_train else net.eval()
         total_loss, total_correct, total_num, data_bar = 0.0, 0.0, 0, tqdm(trainloader) if is_train else tqdm(valloader)
-
-        # TODO: data_bar triggered only every n epochs? according to print_update flag...
-        #if aug_kwargs is None:
-        #    aug_kwargs={'mask_prob': 0.4,
-        #                'num_augs': 1}
 
         data_bar.disable = databar_disable
 
@@ -237,9 +232,10 @@ class TabTransformerModel(AbstractModel):
         import torch
         import torch.nn as nn
         import torch.optim as optim
+        from . import pretexts
 
         start_time = time.time()
-        pretext_tasks= pretexts.PretextClass.__dict__
+        pretext_tasks= pretexts.__dict__
         optimizers=[]
         lr=self.params['lr']
         weight_decay=self.params['weight_decay']

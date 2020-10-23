@@ -2,13 +2,12 @@
 #Xin Huang, Ashish Khetan and Zohar Karnin.
 
 import copy
+from .tab_model_base import TabModelBase
 
-from .tab_model_base import TabModelBaseClass
-from .tab_transformer_encoder import EmbeddingInitializerClass
-from .modified_transformer import TransformerClass
-from ...try_import import try_import_torch
+import torch
+import torch.nn as nn
 
-class TabTransformer(TabModelBaseClass.TabModelBase):
+class TabTransformer(TabModelBase):
     """
     Transformer model for tabular data
     """
@@ -16,9 +15,8 @@ class TabTransformer(TabModelBaseClass.TabModelBase):
     def __init__(self, n_cont_embeddings, n_layers, n_heads, hidden_dim, tab_readout, column_embedding, orig_emb_resid, fix_attention, n_shared_embs=8,
                  shared_embedding_added=False, **kwargs):
         super().__init__(**kwargs)
-        try_import_torch()
-        import torch
-        import torch.nn as nn
+
+        from .modified_transformer import TransformerEncoderLayer_modified
 
         self.n_cont_embeddings = n_cont_embeddings
         self.hidden_dim = hidden_dim
@@ -35,8 +33,9 @@ class TabTransformer(TabModelBaseClass.TabModelBase):
      
         self.cat_initializers = nn.ModuleDict()
 
+        from .tab_transformer_encoder import EmbeddingInitializer
         for col_name, card in self.cat_feat_origin_cards:
-            self.cat_initializers[col_name] = EmbeddingInitializerClass.EmbeddingInitializer(
+            self.cat_initializers[col_name] = EmbeddingInitializer(
                 num_embeddings=card,
                 max_emb_dim=self.max_emb_dim,
                 p_dropout=self.p_dropout,
@@ -60,7 +59,7 @@ class TabTransformer(TabModelBaseClass.TabModelBase):
 
         if fix_attention is True:
             self.n_cat_embeddings = len(self.cat_feat_origin_cards)
-            self.tfmr_layers = nn.ModuleList([TransformerClass.TransformerEncoderLayer_modified(d_model=hidden_dim,
+            self.tfmr_layers = nn.ModuleList([TransformerEncoderLayer_modified(d_model=hidden_dim,
                                                                                n_cat_embeddings=self.n_cat_embeddings,
                                                                                nhead=n_heads,
                                                                                dim_feedforward=4 * hidden_dim,
@@ -77,8 +76,6 @@ class TabTransformer(TabModelBaseClass.TabModelBase):
    
 
     def init_input(self, input):
-        try_import_torch()
-        import torch
         feats = [init(input[:, i]) for i, init in enumerate(self.cat_initializers.values())]
 
         if self.readout == 'readout_emb':
@@ -90,8 +87,6 @@ class TabTransformer(TabModelBaseClass.TabModelBase):
         return feat_embs
 
     def run_tfmr(self, feat_embs):
-        try_import_torch()
-        import torch
         orig_feat_embs = feat_embs
         all_feat_embs = [feat_embs]
         for layer in self.tfmr_layers:

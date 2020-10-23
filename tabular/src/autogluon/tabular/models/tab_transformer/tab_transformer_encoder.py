@@ -16,7 +16,8 @@ from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import RobustScaler, PowerTransformer, QuantileTransformer, KBinsDiscretizer
 
-from ...try_import import try_import_torch
+import torch
+import torch.nn as nn
 
 
 class WontEncodeError(Exception):
@@ -100,8 +101,6 @@ class CategoricalOrdinalEnc(EncBase):
         """
         Values that the encoder has never seen before are returned as 1.  0 is reserved for padding.
         """
-        try_import_torch()
-        import torch
         data = self.clean_data(data)
         idxs = [self._item_to_idx.get(item, 1) for item in data]
         return torch.LongTensor(idxs).unsqueeze(1)
@@ -132,8 +131,6 @@ class ScalarQuantileOrdinalEnc(EncBase):
         """
         Missing values are returned as category 1.  0 is reserved for padding.
         """
-        try_import_torch()
-        import torch
         data = self.clean_data(data, dtype='float')
         data = np.array(data).reshape(-1, 1)
         if None in data:
@@ -172,8 +169,6 @@ class ScalarRescaleEnc(EncBase):
         """
         Returns len(scalars) x 2 tensor, where the second column is a one-hot flag for missing data values
         """
-        try_import_torch()
-        import torch
         scalars = self.clean_data(scalars, dtype='float')
         null_flag = np.full(len(scalars), np.nan, dtype=np.float32)
         vals = np.full(len(scalars), np.nan, dtype=np.float32)
@@ -305,8 +300,6 @@ class DatetimeScalarEnc(EncBase):
         pass
 
     def enc_cont(self, datetimes):
-        try_import_torch()
-        import torch
         datetimes = self.clean_data(datetimes)
         df = pd.DataFrame({'dt': datetimes})
         add_datepart(df, field_name='dt', prefix='', drop=False)
@@ -348,8 +341,6 @@ class DatetimeOrdinalEnc(EncBase):
     cat_cards = [n for _, n in cols_types]
 
     def enc_cat(self, datetimes):
-        try_import_torch()
-        import torch
         # todo: add support for missing values, which should get encoded as 1.
         datetimes = self.clean_data(datetimes)
         df = pd.DataFrame({'dt': datetimes})
@@ -374,8 +365,6 @@ class LatLongScalarEnc(EncBase):
         pass
 
     def enc_cont(self, latlongs):
-        try_import_torch()
-        import torch
         latlongs = self.clean_data(latlongs)
         if isinstance(latlongs[0], str):
             fixed = []
@@ -416,8 +405,6 @@ class LatLongQuantileOrdinalEnc(EncBase):
 
     def enc_cat(self, data):
         # todo: add support for missing values, which should get encoded as 1.
-        try_import_torch()
-        import torch
         data = LatLongScalarEnc().enc_cont(data)
         feats = []
         for col, disc in enumerate(self.discs):
@@ -453,8 +440,6 @@ class TfidfEnc(EncBase):
         pass
 
     def enc_cont(self, data):
-        try_import_torch()
-        import torch
         data = self.clean_data(data)
         text_strings = np.array([d if d is not None else '' for d in data])
         encoded = self.tfidf.transform(text_strings)
@@ -501,8 +486,6 @@ class TextSummaryScalarEnc(EncBase):
         pass
 
     def enc_cont(self, data):
-        try_import_torch()
-        import torch
         data = self.clean_data(data)
         text_strings = [s if s is not None else '' for s in data]
         encoded = self.get_encoded(text_strings)
@@ -524,115 +507,81 @@ class TextSummaryScalarEnc(EncBase):
     def get_base_enc_params(self):
         return self.scaler.center_, self.scaler.scale_
 
-#def EmbeddingInitializer_(func):#num_embeddings, max_emb_dim, p_dropout, minimize_emb_dim=True, drop_whole_embeddings=False,
-                 #one_hot=False, out_dim=None, shared_embedding=False, n_shared_embs=8, shared_embedding_added=False):
-#    try_import_torch()
-#    import torch
-#    import torch.nn as nn
 
-#    @wraps(func)
+class EmbeddingInitializer(nn.Module):
+    def __init__(self, num_embeddings, max_emb_dim, p_dropout, minimize_emb_dim=True, drop_whole_embeddings=False,
+                 one_hot=False, out_dim=None, shared_embedding=False, n_shared_embs=8,
+                 shared_embedding_added=False):
+        """
+        :param minimize_emb_dim:
+            Whether to set embedding_dim = max_emb_dim or to make embedding_dim smaller is num_embeddings is small
+        :param drop_whole_embeddings:
+            If True, dropout pretends the embedding was a missing value. If false, dropout sets embed features to 0
+        :param one_hot:
+            If True, one-hot encode variables whose cardinality is < max_emb_dim. Also, set reqiures_grad = False
+        :param out_dim:
+            If None, return the embedding straight from self.embed.  If another dimension, put the embedding through a
+            Linear layer to make it size (batch x out_dim).
+         :param shared_embedding:
+            If True, 1/(n_shared_embs)th of every embedding will be reserved for a learned parameter that's common to all embeddings.
+            This is useful for transformers to identify which column an embedding came from.
+            Mutually exclusive with one_hot.
 
-class EmbeddingInitializerClass:
-    try_import_torch()
-    import torch.nn as nn
+        Note: the 0 embedding is reserved for padding and masking.  The various encoders use 1 for missing values.
 
-    #def __init__(self, num_embeddings, max_emb_dim, p_dropout, minimize_emb_dim=True, drop_whole_embeddings=False,
-    #                 one_hot=False, out_dim=None, shared_embedding=False, n_shared_embs=8,
-    #                 shared_embedding_added=False):
-        #self.embedding_initializer = self.EmbeddingInitializer(num_embeddings, max_emb_dim, p_dropout, minimize_emb_dim, drop_whole_embeddings,
-    #                 one_hot, out_dim, shared_embedding, n_shared_embs,
-    #                 shared_embedding_added)
-
-    class EmbeddingInitializer(nn.Module):
-        def __init__(self, num_embeddings, max_emb_dim, p_dropout, minimize_emb_dim=True, drop_whole_embeddings=False,
-                     one_hot=False, out_dim=None, shared_embedding=False, n_shared_embs=8,
-                     shared_embedding_added=False):
-            """
-            :param minimize_emb_dim:
-                Whether to set embedding_dim = max_emb_dim or to make embedding_dim smaller is num_embeddings is small
-            :param drop_whole_embeddings:
-                If True, dropout pretends the embedding was a missing value. If false, dropout sets embed features to 0
-            :param one_hot:
-                If True, one-hot encode variables whose cardinality is < max_emb_dim. Also, set reqiures_grad = False
-            :param out_dim:
-                If None, return the embedding straight from self.embed.  If another dimension, put the embedding through a
-                Linear layer to make it size (batch x out_dim).
-             :param shared_embedding:
-                If True, 1/(n_shared_embs)th of every embedding will be reserved for a learned parameter that's common to all embeddings.
-                This is useful for transformers to identify which column an embedding came from.
-                Mutually exclusive with one_hot.
-
-            Note: the 0 embedding is reserved for padding and masking.  The various encoders use 1 for missing values.
-
-            """
-            super().__init__()
-            try_import_torch()
-            import torch
-            import torch.nn as nn
-            assert not (one_hot and out_dim is not None)
-            self.p_dropout = p_dropout
-            self.drop_whole_embeddings = drop_whole_embeddings
-            self.shared_embedding = shared_embedding
-            self.shared_embedding_added = shared_embedding_added
-            if minimize_emb_dim or one_hot:
-                self.emb_dim = min(max_emb_dim, num_embeddings)  # Don't use a crazy huge embedding if not needed
+        """
+        super().__init__()
+        assert not (one_hot and out_dim is not None)
+        self.p_dropout = p_dropout
+        self.drop_whole_embeddings = drop_whole_embeddings
+        self.shared_embedding = shared_embedding
+        self.shared_embedding_added = shared_embedding_added
+        if minimize_emb_dim or one_hot:
+            self.emb_dim = min(max_emb_dim, num_embeddings)  # Don't use a crazy huge embedding if not needed
+        else:
+            self.emb_dim = max_emb_dim
+        self.reshape_out = nn.Identity()
+        if out_dim is not None:
+            assert self.emb_dim <= out_dim, 'Makes no sense: just set max_emb_dim = out_dim and out_dim = None'
+            if num_embeddings > self.emb_dim:
+                self.reshape_out = nn.Linear(self.emb_dim, out_dim, bias=True)
             else:
-                self.emb_dim = max_emb_dim
-            self.reshape_out = nn.Identity()
-            if out_dim is not None:
-                assert self.emb_dim <= out_dim, 'Makes no sense: just set max_emb_dim = out_dim and out_dim = None'
-                if num_embeddings > self.emb_dim:
-                    self.reshape_out = nn.Linear(self.emb_dim, out_dim, bias=True)
-                else:
-                    self.emb_dim = out_dim
-            # Note: if you change the name of self.embed, or initialize an embedding elsewhere in a model,
-            # the function get_optim will not work properly
-            self.embed = nn.Embedding(num_embeddings=num_embeddings + 1,
-                                      embedding_dim=self.emb_dim,
-                                      padding_idx=0)
-            self.embed.weight.data.clamp_(-2, 2)  # Use truncated normal init
-            if one_hot:
-                self.embed.weight.requires_grad = False
-                if num_embeddings <= max_emb_dim:
-                    self.embed.weight.data[1:, :] = torch.eye(self.emb_dim)
-            if shared_embedding:
-                assert not one_hot
-                ce_dim = self.emb_dim if shared_embedding_added else (
-                                                                         out_dim if out_dim else self.emb_dim) // n_shared_embs  # used to be //8
-                self.shared_emb = nn.Parameter(torch.empty(1, ce_dim).uniform_(-1, 1))
-            self.do = nn.Dropout(p=p_dropout)
+                self.emb_dim = out_dim
+        # Note: if you change the name of self.embed, or initialize an embedding elsewhere in a model,
+        # the function get_optim will not work properly
+        self.embed = nn.Embedding(num_embeddings=num_embeddings + 1,
+                                  embedding_dim=self.emb_dim,
+                                  padding_idx=0)
+        self.embed.weight.data.clamp_(-2, 2)  # Use truncated normal init
+        if one_hot:
+            self.embed.weight.requires_grad = False
+            if num_embeddings <= max_emb_dim:
+                self.embed.weight.data[1:, :] = torch.eye(self.emb_dim)
+        if shared_embedding:
+            assert not one_hot
+            ce_dim = self.emb_dim if shared_embedding_added else (
+                                                                     out_dim if out_dim else self.emb_dim) // n_shared_embs  # used to be //8
+            self.shared_emb = nn.Parameter(torch.empty(1, ce_dim).uniform_(-1, 1))
+        self.do = nn.Dropout(p=p_dropout)
 
-        def forward(self, input):
-            try_import_torch()
-            import torch
-            if self.drop_whole_embeddings and self.training:
-                mask = torch.zeros_like(input).bernoulli_(1 - self.p_dropout)
-                input = input * mask
-            out = self.embed(input)
-            if not self.drop_whole_embeddings:
-                out = self.do(out)
-            out = self.reshape_out(out)
-            if self.shared_embedding:
-                shared_emb = self.shared_emb.expand(out.shape[0], -1)
-                if not self.shared_embedding_added:
-                    out[:, :shared_emb.shape[1]] = shared_emb
-                else:
-                    out += shared_emb
-            return out
-
-
-
-
-
-    #num_embeddings, max_emb_dim, p_dropout, minimize_emb_dim = True, drop_whole_embeddings = False,
-    #one_hot = False, out_dim = None, shared_embedding = False, n_shared_embs = 8, shared_embedding_added = False):
-
-    #return EmbeddingInitializer(func, num_embeddings, max_emb_dim, p_dropout, minimize_emb_dim, drop_whole_embeddings, one_hot, out_dim, shared_embedding, n_shared_embs, shared_embedding_added)
+    def forward(self, input):
+        if self.drop_whole_embeddings and self.training:
+            mask = torch.zeros_like(input).bernoulli_(1 - self.p_dropout)
+            input = input * mask
+        out = self.embed(input)
+        if not self.drop_whole_embeddings:
+            out = self.do(out)
+        out = self.reshape_out(out)
+        if self.shared_embedding:
+            shared_emb = self.shared_emb.expand(out.shape[0], -1)
+            if not self.shared_embedding_added:
+                out[:, :shared_emb.shape[1]] = shared_emb
+            else:
+                out += shared_emb
+        return out
 
 
 def one_hot(x, card):
-    try_import_torch()
-    import torch
     assert isinstance(x, torch.LongTensor)
     assert x.dim() == 2
     x_one_hot = x.new_zeros(x.size()[0], card).scatter_(1, x, 1)
