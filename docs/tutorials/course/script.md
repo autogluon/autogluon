@@ -14,7 +14,7 @@ import numpy as np
 
 import mxnet as mx
 from mxnet import gluon, init
-from autogluon.task.image_classification.nets import get_built_in_network
+from autogluon.mxnet.task.nets import get_built_in_network
 ```
 
 Define a function for dataset meta data:
@@ -101,8 +101,8 @@ def train_loop(args, reporter):
 ### How to Do HPO Using AutoGluon on any Training Function
 
 ```{.python .input}
-import autogluon as ag
-from autogluon.utils.mxutils import get_data_rec
+import autogluon.core as ag
+from autogluon.core.utils import get_data_rec
 
 @ag.args(
     dataset='apparel',
@@ -138,7 +138,7 @@ print(myscheduler)
 
 ```{.python .input}
 # myscheduler.run()
-# myscheduler.join_tasks()
+# myscheduler.join_jobs()
 ```
 
 Plot the results.

@@ -8,8 +8,8 @@ This tutorial describes how you can exert greater control when using AutoGluon's
 Using the same census data table as in the :ref:`sec_tabularquick` tutorial, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import TabularPrediction as task
+import autogluon.core as ag
+from autogluon.tabular import TabularPrediction as task
 
 import numpy as np
 
@@ -331,7 +331,7 @@ where `MAX_NGRAM = 1000` say (try various values under 10000 to reduce the numbe
 
 ```
 from sklearn.feature_extraction.text import CountVectorizer
-from autogluon.utils.tabular.features.generators.auto_ml_pipeline import AutoMLPipelineFeatureGenerator
+from autogluon.tabular.features import AutoMLPipelineFeatureGenerator
 ```
 
 In addition to reducing memory usage, many of the above strategies can also be used to reduce training times.

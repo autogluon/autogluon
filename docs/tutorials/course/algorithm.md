@@ -15,14 +15,14 @@ compare their performance via toy experiments.
 
 ## FIFO Scheduling vs. Early Stopping
 
-In this section, we compare the different behaviors of a sequential First In, First Out (FIFO) scheduler using :class:`autogluon.scheduler.FIFOScheduler` vs. a preemptive scheduling algorithm
-:class:`autogluon.scheduler.HyperbandScheduler` that early-terminates certain training jobs that do not appear promising during their early stages.
+In this section, we compare the different behaviors of a sequential First In, First Out (FIFO) scheduler using :class:`autogluon.core.scheduler.FIFOScheduler` vs. a preemptive scheduling algorithm
+:class:`autogluon.core.scheduler.HyperbandScheduler` that early-terminates certain training jobs that do not appear promising during their early stages.
 
 ### Create a Dummy Training Function
 
 ```{.python .input}
 import numpy as np
-import autogluon as ag
+import autogluon.core as ag
 
 @ag.args(
     lr=ag.space.Real(1e-3, 1e-2, log=True),

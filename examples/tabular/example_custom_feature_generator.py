@@ -19,7 +19,7 @@ An advanced user may wish to create a custom feature generator to:
 # Loading Data #
 ################
 
-from autogluon import TabularPrediction as task
+from autogluon.tabular import TabularPrediction as task
 
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')  # can be local CSV file as well, returns Pandas DataFrame
 test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv')  # another Pandas DataFrame
@@ -40,7 +40,7 @@ print(X)
 # Fitting feature generators #
 ##############################
 
-from autogluon.utils.tabular.features.generators import CategoryFeatureGenerator, IdentityFeatureGenerator
+from autogluon.tabular.features import CategoryFeatureGenerator, IdentityFeatureGenerator
 
 # IdentityFeatureGenerator is a 'do-nothing' feature generator if given default arguments. It will simply pass the data along.
 identity_feature_generator = IdentityFeatureGenerator()
@@ -56,7 +56,7 @@ identity_feature_generator = IdentityFeatureGenerator(features_in=['age', 'workc
 X_transform = identity_feature_generator.fit_transform(X=X, verbosity=3)
 print(X_transform.head(5))  # Now the output only contains the two features we declared in the input arguments to the generator, acting as a feature filter.
 
-from autogluon.utils.tabular.features.feature_metadata import R_INT
+from autogluon.tabular.features import R_INT
 identity_feature_generator = IdentityFeatureGenerator(infer_features_in_args={'valid_raw_types': [R_INT]}, verbosity=3)  # Limit the valid input to only integer features.
 X_transform = identity_feature_generator.fit_transform(X=X)
 print(X_transform.head(5))  # Now the output only contains the int type features, acting as a type filter.
@@ -71,7 +71,7 @@ print(X_transform.head(5))  # Note that the int features were automatically filt
 #####################################
 
 from pandas import DataFrame
-from autogluon.utils.tabular.features.generators import AbstractFeatureGenerator
+from autogluon.tabular.features import AbstractFeatureGenerator
 
 
 # Feature generator to add k to all values of integer features.
@@ -109,7 +109,7 @@ print(X_transform.head(5))
 # Multi-stage feature generators #
 ##################################
 
-from autogluon.utils.tabular.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, DropUniqueFeatureGenerator, FillNaFeatureGenerator, PipelineFeatureGenerator
+from autogluon.tabular.features import AsTypeFeatureGenerator, BulkFeatureGenerator, DropUniqueFeatureGenerator, FillNaFeatureGenerator, PipelineFeatureGenerator
 
 # BulkFeatureGenerator is an implementation of AbstractFeatureGenerator that allows for advanced multi-stage feature generation.
 bulk_feature_generator = BulkFeatureGenerator(
@@ -153,7 +153,7 @@ print(X_test_transform.head(5))
 # Pre-made feature generators #
 ###############################
 
-from autogluon.utils.tabular.features.generators import AutoMLPipelineFeatureGenerator
+from autogluon.tabular.features import AutoMLPipelineFeatureGenerator
 
 # This is the default feature generator of AutoGluon, and contains many stages of preprocessing made to handle many types of data.
 # AutoMLPipelineFeatureGenerator is an implementation of PipelineFeatureGenerator

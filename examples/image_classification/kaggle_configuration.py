@@ -1,5 +1,5 @@
 import os
-import autogluon as ag
+import autogluon.core as ag
 from mxnet import optimizer as optim
 
 def download_shopee(dataset, data_path):

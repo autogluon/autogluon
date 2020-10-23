@@ -18,6 +18,7 @@
    .. code-block::
 
      python3 -m pip install --upgrade pip --user
+     python3 -m pip install --upgrade setuptools --user
 
 * I see the error "ERROR: No matching distribution found for mxnet<2.0.0,>=1.7.0b20200713".
 
@@ -26,6 +27,7 @@
    .. code-block::
 
      python3 -m pip install --upgrade pip --user
+     python3 -m pip install --upgrade setuptools --user
 
 * How can I install the customized mxnet (incubating) on SageMaker Notebook?
 
@@ -42,4 +44,4 @@
 * While running AutoGluon, I get error message "Check failed: e == cudaSuccess: CUDA: initialization error".
 
   You may have the wrong version of MXNet installed for your CUDA version.
-  Match the CUDA version carefully when following the installation instructions.
+  Match the CUDA version carefully when following the installation instructions (`nvcc --version`).

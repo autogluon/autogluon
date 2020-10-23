@@ -1,5 +1,4 @@
 import os
-import numpy as np
 
 import argparse, time, logging
 import mxnet as mx
@@ -7,13 +6,11 @@ from mxnet import gluon
 from mxnet.gluon.data.vision import transforms
 
 from gluoncv.model_zoo import get_model
-from gluoncv.utils import makedirs, LRScheduler
+from gluoncv.utils import LRScheduler
 from gluoncv.data import transforms as gcv_transforms
 
-import autogluon as ag
+import autogluon.core as ag
 
-import ConfigSpace as CS
-import ConfigSpace.hyperparameters as CSH
 
 # CLI
 def parse_args():
@@ -188,7 +185,7 @@ if __name__ == '__main__':
 
     print(myscheduler)
     myscheduler.run()
-    myscheduler.join_tasks()
+    myscheduler.join_jobs()
     myscheduler.get_training_curves('{}.png'.format(os.path.splitext(args.checkpoint)[0]))
     print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                    myscheduler.get_best_reward()))

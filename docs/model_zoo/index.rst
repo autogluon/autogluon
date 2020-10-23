@@ -11,7 +11,7 @@ Example showing how to load pretrained network 'efficientnet_b0', which was prod
 
 .. code-block:: python
 
-   import autogluon as ag
+   import autogluon.core as ag
    model = ag.model_zoo.get_model('efficientnet_b0', pretrained=True)
 
 
@@ -51,8 +51,8 @@ How to reproduce EfficientNet's neural architecture search
 .. code-block:: python
 
    import math
-   import autogluon as ag
-   from autogluon import ImageClassification as task
+   import autogluon.core as ag
+   from autogluon.vision import ImageClassification as task
 
    @ag.obj(
        width_coefficient=ag.space.Categorical(1.1, 1.2),

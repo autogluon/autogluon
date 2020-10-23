@@ -27,7 +27,7 @@ First, we consider the Stanford Sentiment Treebank ([SST](https://nlp.stanford.e
 
 
 ```{.python .input}
-from autogluon.utils.tabular.utils.loaders.load_pd import load
+from autogluon.core.utils.loaders.load_pd import load
 train_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
 dev_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
 rand_idx = np.random.permutation(np.arange(len(train_data)))[:2000]
@@ -42,7 +42,7 @@ To achieve reasonable performance in your applications, you should set much long
 
 
 ```{.python .input}
-from autogluon import TextPrediction as task
+from autogluon.text import TextPrediction as task
 
 predictor = task.fit(train_data, label='label', 
                      time_limits=60,

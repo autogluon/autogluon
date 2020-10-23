@@ -24,8 +24,10 @@ net = CIFARResNetV1(CIFARBasicBlockV1, layers, channels)
 We can visualize the network:
 
 ```{.python .input}
-import autogluon as ag
-ag.utils.plot_network(net, (1, 3, 32, 32))
+import autogluon.core as ag
+from autogluon.vision.utils import plot_network
+
+plot_network(net, (1, 3, 32, 32))
 ```
 
 ### Searchable Network Architecture Using AutoGluon Object
@@ -87,7 +89,7 @@ AutoGluon Object is compatible with Fit API in AutoGluon tasks, and also works w
 scripts using :func:`autogluon.autogluon_register_args`. We can start fitting:
 
 ```{.python .input}
-from autogluon import ImageClassification as task
+from autogluon.vision import ImageClassification as task
 # results = task.fit('cifar10', net=mynet, optimizer=myoptim, num_gpus=1, epochs=1)
 ```
 

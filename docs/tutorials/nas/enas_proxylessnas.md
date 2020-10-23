@@ -13,7 +13,7 @@ Recent work of ENAS and ProxylessNAS construct an over-parameterized network (su
 Import MXNet and AutoGluon:
 
 ```{.python .input}
-import autogluon as ag
+import autogluon.core as ag
 import mxnet as mx
 import mxnet.gluon.nn as nn
 ```
@@ -41,7 +41,7 @@ class ConvBNReLU(mx.gluon.HybridBlock):
 ### AutoGluon ENAS Unit
 
 ```{.python .input}
-from autogluon.contrib.enas import *
+from autogluon.extra.contrib.enas import *
 
 @enas_unit()
 class ResUnit(mx.gluon.HybridBlock):

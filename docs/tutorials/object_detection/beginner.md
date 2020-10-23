@@ -7,11 +7,11 @@ Object detection is the process of identifying and localizing objects in an imag
 
 Our goal is to detect motorbike in images by [YOLOv3 model](https://pjreddie.com/media/files/papers/YOLOv3.pdf). A tiny dataset is collected from VOC dataset, which only contains the motorbike category. The model pretrained on the COCO dataset is used to fine-tune our small dataset. With the help of AutoGluon, we are able to try many models with different hyperparameters automatically, and return the best one as our final model. 
 
-To start, import autogluon and ObjectDetection module as your task: 
+To start, import autogluon.vision and ObjectDetection module as your task: 
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import ObjectDetection as task
+import autogluon.core as ag
+from autogluon.vision import ObjectDetection as task
 ```
 
 ## Tiny_motorbike Dataset
@@ -76,7 +76,7 @@ We can also save the trained model, and use it later.
 savefile = 'model.pkl'
 detector.save(savefile)
 
-from autogluon import Detector
+from autogluon.vision import Detector
 new_detector = Detector.load(savefile)
 ```
 

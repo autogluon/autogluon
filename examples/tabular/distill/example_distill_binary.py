@@ -1,7 +1,7 @@
 """ Example: distilling AutoGluon's ensemble-predictor into a single model for binary classification. """
 
 import shutil
-from autogluon import TabularPrediction as task
+from autogluon.tabular import TabularPrediction as task
 
 subsample_size = 500
 time_limits = 60

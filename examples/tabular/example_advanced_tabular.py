@@ -3,8 +3,8 @@
     To maximize predictive accuracy, we recommend you do NOT specify `hyperparameters` or `hyperparameter_tune`, and instead only specify the following fit() arguments: eval_metric=YOUR_METRIC, presets='best_quality'
 """
 
-import autogluon as ag
-from autogluon import TabularPrediction as task
+import autogluon.core as ag
+from autogluon.tabular import TabularPrediction as task
 
 # Training time:
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv') # can be local CSV file as well, returns Pandas DataFrame

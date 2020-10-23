@@ -120,9 +120,16 @@ train/*
 
 tutorials/checkpoint/*
 tutorials/train/*
-autogluon/version.py
 examples/image_classification/*/
 examples/image_classification/*.csv
 tests/unittests/*.zip
+
+autogluon/src/autogluon/version.py
+core/src/autogluon/core/version.py
+mxnet/src/autogluon/mxnet/version.py
+extra/src/autogluon/extra/version.py
+tabular/src/autogluon/tabular/version.py
+text/src/autogluon/text/version.py
+vision/src/autogluon/vision/version.py
 
 AutogluonModels

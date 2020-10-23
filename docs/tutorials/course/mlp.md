@@ -18,8 +18,8 @@ from mxnet import gluon, autograd
 from mxnet.gluon import nn
 
 # AutoGluon and HPO tools
-import autogluon as ag
-from autogluon.utils import load_and_split_openml_data
+import autogluon.core as ag
+from autogluon.mxnet.utils import load_and_split_openml_data
 ```
 
 Check the version of MxNet, you should be fine with version >= 1.5
@@ -31,7 +31,8 @@ mx.__version__
 You can also check the version of AutoGluon and the specific commit and check that it matches what you want.
 
 ```{.python .input  n=3}
-ag.__version__
+import autogluon.core.version
+ag.version.__version__
 ```
 
 ## Hyperparameter Optimization of a 2-layer MLP

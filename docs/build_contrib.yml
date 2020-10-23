@@ -4,7 +4,6 @@ dependencies:
 - graphviz
 - pip:
   - jupyter-sphinx>=0.2.2
-  - gluonnlp==0.8.1
   - mxnet_cu101==1.7.0
   - portalocker
   - nose
@@ -12,6 +11,5 @@ dependencies:
   - mu-notedown
   - torch
   - torchvision
-  - bokeh
   - openml
   - awscli>=1.18.140
