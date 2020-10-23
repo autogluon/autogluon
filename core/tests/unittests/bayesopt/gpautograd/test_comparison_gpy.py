@@ -169,6 +169,7 @@ def test_comparison_gpy():
     # Uncomment the lines between --- to re-generate data and GPy predictions
     # (assumes you have GPy available and verifying the version assertion in
     # `fit_predict_gpy`).
+    trg_path = os.path.join(tempfile.mkdtemp(), 'numcomp')
 
     if do_branin:
         random_seed = 894623209
@@ -178,21 +179,22 @@ def test_comparison_gpy():
         fname = fname_msk.format(data_name, num_train, 'gpy')
         branin_gpy = download_pickle_file(fname)
         # --------------------------------------------------------------------
-        # bb_cls = Branin
-        # branin = sample_data(bb_cls, num_train, num_grid,
-        #     expand_datadct=False)
-        # fname = os.path.join(
-        #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train,
-        #     'data')
-        # with open(fname, 'wb') as handle:
-        #     pickle.dump(branin, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        # branin = expand_data(branin)
+        #bb_cls = Branin
+        #branin = sample_data(bb_cls, num_train, num_grid,
+        #    expand_datadct=False)
+        #print("Storing files to " + trg_path)
+        #os.makedirs(trg_path, exist_ok=True)
+        #fname = os.path.join(
+        #    trg_path, fname_msk.format(data_name, num_train, 'data'))
+        #with open(fname, 'wb') as handle:
+        #    pickle.dump(branin, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        #branin = expand_data(branin)
         #
-        # branin_gpy = fit_predict_gpy(branin, random_seed, optimization_config)
-        # fname = os.path.join(
-        #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'gpy')
-        # with open(fname, 'wb') as handle:
-        #     pickle.dump(branin_gpy, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        #branin_gpy = fit_predict_gpy(branin, random_seed, optimization_config)
+        #fname = os.path.join(
+        #    trg_path, fname_msk.format(data_name, num_train, 'gpy'))
+        #with open(fname, 'wb') as handle:
+        #    pickle.dump(branin_gpy, handle, protocol=pickle.HIGHEST_PROTOCOL)
         # --------------------------------------------------------------------
 
         # test_intermediates = dict()  # DEBUG
@@ -231,21 +233,23 @@ def test_comparison_gpy():
         fname = fname_msk.format(data_name, num_train, 'gpy')
         threehump_gpy = download_pickle_file(fname)
         # --------------------------------------------------------------------
-        # bb_cls = ThreeHumpCamel
-        # threehump = sample_data(bb_cls, num_train, num_grid,
-        #     expand_datadct=False)
-        # fname = os.path.join(
-        #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'data')
-        # with open(fname, 'wb') as handle:
-        #     pickle.dump(threehump, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        # threehump = expand_data(threehump)
+        #bb_cls = ThreeHumpCamel
+        #threehump = sample_data(bb_cls, num_train, num_grid,
+        #    expand_datadct=False)
+        #print("Storing files to " + trg_path)
+        #os.makedirs(trg_path, exist_ok=True)
+        #fname = os.path.join(
+        #    trg_path, fname_msk.format(data_name, num_train, 'data'))
+        #with open(fname, 'wb') as handle:
+        #    pickle.dump(threehump, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        #threehump = expand_data(threehump)
         #
-        # threehump_gpy = fit_predict_gpy(
-        #     threehump, random_seed, optimization_config)
-        # fname = os.path.join(
-        #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'gpy')
-        # with open(fname, 'wb') as handle:
-        #     pickle.dump(threehump_gpy, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        #threehump_gpy = fit_predict_gpy(
+        #    threehump, random_seed, optimization_config)
+        #fname = os.path.join(
+        #    trg_path, fname_msk.format(data_name, num_train, 'gpy'))
+        #with open(fname, 'wb') as handle:
+        #    pickle.dump(threehump_gpy, handle, protocol=pickle.HIGHEST_PROTOCOL)
         # --------------------------------------------------------------------
 
         # test_intermediates = dict()  # DEBUG
@@ -281,20 +285,22 @@ def test_comparison_gpy():
         fname = fname_msk.format(data_name, num_train, 'gpy')
         ackley_gpy = download_pickle_file(fname)
         # --------------------------------------------------------------------
-        # bb_cls = Ackley
-        # ackley = sample_data(bb_cls, num_train, num_grid,
-        #     expand_datadct=False)
-        # fname = os.path.join(
-        #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'data')
-        # with open(fname, 'wb') as handle:
-        #     pickle.dump(ackley, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        # ackley = expand_data(ackley)
+        #bb_cls = Ackley
+        #ackley = sample_data(bb_cls, num_train, num_grid,
+        #    expand_datadct=False)
+        #print("Storing files to " + trg_path)
+        #os.makedirs(trg_path, exist_ok=True)
+        #fname = os.path.join(
+        #    trg_path, fname_msk.format(data_name, num_train, 'data'))
+        #with open(fname, 'wb') as handle:
+        #    pickle.dump(ackley, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        #ackley = expand_data(ackley)
         #
-        # ackley_gpy = fit_predict_gpy(ackley, random_seed, optimization_config)
-        # fname = os.path.join(
-        #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'gpy')
-        # with open(fname, 'wb') as handle:
-        #     pickle.dump(ackley_gpy, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        #ackley_gpy = fit_predict_gpy(ackley, random_seed, optimization_config)
+        #fname = os.path.join(
+        #    trg_path, fname_msk.format(data_name, num_train, 'gpy'))
+        #with open(fname, 'wb') as handle:
+        #    pickle.dump(ackley_gpy, handle, protocol=pickle.HIGHEST_PROTOCOL)
         # --------------------------------------------------------------------
 
         # test_intermediates = dict()  # DEBUG
