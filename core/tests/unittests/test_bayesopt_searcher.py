@@ -1,6 +1,7 @@
 import pytest
 import time
 import autogluon.core as ag
+import pytest
 
 from autogluon.core.searcher.bayesopt.utils.comparison_gpy import BraninWithR
 

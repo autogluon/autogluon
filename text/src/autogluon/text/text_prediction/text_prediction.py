@@ -50,16 +50,12 @@ def default() -> dict:
             },
         },
         'hpo_params': {
-            'scheduler': 'fifo',           # Can be 'fifo', 'hyperband'
-            'search_strategy': 'random',   # Can be 'random', 'skopt', or 'bayesopt'
-            'search_options': None,        # The search option
+            'search_strategy': 'random',   # Can be 'random', 'bayesopt', 'skopt',
+                                           # 'hyperband', 'bayesopt_hyperband'
+            'search_options': None,        # Extra kwargs passed to searcher
+            'scheduler_options': None,     # Extra kwargs passed to scheduler
             'time_limits': None,           # The total time limit
             'num_trials': 4,               # The number of trials
-            'reduction_factor': 4,         # The reduction factor
-            'grace_period': 10,            # The grace period
-            'max_t': 50,                   # The max_t in the hyperband
-            'time_attr': 'report_idx'      # The time attribute used in hyperband searcher.
-                                           # We report the validation accuracy 10 times each epoch.
         }
     }
     return ret
@@ -204,10 +200,10 @@ class TextPrediction(BaseTask):
             nthreads_per_trial=None,
             ngpus_per_trial=None,
             dist_ip_addrs=None,
-            scheduler=None,
             num_trials=None,
             search_strategy=None,
             search_options=None,
+            scheduler_options=None,
             hyperparameters=None,
             plot_results=None,
             seed=None,
@@ -252,17 +248,19 @@ class TextPrediction(BaseTask):
             The number of GPUs to use per individual model training run. If unspecified, a default value is chosen based on total number of GPUs available.
         dist_ip_addrs, default = None
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        scheduler : str, default = None
-            Controls scheduling of model training runs during HPO.
-            Options include: 'fifo' (first in first out) or 'hyperband'.
-            If unspecified, the default is 'fifo'.
         num_trials : , default = None
             The number of trials in the HPO search
         search_strategy : str, default = None
-            The search strategy
-        search_options : , default = None
-            Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune=True`).
-            Options include: 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search).
+            Which hyperparameter search algorithm to use. Options include:
+            'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization),
+            'skopt' (SKopt Bayesian optimization), 'grid' (grid search),
+            'hyperband' (Hyperband scheduling with random search), 'bayesopt-hyperband'
+            (Hyperband scheduling with GP-BO search).
+            If unspecified, the default is 'random'.
+        search_options : dict, default = None
+            Options passed to searcher.
+        scheduler_options : dict, default = None
+            Additional kwargs passed to scheduler __init__.
         hyperparameters : dict, default = None
             Determines the hyperparameters used by the models. Each hyperparameter may be either fixed value or search space of many values.
             For example of default hyperparameters, see: `autogluon.task.text_prediction.text_prediction.default()`
@@ -414,8 +412,6 @@ class TextPrediction(BaseTask):
         assert len(model_candidates) == 1, 'Only one model is supported currently'
         recommended_resource = get_recommended_resource(nthreads_per_trial=nthreads_per_trial,
                                                         ngpus_per_trial=ngpus_per_trial)
-        if scheduler is None:
-            scheduler = hyperparameters['hpo_params']['scheduler']
         if search_strategy is None:
             search_strategy = hyperparameters['hpo_params']['search_strategy']
         if time_limits is None:
@@ -431,11 +427,19 @@ class TextPrediction(BaseTask):
                                      .format(time_limits))
         if num_trials is None:
             num_trials = hyperparameters['hpo_params']['num_trials']
+        if scheduler_options is None:
+            scheduler_options = hyperparameters['hpo_params']['scheduler_options']
+        if search_strategy.endswith('hyperband'):
+            # Specific defaults for hyperband scheduling
+            if scheduler_options is None:
+                scheduler_options = dict()
+            scheduler_options['reduction_factor'] = scheduler_options.get(
+                'reduction_factor', 4)
+            scheduler_options['grace_period'] = scheduler_options.get(
+                'grace_period', 10)
+            scheduler_options['max_t'] = scheduler_options.get(
+                'max_t', 50)
 
-        # Setting the HPO-specific parameters.
-        reduction_factor = hyperparameters['hpo_params']['reduction_factor']
-        grace_period = hyperparameters['hpo_params']['grace_period']
-        max_t = hyperparameters['hpo_params']['max_t']
         if recommended_resource['num_gpus'] == 0:
             warnings.warn('Recommend to use GPU to run the TextPrediction task!')
         model = model_candidates[0]
@@ -448,12 +452,10 @@ class TextPrediction(BaseTask):
                     tuning_data=tuning_data,
                     resource=recommended_resource,
                     time_limits=time_limits,
-                    scheduler=scheduler,
-                    searcher=search_strategy,
+                    search_strategy=search_strategy,
+                    search_options=search_options,
+                    scheduler_options=scheduler_options,
                     num_trials=num_trials,
-                    reduction_factor=reduction_factor,
-                    grace_period=grace_period,
-                    max_t=max_t,
                     plot_results=plot_results,
                     console_log=verbosity > 2,
                     ignore_warning=verbosity <= 2)

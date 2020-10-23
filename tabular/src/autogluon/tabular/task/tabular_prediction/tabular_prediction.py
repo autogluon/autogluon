@@ -415,6 +415,7 @@ class TabularPrediction(BaseTask):
                 Ignored if `hyperparameter_tune=False`.
             search_options : dict, default = None
                 Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
+                Ignored if `hyperparameter_tune=False`.
             nthreads_per_trial : int, default = None
                 How many CPUs to use in each training run of an individual model.
                 This is automatically determined by AutoGluon when left as None (based on available compute).
