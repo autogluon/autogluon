@@ -1,3 +1,4 @@
+import pytest
 import time
 import autogluon.core as ag
 
@@ -63,14 +64,17 @@ def run_bayesopt_test(sch_type):
     myscheduler.join_jobs()
 
 
+@pytest.mark.skip(reason="This test is currently crashing the CI (#734)")
 def test_bayesopt_fifo():
     run_bayesopt_test('fifo')
 
 
+@pytest.mark.skip(reason="This test is currently crashing the CI (#734)")
 def test_bayesopt_hyperband_stopping():
     run_bayesopt_test('stopping')
 
 
+@pytest.mark.skip(reason="This test is currently crashing the CI (#734)")
 def test_bayesopt_hyperband_promotion():
     run_bayesopt_test('promotion')
 
