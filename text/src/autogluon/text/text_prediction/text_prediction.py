@@ -429,10 +429,10 @@ class TextPrediction(BaseTask):
             num_trials = hyperparameters['hpo_params']['num_trials']
         if scheduler_options is None:
             scheduler_options = hyperparameters['hpo_params']['scheduler_options']
-        if search_strategy.endswith('hyperband'):
-            # Specific defaults for hyperband scheduling
             if scheduler_options is None:
                 scheduler_options = dict()
+        if search_strategy.endswith('hyperband'):
+            # Specific defaults for hyperband scheduling
             scheduler_options['reduction_factor'] = scheduler_options.get(
                 'reduction_factor', 4)
             scheduler_options['grace_period'] = scheduler_options.get(

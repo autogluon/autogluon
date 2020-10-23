@@ -663,6 +663,8 @@ class BertForTextPredictionBasic:
         # Scheduler and searcher for HPO
         if search_strategy.endswith('hyperband') and time_limits is None:
             time_limits = 5 * 60 * 60  # 5 hours
+        if scheduler_options is None:
+            scheduler_options = dict()
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,
