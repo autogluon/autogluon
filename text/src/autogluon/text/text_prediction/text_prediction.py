@@ -81,6 +81,8 @@ def merge_params(base_params, partial_params=None):
     else:
         if not isinstance(partial_params, dict):
             return partial_params
+        if base_params is None:
+            base_params = dict()
         final_params = copy.deepcopy(base_params)
         for key in partial_params:
             if key in base_params:
