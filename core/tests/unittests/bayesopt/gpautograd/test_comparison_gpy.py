@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import tempfile
+import pytest
 
 from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm import \
     DEFAULT_METRIC
