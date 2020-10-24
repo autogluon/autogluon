@@ -25,3 +25,4 @@ After release is published, on the mainline branch:
     ```
 * Update `release` in `docs/config.ini`
 * Increment version in the `VERSION` file
+* Add new version links to `docs/versions.rst`
