@@ -61,7 +61,7 @@ class XGBoostModel(AbstractModel):
             verbose = True
             verbose_eval = 50
         else:
-            vervose = True
+            verbose = True
             verbose_eval = 1
         
         X_train = self.preprocess(X_train, is_train=True, max_category_levels=max_category_levels)
