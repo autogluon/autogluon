@@ -43,7 +43,7 @@ requirements = [
     'matplotlib',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',
-    'autogluon.core'
+    f'autogluon.core=={version}'
 ]
 
 test_requirements = [
