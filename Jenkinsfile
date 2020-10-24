@@ -167,7 +167,7 @@ stage("Build Docs") {
         python3 -m pip install --upgrade -e .
         cd ..
 
-        sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/https:\\/\\/${escaped_context_root}/g' docs/config.ini
+        sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini
 
         cd docs && bash build_doc.sh
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
