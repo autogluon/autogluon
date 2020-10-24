@@ -1,4 +1,3 @@
-import pytest
 import time
 import autogluon.core as ag
 import pytest
