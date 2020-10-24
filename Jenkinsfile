@@ -96,8 +96,9 @@ stage("Build Docs") {
             cacheControl = ''
         } else {
             isMaster = env.BRANCH_NAME == 'master'
+            isDev = env.BRANCH_NAME == 'dev'
             bucket = 'autogluon.mxnet.io'
-            path = isMaster ? 'dev' : "${env.BRANCH_NAME}"
+            path = isMaster ? 'dev' : isDev ? 'dev-branch' : "${env.BRANCH_NAME}"
             site = "${bucket}/${path}"
             flags = isMaster ? '' : '--delete'
             cacheControl = '--cache-control max-age=7200'
