@@ -3,7 +3,6 @@ from typing import List, Optional
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-import pytest
 import tempfile
 
 from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm import \
@@ -156,7 +155,6 @@ def download_pickle_file(fname):
 
 
 # Main testing function
-@pytest.mark.skip(reason="Pickle files still wrong")
 def test_comparison_gpy():
     optimization_config = DEFAULT_OPTIMIZATION_CONFIG
     fname_msk = '{}_{}_{}.pickle'
