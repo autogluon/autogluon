@@ -44,37 +44,12 @@ long_description = open(os.path.join('..', 'README.md')).read()
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
-    'Pillow<=6.2.1',
-    'numpy>=1.16.0',
-    'scipy>=1.3.3',
-    'cython',
-    'tornado>=5.0.1',
-    'requests',
-    'matplotlib',
-    'tqdm>=4.38.0',
-    'paramiko>=2.4',
-    'dask>=2.6.0',
-    'cryptography>=2.8',
-    'distributed>=2.6.0',
-    'ConfigSpace<=0.4.10',
-    'gluoncv>=0.5.0,<1.0',
-    'graphviz<0.9.0,>=0.8.1',
-    'fastparquet==0.4.1',
-    'scikit-optimize',
-    'catboost>=0.23.0,<0.25',
-    'pyarrow<=1.0.0',
-    'boto3',
-    'lightgbm>=3.0,<4.0',
-    'pandas>=1.0.0,<2.0',
-    'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
-    'scikit-learn>=0.22.0,<0.24',
-    'networkx>=2.3,<3.0',
-    'autogluon.core',
-    'autogluon.tabular',
-    'autogluon.mxnet',
-    'autogluon.extra',
-    'autogluon.text',
-    'autogluon.vision'
+    f'autogluon.core=={version}',
+    f'autogluon.tabular=={version}',
+    f'autogluon.mxnet=={version}',
+    f'autogluon.extra=={version}',
+    f'autogluon.text=={version}',
+    f'autogluon.vision=={version}'
 ]
 
 test_requirements = [
