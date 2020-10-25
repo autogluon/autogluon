@@ -177,7 +177,7 @@ Hyperband will try multiple hyperparameter configurations simultaneously and wil
 
 
 ```{.python .input}
-scheduler_options = {'max_t': 40}
+scheduler_options = {'max_t': 40}  # Maximal number of epochs for training the neural network
 hyperparameters['hpo_params'] = {
     'search_strategy': 'hyperband',
     'scheduler_options': scheduler_options
