@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import tempfile
-import pytest
+#import pytest
 
 from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm import \
     DEFAULT_METRIC
@@ -156,7 +156,7 @@ def download_pickle_file(fname):
 
 
 # Main testing function
-@pytest.mark.skip(reason="Pickle files not there yet")
+#@pytest.mark.skip(reason="Pickle files not there yet")
 def test_comparison_gpy():
     optimization_config = DEFAULT_OPTIMIZATION_CONFIG
     fname_msk = '{}_{}_{}.pickle'
