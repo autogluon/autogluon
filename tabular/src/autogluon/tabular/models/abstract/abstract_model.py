@@ -189,9 +189,6 @@ class AbstractModel:
         self.path = self.path[:-len(self.name) - 1] + name + os.path.sep
         self.name = name
 
-    # Extensions of preprocess must act identical in bagged situations, otherwise test-time predictions will be incorrect
-    # This means preprocess cannot be used for normalization
-    # TODO: Add preprocess_stateful() to enable stateful preprocessing for models such as KNN
     def preprocess(self, X, preprocess=True, preprocess_stateful=True, **kwargs):
         if preprocess:
             X = self._preprocess(X, **kwargs)
@@ -205,6 +202,7 @@ class AbstractModel:
         Data transformation logic that is non-stateful or ignores internal data values beyond feature dtypes should be added here.
         In bagged ensembles, preprocessing code that lives here will be executed only once per inference call regardless of the number of child models.
         If preprocessing code will produce the same output regardless of which child model processes the input data, then it should live here to avoid redundant repeated processing for each child.
+        This means this function cannot be used for data normalization. Use `_preprocess_stateful` instead.
         """
         if self.features is not None:
             # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
