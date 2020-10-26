@@ -2,9 +2,20 @@ import time
 import numpy as np
 import mxnet as mx
 
-__all__ = ['SplitSampler', 'SampledDataset', 'get_split_samplers']
+__all__ = [
+    'BaseDataset',
+    'SplitSampler',
+    'SampledDataset',
+    'get_split_samplers']
+
 
 SPLIT_SEED = int(time.time())
+
+
+class BaseDataset(mx.gluon.data.Dataset):
+    # put any sharable dataset methods here
+    pass
+
 
 def get_split_samplers(train_dataset, split_ratio=0.8):
     num_samples = len(train_dataset)
@@ -16,6 +27,7 @@ def get_split_samplers(train_dataset, split_ratio=0.8):
     train_sampler = SplitSampler(indices[0: split_idx])
     val_sampler = SplitSampler(indices[split_idx:num_samples])
     return train_sampler, val_sampler
+
 
 class SplitSampler(object):
     """Samples elements from [start, start+length) randomly without replacement.

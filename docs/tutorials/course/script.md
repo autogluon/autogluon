@@ -102,7 +102,7 @@ def train_loop(args, reporter):
 
 ```{.python .input}
 import autogluon.core as ag
-from autogluon.core.utils import get_data_rec
+from autogluon.mxnet.utils import get_data_rec
 
 @ag.args(
     dataset='apparel',
