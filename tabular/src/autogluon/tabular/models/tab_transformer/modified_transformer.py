@@ -48,7 +48,7 @@ def multi_head_attention_forward(self,
                                  static_v=None  # type: Optional[Tensor]
                                  ):
     # type: (...) -> Tuple[Tensor, Optional[Tensor]]
-    r"""
+    """
     Args:
         query, key, value: map a query and a set of key-value pairs to an output.
             See "Attention Is All You Need" for more details.

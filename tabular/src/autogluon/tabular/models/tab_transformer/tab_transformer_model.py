@@ -23,6 +23,7 @@ class TabTransformerModel(AbstractModel):
         super().__init__(**kwargs)
         self.types_of_features = None
         self.verbosity = None
+        self.temp_file_name = "tab_trans_temp.pth"
         try_import_torch()
 
     def _get_types_of_features(self, df):
@@ -283,7 +284,8 @@ class TabTransformerModel(AbstractModel):
                             best_val_metric = val_metric
 
                     best_val_epoch = e
-                    torch.save(self.model, 'tab_trans_temp.pth')
+                    os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                    torch.save(self.model, self.path + self.temp_file_name)
 
             # If time limit has exceeded or we haven't improved in some number of epochs, stop early.
             if e - best_val_epoch > epochs_wo_improve:
@@ -297,8 +299,8 @@ class TabTransformerModel(AbstractModel):
 
         if valloader is not None:
             try:
-                self.model = torch.load('tab_trans_temp.pth')
-                os.remove('tab_trans_temp.pth')
+                self.model = torch.load(self.path + self.temp_file_name)
+                os.remove(self.path + self.temp_file_name)
             except:
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
@@ -437,12 +439,9 @@ class TabTransformerModel(AbstractModel):
         2) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
         "pretrain API change".
         
-        3) Save intermediate model to "directory corresponding to specific training job". In other words, put
-        'tab_trans_temp.pth' in the correct location when saving off the model.
-        
-        4) Investigate options for when the unlabeled schema does not match the training schema. Currently,
+        3) Investigate options for when the unlabeled schema does not match the training schema. Currently,
         we do not allow such mismatches and the schemas must match exactly. We can investigate ways to use
         less or more columns from the unlabeled data. This will likely require a design meeting.
         
-        5) Enable hyperparameter tuning/searching. This will be done in a future PR.  
+        4) Enable hyperparameter tuning/searching. This will be done in a future PR.  
         """
