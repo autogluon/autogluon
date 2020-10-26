@@ -380,18 +380,19 @@ class AbstractTrainer:
             return self._predict_proba_model(X, model)
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
-    def get_inputs_to_model(self, model, X, model_pred_proba_dict=None, fit=False, preprocess=True):
+    def get_inputs_to_model(self, model, X, model_pred_proba_dict=None, fit=False, preprocess=False):
         if isinstance(model, str):
+            # TODO: Remove unnecessary load when no stacking
             model = self.load_model(model)
         model_level = self.get_model_level(model.name)
         if model_level >= 1 and isinstance(model, StackerEnsembleModel):
             if fit:
-                X = model.preprocess(X=X, preprocess=preprocess, fit=fit, model_pred_proba_dict=None)
+                X = model.preprocess(X=X, preprocess_inner=preprocess, fit=fit, model_pred_proba_dict=None)
             else:
                 model_set = self.get_minimum_model_set(model)
                 model_set = [m for m in model_set if m != model.name]  # TODO: Can probably be faster, get this result from graph
                 model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict, fit=fit)
-                X = model.preprocess(X=X, preprocess=preprocess, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
+                X = model.preprocess(X=X, preprocess_inner=preprocess, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
         elif preprocess:
             X = model.preprocess(X)
         return X
@@ -467,8 +468,8 @@ class AbstractTrainer:
             else:
                 model = self.load_model(model_name=model_name)
                 if isinstance(model, StackerEnsembleModel):
-                    X_input = model.preprocess(X=X, preprocess=True, infer=False, model_pred_proba_dict=model_pred_proba_dict)
-                    model_pred_proba_dict[model_name] = model.predict_proba(X_input, preprocess=False)
+                    preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
+                    model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
                 else:
                     model_pred_proba_dict[model_name] = model.predict_proba(X)
 
@@ -508,7 +509,7 @@ class AbstractTrainer:
                 cols_to_drop = dummy_stacker_start.stack_columns
                 X = X.drop(cols_to_drop, axis=1)
             dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
-            X = dummy_stacker.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=True)
+            X = dummy_stacker.preprocess(X=X, preprocess_inner=False, fit=True, compute_base_preds=True)
         elif y_pred_probas is not None:
             if y_pred_probas == []:
                 return X
@@ -532,7 +533,7 @@ class AbstractTrainer:
                     cols_to_drop = dummy_stackers[level].stack_columns
                 else:
                     cols_to_drop = []
-                X = dummy_stackers[level+1].preprocess(X=X, preprocess=False, fit=False, compute_base_preds=True)
+                X = dummy_stackers[level+1].preprocess(X=X, preprocess_inner=False, fit=False, compute_base_preds=True)
                 if len(cols_to_drop) > 0:
                     X = X.drop(cols_to_drop, axis=1)
         return X
@@ -1205,7 +1206,7 @@ class AbstractTrainer:
         if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        y_pred = model.predict(X=X, preprocess=False)
+        y_pred = model.predict(X=X)
         if self._regress_preds_asprobas and model.problem_type == REGRESSION:  # Convert regression preds to classes (during distillation)
             if (len(y_pred.shape) > 1) and (y_pred.shape[1] > 1):
                 problem_type = MULTICLASS
@@ -1218,7 +1219,7 @@ class AbstractTrainer:
         if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        return model.predict_proba(X=X, preprocess=False)
+        return model.predict_proba(X=X)
 
     def _get_dummy_stacker(self, level, model_levels, use_orig_features=True):
         model_names = model_levels[level - 1]
@@ -1286,7 +1287,7 @@ class AbstractTrainer:
         if raw:
             feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, subsample_size=subsample_size, silent=silent)
         else:
-            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, preprocess=False, subsample_size=subsample_size, is_oof=is_oof, silent=silent)
+            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, preprocess=True, subsample_size=subsample_size, is_oof=is_oof, silent=silent)
         return feature_importance
 
     # TODO: Can get feature importances of all children of model at no extra cost, requires scoring the values after predict_proba on each model

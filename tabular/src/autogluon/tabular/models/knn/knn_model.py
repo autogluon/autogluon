@@ -27,8 +27,8 @@ class KNNModel(AbstractModel):
         else:
             return KNeighborsClassifier
 
-    def preprocess(self, X):
-        X = super().preprocess(X).fillna(0)
+    def _preprocess(self, X, **kwargs):
+        X = super()._preprocess(X, **kwargs).fillna(0)
         X = X.to_numpy(dtype=np.float32)
         return X
 

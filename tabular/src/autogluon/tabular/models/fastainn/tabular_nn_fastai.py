@@ -96,7 +96,7 @@ class NNFastAiTabularModel(AbstractModel):
         X = super().preprocess(X)
         return X
 
-    def preprocess_train(self, X_train, Y_train, X_test, Y_test, **kwargs):
+    def preprocess_train(self, X_train, y_train, X_val, y_val, **kwargs):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
         from fastai.tabular import FillMissing, Categorify, Normalize
@@ -112,12 +112,12 @@ class NNFastAiTabularModel(AbstractModel):
         ]).columns.values.tolist()
 
         if self.problem_type == REGRESSION and self.y_scaler is not None:
-            Y_train_norm = pd.Series(self.y_scaler.fit_transform(Y_train.values.reshape(-1, 1)).reshape(-1))
-            Y_test_norm = pd.Series(self.y_scaler.transform(Y_test.values.reshape(-1, 1)).reshape(-1)) if Y_test is not None else None
+            y_train_norm = pd.Series(self.y_scaler.fit_transform(y_train.values.reshape(-1, 1)).reshape(-1))
+            y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
             logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
         else:
-            Y_train_norm = Y_train
-            Y_test_norm = Y_test
+            y_train_norm = y_train
+            y_val_norm = y_val
         try:
             X_train_stats = X_train.describe(include='all').T.reset_index()
             cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_train_stats['unique'].isna())]['index'].values
@@ -131,9 +131,9 @@ class NNFastAiTabularModel(AbstractModel):
         self.cont_columns = [feature for feature in self.cont_columns if feature in list(X_train.columns)]
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
         X_train = self.fold_preprocess(X_train, fit=True)
-        if X_test is not None:
-            X_test = self.fold_preprocess(X_test)
-        df_train, train_idx, val_idx = self._generate_datasets(X_train, Y_train_norm, X_test, Y_test_norm)
+        if X_val is not None:
+            X_val = self.fold_preprocess(X_val)
+        df_train, train_idx, val_idx = self._generate_datasets(X_train, y_train_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
         procs = [FillMissing, Categorify, Normalize]
         data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs)
@@ -221,9 +221,9 @@ class NNFastAiTabularModel(AbstractModel):
             self.params_trained['best_epoch'] = save_callback.best_epoch
 
 
-    def _generate_datasets(self, X_train, Y_train, X_val, Y_val):
+    def _generate_datasets(self, X_train, y_train, X_val, y_val):
         df_train = pd.concat([X_train, X_val], ignore_index=True)
-        df_train[LABEL] = pd.concat([Y_train, Y_val], ignore_index=True)
+        df_train[LABEL] = pd.concat([y_train, y_val], ignore_index=True)
         train_idx = np.arange(len(X_train))
         if X_val is None:
             val_idx = train_idx  # use validation set for refit_full case - it's not going to be used for early stopping
@@ -303,14 +303,13 @@ class NNFastAiTabularModel(AbstractModel):
             objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
         return objective_func_name_to_monitor
 
-    def _predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, **kwargs):
         from fastai.basic_data import DatasetType
         from fastai.tabular import TabularList
         from fastai.utils.mod_display import progress_disabled_ctx
         from fastai.tabular import FillMissing, Categorify, Normalize
 
-        if preprocess:
-            X = self.preprocess(X)
+        X = self.preprocess(X, **kwargs)
         procs = [FillMissing, Categorify, Normalize]
         self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs))
         with progress_disabled_ctx(self.model) as model:
@@ -351,11 +350,11 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
         # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
         # TODO that hyperparameter-tuning is not yet implemented
-        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
-        hpo_model_performances = {self.name: self.score(X_test, Y_test)}
+        self.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **kwargs)
+        hpo_model_performances = {self.name: self.score(X_val, y_val)}
         hpo_results = {}
         self.save()
         hpo_models = {self.name: self.path}

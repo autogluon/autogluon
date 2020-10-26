@@ -76,13 +76,17 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
         return oof_pred_proba / oof_pred_model_repeats_without_0
 
-    def preprocess(self, X, model=None):
-        if model is None:
-            if not self.models:
-                return X
-            model = self.models[0]
-        model = self.load_child(model)
-        return model.preprocess(X)
+    # TODO: preprocess instead of preprocess_inner?
+    def preprocess(self, X, model=None, preprocess_inner=True, **kwargs):
+        if preprocess_inner:
+            if model is None:
+                if not self.models:
+                    return X
+                model = self.models[0]
+            model = self.load_child(model)
+            return model.preprocess(X, preprocess_stateful=False)
+        else:
+            return X
 
     def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, **kwargs):
         if k_fold < 1:
@@ -237,13 +241,9 @@ class BaggedEnsembleModel(AbstractModel):
             self._k_fold_end = k_fold_end
             self._n_repeats_finished = self._n_repeats - 1
 
-    # FIXME: Defective if model does not apply same preprocessing in all bags!
-    #  No model currently violates this rule, but in future it could happen
-    def predict_proba(self, X, preprocess=True, normalize=None):
+    def predict_proba(self, X, normalize=None, **kwargs):
         model = self.load_child(self.models[0])
-        if preprocess:
-            X = self.preprocess(X, model=model)
-
+        X = self.preprocess(X, model=model, **kwargs)
         pred_proba = model.predict_proba(X=X, preprocess=False, normalize=normalize)
         for model in self.models[1:]:
             model = self.load_child(model)
@@ -251,6 +251,9 @@ class BaggedEnsembleModel(AbstractModel):
         pred_proba = pred_proba / len(self.models)
 
         return pred_proba
+
+    def _predict_proba(self, X, normalize=False, **kwargs):
+        return self.predict_proba(X=X, normalize=normalize, **kwargs)
 
     def score_with_oof(self, y):
         self._load_oof()

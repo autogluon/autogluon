@@ -192,7 +192,20 @@ class AbstractModel:
     # Extensions of preprocess must act identical in bagged situations, otherwise test-time predictions will be incorrect
     # This means preprocess cannot be used for normalization
     # TODO: Add preprocess_stateful() to enable stateful preprocessing for models such as KNN
-    def preprocess(self, X):
+    def preprocess(self, X, preprocess=True, preprocess_stateful=True, **kwargs):
+        if preprocess:
+            X = self._preprocess(X, **kwargs)
+        if preprocess_stateful:
+            X = self._preprocess_stateful(X, **kwargs)
+        return X
+
+    # TODO: Remove kwargs?
+    def _preprocess(self, X, **kwargs):
+        """
+        Data transformation logic that is non-stateful or ignores internal data values beyond feature dtypes should be added here.
+        In bagged ensembles, preprocessing code that lives here will be executed only once per inference call regardless of the number of child models.
+        If preprocessing code will produce the same output regardless of which child model processes the input data, then it should live here to avoid redundant repeated processing for each child.
+        """
         if self.features is not None:
             # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
             if list(X.columns) != self.features:
@@ -201,12 +214,26 @@ class AbstractModel:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
             ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', [])
             ignored_type_group_special = self.params_aux.get('ignored_type_group_special', [])
-            valid_features = self.feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+            # TODO: Consider changing how this works or where it is done
+            if self.feature_metadata is None:
+                feature_metadata = FeatureMetadata.from_df(X)
+            else:
+                feature_metadata = self.feature_metadata
+            valid_features = feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
             self.features = [feature for feature in self.features if feature in valid_features]
             if not self.features:
                 raise NoValidFeatures
             if list(X.columns) != self.features:
                 X = X[self.features]
+        return X
+
+    # TODO: Remove kwargs?
+    def _preprocess_stateful(self, X, **kwargs):
+        """
+        Data transformation logic that is stateful and fold specific should be added here.
+        In bagged ensembles, preprocessing code that lives in `_preprocess_stateful` will be executed on each child model once per inference call.
+        If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
+        """
         return X
 
     def _preprocess_fit_args(self, **kwargs):
@@ -241,23 +268,22 @@ class AbstractModel:
         X_train = self.preprocess(X_train)
         self.model = self.model.fit(X_train, y_train)
 
-    def predict(self, X, preprocess=True):
-        y_pred_proba = self.predict_proba(X, preprocess=preprocess)
+    def predict(self, X, **kwargs):
+        y_pred_proba = self.predict_proba(X, **kwargs)
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
-    def predict_proba(self, X, preprocess=True, normalize=None):
+    def predict_proba(self, X, normalize=None, **kwargs):
         if normalize is None:
             normalize = self.normalize_pred_probas
-        y_pred_proba = self._predict_proba(X=X, preprocess=preprocess)
+        y_pred_proba = self._predict_proba(X=X, **kwargs)
         if normalize:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
         return y_pred_proba
 
-    def _predict_proba(self, X, preprocess=True):
-        if preprocess:
-            X = self.preprocess(X)
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
 
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
@@ -275,16 +301,16 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, preprocess=True):
+    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, **kwargs):
         if eval_metric is None:
             eval_metric = self.eval_metric
         if metric_needs_y_pred is None:
             metric_needs_y_pred = self.metric_needs_y_pred
         if metric_needs_y_pred:
-            y_pred = self.predict(X=X, preprocess=preprocess)
+            y_pred = self.predict(X=X, **kwargs)
             return eval_metric(y, y_pred)
         else:
-            y_pred_proba = self.predict_proba(X=X, preprocess=preprocess)
+            y_pred_proba = self.predict_proba(X=X, **kwargs)
             return eval_metric(y, y_pred_proba)
 
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):

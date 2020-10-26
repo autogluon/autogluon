@@ -171,9 +171,8 @@ class LGBModel(AbstractModel):
         else:
             self.params_trained['num_boost_round'] = self.model.current_iteration()
 
-    def _predict_proba(self, X, preprocess=True):
-        if preprocess:
-            X = self.preprocess(X)
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
 
@@ -199,8 +198,8 @@ class LGBModel(AbstractModel):
             else:  # Should this ever happen?
                 return y_pred_proba[:, 1]
 
-    def preprocess(self, X, is_train=False):
-        X = super().preprocess(X=X)
+    def _preprocess(self, X, is_train=False, **kwargs):
+        X = super()._preprocess(X=X, **kwargs)
 
         if is_train:
             for column in X.columns:

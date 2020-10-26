@@ -73,7 +73,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None, model_pred_proba_dict=None):
+    def preprocess(self, X, fit=False, compute_base_preds=True, infer=True, model_pred_proba_dict=None, **kwargs):
         if self.stack_column_prefix_lst:
             if infer:
                 if set(self.stack_columns).issubset(set(list(X.columns))):
@@ -99,8 +99,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                     X = X_stacker
             elif not self.use_orig_features:
                 X = X[self.stack_columns]
-        if preprocess:
-            X = super().preprocess(X, model=model)
+        X = super().preprocess(X, **kwargs)
         return X
 
     def pred_probas_to_df(self, pred_proba: list, index=None) -> pd.DataFrame:
@@ -115,7 +114,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
         start_time = time.time()
-        X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
+        # TODO: This could be preprocess_inner=True in general, just have preprocess=False for child models
+        X = self.preprocess(X=X, preprocess_inner=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
         if len(self.models) == 0:
@@ -160,7 +160,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.model_base.feature_metadata = self.feature_metadata  # TODO: Move this
 
         # TODO: Preprocess data here instead of repeatedly
-        X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
+        X = self.preprocess(X=X, preprocess_inner=False, fit=True, compute_base_preds=compute_base_preds)
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=1)
 
         train_index, test_index = kfolds[0]

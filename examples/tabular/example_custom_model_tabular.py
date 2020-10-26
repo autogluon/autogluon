@@ -14,10 +14,10 @@ from autogluon.tabular.utils import infer_problem_type
 
 # In this example, we create a custom Naive Bayes model for use in AutoGluon
 class NaiveBayesModel(AbstractModel):
-    def preprocess(self, X):
+    def _preprocess(self, X, **kwargs):
         cat_columns = X.select_dtypes(['category', 'object']).columns
         X = X.drop(cat_columns, axis=1)
-        return super().preprocess(X).fillna(0)
+        return super()._preprocess(X, **kwargs).fillna(0)
 
     def _fit(self, X_train, y_train, **kwargs):
         from sklearn.naive_bayes import GaussianNB

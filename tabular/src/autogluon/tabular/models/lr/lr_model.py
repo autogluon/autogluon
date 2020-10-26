@@ -65,14 +65,12 @@ class LinearModel(AbstractModel):
         return features_selector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     # TODO: handle collinear features - they will impact results quality
-    def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000, model_specific_preprocessing=False):
-        X = super().preprocess(X=X)
-        if model_specific_preprocessing:  # This is hack to work-around pre-processing caching in bagging/stacker models
-            if is_train:
-                feature_types = self._get_types_of_features(X)
-                X = self.preprocess_train(X, feature_types, vect_max_features)
-            else:
-                X = self.pipeline.transform(X)
+    def _preprocess_stateful(self, X, is_train=False, vect_max_features=1000, **kwargs):
+        if is_train:
+            feature_types = self._get_types_of_features(X)
+            X = self.preprocess_train(X, feature_types, vect_max_features)
+        else:
+            X = self.pipeline.transform(X)
         return X
 
     def preprocess_train(self, X, feature_types, vect_max_features):
@@ -120,7 +118,7 @@ class LinearModel(AbstractModel):
         if self.problem_type == BINARY:
             y_train = y_train.astype(int).values
 
-        X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'], model_specific_preprocessing=True)
+        X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
 
         params = {k: v for k, v in self.params.items() if k in self.model_params}
 
@@ -138,10 +136,6 @@ class LinearModel(AbstractModel):
         logger.log(15, model)
 
         self.model = model.fit(X_train, y_train)
-
-    def _predict_proba(self, X, preprocess=True):
-        X = self.preprocess(X, is_train=False, model_specific_preprocessing=True)
-        return super()._predict_proba(X, preprocess=False)
 
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
         self.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **kwargs)
