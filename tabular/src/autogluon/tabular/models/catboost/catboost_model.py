@@ -39,8 +39,8 @@ class CatboostModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
 
-    def preprocess(self, X, **kwargs):
-        X = super().preprocess(X, **kwargs)
+    def _preprocess(self, X, **kwargs):
+        X = super()._preprocess(X, **kwargs)
         if self._category_features is None:
             self._category_features = list(X.select_dtypes(include='category').columns)
         if self._category_features:
