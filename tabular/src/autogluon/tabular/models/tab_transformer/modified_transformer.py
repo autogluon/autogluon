@@ -133,9 +133,6 @@ def multi_head_attention_forward(self,
     k = torch.cat([fixed_k.unsqueeze(1) for _ in range(key.shape[1])], dim=1)
     q = torch.cat([fixed_q.unsqueeze(1) for _ in range(key.shape[1])], dim=1)
     q = q * scaling
-    # print(q.shape)
-    # print(tgt_len)
-    # aaadddsdss
 
     q = q.contiguous().view(tgt_len, bsz * num_heads, head_dim).transpose(0, 1)
     k = k.contiguous().view(-1, bsz * num_heads, head_dim).transpose(0, 1)

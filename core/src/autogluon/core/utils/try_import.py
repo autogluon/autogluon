@@ -117,5 +117,5 @@ def try_import_torch():
     try:
         import torch
     except ImportError as e:
-        raise ImportError("Unable to import dependency torch"
+        raise ImportError("Unable to import dependency torch\n"
                           "A quick tip is to install via `pip install torch`.")

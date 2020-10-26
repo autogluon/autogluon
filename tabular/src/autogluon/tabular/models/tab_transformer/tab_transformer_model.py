@@ -11,7 +11,7 @@ from tqdm import tqdm
 from .hyperparameters.parameters import get_default_param
 from ..abstract.abstract_model import AbstractModel
 from ...constants import BINARY, REGRESSION
-from ...try_import import try_import_torch
+from autogluon.core.utils import try_import_torch
 
 logger = logging.getLogger(__name__)
 
@@ -142,9 +142,8 @@ class TabTransformerModel(AbstractModel):
         from .utils import augmentation
         is_train = (optimizers is not None)
         net.train() if is_train else net.eval()
-        total_loss, total_correct, total_num, data_bar = 0.0, 0.0, 0, tqdm(trainloader) if is_train else tqdm(valloader)
-
-        data_bar.disable = databar_disable
+        total_loss, total_correct, total_num = 0.0, 0.0, 0
+        data_bar = tqdm(trainloader, disable=databar_disable) if is_train else tqdm(valloader, disable=databar_disable)
 
         with (torch.enable_grad() if is_train else torch.no_grad()):
             for data, target in data_bar:
@@ -248,7 +247,7 @@ class TabTransformerModel(AbstractModel):
 
         best_loss = np.inf
 
-        self.verbosity = self.params.get('verbosity', 5)
+        self.verbosity = self.params.get('verbosity', 2)
         if self.verbosity <= 1:
             verbose_eval = -1
         elif self.verbosity == 2:

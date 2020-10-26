@@ -84,7 +84,6 @@ class CategoricalOrdinalEnc(EncBase):
         data = super().fit(data)
         distinct_vals = [i for i in pd.unique(data) if i is not None]
         sorted_vals = sorted(distinct_vals)
-        # print(data)
         if len(sorted_vals) >= 0.5 * len(data) or max(Counter(data).values()) < 10:  # sorry for hardcoding this...
             raise WontEncodeError("Too many unique values to bother embedding")
         self.init_with_sorted_values(sorted_vals)
