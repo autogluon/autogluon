@@ -13,7 +13,7 @@ def create_train_fn(epochs=9):
     @ag.args(x1=ag.space.Real(lower=-5, upper=10),
              x2=ag.space.Real(lower=0, upper=15),
              epochs=epochs)
-    def run_branin(args, reporter):
+    def run_branin(args, reporter, **kwargs):
         for epoch in range(args.epochs):
             time.sleep(0.1)
             branin_func = BraninWithR(r=epoch)
