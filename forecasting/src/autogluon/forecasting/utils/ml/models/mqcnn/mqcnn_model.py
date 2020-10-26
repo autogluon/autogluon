@@ -3,10 +3,11 @@ from .default_parameters import get_default_parameters
 from gluonts.model.seq2seq._mq_dnn_estimator import MQCNNEstimator
 import os
 import time
-from ......core import Int, Space
+from core import Int, Space
+import json
 from ..abstract.model_trial import model_trial
 from tqdm import tqdm
-from ......scheduler.fifo import FIFOScheduler
+from core.scheduler.fifo import FIFOScheduler
 
 
 class MQCNNModel(AbstractModel):
@@ -23,6 +24,7 @@ class MQCNNModel(AbstractModel):
         self.params = get_default_parameters()
 
     def create_model(self):
+        # print(self.params)
         self.model = MQCNNEstimator.from_hyperparameters(**self.params)
 
     def fit(self, train_ds):
@@ -38,22 +40,32 @@ class MQCNNModel(AbstractModel):
                                                          num_samples=num_samples)
         return list(tqdm(forecast_it, total=len(test_ds))), list(tqdm(ts_it, total=len(test_ds)))
 
-    def score(self, y, quantiles=[0.9]):
+    def score(self, y, metric=None):
+        """
+        metric: if metric is None, we will by default use mean_wQuantileLoss for scoring.
+                should be one of "MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"
+        """
+        if metric is None:
+            metric = "mean_wQuantileLoss"
+        if metric is not None and metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
+            raise ValueError(f"metric {metric} is not available yet.")
+
         from gluonts.evaluation import Evaluator
-        evaluator = Evaluator(quantiles=quantiles)
+        evaluator = Evaluator(quantiles=self.params["quantiles"])
         forecasts, tss = self.predict(y)
         num_series = len(tss)
         # print(num_series, forecasts, tss)
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
 
         # print(json.dumps(agg_metrics, indent=4))
-        return agg_metrics["mean_wQuantileLoss"]
+        return agg_metrics[metric]
 
-    def hyperparameter_tune(self, train_data, test_data, **kwargs):
+    def hyperparameter_tune(self, train_data, test_data, metric=None, **kwargs):
         params_copy = self.params.copy()
         util_args = dict(
             train_ds=train_data,
             test_ds=test_data,
+            metric=metric,
             model=self,
         )
 

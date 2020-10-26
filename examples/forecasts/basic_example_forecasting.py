@@ -1,24 +1,25 @@
-from autogluon.utils.forecasting.ml.models.mqcnn.mqcnn_model import MQCNNModel
-from autogluon.task.forecasting.dataset import ForecastingDataset
-import autogluon as ag
+from forecasting.utils.ml.models.mqcnn.mqcnn_model import MQCNNModel
+from forecasting.task.forecasting.dataset import TimeSeriesDataset
+import core as ag
 
 
-dataset = ForecastingDataset(
+dataset = TimeSeriesDataset(
     train_path="./COV19/processed_train.csv",
     test_path="./COV19/processed_test.csv",
     index_column="name",
     target_column="ConfirmedCases",
-    date_column="Date")
-# model = MQCNNModel(hyperparameters={"context_length": 10})
+    time_column="Date")
+# model = MQCNNModel(hyperparameters={"context_length": 5 * dataset.prediction_length,
+#                                     "prediction_length": dataset.prediction_length,
+#                                     "freq": dataset.freq})
 # path = "test_model"
 # model.fit(dataset.train_ds)
-# model.save(path)
-# reloaded_model = MQCNNModel.load(path)
 # # predicted_test = model.predict(dataset.test_ds)
-# score = reloaded_model.score(dataset.test_ds)
+# score = model.score(dataset.test_ds)
+# print(score)
 
 
-@ag.args(context_length=ag.space.Int(1, 20))
+@ag.args(context_length=ag.Int(1, 20))
 def train_fn(args, reporter):
     context_length = args.context_length
     train_model = MQCNNModel(hyperparameters={"context_length": context_length})

@@ -1,5 +1,7 @@
-from ..base.base_predictor import BasePredictor
+from autogluon.task.base.base_predictor import BasePredictor
 from .preset_configs import preset_models
+
+__all__ = ['ForecastingPredictor']
 
 
 class ForecastingPredictor(BasePredictor):

@@ -3,18 +3,18 @@ from gluonts.dataset.field_names import FieldName
 from gluonts.dataset.common import ListDataset
 import pandas as pd
 
-__all__ = ["ForecastingDataset", "transform_tabular_to_gluonts_dataset", "gluonts_builtin_datasets"]
+__all__ = ["TimeSeriesDataset", "transform_tabular_to_gluonts_dataset", "gluonts_builtin_datasets"]
 
 
 def gluonts_builtin_datasets():
     return list(dataset_recipes.keys())
 
 
-def rebuild_tabular(X, index_column, date_column, target_column):
+def rebuild_tabular(X, time_column, target_column, index_column=None):
     """
     X: dataframe to rebuild, should have the form of:
     >>> X
-      index_column date_column  target_column
+      index_column time_column  target_column
     0            A  2020-01-22              1
     1            A  2020-01-23              2
     2            A  2020-01-24              3
@@ -24,12 +24,17 @@ def rebuild_tabular(X, index_column, date_column, target_column):
     6            C  2020-01-22              1
     7            C  2020-01-23              2
     8            C  2020-01-24              3
-    index_column: time series index, in the above example, there are three ts: A, B, C
-    date_column: date of a data
-    target_column: the predict target
+
+    index_column: time series index, in the above example, there are three ts: A, B, C,
+                  if index_column is None, we will assume that the dataset contains only one time series
+
+    time_column: time of a data, in the form "YYYY-MM-DD HH:MM:SS", we are assuming that each time series contains the same time sequence,
+                 and the freq in each time series does not change.
+
+    target_column: values used for prediction, integers.
 
     output:
-    a new time series in the form that each line contains a time series
+    a new dataframe in the form that each line contains a time series
     transformed example would be:
     >>> X
           index_column  2020-01-22  2020-01-23  2020-01-24
@@ -38,24 +43,34 @@ def rebuild_tabular(X, index_column, date_column, target_column):
     2            B           1           2           3
 
     """
-    date_list = sorted(list(set(X[date_column])))
-    freq = pd.infer_freq(date_list)
+    if index_column is None:
+        X = X[[time_column, target_column]]
+        X["index_column"] = ["time_series" for i in range(X.shape[0])]
+    time_list = sorted(list(set(X[time_column])))
+    freq = pd.infer_freq(time_list)
+    if freq is None:
+        raise ValueError("Freq cannot be inferred. Check your dataset.")
 
     def reshape_dataframe(df):
+        """
+        for each time occurs in the dataset, we select the target value corresponding to
+        each time series, and use dataframe.pivot() to convert it to one column, where the column name is the
+        time, each row is the corresponding target value for each time series.
+        """
         data_dic = {index_column: list(set(df[index_column]))}
 
-        for date in date_list:
-            tmp = df[df[date_column] == date][[index_column, date_column, target_column]]
-            tmp = tmp.pivot(index=index_column, columns=date_column, values=target_column)
-            tmp_values = tmp[date].values
-            data_dic[date] = tmp_values
+        for time in time_list:
+            tmp = df[df[time_column] == time][[index_column, time_column, target_column]]
+            tmp = tmp.pivot(index=index_column, columns=time_column, values=target_column)
+            tmp_values = tmp[time].values
+            data_dic[time] = tmp_values
         return pd.DataFrame(data_dic)
 
     X = reshape_dataframe(X)
     return X, freq
 
 
-def transform_tabular_to_gluonts_dataset(X, freq, index_column):
+def transform_tabular_to_gluonts_dataset(X, freq, index_column=None):
     """
     transform a dataframe in the following form to a gluon-ts dataset
     >>> X
@@ -65,8 +80,12 @@ def transform_tabular_to_gluonts_dataset(X, freq, index_column):
     2            B           1           2           3
 
     """
-    date_list = X.columns[1:]
-    target_values = X.drop(index_column, axis=1).values
+    if index_column is not None:
+        target = X.drop(index_column, axis=1)
+    else:
+        target = X.copy()
+    target_values = target.values
+    date_list = target.columns
     processed_X = ListDataset([
         {
             FieldName.TARGET: target,
@@ -77,17 +96,14 @@ def transform_tabular_to_gluonts_dataset(X, freq, index_column):
     return processed_X, freq
 
 
-class ForecastingDataset:
+class TimeSeriesDataset:
 
-    def __init__(self, dataset_name="electricity", is_gluonts=True, train_path=None, test_path=None, is_train=True, prediction_length=None,
-                 index_column="index", date_column="date", target_column="target"):
+    def __init__(self, dataset_name=None, train_path=None, test_path=None, is_train=True, prediction_length=None,
+                 index_column="index", time_column="date", target_column="target"):
         """
         dataset used for Forecasting Task
 
         dataset_name: you can choose a built-in dataset in gluon-ts, default is the "electricity" dataset in gluon-ts
-
-        is_gluonts: boolean to determine whether the dataset is from gluon-ts or not, if train_path is
-                    specified, is_gluonts will be automatically turned to False
 
         train_path: path to the train data
 
@@ -99,19 +115,21 @@ class ForecastingDataset:
 
         index_column: time series index, in the above example, there are three ts: A, B, C
 
-        date_column: date of a data
+        time_column: date of a data
 
         target_column: the predict target
         """
         self.is_train = is_train
-        if dataset_name not in gluonts_builtin_datasets():
+        if dataset_name is not None and dataset_name not in gluonts_builtin_datasets():
             raise ValueError("Dataset {} is not available in gluonts.\n"
                              " Current available ones:\n"
                              "{}".format(dataset_name, gluonts_builtin_datasets()))
-        if train_path is not None and is_gluonts:
-            is_gluonts = False
-            print("Warning: is_gluonts is set to False since train_path and test_path are specified.")
-        if is_gluonts:
+
+        if dataset_name is not None:
+            if dataset_name not in gluonts_builtin_datasets():
+                raise ValueError("Dataset {} is not available in gluonts.\n"
+                                 " Current available ones:\n"
+                                 "{}".format(dataset_name, gluonts_builtin_datasets()))
             try:
                 dataset = get_dataset(dataset_name)
             except:
@@ -122,7 +140,12 @@ class ForecastingDataset:
             self.freq = dataset.metadata.freq
             self.prediction_length = dataset.metadata.prediction_length
         else:
-            train_csv, freq = rebuild_tabular(pd.read_csv(train_path), index_column, date_column, target_column)
+            if train_path is None:
+                raise ValueError("You must specify one of train_path and dataset_name to create TimeSeriesDataset.")
+            train_csv, freq = rebuild_tabular(X=pd.read_csv(train_path),
+                                              index_column=index_column,
+                                              time_column=time_column,
+                                              target_column=target_column)
             if is_train:
                 if test_path is None:
                     if prediction_length is None:
@@ -130,7 +153,10 @@ class ForecastingDataset:
                     else:
                         train_csv, test_csv = self.train_test_split(train_csv, prediction_length)
                 else:
-                    test_csv, _ = rebuild_tabular(pd.read_csv(test_path), index_column, date_column, target_column)
+                    test_csv, _ = rebuild_tabular(X=pd.read_csv(test_path),
+                                                  index_column=index_column,
+                                                  time_column=time_column,
+                                                  target_column=target_column)
 
                 self.train_ds, freq = transform_tabular_to_gluonts_dataset(X=train_csv,
                                                                            freq=freq,
@@ -159,10 +185,10 @@ class ForecastingDataset:
 
 
 if __name__ == '__main__':
-    dataset = ForecastingDataset(train_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_train.csv",
-                                 test_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_test.csv",
-                                 # prediction_length=19,
-                                 index_column="name",
-                                 target_column="ConfirmedCases",
-                                 date_column="Date")
+    dataset = TimeSeriesDataset(train_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_train.csv",
+                                test_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_test.csv",
+                                # prediction_length=19,
+                                index_column="name",
+                                target_column="ConfirmedCases",
+                                time_column="Date")
     print(dataset.freq, dataset.prediction_length)
