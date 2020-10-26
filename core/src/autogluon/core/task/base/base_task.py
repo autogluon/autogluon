@@ -1,5 +1,6 @@
 import collections
 import copy
+import logging
 import time
 from abc import abstractmethod
 
@@ -22,6 +23,8 @@ schedulers = {
     'bayesopt': FIFOScheduler,
     'bayesopt_hyperband': HyperbandScheduler}
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 def create_scheduler(train_fn, search_strategy, scheduler_options):
     if isinstance(search_strategy, str):
@@ -67,6 +70,8 @@ class BaseTask(object):
             plot_training_curves = scheduler_options['checkpoint'].replace('exp1.ag', 'plot_training_curves.png')
             scheduler.get_training_curves(filename=plot_training_curves, plot=True, use_legend=False)
         record_args = copy.deepcopy(args)
+        if results is None:
+            logger.warning('No valid results obtained with best config, the result may not be useful...')
         results.update(best_reward=best_reward,
                        best_config=best_config,
                        total_time=total_time,
