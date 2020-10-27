@@ -46,20 +46,37 @@ stage("Build Docs") {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
 
+        index_update_str = ''
         if (env.BRANCH_NAME.startsWith("PR-")) {
             bucket = 'autogluon-staging'
-            path = "${env.BRANCH_NAME}/${env.BUILD_NUMBER}/"
-            site = "${bucket}.s3-website-us-west-2.amazonaws.com/${path}index.html"
+            path = "${env.BRANCH_NAME}/${env.BUILD_NUMBER}"
+            site = "${bucket}.s3-website-us-west-2.amazonaws.com/${path}"
             flags = '--delete'
             cacheControl = ''
         } else {
             isMaster = env.BRANCH_NAME == 'master'
+            isDev = env.BRANCH_NAME == 'dev'
             bucket = 'autogluon.mxnet.io'
-            path = isMaster ? '' : "${env.BRANCH_NAME}/"
+            path = isMaster ? 'dev' : isDev ? 'dev-branch' : "${env.BRANCH_NAME}"
             site = "${bucket}/${path}"
             flags = isMaster ? '' : '--delete'
             cacheControl = '--cache-control max-age=7200'
+            if (isMaster) {
+                index_update_str = """
+                            aws s3 cp root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
+                            echo "Uploaded root_index.html s3://${bucket}/index.html"
+                        """
+            }
         }
+
+        other_doc_version_text = 'Stable Version Documentation'
+        other_doc_version_branch = 'stable'
+        if (env.BRANCH_NAME == 'stable') {
+            other_doc_version_text = 'Nightly Version Documentation'
+            other_doc_version_branch = 'dev'
+        }
+
+        escaped_context_root = site.replaceAll('\\/', '\\\\/')
 
         sh """#!/bin/bash
         set -ex
@@ -88,9 +105,16 @@ stage("Build Docs") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --upgrade --force-reinstall -e .
+
+        sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini
+        sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
+        sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
+
         cd docs && bash build_doc.sh
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
-        echo "Uploaded doc to http://${site}"
+        echo "Uploaded doc to http://${site}/index.html"
+
+        ${index_update_str}
         """
 
         if (env.BRANCH_NAME.startsWith("PR-")) {
