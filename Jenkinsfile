@@ -109,6 +109,14 @@ stage("Build Docs") {
                         """
             }
         }
+
+        other_doc_version_text = 'Stable Version Documentation'
+        other_doc_version_branch = 'stable'
+        if (env.BRANCH_NAME == 'stable') {
+            other_doc_version_text = 'Nightly Version Documentation'
+            other_doc_version_branch = 'dev'
+        }
+
         escaped_context_root = site.replaceAll('\\/', '\\\\/')
 
         sh """#!/bin/bash
@@ -168,6 +176,8 @@ stage("Build Docs") {
         cd ..
 
         sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini
+        sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
+        sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
 
         cd docs && bash build_doc.sh
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
