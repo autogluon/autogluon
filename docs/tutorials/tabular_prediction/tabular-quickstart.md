@@ -117,6 +117,7 @@ Above the scores of predictive performance were based on a default evaluation me
 
 ## Maximizing predictive performance
 
+**Note:** You should not call `fit()` with entirely default arguments if you are benchmarking AutoGluon-Tabular or hoping to maximize its accuracy!
 To get the best predictive accuracy with AutoGluon, you should generally use it like this:
 
 ```{.python .input}
