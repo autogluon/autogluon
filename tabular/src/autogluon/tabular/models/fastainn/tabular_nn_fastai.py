@@ -189,7 +189,7 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             time_left = None
 
-        best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full
+        best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         early_stopping_fn = partial(EarlyStoppingCallbackWithTimeLimit, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
                                     min_delta=self.params['early.stopping.min_delta'], patience=self.params['early.stopping.patience'],
                                     time_limit=time_left, best_epoch_stop=best_epoch_stop)
