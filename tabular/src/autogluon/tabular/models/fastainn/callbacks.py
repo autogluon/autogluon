@@ -12,17 +12,22 @@ logger = logging.getLogger(__name__)
 
 class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
 
-    def __init__(self, learn: Learner, time_limit=None, **kwargs):
+    def __init__(self, learn: Learner, time_limit=None, best_epoch_stop=None, **kwargs):
         super().__init__(learn, **kwargs)
         self.time_limit = time_limit
         self.start_time = time.time()
+        self.best_epoch_stop = best_epoch_stop
 
     def on_epoch_end(self, epoch, **kwargs):
+        if self.best_epoch_stop is not None:
+            if epoch >= self.best_epoch_stop:
+                logger.log(20, f'\tStopping at the best epoch learned earlier - {epoch}.')
+                return {'stop_training': True}
         if self.time_limit:
             time_elapsed = time.time() - self.start_time
             time_left = self.time_limit - time_elapsed
             if time_left <= 0:
-                logger.log(20, "\tRan out of time, stopping training early.")
+                logger.log(20, '\tRan out of time, stopping training early.')
                 return {'stop_training': True}
         return super().on_epoch_end(epoch, **kwargs)
 
@@ -30,9 +35,11 @@ class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
 class SaveModelCallback(TrackerCallback):
     """A `TrackerCallback` that saves the model when monitored quantity is best."""
 
-    def __init__(self, learn: Learner, monitor: str = 'valid_loss', mode: str = 'auto', every: str = 'improvement', name: str = 'bestmodel'):
+    def __init__(self, learn: Learner, monitor: str = 'valid_loss', mode: str = 'auto', every: str = 'improvement', name: str = 'bestmodel',
+                 best_epoch_stop=None):
         super().__init__(learn, monitor=monitor, mode=mode)
-        self.every, self.name, self.best = every, name, None
+        self.every, self.name, self.best, self.best_epoch = every, name, None, None
+        self.best_epoch_stop = best_epoch_stop
         if self.every not in ['improvement', 'epoch']:
             logger.warning(f'SaveModel every {self.every} is invalid, falling back to "improvement".')
             self.every = 'improvement'
@@ -46,7 +53,11 @@ class SaveModelCallback(TrackerCallback):
 
     def on_epoch_end(self, epoch: int, **kwargs: Any) -> None:
         """Compare the value monitored to its best score and maybe save the model."""
-        if self.every == "epoch":
+        if self.best_epoch_stop is not None:  # use epoch learned earlier
+            if epoch >= self.best_epoch_stop:
+                logger.log(15, f'Saving model model at the best epoch learned earlier - {epoch}.')
+                self.learn.save(f'{self.name}')
+        elif self.every == "epoch":
             self.learn.save(f'{self.name}_{epoch}')
         else:  # every="improvement"
             current = self.get_monitor_value()
@@ -54,6 +65,7 @@ class SaveModelCallback(TrackerCallback):
             if current is not None and self.operator(current, self.best):
                 logger.log(15, f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
                 self.best = current
+                self.best_epoch = epoch
                 self.learn.save(f'{self.name}')
 
     def on_train_end(self, **kwargs):

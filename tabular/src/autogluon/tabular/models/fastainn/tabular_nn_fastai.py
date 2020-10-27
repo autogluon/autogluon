@@ -142,7 +142,7 @@ class NNFastAiTabularModel(AbstractModel):
                 .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32))
         return data
 
-    def _fit(self, X_train, y_train, X_val, y_val, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
         try_import_fastai_v1()
         from fastai.layers import LabelSmoothingCrossEntropy
         from fastai.tabular import tabular_learner
@@ -150,6 +150,8 @@ class NNFastAiTabularModel(AbstractModel):
         from .callbacks import EarlyStoppingCallbackWithTimeLimit, SaveModelCallback
 
         start_time = time.time()
+
+        params = self.params.copy()
 
         self.y_scaler = self.params.get('y_scaler', None)
         if self.y_scaler is not None:
@@ -187,8 +189,10 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             time_left = None
 
+        best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         early_stopping_fn = partial(EarlyStoppingCallbackWithTimeLimit, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
-                                    min_delta=self.params['early.stopping.min_delta'], patience=self.params['early.stopping.patience'], time_limit=time_left)
+                                    min_delta=self.params['early.stopping.min_delta'], patience=self.params['early.stopping.patience'],
+                                    time_limit=time_left, best_epoch_stop=best_epoch_stop)
 
         self.model = tabular_learner(
             data, layers=layers, ps=ps, emb_drop=self.params['emb_drop'], metrics=nn_metric,
@@ -197,7 +201,8 @@ class NNFastAiTabularModel(AbstractModel):
         logger.log(15, self.model.model)
 
         with make_temp_directory() as temp_dir:
-            save_callback = SaveModelCallback(self.model, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, name=self.name)
+            save_callback = SaveModelCallback(self.model, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, name=self.name,
+                                              best_epoch_stop=best_epoch_stop)
             with progress_disabled_ctx(self.model) as model:
                 original_path = model.path
                 model.path = Path(temp_dir)
@@ -213,12 +218,17 @@ class NNFastAiTabularModel(AbstractModel):
 
                 logger.log(15, f'Model validation metrics: {eval_result}')
                 model.path = original_path
+            self.params_trained['best_epoch'] = save_callback.best_epoch
+
 
     def _generate_datasets(self, X_train, Y_train, X_val, Y_val):
         df_train = pd.concat([X_train, X_val], ignore_index=True)
         df_train[LABEL] = pd.concat([Y_train, Y_val], ignore_index=True)
         train_idx = np.arange(len(X_train))
-        val_idx = np.arange(len(X_val)) + len(X_train)
+        if X_val is None:
+            val_idx = train_idx  # use validation set for refit_full case - it's not going to be used for early stopping
+        else:
+            val_idx = np.arange(len(X_val)) + len(X_train)
         return df_train, train_idx, val_idx
 
     def __get_objective_func_name(self):
