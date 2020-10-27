@@ -37,7 +37,8 @@ performance = predictor.evaluate(test_data)
 See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for [documentation](https://autogluon.mxnet.io/api/index.html) and instructions on:
 - [Installing AutoGluon](http://autogluon.mxnet.io/index.html#installation)
 - [Learning with tabular data](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html)
-  - [Tips to maximize accuracy](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html#maximizing-predictive-performance)
+  - [Tips to maximize accuracy](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html#maximizing-predictive-performance) (if **benchmarking**, make sure to run `fit()` with argument `presets='best_quality'`).  
+  
 - [Learning with image data](http://autogluon.mxnet.io/tutorials/image_classification/beginner.html)
 - [Learning with text data](http://autogluon.mxnet.io/tutorials/text_prediction/beginner.html)
 - More advanced topics such as [Neural Architecture Search](http://autogluon.mxnet.io/tutorials/nas/index.html)
