@@ -72,6 +72,7 @@ class BaseTask(object):
         record_args = copy.deepcopy(args)
         if results is None:
             logger.warning('No valid results obtained with best config, the result may not be useful...')
+            results = {}
         results.update(best_reward=best_reward,
                        best_config=best_config,
                        total_time=total_time,
