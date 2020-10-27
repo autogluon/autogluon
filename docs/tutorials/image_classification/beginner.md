@@ -1,7 +1,7 @@
 # Image Classification - Quick Start
 :label:`sec_imgquick`
 
-In this quick start, we'll use the task of image classification to illustrate how to use AutoGluon’s APIs. 
+In this quick start, we'll use the task of image classification to illustrate how to use AutoGluon’s APIs.
 
 In this tutorial, we load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to AutoGluon's [fit](/api/autogluon.task.html#autogluon.vision.ImageClassification.fit) function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the model that achieved the highest level of accuracy.
 
@@ -18,23 +18,10 @@ For demonstration purposes, we use a subset of the [Shopee-IET dataset](https://
 Each image in this data depicts a clothing item and the corresponding label specifies its clothing category.
 Our subset of the data contains the following possible labels: `BabyPants`, `BabyShirt`, `womencasualshoes`, `womenchiffontop`.
 
-We download the data subset and unzip it using the following commands:
+We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
-filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
-ag.unzip(filename)
-```
-
-After the dataset is downloaded, we load it into a [Dataset](/api/autogluon.task.html#autogluon.vision.ImageClassification.Dataset) object: 
-
-```{.python .input}
-dataset = task.Dataset('data/train')
-```
-
-Load the test dataset as follows:
-
-```{.python .input}
-test_dataset = task.Dataset('data/test', train=False)
+dataset, val_dataset, test_dataset = task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 ```
 
 If you don't have a GPU, change the dataset to 'FashionMNIST' to ensure that it doesn't take too long to run:
@@ -51,6 +38,7 @@ Now, we fit a classifier using AutoGluon as follows:
 
 ```{.python .input}
 classifier = task.fit(dataset,
+                      val_data=val_dataset,
                       epochs=5,
                       ngpus_per_trial=1,
                       verbose=False)
