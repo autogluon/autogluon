@@ -1,6 +1,7 @@
 import autograd.numpy as anp
 import autograd.scipy.linalg as aspl
 from autograd.extend import primitive, defvjp
+import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ def flatten_and_concat(x: anp.ndarray, sigsq_init: anp.ndarray):
 
 
 @primitive
-def AddJitterOp(inputs: anp.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR,
+def AddJitterOp(inputs: np.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR,
                 jitter_growth=JITTER_GROWTH, debug_log='false'):      
     """
     Finds smaller jitter to add to diagonal of square matrix to render the
@@ -55,13 +56,13 @@ def AddJitterOp(inputs: anp.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR
     """
     assert initial_jitter_factor > 0. and jitter_growth > 1.
     n_square = inputs.shape[0] - 1
-    n = anp.int(anp.sqrt(n_square))
+    n = np.int(np.sqrt(n_square))
     assert n_square % n == 0 and n_square // n == n, "x must be square matrix, shape (n, n)"
-    x, sigsq_init = anp.reshape(inputs[:-1], (n, -1)), inputs[-1]
+    x, sigsq_init = np.reshape(inputs[:-1], (n, -1)), inputs[-1]
     
     def _get_constant_identity(x, constant):
         n, _ = x.shape
-        return anp.diag(anp.ones((n,)) * constant)
+        return np.diag(np.ones((n,)) * constant)
 
     def _get_jitter_upperbound(x):
         # To define a safeguard in the while-loop of the forward,
@@ -69,7 +70,7 @@ def AddJitterOp(inputs: anp.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR
         # the bound is quite generous, and is dependent on the scale of the input x
         # (the scale is captured via the trace of x)
         # the primary goal is avoid any infinite while-loop.
-        return JITTER_UPPERBOUND_FACTOR * max(1., anp.mean(anp.diag(x)))
+        return JITTER_UPPERBOUND_FACTOR * max(1., np.mean(np.diag(x)))
 
     jitter = 0.
     jitter_upperbound = _get_jitter_upperbound(x)
@@ -80,14 +81,14 @@ def AddJitterOp(inputs: anp.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR
         try:
             x_plus_constant = x + _get_constant_identity(
                 x, sigsq_init + jitter)
-            L = anp.linalg.cholesky(x_plus_constant)
+            L = np.linalg.cholesky(x_plus_constant)
             must_increase_jitter = False
-        except anp.linalg.LinAlgError:
+        except np.linalg.LinAlgError:
             if debug_log == 'true':
                 logger.info("sigsq = {} does not work".format(
                     sigsq_init + jitter))
             if jitter == 0.0:
-                jitter = initial_jitter_factor * max(1., anp.mean(anp.diag(x)))
+                jitter = initial_jitter_factor * max(1., np.mean(np.diag(x)))
             else:
                 jitter = jitter * jitter_growth
 
@@ -99,9 +100,12 @@ def AddJitterOp(inputs: anp.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR
     return x_plus_constant
 
 
-def AddJitterOp_vjp(ans: anp.ndarray, inputs: anp.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR, jitter_growth=JITTER_GROWTH, debug_log='false'):
+def AddJitterOp_vjp(
+        ans: np.ndarray, inputs: np.ndarray,
+        initial_jitter_factor=INITIAL_JITTER_FACTOR, jitter_growth=JITTER_GROWTH,
+        debug_log='false'):
     return lambda g: anp.append(anp.reshape(g, (-1,)), anp.sum(anp.diag(g)))
-    
+
 
 defvjp(AddJitterOp, AddJitterOp_vjp)
 
@@ -119,7 +123,7 @@ def cholesky_factorization(a):
     :param a: Symmmetric positive definite matrix A
     :return: Lower-triangular Cholesky factor L of A
     """
-    return anp.linalg.cholesky(a)
+    return np.linalg.cholesky(a)
 
 
 def copyltu(x):
