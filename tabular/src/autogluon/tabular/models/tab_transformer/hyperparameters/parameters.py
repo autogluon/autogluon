@@ -20,7 +20,6 @@ def get_fixed_params():
                     'one_hot_embeddings': False,
                     'drop_whole_embeddings': False,
                     'max_emb_dim': 8,
-                    'lr': 1e-3, # Learning rate
                     'weight_decay': 1e-6, # Rate of linear weight decay for learning rate
                     'base_exp_decay': 0.95, # Rate of exponential decay for learning rate
                     'encoders':  {'CATEGORICAL': 'CategoricalOrdinalEnc',
@@ -45,6 +44,14 @@ def get_fixed_params():
 
     return fixed_params
 
+def get_hyper_params():
+    """ Parameters that currently can be tuned during HPO """
+    hyper_params = {
+        'lr': 1e-3 # Learning rate
+    }
+
+    return hyper_params
+
 def get_default_param(problem_type, nunique=None):
 
     params = get_fixed_params()
@@ -56,5 +63,7 @@ def get_default_param(problem_type, nunique=None):
         params['n_classes'] = 2
     elif problem_type==MULTICLASS:
         params['n_classes'] = nunique
+
+    params.update(get_hyper_params())
 
     return params

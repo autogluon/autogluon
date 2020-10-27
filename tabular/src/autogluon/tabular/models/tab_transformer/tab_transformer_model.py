@@ -9,6 +9,7 @@ from autogluon.core.utils.loaders import load_pkl
 from tqdm import tqdm
 
 from .hyperparameters.parameters import get_default_param
+from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ...constants import BINARY, REGRESSION
 from autogluon.core.utils import try_import_torch
@@ -363,7 +364,10 @@ class TabTransformerModel(AbstractModel):
         self.model.eval()
         softmax = nn.Softmax(dim=1)
 
-        outputs = torch.zeros([len(loader.dataset), self.num_classes])
+        if self.problem_type == REGRESSION:
+            outputs = torch.zeros([len(loader.dataset), 1])
+        else:
+            outputs = torch.zeros([len(loader.dataset), self.num_classes])
 
         iter = 0
         for data, _ in loader:
@@ -371,17 +375,44 @@ class TabTransformerModel(AbstractModel):
                 data = data.cuda()
             with torch.no_grad():
                 data = Variable(data)
-                out, _ = self.model(data)
-                batch_size = len(out)
-                prob = softmax(out)
+                prob, _ = self.model(data)
+                batch_size = len(prob)
+                if self.problem_type != REGRESSION:
+                    prob = softmax(prob)
 
             outputs[iter:(iter + batch_size)] = prob
             iter += batch_size
 
         if self.problem_type == BINARY:
             return outputs[:, 1].cpu().numpy()
+        elif self.problem_type == REGRESSION:
+            outputs = outputs.flatten()
+            #return outputs.flatten().numpy()
 
         return outputs.cpu().numpy()
+
+    def _get_default_searchspace(self):
+        return get_default_searchspace()
+
+
+    # # TODO: Do I need X_unlabeled here?
+    # def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    #
+    #     time_start = time.time()
+    #
+    #     self._set_default_searchspace()
+    #
+    #     scheduler_func = scheduler_options[0]
+    #     scheduler_options = scheduler_options[1]
+    #
+    #     # TODO: What are "scheduler_options" here ?
+    #     #trainloader = X_train.build_loader()
+    #     #valloader =
+    #
+    #
+    #     return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+
+
 
     def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
         """
@@ -427,20 +458,12 @@ class TabTransformerModel(AbstractModel):
         """
         List of features to add (Updated by Anthony Galczak 10-20-20):
         
-        1) "Fix regression"
-        Currently, regression has a dimensionality issue (e.g. dims [400] passed instead of [400,1]) inside the TT model.
-        It also appears that the loss criterion for regression isn't actually being used.
-        
-        Joshs' comment on regression:
-        " doesn't properly work for regression problems yet - due to discretization datapreprocessing TabTransformers
-                                                                may inherantly be unsuitable for regression problems."
-        
-        2) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
+        1) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
         "pretrain API change".
         
-        3) Investigate options for when the unlabeled schema does not match the training schema. Currently,
+        2) Investigate options for when the unlabeled schema does not match the training schema. Currently,
         we do not allow such mismatches and the schemas must match exactly. We can investigate ways to use
         less or more columns from the unlabeled data. This will likely require a design meeting.
         
-        4) Enable hyperparameter tuning/searching. This will be done in a future PR.  
+        3) Enable hyperparameter tuning/searching. This will be done in a future PR.  
         """
