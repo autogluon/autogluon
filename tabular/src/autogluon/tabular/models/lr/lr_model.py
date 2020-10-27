@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer
 from .hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
+from ..abstract.model_trial import skip_hpo
 from ...constants import BINARY, REGRESSION
 from ...models.abstract.abstract_model import AbstractModel
 from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
@@ -137,20 +138,9 @@ class LinearModel(AbstractModel):
 
         self.model = model.fit(X_train, y_train)
 
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
-        self.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **kwargs)
-        hpo_model_performances = {self.name: self.score(X_val, y_val)}
-        hpo_results = {}
-        self.save()
-        hpo_models = {self.name: self.path}
-
-        return hpo_models, hpo_model_performances, hpo_results
-
-    def get_info(self):
-        # TODO: All AG-Tabular models now offer a get_info method:
-        # https://github.com/awslabs/autogluon/blob/master/autogluon/utils/tabular/ml/models/abstract/abstract_model.py#L474
-        # dict of weights?
-        return super().get_info()
+    # TODO: Add HPO
+    def hyperparameter_tune(self, **kwargs):
+        return skip_hpo(self, **kwargs)
 
     def _select_features_handle_text_include(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         # continuous = numeric features to rescale
