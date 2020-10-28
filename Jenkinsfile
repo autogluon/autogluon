@@ -25,12 +25,6 @@ stage("Unit Test") {
         pip uninstall -y autogluon.tabular
         pip uninstall -y autogluon.core
         pip uninstall -y autogluon-contrib-nlp
-        pip uninstall -y autogluon-core
-        pip uninstall -y autogluon-extra
-        pip uninstall -y autogluon-mxnet
-        pip uninstall -y autogluon-tabular
-        pip uninstall -y autogluon-text
-        pip uninstall -y autogluon-vision
 
         cd core/
         python3 -m pip install --upgrade -e .
