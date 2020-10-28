@@ -10,13 +10,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from autogluon.core.utils import try_import_fastai_v1
+from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_pkl
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION, BINARY, MULTICLASS
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils import try_import_fastai_v1
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
@@ -312,9 +312,17 @@ class NNFastAiTabularModel(AbstractModel):
         if preprocess:
             X = self.preprocess(X)
         procs = [FillMissing, Categorify, Normalize]
+
+        single_row = len(X) == 1
+        # fastai has issues predicting on a single row, duplicating the row as a workaround
+        if single_row:
+            X = pd.concat([X, X]).reset_index(drop=True)
+
         self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs))
         with progress_disabled_ctx(self.model) as model:
             preds, _ = model.get_preds(ds_type=DatasetType.Test)
+        if single_row:
+            preds = preds[:1, :]
         if self.problem_type == REGRESSION:
             if self.y_scaler is not None:
                 return self.y_scaler.inverse_transform(preds.numpy()).reshape(-1)
