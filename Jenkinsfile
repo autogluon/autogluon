@@ -107,7 +107,7 @@ stage("Build Docs") {
         other_doc_version_text = 'Stable Version Documentation'
         other_doc_version_branch = 'stable'
         if (env.BRANCH_NAME == 'stable') {
-            other_doc_version_text = 'Nightly Version Documentation'
+            other_doc_version_text = 'Dev Version Documentation'
             other_doc_version_branch = 'dev'
         }
 

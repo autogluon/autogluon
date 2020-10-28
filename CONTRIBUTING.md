@@ -44,10 +44,7 @@ GitHub provides additional document on [forking a repository](https://help.githu
 ## Tips for Modifying the Source Code
 
 - Using a fresh virtualenv, install the package via [these instructions](https://auto.gluon.ai/dev/install.html).
-Be sure to select the *Source* option from the installation preferences, and install the package after cloning this repository via:
-```
-python setup.py develop
-```
+Be sure to select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the only OS where all features are currently 100% functional. Avoid introducing changes that will only work on a particular OS, as we're currently working to support MacOSX and Windows. Changes to existing code that improve cross-platform compatibility are most welcome!
 
