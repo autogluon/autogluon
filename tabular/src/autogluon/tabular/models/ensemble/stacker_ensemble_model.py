@@ -114,8 +114,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
         start_time = time.time()
-        # TODO: This could be preprocess_inner=True in general, just have preprocess=False for child models
-        X = self.preprocess(X=X, preprocess_inner=False, fit=True, compute_base_preds=compute_base_preds)
+        # TODO: This could be preprocess=True in general, just have preprocess=False for child models
+        X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
         if len(self.models) == 0:
@@ -160,7 +160,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.model_base.feature_metadata = self.feature_metadata  # TODO: Move this
 
         # TODO: Preprocess data here instead of repeatedly
-        X = self.preprocess(X=X, preprocess_inner=False, fit=True, compute_base_preds=compute_base_preds)
+        X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=1)
 
         train_index, test_index = kfolds[0]

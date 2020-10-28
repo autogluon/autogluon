@@ -40,9 +40,9 @@ class AbstractModel:
                 path (str): directory where to store all outputs.
                 name (str): name of subdirectory inside path where model will be saved.
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-                eval_metric (str or autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
+                eval_metric (str or autogluon.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-                feature_metadata (autogluon.utils.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
+                feature_metadata (autogluon.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
         self.name = name
         self.path_root = path
@@ -299,6 +299,7 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
+    # TODO: Improve custom eval_metric support
     def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, **kwargs):
         if eval_metric is None:
             eval_metric = self.eval_metric
@@ -311,6 +312,7 @@ class AbstractModel:
             y_pred_proba = self.predict_proba(X=X, **kwargs)
             return eval_metric(y, y_pred_proba)
 
+    # TODO: Improve custom eval_metric support
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
         if eval_metric is None:
             eval_metric = self.eval_metric

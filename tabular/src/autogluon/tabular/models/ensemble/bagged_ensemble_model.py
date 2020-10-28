@@ -76,9 +76,8 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
         return oof_pred_proba / oof_pred_model_repeats_without_0
 
-    # TODO: preprocess instead of preprocess_inner?
-    def preprocess(self, X, model=None, preprocess_inner=True, **kwargs):
-        if preprocess_inner:
+    def preprocess(self, X, preprocess=True, model=None, **kwargs):
+        if preprocess:
             if model is None:
                 if not self.models:
                     return X
