@@ -51,7 +51,10 @@ detector = task.fit(dataset_train,
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal
-practice, it is common to only use `time_limits` and drop `num_trials`.
+practice, it is common to only use `time_limits` and drop `num_trials`. Also note
+that hyperparameter tuning defaults to random search. Model-based variants, such
+as `search_strategy='bayesopt'` or `search_strategy='bayesopt_hyperband'` can be
+a lot more sample-efficient.
 
 After fitting, AutoGluon automatically returns the best model among all models in the searching space. From the output, we know the best model is the one trained with the second learning rate. To see how well the returned model performed on test dataset, call detector.evaluate().
 

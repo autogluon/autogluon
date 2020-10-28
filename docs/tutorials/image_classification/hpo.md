@@ -86,12 +86,14 @@ surprisingly powerful by AutoGluon's support of asynchronous parallel execution.
 
 ### Bayesian Optimization
 
-Here is an example of using Bayesian Optimization using :class:`autogluon.core.searcher.SKoptSearcher`.
+Here is an example of using Bayesian Optimization using :class:`autogluon.core.searcher.GPFIFOSearcher`.
 
-Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration.
-
-You can specify what kind of surrogate model to use (e.g., Gaussian Process, Random Forest, etc.), in addition to which acquisition function to employ (e.g., Expected Improvement, Lower Confidence Bound, etc.).  In the following, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
-For more information, see :class:`autogluon.core.searcher.SKoptSearcher`.
+Bayesian Optimization fits a probabilistic *surrogate model* to estimate the
+function that relates each hyperparameter configuration to the resulting performance
+of a model trained under this hyperparameter configuration. Our implementation makes
+use of a Gaussian process surrogate model along with expected improvement as
+acquisition function. It has been developed specifically to support asynchronous
+parallel evaluations.
 
 ```{.python .input}
 time_limits = 2*60
@@ -100,8 +102,7 @@ epochs = 2
 classifier = task.fit(dataset,
                       net=net,
                       optimizer=optimizer,
-                      search_strategy='skopt', 
-                      search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
+                      search_strategy='bayesopt',
                       time_limits=time_limits,
                       epochs=epochs,
                       ngpus_per_trial=1,
@@ -110,7 +111,8 @@ classifier = task.fit(dataset,
 print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 ```
 
-Load the test dataset and evaluate:
+The BO searcher can be configured by `search_options`, see
+:class:`autogluon.core.searcher.GPFIFOSearcher`. Load the test dataset and evaluate:
 
 ```{.python .input}
 test_dataset = task.Dataset('data/test', train=False)
@@ -134,7 +136,6 @@ bracket, and stop/go decisions are made after 1 and 2 epochs (`grace_period`,
 `grace_period * reduction_factor`):
 
 ```{.python .input}
-search_strategy = 'hyperband'
 scheduler_options = {
     'grace_period': 1,
     'reduction_factor': 2,
@@ -143,7 +144,40 @@ scheduler_options = {
 classifier = task.fit(dataset,
                       net=net,
                       optimizer=optimizer,
-                      search_strategy=search_strategy,
+                      search_strategy='hyperband',
+                      epochs=4,
+                      num_trials=2,
+                      verbose=False,
+                      plot_results=True,
+                      ngpus_per_trial=1,
+                      scheduler_options=scheduler_options)
+
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
+```
+
+The test top-1 accuracy are:
+
+```{.python .input}
+test_acc = classifier.evaluate(test_dataset)
+print('Top-1 test acc: %.3f' % test_acc)
+```
+
+### Bayesian Optimization and Hyperband ###
+
+While Hyperband scheduling is normally driven by a random searcher, AutoGluon
+also provides Hyperband together with Bayesian optimization. The tuning of expensive
+DL models typically works best with this combination.
+
+```{.python .input}
+scheduler_options = {
+    'grace_period': 1,
+    'reduction_factor': 2,
+    'brackets': 1}
+
+classifier = task.fit(dataset,
+                      net=net,
+                      optimizer=optimizer,
+                      search_strategy='bayesopt_hyperband',
                       epochs=4,
                       num_trials=2,
                       verbose=False,

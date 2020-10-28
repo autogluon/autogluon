@@ -73,7 +73,6 @@ hyperparameters = {
             },
     },
     'hpo_params': {
-        'scheduler': 'fifo',  # schedule training jobs in a sequential first-in first-out fashion during HPO
         'search_strategy': 'random'  # perform HPO via simple random search
     }
 }
@@ -127,44 +126,43 @@ print('Prob = "{}"'.format(prediction2_prob[0]))
 ## Use Bayesian Optimization
 
 Instead of random search, we can perform HPO via [Bayesian Optimization](https://distill.pub/2020/bayesian-optimization/).
-Here we specify **skopt** as the searcher, which uses a BayesOpt implementation from the [scikit-optimize](https://scikit-optimize.github.io/stable/) library. 
+Here we specify **bayesopt** as the searcher.
 
 
 ```{.python .input}
 hyperparameters['hpo_params'] = {
-    'scheduler': 'fifo',
-    'search_strategy': 'skopt'
+    'search_strategy': 'bayesopt'
 }
 
-predictor_mrpc_skopt = task.fit(train_data, label='label',
+predictor_mrpc_bo = task.fit(train_data, label='label',
                                 hyperparameters=hyperparameters,
                                 time_limits=60 * 6,
                                 num_trials=5,  # increase this to get good performance in your applications
                                 ngpus_per_trial=1, seed=123,
-                                output_directory='./ag_mrpc_custom_space_fifo_skopt')
+                                output_directory='./ag_mrpc_custom_space_fifo_bo')
 ```
 
 
 ```{.python .input}
-dev_score = predictor_mrpc_skopt.evaluate(dev_data, metrics=['acc', 'f1'])
-print('Best Config = {}'.format(predictor_mrpc_skopt.results['best_config']))
-print('Total Time = {}s'.format(predictor_mrpc_skopt.results['total_time']))
+dev_score = predictor_mrpc_bo.evaluate(dev_data, metrics=['acc', 'f1'])
+print('Best Config = {}'.format(predictor_mrpc_bo.results['best_config']))
+print('Total Time = {}s'.format(predictor_mrpc_bo.results['total_time']))
 print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
 
 
 ```{.python .input}
-predictions = predictor_mrpc_skopt.predict(dev_data)
-prediction1 = predictor_mrpc_skopt.predict({'sentence1': [sentence1], 'sentence2': [sentence2]})
-prediction1_prob = predictor_mrpc_skopt.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence2]})
+predictions = predictor_mrpc_bo.predict(dev_data)
+prediction1 = predictor_mrpc_bo.predict({'sentence1': [sentence1], 'sentence2': [sentence2]})
+prediction1_prob = predictor_mrpc_bo.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence2]})
 print('A = "{}"'.format(sentence1))
 print('B = "{}"'.format(sentence2))
 print('Prediction = "{}"'.format(prediction1[0] == 1))
 print('Prob = "{}"'.format(prediction1_prob[0]))
 print('')
-prediction2 = predictor_mrpc_skopt.predict({'sentence1': [sentence1], 'sentence2': [sentence3]})
-prediction2_prob = predictor_mrpc_skopt.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence3]})
+prediction2 = predictor_mrpc_bo.predict({'sentence1': [sentence1], 'sentence2': [sentence3]})
+prediction2_prob = predictor_mrpc_bo.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence3]})
 print('A = "{}"'.format(sentence1))
 print('B = "{}"'.format(sentence3))
 print('Prediction = "{}"'.format(prediction2[0] == 1))
@@ -179,10 +177,10 @@ Hyperband will try multiple hyperparameter configurations simultaneously and wil
 
 
 ```{.python .input}
+scheduler_options = {'max_t': 40}  # Maximal number of epochs for training the neural network
 hyperparameters['hpo_params'] = {
-    'scheduler': 'hyperband',
-    'search_strategy': 'random',
-    'max_t': 40,  # Number of epochs per training run of one neural network
+    'search_strategy': 'hyperband',
+    'scheduler_options': scheduler_options
 }
 ```
 
@@ -215,6 +213,56 @@ print('Prob = "{}"'.format(prediction1_prob[0]))
 print('')
 prediction2 = predictor_mrpc_hyperband.predict({'sentence1': [sentence1], 'sentence2': [sentence3]})
 prediction2_prob = predictor_mrpc_hyperband.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence3]})
+print('A = "{}"'.format(sentence1))
+print('B = "{}"'.format(sentence3))
+print('Prediction = "{}"'.format(prediction2[0] == 1))
+print('Prob = "{}"'.format(prediction2_prob[0]))
+```
+
+
+## Use Hyperband together with Bayesian Optimization
+
+Finally, we can use a combination of [Hyperband and Bayesian Optimization](https://arxiv.org/abs/2003.10865).
+
+
+```{.python .input}
+scheduler_options = {'max_t': 40}
+hyperparameters['hpo_params'] = {
+    'search_strategy': 'bayesopt_hyperband',
+    'scheduler_options': scheduler_options
+}
+```
+
+
+```{.python .input}
+predictor_mrpc_bohb = task.fit(
+    train_data, label='label',
+    hyperparameters=hyperparameters,
+    time_limits=60 * 6, ngpus_per_trial=1, seed=123,
+    output_directory='./ag_mrpc_custom_space_bohb')
+```
+
+
+```{.python .input}
+dev_score = predictor_mrpc_bohb.evaluate(dev_data, metrics=['acc', 'f1'])
+print('Best Config = {}'.format(predictor_mrpc_bohb.results['best_config']))
+print('Total Time = {}s'.format(predictor_mrpc_bohb.results['total_time']))
+print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
+print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
+```
+
+
+```{.python .input}
+predictions = predictor_mrpc_bohb.predict(dev_data)
+prediction1 = predictor_mrpc_bohb.predict({'sentence1': [sentence1], 'sentence2': [sentence2]})
+prediction1_prob = predictor_mrpc_bohb.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence2]})
+print('A = "{}"'.format(sentence1))
+print('B = "{}"'.format(sentence2))
+print('Prediction = "{}"'.format(prediction1[0] == 1))
+print('Prob = "{}"'.format(prediction1_prob[0]))
+print('')
+prediction2 = predictor_mrpc_bohb.predict({'sentence1': [sentence1], 'sentence2': [sentence3]})
+prediction2_prob = predictor_mrpc_bohb.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence3]})
 print('A = "{}"'.format(sentence1))
 print('B = "{}"'.format(sentence3))
 print('Prediction = "{}"'.format(prediction2[0] == 1))
