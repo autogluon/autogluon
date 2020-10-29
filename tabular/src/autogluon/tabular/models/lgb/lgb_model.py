@@ -198,8 +198,8 @@ class LGBModel(AbstractModel):
             else:  # Should this ever happen?
                 return y_pred_proba[:, 1]
 
-    def _preprocess(self, X, is_train=False, **kwargs):
-        X = super()._preprocess(X=X, **kwargs)
+    def _preprocess_nonadaptive(self, X, is_train=False, **kwargs):
+        X = super()._preprocess_nonadaptive(X=X, **kwargs)
 
         if is_train:
             for column in X.columns:

@@ -191,18 +191,31 @@ class AbstractModel:
 
     def preprocess(self, X, preprocess_nonadaptive=True, preprocess_stateful=True, **kwargs):
         if preprocess_nonadaptive:
-            X = self._preprocess(X, **kwargs)
+            X = self._preprocess_nonadaptive(X, **kwargs)
         if preprocess_stateful:
-            X = self._preprocess_stateful(X, **kwargs)
+            X = self._preprocess(X, **kwargs)
         return X
 
     # TODO: Remove kwargs?
-    def _preprocess(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    def _preprocess(self, X: pd.DataFrame, **kwargs):
         """
+        Data transformation logic should be added here.
+        In bagged ensembles, preprocessing code that lives in `_preprocess` will be executed on each child model once per inference call.
+        If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
+
+        When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
+        """
+        return X
+
+    # TODO: Remove kwargs?
+    def _preprocess_nonadaptive(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """
+        Note: This method is intended for advanced users. It is usually sufficient to implement all preprocessing in `_preprocess` and leave this method untouched.
+            The potential benefit of implementing preprocessing in this method is an inference speedup when used in a bagged ensemble.
         Data transformation logic that is non-stateful or ignores internal data values beyond feature dtypes should be added here.
         In bagged ensembles, preprocessing code that lives here will be executed only once per inference call regardless of the number of child models.
         If preprocessing code will produce the same output regardless of which child model processes the input data, then it should live here to avoid redundant repeated processing for each child.
-        This means this function cannot be used for data normalization. Refer to `_preprocess_stateful` instead.
+        This means this method cannot be used for data normalization. Refer to `_preprocess` instead.
         """
         if self.features is not None:
             # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
@@ -223,15 +236,6 @@ class AbstractModel:
                 raise NoValidFeatures
             if list(X.columns) != self.features:
                 X = X[self.features]
-        return X
-
-    # TODO: Remove kwargs?
-    def _preprocess_stateful(self, X: pd.DataFrame, **kwargs):
-        """
-        Data transformation logic that is stateful and fold specific should be added here.
-        In bagged ensembles, preprocessing code that lives in `_preprocess_stateful` will be executed on each child model once per inference call.
-        If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
-        """
         return X
 
     def _preprocess_fit_args(self, **kwargs):

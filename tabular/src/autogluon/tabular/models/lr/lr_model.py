@@ -66,7 +66,7 @@ class LinearModel(AbstractModel):
         return features_selector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     # TODO: handle collinear features - they will impact results quality
-    def _preprocess_stateful(self, X, is_train=False, vect_max_features=1000, **kwargs):
+    def _preprocess(self, X, is_train=False, vect_max_features=1000, **kwargs):
         if is_train:
             feature_types = self._get_types_of_features(X)
             X = self.preprocess_train(X, feature_types, vect_max_features)

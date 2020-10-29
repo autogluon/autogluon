@@ -30,8 +30,8 @@ class RFModel(AbstractModel):
             return RandomForestClassifier
 
     # TODO: X.fillna -inf? Add extra is_missing column?
-    def _preprocess_stateful(self, X, **kwargs):
-        X = super()._preprocess_stateful(X, **kwargs)
+    def _preprocess(self, X, **kwargs):
+        X = super()._preprocess(X, **kwargs)
         if self._feature_generator is None:
             self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
             self._feature_generator.fit(X=X)

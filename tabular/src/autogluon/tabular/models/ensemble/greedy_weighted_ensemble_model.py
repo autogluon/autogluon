@@ -25,7 +25,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
             self._set_default_param_value(param, val)
 
     # TODO: Consider moving convert_pred_probas_df_to_list into inner model to ensure X remains a dataframe after preprocess is called
-    def _preprocess(self, X, **kwargs):
+    def _preprocess_nonadaptive(self, X, **kwargs):
         # TODO: super() call?
         X = self.convert_pred_probas_df_to_list(X)
         return X
