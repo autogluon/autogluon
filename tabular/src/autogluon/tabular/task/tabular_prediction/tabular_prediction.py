@@ -4,18 +4,20 @@ import math
 
 import numpy as np
 
+from autogluon.core.task.base import BaseTask, compile_scheduler_options
+from autogluon.core.task.base.base_task import schedulers
+from autogluon.core.utils import verbosity2loglevel
+from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
+
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
-from autogluon.core.task.base import BaseTask, compile_scheduler_options
-from autogluon.core.task.base.base_task import schedulers
-from autogluon.core.utils import verbosity2loglevel
 from ...features import AutoMLPipelineFeatureGenerator
-from ...metrics import get_metric
 from ...learner import DefaultLearner as Learner
+from ...metrics import get_metric
 from ...trainer import AutoTrainer
-from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
+
 
 __all__ = ['TabularPrediction']
 
@@ -141,9 +143,10 @@ class TabularPrediction(BaseTask):
                     This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
                     Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
 
-                ignore_text={'feature_generator_kwargs': {'enable_text_ngram_features': False, 'enable_text_special_features': False}}
+                ignore_text={'_feature_generator_kwargs': {'enable_text_ngram_features': False, 'enable_text_special_features': False}}
                     Disables automated feature generation when text features are detected.
                     This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
+                    Ignored if `feature_generator` was also specified.
 
         problem_type : str, default = None
             Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
@@ -479,6 +482,7 @@ class TabularPrediction(BaseTask):
             'ngpus_per_trial',
             'dist_ip_addrs',
             'visualizer',
+            '_feature_generator_kwargs',
         }
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
@@ -549,7 +553,11 @@ class TabularPrediction(BaseTask):
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory)  # Format directory name
 
-        feature_generator = kwargs.get('feature_generator', AutoMLPipelineFeatureGenerator())
+        _feature_generator_kwargs = kwargs.get('_feature_generator_kwargs', dict())
+        if _feature_generator_kwargs:
+            if 'feature_generator' in kwargs:
+                logger.log(30, "WARNING: `feature_generator` was specified and will override any presets that alter feature generation (such as 'ignore_text')")
+        feature_generator = kwargs.get('feature_generator', AutoMLPipelineFeatureGenerator(**_feature_generator_kwargs))
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         ag_args_fit = kwargs.get('AG_args_fit', {})
