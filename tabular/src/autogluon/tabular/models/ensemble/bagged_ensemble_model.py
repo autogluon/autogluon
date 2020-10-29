@@ -76,8 +76,8 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
         return oof_pred_proba / oof_pred_model_repeats_without_0
 
-    def preprocess(self, X, preprocess=True, model=None, **kwargs):
-        if preprocess:
+    def preprocess(self, X, preprocess_nonadaptive=True, model=None, **kwargs):
+        if preprocess_nonadaptive:
             if model is None:
                 if not self.models:
                     return X
@@ -243,10 +243,10 @@ class BaggedEnsembleModel(AbstractModel):
     def predict_proba(self, X, normalize=None, **kwargs):
         model = self.load_child(self.models[0])
         X = self.preprocess(X, model=model, **kwargs)
-        pred_proba = model.predict_proba(X=X, preprocess=False, normalize=normalize)
+        pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         for model in self.models[1:]:
             model = self.load_child(model)
-            pred_proba += model.predict_proba(X=X, preprocess=False, normalize=normalize)
+            pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
 
         return pred_proba
@@ -264,7 +264,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, silent=False, **kwargs) -> pd.Series:
+    def compute_feature_importance(self, X, y, features_to_use=None, is_oof=True, silent=False, **kwargs) -> pd.Series:
         feature_importance_fold_list = []
         fold_weights = []
         # TODO: Preprocess data here instead of repeatedly
@@ -280,7 +280,7 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, preprocess=preprocess, silent=silent, **kwargs)
+                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, silent=silent, **kwargs)
                 feature_importance_fold_list.append(feature_importance_fold)
                 fold_weights.append(len(test_index))
             model_index += k

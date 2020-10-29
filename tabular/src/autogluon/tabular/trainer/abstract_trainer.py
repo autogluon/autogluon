@@ -380,11 +380,11 @@ class AbstractTrainer:
             return self._predict_proba_model(X, model)
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
-    def get_inputs_to_model(self, model, X, model_pred_proba_dict=None, fit=False, preprocess=False):
+    def get_inputs_to_model(self, model, X, model_pred_proba_dict=None, fit=False, preprocess_nonadaptive=False):
         """
         For output X:
-            If preprocess=False, call model.predict(X)
-            If preprocess=True, call model.predict(X, preprocess=False)
+            If preprocess_nonadaptive=False, call model.predict(X)
+            If preprocess_nonadaptive=True, call model.predict(X, preprocess_nonadaptive=False)
         """
         if isinstance(model, str):
             # TODO: Remove unnecessary load when no stacking
@@ -397,8 +397,8 @@ class AbstractTrainer:
                 model_set = self.get_minimum_model_set(model)
                 model_set = [m for m in model_set if m != model.name]  # TODO: Can probably be faster, get this result from graph
                 model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict, fit=fit)
-            X = model.preprocess(X=X, preprocess=preprocess, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
-        elif preprocess:
+            X = model.preprocess(X=X, preprocess_nonadaptive=preprocess_nonadaptive, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
+        elif preprocess_nonadaptive:
             X = model.preprocess(X=X, preprocess_stateful=False)
         return X
 
@@ -514,7 +514,7 @@ class AbstractTrainer:
                 cols_to_drop = dummy_stacker_start.stack_columns
                 X = X.drop(cols_to_drop, axis=1)
             dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
-            X = dummy_stacker.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=True)
+            X = dummy_stacker.preprocess(X=X, preprocess_nonadaptive=False, fit=True, compute_base_preds=True)
         elif y_pred_probas is not None:
             if y_pred_probas == []:
                 return X
@@ -538,7 +538,7 @@ class AbstractTrainer:
                     cols_to_drop = dummy_stackers[level].stack_columns
                 else:
                     cols_to_drop = []
-                X = dummy_stackers[level+1].preprocess(X=X, preprocess=False, fit=False, compute_base_preds=True)
+                X = dummy_stackers[level+1].preprocess(X=X, preprocess_nonadaptive=False, fit=False, compute_base_preds=True)
                 if len(cols_to_drop) > 0:
                     X = X.drop(cols_to_drop, axis=1)
         return X
@@ -1292,7 +1292,7 @@ class AbstractTrainer:
         if raw:
             feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, subsample_size=subsample_size, silent=silent)
         else:
-            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, preprocess=True, subsample_size=subsample_size, is_oof=is_oof, silent=silent)
+            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, subsample_size=subsample_size, is_oof=is_oof, silent=silent)
         return feature_importance
 
     # TODO: Can get feature importances of all children of model at no extra cost, requires scoring the values after predict_proba on each model

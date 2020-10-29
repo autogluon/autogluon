@@ -189,15 +189,15 @@ class AbstractModel:
         self.path = self.path[:-len(self.name) - 1] + name + os.path.sep
         self.name = name
 
-    def preprocess(self, X, preprocess=True, preprocess_stateful=True, **kwargs):
-        if preprocess:
+    def preprocess(self, X, preprocess_nonadaptive=True, preprocess_stateful=True, **kwargs):
+        if preprocess_nonadaptive:
             X = self._preprocess(X, **kwargs)
         if preprocess_stateful:
             X = self._preprocess_stateful(X, **kwargs)
         return X
 
     # TODO: Remove kwargs?
-    def _preprocess(self, X, **kwargs):
+    def _preprocess(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """
         Data transformation logic that is non-stateful or ignores internal data values beyond feature dtypes should be added here.
         In bagged ensembles, preprocessing code that lives here will be executed only once per inference call regardless of the number of child models.
@@ -226,7 +226,7 @@ class AbstractModel:
         return X
 
     # TODO: Remove kwargs?
-    def _preprocess_stateful(self, X, **kwargs):
+    def _preprocess_stateful(self, X: pd.DataFrame, **kwargs):
         """
         Data transformation logic that is stateful and fold specific should be added here.
         In bagged ensembles, preprocessing code that lives in `_preprocess_stateful` will be executed on each child model once per inference call.
@@ -380,7 +380,7 @@ class AbstractModel:
         return model
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, subsample_size=10000, silent=False, **kwargs) -> pd.Series:
+    def compute_feature_importance(self, X, y, features_to_use=None, subsample_size=10000, silent=False, **kwargs) -> pd.Series:
         if (subsample_size is not None) and (len(X) > subsample_size):
             # Reset index to avoid error if duplicated indices.
             X = X.reset_index(drop=True)
@@ -392,8 +392,7 @@ class AbstractModel:
             X = X.copy()
             y = y.copy()
 
-        if preprocess:
-            X = self.preprocess(X)
+        X = self.preprocess(X=X, preprocess_stateful=False, **kwargs)
 
         if not features_to_use:
             features = list(X.columns.values)
@@ -406,10 +405,10 @@ class AbstractModel:
         banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         features = [feature for feature in features if feature not in banned_features]
 
-        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess=False, silent=silent)
+        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess_nonadaptive=False, silent=silent)
 
         feature_importances = pd.Series(permutation_importance_dict)
-        results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features)
+        results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features, dtype='float64')
         feature_importances = pd.concat([feature_importances, results_banned])
         feature_importances = feature_importances.sort_values(ascending=False)
 
@@ -420,17 +419,17 @@ class AbstractModel:
     # Compute feature importance via permutation importance
     # Note: Expensive to compute
     #  Time to compute is O(predict_time*num_features)
-    def compute_permutation_importance(self, X, y, features: list, preprocess=True, silent=False) -> dict:
+    def compute_permutation_importance(self, X, y, features: list, preprocess_nonadaptive=True, silent=False) -> dict:
         time_start = time.time()
 
         feature_count = len(features)
         if not silent:
             logger.log(20, f'Computing permutation importance for {feature_count} features on {self.name} ...')
-        if preprocess:
-            X = self.preprocess(X)
+        if preprocess_nonadaptive:
+            X = self.preprocess(X, preprocess_stateful=False)
 
         time_start_score = time.time()
-        model_score_base = self.score(X=X, y=y, preprocess=False)
+        model_score_base = self.score(X=X, y=y, preprocess_nonadaptive=False)
         time_score = time.time() - time_start_score
 
         if not silent:
@@ -473,9 +472,9 @@ class AbstractModel:
                 row_index = row_index_end
 
             if self.metric_needs_y_pred:
-                y_pred = self.predict(X_raw, preprocess=False)
+                y_pred = self.predict(X_raw, preprocess_nonadaptive=False)
             else:
-                y_pred = self.predict_proba(X_raw, preprocess=False)
+                y_pred = self.predict_proba(X_raw, preprocess_nonadaptive=False)
 
             row_index = 0
             for feature in parallel_computed_features:
