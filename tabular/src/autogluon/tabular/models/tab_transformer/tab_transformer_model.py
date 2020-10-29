@@ -11,8 +11,7 @@ from tqdm import tqdm
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
-from .utils import tt_trial
-from ...constants import BINARY, REGRESSION
+from ...constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.utils import try_import_torch
 
 logger = logging.getLogger(__name__)
@@ -65,10 +64,10 @@ class TabTransformerModel(AbstractModel):
 
             self.types_of_features.append({"name": feature, "type": type})
 
-    def set_default_params(self, y_train):
+    def _set_default_params(self):
         import torch
 
-        default_params = get_default_param(self.problem_type, y_train.nunique())
+        default_params = get_default_param(self.problem_type)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
@@ -82,9 +81,12 @@ class TabTransformerModel(AbstractModel):
 
     def get_model(self):
         from .tab_model_base import TabNet
-        self.model = TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
-        if self.params['device'].type == "cuda":
-            self.model = self.model.cuda()
+        # If we have already initialized the model, we don't need to do it again.
+        # TODO: Should this be initialized in init()?
+        if self.model is None:
+            self.model = TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
+            if self.params['device'].type == "cuda":
+                self.model = self.model.cuda()
 
     # TODO: Ensure column name uniqueness. Potential conflict if input column name has "/-#" in it.
     def _get_no_period_columns(self, X):
@@ -314,7 +316,14 @@ class TabTransformerModel(AbstractModel):
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, **kwargs):
         import torch
-        self.set_default_params(y_train)
+
+        if self.params['problem_type']==REGRESSION:
+            self.params['n_classes'] = 1
+        elif self.params['problem_type']==BINARY:
+            self.params['n_classes'] = 2
+        elif self.params['problem_type']==MULTICLASS:
+            self.params['n_classes'] = y_train.unique()
+
         num_cols = X_train.shape[1]
         if num_cols > self.params['max_columns']:
             raise NotImplementedError(
@@ -401,8 +410,9 @@ class TabTransformerModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace()
 
-    # TODO: Consider HPO for pretraining with unlabeled data. (Future work)
+    # TODO: Consider HPO for pretraining with unlabeled data. (Potential future work)
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+        from .utils import tt_trial
 
         time_start = time.time()
 
@@ -414,7 +424,22 @@ class TabTransformerModel(AbstractModel):
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
 
-        tt_trial.register_args()
+        self.get_model()
+
+        util_args = dict(
+            X_train=X_train,
+            y_train=y_train,
+            X_val=X_val,
+            y_val=y_val,
+            types_of_features=self.types_of_features,
+            model=self.model, # TODO: Is this TT_model or TabNet (get_model())? I think it should be self.model.
+            time_start=time_start,
+            time_limit=scheduler_options['time_out']
+        )
+
+        params_copy = self.params.copy()
+        print(params_copy)
+        tt_trial.register_args(util_args=util_args, **params_copy)
 
         scheduler = scheduler_func(tt_trial, **scheduler_options)
         scheduler.run()

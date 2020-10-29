@@ -52,17 +52,12 @@ def get_hyper_params():
 
     return hyper_params
 
-def get_default_param(problem_type, nunique=None):
+def get_default_param(problem_type):
 
     params = get_fixed_params()
     params['problem_type'] = problem_type
 
-    if problem_type==REGRESSION:
-        params['n_classes'] = 1
-    elif problem_type==BINARY:
-        params['n_classes'] = 2
-    elif problem_type==MULTICLASS:
-        params['n_classes'] = nunique
+
 
     params.update(get_hyper_params())
 
