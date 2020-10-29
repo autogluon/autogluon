@@ -39,7 +39,7 @@ class DefaultLearner(AbstractLearner):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
-                X_unlabeled (DataFrame): data used for pretraining a model. Mostly used in semi-supervised situations.
+                X_unlabeled (DataFrame): data used for pretraining a model. This is same data format as X, without label-column. This data is used for semi-supervised learning.
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
@@ -103,7 +103,7 @@ class DefaultLearner(AbstractLearner):
             self.stopping_metric = trainer.stopping_metric
 
         self.save()
-        trainer.train(X, y, X_val, y_val, X_unlabeled, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
+        trainer.train(X, y, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
                       hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limit_trainer)
         self.save_trainer(trainer=trainer)
         time_end = time.time()

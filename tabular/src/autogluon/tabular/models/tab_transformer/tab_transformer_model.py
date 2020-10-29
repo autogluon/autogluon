@@ -11,6 +11,7 @@ from tqdm import tqdm
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
+from .utils import tt_trial
 from ...constants import BINARY, REGRESSION
 from autogluon.core.utils import try_import_torch
 
@@ -85,6 +86,7 @@ class TabTransformerModel(AbstractModel):
         if self.params['device'].type == "cuda":
             self.model = self.model.cuda()
 
+    # TODO: Ensure column name uniqueness. Potential conflict if input column name has "/-#" in it.
     def _get_no_period_columns(self, X):
         # Latest pytorch does not support . in module names. Therefore, we must replace the . with some other symbol
         # that hopefully doesn't collide with other column names.
@@ -138,7 +140,7 @@ class TabTransformerModel(AbstractModel):
         return data, val_data, unlab_data
 
     def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch,
-               epochs, databar_disable, params):
+               epochs, databar_disable, reporter, params):
         import torch
         from .utils import augmentation
         is_train = (optimizers is not None)
@@ -185,6 +187,11 @@ class TabTransformerModel(AbstractModel):
                                             metric_needs_y_pred=self.stopping_metric_needs_y_pred)
                     data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(
                         train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
+
+                    if reporter is not None:
+                        # TODO: Is total_loss correct here? Do I want loss.item().asscalar() instead?
+                        reporter(epoch=epoch+1, validation_performance=val_metric, train_loss=total_loss)
+
                 else:
                     data_bar.set_description(
                         '{} Epoch: [{}/{}] Loss: {:.4f}'.format(train_test, epoch, epochs, total_loss / total_num))
@@ -195,7 +202,7 @@ class TabTransformerModel(AbstractModel):
             scheduler.step()
         return total_loss / total_num
 
-    def tt_fit(self, trainloader, valloader=None, y_val=None, state=None, time_limit=None):
+    def tt_fit(self, trainloader, valloader=None, y_val=None, state=None, time_limit=None, reporter=None):
         """
         Main training function for TabTransformer
         "state" must be one of [None, 'pretrain', 'finetune']
@@ -266,10 +273,10 @@ class TabTransformerModel(AbstractModel):
             # Whether or not we want to suppress output based on our verbosity.
             databar_disable = False if e % verbose_eval == 0 else True
 
-            train_loss, val_metric = self._epoch(self.model, trainloader=trainloader, valloader=valloader, y_val=y_val,
+            train_loss, val_metric = self._epoch(net=self.model, trainloader=trainloader, valloader=valloader, y_val=y_val,
                                                  optimizers=optimizers, loss_criterion=loss_criterion, \
                                                  pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs,
-                                                 databar_disable=databar_disable, params=self.params)
+                                                 databar_disable=databar_disable, reporter=reporter, params=self.params)
 
             # Early stopping for pretrain'ing based on loss.
             if state == 'pretrain':
@@ -305,18 +312,19 @@ class TabTransformerModel(AbstractModel):
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, **kwargs):
         import torch
         self.set_default_params(y_train)
         num_cols = X_train.shape[1]
         if num_cols > self.params['max_columns']:
             raise NotImplementedError(
                 f"This dataset has {num_cols} columns and exceeds 'max_columns' == {self.params['max_columns']}.\n"
-                f"If you are confident you will have enough memory, set 'max_columns' higher and try again.")
+                f"Which is set by default to ensure the TabTransformer model will not run out of memory.\n"
+                f"If you are confident you will have enough memory, set the 'max_columns' hyperparameter higher and try again.\n")
 
         train, val, unlab = self._tt_preprocess(X_train, X_val, X_unlabeled)
 
-        if self.problem_type == 'regression':
+        if self.problem_type == REGRESSION:
             train.targets = torch.FloatTensor(list(y_train))
             val.targets = torch.FloatTensor(list(y_val))
         else:
@@ -331,10 +339,10 @@ class TabTransformerModel(AbstractModel):
         self.get_model()
 
         if X_unlabeled is not None:
-            self.tt_fit(unlabloader, valloader, y_val, state='pretrain', time_limit=time_limit)
-            self.tt_fit(trainloader, valloader, y_val, state='finetune', time_limit=time_limit)
+            self.tt_fit(unlabloader, valloader, y_val, state='pretrain', time_limit=time_limit, reporter=reporter)
+            self.tt_fit(trainloader, valloader, y_val, state='finetune', time_limit=time_limit, reporter=reporter)
         else:
-            self.tt_fit(trainloader, valloader, y_val, time_limit=time_limit)
+            self.tt_fit(trainloader, valloader, y_val, time_limit=time_limit, reporter=reporter)
 
     def _predict_proba(self, X, preprocess=False):
         """
@@ -387,32 +395,33 @@ class TabTransformerModel(AbstractModel):
             return outputs[:, 1].cpu().numpy()
         elif self.problem_type == REGRESSION:
             outputs = outputs.flatten()
-            #return outputs.flatten().numpy()
 
         return outputs.cpu().numpy()
 
     def _get_default_searchspace(self):
         return get_default_searchspace()
 
+    # TODO: Consider HPO for pretraining with unlabeled data. (Future work)
+    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
 
-    # # TODO: Do I need X_unlabeled here?
-    # def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
-    #
-    #     time_start = time.time()
-    #
-    #     self._set_default_searchspace()
-    #
-    #     scheduler_func = scheduler_options[0]
-    #     scheduler_options = scheduler_options[1]
-    #
-    #     # TODO: What are "scheduler_options" here ?
-    #     #trainloader = X_train.build_loader()
-    #     #valloader =
-    #
-    #
-    #     return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        time_start = time.time()
 
+        self._set_default_searchspace()
 
+        scheduler_func = scheduler_options[0]
+        scheduler_options = scheduler_options[1]
+
+        if scheduler_func is None or scheduler_options is None:
+            raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
+
+        tt_trial.register_args()
+
+        scheduler = scheduler_func(tt_trial, **scheduler_options)
+        scheduler.run()
+        scheduler.join_jobs()
+        scheduler.get_training_curves(plot=False, use_legend=False)
+
+        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
 
     def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
         """
@@ -466,4 +475,7 @@ class TabTransformerModel(AbstractModel):
         less or more columns from the unlabeled data. This will likely require a design meeting.
         
         3) Enable hyperparameter tuning/searching. This will be done in a future PR.  
+        
+        4) Enable output layer of TT model to be multiple fully connected layers rather than just a single
+        linear layer. "TabTransformer2 changes"
         """

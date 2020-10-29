@@ -28,9 +28,9 @@ DEFAULT_MODEL_PRIORITY = dict(
     GBM=70,
     CAT=60,
     NN=50,
-    TRANSF=50,
     FASTAI=45,
     LR=40,
+    TRANSF=0,
     custom=0,
 )
 
