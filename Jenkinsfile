@@ -25,12 +25,6 @@ stage("Unit Test") {
         pip uninstall -y autogluon.tabular
         pip uninstall -y autogluon.core
         pip uninstall -y autogluon-contrib-nlp
-        pip uninstall -y autogluon-core
-        pip uninstall -y autogluon-extra
-        pip uninstall -y autogluon-mxnet
-        pip uninstall -y autogluon-tabular
-        pip uninstall -y autogluon-text
-        pip uninstall -y autogluon-vision
 
         cd core/
         python3 -m pip install --upgrade -e .
@@ -113,7 +107,7 @@ stage("Build Docs") {
         other_doc_version_text = 'Stable Version Documentation'
         other_doc_version_branch = 'stable'
         if (env.BRANCH_NAME == 'stable') {
-            other_doc_version_text = 'Nightly Version Documentation'
+            other_doc_version_text = 'Dev Version Documentation'
             other_doc_version_branch = 'dev'
         }
 
