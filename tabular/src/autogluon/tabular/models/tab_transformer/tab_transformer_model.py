@@ -76,13 +76,14 @@ class TabTransformerModel(AbstractModel):
             device = torch.device("cuda")
         else:
             device = torch.device("cpu")
+        # TODO: hyperparameter_tune() is bugged when using gpu/cuda.
+        #device = torch.device("cpu")
 
         self.params['device'] = device
 
     def get_model(self):
         from .tab_model_base import TabNet
         # If we have already initialized the model, we don't need to do it again.
-        # TODO: Should this be initialized in init()?
         if self.model is None:
             self.model = TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
             if self.params['device'].type == "cuda":
@@ -417,6 +418,7 @@ class TabTransformerModel(AbstractModel):
         time_start = time.time()
 
         self._set_default_searchspace()
+        #self._set_classes(y_train.unique())
 
         scheduler_func = scheduler_options[0]
         scheduler_options = scheduler_options[1]
@@ -424,21 +426,17 @@ class TabTransformerModel(AbstractModel):
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
 
-        self.get_model()
-
         util_args = dict(
             X_train=X_train,
             y_train=y_train,
             X_val=X_val,
             y_val=y_val,
-            types_of_features=self.types_of_features,
-            model=self.model, # TODO: Is this TT_model or TabNet (get_model())? I think it should be self.model.
+            model=self,
             time_start=time_start,
             time_limit=scheduler_options['time_out']
         )
 
         params_copy = self.params.copy()
-        print(params_copy)
         tt_trial.register_args(util_args=util_args, **params_copy)
 
         scheduler = scheduler_func(tt_trial, **scheduler_options)

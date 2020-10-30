@@ -1059,7 +1059,8 @@ class AbstractTrainer:
                 else:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
-                models_valid_next += self._train_single_full(X_train, y_train, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, k_fold=k_fold, k_fold_start=0, k_fold_end=None, n_repeats=n + 1, n_repeat_start=n, level=level, time_limit=time_left)
+
+                models_valid_next += self._train_single_full(X_train=X_train, y_train=y_train, model=model, X_unlabeled=X_unlabeled, X_val=X_val, y_val=y_val, stack_name=stack_name, k_fold=k_fold, k_fold_start=0, k_fold_end=None, n_repeats=n + 1, n_repeat_start=n, level=level, time_limit=time_left)
             models_valid = copy.deepcopy(models_valid_next)
             models_valid_next = []
             repeats_completed += 1

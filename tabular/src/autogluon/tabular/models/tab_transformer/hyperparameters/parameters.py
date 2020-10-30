@@ -56,9 +56,6 @@ def get_default_param(problem_type):
 
     params = get_fixed_params()
     params['problem_type'] = problem_type
-
-
-
     params.update(get_hyper_params())
 
     return params

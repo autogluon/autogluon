@@ -8,6 +8,7 @@ import logging
 from autogluon.core import args
 from ..abstract import model_trial
 from ... import REGRESSION
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -15,17 +16,16 @@ logger = logging.getLogger(__name__)
 def tt_trial(args, reporter):
     """ Training and evaluation function used during a single trial of HPO """
     try:
-        #print(args)
         model, args, util_args = model_trial.prepare_inputs(args=args)
-        #print(util_args)
 
-        # TODO: TabTransformerDataset needs things like params['encoders'], params['problem_type'], but they aren't initialized yet (via set_default_params)
-        #  Where should I get these? problem_type is passed in tabular_nn. Maybe 'encoders' should be hard-coded somewhere.
-        train_dataset = TabTransformerDataset(X=util_args.X_train, y=util_args.y_train, col_info=util_args.types_of_features, **args)
-        val_dataset = TabTransformerDataset(X=util_args.X_val, y=util_args.y_val, col_info=util_args.types_of_features, **args)
-        y_val = val_dataset.targets
+        X_train = util_args.X_train
+        y_train = util_args.y_train
+        X_val = util_args.X_val
+        y_val = util_args.y_val
 
-        fit_model_args = dict(X_train=train_dataset, y_train=None, X_val=val_dataset)
+        val_dataset = pd.concat([X_val, y_val], ignore_index=True)
+
+        fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
         predict_proba_args = dict(X=val_dataset)
         model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
