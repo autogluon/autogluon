@@ -86,7 +86,7 @@ def AddJitterOp(inputs: np.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR,
                 x, sigsq_init + jitter)
             # Note: Do not use np.linalg.cholesky here, this can cause
             # locking issues
-            L = spl.cholesky(x_plus_constant)
+            L = spl.cholesky(x_plus_constant, lower=True)
             must_increase_jitter = False
         except spl.LinAlgError:
             if debug_log == 'true':
@@ -129,7 +129,7 @@ def cholesky_factorization(a):
     :return: Lower-triangular Cholesky factor L of A
     """
     # Note: Do not use np.linalg.cholesky here, this can cause locking issues
-    return spl.cholesky(a)
+    return spl.cholesky(a, lower=True)
 
 
 def copyltu(x):
