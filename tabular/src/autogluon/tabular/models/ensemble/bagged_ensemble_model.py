@@ -76,13 +76,16 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
         return oof_pred_proba / oof_pred_model_repeats_without_0
 
-    def preprocess(self, X, model=None):
-        if model is None:
-            if not self.models:
-                return X
-            model = self.models[0]
-        model = self.load_child(model)
-        return model.preprocess(X)
+    def preprocess(self, X, preprocess_nonadaptive=True, model=None, **kwargs):
+        if preprocess_nonadaptive:
+            if model is None:
+                if not self.models:
+                    return X
+                model = self.models[0]
+            model = self.load_child(model)
+            return model.preprocess(X, preprocess_stateful=False)
+        else:
+            return X
 
     def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, **kwargs):
         if k_fold < 1:
@@ -237,20 +240,19 @@ class BaggedEnsembleModel(AbstractModel):
             self._k_fold_end = k_fold_end
             self._n_repeats_finished = self._n_repeats - 1
 
-    # FIXME: Defective if model does not apply same preprocessing in all bags!
-    #  No model currently violates this rule, but in future it could happen
-    def predict_proba(self, X, preprocess=True, normalize=None):
+    def predict_proba(self, X, normalize=None, **kwargs):
         model = self.load_child(self.models[0])
-        if preprocess:
-            X = self.preprocess(X, model=model)
-
-        pred_proba = model.predict_proba(X=X, preprocess=False, normalize=normalize)
+        X = self.preprocess(X, model=model, **kwargs)
+        pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         for model in self.models[1:]:
             model = self.load_child(model)
-            pred_proba += model.predict_proba(X=X, preprocess=False, normalize=normalize)
+            pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
 
         return pred_proba
+
+    def _predict_proba(self, X, normalize=False, **kwargs):
+        return self.predict_proba(X=X, normalize=normalize, **kwargs)
 
     def score_with_oof(self, y):
         self._load_oof()
@@ -262,7 +264,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, silent=False, **kwargs) -> pd.Series:
+    def compute_feature_importance(self, X, y, features_to_use=None, is_oof=True, silent=False, **kwargs) -> pd.Series:
         feature_importance_fold_list = []
         fold_weights = []
         # TODO: Preprocess data here instead of repeatedly
@@ -278,7 +280,7 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, preprocess=preprocess, silent=silent, **kwargs)
+                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, silent=silent, **kwargs)
                 feature_importance_fold_list.append(feature_importance_fold)
                 fold_weights.append(len(test_index))
             model_index += k

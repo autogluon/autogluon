@@ -8,7 +8,7 @@ import numpy as np
 import psutil
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from ..abstract import model_trial
+from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION
 from ...features.generators import LabelEncoderFeatureGenerator
@@ -30,8 +30,8 @@ class RFModel(AbstractModel):
             return RandomForestClassifier
 
     # TODO: X.fillna -inf? Add extra is_missing column?
-    def preprocess(self, X):
-        X = super().preprocess(X)
+    def _preprocess(self, X, **kwargs):
+        X = super()._preprocess(X, **kwargs)
         if self._feature_generator is None:
             self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
             self._feature_generator.fit(X=X)
@@ -142,14 +142,9 @@ class RFModel(AbstractModel):
 
         self.params_trained['n_estimators'] = self.model.n_estimators
 
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
-        fit_model_args = dict(X_train=X_train, y_train=y_train, **kwargs)
-        predict_proba_args = dict(X=X_val)
-        model_trial.fit_and_save_model(model=self, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=None)
-        hpo_results = {'total_time': self.fit_time}
-        hpo_model_performances = {self.name: self.val_score}
-        hpo_models = {self.name: self.path}
-        return hpo_models, hpo_model_performances, hpo_results
+    # TODO: Add HPO
+    def hyperparameter_tune(self, **kwargs):
+        return skip_hpo(self, **kwargs)
 
     def get_model_feature_importance(self):
         if self.features is None:

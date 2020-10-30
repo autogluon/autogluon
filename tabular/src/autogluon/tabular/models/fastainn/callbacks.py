@@ -56,6 +56,7 @@ class SaveModelCallback(TrackerCallback):
         if self.best_epoch_stop is not None:  # use epoch learned earlier
             if epoch >= self.best_epoch_stop:
                 logger.log(15, f'Saving model model at the best epoch learned earlier - {epoch}.')
+                self.best_epoch = epoch
                 self.learn.save(f'{self.name}')
         elif self.every == "epoch":
             self.learn.save(f'{self.name}_{epoch}')

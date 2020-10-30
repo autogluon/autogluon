@@ -15,6 +15,7 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
+from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION, BINARY, MULTICLASS
 
@@ -96,7 +97,7 @@ class NNFastAiTabularModel(AbstractModel):
         X = super().preprocess(X)
         return X
 
-    def preprocess_train(self, X_train, Y_train, X_test, Y_test, **kwargs):
+    def preprocess_train(self, X_train, y_train, X_val, y_val, **kwargs):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
         from fastai.tabular import FillMissing, Categorify, Normalize
@@ -112,12 +113,12 @@ class NNFastAiTabularModel(AbstractModel):
         ]).columns.values.tolist()
 
         if self.problem_type == REGRESSION and self.y_scaler is not None:
-            Y_train_norm = pd.Series(self.y_scaler.fit_transform(Y_train.values.reshape(-1, 1)).reshape(-1))
-            Y_test_norm = pd.Series(self.y_scaler.transform(Y_test.values.reshape(-1, 1)).reshape(-1)) if Y_test is not None else None
+            y_train_norm = pd.Series(self.y_scaler.fit_transform(y_train.values.reshape(-1, 1)).reshape(-1))
+            y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
             logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
         else:
-            Y_train_norm = Y_train
-            Y_test_norm = Y_test
+            y_train_norm = y_train
+            y_val_norm = y_val
         try:
             X_train_stats = X_train.describe(include='all').T.reset_index()
             cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_train_stats['unique'].isna())]['index'].values
@@ -131,9 +132,9 @@ class NNFastAiTabularModel(AbstractModel):
         self.cont_columns = [feature for feature in self.cont_columns if feature in list(X_train.columns)]
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
         X_train = self.fold_preprocess(X_train, fit=True)
-        if X_test is not None:
-            X_test = self.fold_preprocess(X_test)
-        df_train, train_idx, val_idx = self._generate_datasets(X_train, Y_train_norm, X_test, Y_test_norm)
+        if X_val is not None:
+            X_val = self.fold_preprocess(X_val)
+        df_train, train_idx, val_idx = self._generate_datasets(X_train, y_train_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
         procs = [FillMissing, Categorify, Normalize]
         data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs)
@@ -153,11 +154,11 @@ class NNFastAiTabularModel(AbstractModel):
 
         params = self.params.copy()
 
-        self.y_scaler = self.params.get('y_scaler', None)
+        self.y_scaler = params.get('y_scaler', None)
         if self.y_scaler is not None:
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
-        logger.log(15, f'Fitting Neural Network with parameters {self.params}...')
+        logger.log(15, f'Fitting Neural Network with parameters {params}...')
         data = self.preprocess_train(X_train, y_train, X_val, y_val)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
@@ -167,8 +168,8 @@ class NNFastAiTabularModel(AbstractModel):
         ] else 'auto'
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
-        if self.params.get('layers', None) is not None:
-            layers = self.params['layers']
+        if params.get('layers', None) is not None:
+            layers = params['layers']
         elif self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
         else:
@@ -176,10 +177,10 @@ class NNFastAiTabularModel(AbstractModel):
             layers = [base_size * 2, base_size]
 
         loss_func = None
-        if self.problem_type in [BINARY, MULTICLASS] and self.params.get('smoothing', 0.0) > 0.0:
-            loss_func = LabelSmoothingCrossEntropy(self.params['smoothing'])
+        if self.problem_type in [BINARY, MULTICLASS] and params.get('smoothing', 0.0) > 0.0:
+            loss_func = LabelSmoothingCrossEntropy(params['smoothing'])
 
-        ps = self.params['ps']
+        ps = params['ps']
         if type(ps) != list:
             ps = [ps]
 
@@ -191,11 +192,11 @@ class NNFastAiTabularModel(AbstractModel):
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         early_stopping_fn = partial(EarlyStoppingCallbackWithTimeLimit, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
-                                    min_delta=self.params['early.stopping.min_delta'], patience=self.params['early.stopping.patience'],
+                                    min_delta=params['early.stopping.min_delta'], patience=params['early.stopping.patience'],
                                     time_limit=time_left, best_epoch_stop=best_epoch_stop)
 
         self.model = tabular_learner(
-            data, layers=layers, ps=ps, emb_drop=self.params['emb_drop'], metrics=nn_metric,
+            data, layers=layers, ps=ps, emb_drop=params['emb_drop'], metrics=nn_metric,
             loss_func=loss_func, callback_fns=[early_stopping_fn]
         )
         logger.log(15, self.model.model)
@@ -206,7 +207,7 @@ class NNFastAiTabularModel(AbstractModel):
             with progress_disabled_ctx(self.model) as model:
                 original_path = model.path
                 model.path = Path(temp_dir)
-                model.fit_one_cycle(self.params['epochs'], self.params['lr'], callbacks=save_callback)
+                model.fit_one_cycle(params['epochs'], params['lr'], callbacks=save_callback)
 
                 # Load the best one and export it
                 model.load(self.name)
@@ -220,10 +221,9 @@ class NNFastAiTabularModel(AbstractModel):
                 model.path = original_path
             self.params_trained['best_epoch'] = save_callback.best_epoch
 
-
-    def _generate_datasets(self, X_train, Y_train, X_val, Y_val):
+    def _generate_datasets(self, X_train, y_train, X_val, y_val):
         df_train = pd.concat([X_train, X_val], ignore_index=True)
-        df_train[LABEL] = pd.concat([Y_train, Y_val], ignore_index=True)
+        df_train[LABEL] = pd.concat([y_train, y_val], ignore_index=True)
         train_idx = np.arange(len(X_train))
         if X_val is None:
             val_idx = train_idx  # use validation set for refit_full case - it's not going to be used for early stopping
@@ -303,14 +303,13 @@ class NNFastAiTabularModel(AbstractModel):
             objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
         return objective_func_name_to_monitor
 
-    def _predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, **kwargs):
         from fastai.basic_data import DatasetType
         from fastai.tabular import TabularList
         from fastai.utils.mod_display import progress_disabled_ctx
         from fastai.tabular import FillMissing, Categorify, Normalize
 
-        if preprocess:
-            X = self.preprocess(X)
+        X = self.preprocess(X, **kwargs)
         procs = [FillMissing, Categorify, Normalize]
 
         single_row = len(X) == 1
@@ -359,13 +358,7 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-        # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
-        # TODO that hyperparameter-tuning is not yet implemented
-        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
-        hpo_model_performances = {self.name: self.score(X_test, Y_test)}
-        hpo_results = {}
-        self.save()
-        hpo_models = {self.name: self.path}
-
-        return hpo_models, hpo_model_performances, hpo_results
+    # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
+    # TODO: Add HPO
+    def hyperparameter_tune(self, **kwargs):
+        return skip_hpo(self, **kwargs)
