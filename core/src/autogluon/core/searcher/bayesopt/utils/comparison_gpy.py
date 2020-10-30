@@ -1,6 +1,6 @@
 from typing import Optional, List
 import numpy as np
-from scipy.linalg import solve_triangular
+import scipy.linalg as spl
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 import copy
@@ -224,16 +224,16 @@ def compare_gpy_predict_posterior_marginals(
                   noise_variance_gpy
     np.testing.assert_almost_equal(
         test_intermediates['sys_mat'], sys_mat_gpy, decimal=5)
-    chol_fact_gpy = np.linalg.cholesky(sys_mat_gpy)
+    chol_fact_gpy = spl.cholesky(sys_mat_gpy, lower=True)
     # Use test_intermediates['sys_mat'] instead:
-    #chol_fact_gpy = np.linalg.cholesky(test_intermediates['sys_mat'])
+    #chol_fact_gpy = spl.cholesky(test_intermediates['sys_mat'], lower=True)
     np.testing.assert_almost_equal(
         test_intermediates['chol_fact'], chol_fact_gpy, decimal=4)
     # Mean function must be constant 0
     centered_y = test_intermediates['targets'].reshape((-1, 1))
     np.testing.assert_almost_equal(
         test_intermediates['centered_y'], centered_y, decimal=9)
-    pred_mat_gpy = solve_triangular(chol_fact_gpy, centered_y, lower=True)
+    pred_mat_gpy = spl.solve_triangular(chol_fact_gpy, centered_y, lower=True)
     np.testing.assert_almost_equal(
         test_intermediates['pred_mat'], pred_mat_gpy, decimal=3)
     # Compare intermediates step by step (predict_posterior_marginals)
@@ -241,7 +241,7 @@ def compare_gpy_predict_posterior_marginals(
                            X2=test_intermediates['test_features'])
     np.testing.assert_almost_equal(
         test_intermediates['k_tr_te'], k_tr_te_gpy, decimal=5)
-    linv_k_tr_te_gpy = solve_triangular(chol_fact_gpy, k_tr_te_gpy, lower=True)
+    linv_k_tr_te_gpy = spl.solve_triangular(chol_fact_gpy, k_tr_te_gpy, lower=True)
     np.testing.assert_almost_equal(
         test_intermediates['linv_k_tr_te'], linv_k_tr_te_gpy, decimal=4)
     pred_means_gpy = np.dot(linv_k_tr_te_gpy.T, pred_mat_gpy)
