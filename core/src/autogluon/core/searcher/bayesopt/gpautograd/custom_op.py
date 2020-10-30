@@ -2,12 +2,15 @@ import autograd.numpy as anp
 import autograd.scipy.linalg as aspl
 from autograd.extend import primitive, defvjp
 import numpy as np
+import scipy.linalg as spl
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['AddJitterOp',
-           'flatten_and_concat']
+           'flatten_and_concat',
+           'cholesky_factorization']
 
 
 INITIAL_JITTER_FACTOR = 1e-9
@@ -56,7 +59,7 @@ def AddJitterOp(inputs: np.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR,
     """
     assert initial_jitter_factor > 0. and jitter_growth > 1.
     n_square = inputs.shape[0] - 1
-    n = np.int(np.sqrt(n_square))
+    n = int(math.sqrt(n_square))
     assert n_square % n == 0 and n_square // n == n, "x must be square matrix, shape (n, n)"
     x, sigsq_init = np.reshape(inputs[:-1], (n, -1)), inputs[-1]
     
@@ -81,9 +84,11 @@ def AddJitterOp(inputs: np.ndarray, initial_jitter_factor=INITIAL_JITTER_FACTOR,
         try:
             x_plus_constant = x + _get_constant_identity(
                 x, sigsq_init + jitter)
-            L = np.linalg.cholesky(x_plus_constant)
+            # Note: Do not use np.linalg.cholesky here, this can cause
+            # locking issues
+            L = spl.cholesky(x_plus_constant)
             must_increase_jitter = False
-        except np.linalg.LinAlgError:
+        except spl.LinAlgError:
             if debug_log == 'true':
                 logger.info("sigsq = {} does not work".format(
                     sigsq_init + jitter))
@@ -123,7 +128,8 @@ def cholesky_factorization(a):
     :param a: Symmmetric positive definite matrix A
     :return: Lower-triangular Cholesky factor L of A
     """
-    return np.linalg.cholesky(a)
+    # Note: Do not use np.linalg.cholesky here, this can cause locking issues
+    return spl.cholesky(a)
 
 
 def copyltu(x):
