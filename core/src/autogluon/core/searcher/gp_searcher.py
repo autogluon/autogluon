@@ -181,7 +181,7 @@ class GPFIFOSearcher(BaseSearcher):
             _gp_searcher = self.gp_searcher.clone_from_state(state)
         # Use copy constructor
         return GPFIFOSearcher(
-            reward_attribute=self._reward_attribute,
+            self.configspace, reward_attribute=self._reward_attribute,
             _gp_searcher=_gp_searcher)
 
     @property
@@ -398,7 +398,7 @@ class GPMultiFidelitySearcher(BaseSearcher):
             _gp_searcher = self.gp_searcher.clone_from_state(state)
         # Use copy constructor
         return GPMultiFidelitySearcher(
-            reward_attribute=self._reward_attribute,
+            self.configspace, reward_attribute=self._reward_attribute,
             resource_attribute=self._resource_attribute,
             _gp_searcher=_gp_searcher)
 

@@ -244,7 +244,7 @@ def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
         'opt_verbose': Boolean(),
         'opt_debug_writer': Boolean(),
         'num_fantasy_samples': Integer(1, None),
-        'num_init_random': Integer(1, None),
+        'num_init_random': Integer(0, None),
         'num_init_candidates': Integer(5, None),
         'initial_scoring': Categorical(
             choices=tuple(SUPPORTED_INITIAL_SCORING)),
