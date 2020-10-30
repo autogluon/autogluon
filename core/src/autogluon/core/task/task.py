@@ -4,6 +4,8 @@ import argparse
 import multiprocessing as mp
 
 logger = logging.getLogger(__name__)
+import time
+import random
 
 __all__ = ['Task']
 
@@ -30,6 +32,9 @@ class Task(object):
         self.args = copy.deepcopy(args)
         self.resources = resources
         with Task.LOCK:
+            # Adding random jitter to reduce likelihood of tasks starting at the same time
+            # This should significantly reduce generation of duplicate values (observed earlier)
+            time.sleep(0.1 + random.random())
             self.task_id = Task.TASK_ID.value
             if 'args' in self.args:
                 if isinstance(self.args['args'], (argparse.Namespace, argparse.ArgumentParser)):
