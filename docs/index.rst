@@ -67,7 +67,7 @@ Advanced Topics
 .. container:: cards
 
    .. card::
-      :title: Tune custom models
+      :title: Tune Custom Models
       :link: tutorials/course/index.html
 
       How to hyperparameter-tune your own custom models or Python code.
