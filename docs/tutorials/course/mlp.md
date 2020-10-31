@@ -1,6 +1,8 @@
 # Getting started with Advanced HPO Algorithms
 :label:`sec_custom_advancedhpo`
 
+This tutorial provides a complete example of how to use AutoGluon's state-of-the-art hyperparameter optimization (HPO) algorithms to tune a basic Multi-Layer Perceptron (MLP) model, which is the most basic type of neural network.
+
 ## Loading libraries
 
 ```{.python .input  n=1}
