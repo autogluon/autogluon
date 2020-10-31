@@ -64,7 +64,7 @@ class AbstractModel:
 
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
             self.normalize_pred_probas = True
-            logger.debug(self.name +" predicted probabilities will be transformed to never =0 since eval_metric=" + self.eval_metric.name)
+            logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
         else:
             self.normalize_pred_probas = False
 
@@ -118,11 +118,22 @@ class AbstractModel:
     def is_fit(self) -> bool:
         return self.model is not None
 
+    # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
         pass
 
     def _set_default_auxiliary_params(self):
+        """
+        Sets the default aux parameters of the model.
+        This method should not be extended by inheriting models, instead extend _get_default_auxiliary_params.
+        """
         # TODO: Consider adding to get_info() output
+        default_auxiliary_params = self._get_default_auxiliary_params()
+        for key, value in default_auxiliary_params.items():
+            self._set_default_param_value(key, value, params=self.params_aux)
+
+    def _get_default_auxiliary_params(self) -> dict:
+        """Dictionary of auxiliary parameters that dictate various model-agnostic logic."""
         default_auxiliary_params = dict(
             max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors.
             # TODO: Add more params
@@ -137,11 +148,13 @@ class AbstractModel:
             # max_early_stopping_rounds=None,
             # use_orig_features=True,  # TODO: Only for stackers
             # TODO: add option for only top-k ngrams
-            ignored_type_group_special=[],  # List, drops any features in `self.feature_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
-            ignored_type_group_raw=[],  # List, drops any features in `self.feature_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
+            ignored_type_group_special=None,  # List, drops any features in `self.feature_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
+            ignored_type_group_raw=None,  # List, drops any features in `self.feature_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
+            get_features_kwargs=None,  # Kwargs for `autogluon.tabular.features.feature_metadata.FeatureMetadata.get_features()`. Overrides ignored_type_group_special and ignored_type_group_raw. | Currently undocumented in task.
+            # TODO: v0.1 Document get_features_kwargs_extra in task.fit
+            get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
         )
-        for key, value in default_auxiliary_params.items():
-            self._set_default_param_value(key, value, params=self.params_aux)
+        return default_auxiliary_params
 
     def _set_default_param_value(self, param_name, param_value, params=None):
         if params is None:
@@ -223,14 +236,24 @@ class AbstractModel:
                 return X[self.features]
         else:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
-            ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', [])
-            ignored_type_group_special = self.params_aux.get('ignored_type_group_special', [])
             # TODO: Consider changing how this works or where it is done
             if self.feature_metadata is None:
                 feature_metadata = FeatureMetadata.from_df(X)
             else:
                 feature_metadata = self.feature_metadata
-            valid_features = feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+            get_features_kwargs = self.params_aux.get('get_features_kwargs', None)
+            if get_features_kwargs is not None:
+                valid_features = feature_metadata.get_features(**get_features_kwargs)
+            else:
+                ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', None)
+                ignored_type_group_special = self.params_aux.get('ignored_type_group_special', None)
+                valid_features = feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+            get_features_kwargs_extra = self.params_aux.get('get_features_kwargs_extra', None)
+            if get_features_kwargs_extra is not None:
+                valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
+                valid_features = [feature for feature in valid_features if feature in valid_features_extra]
+            dropped_features = [feature for feature in self.features if feature not in valid_features]
+            logger.log(10, f'\tDropped {len(dropped_features)} of {len(self.features)} features.')
             self.features = [feature for feature in self.features if feature in valid_features]
             if not self.features:
                 raise NoValidFeatures
