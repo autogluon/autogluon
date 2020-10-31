@@ -32,7 +32,7 @@ Tutorials to hyperparameter-tune any custom models or Python code.
       Tune the argument values (hyperparameters) of arbitrary Python scripts using AutoGluon.
 
    .. card::
-      :title: Distributed Search Tutorial
+      :title: Distributed Search
       :link: distributed.html
 
       Easily distribute the hyperparameter search across multiple machines to improve efficiency.
