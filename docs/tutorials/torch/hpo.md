@@ -1,4 +1,4 @@
-# MNIST Training in PyTorch
+# Tune PyTorch Model on MNIST
 :label:`sec_customstorch`
 
 In this tutorial, we demonstrate how to do Hyperparameter Optimization (HPO) using AutoGluon with PyTorch.
