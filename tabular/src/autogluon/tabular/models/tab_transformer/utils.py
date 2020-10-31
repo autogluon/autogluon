@@ -8,7 +8,6 @@ import logging
 from autogluon.core import args
 from ..abstract import model_trial
 from ... import REGRESSION
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -18,16 +17,9 @@ def tt_trial(args, reporter):
     try:
         model, args, util_args = model_trial.prepare_inputs(args=args)
 
-        X_train = util_args.X_train
-        y_train = util_args.y_train
-        X_val = util_args.X_val
-        y_val = util_args.y_val
-
-        val_dataset = pd.concat([X_val, y_val], ignore_index=True)
-
-        fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
-        predict_proba_args = dict(X=val_dataset)
-        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
+        fit_model_args = dict(X_train=util_args.X_train, y_train=util_args.y_train, X_val=util_args.X_val, y_val=util_args.y_val)
+        predict_proba_args = dict(X=util_args.X_val)
+        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=util_args.y_val,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):

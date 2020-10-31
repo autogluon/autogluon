@@ -1,9 +1,15 @@
-from autogluon.core import Real
+from autogluon.core import Real, Categorical, Int
 
-# TODO: May have to split search space's by problem type. Not necessary now.
+# TODO: May have to split search space's by problem type. Not necessary right now.
 def get_default_searchspace():
     params = {
-        'lr': Real(5e-5, 5e-3, log=True)
+        'lr': Real(5e-5, 5e-3, default=1e-3, log=True),
+        'weight_decay': Real(1e-6, 5e-2, default=1e-6, log=True),
+        'p_dropout': Categorical(0, 0.1, 0.2, 0.3, 0.4, 0.5),
+        'n_heads': Categorical(2, 4, 8),
+        'hidden_dim': Categorical(32, 64, 128, 256),
+        'n_layers': Categorical(1, 2, 3, 4, 5),
+        'feature_dim': Int(8, 128, default=64),
     }
 
     return params.copy()

@@ -76,8 +76,6 @@ class TabTransformerModel(AbstractModel):
             device = torch.device("cuda")
         else:
             device = torch.device("cpu")
-        # TODO: hyperparameter_tune() is bugged when using gpu/cuda.
-        #device = torch.device("cpu")
 
         self.params['device'] = device
 
@@ -192,7 +190,6 @@ class TabTransformerModel(AbstractModel):
                         train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
 
                     if reporter is not None:
-                        # TODO: Is total_loss correct here? Do I want loss.item().asscalar() instead?
                         reporter(epoch=epoch+1, validation_performance=val_metric, train_loss=total_loss)
 
                 else:
@@ -225,7 +222,6 @@ class TabTransformerModel(AbstractModel):
         lr = self.params['lr']
         weight_decay = self.params['weight_decay']
         epochs = self.params['pretrain_epochs'] if state == 'pretrain' else self.params['epochs']
-        freq = self.params['pretrain_freq'] if state == 'pretrain' else self.params['freq']  # TODO: What is this for?
         epochs_wo_improve = self.params['epochs_wo_improve']
 
         if state is None:
@@ -238,7 +234,7 @@ class TabTransformerModel(AbstractModel):
             base_exp_decay = self.params['base_exp_decay']
             optimizer_fc = optim.Adam(self.model.fc.parameters(), lr=lr, weight_decay=weight_decay)
             optimizer_embeds = optim.Adam(self.model.embed.parameters(), lr=lr, weight_decay=weight_decay)
-            scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds, gamma=base_exp_decay)
+            scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds, gamma=base_exp_decay) # TODO: Should we be using this in _epoch()?
             optimizers.append(optimizer_fc)
             optimizers.append(optimizer_embeds)
 
@@ -412,14 +408,12 @@ class TabTransformerModel(AbstractModel):
         return get_default_searchspace()
 
     # TODO: Consider HPO for pretraining with unlabeled data. (Potential future work)
+    # TODO: Does not work correctly when cuda is enabled.
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         from .utils import tt_trial
 
         time_start = time.time()
-
         self._set_default_searchspace()
-        #self._set_classes(y_train.unique())
-
         scheduler_func = scheduler_options[0]
         scheduler_options = scheduler_options[1]
 
@@ -488,7 +482,7 @@ class TabTransformerModel(AbstractModel):
         return obj
 
         """
-        List of features to add (Updated by Anthony Galczak 10-20-20):
+        List of features to add (Updated by Anthony Galczak 10-30-20):
         
         1) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
         "pretrain API change".
@@ -497,7 +491,8 @@ class TabTransformerModel(AbstractModel):
         we do not allow such mismatches and the schemas must match exactly. We can investigate ways to use
         less or more columns from the unlabeled data. This will likely require a design meeting.
         
-        3) Enable hyperparameter tuning/searching. This will be done in a future PR.  
+        3) Bug where HPO doesn't work when cuda is enabled.
+        "RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method"
         
         4) Enable output layer of TT model to be multiple fully connected layers rather than just a single
         linear layer. "TabTransformer2 changes"
