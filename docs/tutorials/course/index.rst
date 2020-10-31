@@ -41,7 +41,7 @@ Tutorials to hyperparameter-tune any custom models or Python code.
       :title: Example: Tune a Multi-Layer Perceptron
       :link: mlp.html
 
-      Complete example of how to use AutoGluon and its state-of-the-art hyperparameter optimization to tune a basic MLP.
+      Complete example of using AutoGluon's state-of-the-art hyperparameter optimization to tune a basic MLP model.
 
 .. toctree::
    :maxdepth: 1
