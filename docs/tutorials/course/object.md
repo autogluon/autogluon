@@ -1,7 +1,7 @@
 # Searchable Objects
 :label:`sec_customobj`
 
-When defining customized objects such as network architectures,
+When defining custom Python objects such as network architectures,
 or specialized optimizers, it may be hard to decide what values to set for all of their attributes. AutoGluon provides an API that allows you to instead specify  a search space of possible values to consider for such attributes, within which the optimal value will be automatically searched for at runtime. This tutorial demonstrates how easy this is to do, without having to modify your existing code at all!  
 
 ## Example for Constructing a Network
