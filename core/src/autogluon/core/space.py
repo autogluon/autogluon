@@ -11,7 +11,7 @@ SPLITTER = u'▁'  # Use U+2581 as the special symbol for splitting the space
 
 
 class Space(object):
-    """Basic search space describing set of possible values for hyperparameter.
+    """Basic search space describing set of possible candidate values for hyperparameter.
     """
     pass
 
@@ -40,14 +40,14 @@ class SimpleSpace(Space):
 
     @property
     def default(self):
-        """Return default value of hyperparameter corresponding to this search space.
+        """Return default value of hyperparameter corresponding to this search space. This value is tried first during hyperparameter optimization.
         """
         default = self._default if self._default else self.hp.default_value
         return default
 
     @default.setter
     def default(self, value):
-        """Set default value for hyperparameter corresponding to this search space.
+        """Set default value for hyperparameter corresponding to this search space. The default value is always tried in the first trial of HPO.
         """
         self._default = value
 
@@ -81,7 +81,7 @@ class NestedSpace(Space):
 
     @property
     def default(self):
-        """Return default value for hyperparameter corresponding to this search space.
+        """Return default value for hyperparameter corresponding to this search space. The default value is always tried in the first trial of HPO.
         """
         config = self.cs.get_default_configuration().get_dictionary()
         return self.sample(**config)
@@ -328,7 +328,8 @@ class Dict(NestedSpace):
 
 
 class Categorical(NestedSpace):
-    """Nested search space for hyperparameters which are categorical. Such a hyperparameter takes one value out of the discrete set of provided options.
+    """Nested search space for hyperparameters which are categorical. Such a hyperparameter takes one value out of the discrete set of provided options. 
+       The first value in the list of options will be the default value that gets tried first during HPO.
 
     Parameters
     ----------
@@ -337,7 +338,7 @@ class Categorical(NestedSpace):
 
     Examples
     --------
-    a = ag.space.Categorical('a', 'b', 'c', 'd')
+    a = ag.space.Categorical('a', 'b', 'c', 'd')  # 'a' will be default value tried first during HPO
     b = ag.space.Categorical('resnet50', autogluon_obj())
     """
     def __init__(self, *data):
@@ -405,11 +406,11 @@ class Real(SimpleSpace):
     Parameters
     ----------
     lower : float
-        the lower bound of the search space
+        The lower bound of the search space (minimum possible value of hyperparameter)
     upper : float
-        the upper bound of the search space
+        The upper bound of the search space (maximum possible value of hyperparameter)
     default : float (optional)
-        default value
+        Default value tried first during hyperparameter optimization
     log : (True/False)
         Whether to search the values on a logarithmic rather than linear scale. 
         This is useful for numeric hyperparameters (such as learning rates) whose search space spans many orders of magnitude.
@@ -435,11 +436,11 @@ class Int(SimpleSpace):
     Parameters
     ----------
     lower : int
-        The lower bound of the search space
+        The lower bound of the search space (minimum possible value of hyperparameter)
     upper : int
-        The upper bound of the search space
+        The upper bound of the search space (maximum possible value of hyperparameter)
     default : int (optional)
-        Default value
+        Default value tried first during hyperparameter optimization
 
 
     Examples
