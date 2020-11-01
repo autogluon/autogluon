@@ -1,7 +1,7 @@
-Customize AutoGluon
+Tune Custom Models
 ===================
 
-Tutorials for customizing AutoGluon using advanced APIs.
+Tutorials to hyperparameter-tune any custom models or Python code.
 
 .. container:: cards
    
@@ -9,39 +9,39 @@ Tutorials for customizing AutoGluon using advanced APIs.
       :title: Search Space and Decorator
       :link: core.html
 
-      Using the AutoGluon Core API for customized search spaces, searchable objects, 
-      and training functions, in order to hyperparameter-tune any model.
+      Using AutoGluon's Core APIs to hyperparameter-tune any model/code by making existing objects/training-functions 
+      searchable.
 
    .. card::
       :title: Search Algorithms
       :link: algorithm.html
 
-      Learn how to use AutoGluon's built-in hyperparameter search algorithms, 
+      How to use AutoGluon's built-in hyperparameter search algorithms, 
       including early-stopping strategies.
 
    .. card::
-      :title: Searchable Customized Objects
+      :title: Searchable Objects
       :link: object.html
 
-      Hyperparameter search in customized objects such as your own: neural network, optimizer, dataset, etc.
+      Tune the hyperparameters of custom objects such as your own: neural network, optimizer, dataset, etc.
 
    .. card::
-      :title: Bring Your Own Training Scripts
+      :title: Tune Training Scripts
       :link: script.html
 
-      Tune the hyperparameters of arbitrary Python scripts using AutoGluon.
+      Tune the argument values (hyperparameters) of arbitrary Python scripts using AutoGluon.
 
    .. card::
-      :title: Distributed Search Tutorial
+      :title: Distributed Search
       :link: distributed.html
 
-      Easily distribute the hyperparameter search arcross multiple machines to improve efficiency.
+      Easily distribute the hyperparameter search across multiple machines to improve efficiency.
    
    .. card::
-      :title: Tune a Multi-Layer Perceptron
+      :title: Example: Tune a Multi-Layer Perceptron
       :link: mlp.html
 
-      Complete example of how to use AutoGluon and its state-of-the-art schedulers and model-based searchers to tune a MLP.
+      Complete example of using AutoGluon's state-of-the-art hyperparameter optimization to tune a basic MLP model.
 
 .. toctree::
    :maxdepth: 1

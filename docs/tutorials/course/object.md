@@ -1,13 +1,12 @@
-# Customize User Objects
+# Searchable Objects
 :label:`sec_customobj`
 
-A user may want to define some customized objects with search spaces, such as network architectures,
-or specialized optimizers. We provide an API to do that.
+When defining custom Python objects such as network architectures,
+or specialized optimizers, it may be hard to decide what values to set for all of their attributes. AutoGluon provides an API that allows you to instead specify  a search space of possible values to consider for such attributes, within which the optimal value will be automatically searched for at runtime. This tutorial demonstrates how easy this is to do, without having to modify your existing code at all!  
 
 ## Example for Constructing a Network
 
-This is an example of doing architecture search as HPO. If you are interested in efficient neural
-architecture search, please refer another tutorial `sec_proxyless`_ .
+This tutorial covers an example of selecting a neural network's architecture as a hyperparameter optimization (HPO) task. If you are interested in efficient neural architecture search (NAS), please refer to this other tutorial instead: `sec_proxyless`_ .
 
 ### CIFAR ResNet in GluonCV
 

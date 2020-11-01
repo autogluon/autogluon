@@ -1,12 +1,12 @@
-AutoGluon: AutoML Toolkit for Tabular, Text, and Image Data
-===========================================================
+AutoGluon: AutoML for Text, Image, and Tabular Data
+====================================================
 
-`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning tabular, text, and image data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
+`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning text, image, and tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
 
-- Quickly prototype classical and deep learning solutions for your data with a few lines of code.
-- Automatically utilize state-of-the-art techniques without expert knowledge.
-- Leverage automatic hyperparameter tuning, model selection / architecture search, and data processing.
-- Easily improve existing bespoke models and data pipelines, or customize `AutoGluon` for your use-case.
+- Quickly prototype deep learning and classical ML solutions for your raw data with a few lines of code.
+- Automatically utilize state-of-the-art techniques (where appropriate) without expert knowledge.
+- Leverage automatic hyperparameter tuning, model selection/ensembling, architecture search, and data processing.
+- Easily improve/tune your bespoke models and data pipelines, or customize `AutoGluon` for your use-case.
 
 .. note::
 
@@ -67,10 +67,10 @@ Advanced Topics
 .. container:: cards
 
    .. card::
-      :title: Customize AutoGluon
+      :title: Tune Custom Models
       :link: tutorials/course/index.html
 
-      Advanced usage of AutoGluon APIs for customized applications.
+      How to hyperparameter-tune your own custom models or Python code.
 
    .. card::
       :title: Neural Architecture Search
