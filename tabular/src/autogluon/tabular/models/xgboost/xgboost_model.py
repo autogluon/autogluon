@@ -7,6 +7,7 @@ from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.utils import try_import_xgboost
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class XGBoostModel(AbstractModel):
             X_val = self.preprocess(X_val, is_train=False)
             eval_set.append((X_val, y_val))
 
+        try_import_xgboost()
         from .callbacks import print_evaluation, early_stop_custom
         callbacks = []
         if verbose:

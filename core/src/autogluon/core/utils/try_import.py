@@ -4,6 +4,7 @@ __all__ = [
     'try_import_catboost',
     'try_import_catboostdev',
     'try_import_lightgbm',
+    'try_import_xgboost',
     'try_import_faiss',
     'try_import_fastai_v1',
     'try_import_cv2',
@@ -64,6 +65,13 @@ def try_import_lightgbm():
         raise ImportError("Import lightgbm failed. If you are using Mac OSX, "
                           "Please try 'brew install libomp'. Detailed info: {}".format(str(e)))
 
+
+def try_import_xgboost():
+    try:
+        import xgboost
+    except ImportError:
+        raise ImportError("Import xgboost failed."
+                          "A quick tip is to install via `pip install xgboost`.")
 
 def try_import_faiss():
     try:
