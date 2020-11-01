@@ -6,7 +6,7 @@ or specialized optimizers, it may be hard to decide what values to set for all o
 
 ## Example for Constructing a Network
 
-This tutorial covers an example of selecting a neural network's architecture as a hyperparameter optimization (HPO) task. If you are interested in efficient neural architecture search (NAS), please refer another tutorial `sec_proxyless`_ .
+This tutorial covers an example of selecting a neural network's architecture as a hyperparameter optimization (HPO) task. If you are interested in efficient neural architecture search (NAS), please refer to this other tutorial instead: `sec_proxyless`_ .
 
 ### CIFAR ResNet in GluonCV
 
