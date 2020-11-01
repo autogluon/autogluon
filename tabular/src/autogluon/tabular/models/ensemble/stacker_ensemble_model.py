@@ -73,7 +73,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None, model_pred_proba_dict=None):
+    def preprocess(self, X, fit=False, compute_base_preds=True, infer=True, model_pred_proba_dict=None, **kwargs):
         if self.stack_column_prefix_lst:
             if infer:
                 if set(self.stack_columns).issubset(set(list(X.columns))):
@@ -99,8 +99,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                     X = X_stacker
             elif not self.use_orig_features:
                 X = X[self.stack_columns]
-        if preprocess:
-            X = super().preprocess(X, model=model)
+        X = super().preprocess(X, **kwargs)
         return X
 
     def pred_probas_to_df(self, pred_proba: list, index=None) -> pd.DataFrame:
@@ -115,6 +114,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
         start_time = time.time()
+        # TODO: This could be preprocess=True in general, just have preprocess=False for child models
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)

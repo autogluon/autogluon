@@ -11,7 +11,7 @@ information to effectively respond to your bug report or contribution.
 
 We welcome you to use the GitHub issue tracker to report bugs or suggest features.
 
-When filing an issue, please check [existing open](https://github.com/awslabs/auto-ml-with-gluon/issues), or [recently closed](https://github.com/awslabs/auto-ml-with-gluon/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aclosed%20), issues to make sure somebody else hasn't already
+When filing an issue, please check [existing open](https://github.com/awslabs/autogluon/issues), or [recently closed](https://github.com/awslabs/autogluon/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aclosed%20), issues to make sure somebody else hasn't already
 reported the issue. Please try to include as much information as you can. Details like these are incredibly useful:
 
 * A reproducible test case or series of steps
@@ -43,11 +43,8 @@ GitHub provides additional document on [forking a repository](https://help.githu
 
 ## Tips for Modifying the Source Code
 
-- Using a fresh virtualenv, install the package via [these instructions](https://autogluon.mxnet.io/install.html).
-Be sure to select the *Source* option from the installation preferences, and install the package after cloning this repository via:
-```
-python setup.py develop
-```
+- Using a fresh virtualenv, install the package via [these instructions](https://auto.gluon.ai/dev/install.html).
+Be sure to select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the only OS where all features are currently 100% functional. Avoid introducing changes that will only work on a particular OS, as we're currently working to support MacOSX and Windows. Changes to existing code that improve cross-platform compatibility are most welcome!
 
@@ -93,7 +90,7 @@ python3 -m pytest path_to_file
 
 
 ## Finding Contributions to Work On
-Looking at the existing issues is a great way to find something to contribute on. As our project uses the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any ['help wanted'](https://github.com/awslabs/auto-ml-with-gluon/labels/help%20wanted) issues is a great place to start.
+Looking at the existing issues is a great way to find something to contribute on. As our project uses the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any ['help wanted'](https://github.com/awslabs/autogluon/labels/help%20wanted) issues is a great place to start.
 
 
 ## Code of Conduct
@@ -108,6 +105,6 @@ If you discover a potential security issue in this project we ask that you notif
 
 ## Licensing
 
-See the [LICENSE](https://github.com/awslabs/auto-ml-with-gluon/blob/master/LICENSE) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
+See the [LICENSE](https://github.com/awslabs/autogluon/blob/master/LICENSE) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
 
 We may ask you to sign a [Contributor License Agreement (CLA)](http://en.wikipedia.org/wiki/Contributor_License_Agreement) for larger changes.

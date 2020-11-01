@@ -1,15 +1,13 @@
 import collections
 import copy
+import logging
 import time
 from abc import abstractmethod
 
-import mxnet as mx
-
 from ...scheduler import *
-from ...utils import in_ipynb
+from ...utils import in_ipynb, try_import_mxnet
 
 __all__ = [
-    'BaseDataset',
     'BaseTask',
     'compile_scheduler_options',
     'create_scheduler']
@@ -25,6 +23,8 @@ schedulers = {
     'bayesopt': FIFOScheduler,
     'bayesopt_hyperband': HyperbandScheduler}
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 def create_scheduler(train_fn, search_strategy, scheduler_options):
     if isinstance(search_strategy, str):
@@ -37,15 +37,15 @@ def create_scheduler(train_fn, search_strategy, scheduler_options):
     return scheduler_cls(train_fn, **scheduler_options)
 
 
-class BaseDataset(mx.gluon.data.Dataset):
-    # put any sharable dataset methods here
-    pass
-
-
 class BaseTask(object):
     """BaseTask for AutoGluon applications
     """
-    Dataset = BaseDataset
+    @property
+    @staticmethod
+    def Dataset():
+        try_import_mxnet()
+        from autogluon.mxnet.utils.dataset import BaseDataset
+        return BaseDataset
 
     @classmethod
     def run_fit(cls, train_fn, search_strategy, scheduler_options,
@@ -70,6 +70,9 @@ class BaseTask(object):
             plot_training_curves = scheduler_options['checkpoint'].replace('exp1.ag', 'plot_training_curves.png')
             scheduler.get_training_curves(filename=plot_training_curves, plot=True, use_legend=False)
         record_args = copy.deepcopy(args)
+        if results is None:
+            logger.warning('No valid results obtained with best config, the result may not be useful...')
+            results = {}
         results.update(best_reward=best_reward,
                        best_config=best_config,
                        total_time=total_time,

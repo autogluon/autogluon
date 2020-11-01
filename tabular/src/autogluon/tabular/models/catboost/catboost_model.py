@@ -13,7 +13,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ...constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
-from ...try_import import try_import_catboost, try_import_catboostdev
+from autogluon.core.utils import try_import_catboost, try_import_catboostdev
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,8 @@ class CatboostModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
 
-    def preprocess(self, X):
-        X = super().preprocess(X)
+    def _preprocess_nonadaptive(self, X, **kwargs):
+        X = super()._preprocess_nonadaptive(X, **kwargs)
         if self._category_features is None:
             self._category_features = list(X.select_dtypes(include='category').columns)
         if self._category_features:
@@ -262,13 +262,12 @@ class CatboostModel(AbstractModel):
 
         self.params_trained['iterations'] = self.model.tree_count_
 
-    def _predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, **kwargs):
         if self.problem_type != SOFTCLASS:
-            return super()._predict_proba(X, preprocess)
+            return super()._predict_proba(X, **kwargs)
         # For SOFTCLASS problems, manually transform predictions into probabilities via softmax
-        if preprocess:
-            X = self.preprocess(X)
-        y_pred_proba = self.model.predict(X, prediction_type = 'RawFormulaVal')
+        X = self.preprocess(X, **kwargs)
+        y_pred_proba = self.model.predict(X, prediction_type='RawFormulaVal')
         y_pred_proba = np.exp(y_pred_proba)
         y_pred_proba = np.multiply(y_pred_proba, 1/np.sum(y_pred_proba, axis=1)[:, np.newaxis])
         if y_pred_proba.shape[1] == 2:

@@ -1,5 +1,6 @@
 import math
 import autogluon.core as ag
+from autogluon.mxnet.optimizer import SGD
 from autogluon.extra.model_zoo import EfficientNet
 from autogluon.vision import ImageClassification as task
 
@@ -16,7 +17,7 @@ class EfficientNetB1(EfficientNet):
                          input_size=input_size)
 
 results = task.fit('imagenet', net=EfficientNetB1(), search_strategy='grid',
-                   optimizer=ag.optimizer.SGD(learning_rate=1e-1, momentum=0.9, wd=1e-4),
+                   optimizer=SGD(learning_rate=1e-1, momentum=0.9, wd=1e-4),
                    batch_size=32)
 
 print(results)

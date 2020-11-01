@@ -3,7 +3,6 @@ from .miscs import *
 from .plots import *
 from .tqdm import tqdm
 from .deprecate import *
-from .mxutils import *
 from .try_import import *
 from .edict import EasyDict
 from .serialization import *

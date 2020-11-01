@@ -1,12 +1,11 @@
 import logging
-import time
 
 import numpy as np
 import psutil
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 
-from ..abstract import model_trial
+from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
@@ -27,9 +26,9 @@ class KNNModel(AbstractModel):
         else:
             return KNeighborsClassifier
 
-    def preprocess(self, X):
-        X = super().preprocess(X).fillna(0)
-        X = X.to_numpy(dtype=np.float32)
+    def _preprocess(self, X, **kwargs):
+        X = super()._preprocess(X, **kwargs)
+        X = X.fillna(0).to_numpy(dtype=np.float32)
         return X
 
     def _set_default_params(self):
@@ -71,14 +70,9 @@ class KNNModel(AbstractModel):
             if model_memory_ratio > (0.20 * max_memory_usage_ratio):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
-        fit_model_args = dict(X_train=X_train, y_train=y_train, **kwargs)
-        predict_proba_args = dict(X=X_val)
-        model_trial.fit_and_save_model(model=self, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=None)
-        hpo_results = {'total_time': self.fit_time}
-        hpo_model_performances = {self.name: self.val_score}
-        hpo_models = {self.name: self.path}
-        return hpo_models, hpo_model_performances, hpo_results
+    # TODO: Add HPO
+    def hyperparameter_tune(self, **kwargs):
+        return skip_hpo(self, **kwargs)
 
 
 class FAISSModel(KNNModel):

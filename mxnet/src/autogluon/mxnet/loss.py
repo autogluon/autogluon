@@ -1,5 +1,6 @@
 from mxnet.gluon import loss
-from . import obj
+
+from autogluon.core import obj
 
 __all__ = ['SoftmaxCrossEntropyLoss']
 

@@ -3,16 +3,16 @@ import os
 import copy
 import mxnet as mx
 
+from .pipeline import train_image_classification
+from autogluon.core.scheduler import get_cpu_count, get_gpu_count
+from autogluon.core.task.base import BaseTask, compile_scheduler_options, create_scheduler
 from autogluon.mxnet.task.classifier import Classifier
 from autogluon.mxnet.task.dataset import get_dataset
 from autogluon.mxnet.task.nets import *
-from .pipeline import train_image_classification
 from autogluon.mxnet.task.utils import *
-from autogluon.core.task.base import BaseTask, compile_scheduler_options, create_scheduler
-from autogluon.core.loss import *
-from autogluon.core.optimizer import *
-from autogluon.core.scheduler import get_cpu_count, get_gpu_count
-from autogluon.core.utils import update_params
+from autogluon.mxnet.loss import SoftmaxCrossEntropyLoss
+from autogluon.mxnet.optimizer import NAG
+from autogluon.mxnet.utils import update_params
 import autogluon.core as ag
 
 __all__ = ['ImageClassification']
@@ -159,11 +159,13 @@ class ImageClassification(BaseTask):
         scheduler_options : dict
             Extra arguments passed to __init__ of scheduler, to configure the
             orchestration of training jobs during hyperparameter-tuning.
-        search_strategy : str
-            Which hyperparameter search algorithm to use.
-            Options include: 'random' (random search), 'skopt' (SKopt Bayesian
-            optimization), 'grid' (grid search), 'hyperband' (Hyperband random),
-            'rl' (reinforcement learner).
+        search_strategy : str, default = None
+            Which hyperparameter search algorithm to use. Options include:
+            'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization),
+            'skopt' (SKopt Bayesian optimization), 'grid' (grid search),
+            'hyperband' (Hyperband scheduling with random search), 'bayesopt-hyperband'
+            (Hyperband scheduling with GP-BO search).
+            If unspecified, the default is 'random'.
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs
             hyperparameter optimization.
@@ -245,8 +247,6 @@ class ImageClassification(BaseTask):
         use-gn', default= False.
             whether to use group norm.
         """
-        assert search_strategy not in {'bayesopt', 'bayesopt_hyperband'}, \
-            "search_strategy == 'bayesopt' or 'bayesopt_hyperband' not yet supported"
         checkpoint = os.path.join(output_directory, 'exp1.ag')
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps

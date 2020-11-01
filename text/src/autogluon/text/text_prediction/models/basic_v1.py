@@ -23,7 +23,8 @@ from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_
 from ..metrics import calculate_metric_by_expr
 from .. import constants as _C
 from autogluon.core import args, space
-from autogluon.core.scheduler import FIFOScheduler, HyperbandScheduler
+from autogluon.core.task.base import compile_scheduler_options
+from autogluon.core.task.base.base_task import schedulers
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
@@ -514,7 +515,7 @@ def train_function(args, reporter, train_data, tuning_data,
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60))
             report_items = [('iteration', update_idx + 1),
-                            ('report_idx', report_idx),
+                            ('report_idx', report_idx + 1),
                             ('epoch', int(update_idx / updates_per_epoch))] +\
                            list(metric_scores.items()) + \
                            [('fine_better', find_better),
@@ -644,13 +645,10 @@ class BertForTextPredictionBasic:
 
     def train(self, train_data, tuning_data, resource,
               time_limits=None,
-              scheduler='fifo',
-              searcher=None,
-              num_trials=10,
-              grace_period=None,
-              max_t=None,
-              reduction_factor=4,
-              brackets=1,
+              search_strategy='random',
+              search_options=None,
+              scheduler_options=None,
+              num_trials=None,
               plot_results=False,
               console_log=True,
               ignore_warning=True):
@@ -662,8 +660,25 @@ class BertForTextPredictionBasic:
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
         search_space_reg = args(search_space=space.Dict(**self.search_space))
-        if scheduler == 'hyperband' and time_limits is None:
-            time_limits = 5 * 60 * 60  # 5 hour
+        # Scheduler and searcher for HPO
+        if search_strategy.endswith('hyperband') and time_limits is None:
+            time_limits = 5 * 60 * 60  # 5 hours
+        if scheduler_options is None:
+            scheduler_options = dict()
+        scheduler_options = compile_scheduler_options(
+            scheduler_options=scheduler_options,
+            search_strategy=search_strategy,
+            search_options=search_options,
+            nthreads_per_trial=resource['num_cpus'],
+            ngpus_per_trial=resource['num_gpus'],
+            checkpoint=None,
+            num_trials=num_trials,
+            time_out=scheduler_options.get('time_out'),
+            resume=False,
+            visualizer=scheduler_options.get('visualizer'),
+            time_attr='report_idx',
+            reward_attr='reward',
+            dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_data=train_data,
                                                       time_limits=time_limits,
@@ -677,37 +692,9 @@ class BertForTextPredictionBasic:
                                                       stopping_metric=self._stopping_metric,
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
-        if scheduler == 'fifo':
-            if searcher is None:
-                searcher = 'random'
-            scheduler = FIFOScheduler(train_fn,
-                                      time_out=time_limits,
-                                      num_trials=num_trials,
-                                      resource=resource,
-                                      searcher=searcher,
-                                      checkpoint=None,
-                                      reward_attr='reward',
-                                      time_attr='time_spent')
-        elif scheduler == 'hyperband':
-            if searcher is None:
-                searcher = 'random'
-            if grace_period is None:
-                grace_period = 1
-            if max_t is None:
-                max_t = 5
-            scheduler = HyperbandScheduler(train_fn,
-                                           time_out=time_limits,
-                                           max_t=max_t,
-                                           resource=resource,
-                                           searcher=searcher,
-                                           grace_period=grace_period,
-                                           reduction_factor=reduction_factor,
-                                           brackets=brackets,
-                                           checkpoint=None,
-                                           reward_attr='reward',
-                                           time_attr='report_idx')
-        else:
-            raise NotImplementedError
+        scheduler_cls = schedulers[search_strategy.lower()]
+        # Create scheduler, run HPO experiment
+        scheduler = scheduler_cls(train_fn, **scheduler_options)
         scheduler.run()
         scheduler.join_jobs()
         if len(scheduler.config_history) == 0:
