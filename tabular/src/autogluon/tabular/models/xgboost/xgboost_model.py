@@ -31,8 +31,8 @@ class XGBoostModel(AbstractModel):
             eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)
         return eval_metric
 
-    def preprocess(self, X, is_train=False, max_category_levels=None):
-        X = super().preprocess(X=X)
+    def _preprocess(self, X, is_train=False, max_category_levels=None, **kwargs):
+        X = super()._preprocess(X=X, **kwargs)
 
         if self._ohe_generator is None:
             self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
@@ -98,7 +98,7 @@ class XGBoostModel(AbstractModel):
         )
 
         bst = self.model.get_booster()
-        self.params_trained['best_iteration'] = bst.best_iteration
+        self.params_trained['n_estimators'] = bst.best_iteration + 1
         self.params_trained['best_ntree_limit'] = bst.best_ntree_limit
 
     def get_model_feature_importance(self):
