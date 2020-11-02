@@ -14,6 +14,8 @@ from ..abstract.abstract_model import AbstractModel
 from ...constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.utils import try_import_torch
 
+from ...features import R_CATEGORY, R_INT, R_OBJECT, R_FLOAT
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,43 +28,6 @@ class TabTransformerModel(AbstractModel):
         self.verbosity = None
         self.temp_file_name = "tab_trans_temp.pth"
         try_import_torch()
-
-    def _get_types_of_features(self, df):
-        """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
-            Each value is a list of feature-names corresponding to columns in original dataframe.
-            TODO: ensure features with zero variance have already been removed before this function is called.
-        """
-        if self.types_of_features is not None:
-            Warning("Attempting to _get_types_of_features for TabTransformerModel, but previously already did this.")
-
-        feature_types = self.feature_metadata.get_type_group_map_raw()
-
-        categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
-        continuous_featnames = feature_types['float'] + feature_types[
-            'int']  # + self.__get_feature_type_if_present('datetime')
-        language_featnames = []  # TODO: not implemented. This should fetch text features present in the data
-        valid_features = categorical_featnames + continuous_featnames + language_featnames
-
-        # TODO: Making an assumption that "feature_types_raw" above isn't used elsewhere, since feature_types_raw will
-        # still have features with periods (".") in them.
-        valid_features = [feat.replace(".", "/-#") for feat in valid_features]
-
-        if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
-            unknown_features = [feature for feature in df.columns if feature not in valid_features]
-
-            df = df.drop(columns=unknown_features)
-            self.features = list(df.columns)
-
-        self.types_of_features = []
-        for feature in valid_features:
-            if feature in categorical_featnames:
-                type = 'CATEGORICAL'
-            elif feature in continuous_featnames:
-                type = 'SCALAR'
-            elif feature in language_featnames:
-                type = 'TEXT'
-
-            self.types_of_features.append({"name": feature, "type": type})
 
     def _set_default_params(self):
         import torch
@@ -108,7 +73,7 @@ class TabTransformerModel(AbstractModel):
         if X_unlabeled is not None:
             X_unlabeled = X_unlabeled.rename(columns=self._get_no_period_columns(X_unlabeled))
 
-        self._get_types_of_features(X)
+        self.types_of_features, _ = self._get_types_of_features(X, needs_torch=True, needs_extra_types=False)
 
         data = TabTransformerDataset(X, col_info=self.types_of_features, **self.params)
         self.fe = fe

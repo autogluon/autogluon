@@ -384,9 +384,9 @@ class TabularNeuralNetModel(AbstractModel):
         self.params_trained['num_epochs'] = best_val_epoch + 1
         return
 
-    def _predict_proba(self, X, **kwargs):
-        """ To align predict with abstract_model API.
-            Preprocess here only refers to feature processing steps done by all AbstractModel objects,
+    def _predict_proba(self, X, preprocess=True):
+        """ To align predict wiht abstract_model API.
+            Preprocess here only refers to feature processing stesp done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.
             If X is not DataFrame but instead TabularNNDataset object, we can still produce predictions,
             but cannot use preprocess in this case (needs to be already processed).
@@ -394,7 +394,8 @@ class TabularNeuralNetModel(AbstractModel):
         if isinstance(X, TabularNNDataset):
             return self._predict_tabular_data(new_data=X, process=False, predict_proba=True)
         elif isinstance(X, pd.DataFrame):
-            X = self.preprocess(X, **kwargs)
+            if preprocess:
+                X = self.preprocess(X)
             return self._predict_tabular_data(new_data=X, process=True, predict_proba=True)
         else:
             raise ValueError("X must be of type pd.DataFrame or TabularNNDataset, not type: %s" % type(X))
@@ -557,54 +558,6 @@ class TabularNeuralNetModel(AbstractModel):
     @staticmethod
     def convert_df_dtype_to_str(df):
         return df.astype(str)
-
-    def _get_types_of_features(self, df, skew_threshold, embed_min_categories, use_ngram_features):
-        """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
-            Each value is a list of feature-names corresponding to columns in original dataframe.
-            TODO: ensure features with zero variance have already been removed before this function is called.
-        """
-        if self.types_of_features is not None:
-            Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
-
-        feature_types = self.feature_metadata.get_type_group_map_raw()
-        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
-        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
-        language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
-        valid_features = categorical_featnames + continuous_featnames + language_featnames
-        if len(valid_features) < df.shape[1]:
-            unknown_features = [feature for feature in df.columns if feature not in valid_features]
-            logger.log(15, f"TabularNeuralNetModel will additionally ignore the following columns: {unknown_features}")
-            df = df.drop(columns=unknown_features)
-            self.features = list(df.columns)
-
-        self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
-        if self.features_to_drop:
-            logger.log(15, f"TabularNeuralNetModel will additionally ignore the following columns: {self.features_to_drop}")
-            df = df.drop(columns=self.features_to_drop)
-
-        types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'embed': [], 'language': []}
-        # continuous = numeric features to rescale
-        # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
-        # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-        features_to_consider = [feat for feat in self.features if feat not in self.features_to_drop]
-        for feature in features_to_consider:
-            feature_data = df[feature]  # pd.Series
-            num_unique_vals = len(feature_data.unique())
-            if num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
-                types_of_features['onehot'].append(feature)
-            elif feature in continuous_featnames:
-                if np.abs(feature_data.skew()) > skew_threshold:
-                    types_of_features['skewed'].append(feature)
-                else:
-                    types_of_features['continuous'].append(feature)
-            elif feature in categorical_featnames:
-                if num_unique_vals >= embed_min_categories:  # sufficiently many categories to warrant learned embedding dedicated to this feature
-                    types_of_features['embed'].append(feature)
-                else:
-                    types_of_features['onehot'].append(feature)
-            elif feature in language_featnames:
-                types_of_features['language'].append(feature)
-        return types_of_features, df
 
     def _get_feature_arraycol_map(self, max_category_levels):
         """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
