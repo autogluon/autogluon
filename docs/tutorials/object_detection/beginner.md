@@ -11,7 +11,7 @@ To start, import autogluon.vision and ObjectDetection module as your task:
 
 ```{.python .input}
 import autogluon.core as ag
-from autogluon.vision import ObjectDetection as task
+from autogluon.vision import ObjectDetection as Task
 ```
 
 ## Tiny_motorbike Dataset
@@ -20,7 +20,8 @@ We collect a toy dataset for detecting motorbikes in images. From the VOC datase
 Using the commands below, we can download this dataset, which is only 23M. The name of unzipped folder is called `tiny_motorbike`. Anyway, the task dataset helper can perform the download and extraction automatically, and load the dataset according to the detection formats.
 
 ```{.python .input}
-dataset_train = task.Dataset.from_voc('https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip', classes=('motorbike',))
+url = 'https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip'
+dataset_train = Task.Dataset.from_voc(url, splits='train')
 ```
 
 ## Fit Models by AutoGluon
@@ -29,14 +30,9 @@ In this section, we demonstrate how to apply AutoGluon to fit our detection mode
 We `fit` a classifier using AutoGluon as follows. In each experiment (one trial in our searching space), we train the model for 30 epochs.
 
 ```{.python .input}
-time_limits = 5*60*60  # 5 hours
-epochs = 30
-detector = task.fit(dataset_train,
-                    num_trials=2,
-                    epochs=epochs,
-                    lr=ag.Categorical(5e-4, 1e-4),
-                    ngpus_per_trial=1,
-                    time_limits=time_limits)
+time_limits = 60*60  # 1 hour
+task = Task({'time_limits': time_limit, 'num_trials': 2})
+detector = task.fit(dataset_train)
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal
@@ -48,10 +44,10 @@ a lot more sample-efficient.
 After fitting, AutoGluon automatically returns the best model among all models in the searching space. From the output, we know the best model is the one trained with the second learning rate. To see how well the returned model performed on test dataset, call detector.evaluate().
 
 ```{.python .input}
-dataset_test = task.Dataset(data_root, index_file_name='test', classes=('motorbike',))
+dataset_test = Task.Dataset.from_voc(url, splits='test')
 
 test_map = detector.evaluate(dataset_test)
-print("mAP on test dataset: {}".format(test_map[1][1]))
+print("mAP on test dataset: {}".format(test_map[1][-1]))
 ```
 
 Below, we randomly select an image from test dataset and show the predicted box and probability over the origin image.  
@@ -60,14 +56,19 @@ Below, we randomly select an image from test dataset and show the predicted box 
 image = '000467.jpg'
 image_path = os.path.join(data_root, 'JPEGImages', image)
 
-ind, prob, loc = detector.predict(image_path)
+result = detector.predict(image_path)
+print(result)
+```
+
+Prediction with multiple images is permitted:
+```{.python .input}
+bulk_result = detector.predict(dataset_test)
+print(bulk_result)
 ```
 
 We can also save the trained model, and use it later.
 ```{.python .input}
-savefile = 'model.pkl'
+savefile = 'detector.ag'
 detector.save(savefile)
-
-from autogluon.vision import Detector
-new_detector = Detector.load(savefile)
+new_detector = Task.load(savefile)
 ```

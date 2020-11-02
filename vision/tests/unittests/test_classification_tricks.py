@@ -79,6 +79,7 @@ def config_choice(dataset, data_path, tricks):
     return kaggle_choice
 
 
+@pytest.mark.skip(reason="change of api")
 @pytest.mark.slow
 @pytest.mark.parametrize("combination", tricks_combination)
 def test_tricks(combination):
@@ -108,7 +109,3 @@ def test_tricks(combination):
     print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
     # summary = classifier.fit_summary(output_directory=dataset, verbosity=3)
     # print(summary)
-
-
-
-

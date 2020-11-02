@@ -9,7 +9,7 @@ We begin by specifying [ImageClassification](/api/autogluon.task.html#autogluon.
 
 ```{.python .input}
 import autogluon.core as ag
-from autogluon.vision import ImageClassification as task
+from autogluon.vision import ImageClassification as Task
 ```
 
 ## Create AutoGluon Dataset
@@ -21,15 +21,8 @@ Our subset of the data contains the following possible labels: `BabyPants`, `Bab
 We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
-dataset, val_dataset, test_dataset = task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
-```
-
-If you don't have a GPU, change the dataset to 'FashionMNIST' to ensure that it doesn't take too long to run:
-
-```{.python .input}
-if ag.get_gpu_count() == 0:
-    dataset = task.Dataset(name='FashionMNIST')
-    test_dataset = task.Dataset(name='FashionMNIST', train=False)
+train_dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+print(train_dataset)
 ```
 
 ## Use AutoGluon to Fit Models
@@ -37,11 +30,9 @@ if ag.get_gpu_count() == 0:
 Now, we fit a classifier using AutoGluon as follows:
 
 ```{.python .input}
-classifier = task.fit(dataset,
-                      val_data=val_dataset,
-                      epochs=5,
-                      ngpus_per_trial=1,
-                      verbose=False)
+task = Task()  # you can trust the default config if no paticular requirement
+# since the original dataset does not provide validation data, the `fit` function split it randomly
+classifier = task.fit(train_dataset)
 ```
 
 Within `fit`, the dataset is automatically split into training and validation sets.
@@ -51,7 +42,8 @@ The best model is finally retrained on our entire dataset (i.e., merging trainin
 The best Top-1 accuracy achieved on the validation set is as follows:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+fit_result = task.fit_summary()
+print('Top-1 train acc: %.3f, val acc: %.3f' % fit_result['train_acc'], fit_result['vac_acc'])
 ```
 
 ## Predict on a New Image
@@ -59,28 +51,40 @@ print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
 ```{.python .input}
-# skip this if training FashionMNIST on CPU.
-if ag.get_gpu_count() > 0:
-    image = 'data/test/BabyShirt/BabyShirt_323.jpg'
-    ind, prob, _ = classifier.predict(image, plot=True)
+image = 'data/test/BabyShirt/BabyShirt_323.jpg'
+result = classifier.predict(image)
 
-    print('The input picture is classified as [%s], with probability %.2f.' %
-          (dataset.init().classes[ind.asscalar()], prob.asscalar()))
-
-    image = 'data/test/womenchiffontop/womenchiffontop_184.jpg'
-    ind, prob, _ = classifier.predict(image, plot=True)
-
-    print('The input picture is classified as [%s], with probability %.2f.' %
-          (dataset.init().classes[ind.asscalar()], prob.asscalar()))
+print(result)
 ```
+
+Of course you can feed in multiple images, let's use images in test dataset as an example:
+```{.python .input}
+bulk_result = classifier.predict(test_dataset)
+
+print(bulk_result)
+```
+
 
 ## Evaluate on Test Dataset
 
-We now evaluate the classifier on a test dataset.
+You can evaluate the classifier on a test dataset rather than retrieving the predictions.
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-test_acc = classifier.evaluate(test_dataset)
+test_acc, _ = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
+```
+
+## Save and load classifiers
+
+You can directly save the instances of classifiers:
+
+```{.python .input}
+filename = 'classifier.ag'
+classifier.save(filename)
+classifier_loaded = Task.load(filename)
+# use classifier_loaded as usual
+result = classifier_loaded.predict(image)
+print(result)
 ```

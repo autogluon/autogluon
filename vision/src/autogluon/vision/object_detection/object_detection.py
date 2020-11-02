@@ -15,7 +15,7 @@ class ObjectDetection(_ObjectDetection):
         The desired logger object, use `None` for module specific logger with default setting.
 
     """
-    def __init__(self, config, logger=None):
+    def __init__(self, config=None, logger=None):
         super().__init__(config=config, logger=logger)
 
     def fit(self, train_data, val_data=None, train_size=0.9, random_state=None):

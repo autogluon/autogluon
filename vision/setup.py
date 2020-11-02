@@ -13,8 +13,8 @@ with open(os.path.join('..', 'VERSION')) as version_file:
     version = version_file.read().strip()
 
 """
-To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
-a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
+To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish
+a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml .
 You need to increase the version number after stable release, so that the nightly pypi can work properly.
 """
 try:

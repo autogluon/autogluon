@@ -1,24 +1,11 @@
 from autogluon.vision import ImageClassification as task
 
+def test_task():
+    dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 
-def test_ensemble():
-    dataset = task.Dataset(name='FashionMNIST')
-    test_dataset = task.Dataset(name='FashionMNIST', train=False)
-    classifier = task.fit(dataset,
-                          epochs=1,
-                          ngpus_per_trial=1,
-                          verbose=False,
-                          ensemble=2)
-    test_acc = classifier.evaluate(test_dataset)
-
-
-def test_classifier_save_load():
-    dataset = task.Dataset(name='FashionMNIST')
-    test_dataset = task.Dataset(name='FashionMNIST', train=False)
-    classifier = task.fit(dataset,
-                          epochs=1,
-                          ngpus_per_trial=1,
-                          verbose=False)
+    classifier = Task().fit(dataset)
+    test_result = classifier.predict(test_dataset)
+    print('test result', test_result)
     classifier.save('classifier.ag')
     classifier2 = task.Classifier.load('classifier.ag')
     test_acc = classifier2.evaluate(test_dataset)
