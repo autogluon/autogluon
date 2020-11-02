@@ -306,16 +306,12 @@ class MultiheadAttention(Module):
           L is the target sequence length, S is the source sequence length.
         """
 
-        return multi_head_attention_forward(
-            query, key, value, self.embed_dim, self.num_heads,
-            self.in_proj_weight, self.in_proj_bias,
-            self.bias_k, self.bias_v, self.add_zero_attn,
-            self.dropout, self.out_proj.weight, self.out_proj.bias,
-            fixed_k=self.fixed_k,
-            fixed_q=self.fixed_q,
-            training=self.training,
-            key_padding_mask=key_padding_mask, need_weights=need_weights,
-            attn_mask=attn_mask)
+        return multi_head_attention_forward(self,
+            query=query, key=key, value=value, embed_dim_to_check=self.embed_dim, num_heads=self.num_heads,
+            in_proj_weight=self.in_proj_weight, in_proj_bias=self.in_proj_bias, bias_k=self.bias_k, bias_v=self.bias_v,
+            add_zero_attn=self.add_zero_attn, dropout_p=self.dropout, out_proj_weight=self.out_proj.weight,
+            out_proj_bias=self.out_proj.bias, fixed_k=self.fixed_k, fixed_q=self.fixed_q, training=self.training,
+            key_padding_mask=key_padding_mask, need_weights=need_weights, attn_mask=attn_mask)
 
 
 class Linear(Module):
@@ -425,7 +421,7 @@ class TransformerEncoderLayer_modified(Module):
         self.dropout1 = Dropout(dropout)
         self.dropout2 = Dropout(dropout)
 
-        self.activation = self._get_activation_fn(activation)
+        self.activation = _get_activation_fn(activation)
 
     def __setstate__(self, state):
         if 'activation' not in state:

@@ -241,23 +241,22 @@ class AbstractModel:
         X_train = self.preprocess(X_train)
         self.model = self.model.fit(X_train, y_train)
 
-    def predict(self, X, preprocess=True):
-        y_pred_proba = self.predict_proba(X, preprocess=preprocess)
+    def predict(self, X, **kwargs):
+        y_pred_proba = self.predict_proba(X, **kwargs)
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
-    def predict_proba(self, X, preprocess=True, normalize=None):
+    def predict_proba(self, X, normalize=None, **kwargs):
         if normalize is None:
             normalize = self.normalize_pred_probas
-        y_pred_proba = self._predict_proba(X=X, preprocess=preprocess)
+        y_pred_proba = self._predict_proba(X=X, **kwargs)
         if normalize:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
         return y_pred_proba
 
-    def _predict_proba(self, X, preprocess=True):
-        if preprocess:
-            X = self.preprocess(X)
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
 
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
@@ -665,7 +664,7 @@ class AbstractModel:
             TODO: ensure features with zero variance have already been removed before this function is called.
         """
         if self.types_of_features is not None:
-            Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
+            Warning("Attempting to _get_types_of_features for Model, but previously already did this.")
 
         feature_types = self.feature_metadata.get_type_group_map_raw()
         categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
@@ -680,13 +679,13 @@ class AbstractModel:
 
         if len(valid_features) < df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
-            logger.log(15, f"TabularNeuralNetModel will additionally ignore the following columns: {unknown_features}")
+            logger.log(15, f"Model will additionally ignore the following columns: {unknown_features}")
             df = df.drop(columns=unknown_features)
             self.features = list(df.columns)
 
         self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
         if self.features_to_drop:
-            logger.log(15, f"TabularNeuralNetModel will additionally ignore the following columns: {self.features_to_drop}")
+            logger.log(15, f"Model will additionally ignore the following columns: {self.features_to_drop}")
             df = df.drop(columns=self.features_to_drop)
 
         if needs_extra_types is True:

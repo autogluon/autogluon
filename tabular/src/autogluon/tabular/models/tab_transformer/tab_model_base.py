@@ -3,6 +3,15 @@ import torch.nn as nn
 
 class TabNet(nn.Module):
     def __init__(self, num_class, params, cat_feat_origin_cards):
+        """
+        Internal torch model that uses TabTransformer as an embedding.
+        This is where we are passing through activations and neurons.
+
+        Parameters
+        ----------
+        num_class (int): Number of classes identified.
+        cat_feat_origin_cards (list): List of categorical features
+        """
         super(TabNet, self).__init__()
         import torch.nn as nn
         from .tab_transformer import TabTransformer
@@ -21,16 +30,27 @@ class TabNet(nn.Module):
 
 
 class TabModelBase(nn.Module):
-    """
-    Base class for all tabular models
-    """
+
 
     def __init__(self, n_cont_features, norm_class_name, cat_feat_origin_cards, max_emb_dim,
                  p_dropout, one_hot_embeddings, drop_whole_embeddings, **kwargs):
         super().__init__()
+        """
+        Base class for all TabTransformer models
+        
+        Parameters
+        ----------
+        max_emb_dim (int): Maximum allowable amount of embeddings.
+        n_cont_features (int): How many continuous features to concatenate onto the categorical features.
+        cat_feat_origin_cards (list): Categorical features to turn into embeddings.
+        norm_class: What normalization to use for continuous features.
+        p_dropout (float): How much dropout to apply.
+        drop_whole_embeddings (bool): If True, dropout pretends the embedding was a missing value. If false, dropout sets embed features to 0
+        one_hot_embeddings (bool): If True, one-hot encode variables whose cardinality is < max_emb_dim.
+        cat_initializers (dict): Structure to hold the initial embeddings for categorical features.
+        """
         self.kwargs = kwargs
 
-        self.act_on_output = True
         self.max_emb_dim = max_emb_dim
         self.n_cont_features = n_cont_features
         self.cat_feat_origin_cards = cat_feat_origin_cards

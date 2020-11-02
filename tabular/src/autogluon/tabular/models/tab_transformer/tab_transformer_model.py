@@ -315,7 +315,7 @@ class TabTransformerModel(AbstractModel):
         else:
             self.tt_fit(trainloader, valloader, y_val, time_limit=time_limit, reporter=reporter)
 
-    def _predict_proba(self, X, preprocess=False):
+    def _predict_proba(self, X, **kwargs):
         """
         X (torch.tensor or pd.dataframe): data for model to give prediction probabilities
         returns: np.array of k-probabilities for each of the k classes. If k=2 we drop the second probability.
@@ -326,8 +326,7 @@ class TabTransformerModel(AbstractModel):
         from torch.autograd import Variable
 
         if isinstance(X, pd.DataFrame):
-            if preprocess:
-                X = self.preprocess(X)
+            X = self.preprocess(X, **kwargs)
             # Internal preprocessing, renaming col names, tt specific.
             X, _, _ = self._tt_preprocess(X, fe=self.fe)
             loader = X.build_loader()

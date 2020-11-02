@@ -9,7 +9,7 @@ def get_fixed_params():
                     #'shared_embedding': False,
                     #'n_shared_embs': 8,
                     'orig_emb_resid': False,
-                    'one_hot_embeddings': False,
+                    'one_hot_embeddings': False, # If True, one-hot encode variables whose cardinality is < max_emb_dim.
                     'drop_whole_embeddings': False, # If True, dropout pretends the embedding was a missing value. If false, dropout sets embed features to 0
                     'max_emb_dim': 8, # Maximum allowable amount of embeddings.
                     'base_exp_decay': 0.95, # Rate of exponential decay for learning rate, used during finetuning.
@@ -21,7 +21,7 @@ def get_fixed_params():
                     'aug_mask_prob' : 0.4, # What percentage of values to apply augmentation to.
                     'num_augs' : 1, # Number of augmentations to add.
                     'pretext': 'BERT_pretext', # What pretext to use when performing pretraining/semi-supervised learning.
-                    'n_cont_features': 8,
+                    'n_cont_features': 8, # How many continuous features to concatenate onto the categorical features
                     # TODO: Shouldn't we be using the custom Transformer architecture? Is this a bad oversight? Was default'ed to False in original PR.
                     'fix_attention': False, # If True, use the categorical embeddings in the transformer architecture.
                     'epochs': 100, # How many epochs to train on with labeled data.
