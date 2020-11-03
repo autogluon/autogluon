@@ -834,7 +834,7 @@ class BertForTextPredictionBasic:
         Returns
         -------
         probabilities : array
-            The predicted class probabilities for each sample. Shape of this array is (#Samples, num_class).
+            The predicted class probabilities for each sample. Shape of this array is (#Samples, num_class).
         """
         assert self.problem_types[0] == _C.CLASSIFICATION
         return self._internal_predict(test_data,
