@@ -30,8 +30,6 @@ class TabNet(nn.Module):
 
 
 class TabModelBase(nn.Module):
-
-
     def __init__(self, n_cont_features, norm_class_name, cat_feat_origin_cards, max_emb_dim,
                  p_dropout, one_hot_embeddings, drop_whole_embeddings, **kwargs):
         super().__init__()

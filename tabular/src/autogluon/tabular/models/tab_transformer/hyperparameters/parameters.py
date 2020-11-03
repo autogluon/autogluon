@@ -4,7 +4,6 @@ def get_fixed_params():
     fixed_params = {'batch_size': 512, # The size of example chunks to predict on.
                     'n_cont_embeddings': 0, # How many continuous feature embeddings to use.
                     'norm_class_name': 'LayerNorm', # What kind of normalization to use on continuous features.
-                    'tab_readout': 'none', # What sort of readout from the transformer. Options: ['readout_emb', 'mean', 'concat_pool', 'concat_pool_all', 'concat_pool_add', 'all_feat_embs', 'mean_feat_embs', 'none']
                     'column_embedding': True, # If True, 1/(n_shared_embs)th of every embedding will be reserved for a learned parameter that's common to all embeddings.
                     #'shared_embedding': False,
                     #'n_shared_embs': 8,
@@ -49,6 +48,8 @@ def get_hyper_params():
         # Options: Categorical(1, 2, 3, 4, 5)
         'feature_dim': 64, # Size of fully connected layer in TabNet.
         # Options: Int(8, 128)
+        'tab_readout': 'none', # What sort of readout from the transformer.
+        # Options: ['readout_emb', 'mean', 'concat_pool', 'concat_pool_all', 'concat_pool_add', 'all_feat_embs', 'mean_feat_embs', 'none']
     }
 
     return hyper_params

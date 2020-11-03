@@ -10,16 +10,17 @@ from tqdm import tqdm
 
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
-from ..abstract.abstract_model import AbstractModel
+from ..abstract.abstract_model import AbstractNeuralNetworkModel
 from ...constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.utils import try_import_torch
 
 logger = logging.getLogger(__name__)
 
 
-class TabTransformerModel(AbstractModel):
+class TabTransformerModel(AbstractNeuralNetworkModel):
     """
-    Main TabTransformer model that inherits from AbstractModel.
+    Main TabTransformer model that inherits from AbstractModel. This is the internal embedding for the Transformer
+    architecture.
 
     TabTransformer uses modifications to the typical Transformer architecture and the pretraining in BERT
     and applies them to the use case of tabular data. Specifically, this makes TabTransformer suitable for unsupervised
@@ -28,11 +29,11 @@ class TabTransformerModel(AbstractModel):
     params_file_name = "tab_trans_params.pth"
 
     def __init__(self, **kwargs):
+        try_import_torch()
         super().__init__(**kwargs)
         self.types_of_features = None
         self.verbosity = None
         self.temp_file_name = "tab_trans_temp.pth"
-        try_import_torch()
 
     def _set_default_params(self):
         import torch
@@ -471,4 +472,6 @@ class TabTransformerModel(AbstractModel):
         
         4) Enable output layer of TT model to be multiple fully connected layers rather than just a single
         linear layer. "TabTransformer2 changes"
+        NOTE: This is "partially done" right now as there is two FC layers at the end of TabNet. The main addition
+        still needed is to process and concatenate continous features.
         """

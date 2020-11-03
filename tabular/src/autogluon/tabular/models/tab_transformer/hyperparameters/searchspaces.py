@@ -10,6 +10,7 @@ def get_default_searchspace():
         'hidden_dim': Categorical(128, 32, 64, 256),
         'n_layers': Categorical(1, 2, 3, 4, 5),
         'feature_dim': Int(8, 128, default=64),
+        'tab_readout': Categorical('none', 'readout_emb', 'mean', 'concat_pool', 'concat_pool_all', 'concat_pool_add', 'all_feat_embs', 'mean_feat_embs')
     }
 
     return params.copy()

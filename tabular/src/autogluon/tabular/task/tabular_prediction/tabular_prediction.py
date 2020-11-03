@@ -92,9 +92,6 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
-        unlabeled_data : TODO: Not sure what all the data types are that this can be.
-            Collection of data without labels that we can use to pretrain on.
-            TODO: Write more descriptive description
         time_limits : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` or `auto_stack` is specified.
@@ -432,6 +429,9 @@ class TabularPrediction(BaseTask):
                 List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
             visualizer : str, default = None
                 How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', None].
+            unlabeled_data : pd.DataFrame, default = None
+            Collection of data without labels that we can use to pretrain on. This is the same schema as X, but
+            without labels.
 
         Returns
         -------

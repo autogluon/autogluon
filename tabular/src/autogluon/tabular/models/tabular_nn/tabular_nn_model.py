@@ -26,7 +26,7 @@ from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from .tabular_nn_dataset import TabularNNDataset
 from .tabular_nn_trial import tabular_nn_trial
-from ..abstract.abstract_model import AbstractModel
+from ..abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
@@ -41,7 +41,7 @@ EPS = 1e-10  # small number
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
 #  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.
-class TabularNeuralNetModel(AbstractModel):
+class TabularNeuralNetModel(AbstractNeuralNetworkModel):
     """ Class for neural network models that operate on tabular data.
         These networks use different types of input layers to process different types of data in various columns.
 
@@ -384,7 +384,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.params_trained['num_epochs'] = best_val_epoch + 1
         return
 
-    def _predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, **kwargs):
         """ To align predict wiht abstract_model API.
             Preprocess here only refers to feature processing stesp done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.
@@ -394,8 +394,7 @@ class TabularNeuralNetModel(AbstractModel):
         if isinstance(X, TabularNNDataset):
             return self._predict_tabular_data(new_data=X, process=False, predict_proba=True)
         elif isinstance(X, pd.DataFrame):
-            if preprocess:
-                X = self.preprocess(X)
+            X = self.preprocess(X, **kwargs)
             return self._predict_tabular_data(new_data=X, process=True, predict_proba=True)
         else:
             raise ValueError("X must be of type pd.DataFrame or TabularNNDataset, not type: %s" % type(X))
