@@ -46,10 +46,7 @@ def test_sst():
                          output_directory='./sst',
                          plot_results=False)
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
-    dev_prediction = predictor.predict(dev_data)
-    dev_pred_prob = predictor.predict_proba(dev_data)
-    model_path = 'saved_model'
-    predictor1.save(model_path)
+    verify_predictor_save_load(predictor, dev_data)
 
 
 def test_mrpc():
