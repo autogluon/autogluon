@@ -2,6 +2,7 @@ name: autogluon_py3
 dependencies:
 - python=3.7
 - graphviz
+- libpng
 - pip:
   - jupyter-sphinx>=0.2.2
   - mxnet_cu101==1.7.0

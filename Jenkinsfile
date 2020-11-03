@@ -61,10 +61,11 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
-          cd tabular/
+          cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../tabular/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
-          pip uninstall -y autogluon.tabular
           """
         }
       }
@@ -96,7 +97,11 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
-          cd mxnet/
+          cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../extra/
+          python3 -m pip install --upgrade -e .
+          cd ../mxnet/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
@@ -130,7 +135,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
-          cd extra/
+          cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../extra/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
@@ -164,10 +171,15 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
-          cd text/
+          cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../tabular/
+          python3 -m pip install --upgrade -e .
+          cd ../mxnet/
+          python3 -m pip install --upgrade -e .
+          cd ../text/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
-          pip uninstall -y autogluon.text
           """
         }
       }
@@ -199,6 +211,12 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
+          cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../mxnet/
+          python3 -m pip install --upgrade -e .
+          cd ../extra/
+          python3 -m pip install --upgrade -e .
           cd vision/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
