@@ -18,7 +18,7 @@ from ...tuning.feature_pruner import FeaturePruner
 from autogluon.core.utils import shuffle_df_rows
 from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
 from ... import metrics
-from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from ...features.feature_metadata import FeatureMetadata
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
@@ -40,9 +40,9 @@ class AbstractModel:
                 path (str): directory where to store all outputs.
                 name (str): name of subdirectory inside path where model will be saved.
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-                eval_metric (str or autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
+                eval_metric (str or autogluon.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-                feature_metadata (autogluon.utils.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
+                feature_metadata (autogluon.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
         self.name = name
         self.path_root = path
@@ -153,7 +153,6 @@ class AbstractModel:
         """
         Get the default hyperparameter searchspace of the model.
         See `autogluon.core.space` for available space classes.
-
         Returns
         -------
         dict of hyperparameter search spaces.
@@ -330,7 +329,6 @@ class AbstractModel:
     def save(self, path: str = None, verbose=True) -> str:
         """
         Saves the model to disk.
-
         Parameters
         ----------
         path : str, default None
@@ -340,7 +338,6 @@ class AbstractModel:
             The final model file is typically saved to path + self.model_file_name.
         verbose : bool, default True
             Whether to log the location of the saved file.
-
         Returns
         -------
         path : str
@@ -357,7 +354,6 @@ class AbstractModel:
     def load(cls, path: str, reset_paths=True, verbose=True):
         """
         Loads the model from disk to memory.
-
         Parameters
         ----------
         path : str
@@ -370,7 +366,6 @@ class AbstractModel:
             If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
         verbose : bool, default True
             Whether to log the location of the loaded file.
-
         Returns
         -------
         model : cls
@@ -383,7 +378,7 @@ class AbstractModel:
         return model
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, subsample_size=10000, silent=False, **kwargs) -> pd.Series:
+    def compute_feature_importance(self, X, y, features_to_use=None, subsample_size=10000, silent=False, **kwargs) -> pd.Series:
         if (subsample_size is not None) and (len(X) > subsample_size):
             # Reset index to avoid error if duplicated indices.
             X = X.reset_index(drop=True)
@@ -395,8 +390,7 @@ class AbstractModel:
             X = X.copy()
             y = y.copy()
 
-        if preprocess:
-            X = self.preprocess(X)
+        X = self.preprocess(X=X, preprocess_stateful=False, **kwargs)
 
         if not features_to_use:
             features = list(X.columns.values)
@@ -409,10 +403,10 @@ class AbstractModel:
         banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         features = [feature for feature in features if feature not in banned_features]
 
-        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess=False, silent=silent)
+        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess_nonadaptive=False, silent=silent)
 
         feature_importances = pd.Series(permutation_importance_dict)
-        results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features)
+        results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features, dtype='float64')
         feature_importances = pd.concat([feature_importances, results_banned])
         feature_importances = feature_importances.sort_values(ascending=False)
 
@@ -423,17 +417,17 @@ class AbstractModel:
     # Compute feature importance via permutation importance
     # Note: Expensive to compute
     #  Time to compute is O(predict_time*num_features)
-    def compute_permutation_importance(self, X, y, features: list, preprocess=True, silent=False) -> dict:
+    def compute_permutation_importance(self, X, y, features: list, preprocess_nonadaptive=True, silent=False) -> dict:
         time_start = time.time()
 
         feature_count = len(features)
         if not silent:
             logger.log(20, f'Computing permutation importance for {feature_count} features on {self.name} ...')
-        if preprocess:
-            X = self.preprocess(X)
+        if preprocess_nonadaptive:
+            X = self.preprocess(X, preprocess_stateful=False)
 
         time_start_score = time.time()
-        model_score_base = self.score(X=X, y=y, preprocess=False)
+        model_score_base = self.score(X=X, y=y, preprocess_nonadaptive=False)
         time_score = time.time() - time_start_score
 
         if not silent:
@@ -476,9 +470,9 @@ class AbstractModel:
                 row_index = row_index_end
 
             if self.metric_needs_y_pred:
-                y_pred = self.predict(X_raw, preprocess=False)
+                y_pred = self.predict(X_raw, preprocess_nonadaptive=False)
             else:
-                y_pred = self.predict_proba(X_raw, preprocess=False)
+                y_pred = self.predict_proba(X_raw, preprocess_nonadaptive=False)
 
             row_index = 0
             for feature in parallel_computed_features:
@@ -688,6 +682,26 @@ class AbstractModel:
         )
         return info
 
+    @classmethod
+    def load_info(cls, path, load_model_if_required=True) -> dict:
+        load_path = path + cls.model_info_name
+        try:
+            return load_pkl.load(path=load_path)
+        except:
+            if load_model_if_required:
+                model = cls.load(path=path, reset_paths=True)
+                return model.get_info()
+            else:
+                raise
+
+    def save_info(self) -> dict:
+        info = self.get_info()
+
+        save_pkl.save(path=self.path + self.model_info_name, object=info)
+        json_path = self.path + self.model_info_json_name
+        save_json.save(path=json_path, obj=info)
+        return info
+
     def _get_types_of_features(self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_torch=False, needs_extra_types=True):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
             Each value is a list of feature-names corresponding to columns in original dataframe.
@@ -754,24 +768,3 @@ class AbstractModel:
                 types_of_features.append({"name": feature, "type": feature_type})
 
         return types_of_features, df
-
-
-    @classmethod
-    def load_info(cls, path, load_model_if_required=True) -> dict:
-        load_path = path + cls.model_info_name
-        try:
-            return load_pkl.load(path=load_path)
-        except:
-            if load_model_if_required:
-                model = cls.load(path=path, reset_paths=True)
-                return model.get_info()
-            else:
-                raise
-
-    def save_info(self) -> dict:
-        info = self.get_info()
-
-        save_pkl.save(path=self.path + self.model_info_name, object=info)
-        json_path = self.path + self.model_info_json_name
-        save_json.save(path=json_path, obj=info)
-        return info

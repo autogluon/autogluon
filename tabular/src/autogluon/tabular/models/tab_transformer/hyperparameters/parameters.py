@@ -8,7 +8,7 @@ def get_fixed_params():
                     'column_embedding': True, # If True, 1/(n_shared_embs)th of every embedding will be reserved for a learned parameter that's common to all embeddings.
                     #'shared_embedding': False,
                     #'n_shared_embs': 8,
-                    'orig_emb_resid': False,
+                    'orig_emb_resid': False, # If True, concatenate the original embeddings on top of the feature embeddings in the Transformer layers.
                     'one_hot_embeddings': False, # If True, one-hot encode variables whose cardinality is < max_emb_dim.
                     'drop_whole_embeddings': False, # If True, dropout pretends the embedding was a missing value. If false, dropout sets embed features to 0
                     'max_emb_dim': 8, # Maximum allowable amount of embeddings.

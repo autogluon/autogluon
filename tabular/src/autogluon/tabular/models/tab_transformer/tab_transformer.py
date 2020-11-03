@@ -11,7 +11,7 @@ from .tab_model_base import TabModelBase
 
 class TabTransformer(TabModelBase):
     """
-    Transformer model for tabular data, can be useful for semi-supervised learning.
+    Transformer model for tabular data, can also be used for semi-supervised learning.
     """
 
     def __init__(self, n_cont_embeddings, n_layers, n_heads, hidden_dim, tab_readout, column_embedding, orig_emb_resid,

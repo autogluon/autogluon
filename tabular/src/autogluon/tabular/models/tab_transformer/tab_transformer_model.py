@@ -14,12 +14,17 @@ from ..abstract.abstract_model import AbstractModel
 from ...constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.utils import try_import_torch
 
-from ...features import R_CATEGORY, R_INT, R_OBJECT, R_FLOAT
-
 logger = logging.getLogger(__name__)
 
 
 class TabTransformerModel(AbstractModel):
+    """
+    Main TabTransformer model that inherits from AbstractModel.
+
+    TabTransformer uses modifications to the typical Transformer architecture and the pretraining in BERT
+    and applies them to the use case of tabular data. Specifically, this makes TabTransformer suitable for unsupervised
+    training of Tabular data with a subsequent fine-tuning step on labeled data.
+    """
     params_file_name = "tab_trans_params.pth"
 
     def __init__(self, **kwargs):
@@ -65,6 +70,10 @@ class TabTransformerModel(AbstractModel):
         return rename_columns
 
     def _tt_preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
+        """
+        Pre-processing specific to TabTransformer. Setting up feature encoders, renaming columns with periods in
+        them (torch), and converting X, X_val, X_unlabeled into TabTransformerDataset's.
+        """
         from .utils import TabTransformerDataset
         X = X.rename(columns=self._get_no_period_columns(X))
 
@@ -107,6 +116,9 @@ class TabTransformerModel(AbstractModel):
 
     def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch,
                epochs, databar_disable, reporter, params):
+        """
+        Helper function to run one epoch of training, essentially the "inner loop" of training.
+        """
         import torch
         from .utils import augmentation
         is_train = (optimizers is not None)
@@ -215,8 +227,6 @@ class TabTransformerModel(AbstractModel):
 
         best_val_metric = -np.inf  # higher = better
         best_val_epoch = 0
-        val_improve_epoch = 0
-
         best_loss = np.inf
 
         self.verbosity = self.params.get('verbosity', 2)
@@ -327,7 +337,6 @@ class TabTransformerModel(AbstractModel):
 
         if isinstance(X, pd.DataFrame):
             X = self.preprocess(X, **kwargs)
-            # Internal preprocessing, renaming col names, tt specific.
             X, _, _ = self._tt_preprocess(X, fe=self.fe)
             loader = X.build_loader()
         elif isinstance(X, DataLoader):
