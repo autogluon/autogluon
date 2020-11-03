@@ -27,7 +27,7 @@ class ImageClassification(_ImageClassification):
             The estimator obtained by training on the specified dataset.
 
         """
-        super().fit(train_data, val_data, train_size, random_state)
+        return super().fit(train_data, val_data, train_size, random_state)
 
     @classmethod
     def load(cls, filename):

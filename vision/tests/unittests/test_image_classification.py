@@ -7,5 +7,5 @@ def test_task():
     test_result = classifier.predict(test_dataset)
     print('test result', test_result)
     classifier.save('classifier.ag')
-    classifier2 = task.Classifier.load('classifier.ag')
+    classifier2 = Task.load('classifier.ag')
     test_acc = classifier2.evaluate(test_dataset)
