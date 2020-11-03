@@ -11,8 +11,8 @@ with open(os.path.join('..', 'VERSION')) as version_file:
     version = version_file.read().strip()
 
 """
-To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
-a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
+To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish
+a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml .
 You need to increase the version number after stable release, so that the nightly pypi can work properly.
 """
 try:
@@ -46,7 +46,7 @@ requirements = [
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'scikit-learn>=0.22.0,<0.24',
     'networkx>=2.3,<3.0',
-    'gluoncv>=0.5.0,<1.0',
+    'gluoncv==0.9.0b20201103',
     f'autogluon.core=={version}'
 ]
 
