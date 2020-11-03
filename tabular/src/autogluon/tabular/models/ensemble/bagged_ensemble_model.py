@@ -432,8 +432,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         if save_oof and self._oof_pred_proba is not None:
             save_pkl.save(path=path + 'utils' + os.path.sep + self._oof_filename, object={
-                    '_oof_pred_proba': self._oof_pred_proba,
-                    '_oof_pred_model_repeats': self._oof_pred_model_repeats,
+                '_oof_pred_proba': self._oof_pred_proba,
+                '_oof_pred_model_repeats': self._oof_pred_model_repeats,
             })
             self._oof_pred_proba = None
             self._oof_pred_model_repeats = None

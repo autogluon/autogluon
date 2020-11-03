@@ -294,7 +294,7 @@ class TabTransformerModel(AbstractModel):
         elif self.params['problem_type']==BINARY:
             self.params['n_classes'] = 2
         elif self.params['problem_type']==MULTICLASS:
-            self.params['n_classes'] = y_train.unique()
+            self.params['n_classes'] = y_train.nunique()
 
         num_cols = X_train.shape[1]
         if num_cols > self.params['max_columns']:
@@ -384,6 +384,7 @@ class TabTransformerModel(AbstractModel):
     # TODO: Does not work correctly when cuda is enabled.
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         from .utils import tt_trial
+        import torch
 
         time_start = time.time()
         self._set_default_searchspace()
@@ -409,6 +410,7 @@ class TabTransformerModel(AbstractModel):
         scheduler = scheduler_func(tt_trial, **scheduler_options)
         scheduler.run()
         scheduler.join_jobs()
+        self.model = self.model.to(torch.device("cpu"))
         scheduler.get_training_curves(plot=False, use_legend=False)
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)

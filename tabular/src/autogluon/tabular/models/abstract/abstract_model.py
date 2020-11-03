@@ -18,7 +18,7 @@ from ...tuning.feature_pruner import FeaturePruner
 from autogluon.core.utils import shuffle_df_rows
 from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
 from ... import metrics
-from ...features.feature_metadata import FeatureMetadata
+from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
