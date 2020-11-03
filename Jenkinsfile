@@ -34,7 +34,7 @@ stage("Unit Test") {
         }
       }
     }
-  }
+  },
   'tabular': {
     node('linux-gpu') {
       ws('workspace/autugluon-tabular-py3') {
@@ -69,7 +69,7 @@ stage("Unit Test") {
         }
       }
     }
-  }
+  },
   'mxnet': {
     node('linux-gpu') {
       ws('workspace/autugluon-mxnet-py3') {
@@ -103,7 +103,7 @@ stage("Unit Test") {
         }
       }
     }
-  }
+  },
   'extra': {
     node('linux-gpu') {
       ws('workspace/autugluon-extra-py3') {
@@ -137,7 +137,7 @@ stage("Unit Test") {
         }
       }
     }
-  }
+  },
   'text': {
     node('linux-gpu') {
       ws('workspace/autugluon-text-py3') {
@@ -172,7 +172,7 @@ stage("Unit Test") {
         }
       }
     }
-  }
+  },
   'vision': {
     node('linux-gpu') {
       ws('workspace/autugluon-vision-py3') {
@@ -206,7 +206,7 @@ stage("Unit Test") {
         }
       }
     }
-  }
+  },
   'install': {
     node('linux-cpu') {
       ws('workspace/autugluon-install-py3') {
