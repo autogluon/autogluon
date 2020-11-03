@@ -14,9 +14,28 @@ from autogluon.tabular.utils import infer_problem_type
 
 # In this example, we create a custom Naive Bayes model for use in AutoGluon
 class NaiveBayesModel(AbstractModel):
+    # The `_preprocess` method takes the input data and transforms it to the internal representation usable by the model.
+    # `_preprocess` is called by `preprocess` and is used during model fit and model inference.
     def _preprocess(self, X, **kwargs):
+        # Drop category and object column dtypes, since NaiveBayes can't handle these dtypes.
         cat_columns = X.select_dtypes(['category', 'object']).columns
         X = X.drop(cat_columns, axis=1)
+        # Add a fillna call to handle missing values.
+        return super()._preprocess(X, **kwargs).fillna(0)
+
+    # The `_fit` method takes the input training data (and optionally the validation data) and trains the model.
+    def _fit(self, X_train, y_train, **kwargs):
+        from sklearn.naive_bayes import GaussianNB
+        # It is important to call `preprocess(X_train)` in `_fit` to replicate what will occur during inference.
+        X_train = self.preprocess(X_train)
+        self.model = GaussianNB(**self.params)
+        self.model.fit(X_train, y_train)
+
+
+# Example of a more optimized implementation that drops the invalid features earlier on to avoid having to make repeated checks.
+class AdvancedNaiveBayesModel(AbstractModel):
+    def _preprocess(self, X, **kwargs):
+        # Add a fillna call to handle missing values.
         return super()._preprocess(X, **kwargs).fillna(0)
 
     def _fit(self, X_train, y_train, **kwargs):
@@ -25,6 +44,16 @@ class NaiveBayesModel(AbstractModel):
         self.model = GaussianNB(**self.params)
         self.model.fit(X_train, y_train)
 
+    # The `_get_default_auxiliary_params` method defines various model-agnostic parameters such as maximum memory usage and valid input column dtypes.
+    # For most users who build custom models, they will only need to specify the valid/invalid dtypes to the model here.
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            # Drop category and object column dtypes, since NaiveBayes can't handle these dtypes.
+            ignored_type_group_raw=['category', 'object'],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
 
 ################
 # Loading Data #
