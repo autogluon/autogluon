@@ -1,74 +1,249 @@
 max_time = 180
 
 stage("Unit Test") {
-  node('linux-gpu') {
-    ws('workspace/autogluon-py3') {
-      timeout(time: max_time, unit: 'MINUTES') {
-        checkout scm
-        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
-        set -ex
-        conda env update -n autogluon_py3 -f docs/build.yml
-        conda activate autogluon_py3
-        conda list
-        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-        export MPLBACKEND=Agg
-        export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+  parallel 'core': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-core-py3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon_core_py3 -f docs/build.yml
+          conda activate autogluon_core_py3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+          export MPLBACKEND=Agg
+          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 
-        pip uninstall -y autogluon
-        pip uninstall -y autogluon.vision
-        pip uninstall -y autogluon.text
-        pip uninstall -y autogluon.mxnet
-        pip uninstall -y autogluon.extra
-        pip uninstall -y autogluon.tabular
-        pip uninstall -y autogluon.core
-        pip uninstall -y autogluon-contrib-nlp
+          pip uninstall -y autogluon
+          pip uninstall -y autogluon.vision
+          pip uninstall -y autogluon.text
+          pip uninstall -y autogluon.mxnet
+          pip uninstall -y autogluon.extra
+          pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.core
+          pip uninstall -y autogluon-contrib-nlp
 
-        cd core/
-        python3 -m pip install --upgrade -e .
-        python3 -m pytest --junitxml=results.xml --runslow tests
-        cd ..
+          cd core/
+          python3 -m pip install --upgrade -e .
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  }
+  'tabular': {
+    node('linux-gpu') {
+      ws('workspace/autugluon-tabular-py3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon_tabular_py3 -f docs/build.yml
+          conda activate autogluon_tabular_py3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+          export MPLBACKEND=Agg
+          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 
-        cd tabular/
-        python3 -m pip install --upgrade -e .
-        python3 -m pytest --junitxml=results.xml --runslow tests
-        pip uninstall -y autogluon.tabular
-        cd ..
+          pip uninstall -y autogluon
+          pip uninstall -y autogluon.vision
+          pip uninstall -y autogluon.text
+          pip uninstall -y autogluon.mxnet
+          pip uninstall -y autogluon.extra
+          pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.core
+          pip uninstall -y autogluon-contrib-nlp
 
-        cd mxnet/
-        python3 -m pip install --upgrade -e .
-        python3 -m pytest --junitxml=results.xml --runslow tests
-        cd ..
+          cd tabular/
+          python3 -m pip install --upgrade -e .
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          pip uninstall -y autogluon.tabular
+          """
+        }
+      }
+    }
+  }
+  'mxnet': {
+    node('linux-gpu') {
+      ws('workspace/autugluon-mxnet-py3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon_mxnet_py3 -f docs/build.yml
+          conda activate autogluon_mxnet_py3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+          export MPLBACKEND=Agg
+          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 
-        cd extra/
-        python3 -m pip install --upgrade -e .
-        python3 -m pytest --junitxml=results.xml --runslow tests
-        cd ..
+          pip uninstall -y autogluon
+          pip uninstall -y autogluon.vision
+          pip uninstall -y autogluon.text
+          pip uninstall -y autogluon.mxnet
+          pip uninstall -y autogluon.extra
+          pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.core
+          pip uninstall -y autogluon-contrib-nlp
 
-        cd text/
-        python3 -m pip install --upgrade -e .
-        python3 -m pytest --junitxml=results.xml --runslow tests
-        pip uninstall -y autogluon.text
-        cd ..
+          cd mxnet/
+          python3 -m pip install --upgrade -e .
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  }
+  'extra': {
+    node('linux-gpu') {
+      ws('workspace/autugluon-extra-py3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon_extra_py3 -f docs/build.yml
+          conda activate autogluon_extra_py3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+          export MPLBACKEND=Agg
+          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 
-        cd vision/
-        python3 -m pip install --upgrade -e .
-        python3 -m pytest --junitxml=results.xml --runslow tests
-        cd ..
+          pip uninstall -y autogluon
+          pip uninstall -y autogluon.vision
+          pip uninstall -y autogluon.text
+          pip uninstall -y autogluon.mxnet
+          pip uninstall -y autogluon.extra
+          pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.core
+          pip uninstall -y autogluon-contrib-nlp
 
+          cd extra/
+          python3 -m pip install --upgrade -e .
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  }
+  'text': {
+    node('linux-gpu') {
+      ws('workspace/autugluon-text-py3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon_text_py3 -f docs/build.yml
+          conda activate autogluon_text_py3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+          export MPLBACKEND=Agg
+          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 
-        cd tabular/
-        python3 -m pip install --upgrade -e .
-        cd ../text/
-        python3 -m pip install --upgrade -e .
-        cd ../
+          pip uninstall -y autogluon
+          pip uninstall -y autogluon.vision
+          pip uninstall -y autogluon.text
+          pip uninstall -y autogluon.mxnet
+          pip uninstall -y autogluon.extra
+          pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.core
+          pip uninstall -y autogluon-contrib-nlp
 
-        cd autogluon/
-        python3 -m pip install --upgrade -e .
-        cd ..
-        """
+          cd text/
+          python3 -m pip install --upgrade -e .
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          pip uninstall -y autogluon.text
+          """
+        }
+      }
+    }
+  }
+  'vision': {
+    node('linux-gpu') {
+      ws('workspace/autugluon-vision-py3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon_vision_py3 -f docs/build.yml
+          conda activate autogluon_vision_py3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+          export MPLBACKEND=Agg
+          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+
+          pip uninstall -y autogluon
+          pip uninstall -y autogluon.vision
+          pip uninstall -y autogluon.text
+          pip uninstall -y autogluon.mxnet
+          pip uninstall -y autogluon.extra
+          pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.core
+          pip uninstall -y autogluon-contrib-nlp
+
+          cd vision/
+          python3 -m pip install --upgrade -e .
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  }
+  'install': {
+    node('linux-cpu') {
+      ws('workspace/autugluon-install-py3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon_install_py3 -f docs/build.yml
+          conda activate autogluon_install_py3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+          export MPLBACKEND=Agg
+          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+
+          pip uninstall -y autogluon
+          pip uninstall -y autogluon.vision
+          pip uninstall -y autogluon.text
+          pip uninstall -y autogluon.mxnet
+          pip uninstall -y autogluon.extra
+          pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.core
+          pip uninstall -y autogluon-contrib-nlp
+
+          cd tabular/
+          python3 -m pip install --upgrade -e .
+          cd ../text/
+          python3 -m pip install --upgrade -e .
+          cd ../
+
+          cd autogluon/
+          python3 -m pip install --upgrade -e .
+          cd ..
+          """
+        }
       }
     }
   }
