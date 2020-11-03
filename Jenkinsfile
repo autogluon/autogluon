@@ -137,6 +137,8 @@ stage("Unit Test") {
 
           cd core/
           python3 -m pip install --upgrade -e .
+          cd ../mxnet/
+          python3 -m pip install --upgrade -e .
           cd ../extra/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
@@ -217,7 +219,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade -e .
           cd ../extra/
           python3 -m pip install --upgrade -e .
-          cd vision/
+          cd ../vision/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
