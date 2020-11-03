@@ -1,6 +1,8 @@
 import numpy as np
+import numpy.testing as npt
 import pandas as pd
 import pytest
+import tempfile
 from autogluon.core.utils.loaders import load_pd
 from autogluon.text import TextPrediction as task
 
@@ -13,6 +15,18 @@ test_hyperparameters = {
         }
     }
 }
+
+
+def verify_predictor_save_load(predictor, df):
+    with tempfile.TemporaryDirectory() as root:
+        predictor.save(root)
+        predictions = predictor.predict(df)
+        predictions_prob = predictor.predict_proba(df)
+        loaded_predictor = task.load(root)
+        predictions2 = loaded_predictor.predict(df)
+        predictions2_prob = loaded_predictor.predict(df)
+        npt.assert_allclose(predictions, predictions2)
+        npt.assert_allclose(predictions_prob, predictions2_prob)
 
 
 def test_sst():
@@ -34,6 +48,8 @@ def test_sst():
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
     dev_prediction = predictor.predict(dev_data)
     dev_pred_prob = predictor.predict_proba(dev_data)
+    model_path = 'saved_model'
+    predictor1.save(model_path)
 
 
 def test_mrpc():
@@ -53,8 +69,7 @@ def test_mrpc():
                          output_directory='./mrpc',
                          plot_results=False)
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
-    dev_prediction = predictor.predict(dev_data)
-    dev_pred_prob = predictor.predict_proba(dev_data)
+    verify_predictor_save_load(predictor, dev_data)
 
 
 def test_sts():
@@ -74,9 +89,10 @@ def test_sts():
                          output_directory='./sts',
                          plot_results=False)
     dev_rmse = predictor.evaluate(dev_data, metrics=['rmse'])
-    dev_prediction = predictor.predict(dev_data)
+    verify_predictor_save_load(predictor, dev_data)
 
 
+# Test the case that the model should raise because there are no text columns in the model.
 def test_no_text_column_raise():
     data = [('😁😁😁😁😁😁', 'grin')] * 20 + [('😃😃😃😃😃😃😃😃', 'smile')] * 50 + [
         ('😉😉😉', 'wink')] * 30
@@ -101,13 +117,12 @@ def test_emoji():
 
     predictor = task.fit(df, label='label',
                          verbosity=3)
+    verify_predictor_save_load(predictor, df)
 
 
 def test_no_job_finished_raise():
     train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
                               'glue/sst/train.parquet')
-    dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
-                            'glue/sst/dev.parquet')
     with pytest.raises(RuntimeError):
         # Setting a very small time limits to trigger the bug
         predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
@@ -154,7 +169,7 @@ def test_mixed_column_type():
                           output_directory='./sts_score',
                           plot_results=False)
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
-    dev_prediction = predictor1.predict(dev_data)
+    verify_predictor_save_load(predictor1, dev_data)
 
     # Tran Classification
     predictor2 = task.fit(train_data,
@@ -165,7 +180,7 @@ def test_mixed_column_type():
                           output_directory='./sts_genre',
                           plot_results=False)
     dev_rmse = predictor2.evaluate(dev_data, metrics=['acc'])
-    dev_prediction = predictor2.predict(dev_data)
+    verify_predictor_save_load(predictor2, dev_data)
 
     # Specify the feature column
     predictor3 = task.fit(train_data,
@@ -177,9 +192,4 @@ def test_mixed_column_type():
                           output_directory='./sts_score',
                           plot_results=False)
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
-    dev_prediction = predictor1.predict(dev_data)
-    model_path = 'saved_model'
-    predictor1.save(model_path)
-    loaded_predictor = task.load(model_path)
-    loaded_predictions = loaded_predictor.predict(dev_data)
-    np.testing.assert_array_almost_equal(dev_prediction, loaded_predictions)
+    verify_predictor_save_load(predictor3, dev_data)
