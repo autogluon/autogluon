@@ -189,10 +189,33 @@ class AbstractModel:
         self.path = self.path[:-len(self.name) - 1] + name + os.path.sep
         self.name = name
 
-    # Extensions of preprocess must act identical in bagged situations, otherwise test-time predictions will be incorrect
-    # This means preprocess cannot be used for normalization
-    # TODO: Add preprocess_stateful() to enable stateful preprocessing for models such as KNN
-    def preprocess(self, X):
+    def preprocess(self, X, preprocess_nonadaptive=True, preprocess_stateful=True, **kwargs):
+        if preprocess_nonadaptive:
+            X = self._preprocess_nonadaptive(X, **kwargs)
+        if preprocess_stateful:
+            X = self._preprocess(X, **kwargs)
+        return X
+
+    # TODO: Remove kwargs?
+    def _preprocess(self, X: pd.DataFrame, **kwargs):
+        """
+        Data transformation logic should be added here.
+        In bagged ensembles, preprocessing code that lives in `_preprocess` will be executed on each child model once per inference call.
+        If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
+        When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
+        """
+        return X
+
+    # TODO: Remove kwargs?
+    def _preprocess_nonadaptive(self, X: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        """
+        Note: This method is intended for advanced users. It is usually sufficient to implement all preprocessing in `_preprocess` and leave this method untouched.
+            The potential benefit of implementing preprocessing in this method is an inference speedup when used in a bagged ensemble.
+        Data transformation logic that is non-stateful or ignores internal data values beyond feature dtypes should be added here.
+        In bagged ensembles, preprocessing code that lives here will be executed only once per inference call regardless of the number of child models.
+        If preprocessing code will produce the same output regardless of which child model processes the input data, then it should live here to avoid redundant repeated processing for each child.
+        This means this method cannot be used for data normalization. Refer to `_preprocess` instead.
+        """
         if self.features is not None:
             # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
             if list(X.columns) != self.features:
@@ -201,7 +224,12 @@ class AbstractModel:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
             ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', [])
             ignored_type_group_special = self.params_aux.get('ignored_type_group_special', [])
-            valid_features = self.feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+            # TODO: Consider changing how this works or where it is done
+            if self.feature_metadata is None:
+                feature_metadata = FeatureMetadata.from_df(X)
+            else:
+                feature_metadata = self.feature_metadata
+            valid_features = feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
             self.features = [feature for feature in self.features if feature in valid_features]
             if not self.features:
                 raise NoValidFeatures
@@ -274,18 +302,20 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, preprocess=True):
+    # TODO: Improve custom eval_metric support
+    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, **kwargs):
         if eval_metric is None:
             eval_metric = self.eval_metric
         if metric_needs_y_pred is None:
             metric_needs_y_pred = self.metric_needs_y_pred
         if metric_needs_y_pred:
-            y_pred = self.predict(X=X, preprocess=preprocess)
+            y_pred = self.predict(X=X, **kwargs)
             return eval_metric(y, y_pred)
         else:
-            y_pred_proba = self.predict_proba(X=X, preprocess=preprocess)
+            y_pred_proba = self.predict_proba(X=X, **kwargs)
             return eval_metric(y, y_pred_proba)
 
+    # TODO: Improve custom eval_metric support
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
         if eval_metric is None:
             eval_metric = self.eval_metric

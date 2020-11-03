@@ -22,7 +22,6 @@ def get_fixed_params():
                     'num_augs' : 1, # Number of augmentations to add.
                     'pretext': 'BERT_pretext', # What pretext to use when performing pretraining/semi-supervised learning.
                     'n_cont_features': 8, # How many continuous features to concatenate onto the categorical features
-                    # TODO: Shouldn't we be using the custom Transformer architecture? Is this a bad oversight? Was default'ed to False in original PR.
                     'fix_attention': False, # If True, use the categorical embeddings in the transformer architecture.
                     'epochs': 100, # How many epochs to train on with labeled data.
                     'pretrain_epochs': 200, # How many epochs to pretrain on with unlabeled data.
