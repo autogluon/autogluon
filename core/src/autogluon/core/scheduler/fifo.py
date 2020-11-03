@@ -225,7 +225,7 @@ class FIFOScheduler(TaskScheduler):
                 self.load_state_dict(load(checkpoint))
             else:
                 msg = f'checkpoint path {checkpoint} is not available for resume.'
-                logger.exception(msg)
+                logger.critical(msg)
                 raise FileExistsError(msg)
 
     def run(self, **kwargs):
@@ -399,7 +399,7 @@ class FIFOScheduler(TaskScheduler):
             reported_result = reporter.fetch()
             if 'traceback' in reported_result:
                 # Evaluation has failed
-                logger.exception(reported_result['traceback'])
+                logger.critical(reported_result['traceback'])
                 self.searcher.evaluation_failed(
                     config=task.args['config'], **reported_result)
                 reporter.move_on()

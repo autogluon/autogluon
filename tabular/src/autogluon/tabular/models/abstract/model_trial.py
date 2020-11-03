@@ -71,3 +71,15 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
     model.predict_time = time_pred_end - time_fit_end
     model.save()
     return model
+
+
+def skip_hpo(model, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
+    """Skips HPO and simply trains the model once with the provided HPO time budget. Returns model artifacts as if from HPO."""
+    fit_model_args = dict(X_train=X_train, y_train=y_train, **kwargs)
+    predict_proba_args = dict(X=X_val)
+    time_limit = scheduler_options[1]['time_out']
+    fit_and_save_model(model=model, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=time_limit)
+    hpo_results = {'total_time': model.fit_time}
+    hpo_model_performances = {model.name: model.val_score}
+    hpo_models = {model.name: model.path}
+    return hpo_models, hpo_model_performances, hpo_results

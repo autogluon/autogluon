@@ -83,7 +83,7 @@ Text Prediction
       Learning how to use AutoGluon to handle datasets with mixed data types.
 
 
-Tuning Custom Models
+Tune Custom Models
 --------------------
 .. container:: cards
    

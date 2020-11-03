@@ -87,7 +87,7 @@ def test_cholesky_factorization():
         max_diff_grad_mahal = np.max(np.abs(gval_my - gval_cmp))
         print('max_abs_diff_grad = {}, time_my = {}, time_cmp = {}'.format(
             max_diff_grad_mahal, time_my, time_cmp))
-        assert max_diff_grad_mahal < 1e-12
+        assert max_diff_grad_mahal < 1e-11
 
 
 if __name__ == "__main__":

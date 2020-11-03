@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer
 from .hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
+from ..abstract.model_trial import skip_hpo
 from ...constants import BINARY, REGRESSION
 from ...models.abstract.abstract_model import AbstractModel
 from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
@@ -65,14 +66,12 @@ class LinearModel(AbstractModel):
         return features_selector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     # TODO: handle collinear features - they will impact results quality
-    def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000, model_specific_preprocessing=False):
-        X = super().preprocess(X=X)
-        if model_specific_preprocessing:  # This is hack to work-around pre-processing caching in bagging/stacker models
-            if is_train:
-                feature_types = self._get_types_of_features(X)
-                X = self.preprocess_train(X, feature_types, vect_max_features)
-            else:
-                X = self.pipeline.transform(X)
+    def _preprocess(self, X, is_train=False, vect_max_features=1000, **kwargs):
+        if is_train:
+            feature_types = self._get_types_of_features(X)
+            X = self.preprocess_train(X, feature_types, vect_max_features)
+        else:
+            X = self.pipeline.transform(X)
         return X
 
     def preprocess_train(self, X, feature_types, vect_max_features):
@@ -120,7 +119,7 @@ class LinearModel(AbstractModel):
         if self.problem_type == BINARY:
             y_train = y_train.astype(int).values
 
-        X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'], model_specific_preprocessing=True)
+        X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
 
         params = {k: v for k, v in self.params.items() if k in self.model_params}
 
@@ -139,24 +138,9 @@ class LinearModel(AbstractModel):
 
         self.model = model.fit(X_train, y_train)
 
-    def _predict_proba(self, X, preprocess=True):
-        X = self.preprocess(X, is_train=False, model_specific_preprocessing=True)
-        return super()._predict_proba(X, preprocess=False)
-
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
-        self.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **kwargs)
-        hpo_model_performances = {self.name: self.score(X_val, y_val)}
-        hpo_results = {}
-        self.save()
-        hpo_models = {self.name: self.path}
-
-        return hpo_models, hpo_model_performances, hpo_results
-
-    def get_info(self):
-        # TODO: All AG-Tabular models now offer a get_info method:
-        # https://github.com/awslabs/autogluon/blob/master/autogluon/utils/tabular/ml/models/abstract/abstract_model.py#L474
-        # dict of weights?
-        return super().get_info()
+    # TODO: Add HPO
+    def hyperparameter_tune(self, **kwargs):
+        return skip_hpo(self, **kwargs)
 
     def _select_features_handle_text_include(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         # continuous = numeric features to rescale

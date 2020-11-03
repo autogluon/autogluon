@@ -4,13 +4,13 @@
   <img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="350">
 </div>
 
-## AutoML Toolkit for Text, Image, and Tabular Data
+## AutoML for Text, Image, and Tabular Data
 
-[![Build Status](http://ci.mxnet.io/view/all/job/autogluon/job/master/badge/icon)](http://ci.mxnet.io/view/all/job/autogluon/job/master/)
+[![Build Status](https://ci.gluon.ai/view/all/job/autogluon/job/master/badge/icon)](https://ci.gluon.ai/view/all/job/autogluon/job/master/)
 [![Pypi Version](https://img.shields.io/pypi/v/autogluon.svg)](https://pypi.org/project/autogluon/#history)
 ![Upload Python Package](https://github.com/awslabs/autogluon/workflows/Upload%20Python%20Package/badge.svg)
 
-AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on tabular, text, and image data.
+AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on text, image, and tabular data.
 
 ## Example
 
@@ -29,18 +29,19 @@ performance = predictor.evaluate(test_data)
 ```
 ## News
 
-**Announcement for previous users:** The AutoGluon codebase has been modularized into [namespace packages](https://packaging.python.org/guides/packaging-namespace-packages/), which means you now only need those dependencies relevant to your prediction task of interest! For example, you can now work with tabular data without having to [install](https://autogluon.mxnet.io/install.html) dependencies required for AutoGluon's computer vision tasks (and vice versa). Unfortunately this improvement required a minor API change (eg. instead of `from autogluon import TabularPrediction`, you should now do: `from autogluon.tabular import TabularPrediction`), for all versions newer than v0.0.14. Documentation/tutorials under the old API may still be viewed [for version 0.0.14](https://autogluon.mxnet.io/v0.0.14/index.html) which is the last released version under the old API.
+**Announcement for previous users:** The AutoGluon codebase has been modularized into [namespace packages](https://packaging.python.org/guides/packaging-namespace-packages/), which means you now only need those dependencies relevant to your prediction task of interest! For example, you can now work with tabular data without having to [install](https://auto.gluon.ai/dev/install.html) dependencies required for AutoGluon's computer vision tasks (and vice versa). Unfortunately this improvement required a minor API change (eg. instead of `from autogluon import TabularPrediction`, you should now do: `from autogluon.tabular import TabularPrediction`), for all versions newer than v0.0.14. Documentation/tutorials under the old API may still be viewed [for version 0.0.14](https://auto.gluon.ai/0.0.14/index.html) which is the last released version under the old API.
 
 
 ## Resources
 
-See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for [documentation](https://autogluon.mxnet.io/api/index.html) and instructions on:
-- [Installing AutoGluon](http://autogluon.mxnet.io/index.html#installation)
-- [Learning with tabular data](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html)
-  - [Tips to maximize accuracy](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html#maximizing-predictive-performance)
-- [Learning with image data](http://autogluon.mxnet.io/tutorials/image_classification/beginner.html)
-- [Learning with text data](http://autogluon.mxnet.io/tutorials/text_prediction/beginner.html)
-- More advanced topics such as [Neural Architecture Search](http://autogluon.mxnet.io/tutorials/nas/index.html)
+See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [documentation](https://auto.gluon.ai/stable/api/index.html) and instructions on:
+- [Installing AutoGluon](https://auto.gluon.ai/stable/index.html#installation)
+- [Learning with tabular data](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html)
+  - [Tips to maximize accuracy](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html#maximizing-predictive-performance) (if **benchmarking**, make sure to run `fit()` with argument `presets='best_quality'`).  
+
+- [Learning with text data](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html) 
+- [Learning with image data](https://auto.gluon.ai/stable/tutorials/image_classification/beginner.html)
+- More advanced topics such as [Neural Architecture Search](https://auto.gluon.ai/stable/tutorials/nas/index.html)
 
 ### Scientific Publications
 - [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020)
@@ -51,7 +52,7 @@ See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for [documenta
 - [AutoGluon overview & example applications](https://towardsdatascience.com/autogluon-deep-learning-automl-5cdb4e2388ec?source=friends_link&sk=e3d17d06880ac714e47f07f39178fdf2) (*Towards Data Science*, Dec 2019)
 
 ### Hands-on Tutorials
-- [From HPO to NAS: Automated Deep Learning (CVPR 2020)](http://hangzhang.org/CVPR2020/)
+- [From HPO to NAS: Automated Deep Learning (CVPR 2020)](https://hangzhang.org/CVPR2020/)
 - [Practical Automated Machine Learning with Tabular, Text, and Image Data (KDD 2020)](https://jwmueller.github.io/KDD20-tutorial/)
 
 ### Train/Deploy AutoGluon in the Cloud
