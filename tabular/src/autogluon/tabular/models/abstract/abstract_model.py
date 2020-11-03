@@ -132,10 +132,14 @@ class AbstractModel:
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
 
+    # TODO: v0.1 consider adding documentation to each model highlighting which feature dtypes are valid
     def _get_default_auxiliary_params(self) -> dict:
-        """Dictionary of auxiliary parameters that dictate various model-agnostic logic."""
+        """
+        Dictionary of auxiliary parameters that dictate various model-agnostic logic, such as:
+            Which column dtypes are filtered out of the input data, or how much memory the model is allowed to use.
+        """
         default_auxiliary_params = dict(
-            max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors.
+            max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors. Used in memory checks during model training to avoid OOM errors.
             # TODO: Add more params
             # max_memory_usage=None,
             # max_disk_usage=None,
