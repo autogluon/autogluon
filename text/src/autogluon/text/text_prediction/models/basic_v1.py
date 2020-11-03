@@ -755,7 +755,7 @@ class BertForTextPredictionBasic:
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=self._label_shapes[0],
                                     cfg=cfg.model.network)
-        ctx_l = get_mxnet_available_ctx()
+        net.hybridize()
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
                             ctx=mx.cpu())
         self._net = net
@@ -887,8 +887,12 @@ class BertForTextPredictionBasic:
                     'version': version.__version__,
                 }, of, ensure_ascii=True)
 
+    def cuda(self):
+        """Try to use CUDA for inference"""
+        self._net.reset_ctx(mx.gpu())
+
     @classmethod
-    def load(cls, dir_path: str, use_gpu: bool = True):
+    def load(cls, dir_path: str):
         """Load a model object previously produced by `fit()` from disk and return this object.
            It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -928,11 +932,8 @@ class BertForTextPredictionBasic:
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=label_shapes[0],
                                     cfg=loaded_config.model.network)
-        if use_gpu:
-            ctx_l = get_mxnet_available_ctx()
-            net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=ctx_l[0])
-        else:
-            net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=mx.cpu())
+        net.hybridize()
+        net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=mx.cpu())
         model = cls(column_properties=column_properties,
                     label_columns=label_columns,
                     feature_columns=feature_columns,
