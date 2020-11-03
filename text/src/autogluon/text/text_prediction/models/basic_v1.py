@@ -891,6 +891,10 @@ class BertForTextPredictionBasic:
         """Try to use CUDA for inference"""
         self._net.reset_ctx(mx.gpu())
 
+    def cpu(self):
+        """Switch to use CPU for inference"""
+        self._net.reset_ctx(mx.cpu())
+
     @classmethod
     def load(cls, dir_path: str):
         """Load a model object previously produced by `fit()` from disk and return this object.
