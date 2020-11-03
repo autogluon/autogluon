@@ -220,6 +220,7 @@ stage("Unit Test") {
           cd ../extra/
           python3 -m pip install --upgrade -e .
           cd ../vision/
+          pip uninstall -y gluoncv
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
