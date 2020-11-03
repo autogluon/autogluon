@@ -24,9 +24,9 @@ def verify_predictor_save_load(predictor, df):
         predictions_prob = predictor.predict_proba(df)
         loaded_predictor = task.load(root)
         predictions2 = loaded_predictor.predict(df)
-        predictions2_prob = loaded_predictor.predict(df)
-        npt.assert_allclose(predictions, predictions2)
-        npt.assert_allclose(predictions_prob, predictions2_prob)
+        predictions2_prob = loaded_predictor.predict_proba(df)
+        npt.assert_allclose(predictions, predictions2, 1E-4, 1E-4)
+        npt.assert_allclose(predictions_prob, predictions2_prob, 1E-4, 1E-4)
 
 
 def test_sst():
