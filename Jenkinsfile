@@ -220,6 +220,7 @@ stage("Unit Test") {
           cd ../extra/
           python3 -m pip install --upgrade -e .
           cd ../vision/
+          python3 -m pip install https://github.com/dmlc/gluon-cv/archive/master.zip
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
