@@ -28,7 +28,7 @@ from ..column_property import get_column_property_metadata, get_column_propertie
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
 from ..dataset import TabularDataset
-from .... import version
+from ... import version
 
 
 @use_np
