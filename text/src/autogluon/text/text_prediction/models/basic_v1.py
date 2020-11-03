@@ -20,10 +20,11 @@ from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.utils.misc import logging_config, grouper,\
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
-from ..metrics import calculate_metric_by_expr
-from .. import constants as _C
 from autogluon.core import args, space
 from autogluon.core.scheduler import FIFOScheduler, HyperbandScheduler
+from .. import version
+from ..metrics import calculate_metric_by_expr
+from .. import constants as _C
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
@@ -756,7 +757,7 @@ class BertForTextPredictionBasic:
                                     cfg=cfg.model.network)
         ctx_l = get_mxnet_available_ctx()
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
-                            ctx=ctx_l[0])
+                            ctx=mx.cpu())
         self._net = net
         mx.npx.waitall()
 
@@ -875,25 +876,29 @@ class BertForTextPredictionBasic:
         with open(os.path.join(dir_path, 'column_metadata.json'), 'w') as of:
             json.dump(get_column_property_metadata(self._column_properties),
                       of, ensure_ascii=True)
+        # Save an additional assets about the parsed dataset information
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump(
                 {
                     'label_columns': self._label_columns,
                     'label_shapes': self._label_shapes,
                     'problem_types': self._problem_types,
-                    'feature_columns': self._feature_columns
+                    'feature_columns': self._feature_columns,
+                    'version': version.__version__,
                 }, of, ensure_ascii=True)
 
     @classmethod
-    def load(cls, dir_path):
+    def load(cls, dir_path: str, use_gpu: bool = True):
         """Load a model object previously produced by `fit()` from disk and return this object.
            It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
 
         Parameters
         ----------
-        dir_path : str
+        dir_path
             Path to directory where this model was previously saved.
+        use_gpu
+            Whether try to use GPU if possible.
  
         Returns
         -------
@@ -923,9 +928,11 @@ class BertForTextPredictionBasic:
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=label_shapes[0],
                                     cfg=loaded_config.model.network)
-        ctx_l = get_mxnet_available_ctx()
-        net.load_parameters(os.path.join(dir_path, 'net.params'),
-                            ctx=ctx_l[0])
+        if use_gpu:
+            ctx_l = get_mxnet_available_ctx()
+            net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=ctx_l[0])
+        else:
+            net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=mx.cpu())
         model = cls(column_properties=column_properties,
                     label_columns=label_columns,
                     feature_columns=feature_columns,
