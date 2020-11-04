@@ -12,6 +12,8 @@ from .tab_model_base import TabModelBase
 class TabTransformer(TabModelBase):
     """
     Transformer model for tabular data, can also be used for semi-supervised learning.
+    This is the internal transformer model embedding that will have further fully connected layers (TabNet) to
+    actually produce predictions.
     """
 
     def __init__(self, n_cont_embeddings, n_layers, n_heads, hidden_dim, tab_readout, column_embedding, orig_emb_resid,

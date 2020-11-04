@@ -27,6 +27,7 @@ def get_fixed_params():
                     'epochs_wo_improve': 50, # How many epochs to continue running without improving on metric. aka "Early Stopping Patience"
                     'num_workers': 16, # How many workers to use for torch DataLoader.
                     'max_columns': 1000, # Maximum number of columns TabTransformer will accept as input. This is to combat huge memory requirements/errors.
+                    'num_output_layers': 1 # How many fully-connected layers on top of transformer to produce predictions. Minimum 1 layer.
                     }
 
     return fixed_params

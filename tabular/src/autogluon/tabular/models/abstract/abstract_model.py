@@ -702,10 +702,7 @@ class AbstractModel:
         save_json.save(path=json_path, obj=info)
         return info
 
-
 class AbstractNeuralNetworkModel(AbstractModel):
-
-
     # TODO: v0.1 clean method
     def _get_types_of_features(self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_torch=False, needs_extra_types=True):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.

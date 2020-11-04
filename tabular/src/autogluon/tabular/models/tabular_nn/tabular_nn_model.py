@@ -385,7 +385,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         return
 
     def _predict_proba(self, X, **kwargs):
-        """ To align predict wiht abstract_model API.
+        """ To align predict with abstract_model API.
             Preprocess here only refers to feature processing stesp done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.
             If X is not DataFrame but instead TabularNNDataset object, we can still produce predictions,
