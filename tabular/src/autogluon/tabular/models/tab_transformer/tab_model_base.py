@@ -15,37 +15,29 @@ class TabNet(nn.Module):
         super(TabNet, self).__init__()
         import torch.nn as nn
         from .tab_transformer import TabTransformer
-        import torch
         self.params = params
         self.params['cat_feat_origin_cards'] = cat_feat_origin_cards
         self.embed = TabTransformer(**self.params)
         self.num_output_layers = params['num_output_layers']
 
-        # relu = nn.ReLU()
-        # in_dim = 2 * self.params['feature_dim']
-        # lin = nn.Linear(in_dim, in_dim, bias=True)
-        # lin_out = nn.Linear(in_dim, num_class, bias=True)
-        # self.fc = [nn.Sequential(*[relu, lin])] * (self.num_output_layers - 1) + [nn.Sequential(*[relu, lin_out])]
+        relu = nn.ReLU()
+        in_dim = 2 * self.params['feature_dim']
+        lin = nn.Linear(in_dim, in_dim, bias=True)
+        lin_out = nn.Linear(in_dim, num_class, bias=True)
+        self.fc = [nn.Sequential(*[relu, lin])] * (self.num_output_layers - 1) + [nn.Sequential(*[relu, lin_out])]
 
-        relu, lin = nn.ReLU(), nn.Linear(2 * self.params['feature_dim'], num_class, bias=True)
-        self.fc = nn.Sequential(*[relu, lin])
-        # print(self.fc)
+        # Each individual layer inside needs to be put into the GPU.
+        # Calling "self.model.cuda()" (TabTransformer:get_model()) will not put a python list into GPU.
+        if self.params['device'].type == "cuda":
+            for layer in range(self.num_output_layers):
+                self.fc[layer] = self.fc[layer].cuda()
 
     def forward(self, data):
         features = self.embed(data)
         out = features.mean(dim=1)
-        out = self.fc(out)
+        for layer in range(len(self.fc)):
+            out = self.fc[layer](out)
         return out, features
-
-# TODO: Adding multi-layer output.
-#     def forward(self, data):
-#         features = self.embed(data)
-#         out = features.mean(dim=1)
-#         for layer in range(len(self.fc)):
-#             print(self.fc[layer])
-#             out = self.fc[layer](out)
-#         return out, features
-
 
 
 class TabModelBase(nn.Module):
