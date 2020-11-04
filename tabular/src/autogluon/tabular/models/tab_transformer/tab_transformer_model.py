@@ -59,7 +59,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             self.model = TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
             if self.params['device'].type == "cuda":
                 self.model = self.model.cuda()
-                print(self.model.fc)
 
     # TODO: Ensure column name uniqueness. Potential conflict if input column name has "/-#" in it.
     def _get_no_period_columns(self, X):
@@ -135,9 +134,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 data, target = pretext.get(data, target)
 
                 if params['device'].type == "cuda":
-                    print(data)
-                    print(target)
-                    print(pretext)
                     data, target = data.cuda(), target.cuda()
                     pretext = pretext.cuda()
 
@@ -148,7 +144,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     _, out = net(data)
                 else:
                     raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
-                print(f"_epoch out:{out}\n")
 
                 # TODO: Is this the right spot to put "out" into GPU? Likely not... memory access error..
                 #if params['device'].type == "cuda":

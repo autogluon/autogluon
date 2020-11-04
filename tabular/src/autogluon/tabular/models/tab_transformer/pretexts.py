@@ -23,7 +23,6 @@ class SUPERVISED_pretext(nn.Module):
         self.loss_funct = nn.MSELoss() if kwargs['problem_type'] == REGRESSION else nn.CrossEntropyLoss()
 
     def forward(self, out, target):
-        print(f"pretext out: {out}\n")
         loss = self.loss_funct(out, target)
         pred = out.max(dim=1, keepdim=True)[1]
         correct = pred.eq(target.view_as(pred)).sum()
