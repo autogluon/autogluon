@@ -61,6 +61,18 @@ class HyperbandScheduler(FIFOScheduler):
     using multiple brackets, task allocation to bracket is done randomly,
     based on a distribution inspired by the synchronous Hyperband case.
 
+    For definitions of concepts (bracket, rung, milestone), see
+
+        Li, Jamieson, Rostamizadeh, Gonina, Hardt, Recht, Talwalkar (2018)
+        A System for Massively Parallel Hyperparameter Tuning
+        https://arxiv.org/abs/1810.05934
+
+    or
+
+        Tiao, Klein, Lienart, Archambeau, Seeger (2020)
+        Model-based Asynchronous Hyperparameter and Neural Architecture Search
+        https://arxiv.org/abs/2003.10865
+
     Note: This scheduler requires both reward and resource (time) to be
     returned by the reporter. Here, resource (time) values must be positive
     int. If time_attr == 'epoch', this should be the number of epochs done,
@@ -212,10 +224,17 @@ class HyperbandScheduler(FIFOScheduler):
         bracket, the larger the grace period for the config. If
         `rung_system_per_bracket` is True, we maintain separate rung level
         systems for each bracket, so that configs only compete with others
-        started in the same bracket. If False, we use a single rung level
-        system, so that all configs compete with each other. In this case, the
-        bracket of a config only determines the initial grace period, i.e. the
-        first milestone at which it starts competing with others.
+        started in the same bracket. This is the default behaviour of Hyperband.
+        If False, we use a single rung level system, so that all configs
+        compete with each other. In this case, the bracket of a config only
+        determines the initial grace period, i.e. the first milestone at which
+        it starts competing with others.
+        The concept of brackets in Hyperband is meant to hedge against overly
+        aggressive filtering in successive halving, based on low fidelity
+        criteria. In practice, successive halving (i.e., `brackets = 1`) often
+        works best in the asynchronous case (as implemented here). If
+        `brackets > 1`, the hedging is stronger if `rung_system_per_bracket`
+        is True.
     random_seed : int
         Random seed for PRNG for bracket sampling
 
