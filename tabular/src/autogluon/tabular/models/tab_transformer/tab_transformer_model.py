@@ -29,14 +29,16 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     training of Tabular data with a subsequent fine-tuning step on labeled data.
     """
     params_file_name = "tab_trans_params.pth"
+    renamed_column_count = 0
 
     def __init__(self, **kwargs):
         try_import_torch()
         super().__init__(**kwargs)
         import torch
-        self.types_of_features = None
-        self.verbosity = None
-        self.temp_file_name = "tab_trans_temp.pth"
+        self._types_of_features = None
+        self._verbosity = None
+        self._temp_file_name = "tab_trans_temp.pth"
+        self._period_columns_mapping = None
 
         # TODO: Take in num_gpu's as a param. Currently this is hard-coded upon detection of cuda.
         if torch.cuda.is_available():
@@ -59,17 +61,21 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         return model
 
-    # TODO: Ensure column name uniqueness. Potential conflict if input column name has "/-#" in it.
+    # NOTE: Making an assumption that X_unlabeled will not have a different schema. Otherwise, we would need two
+    # period_columns_mapping fields. One for X/X_val, another for X_unlabeled, which may have different columns.
     def _get_no_period_columns(self, X):
-        # Latest pytorch does not support . in module names. Therefore, we must replace the . with some other symbol
-        # that hopefully doesn't collide with other column names.
-        rename_columns = dict()
-        for col in X.columns:
-            if "." in col:
-                new_col_name = col.replace(".", "/-#")
-                rename_columns[col] = new_col_name
+        # Latest pytorch does not support . in module names. Therefore, we must replace the ".".
+        if self._period_columns_mapping is None:
+            rename_columns = dict()
+            for col in X.columns:
+                if "." in col:
+                    new_col_name = col.replace(".", "_")
+                    new_col_name += "_" + str(self.renamed_column_count)
+                    self.renamed_column_count += 1
+                    rename_columns[col] = new_col_name
+            self._period_columns_mapping = rename_columns
 
-        return rename_columns
+        return self._period_columns_mapping
 
     def _tt_preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
         """
@@ -84,30 +90,30 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         if X_unlabeled is not None:
             X_unlabeled = X_unlabeled.rename(columns=self._get_no_period_columns(X_unlabeled))
 
-        self.types_of_features, _ = self._get_types_of_features(X, needs_torch=True, needs_extra_types=False)
+        self._types_of_features, _ = self._get_types_of_features(X, needs_torch=True, needs_extra_types=False)
 
         encoders = self.params['encoders']
-        data = TabTransformerDataset(X, encoders=encoders, problem_type=self.problem_type, col_info=self.types_of_features)
+        data = TabTransformerDataset(X, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
         self.fe = fe
         if self.fe is not None:
             if X_unlabeled is None:
                 unlab_data = None
             elif X_unlabeled is not None:
-                unlab_data = TabTransformerDataset(X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self.types_of_features)
+                unlab_data = TabTransformerDataset(X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
         if self.fe is None:
             if X_unlabeled is None:
                 data.fit_feat_encoders()
                 self.fe = data.feature_encoders
                 unlab_data = None
             elif X_unlabeled is not None:
-                unlab_data = TabTransformerDataset(X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self.types_of_features)
+                unlab_data = TabTransformerDataset(X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
                 unlab_data.fit_feat_encoders()
                 self.fe = unlab_data.feature_encoders
 
         data.encode(self.fe)
 
         if X_val is not None:
-            val_data = TabTransformerDataset(X_val, encoders=encoders, problem_type=self.problem_type, col_info=self.types_of_features)
+            val_data = TabTransformerDataset(X_val, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
             val_data.encode(self.fe)
         else:
             val_data = None
@@ -232,12 +238,12 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         best_val_epoch = 0
         best_loss = np.inf
 
-        self.verbosity = self.params.get('verbosity', 2)
-        if self.verbosity <= 1:
+        self._verbosity = self.params.get('verbosity', 2)
+        if self._verbosity <= 1:
             verbose_eval = -1
-        elif self.verbosity == 2:
+        elif self._verbosity == 2:
             verbose_eval = 50
-        elif self.verbosity == 3:
+        elif self._verbosity == 3:
             verbose_eval = 10
         else:
             verbose_eval = 1
@@ -268,7 +274,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
                     best_val_epoch = e
                     os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                    torch.save(self.model, self.path + self.temp_file_name)
+                    torch.save(self.model, self.path + self._temp_file_name)
 
             # If time limit has exceeded or we haven't improved in some number of epochs, stop early.
             if e - best_val_epoch > epochs_wo_improve:
@@ -282,8 +288,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         if loader_val is not None:
             try:
-                self.model = torch.load(self.path + self.temp_file_name)
-                os.remove(self.path + self.temp_file_name)
+                self.model = torch.load(self.path + self._temp_file_name)
+                os.remove(self.path + self._temp_file_name)
             except:
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
@@ -306,6 +312,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 f"If you are confident you will have enough memory, set the 'max_columns' hyperparameter higher and try again.\n")
 
         train, val, unlab = self._tt_preprocess(X_train, X_val, X_unlabeled)
+
+        # There's a very small potential for column name clashes in preprocessing. Let's error if we have such a conflict.
+        if sum(X_train.columns.duplicated()) > 0:
+            raise NameError(f"Duplicate column name(s) detected. Rename highly similar column names with '.' or '_' in them.\n")
 
         if self.problem_type == REGRESSION:
             train.targets = torch.FloatTensor(list(y_train))
@@ -467,7 +477,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         return obj
 
         """
-        List of features to add (Updated by Anthony Galczak 10-30-20):
+        List of features to add (Updated by Anthony Galczak 11-4-20):
         
         1) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
         "pretrain API change".
@@ -481,6 +491,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         
         4) Enable output layer of TT model to be multiple fully connected layers rather than just a single
         linear layer. "TabTransformer2 changes"
-        NOTE: This is "partially done" right now as there is two FC layers at the end of TabNet. The main addition
-        still needed is to process and concatenate continous features.
+        NOTE: This is "partially done" right now. The new hyperparameter 'num_output_layers' allows you to configure how
+        many output layers you would like to use. TabTransformer would be 1, "TabTransformer2" is 2, but with continuous
+        features concatenated (not currently added).
         """

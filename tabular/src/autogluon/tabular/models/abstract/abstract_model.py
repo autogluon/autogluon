@@ -709,7 +709,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
             Each value is a list of feature-names corresponding to columns in original dataframe.
             TODO: ensure features with zero variance have already been removed before this function is called.
         """
-        if self.types_of_features is not None:
+        if self._types_of_features is not None:
             Warning("Attempting to _get_types_of_features for Model, but previously already did this.")
 
         feature_types = self.feature_metadata.get_type_group_map_raw()
