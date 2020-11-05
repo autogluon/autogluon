@@ -215,7 +215,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             pretext = pretext_tasks['BERT_pretext'](self.params)
         elif state == 'finetune':
             base_exp_decay = self.params['base_exp_decay']
-            print(type(self.model.embed.parameters()))
             optimizer_fc = [optim.Adam(fc_layer.parameters(), lr=lr, weight_decay=weight_decay) for fc_layer in self.model.fc]
             optimizer_embeds = optim.Adam(self.model.embed.parameters(), lr=lr, weight_decay=weight_decay)
             scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds, gamma=base_exp_decay) # TODO: Should we be using this in _epoch()?
