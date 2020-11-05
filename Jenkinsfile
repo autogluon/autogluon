@@ -262,9 +262,9 @@ stage("Unit Test") {
           python3 -m pip install --upgrade -e .
           cd ../text/
           python3 -m pip install --upgrade -e .
-          cd ../
-
-          cd autogluon/
+          cd ../extra/
+          python3 -m pip install --upgrade -e .
+          cd ../autogluon/
           python3 -m pip install --upgrade -e .
           cd ..
           """
