@@ -254,7 +254,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
-          cd tabular/
+          cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../tabular/
           python3 -m pip install --upgrade -e .
           cd ../text/
           python3 -m pip install --upgrade -e .
