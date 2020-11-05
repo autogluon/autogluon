@@ -43,7 +43,7 @@ requirements = [
     'Pillow<=6.2.1',
     'numpy>=1.16.0',
     'matplotlib',
-    'gluoncv==0.9.0b20201103',
+    'gluoncv==0.9.0b20201105',
     'graphviz<0.9.0,>=0.8.1',
     'pandas>=1.0.0,<2.0',
     f'autogluon.core=={version}',
