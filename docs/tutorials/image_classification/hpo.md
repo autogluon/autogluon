@@ -3,7 +3,7 @@
 
 While the :ref:`sec_imgquick` introduced basic usage of AutoGluon `fit`, `evaluate`, `predict` with default configurations, this tutorial dives into the various options that you can specify for more advanced control over the fitting process.
 
-These options include: 
+These options include:
 - Defining the search space of various hyperparameter values for the training of neural networks
 - Specifying how to search through your choosen hyperparameter space
 - Specifying how to schedule jobs to train a network under a particular hyperparameter configuration.
@@ -12,25 +12,20 @@ The advanced functionalities of AutoGluon enable you to use your external knowle
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` to learn the basics of the AutoGluon API.
 
-We begin by letting AutoGluon know that [ImageClassification](/api/autogluon.task.html#autogluon.vision.ImageClassification) is the task of interest: 
+We begin by letting AutoGluon know that [ImageClassification](/api/autogluon.task.html#autogluon.vision.ImageClassification) is the task of interest:
 
 ```{.python .input}
 import autogluon.core as ag
-from autogluon.vision import ImageClassification as task
+from autogluon.vision import ImageClassification as Task
 ```
 
 ## Create AutoGluon Dataset
 
 Let's first create the dataset using the same subset of the `Shopee-IET` dataset as the :ref:`sec_imgquick` tutorial.
-Recall that because we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
+Recall that there's no validation split in original data, a 90/10 train/validation split is automatically performed when `fit` with `train_data`.
 
 ```{.python .input}
-filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
-ag.unzip(filename)
-```
-
-```{.python .input}
-dataset = task.Dataset('data/train')
+train_data, _, test_data = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 ```
 
 ## Specify which Networks to Try
@@ -40,45 +35,32 @@ Given such a list, AutoGluon tries to train different networks from this list to
 This is an example of a :class:`autogluon.core.space.Categorical` search space, in which there are a limited number of values to choose from.
 
 ```{.python .input}
+config_space = {'model': ag.Categorical('resnet18_v1b', 'mobilenetv3_small')}
+
+# you may choose more than 70+ available model in the model zoo provided by GluonCV:
 import gluoncv as gcv
-
-@ag.func(
-    multiplier=ag.Categorical(0.25, 0.5),
-)
-def get_mobilenet(multiplier):
-    return gcv.model_zoo.MobileNetV2(multiplier=multiplier, classes=4)
-
-net = ag.space.Categorical('mobilenet0.25', get_mobilenet())
-print(net)
+model_list = gcv.model_zoo.get_model_list()
 ```
 
-## Specify the Optimizer and Its Search Space
+## Specify the training hyper-parameters
 
-Similarly, we can manually specify the optimizer candidates.
-We can construct another search space to identify which optimizer works best for our task, and also identify the best hyperparameter configurations for this optimizer.
-Additionally, we can customize the optimizer-specific hyperparameters search spaces, such as learning rate and weight decay using :class:`autogluon.core.space.Real`.
+Similarly, we can manually specify many crucial hyper-parameters, with specific value or search space(`autogluon.core.space`).
 
 
 ```{.python .input}
-from mxnet import optimizer as optim
-
-@ag.obj(
-    learning_rate=ag.space.Real(1e-4, 1e-2, log=True),
-    momentum=ag.space.Real(0.85, 0.95),
-    wd=ag.space.Real(1e-6, 1e-2, log=True)
-)
-class NAG(optim.NAG):
-    pass
-
-optimizer = NAG()
-print(optimizer)
+config_space.update({
+  'batch_size': 8,
+  'time_limits': 60*10,
+  'epochs': 2,
+  'lr': ag.Categorical(1e-2, 1e-3)
+  })
 ```
 
 ## Search Algorithms
 
 In AutoGluon, `autogluon.core.searcher` supports different search search strategies for both hyperparameter optimization and architecture search.
-Beyond simply specifying the space of hyperparameter configurations to search over, you can also tell AutoGluon what strategy it should employ to actually search through this space. 
-This process of finding good hyperparameters from a given search space is commonly referred to as *hyperparameter optimization* (HPO) or *hyperparameter tuning*. 
+Beyond simply specifying the space of hyperparameter configurations to search over, you can also tell AutoGluon what strategy it should employ to actually search through this space.
+This process of finding good hyperparameters from a given search space is commonly referred to as *hyperparameter optimization* (HPO) or *hyperparameter tuning*.
 `autogluon.core.scheduler` orchestrates how individual training jobs are scheduled.
 We currently support FIFO (standard) and Hyperband scheduling, along with search
 by random sampling or Bayesian optimization. These basic techniques are rendered
@@ -96,29 +78,21 @@ acquisition function. It has been developed specifically to support asynchronous
 parallel evaluations.
 
 ```{.python .input}
-time_limits = 2*60
-epochs = 2
-
-classifier = task.fit(dataset,
-                      net=net,
-                      optimizer=optimizer,
-                      search_strategy='bayesopt',
-                      time_limits=time_limits,
-                      epochs=epochs,
-                      ngpus_per_trial=1,
-                      num_trials=2)
-
-print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
+config_space.update({
+  'search_strategy': 'bayesopt',
+  'num_trials': 2
+  })
+task = Task(config_space)
+classifier = task.fit(train_data)
+print('Top-1 val acc: %.3f' % task.fit_summary['valid_acc'])
 ```
 
 The BO searcher can be configured by `search_options`, see
 :class:`autogluon.core.searcher.GPFIFOSearcher`. Load the test dataset and evaluate:
 
 ```{.python .input}
-test_dataset = task.Dataset('data/test', train=False)
-
-test_acc = classifier.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
+top1, top5 = classifier.evaluate(test_data)
+print('Test acc on hold-out data:', top1)
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal
@@ -136,31 +110,13 @@ bracket, and stop/go decisions are made after 1 and 2 epochs (`grace_period`,
 `grace_period * reduction_factor`):
 
 ```{.python .input}
-scheduler_options = {
-    'grace_period': 1,
-    'reduction_factor': 2,
-    'brackets': 1}
-
-classifier = task.fit(dataset,
-                      net=net,
-                      optimizer=optimizer,
-                      search_strategy='hyperband',
-                      epochs=4,
-                      num_trials=2,
-                      verbose=False,
-                      plot_results=True,
-                      ngpus_per_trial=1,
-                      scheduler_options=scheduler_options)
-
-print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
+config_space.update({
+  'search_strategy': 'hyperband',
+  'grace_period': 1
+  })
 ```
 
-The test top-1 accuracy are:
-
-```{.python .input}
-test_acc = classifier.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
-```
+The `fit`, `evaluate` and `predict` processes are exactly the same, so we will skip training to save some time.
 
 ### Bayesian Optimization and Hyperband ###
 
@@ -169,30 +125,10 @@ also provides Hyperband together with Bayesian optimization. The tuning of expen
 DL models typically works best with this combination.
 
 ```{.python .input}
-scheduler_options = {
-    'grace_period': 1,
-    'reduction_factor': 2,
-    'brackets': 1}
-
-classifier = task.fit(dataset,
-                      net=net,
-                      optimizer=optimizer,
-                      search_strategy='bayesopt_hyperband',
-                      epochs=4,
-                      num_trials=2,
-                      verbose=False,
-                      plot_results=True,
-                      ngpus_per_trial=1,
-                      scheduler_options=scheduler_options)
-
-print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
-```
-
-The test top-1 accuracy are:
-
-```{.python .input}
-test_acc = classifier.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
+config_space.update({
+  'search_strategy': 'bayesopt_hyperband',
+  'grace_period': 1
+  })
 ```
 
 For a comparison of different search algorithms and scheduling strategies, see :ref:`course_alg`.

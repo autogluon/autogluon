@@ -53,9 +53,7 @@ print("mAP on test dataset: {}".format(test_map[1][-1]))
 Below, we randomly select an image from test dataset and show the predicted box and probability over the origin image.  
 
 ```{.python .input}
-image = '000467.jpg'
-image_path = os.path.join(data_root, 'JPEGImages', image)
-
+image_path = dataset_test.iloc[0]['image']
 result = detector.predict(image_path)
 print(result)
 ```

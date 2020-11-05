@@ -42,8 +42,8 @@ The best model is finally retrained on our entire dataset (i.e., merging trainin
 The best Top-1 accuracy achieved on the validation set is as follows:
 
 ```{.python .input}
-fit_result = task.fit_summary()
-print('Top-1 train acc: %.3f, val acc: %.3f' % fit_result['train_acc'], fit_result['vac_acc'])
+fit_result = task.fit_summary
+print('Top-1 train acc: %.3f, val acc: %.3f' %(fit_result['train_acc'], fit_result['valid_acc']))
 ```
 
 ## Predict on a New Image
@@ -51,8 +51,8 @@ print('Top-1 train acc: %.3f, val acc: %.3f' % fit_result['train_acc'], fit_resu
 Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
 ```{.python .input}
-image = 'data/test/BabyShirt/BabyShirt_323.jpg'
-result = classifier.predict(image)
+image_path = test_dataset.iloc[0]['image']
+result = classifier.predict(image_path)
 
 print(result)
 ```
@@ -85,6 +85,6 @@ filename = 'classifier.ag'
 classifier.save(filename)
 classifier_loaded = Task.load(filename)
 # use classifier_loaded as usual
-result = classifier_loaded.predict(image)
+result = classifier_loaded.predict(image_path)
 print(result)
 ```
