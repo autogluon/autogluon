@@ -38,6 +38,9 @@ def augmentation(data, target, **params):
 
 
 def get_col_info(X):
+    """
+    If we somehow do not get col_info when creating a TT dataset, then set every feature type to CATEGORICAL.
+    """
     cols = list(X.columns)
     col_info = []
     for c in cols:
@@ -60,7 +63,7 @@ class TabTransformerDataset(Dataset):
             self.targets = torch.LongTensor(y)
 
         if col_info is None:
-            self.columns = get_col_info(X)  # this is a stop-gap -- it just sets all feature types to CATEGORICAL.
+            self.columns = get_col_info(X)
         else:
             self.columns = self.col_info
 

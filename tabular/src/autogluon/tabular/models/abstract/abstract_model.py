@@ -709,7 +709,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
         self._types_of_features = None
 
     # TODO: v0.1 clean method
-    def _get_types_of_features(self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_torch=False, needs_extra_types=True):
+    def _get_types_of_features(self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_extra_types=True):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
             Each value is a list of feature-names corresponding to columns in original dataframe.
             TODO: ensure features with zero variance have already been removed before this function is called.
@@ -722,10 +722,6 @@ class AbstractNeuralNetworkModel(AbstractModel):
         continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
-
-        # TODO: Work on changing this. How can I get the correct feature_names given the "renamed_column_count" in tt_model?
-        if needs_torch is True:
-            valid_features = [feat.replace(".", "/-#") for feat in valid_features]
 
         if len(valid_features) < df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]

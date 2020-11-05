@@ -29,7 +29,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     training of Tabular data with a subsequent fine-tuning step on labeled data.
     """
     params_file_name = "tab_trans_params.pth"
-    renamed_column_count = 0
 
     def __init__(self, **kwargs):
         try_import_torch()
@@ -62,19 +61,29 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
     # NOTE: Making an assumption that X_unlabeled will not have a different schema. Otherwise, we would need two
     # period_columns_mapping fields. One for X/X_val, another for X_unlabeled, which may have different columns.
-    def _get_no_period_columns(self, X):
+    @staticmethod
+    def _get_no_period_columns(columns):
         # Latest pytorch does not support . in module names. Therefore, we must replace the ".".
-        if self._period_columns_mapping is None:
-            rename_columns = dict()
-            for col in X.columns:
-                if "." in col:
-                    new_col_name = col.replace(".", "_")
-                    new_col_name += "_" + str(self.renamed_column_count)
-                    self.renamed_column_count += 1
-                    rename_columns[col] = new_col_name
-            self._period_columns_mapping = rename_columns
+        rename_columns = dict()
+        for col in columns:
+            new_col_name = col
+            if "." in col:
+                new_col_name = col.replace(".", "_")
 
-        return self._period_columns_mapping
+            if new_col_name in rename_columns:
+                for i in range(1, 100):
+                    append_col_name = new_col_name + "_" + str(i)
+                    if append_col_name not in rename_columns:
+                        new_col_name = append_col_name
+                        break
+                else:
+                    raise RuntimeError("Tried 100 column renames to eliminate duplicates.\n"
+                                       "Please check similar columns with . or _ in them.")
+
+            # Mapping for every column
+            rename_columns[col] = new_col_name
+
+        return rename_columns
 
     def _tt_preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
         """
@@ -82,14 +91,21 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         them (torch), and converting X, X_val, X_unlabeled into TabTransformerDataset's.
         """
         from .utils import TabTransformerDataset
-        X = X.rename(columns=self._get_no_period_columns(X))
+
+        self._period_columns_mapping = self._get_no_period_columns(X.columns)
+
+        X = X.rename(columns=self._period_columns_mapping)
 
         if X_val is not None:
-            X_val = X_val.rename(columns=self._get_no_period_columns(X_val))
+            X_val = X_val.rename(columns=self._period_columns_mapping)
         if X_unlabeled is not None:
-            X_unlabeled = X_unlabeled.rename(columns=self._get_no_period_columns(X_unlabeled))
+            X_unlabeled = X_unlabeled.rename(columns=self._period_columns_mapping)
 
-        self._types_of_features, _ = self._get_types_of_features(X, needs_torch=True, needs_extra_types=False)
+        self._types_of_features, _ = self._get_types_of_features(X, needs_extra_types=False)
+
+        # Also need to rename the feature names in the types_of_features dictionary.
+        for feature_dict in self._types_of_features:
+            feature_dict.update(('name', self._period_columns_mapping[v]) for k, v in feature_dict.items() if k == 'name')
 
         encoders = self.params['encoders']
         data = TabTransformerDataset(X, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
