@@ -6,7 +6,7 @@ import wandb
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--num_cpus', default=4, type=int, help='number of CPUs to use')
+parser.add_argument('--num_cpus', default=2, type=int, help='number of CPUs to use')
 parser.add_argument('--num_gpus', default=0, type=int, help='number of GPUs to use')
 parser.add_argument('--num_trials', default=6, type=int, help='number of trials to run')
 
