@@ -703,6 +703,11 @@ class AbstractModel:
         return info
 
 class AbstractNeuralNetworkModel(AbstractModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._types_of_features = None
+
     # TODO: v0.1 clean method
     def _get_types_of_features(self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_torch=False, needs_extra_types=True):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.

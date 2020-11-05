@@ -35,7 +35,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         try_import_torch()
         super().__init__(**kwargs)
         import torch
-        self._types_of_features = None
         self._verbosity = None
         self._temp_file_name = "tab_trans_temp.pth"
         self._period_columns_mapping = None
@@ -432,17 +431,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
-        """
-        file_prefix (str): Appended to beginning of file-name (does not affect directory in file-path).
-        directory (str): if unspecified, use self.path as directory
-        return_filename (bool): return the file-name corresponding to this save
-        """
+    def save(self, path: str = None, verbose=True) -> str:
         import torch
-        if directory is not None:
-            path = directory + file_prefix
-        else:
-            path = self.path + file_prefix
+        if path is None:
+            path = self.path
 
         params_filepath = path + self.params_file_name
 
@@ -457,17 +449,11 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         self.model = temp_model
 
-        if return_filename:
-            return modelobj_filepath
+        return modelobj_filepath
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
-        """
-        file_prefix (str): Appended to beginning of file-name.
-        If you want to load files with given prefix, can also pass arg: path = directory+file_prefix
-        """
+    def load(cls, path: str, reset_paths=False, verbose=True):
         import torch
-        path = path + file_prefix
         obj: TabTransformerModel = load_pkl.load(path=path + cls.model_file_name, verbose=verbose)
         if reset_paths:
             obj.set_contexts(path)
