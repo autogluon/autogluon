@@ -76,7 +76,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
         features (list): List of predictive features to use, other features are ignored by the model.
         """
-        self.types_of_features = None
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self.features if it works with bagging

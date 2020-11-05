@@ -723,8 +723,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
 
-        # TODO: Making an assumption that "feature_types_raw" above isn't used elsewhere, since feature_types_raw will
-        # still have features with periods (".") in them.
+        # TODO: Work on changing this. How can I get the correct feature_names given the "renamed_column_count" in tt_model?
         if needs_torch is True:
             valid_features = [feat.replace(".", "/-#") for feat in valid_features]
 
