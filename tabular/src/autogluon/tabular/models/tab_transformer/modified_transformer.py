@@ -195,7 +195,7 @@ class MultiheadAttention(Module):
 
     def __init__(self, embed_dim, n_cat_embeddings, num_heads, dropout=0., bias=True, add_bias_kv=False,
                  add_zero_attn=False, kdim=None, vdim=None):
-        super(MultiheadAttention, self).__init__()
+        super().__init__()
 
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -349,7 +349,7 @@ class Linear(Module):
     weight: torch.Tensor
 
     def __init__(self, in_features: int, out_features: int, bias: bool = True) -> None:
-        super(Linear, self).__init__()
+        super().__init__()
 
         self.in_features = in_features
         self.out_features = out_features

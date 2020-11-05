@@ -40,25 +40,28 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     def _set_default_params(self):
         import torch
 
-        default_params = get_default_param(self.problem_type)
-        for param, val in default_params.items():
-            self._set_default_param_value(param, val)
+        default_params = dict()
 
         # TODO: Take in num_gpu's as a param. Currently this is hard-coded upon detection of cuda.
         if torch.cuda.is_available():
-            device = torch.device("cuda")
+            default_params['device'] = torch.device("cuda")
         else:
-            device = torch.device("cpu")
+            default_params['device'] = torch.device("cpu")
 
-        self.params['device'] = device
+        default_params.update(get_default_param(self.problem_type))
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
 
-    def get_model(self):
+    def _get_model(self):
         from .tab_model_base import TabNet
         # If we have already initialized the model, we don't need to do it again.
+        model = None
         if self.model is None:
-            self.model = TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
+            model = TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
             if self.params['device'].type == "cuda":
-                self.model = self.model.cuda()
+                model = model.cuda()
+
+        return model
 
     # TODO: Ensure column name uniqueness. Potential conflict if input column name has "/-#" in it.
     def _get_no_period_columns(self, X):
@@ -117,7 +120,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         return data, val_data, unlab_data
 
-    def _epoch(self, net, trainloader, valloader, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch,
+    def _epoch(self, net, loader_train, loader_val, y_val, optimizers, loss_criterion, pretext, state, scheduler, epoch,
                epochs, databar_disable, reporter, params):
         """
         Helper function to run one epoch of training, essentially the "inner loop" of training.
@@ -127,7 +130,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         is_train = (optimizers is not None)
         net.train() if is_train else net.eval()
         total_loss, total_correct, total_num = 0.0, 0.0, 0
-        data_bar = tqdm(trainloader, disable=databar_disable) if is_train else tqdm(valloader, disable=databar_disable)
+        data_bar = tqdm(loader_train, disable=databar_disable) if is_train else tqdm(loader_val, disable=databar_disable)
 
         with (torch.enable_grad() if is_train else torch.no_grad()):
             for data, target in data_bar:
@@ -144,10 +147,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     _, out = net(data)
                 else:
                     raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
-
-                # TODO: Is this the right spot to put "out" into GPU? Likely not... memory access error..
-                #if params['device'].type == "cuda":
-                #    out = out.cuda()
 
                 loss, correct = pretext(out, target)
 
@@ -167,8 +166,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     train_test = 'Train'
 
                 val_metric = None
-                if valloader is not None and state != 'pretrain':
-                    val_metric = self.score(X=valloader, y=y_val, eval_metric=self.stopping_metric,
+                if loader_val is not None and state != 'pretrain':
+                    val_metric = self.score(X=loader_val, y=y_val, eval_metric=self.stopping_metric,
                                             metric_needs_y_pred=self.stopping_metric_needs_y_pred)
                     data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(
                         train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
@@ -186,7 +185,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             scheduler.step()
         return total_loss / total_num
 
-    def tt_fit(self, trainloader, valloader=None, y_val=None, state=None, time_limit=None, reporter=None):
+    def tt_fit(self, loader_train, loader_val=None, y_val=None, state=None, time_limit=None, reporter=None):
         """
         Main training function for TabTransformer
         "state" must be one of [None, 'pretrain', 'finetune']
@@ -216,10 +215,11 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             pretext = pretext_tasks['BERT_pretext'](self.params)
         elif state == 'finetune':
             base_exp_decay = self.params['base_exp_decay']
-            optimizer_fc = optim.Adam(self.model.fc.parameters(), lr=lr, weight_decay=weight_decay)
+            print(type(self.model.embed.parameters()))
+            optimizer_fc = [optim.Adam(fc_layer.parameters(), lr=lr, weight_decay=weight_decay) for fc_layer in self.model.fc]
             optimizer_embeds = optim.Adam(self.model.embed.parameters(), lr=lr, weight_decay=weight_decay)
             scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds, gamma=base_exp_decay) # TODO: Should we be using this in _epoch()?
-            optimizers.append(optimizer_fc)
+            optimizers.extend(optimizer_fc)
             optimizers.append(optimizer_embeds)
 
             pretext = pretext_tasks['SUPERVISED_pretext'](self.params)
@@ -227,7 +227,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         else:
             raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
 
-        if self.params['problem_type'] == REGRESSION:
+        if self.problem_type == REGRESSION:
             loss_criterion = nn.MSELoss()
         else:
             loss_criterion = nn.CrossEntropyLoss()
@@ -252,9 +252,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 logger.log(15, str(self.model))
 
             # Whether or not we want to suppress output based on our verbosity.
-            databar_disable = False if e % verbose_eval == 0 else True
-
-            train_loss, val_metric = self._epoch(net=self.model, trainloader=trainloader, valloader=valloader, y_val=y_val,
+            databar_disable = e % verbose_eval != 0
+            train_loss, val_metric = self._epoch(net=self.model, loader_train=loader_train, loader_val=loader_val, y_val=y_val,
                                                  optimizers=optimizers, loss_criterion=loss_criterion, \
                                                  pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs,
                                                  databar_disable=databar_disable, reporter=reporter, params=self.params)
@@ -267,7 +266,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     best_val_epoch = e
             else:
                 if val_metric >= best_val_metric or e == 0:
-                    if valloader is not None:
+                    if loader_val is not None:
                         if not np.isnan(val_metric):
                             best_val_metric = val_metric
 
@@ -285,7 +284,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     logger.log(20, "\tRan out of time, stopping training early.")
                     break
 
-        if valloader is not None:
+        if loader_val is not None:
             try:
                 self.model = torch.load(self.path + self.temp_file_name)
                 os.remove(self.path + self.temp_file_name)
@@ -296,11 +295,11 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, **kwargs):
         import torch
 
-        if self.params['problem_type']==REGRESSION:
+        if self.problem_type ==REGRESSION:
             self.params['n_classes'] = 1
-        elif self.params['problem_type']==BINARY:
+        elif self.problem_type ==BINARY:
             self.params['n_classes'] = 2
-        elif self.params['problem_type']==MULTICLASS:
+        elif self.problem_type ==MULTICLASS:
             self.params['n_classes'] = y_train.nunique()
 
         num_cols = X_train.shape[1]
@@ -319,18 +318,18 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             train.targets = torch.LongTensor(list(y_train))
             val.targets = torch.LongTensor(list(y_val))
 
-        trainloader, valloader, unlabloader = train.build_loader(
+        loader_train, loader_val, loader_unlab = train.build_loader(
             shuffle=True), val.build_loader(), unlab.build_loader() if unlab is not None else None
 
-        self.cat_feat_origin_cards = trainloader.cat_feat_origin_cards
+        self.cat_feat_origin_cards = loader_train.cat_feat_origin_cards
 
-        self.get_model()
+        self.model = self._get_model()
 
         if X_unlabeled is not None:
-            self.tt_fit(unlabloader, valloader, y_val, state='pretrain', time_limit=time_limit, reporter=reporter)
-            self.tt_fit(trainloader, valloader, y_val, state='finetune', time_limit=time_limit, reporter=reporter)
+            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=time_limit, reporter=reporter)
+            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=time_limit, reporter=reporter)
         else:
-            self.tt_fit(trainloader, valloader, y_val, time_limit=time_limit, reporter=reporter)
+            self.tt_fit(loader_train, loader_val, y_val, time_limit=time_limit, reporter=reporter)
 
     def _predict_proba(self, X, **kwargs):
         """

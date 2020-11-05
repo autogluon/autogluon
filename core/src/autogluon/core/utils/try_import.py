@@ -118,4 +118,5 @@ def try_import_torch():
         import torch
     except ImportError as e:
         raise ImportError("Unable to import dependency torch\n"
-                          "A quick tip is to install via `pip install torch`.")
+                          "A quick tip is to install via `pip install torch`.\n"
+                          "The minimum torch version is currently 1.6.")
