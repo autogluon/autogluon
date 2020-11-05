@@ -2,11 +2,12 @@ import argparse
 from datetime import datetime
 import autogluon.core as ag
 from imageClassification import train_image_classification
+import wandb
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--num_cpus', default=8, type=int, help='number of CPUs to use')
-parser.add_argument('--num_gpus', default=1, type=int, help='number of GPUs to use')
+parser.add_argument('--num_cpus', default=4, type=int, help='number of CPUs to use')
+parser.add_argument('--num_gpus', default=0, type=int, help='number of GPUs to use')
 parser.add_argument('--num_trials', default=6, type=int, help='number of trials to run')
 
 args = parser.parse_args()
@@ -29,14 +30,15 @@ for task in tasks:
             resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
             num_trials=args.num_trials,
             time_attr='epoch',
-            reward_attr='accuracy'),    # add the FIFO scheduler
+            reward_attr='accuracy',
+        ),    # add the FIFO scheduler
 
-        # ag.scheduler.HyperbandScheduler(
-        #     task,
-        #     resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
-        #     num_trials=args.num_trials,
-        #     time_attr='epoch',
-        #     reward_attr='accuracy'),  # add the Hyperband scheduler
+        ag.scheduler.HyperbandScheduler(
+            task,
+            resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
+            num_trials=args.num_trials,
+            time_attr='epoch',
+            reward_attr='accuracy'),  # add the Hyperband scheduler
 
         ag.scheduler.RLScheduler(
             task,
@@ -51,6 +53,9 @@ for task in tasks:
 
     # run the task with each scheduler
     for scheduler in schedulers:
+
+        # initialize the logging
+        run = wandb.init(project='autogluon')
 
         # display the scheduler and available resources
         print('')
@@ -67,6 +72,9 @@ for task in tasks:
         # stop the clock
         stop_time = datetime.now()
         scheduler_runtimes.append((stop_time-start_time).total_seconds())
+
+        # end the run
+        run.finish()
 
     run_times.append(scheduler_runtimes)
 

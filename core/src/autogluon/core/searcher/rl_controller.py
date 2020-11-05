@@ -26,7 +26,7 @@ class RLSearcher(BaseSearcher):
     >>> searcher = RLSearcher(train_fn.kwspaces)
     >>> searcher.get_config()
     """
-    def __init__(self, kwspaces, ctx=None, controller_type='lstm',
+    def __init__(self, kwspaces, ctx=None, controller_type='atten',
                  **kwargs):
         try_import_mxnet()
         import mxnet as mx

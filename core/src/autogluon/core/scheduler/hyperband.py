@@ -3,6 +3,7 @@ import logging
 import threading
 import multiprocessing as mp
 import os
+import autogluon as ag
 
 from .fifo import FIFOScheduler
 from .hyperband_stopping import HyperbandStopping_Manager
@@ -300,7 +301,10 @@ class HyperbandScheduler(FIFOScheduler):
     @staticmethod
     def _infer_max_t(args):
         if hasattr(args, 'epochs'):
-            return args.epochs
+            if isinstance(args.epochs, ag.core.space.Categorical):
+                return max(args.epochs)
+            else:
+                return args.epochs
         elif hasattr(args, 'max_t'):
             return args.max_t
         else:
