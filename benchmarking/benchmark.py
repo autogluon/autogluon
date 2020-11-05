@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--num_cpus', default=2, type=int, help='number of CPUs to use')
 parser.add_argument('--num_gpus', default=0, type=int, help='number of GPUs to use')
 parser.add_argument('--num_trials', default=6, type=int, help='number of trials to run')
+parser.add_argument('--ip', default=None, help='additional ips to be added')
 
 args = parser.parse_args()
 
@@ -19,6 +20,7 @@ tasks = [
 
 # define run time table
 run_times = []
+ext_ips = [args.ip]
 
 # Run every task with all available schedulers
 for task in tasks:
@@ -31,6 +33,7 @@ for task in tasks:
             num_trials=args.num_trials,
             time_attr='epoch',
             reward_attr='accuracy',
+            dist_ip_addrs=ext_ips
         ),    # add the FIFO scheduler
 
         ag.scheduler.HyperbandScheduler(
@@ -38,14 +41,18 @@ for task in tasks:
             resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
             num_trials=args.num_trials,
             time_attr='epoch',
-            reward_attr='accuracy'),  # add the Hyperband scheduler
+            reward_attr='accuracy',
+            dist_ip_addrs=ext_ips
+        ),  # add the Hyperband scheduler
 
         ag.scheduler.RLScheduler(
             task,
             resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
             num_trials=args.num_trials,
             time_attr='epoch',
-            reward_attr='accuracy')  # add the FIFO scheduler
+            reward_attr='accuracy',
+            dist_ip_addrs = ext_ips
+        )  # add the FIFO scheduler
     ]
 
     # define the scheduler run time list
