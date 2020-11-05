@@ -17,9 +17,11 @@ class TabTransformer(TabModelBase):
     """
 
     def __init__(self, n_cont_embeddings, n_layers, n_heads, hidden_dim, tab_readout, column_embedding, orig_emb_resid,
-                 fix_attention, n_shared_embs=8,
-                 shared_embedding_added=False, **kwargs):
-        super().__init__(**kwargs)
+                 fix_attention, n_shared_embs=8, shared_embedding_added=False, **kwargs):
+        super().__init__(n_cont_features=kwargs['n_cont_features'], norm_class_name=kwargs['norm_class_name'],
+                         cat_feat_origin_cards=kwargs['cat_feat_origin_cards'], max_emb_dim=kwargs['max_emb_dim'],
+                         p_dropout=kwargs['p_dropout'], one_hot_embeddings=kwargs['one_hot_embeddings'],
+                         drop_whole_embeddings=kwargs['drop_whole_embeddings'])
 
         from .modified_transformer import TransformerEncoderLayer_modified
 

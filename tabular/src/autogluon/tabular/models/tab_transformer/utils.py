@@ -46,21 +46,15 @@ def get_col_info(X):
 
 
 class TabTransformerDataset(Dataset):
-    def __init__(
-            self,
-            X,
-            y=None,
-            col_info=None,
-            **params):
-        self.encoders = params['encoders']
-        self.params = params
+    def __init__(self, X, encoders, problem_type, y=None, col_info=None):
+        self.encoders = encoders
         self.col_info = col_info
 
         self.raw_data = X
 
         if y is None:
             self.targets = None
-        elif self.params['problem_type'] == REGRESSION:
+        elif problem_type == REGRESSION:
             self.targets = torch.FloatTensor(y)
         else:
             self.targets = torch.LongTensor(y)
@@ -129,11 +123,8 @@ class TabTransformerDataset(Dataset):
             else:
                 self.cont_data = None
 
-    def build_loader(self, shuffle=False):
-        loader = DataLoader(self, batch_size=self.params['batch_size'],
-                            shuffle=shuffle, num_workers=self.params['num_workers'],
-                            pin_memory=True)
-
+    def build_loader(self, batch_size, num_workers, shuffle=False):
+        loader = DataLoader(self, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True)
         loader.cat_feat_origin_cards = self.cat_feat_origin_cards
         return loader
 

@@ -17,10 +17,10 @@ with that particular column as the label.
 
 class SUPERVISED_pretext(nn.Module):
     # holder class to handle supervised pretraining.
-    def __init__(self, kwargs):
+    def __init__(self, problem_type, device):
         super().__init__()
-        self.kwargs = kwargs
-        self.loss_funct = nn.MSELoss() if kwargs['problem_type'] == REGRESSION else nn.CrossEntropyLoss()
+        self.device = device
+        self.loss_funct = nn.MSELoss() if problem_type == REGRESSION else nn.CrossEntropyLoss()
 
     def forward(self, out, target):
         loss = self.loss_funct(out, target)
@@ -31,8 +31,8 @@ class SUPERVISED_pretext(nn.Module):
         return loss, correct
 
     def get(self, data, target):
-        data = data.to(self.kwargs['device'], non_blocking=True)
-        target = target.to(self.kwargs['device'], non_blocking=True)
+        data = data.to(self.device, non_blocking=True)
+        target = target.to(self.device, non_blocking=True)
 
         return data, target
 
@@ -58,18 +58,19 @@ class BERT_pretext(nn.Module):
             predict the pretext label.
     """
 
-    def __init__(self, kwargs, replacement_noise='random', p_replace=0.3):
+    def __init__(self, cat_feat_origin_cards, device, hidden_dim, replacement_noise='random', p_replace=0.3):
         super().__init__()
-        self.kwargs = kwargs
+        self.cat_feat_origin_cards = cat_feat_origin_cards
+        self.device = device
+        self.hidden_dim = hidden_dim
         self.loss_funct = nn.CrossEntropyLoss()
         self.p_replace = p_replace
         self.predicters = nn.ModuleList()
-        self.n_cat_feats = len(kwargs['cat_feat_origin_cards'])
+        self.n_cat_feats = len(cat_feat_origin_cards)
         self.replacement_noise = replacement_noise
 
-        number_devices = torch.cuda.device_count()
         for col in range(self.n_cat_feats):
-            lin = nn.Linear(kwargs['hidden_dim'], 2)
+            lin = nn.Linear(self.hidden_dim, 2)
             self.predicters.append(lin)
 
     def forward(self, out, target):
@@ -98,7 +99,7 @@ class BERT_pretext(nn.Module):
 
         elif self.replacement_noise == 'random':
             locs_to_replace = torch.empty_like(cat_feats, dtype=float).uniform_() < self.p_replace
-            col_cardinalities = torch.LongTensor([i[1] for i in self.kwargs['cat_feat_origin_cards']]).to(cat_feats)
+            col_cardinalities = torch.LongTensor([i[1] for i in self.cat_feat_origin_cards]).to(cat_feats)
             col_cardinalities = col_cardinalities.unsqueeze(0).expand_as(cat_feats)
 
             unif = torch.rand(cat_feats.shape, device=col_cardinalities.device)
@@ -123,7 +124,7 @@ class BERT_pretext(nn.Module):
 
             locs_to_change = torch.multinomial(weights, np.prod(cat_feats.shape), replacement=True).view(
                 cat_feats.shape)
-            col_cardinalities = torch.LongTensor([i[1] for i in self.kwargs['cat_feat_origin_cards']]).to(cat_feats)
+            col_cardinalities = torch.LongTensor([i[1] for i in self.cat_feat_origin_cards]).to(cat_feats)
             col_cardinalities = col_cardinalities.unsqueeze(0).expand_as(cat_feats)
 
             unif = torch.rand(cat_feats.shape, device=col_cardinalities.device)
@@ -145,7 +146,7 @@ class BERT_pretext(nn.Module):
         pretext_label = (cat_feats != orig_cat_feats).long()
         pretext_data = cat_feats
 
-        pretext_data = pretext_data.to(self.kwargs['device'], non_blocking=True)
-        pretext_label = pretext_label.to(self.kwargs['device'], non_blocking=True)
+        pretext_data = pretext_data.to(self.device, non_blocking=True)
+        pretext_label = pretext_label.to(self.device, non_blocking=True)
 
         return pretext_data, pretext_label

@@ -33,33 +33,29 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     def __init__(self, **kwargs):
         try_import_torch()
         super().__init__(**kwargs)
+        import torch
         self.types_of_features = None
         self.verbosity = None
         self.temp_file_name = "tab_trans_temp.pth"
 
-    def _set_default_params(self):
-        import torch
-
-        default_params = dict()
-
         # TODO: Take in num_gpu's as a param. Currently this is hard-coded upon detection of cuda.
         if torch.cuda.is_available():
-            default_params['device'] = torch.device("cuda")
+            self.device = torch.device("cuda")
         else:
-            default_params['device'] = torch.device("cpu")
+            self.device = torch.device("cpu")
 
-        default_params.update(get_default_param(self.problem_type))
+    def _set_default_params(self):
+        default_params = get_default_param()
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
     def _get_model(self):
         from .tab_model_base import TabNet
         # If we have already initialized the model, we don't need to do it again.
-        model = None
-        if self.model is None:
-            model = TabNet(self.params['n_classes'], self.params, self.cat_feat_origin_cards)
-            if self.params['device'].type == "cuda":
-                model = model.cuda()
+        model = TabNet(self.params['n_classes'], self.params['feature_dim'],
+                       self.params['num_output_layers'], self.device, self.params)
+        if self.device.type == "cuda":
+            model = model.cuda()
 
         return model
 
@@ -90,27 +86,28 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         self.types_of_features, _ = self._get_types_of_features(X, needs_torch=True, needs_extra_types=False)
 
-        data = TabTransformerDataset(X, col_info=self.types_of_features, **self.params)
+        encoders = self.params['encoders']
+        data = TabTransformerDataset(X, encoders=encoders, problem_type=self.problem_type, col_info=self.types_of_features)
         self.fe = fe
         if self.fe is not None:
             if X_unlabeled is None:
                 unlab_data = None
             elif X_unlabeled is not None:
-                unlab_data = TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.params)
+                unlab_data = TabTransformerDataset(X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self.types_of_features)
         if self.fe is None:
             if X_unlabeled is None:
                 data.fit_feat_encoders()
                 self.fe = data.feature_encoders
                 unlab_data = None
             elif X_unlabeled is not None:
-                unlab_data = TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.params)
+                unlab_data = TabTransformerDataset(X_unlabeled, encoders=encoders, problem_type=self.problem_type, col_info=self.types_of_features)
                 unlab_data.fit_feat_encoders()
                 self.fe = unlab_data.feature_encoders
 
         data.encode(self.fe)
 
         if X_val is not None:
-            val_data = TabTransformerDataset(X_val, col_info=self.types_of_features, **self.params)
+            val_data = TabTransformerDataset(X_val, encoders=encoders, problem_type=self.problem_type, col_info=self.types_of_features)
             val_data.encode(self.fe)
         else:
             val_data = None
@@ -136,7 +133,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             for data, target in data_bar:
                 data, target = pretext.get(data, target)
 
-                if params['device'].type == "cuda":
+                if self.device.type == "cuda":
                     data, target = data.cuda(), target.cuda()
                     pretext = pretext.cuda()
 
@@ -209,10 +206,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         if state is None:
             optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
-            pretext = pretext_tasks['SUPERVISED_pretext'](self.params)
+            pretext = pretext_tasks['SUPERVISED_pretext'](self.problem_type, self.device)
         elif state == 'pretrain':
             optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
-            pretext = pretext_tasks['BERT_pretext'](self.params)
+            pretext = pretext_tasks['BERT_pretext'](self.cat_feat_origin_cards, self.device, self.params['hidden_dim'])
         elif state == 'finetune':
             base_exp_decay = self.params['base_exp_decay']
             optimizer_fc = [optim.Adam(fc_layer.parameters(), lr=lr, weight_decay=weight_decay) for fc_layer in self.model.fc]
@@ -221,7 +218,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             optimizers.extend(optimizer_fc)
             optimizers.append(optimizer_embeds)
 
-            pretext = pretext_tasks['SUPERVISED_pretext'](self.params)
+            pretext = pretext_tasks['SUPERVISED_pretext'](self.problem_type, self.device)
 
         else:
             raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
@@ -317,10 +314,15 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             train.targets = torch.LongTensor(list(y_train))
             val.targets = torch.LongTensor(list(y_val))
 
-        loader_train, loader_val, loader_unlab = train.build_loader(
-            shuffle=True), val.build_loader(), unlab.build_loader() if unlab is not None else None
+        batch_size = self.params['batch_size']
+        num_workers = self.params['num_workers']
+
+        loader_train = train.build_loader(batch_size, num_workers, shuffle=True)
+        loader_val = val.build_loader(batch_size, num_workers)
+        loader_unlab = unlab.build_loader(batch_size, num_workers) if unlab is not None else None
 
         self.cat_feat_origin_cards = loader_train.cat_feat_origin_cards
+        self.params['cat_feat_origin_cards'] = self.cat_feat_origin_cards
 
         self.model = self._get_model()
 
@@ -343,7 +345,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         if isinstance(X, pd.DataFrame):
             X = self.preprocess(X, **kwargs)
             X, _, _ = self._tt_preprocess(X, fe=self.fe)
-            loader = X.build_loader()
+            loader = X.build_loader(self.params['batch_size'], self.params['num_workers'])
         elif isinstance(X, DataLoader):
             loader = X
         elif isinstance(X, torch.Tensor):
@@ -363,7 +365,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         iter = 0
         for data, _ in loader:
-            if self.params['device'].type == "cuda":
+            if self.device.type == "cuda":
                 data = data.cuda()
             with torch.no_grad():
                 data = Variable(data)
@@ -436,11 +438,14 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
+        temp_model = self.model
         if self.model is not None:
             torch.save(self.model, params_filepath)
 
         self.model = None  # Avoiding pickling the weights.
         modelobj_filepath = super().save(path=path, verbose=verbose)
+
+        self.model = temp_model
 
         if return_filename:
             return modelobj_filepath

@@ -822,6 +822,7 @@ class AbstractTrainer:
         """
         if model.feature_metadata is None:
             model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: move this into model creation process?
+
         if isinstance(model, BaggedEnsembleModel):
             model.fit(X=X_train, y=y_train, X_unlabeled=X_unlabeled, **model_fit_kwargs)
         else:
@@ -1629,7 +1630,7 @@ class AbstractTrainer:
                 self.path_data + 'X_val.pkl',
                 self.path_data + 'y_train.pkl',
                 self.path_data + 'y_val.pkl',
-                ]
+            ]
             for data_file in data_files:
                 try:
                     os.remove(data_file)

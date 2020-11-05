@@ -431,7 +431,7 @@ class TabularPrediction(BaseTask):
                 How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', None].
             unlabeled_data : pd.DataFrame, default = None
                 Collection of data without labels that we can use to pretrain on. This is the same schema as train_data, except
-                without the labels. unlabeled_data is specifically used for pre-train'ing a model, which we will typically
+                without the labels. unlabeled_data is specifically used for pretraining a model, which we will typically
                 fine-tune on training data afterwards. This whole process is called semi-supervised learning.
                 The typical use case for unlabeled_data is to add signal to your model where you may not have sufficient training
                 data. e.g. 500 hand-labeled samples (perhaps a hard human task), whole data set (unlabeled) is thousands/millions.

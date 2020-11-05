@@ -2,7 +2,7 @@ import torch.nn as nn
 
 
 class TabNet(nn.Module):
-    def __init__(self, num_class, params, cat_feat_origin_cards):
+    def __init__(self, num_class, feature_dim, num_output_layers, device, params):
         """
         Internal torch model that uses TabTransformer as an embedding.
         This is where we are passing through activations and neurons.
@@ -12,24 +12,21 @@ class TabNet(nn.Module):
         num_class (int): Number of classes identified.
         cat_feat_origin_cards (list): List of categorical features
         """
-        super(TabNet, self).__init__()
+        super().__init__()
         import torch.nn as nn
         from .tab_transformer import TabTransformer
-        self.params = params
-        self.params['cat_feat_origin_cards'] = cat_feat_origin_cards
-        self.embed = TabTransformer(**self.params)
-        self.num_output_layers = params['num_output_layers']
+        self.embed = TabTransformer(**params)
 
         relu = nn.ReLU()
-        in_dim = 2 * self.params['feature_dim']
+        in_dim = 2 * feature_dim
         lin = nn.Linear(in_dim, in_dim, bias=True)
         lin_out = nn.Linear(in_dim, num_class, bias=True)
-        self.fc = [nn.Sequential(*[relu, lin])] * (self.num_output_layers - 1) + [nn.Sequential(*[relu, lin_out])]
+        self.fc = [nn.Sequential(*[relu, lin])] * (num_output_layers - 1) + [nn.Sequential(*[relu, lin_out])]
 
         # Each individual layer inside needs to be put into the GPU.
         # Calling "self.model.cuda()" (TabTransformer:get_model()) will not put a python list into GPU.
-        if self.params['device'].type == "cuda":
-            for layer in range(self.num_output_layers):
+        if device.type == "cuda":
+            for layer in range(num_output_layers):
                 self.fc[layer] = self.fc[layer].cuda()
 
     def forward(self, data):
@@ -42,7 +39,7 @@ class TabNet(nn.Module):
 
 class TabModelBase(nn.Module):
     def __init__(self, n_cont_features, norm_class_name, cat_feat_origin_cards, max_emb_dim,
-                 p_dropout, one_hot_embeddings, drop_whole_embeddings, **kwargs):
+                 p_dropout, one_hot_embeddings, drop_whole_embeddings):
         super().__init__()
         """
         Base class for all TabTransformer models
@@ -58,8 +55,6 @@ class TabModelBase(nn.Module):
         one_hot_embeddings (bool): If True, one-hot encode variables whose cardinality is < max_emb_dim.
         cat_initializers (dict): Structure to hold the initial embeddings for categorical features.
         """
-        self.kwargs = kwargs
-
         self.max_emb_dim = max_emb_dim
         self.n_cont_features = n_cont_features
         self.cat_feat_origin_cards = cat_feat_origin_cards
