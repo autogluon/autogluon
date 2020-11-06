@@ -137,6 +137,8 @@ for ix, px in enumerate(px_sizes):
         spine.set_visible(True)
     cax.xaxis.set_major_locator(ticker.MultipleLocator(5))
     cax.yaxis.set_major_locator(ticker.MultipleLocator(5))
+plt.tight_layout()    
+    
 it.pixels = 50
 ```
 
