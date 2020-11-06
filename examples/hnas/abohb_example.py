@@ -1,4 +1,4 @@
-import autogluon as ag
+import autogluon.core as ag
 import time
 import logging
 import yaml
