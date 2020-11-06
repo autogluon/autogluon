@@ -96,7 +96,17 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         return rename_columns
 
-    def _tt_preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
+    def _preprocess(self, X, **kwargs):
+        from .utils import TabTransformerDataset
+
+        X = X.rename(columns=self._period_columns_mapping)
+        encoders = self.params['encoders']
+        data = TabTransformerDataset(X, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
+        data.encode(self.fe)
+
+        return data
+
+    def _preprocess_train(self, X, X_val=None, X_unlabeled=None, fe=None):
         """
         Pre-processing specific to TabTransformer. Setting up feature encoders, renaming columns with periods in
         them (torch), and converting X, X_val, X_unlabeled into TabTransformerDataset's.
@@ -104,7 +114,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         from .utils import TabTransformerDataset
 
         self._period_columns_mapping = self._get_no_period_columns(X.columns)
-
         X = X.rename(columns=self._period_columns_mapping)
 
         if X_val is not None:
@@ -337,11 +346,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 f"Which is set by default to ensure the TabTransformer model will not run out of memory.\n"
                 f"If you are confident you will have enough memory, set the 'max_columns' hyperparameter higher and try again.\n")
 
-        train, val, unlab = self._tt_preprocess(X_train, X_val, X_unlabeled)
-
-        # There's a very small potential for column name clashes in preprocessing. Let's error if we have such a conflict.
-        if sum(X_train.columns.duplicated()) > 0:
-            raise NameError(f"Duplicate column name(s) detected. Rename highly similar column names with '.' or '_' in them.\n")
+        train, val, unlab = self._preprocess_train(X_train, X_val, X_unlabeled)
 
         if self.problem_type == REGRESSION:
             train.targets = torch.FloatTensor(list(y_train))
@@ -379,14 +384,14 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         from torch.autograd import Variable
 
         if isinstance(X, pd.DataFrame):
+            # Preprocess here also calls our _preprocess, which creates a TTDataset.
             X = self.preprocess(X, **kwargs)
-            X, _, _ = self._tt_preprocess(X, fe=self.fe)
             loader = X.build_loader(self.params['batch_size'], self.params['num_workers'])
         elif isinstance(X, DataLoader):
             loader = X
         elif isinstance(X, torch.Tensor):
             X = X.rename(columns=self._get_no_period_columns(X))
-            loader = X.build_loader()
+            loader = X.build_loader(self.params['batch_size'], self.params['num_workers'])
         else:
             raise NotImplementedError(
                 "Attempting to predict against a non-supported data type. \nNeeds to be a pandas DataFrame, torch DataLoader or torch Tensor.")
