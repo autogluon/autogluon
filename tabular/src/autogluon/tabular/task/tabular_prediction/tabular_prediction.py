@@ -431,8 +431,11 @@ class TabularPrediction(BaseTask):
                 How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', None].
             unlabeled_data : pd.DataFrame, default = None
                 Collection of data without labels that we can use to pretrain on. This is the same schema as train_data, except
-                without the labels. unlabeled_data is specifically used for pretraining a model, which we will typically
-                fine-tune on training data afterwards. This whole process is called semi-supervised learning.
+                without the labels. Currently, unlabeled_data is only used for pretraining a TabTransformer model.
+                If you do not specify 'TRANSF' with unlabeled_data, then no pretraining will occur and unlabeled_data will be ignored!
+                After the pretraining step, we will finetune using the TabTransformer model as well. If TabTransformer is ensembled
+                with other models, like in typical AutoGluon fashion, then the output of this "pretrain/finetune" will be ensembled
+                with other models, which will not used the unlabeled_data. The "pretrain/finetune flow" is also known as semi-supervised learning.
                 The typical use case for unlabeled_data is to add signal to your model where you may not have sufficient training
                 data. e.g. 500 hand-labeled samples (perhaps a hard human task), whole data set (unlabeled) is thousands/millions.
                 However, this isn't the only use case. Given enough unlabeled data(millions of rows), you may see improvements
@@ -526,9 +529,10 @@ class TabularPrediction(BaseTask):
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
             train_features = np.array([column for column in train_data.columns if column != label])
-            unlabeled_features = np.array([column for column in unlabeled_data.columns if column != label])
+            unlabeled_features = np.array([column for column in unlabeled_data.columns])
             if np.any(train_features != unlabeled_features):
-                raise ValueError("Column names must match between training and unlabeled data")
+                raise ValueError("Column names must match between training and unlabeled data.\n"
+                                 "Unlabeled data must have not the label column specified in it.\n")
 
         if feature_prune:
             feature_prune = False  # TODO: Fix feature pruning to add back as an option

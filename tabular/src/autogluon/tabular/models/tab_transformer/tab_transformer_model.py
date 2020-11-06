@@ -13,6 +13,8 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractNeuralNetworkModel
 from ...constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.utils import try_import_torch
+from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,15 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         default_params = get_default_param()
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
 
     def _get_model(self):
         from .tab_model_base import TabNet
