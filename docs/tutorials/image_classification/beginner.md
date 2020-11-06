@@ -30,8 +30,8 @@ print(train_dataset)
 Now, we fit a classifier using AutoGluon as follows:
 
 ```{.python .input}
-task = Task()  # you can trust the default config if no paticular requirement
-# since the original dataset does not provide validation data, the `fit` function split it randomly
+task = Task({'epochs': 2})  # you can trust the default config, we reduce the # epoch to save some build time
+# since the original dataset does not provide validation split, the `fit` function splits it randomly with 90/10 ratio
 classifier = task.fit(train_dataset)
 ```
 
@@ -48,7 +48,7 @@ print('Top-1 train acc: %.3f, val acc: %.3f' %(fit_result['train_acc'], fit_resu
 
 ## Predict on a New Image
 
-Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
+Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability denoted as `score`):
 
 ```{.python .input}
 image_path = test_dataset.iloc[0]['image']
@@ -57,7 +57,7 @@ result = classifier.predict(image_path)
 print(result)
 ```
 
-Of course you can feed in multiple images, let's use images in test dataset as an example:
+You can also feed in multiple images all together, let's use images in test dataset as an example:
 ```{.python .input}
 bulk_result = classifier.predict(test_dataset)
 

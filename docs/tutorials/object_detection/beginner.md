@@ -21,7 +21,7 @@ Using the commands below, we can download this dataset, which is only 23M. The n
 
 ```{.python .input}
 url = 'https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip'
-dataset_train = Task.Dataset.from_voc(url, splits='train')
+dataset_train = Task.Dataset.from_voc(url, splits='trainval')
 ```
 
 ## Fit Models by AutoGluon
@@ -31,7 +31,7 @@ We `fit` a classifier using AutoGluon as follows. In each experiment (one trial 
 
 ```{.python .input}
 time_limits = 60*60  # 1 hour
-task = Task({'time_limits': time_limit, 'num_trials': 2})
+task = Task({'time_limits': time_limits, 'num_trials': 2})
 detector = task.fit(dataset_train)
 ```
 
