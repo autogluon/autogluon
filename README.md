@@ -7,12 +7,7 @@ This repository contains the original MatLab code for DeepInsight as described i
 This package provides a python version of the image transformation procedure of DeepInsight.
 
 ## Installation
-
-
-```python
-import sys
-!{sys.executable} -m pip -q install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
-```
+    python -m pip -q install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
 
 ## Usage
 
@@ -84,7 +79,7 @@ it.fit(X_train_norm, plot=True)
 
 
     
-![png](README_files/README_11_0.png)
+![png](README_files/README_10_0.png)
     
 
 
@@ -114,7 +109,7 @@ for _, spine in ax.spines.items():
 
 
     
-![png](README_files/README_13_0.png)
+![png](README_files/README_12_0.png)
     
 
 
@@ -144,7 +139,7 @@ it.pixels = 50
 
 
     
-![png](README_files/README_15_0.png)
+![png](README_files/README_14_0.png)
     
 
 
@@ -179,7 +174,7 @@ plt.tight_layout()
 
 
     
-![png](README_files/README_21_0.png)
+![png](README_files/README_20_0.png)
     
 
 
@@ -201,7 +196,7 @@ plt.tight_layout()
 
 
     
-![png](README_files/README_23_0.png)
+![png](README_files/README_22_0.png)
     
 
 
