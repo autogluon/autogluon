@@ -69,9 +69,7 @@ class TabTransformerDataset(Dataset):
 
         """must be a list of dicts, each dict is of the form {"name": col_name, "type": col_type} 
         where col_name is obtained from the df X, and col_type is CATEGORICAL, TEXT or SCALAR
- 
-        #TODO FIX THIS self.ds_info['meta']['columns'][1:]
-        """
+         """
         self.cat_feat_origin_cards = None
         self.cont_feat_origin = None
         self.feature_encoders = None

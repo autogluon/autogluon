@@ -22,12 +22,11 @@ def get_fixed_params():
                     'pretext': 'BERT_pretext', # What pretext to use when performing pretraining/semi-supervised learning.
                     'n_cont_features': 8, # How many continuous features to concatenate onto the categorical features
                     'fix_attention': False, # If True, use the categorical embeddings in the transformer architecture.
-                    'epochs': 100, # How many epochs to train on with labeled data.
+                    'epochs': 200, # How many epochs to train on with labeled data.
                     'pretrain_epochs': 200, # How many epochs to pretrain on with unlabeled data.
-                    'epochs_wo_improve': 50, # How many epochs to continue running without improving on metric. aka "Early Stopping Patience"
+                    'epochs_wo_improve': 30, # How many epochs to continue running without improving on metric. aka "Early Stopping Patience"
                     'num_workers': 16, # How many workers to use for torch DataLoader.
-                    'max_columns': 1000, # Maximum number of columns TabTransformer will accept as input. This is to combat huge memory requirements/errors.
-                    'num_output_layers': 1 # How many fully-connected layers on top of transformer to produce predictions. Minimum 1 layer.
+                    'max_columns': 500, # Maximum number of columns TabTransformer will accept as input. This is to combat huge memory requirements/errors.
                     }
 
     return fixed_params
@@ -51,6 +50,8 @@ def get_hyper_params():
         # Options: Int(8, 128)
         'tab_readout': 'none', # What sort of readout from the transformer.
         # Options: ['readout_emb', 'mean', 'concat_pool', 'concat_pool_all', 'concat_pool_add', 'all_feat_embs', 'mean_feat_embs', 'none']
+        'num_output_layers': 1 # How many fully-connected layers on top of transformer to produce predictions. Minimum 1 layer.
+        # Options: Categorical(1, 2, 3)
     }
 
     return hyper_params
