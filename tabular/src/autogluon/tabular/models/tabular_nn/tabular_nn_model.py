@@ -29,7 +29,7 @@ from .tabular_nn_trial import tabular_nn_trial
 from ..abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from ...metrics import log_loss, roc_auc
 from autogluon.core import Space
 from autogluon.core.utils import try_import_mxboard
@@ -101,13 +101,14 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def _set_default_auxiliary_params(self):
-        default_auxiliary_params = dict(
-            ignored_type_group_special=['text_ngram', 'text_as_category'],
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
         )
-        for key, value in default_auxiliary_params.items():
-            self._set_default_param_value(key, value, params=self.params_aux)
-        super()._set_default_auxiliary_params()
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)

@@ -374,19 +374,6 @@ class GPMultiFidelitySearcher(object):
         config_ext = self.configspace_ext.get(config, resource)
         self.state_transformer.drop_candidate(config_ext)
 
-    def set_map_resource_to_index(self, map_fun: Callable[[float], int]):
-        """
-        map_fun is a function mapping the normalized resource level
-        r / max_t in (0, 1] to an index for the rung level. The function is
-        increasing.
-
-        If self.gp_model uses a kernel function that needs map_fun, configure
-        the kernel function here.
-
-        :param map_fun: See above
-        """
-        pass
-
     def dataset_size(self):
         return len(self.state_transformer.state.candidate_evaluations)
 

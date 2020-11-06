@@ -18,6 +18,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION, BINARY, MULTICLASS
+from ...features.feature_metadata import R_OBJECT
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
@@ -362,3 +363,11 @@ class NNFastAiTabularModel(AbstractModel):
     # TODO: Add HPO
     def hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params

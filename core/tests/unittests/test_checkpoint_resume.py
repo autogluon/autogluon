@@ -30,9 +30,12 @@ def branin_fn(args, reporter, **kwargs):
     x1=ag.space.Real(-5.0, 10.0),
     x2=ag.space.Real(0.0, 15.0),
     epochs=9)
-def branin_epochs_fn(args, reporter, **kwargs):
+def branin_epochs_fn(args, reporter):
     func = Branin()
-    resume_from = kwargs.get('resume_from', 1)
+    if 'scheduler' in args and 'resume_from' in args.scheduler:
+        resume_from = args.scheduler.resume_from
+    else:
+        resume_from = 1
     # Sample sleep time per epoch
     x1 = (args.x1 + 5) / 15
     x2 = args.x2 / 15

@@ -94,7 +94,7 @@ class FeatureMetadata:
         """
         Returns a list of features held within the feature metadata object after being pruned through the available parameters.
 
-         Parameters
+        Parameters
         ----------
         valid_raw_types : list, default None
             If a feature's raw type is not in this list, it is pruned.
@@ -121,7 +121,7 @@ class FeatureMetadata:
             If special_types is None, then any feature will satisfy the special type requirement (including those with no special types).
         required_exact : bool, default False
             If True, then if a feature does not have the exact same special types (with no extra special types) as required_special_types, it is pruned.
-            This also applied to required_raw_special_pairs if specified.
+            This is also applied to required_raw_special_pairs if specified.
             Has no effect if required_special_types and required_raw_special_pairs are None.
         required_at_least_one_special : bool, default False
             If True, then if a feature has zero special types, it is pruned.
