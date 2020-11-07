@@ -351,15 +351,11 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         train, val, unlab = self._preprocess_train(X_train, X_val, X_unlabeled)
 
         num_cols = len(train.columns)
-
-
-    #num_cols = X_train.shape[1]
         if num_cols > self.params['max_columns']:
             raise NotImplementedError(
                 f"This dataset has {num_cols} columns and exceeds 'max_columns' == {self.params['max_columns']}.\n"
                 f"Which is set by default to ensure the TabTransformer model will not run out of memory.\n"
                 f"If you are confident you will have enough memory, set the 'max_columns' hyperparameter higher and try again.\n")
-
 
         if self.problem_type == REGRESSION:
             train.targets = torch.FloatTensor(list(y_train))
