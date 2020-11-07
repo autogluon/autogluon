@@ -18,7 +18,14 @@ from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEG
 
 logger = logging.getLogger(__name__)
 
-
+"""
+TODO: Fix Mac OS X warning spam.
+The error message is:
+Cannot set number of intraop threads after parallel work has started or after set_num_threads call when using native parallel backend (function set_num_threads)
+This has been investigated to be a harmless warning for training and running inference on TabTransformer.
+This warning can occur with a very specific environment: torch 1.7, Mac OS X, Python 3.6/3.7, when using torch DataLoader.
+https://github.com/pytorch/pytorch/issues/46409
+"""
 class TabTransformerModel(AbstractNeuralNetworkModel):
     """
     Main TabTransformer model that inherits from AbstractModel.

@@ -1,5 +1,4 @@
 import torch
-import warnings
 from torch.utils.data import Dataset, DataLoader
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -126,13 +125,9 @@ class TabTransformerDataset(Dataset):
                 self.cont_data = None
 
     def build_loader(self, batch_size, num_workers, shuffle=False):
-        # Torch has an open issue on specifically Mac OS X, python < 3.8, and when using DataLoader.
-        # https://github.com/pytorch/pytorch/issues/46409
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message="Cannot set number of intraop threads after parallel work has started or after set_num_threads call when using native parallel backend (function set_num_threads)")
-            loader = DataLoader(self, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True)
-            loader.cat_feat_origin_cards = self.cat_feat_origin_cards
-            return loader
+        loader = DataLoader(self, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True)
+        loader.cat_feat_origin_cards = self.cat_feat_origin_cards
+        return loader
 
     def __len__(self):
         return len(self.raw_data)

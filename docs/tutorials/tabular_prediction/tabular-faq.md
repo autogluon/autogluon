@@ -138,6 +138,14 @@ Note that the `TabularDataset` object is essentially a [pandas DataFrame](https:
 
 To solely use custom data preprocessing and automatically apply your custom transformations to both the train data and all future data encountered during inference, you should instead create a custom FeatureGenerator. Follow this example in the source code: [examples/tabular/example_custom_feature_generator.py](https://github.com/awslabs/autogluon/blob/master/examples/tabular/example_custom_feature_generator.py)
 
+### I'm receiving C++ warning spam during training or inference
+
+This can happen from downstream PyTorch dependencies (OpenMP) when using a specific environment. If you are using PyTorch 1.7, Mac OS X, Python 3.6/3.7, and using the PyTorch DataLoader, then you may get this warning spam. We have only seen this occur with the TabTransformer model. Reference open [torch issue](https://github.com/pytorch/pytorch/issues/46409).
+
+The recommended workaround from the torch issue to suppress this warning is to set an environment variable used in OpenMP. This has been tested on Torch 1.7, Python 3.6, and Mac OS X.
+```
+export OMP_NUM_THREADS=1
+```
 
 ### Issues not addressed here
 
