@@ -98,6 +98,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
     def _preprocess(self, X, **kwargs):
         from .utils import TabTransformerDataset
+        X = super()._preprocess(X=X, **kwargs)
 
         X = X.rename(columns=self._period_columns_mapping)
         encoders = self.params['encoders']
@@ -113,6 +114,13 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         """
         from .utils import TabTransformerDataset
 
+        X = self._preprocess_nonadaptive(X)
+        if X_val is not None:
+            X_val = self._preprocess_nonadaptive(X_val)
+        if X_unlabeled is not None:
+            X_unlabeled = self._preprocess_nonadaptive(X_unlabeled)
+
+
         self._period_columns_mapping = self._get_no_period_columns(X.columns)
         X = X.rename(columns=self._period_columns_mapping)
 
@@ -125,7 +133,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         # Also need to rename the feature names in the types_of_features dictionary.
         for feature_dict in self._types_of_features:
-            feature_dict.update(('name', self._period_columns_mapping[v]) for k, v in feature_dict.items() if k == 'name')
+            # Need to check that the value is in the mapping. Otherwise, we could be updating columns that have been dropped.
+            feature_dict.update(('name', self._period_columns_mapping[v]) for k, v in feature_dict.items() if k == 'name' and v in self._period_columns_mapping)
 
         encoders = self.params['encoders']
         data = TabTransformerDataset(X, encoders=encoders, problem_type=self.problem_type, col_info=self._types_of_features)
@@ -247,10 +256,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         if state is None:
             optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
-            pretext = pretext_tasks['SUPERVISED_pretext'](self.problem_type, self.device)
+            pretext = pretext_tasks['SupervisedPretext'](self.problem_type, self.device)
         elif state == 'pretrain':
             optimizers = [optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)]
-            pretext = pretext_tasks['BERT_pretext'](self.cat_feat_origin_cards, self.device, self.params['hidden_dim'])
+            pretext = pretext_tasks['BERTPretext'](self.cat_feat_origin_cards, self.device, self.params['hidden_dim'])
         elif state == 'finetune':
             base_exp_decay = self.params['base_exp_decay']
             optimizer_fc = [optim.Adam(fc_layer.parameters(), lr=lr, weight_decay=weight_decay) for fc_layer in self.model.fc]
@@ -259,7 +268,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             optimizers.extend(optimizer_fc)
             optimizers.append(optimizer_embeds)
 
-            pretext = pretext_tasks['SUPERVISED_pretext'](self.problem_type, self.device)
+            pretext = pretext_tasks['SupervisedPretext'](self.problem_type, self.device)
 
         else:
             raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
@@ -339,14 +348,18 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         elif self.problem_type ==MULTICLASS:
             self.params['n_classes'] = y_train.nunique()
 
-        num_cols = X_train.shape[1]
+        train, val, unlab = self._preprocess_train(X_train, X_val, X_unlabeled)
+
+        num_cols = len(train.columns)
+
+
+    #num_cols = X_train.shape[1]
         if num_cols > self.params['max_columns']:
             raise NotImplementedError(
                 f"This dataset has {num_cols} columns and exceeds 'max_columns' == {self.params['max_columns']}.\n"
                 f"Which is set by default to ensure the TabTransformer model will not run out of memory.\n"
                 f"If you are confident you will have enough memory, set the 'max_columns' hyperparameter higher and try again.\n")
 
-        train, val, unlab = self._preprocess_train(X_train, X_val, X_unlabeled)
 
         if self.problem_type == REGRESSION:
             train.targets = torch.FloatTensor(list(y_train))

@@ -111,6 +111,7 @@ class DefaultLearner(AbstractLearner):
         self._time_fit_total = time_end - time_preprocessing_start
         logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ...')
 
+    # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bagging_folds
     def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bagging_folds: int):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)

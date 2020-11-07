@@ -15,7 +15,7 @@ with that particular column as the label.
 """
 
 
-class SUPERVISED_pretext(nn.Module):
+class SupervisedPretext(nn.Module):
     # holder class to handle supervised pretraining.
     def __init__(self, problem_type, device):
         super().__init__()
@@ -37,7 +37,7 @@ class SUPERVISED_pretext(nn.Module):
         return data, target
 
 
-class BERT_pretext(nn.Module):
+class BERTPretext(nn.Module):
     """
     This is the current default pretext task module.
 

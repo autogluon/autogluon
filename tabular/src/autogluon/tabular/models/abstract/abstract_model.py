@@ -257,6 +257,8 @@ class AbstractModel:
             dropped_features = [feature for feature in self.features if feature not in valid_features]
             logger.log(10, f'\tDropped {len(dropped_features)} of {len(self.features)} features.')
             self.features = [feature for feature in self.features if feature in valid_features]
+            if self.feature_metadata is not None:
+                self.feature_metadata = self.feature_metadata.keep_features(self.features)
             if not self.features:
                 raise NoValidFeatures
             if list(X.columns) != self.features:

@@ -23,7 +23,7 @@ class TabTransformer(TabModelBase):
                          p_dropout=kwargs['p_dropout'], one_hot_embeddings=kwargs['one_hot_embeddings'],
                          drop_whole_embeddings=kwargs['drop_whole_embeddings'])
 
-        from .modified_transformer import TransformerEncoderLayer_modified
+        from .modified_transformer import TransformerEncoderLayerModified
 
         self.n_cont_embeddings = n_cont_embeddings
         self.hidden_dim = hidden_dim
@@ -66,7 +66,7 @@ class TabTransformer(TabModelBase):
 
         if fix_attention is True:
             self.n_cat_embeddings = len(self.cat_feat_origin_cards)
-            self.tfmr_layers = nn.ModuleList([TransformerEncoderLayer_modified(d_model=hidden_dim,
+            self.tfmr_layers = nn.ModuleList([TransformerEncoderLayerModified(d_model=hidden_dim,
                                                                                n_cat_embeddings=self.n_cat_embeddings,
                                                                                nhead=n_heads,
                                                                                dim_feedforward=4 * hidden_dim,

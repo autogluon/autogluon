@@ -10,7 +10,12 @@ from typing import Tuple, Optional
 
 import torch
 import torch.nn.functional as F
-from torch._overrides import has_torch_function, handle_torch_function
+# Needed for pytorch 1.7 and 1.2
+try:
+    from torch.overrides import has_torch_function, handle_torch_function
+# Needed for pytorch 1.6
+except ImportError:
+    from torch._overrides import has_torch_function, handle_torch_function
 from torch.nn import Module
 from torch.nn import init
 from torch.nn.functional import linear, softmax, dropout
@@ -261,7 +266,7 @@ class MultiheadAttention(Module):
         if '_qkv_same_embed_dim' not in state:
             state['_qkv_same_embed_dim'] = True
 
-        super(MultiheadAttention, self).__setstate__(state)
+        super().__setstate__(state)
 
     def forward(self, query, key, value, key_padding_mask=None,
                 need_weights=True, attn_mask=None):
@@ -385,7 +390,7 @@ class _LinearWithBias(Linear):
         super().__init__(in_features, out_features, bias=True)
 
 
-class TransformerEncoderLayer_modified(Module):
+class TransformerEncoderLayerModified(Module):
     """TransformerEncoderLayer is made up of self-attn and feedforward network.
     This standard encoder layer is based on the paper "Attention Is All You Need".
     Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
@@ -407,7 +412,7 @@ class TransformerEncoderLayer_modified(Module):
     """
 
     def __init__(self, d_model, n_cat_embeddings, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
-        super(TransformerEncoderLayer_modified, self).__init__()
+        super().__init__()
 
         self.self_attn = MultiheadAttention(d_model, n_cat_embeddings, nhead, dropout=dropout)
 
@@ -426,7 +431,7 @@ class TransformerEncoderLayer_modified(Module):
     def __setstate__(self, state):
         if 'activation' not in state:
             state['activation'] = F.relu
-        super(TransformerEncoderLayer_modified, self).__setstate__(state)
+        super().__setstate__(state)
 
     def forward(self, src: torch.Tensor, src_mask: Optional[torch.Tensor] = None,
                 src_key_padding_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
