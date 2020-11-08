@@ -16,7 +16,6 @@ from ..utils import get_pred_from_proba, generate_train_test_split, infer_eval_m
 from ..models.abstract.abstract_model import AbstractModel
 from ..metrics import log_loss, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from ..trainer.model_presets.presets import get_preset_models
 from ..trainer.model_presets.presets_custom import get_preset_custom
 from ..trainer.model_presets.presets_distill import get_preset_models_distillation
 from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
@@ -193,7 +192,7 @@ class AbstractTrainer:
         return max_level
 
     # TODO: Rename method for v0.1
-    def get_models(self, hyperparameters: dict, hyperparameter_tune=False, **kwargs) -> List[AbstractModel]:
+    def get_models(self, hyperparameters: dict, **kwargs) -> List[AbstractModel]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
 
@@ -248,6 +247,8 @@ class AbstractTrainer:
             base_model_names = []
         if hyperparameters is None:
             hyperparameters = self.hyperparameters
+        else:
+            hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
         hyperparameters = copy.deepcopy(hyperparameters)
 
         # TODO: Hack
@@ -336,13 +337,24 @@ class AbstractTrainer:
                     return []
             else:
                 raise AssertionError(f'Stack level cannot be negative! level = {level}')
-            models = [
-                stacker_type(
-                    path=self.path, name=model.name + '_STACKER_l' + str(level), model_base=model, base_model_names=base_model_names,
+            invalid_model_names = set(self.get_model_names_all())
+            models_stack = []
+            for model in models:
+                # Ensure name is unique
+                model_stack_name = f'{model.name}_STACKER_l{level}'
+                num_increment = 2
+                while model_stack_name in invalid_model_names:  # Ensure name is unique
+                    model_stack_name = f'{model.name}_{num_increment}_STACKER_l{level}'
+                    num_increment += 1
+                invalid_model_names.add(model_stack_name)
+
+                model_stack = stacker_type(
+                    path=self.path, name=model_stack_name, model_base=model, base_model_names=base_model_names,
                     base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
                     num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level+self.random_seed
                 )
-                for model in models]
+                models_stack.append(model_stack)
+            models = models_stack
         X_train_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
@@ -795,9 +807,18 @@ class AbstractTrainer:
             extra_params = {'_tmp_greedy_hyperparameters': child_hyperparameters}
         else:
             extra_params = {}
+
+        invalid_model_names = set(self.get_model_names_all())
+        # Ensure name is unique
+        model_stack_name = f'weighted_ensemble{name_suffix}_k{k_fold}_l{level}'
+        num_increment = 2
+        while model_stack_name in invalid_model_names:  # Ensure name is unique
+            model_stack_name = f'weighted_ensemble{name_suffix}_{num_increment}_k{k_fold}_l{level}'
+            num_increment += 1
+
         weighted_ensemble_model = WeightedEnsembleModel(
             path=self.path,
-            name='weighted_ensemble' + name_suffix + '_k' + str(k_fold) + '_l' + str(level),
+            name=model_stack_name,
             base_model_names=base_model_names,
             base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=base_model_names),
             base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=base_model_names),
@@ -1758,7 +1779,7 @@ class AbstractTrainer:
         save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
         return info
 
-    def _process_hyperparameters(self, hyperparameters, ag_args_fit=None, excluded_model_types=None):
+    def _process_hyperparameters(self, hyperparameters: dict, ag_args_fit=None, excluded_model_types=None) -> dict:
         if ag_args_fit is None:
             ag_args_fit = {}
         if excluded_model_types is None:
@@ -1793,10 +1814,6 @@ class AbstractTrainer:
                     valid_models = []
                     for candidate in candidate_models:
                         is_valid = True
-                        if '_ag_args' in candidate:  # Legacy keyword from autogluon<=0.0.11
-                            if AG_ARGS not in candidate:
-                                candidate[AG_ARGS] = candidate['_ag_args']
-                                candidate.pop('_ag_args')
                         if AG_ARGS in candidate:
                             model_valid_problem_types = candidate[AG_ARGS].get('problem_types', None)
                             if model_valid_problem_types is not None:
@@ -1953,13 +1970,11 @@ class AbstractTrainer:
         else:
             hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=None, excluded_model_types=None)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
         if teacher_preds is None or teacher_preds == 'hard':
-            models_distill = get_preset_models(path=self.path, problem_type=self.problem_type,
-                                eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
-                                num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix)
+            models_distill = self.get_models(hyperparameters=hyperparameters, name_suffix=student_suffix)
         else:
             models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type,
                                 eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
-                                num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix)
+                                num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix, invalid_model_names=self.get_model_names_all())
             if self.problem_type != REGRESSION:
                 self._regress_preds_asprobas = True
 
