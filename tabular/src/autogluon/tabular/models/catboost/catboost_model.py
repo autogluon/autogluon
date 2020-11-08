@@ -12,15 +12,15 @@ from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ...constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
+from ...features.feature_metadata import R_OBJECT
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils import try_import_catboost, try_import_catboostdev
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: Catboost crashes on multiclass problems where only two classes have significant member count.
-#  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
-# TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
+# TODO: Consider having CatBoost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
+# TODO: v0.1 rename to CatBoostModel and rename model name default to CatBoost (instead of Catboost)
 class CatboostModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -280,3 +280,11 @@ class CatboostModel(AbstractModel):
         importance_series = importance_df.set_index('Feature Id')['Importances']
         importance_dict = importance_series.to_dict()
         return importance_dict
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
