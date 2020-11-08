@@ -140,6 +140,8 @@ To solely use custom data preprocessing and automatically apply your custom tran
 
 ### I'm receiving C++ warning spam during training or inference
 
+Warning message: [W ParallelNative.cpp:206] Warning: Cannot set number of intraop threads after parallel work has started or after set_num_threads call when using native parallel backend (function set_num_threads)
+
 This can happen from downstream PyTorch dependencies (OpenMP) when using a specific environment. If you are using PyTorch 1.7, Mac OS X, Python 3.6/3.7, and using the PyTorch DataLoader, then you may get this warning spam. We have only seen this occur with the TabTransformer model. Reference open [torch issue](https://github.com/pytorch/pytorch/issues/46409).
 
 The recommended workaround from the torch issue to suppress this warning is to set an environment variable used in OpenMP. This has been tested on Torch 1.7, Python 3.6, and Mac OS X.
