@@ -555,6 +555,7 @@ class AbstractTrainer:
                     X = X.drop(cols_to_drop, axis=1)
         return X
 
+    # TODO: v0.1 this does not ensure unique model names (although the models they are refitting from should be unique, making this produce unique names as well)
     # You must have previously called fit() with cache_data=True
     # Fits _FULL versions of specified models, but does NOT link them (_FULL stackers will still use normal models as input)
     def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, models=None):
@@ -651,7 +652,17 @@ class AbstractTrainer:
             if model == 'best':
                 model = self.get_model_best()
             ensemble_set = self.get_minimum_model_set(model)
-        models_trained_full = self.refit_single_full(models=ensemble_set)
+        existing_models = self.get_model_names_all()
+        ensemble_set_valid = []
+        for model in ensemble_set:
+            if model in self.model_full_dict and self.model_full_dict[model] in existing_models:
+                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{self.model_full_dict[model]}', skipping refit...")
+            else:
+                ensemble_set_valid.append(model)
+        if ensemble_set_valid:
+            models_trained_full = self.refit_single_full(models=ensemble_set_valid)
+        else:
+            models_trained_full = []
 
         for model_full in models_trained_full:
             # TODO: Consider moving base model info to a separate pkl file so that it can be edited without having to load/save the model again
