@@ -914,10 +914,8 @@ class AbstractTrainer:
             logger.warning(f'\tNo valid features to train {model.name}... Skipping this model.')
             del model
         except Exception as err:
-            if self.verbosity >= 1:
-                traceback.print_tb(err.__traceback__)
-            logger.exception(f'Warning: Exception caused {model.name} to fail during training... Skipping this model.')
-            logger.log(20, err)
+            logger.exception(f'\tWarning: Exception caused {model.name} to fail during training... Skipping this model.')
+            logger.warning(err)
             del model
         else:
             self._add_model(model=model, stack_name=stack_name, level=level)
