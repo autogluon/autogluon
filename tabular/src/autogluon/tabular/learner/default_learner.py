@@ -165,7 +165,10 @@ class DefaultLearner(AbstractLearner):
             X = X.drop(self.id_columns, axis=1, errors='ignore')
             if X_val is not None:
                 X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
-
+        print('Inside Default Learner:')
+        print('X=', X)
+        print('y=', y)
+        ch = input()
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         logger.log(20, f'Using Feature Generators to preprocess the data ...')
         if X_val is not None:
