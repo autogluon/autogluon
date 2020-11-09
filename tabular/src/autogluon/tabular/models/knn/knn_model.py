@@ -39,14 +39,14 @@ class KNNModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def _set_default_auxiliary_params(self):
-        default_auxiliary_params = dict(
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
             ignored_type_group_raw=[R_CATEGORY, R_OBJECT],  # TODO: Eventually use category features
             ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT],
         )
-        for key, value in default_auxiliary_params.items():
-            self._set_default_param_value(key, value, params=self.params_aux)
-        super()._set_default_auxiliary_params()
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
 
     # TODO: Enable HPO for KNN
     def _get_default_searchspace(self):

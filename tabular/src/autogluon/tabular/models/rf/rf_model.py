@@ -8,6 +8,7 @@ import numpy as np
 import psutil
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
+from ...features.feature_metadata import R_OBJECT
 from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION
@@ -152,3 +153,11 @@ class RFModel(AbstractModel):
             logger.warning('Warning: get_model_feature_importance called when self.features is None!')
             return dict()
         return dict(zip(self.features, self.model.feature_importances_))
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params

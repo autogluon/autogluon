@@ -183,3 +183,11 @@ class LinearModel(AbstractModel):
             elif (feature in categorical_featnames) and (num_unique_vals <= one_hot_threshold):
                 types_of_features['onehot'].append(feature)
         return types_of_features
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params

@@ -337,9 +337,6 @@ class GPMultiFidelitySearcher(BaseSearcher):
         assert isinstance(scheduler, HyperbandScheduler), \
             "This searcher requires HyperbandScheduler scheduler"
         super().configure_scheduler(scheduler)
-        with self._gp_lock:
-            self.gp_searcher.set_map_resource_to_index(
-                scheduler.map_resource_to_index())
         self._resource_attribute = scheduler._time_attr
 
     def get_config(self, **kwargs):

@@ -49,6 +49,8 @@ def parse_args():
     parser.add_argument('--grace_period', type=int,
                         help='minimum number of epochs to run with'
                              'hyperband_* scheduler')
+    parser.add_argument('--use_single_rung_system', action='store_true',
+                        help='Use single rung level system for all brackets')
     args = parser.parse_args()
     return args
 
@@ -87,6 +89,9 @@ def from_argparse(args) -> (dict, dict):
         _enter_not_none(scheduler_options, 'max_t', args.epochs)
         _enter_not_none(scheduler_options, 'grace_period', args.grace_period)
         _enter_not_none(scheduler_options, 'brackets', args.brackets)
+        _enter_not_none(scheduler_options, 'rung_system_per_bracket',
+                        not args.use_single_rung_system)
+        _enter_not_none(scheduler_options, 'random_seed', args.random_seed)
 
     return search_options, scheduler_options
 
