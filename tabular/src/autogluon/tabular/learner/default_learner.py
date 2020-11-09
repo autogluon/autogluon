@@ -191,7 +191,8 @@ class DefaultLearner(AbstractLearner):
                 self.feature_generator.print_feature_metadata_info()
             else:
                 X = self.feature_generator.fit_transform(X)
-
+        print('After feature generator:')
+        print('X=', X)
         return X, y, X_val, y_val, holdout_frac, num_bagging_folds
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
