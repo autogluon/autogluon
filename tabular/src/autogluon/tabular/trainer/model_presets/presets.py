@@ -29,7 +29,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     CAT=60,
     NN=50,
     FASTAI=45,
-    TEXT_V1=42,
+    TEXT_NN_V1=42,
     LR=40,
     custom=0,
 )
@@ -60,7 +60,7 @@ MODEL_TYPES = dict(
     GBM=LGBModel,
     CAT=CatboostModel,
     NN=TabularNeuralNetModel,
-    TEXT_V1=TextPredictionV1Model,
+    TEXT_NN_V1=TextPredictionV1Model,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
 )
