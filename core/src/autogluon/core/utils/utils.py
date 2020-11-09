@@ -1,3 +1,8 @@
+__all__ = ['generate_kfold', 'setup_outputdir', 'setup_compute',
+           'setup_trial_limits', 'dd_list', 'get_leaderboard_pareto_frontier',
+           'shuffle_df_rows', 'normalize_binary_probas', 'normalize_multi_probas',
+           'default_holdout_frac', 'augment_rare_classess']
+
 import logging
 import multiprocessing
 import os
@@ -7,7 +12,7 @@ from datetime import datetime
 import numpy as np
 from pandas import DataFrame
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
-from .. import get_cpu_count, get_gpu_count
+from ..scheduler.resource import get_cpu_count, get_gpu_count
 
 logger = logging.getLogger(__name__)
 
