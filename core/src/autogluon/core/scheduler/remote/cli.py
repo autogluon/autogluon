@@ -1,6 +1,7 @@
 import click
 
 from .remote import DaskRemoteService
+import multiprocessing as mp
 
 @click.command(
     help="""Launch an AutoGluon Remote from terminal, example:
@@ -21,4 +22,13 @@ from .remote import DaskRemoteService
     help="Specify the port number.",
 )
 def main(address, port):
+    # Dask requirement - add support for when a program which uses multiprocessing has been frozen to produce a Windows executable.
+    mp.freeze_support()
+
+    if mp.get_start_method(allow_none=True) != 'forkserver':
+        # The CUDA runtime does not support the fork start method;
+        # either the spawn or forkserver start method are required to use CUDA in subprocesses.
+        # forkserver is used because spawn is still affected by locking issues
+        mp.set_start_method('forkserver', force=True)
+
     service = DaskRemoteService(address, port)
