@@ -7,6 +7,7 @@ from datetime import datetime
 import numpy as np
 from pandas import DataFrame
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
+from ..scheduler.resource import get_cpu_count, get_gpu_count
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +52,28 @@ def setup_outputdir(output_directory):
 
 
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
-    if nthreads_per_trial is None:
-        nthreads_per_trial = multiprocessing.cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
-
-    if ngpus_per_trial is None:
-        ngpus_per_trial = 0  # do not use GPU by default
-    elif ngpus_per_trial > 1:
+    if nthreads_per_trial is None and ngpus_per_trial is None:
+        nthreads_per_trial = get_cpu_count()
+        ngpus_per_trial = get_gpu_count()
+    elif nthreads_per_trial is not None and ngpus_per_trial is None:
+        ngpus_per_trial = get_gpu_count()
+    elif nthreads_per_trial is None and ngpus_per_trial is not None:
+        if ngpus_per_trial > 1:
+            ngpus_per_trial = 1
+            logger.debug(
+                "tabular_prediction currently doesn't use >1 GPU per training run. "
+                "ngpus_per_trial set = 1")
+        if ngpus_per_trial != 0:
+            num_parallel_jobs = get_gpu_count() // ngpus_per_trial
+            nthreads_per_trial = max(get_cpu_count() // num_parallel_jobs, 1)
+        else:
+            nthreads_per_trial = min(get_cpu_count(), 4)
+    nthreads_per_trial = min(nthreads_per_trial, get_cpu_count())
+    ngpus_per_trial = min(ngpus_per_trial, get_gpu_count())
+    if ngpus_per_trial > 1:
         ngpus_per_trial = 1
-        logger.debug("tabular_prediction currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
+        logger.debug("tabular_prediction currently doesn't use >1 GPU per training run. "
+                     "ngpus_per_trial set = 1")
     return nthreads_per_trial, ngpus_per_trial
 
 
