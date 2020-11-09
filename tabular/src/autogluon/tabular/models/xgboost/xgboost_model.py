@@ -6,6 +6,7 @@ from . import xgboost_utils
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
+from ...features.feature_metadata import R_OBJECT
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.utils import try_import_xgboost
 
@@ -24,6 +25,14 @@ class XGBoostModel(AbstractModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
 
     # Use specialized XGBoost metric if available (fast), otherwise use custom func generator
     def get_eval_metric(self):
@@ -85,6 +94,7 @@ class XGBoostModel(AbstractModel):
         callbacks = []
         if verbose:
             callbacks.append(print_evaluation(verbose_eval))
+        # TODO: disable early stopping during refit_full
         callbacks.append(early_stop_custom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
 
         from xgboost import XGBClassifier, XGBRegressor
@@ -100,8 +110,27 @@ class XGBoostModel(AbstractModel):
         )
 
         bst = self.model.get_booster()
-        self.params_trained['n_estimators'] = bst.best_iteration + 1
-        self.params_trained['best_ntree_limit'] = bst.best_ntree_limit
+        self.params_trained['n_estimators'] = bst.best_ntree_limit
+        self._best_ntree_limit = bst.best_ntree_limit
+
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
+
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X, ntree_limit=self._best_ntree_limit)
+
+        y_pred_proba = self.model.predict_proba(X, ntree_limit=self._best_ntree_limit)
+        if self.problem_type == BINARY:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            elif y_pred_proba.shape[1] > 1:
+                return y_pred_proba[:, 1]
+            else:
+                return y_pred_proba
+        elif y_pred_proba.shape[1] > 2:
+            return y_pred_proba
+        else:
+            return y_pred_proba[:, 1]
 
     def get_model_feature_importance(self):
         original_feature_names: list = self._ohe_generator.get_original_feature_names()
