@@ -31,6 +31,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     # TODO: Improve handling of missing datetimes
     def _generate_features_datetime(self, X: DataFrame) -> DataFrame:
         X_datetime = DataFrame(index=X.index)
+        print('In DataTimeGenerator, features_in=', self.features_in)
         for datetime_feature in self.features_in:
             # TODO: Be aware: When converted to float32 by downstream models, the seconds value will be up to 3 seconds off the true time due to rounding error. If seconds matter, find a separate way to generate (Possibly subtract smallest datetime from all values).
             X_datetime[datetime_feature] = pd.to_datetime(X[datetime_feature])

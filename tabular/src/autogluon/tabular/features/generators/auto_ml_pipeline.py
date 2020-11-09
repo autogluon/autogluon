@@ -86,6 +86,9 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if self.enable_numeric_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
                 valid_raw_types=[R_INT, R_FLOAT])))
+        if self.enable_raw_text_feature:
+            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
+                valid_raw_types=[R_OBJECT])))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
         if self.enable_datetime_features:
@@ -95,8 +98,4 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if self.enable_text_ngram_features:
             generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer))
         generators = [generator_group]
-        if self.enable_raw_text_feature:
-            raw_text_generator_group = [IdentityFeatureGenerator(infer_features_in_args=dict(
-                valid_raw_types=[R_OBJECT]))]
-            generators.append(raw_text_generator_group)
         return generators
