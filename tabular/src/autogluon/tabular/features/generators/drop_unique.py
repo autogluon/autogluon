@@ -3,7 +3,7 @@ import logging
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT
+from ..feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, S_TEXT
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
                 features_to_drop.append(column)
             elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT]\
                     and (unique_value_count > max_unique_value_count):
-                if 'text' in feature_metadata.get_feature_types_special(column):
+                if S_TEXT in feature_metadata.get_feature_types_special(column):
                     # We should not drop a text column
                     continue
                 else:
