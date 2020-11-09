@@ -63,7 +63,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     >>> X_test_transformed = feature_generator.transform(test_data)
     """
     def __init__(self, enable_numeric_features=True, enable_categorical_features=True, enable_datetime_features=True,
-                 enable_text_special_features=True, enable_text_ngram_features=True, vectorizer=None, **kwargs):
+                 enable_text_special_features=True, enable_text_ngram_features=True,
+                 enable_raw_text_feature=True, vectorizer=None, **kwargs):
         if 'generators' in kwargs:
             raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
         if 'enable_raw_features' in kwargs:
@@ -75,6 +76,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_datetime_features = enable_datetime_features
         self.enable_text_special_features = enable_text_special_features
         self.enable_text_ngram_features = enable_text_ngram_features
+        self.enable_raw_text_feature = enable_raw_text_feature
 
         generators = self._get_default_generators(vectorizer=vectorizer)
         super().__init__(generators=generators, **kwargs)
@@ -83,7 +85,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         generator_group = []
         if self.enable_numeric_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
-                valid_raw_types=[R_INT, R_FLOAT, R_OBJECT])))
+                valid_raw_types=[R_INT, R_FLOAT])))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
         if self.enable_datetime_features:
@@ -93,4 +95,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if self.enable_text_ngram_features:
             generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer))
         generators = [generator_group]
+        if self.enable_raw_text_feature:
+            raw_text_generator_group = [IdentityFeatureGenerator(infer_features_in_args=dict(
+                valid_raw_types=[R_OBJECT]))]
+            generators.append(raw_text_generator_group)
         return generators
