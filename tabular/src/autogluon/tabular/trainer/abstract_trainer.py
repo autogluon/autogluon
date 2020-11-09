@@ -223,6 +223,7 @@ class AbstractTrainer:
     def train(self, X_train, y_train, X_val=None, y_val=None, **kwargs):
         raise NotImplementedError
 
+    # TODO: v0.1 add invalid_model_names argument
     # TODO: make models accept dictionary of level -> list of models for more control of future fit calls.
     # TODO: Enable HPO on levels > 0
     # TODO: Enable feature prune on levels > 0
