@@ -7,7 +7,7 @@ from datetime import datetime
 import numpy as np
 from pandas import DataFrame
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
-from ..scheduler.resource import get_cpu_count, get_gpu_count
+from .. import get_cpu_count, get_gpu_count
 
 logger = logging.getLogger(__name__)
 

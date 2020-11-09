@@ -5,4 +5,3 @@ from .decorator import *
 from .utils.files import *
 from .scheduler.resource.resource import *
 from .scheduler.scheduler import *
-from .utils import utils
