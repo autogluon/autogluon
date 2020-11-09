@@ -4,7 +4,8 @@ import pandas as pd
 from ...constants import BINARY, REGRESSION
 from ..abstract.abstract_model import AbstractModel
 from ... import metrics
-from ...features.feature_metadata import FeatureMetadata
+from ...features.feature_metadata import FeatureMetadata, R_OBJECT, R_INT, R_FLOAT, R_CATEGORY
+
 
 # Import autogluon text specific dependencies
 try:
@@ -103,7 +104,15 @@ class TextPredictionV1Model(AbstractModel):
             # Return the probability that the label is 1 (True)
             return y_pred_proba[:, 1]
 
-
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            get_feature_kwargs=dict(
+                valid_raw_types=[R_OBJECT, R_INT, R_FLOAT, R_CATEGORY],
+            )
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
 
     def _fit(self,
              X_train: pd.DataFrame, y_train: pd.Series,
