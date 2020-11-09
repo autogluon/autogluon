@@ -166,6 +166,7 @@ class DefaultLearner(AbstractLearner):
             if X_val is not None:
                 X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
         print('Inside Default Learner:')
+        original_feature_columns = X.columns
         print('X=', X)
         print('y=', y)
         ch = input()
@@ -193,6 +194,10 @@ class DefaultLearner(AbstractLearner):
                 X = self.feature_generator.fit_transform(X)
         print('After feature generator:')
         print('X=', X)
+        for col in original_feature_columns:
+            if col not in X.columns:
+                print(f'col{col} not in columns!')
+        ch = input()
         return X, y, X_val, y_val, holdout_frac, num_bagging_folds
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
