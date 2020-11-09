@@ -62,6 +62,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             self._post_generators = [CategoryMemoryMinimizeFeatureGenerator(inplace=True)] + self._post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
+        print('self._stateful_categories=', self._stateful_categories)
         if self._stateful_categories:
             X_out, self.category_map = self._generate_category_map(X=X)
         else:
