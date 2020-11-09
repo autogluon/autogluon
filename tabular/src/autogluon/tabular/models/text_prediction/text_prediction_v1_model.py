@@ -67,7 +67,8 @@ class TextPredictionV1Model(AbstractModel):
                          feature_metadata=feature_metadata, debug=debug, **kwargs)
 
     def _build_model(self):
-        self.model = text_models.basic_v1.BertForTextPredictionBasic()
+        pass
+        self.model = BertForTextPredictionBasic()
 
     def _predict_proba(self, X, **kwargs):
         """Predict the probability from the model.
