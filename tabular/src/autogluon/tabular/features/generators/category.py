@@ -83,6 +83,8 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         )
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:
+        print('Line 86, self.features_in=', self.features_in)
+        ch = input()
         if self.features_in:
             X_category = X.astype('category')
             if self.category_map is not None:
