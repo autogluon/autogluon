@@ -103,6 +103,8 @@ class TextPredictionV1Model(AbstractModel):
             # Return the probability that the label is 1 (True)
             return y_pred_proba[:, 1]
 
+
+
     def _fit(self,
              X_train: pd.DataFrame, y_train: pd.Series,
              X_val: Optional[pd.DataFrame] = None, y_val: Optional[pd.Series] = None,
@@ -127,10 +129,15 @@ class TextPredictionV1Model(AbstractModel):
         """
         # kwargs may contain: num_cpus, num_gpus
         print('kwargs=', kwargs)
+        print('Before preprocess, X_train=', X_train)
+        ch = input()
         X_train = self.preprocess(X_train)
         print('X_train=', X_train)
+        ch = input()
         print('y_train=', y_train)
+        ch = input()
         print('X_val=', X_val)
+        ch = input()
         print('y_val=', y_val)
         ch = input()
         self._build_model()
