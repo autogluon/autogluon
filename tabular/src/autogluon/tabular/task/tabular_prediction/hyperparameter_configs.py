@@ -26,7 +26,7 @@ hyperparameter_config_dict = dict(
             {'weights': 'uniform', 'AG_args': {'name_suffix': 'Unif'}},
             {'weights': 'distance', 'AG_args': {'name_suffix': 'Dist'}},
         ],
-        'TEXT_V1': {},
+        'TEXT_NN_V1': {},
         'custom': ['GBM'],
     },
     # Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
