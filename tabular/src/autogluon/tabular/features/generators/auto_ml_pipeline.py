@@ -62,7 +62,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     >>>
     >>> X_test_transformed = feature_generator.transform(test_data)
     """
-    def __init__(self, enable_numeric_features=True, enable_categorical_features=True, enable_datetime_features=True,
+    def __init__(self, enable_numeric_features=True, enable_categorical_features=True,
+                 enable_datetime_features=True,
                  enable_text_special_features=True, enable_text_ngram_features=True,
                  enable_raw_text_feature=True, vectorizer=None, **kwargs):
         if 'generators' in kwargs:
