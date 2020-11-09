@@ -8,8 +8,7 @@ from ...features.feature_metadata import FeatureMetadata
 
 # Import autogluon text specific dependencies
 try:
-    import autogluon.text
-    from autogluon.text.models.basic_v1 import BertForTextPredictionBasic
+    from autogluon.text.text_prediction.models.basic_v1 import BertForTextPredictionBasic
 except ImportError:
     raise ImportError('autogluon.text has not been installed. '
                       'You may try to install "autogluon.text" first by running. '
@@ -19,11 +18,20 @@ except ImportError:
 class TextPredictionV1Model(AbstractModel):
     def __init__(self, path: str, name: str, problem_type: str,
                  eval_metric: Union[str, metrics.Scorer] = None,
-                 num_classes=None, stopping_metric=None, model=None,
+                 num_classes=None,
+                 stopping_metric: Optional[metrics.Scorer] = None,
+                 model=None,
                  hyperparameters=None, features=None,
                  feature_metadata: FeatureMetadata = None,
                  debug=0, **kwargs):
-        """The BertTextPredictionV1Model
+        """The TextPredictionV1Model.
+
+        The features can be a mix of
+        - text column
+        - categorical column
+        - numerical column
+
+        The labels can be categorical or numerical.
 
         Parameters
         ----------
@@ -45,7 +53,7 @@ class TextPredictionV1Model(AbstractModel):
         hyperparameters
             The hyperparameters of the model
         features
-            The features.
+            Names of the features.
         feature_metadata
             The feature metadata.
         debug
@@ -59,7 +67,7 @@ class TextPredictionV1Model(AbstractModel):
                          feature_metadata=feature_metadata, debug=debug, **kwargs)
 
     def _build_model(self):
-        pass
+        self.model = text_models.basic_v1.BertForTextPredictionBasic()
 
     def _predict_proba(self, X, **kwargs):
         """Predict the probability from the model.
@@ -91,6 +99,7 @@ class TextPredictionV1Model(AbstractModel):
         elif y_pred_proba.shape[1] > 2:
             return y_pred_proba
         else:
+            # Return the probability that the label is 1 (True)
             return y_pred_proba[:, 1]
 
     def _fit(self,
@@ -117,4 +126,5 @@ class TextPredictionV1Model(AbstractModel):
         """
         # kwargs may contain: num_cpus, num_gpus
         X_train = self.preprocess(X_train)
+        self._build_model()
         self.model = self.model.fit(X_train, y_train)
