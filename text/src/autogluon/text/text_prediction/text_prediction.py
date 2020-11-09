@@ -21,6 +21,7 @@ from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count, default_holdout_frac
 from autogluon.core.utils.miscs import verbosity2loglevel
 
+
 __all__ = ['TextPrediction', 'ag_text_prediction_params']
 
 logger = logging.getLogger()  # return root logger

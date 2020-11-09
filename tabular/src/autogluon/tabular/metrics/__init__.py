@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import sklearn.metrics
 from sklearn.utils.multiclass import type_of_target
-
+import scipy.stats
 from . import classification_metrics, softclass_metrics
 from .util import sanitize_array
 from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
@@ -231,6 +231,16 @@ median_absolute_error = make_scorer('median_absolute_error',
                                     sklearn.metrics.median_absolute_error,
                                     optimum=0,
                                     greater_is_better=False)
+spearmanr = make_scorer('spearmanr',
+                        lambda predictions, ground_truth:
+                        float(scipy.stats.spearmanr(ground_truth, predictions)[0]),
+                        optimum=1.0,
+                        greater_is_better=True)
+pearsonr = make_scorer('pearsonr',
+                       lambda predictions, ground_truth:
+                       float(scipy.stats.pearsonr(ground_truth, predictions)[0]),
+                       optimum=1.0,
+                       greater_is_better=True)
 
 
 def rmse_func(predictions, targets):
@@ -285,7 +295,8 @@ soft_log_loss = make_scorer('soft_log_loss', softclass_metrics.soft_log_loss,
 
 REGRESSION_METRICS = {
     scorer.name: scorer
-    for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error, median_absolute_error]
+    for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
+                   median_absolute_error, spearmanr, pearsonr]
 }
 
 CLASSIFICATION_METRICS = {

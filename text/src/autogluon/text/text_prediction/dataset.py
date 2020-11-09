@@ -119,7 +119,7 @@ def is_categorical_column(data: pd.Series,
 
 def get_column_properties(
         df: 'DataFrame',
-        label_columns: Union[str, List[str]],
+        label_columns: Optional[Union[str, List[str]]],
         metadata: Optional[Dict] = None,
         provided_column_properties: Optional[Dict] = None,
         categorical_default_handle_missing_value: bool = True) -> collections.OrderedDict:
@@ -133,11 +133,11 @@ def get_column_properties(
         The chosen column names of the table
     metadata
         The additional metadata object to help specify the column types
-        {'col_name': {'type':
+        {'col_name': {'type': type_string}}
     provided_column_properties
         The column properties provided.
         For example, these can be the column properties of the training set and you provide this
-        to help inference the column properties of the dev/test set.
+        to help infer the column properties of the dev/test set.
     categorical_default_handle_missing_value
         Whether to handle missing values for categorical columns by default
 
