@@ -249,6 +249,8 @@ balanced_accuracy = make_scorer('balanced_accuracy',
                                 classification_metrics.balanced_accuracy)
 f1 = make_scorer('f1',
                  sklearn.metrics.f1_score)
+mcc = make_scorer('mcc', sklearn.metrics.matthews_corrcoef)
+
 
 # Score functions that need decision values
 roc_auc = make_scorer('roc_auc',
@@ -288,7 +290,7 @@ REGRESSION_METRICS = {
 
 CLASSIFICATION_METRICS = {
     scorer.name: scorer
-    for scorer in [accuracy, balanced_accuracy, roc_auc, average_precision, log_loss, pac_score]
+    for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, average_precision, log_loss, pac_score]
 }
 
 for name, metric in [('precision', sklearn.metrics.precision_score),
