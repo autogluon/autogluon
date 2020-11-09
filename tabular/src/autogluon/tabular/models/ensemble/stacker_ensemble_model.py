@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.utils.utils import generate_kfold
 from autogluon.core.constants import MULTICLASS
 
@@ -147,6 +148,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     # TODO: Currently double disk usage, saving model in HPO and also saving model in stacker
     def hyperparameter_tune(self, X, y, k_fold, scheduler_options=None, compute_base_preds=True, **kwargs):
+        force_forkserver()
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 

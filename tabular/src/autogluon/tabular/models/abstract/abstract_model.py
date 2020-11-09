@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import psutil
 
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.utils import shuffle_df_rows
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from autogluon.core.utils.loaders import load_pkl
@@ -572,6 +573,7 @@ class AbstractModel:
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
+        force_forkserver()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         self._set_default_searchspace()
         params_copy = self.params.copy()
