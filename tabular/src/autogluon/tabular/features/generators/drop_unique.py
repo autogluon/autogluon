@@ -16,6 +16,7 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
         self.max_unique_ratio = max_unique_ratio
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
+        print('In DropUniqueFeatureGenerator, X=', X)
         features_to_drop = self._drop_unique_features(X, self.feature_metadata_in, max_unique_ratio=self.max_unique_ratio)
         self._remove_features_in(features_to_drop)
         X_out = X[self.features_in]
