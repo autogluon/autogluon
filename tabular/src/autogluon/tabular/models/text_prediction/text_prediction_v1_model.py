@@ -112,6 +112,7 @@ class TextPredictionV1Model(AbstractModel):
                                         stopping_metric=self.stopping_metric)
         search_space = hyperparameters['models']['BertForTextPredictionBasic']['search_space']
         print('output_directory=', os.path.join(self.path, self.name))
+        ch = input()
         self.model = BertForTextPredictionBasic(column_properties=column_properties,
                                                 feature_columns=list(X_train.columns),
                                                 label_columns=[self._label_column_name],
