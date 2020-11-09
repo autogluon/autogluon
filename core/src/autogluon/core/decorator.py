@@ -7,6 +7,7 @@ import numpy as np
 import multiprocessing as mp
 import ConfigSpace as CS
 
+from . import space
 from .space import *
 from .space import _add_hp, _add_cs, _rm_hp, _strip_config_space, SPLITTER
 from .utils import EasyDict as ezdict
