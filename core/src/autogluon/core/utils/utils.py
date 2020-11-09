@@ -1,4 +1,5 @@
-__all__ = ['generate_kfold', 'setup_outputdir', 'setup_compute',
+__all__ = ['get_cpu_count', 'get_gpu_count',
+           'generate_kfold', 'setup_outputdir', 'setup_compute',
            'setup_trial_limits', 'dd_list', 'get_leaderboard_pareto_frontier',
            'shuffle_df_rows', 'normalize_binary_probas', 'normalize_multi_probas',
            'default_holdout_frac', 'augment_rare_classes']
@@ -15,6 +16,18 @@ from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, Repea
 from ..scheduler.resource.resource import get_cpu_count, get_gpu_count
 
 logger = logging.getLogger(__name__)
+
+
+def get_cpu_count():
+    return multiprocessing.cpu_count()
+
+
+def get_gpu_count():
+    from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
+    if not cudaInit(): return 0
+    gpu_count = cudaDeviceGetCount()
+    cudaShutdown()
+    return gpu_count
 
 
 def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_repeats=1):
