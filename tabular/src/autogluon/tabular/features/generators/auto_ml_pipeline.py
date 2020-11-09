@@ -6,7 +6,7 @@ from .datetime import DatetimeFeatureGenerator
 from .identity import IdentityFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
-from ..feature_metadata import R_INT, R_FLOAT
+from ..feature_metadata import R_INT, R_FLOAT, R_OBJECT
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     def _get_default_generators(self, vectorizer=None):
         generator_group = []
         if self.enable_numeric_features:
-            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])))
+            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
+                valid_raw_types=[R_INT, R_FLOAT, R_OBJECT])))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
         if self.enable_datetime_features:
