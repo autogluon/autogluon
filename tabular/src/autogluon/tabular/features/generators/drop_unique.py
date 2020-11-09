@@ -40,9 +40,12 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
         max_unique_value_count = X_len * max_unique_ratio
         for column in X:
             unique_value_count = len(X[column].unique())
+            # Drop features that are always the same
             if unique_value_count == 1:
                 features_to_drop.append(column)
-            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT] and (unique_value_count > max_unique_value_count):
+            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT]\
+                    and (unique_value_count > max_unique_value_count):
+                print(feature_metadata.get_feature_types_special(column))
                 features_to_drop.append(column)
         return features_to_drop
 
