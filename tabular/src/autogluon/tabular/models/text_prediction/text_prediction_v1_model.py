@@ -126,6 +126,7 @@ class TextPredictionV1Model(AbstractModel):
 
         """
         # kwargs may contain: num_cpus, num_gpus
+        print('kwargs=', kwargs)
         X_train = self.preprocess(X_train)
         print('X_train=', X_train)
         print('y_train=', y_train)
