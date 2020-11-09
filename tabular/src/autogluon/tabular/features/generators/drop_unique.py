@@ -45,8 +45,11 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
                 features_to_drop.append(column)
             elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT]\
                     and (unique_value_count > max_unique_value_count):
-                print(feature_metadata.get_feature_types_special(column))
-                features_to_drop.append(column)
+                if 'text' in feature_metadata.get_feature_types_special(column):
+                    # We should not drop a text column
+                    continue
+                else:
+                    features_to_drop.append(column)
         return features_to_drop
 
     def _more_tags(self):
