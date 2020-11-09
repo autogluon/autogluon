@@ -3,6 +3,7 @@ from typing import Union, Optional
 import collections
 import logging
 import pandas as pd
+import os
 from ...constants import BINARY, REGRESSION
 from ..abstract.abstract_model import AbstractModel
 from ... import metrics
@@ -117,6 +118,7 @@ class TextPredictionV1Model(AbstractModel):
                                                 label_shapes=[label_shape],
                                                 stopping_metric=stopping_metric,
                                                 log_metrics=log_metrics,
+                                                output_directory=os.path.join(self.path, self.name),
                                                 logger=logger,
                                                 base_config=None,
                                                 search_space=search_space)

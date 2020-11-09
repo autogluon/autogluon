@@ -573,6 +573,8 @@ class BertForTextPredictionBasic:
         self._base_config.defrost()
         if output_directory is not None:
             self._base_config.misc.exp_dir = output_directory
+        else:
+            output_directory = self._base_config.misc.exp_dir
         self._base_config.misc.exp_dir = os.path.abspath(self._base_config.misc.exp_dir)
         self._base_config.freeze()
         if search_space is None:
