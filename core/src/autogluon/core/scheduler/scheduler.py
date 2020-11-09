@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
-from .. import Task
+from ..task.task import Task
 from .reporter import *
 from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
 
