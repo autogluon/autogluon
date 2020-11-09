@@ -100,10 +100,10 @@ class TextPredictionV1Model(AbstractModel):
             label_columns=None,
             provided_column_properties=None
         )
-        problem_type, label_shape = infer_problem_type(column_properties=feature_column_properties,
-                                                       label_col_name=self._label_column_name)
         column_properties = collections.OrderedDict(list(feature_column_properties.items()) +
                                                     list(label_column_property.items()))
+        problem_type, label_shape = infer_problem_type(column_properties=column_properties,
+                                                       label_col_name=self._label_column_name)
         eval_metric, stopping_metric, log_metrics =\
             infer_eval_stop_log_metrics(problem_type,
                                         label_shape=label_shape,
