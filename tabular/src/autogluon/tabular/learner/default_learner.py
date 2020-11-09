@@ -67,8 +67,6 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
-        print('self.feature_generator.feature_metadata=', self.feature_generator.feature_metadata)
-        ch = input()
         X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
         self._time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
@@ -181,9 +179,9 @@ class DefaultLearner(AbstractLearner):
             if self.feature_generator.is_fit():
                 logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
                 X_super = self.feature_generator.transform(X_super)
-                self.feature_generator.print_feature_metadata_info()
             else:
                 X_super = self.feature_generator.fit_transform(X_super)
+            self.feature_generator.print_feature_metadata_info()
             X = X_super.head(len(X)).set_index(X.index)
             X_val = X_super.tail(len(X_val)).set_index(X_val.index)
             del X_super
