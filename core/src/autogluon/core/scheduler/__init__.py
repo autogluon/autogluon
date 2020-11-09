@@ -1,5 +1,4 @@
 from .import remote, resource
-from ..utils import get_cpu_count, get_gpu_count
 
 # schedulers
 from .scheduler import *
