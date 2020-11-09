@@ -99,6 +99,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         ch = input()
         if self.features_in:
             category_map = dict()
+            print('X=', X)
             X_category = X.astype('category')
             for column in X_category:
                 if self.cat_order == 'count' or self._minimum_cat_count is not None or self._maximum_num_cat is not None:
