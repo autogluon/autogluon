@@ -39,7 +39,7 @@ def print_evaluation(period=1, show_stdv=True):
         i = env.iteration
         if i % period == 0 or i + 1 == env.begin_iteration or i + 1 == env.end_iteration:
             msg = '\t'.join([_fmt_metric(x, show_stdv) for x in env.evaluation_result_list])
-            logger.log(20, '[%d]\t%s\n' % (i, msg))
+            logger.log(20, '[%d]\t%s' % (i, msg))
     return callback
 
 
@@ -86,7 +86,7 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
             raise ValueError('For early stopping you need at least one set in evals.')
         if len(env.evaluation_result_list) > 1 and verbose:
             msg = ("Multiple eval metrics have been passed: "
-                   "'{0}' will be used for early stopping.\n\n")
+                   "'{0}' will be used for early stopping.")
             logger.log(20, msg.format(env.evaluation_result_list[-1][0]))
         maximize_metrics = ('auc', 'aucpr', 'map', 'ndcg')
         maximize_at_n_metrics = ('auc@', 'aucpr@', 'map@', 'ndcg@')
@@ -101,7 +101,7 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
             maximize_score = True
 
         if verbose and env.rank == 0:
-            msg = "Will train until {} hasn't improved in {} rounds.\n"
+            msg = "Will train until {} hasn't improved in {} rounds."
             logger.log(20, msg.format(metric_label, stopping_rounds))
 
         state['maximize_score'] = maximize_score
@@ -151,7 +151,7 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
         elif env.iteration - best_iteration >= stopping_rounds:
             best_msg = state['best_msg']
             if verbose and env.rank == 0:
-                msg = "Stopping. Best iteration:\n{}\n\n"
+                msg = "Stopping. Best iteration: {}"
                 logger.log(15, msg.format(best_msg))
             raise EarlyStopException(best_iteration)
 
@@ -165,20 +165,20 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
 
             model_size_memory_ratio = estimated_model_size_mb / available_mb
             if verbose and (model_size_memory_ratio > 0.25):
-                logger.debug(15, f'Available Memory: {available_mb} MB\n')
-                logger.debug(15, f'Estimated XGB model size: {estimated_model_size_mb} MB\n')
+                logger.debug(15, f'Available Memory: {available_mb} MB')
+                logger.debug(15, f'Estimated XGB model size: {estimated_model_size_mb} MB')
 
             early_stop = False
             if (model_size_memory_ratio > 1.0) or (available_mb < 512):
-                logger.warning('Warning: Large XGB model size may cause OOM error if training continues\n')
-                logger.warning(f'Available Memory: {available_mb} MB\n')
-                logger.warning(f'Estimated XGB model size: {estimated_model_size_mb} MB\n')
+                logger.warning('Warning: Large XGB model size may cause OOM error if training continues')
+                logger.warning(f'Available Memory: {available_mb} MB')
+                logger.warning(f'Estimated XGB model size: {estimated_model_size_mb} MB')
                 early_stop = True
             
             if early_stop:
                 if verbose and env.rank == 0:
                     logger.warning(f'Warning: Early stopped GBM model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.\n')
-                    logger.warning(f'Early stopping. best iteration is:\n[{best_iteration}]\t{best_score}')
+                    logger.warning(f'Early stopping. best iteration is: [{best_iteration}]\t{best_score}')
                 raise EarlyStopException(best_iteration)
         
         if time_limit:
@@ -186,7 +186,7 @@ def early_stop_custom(stopping_rounds, start_time=None, time_limit=None, maximiz
             time_left = time_limit - time_elapsed
             if time_left <= 0:
                 if verbose and env.rank == 0:
-                    logger.log(20, f"Ran out of time, early stopping on iteration {env.iteration}. Best iteration is:\n\t[{best_iteration}]\t{best_score}")
+                    logger.log(20, f"Ran out of time, early stopping on iteration {env.iteration}. Best iteration is: \t[{best_iteration}]\t{best_score}")
                     logger.log(20, state['best_msg'])
                 raise EarlyStopException(best_iteration)
 
