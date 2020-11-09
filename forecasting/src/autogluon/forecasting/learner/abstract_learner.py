@@ -1,4 +1,4 @@
-from ..models.mqcnn.mqcnn_model import MQCNNModel
+from ..models.gluonts_model.mqcnn.mqcnn_model import MQCNNModel
 
 
 class AbstractLearner:

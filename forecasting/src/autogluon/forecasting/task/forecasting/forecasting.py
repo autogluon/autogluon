@@ -1,7 +1,7 @@
 from autogluon.task.base.base_task import BaseTask
 from .dataset import TimeSeriesDataset
 
-from ...utils.ml.learner.abstract_learner import AbstractLearner
+from ...learner.abstract_learner import AbstractLearner
 
 from .predictor import ForecastingPredictor
 

@@ -135,8 +135,8 @@ class TimeSeriesDataset:
             except:
                 dataset = get_dataset(dataset_name, regenerate=True)
             self.is_train = True
-            self.train_ds = dataset.train
-            self.test_ds = dataset.test
+            self.train_data = dataset.train
+            self.test_data = dataset.test
             self.freq = dataset.metadata.freq
             self.prediction_length = dataset.metadata.prediction_length
         else:
@@ -158,24 +158,24 @@ class TimeSeriesDataset:
                                                   time_column=time_column,
                                                   target_column=target_column)
 
-                self.train_ds, freq = transform_tabular_to_gluonts_dataset(X=train_csv,
-                                                                           freq=freq,
-                                                                           index_column=index_column)
+                self.train_data, freq = transform_tabular_to_gluonts_dataset(X=train_csv,
+                                                                             freq=freq,
+                                                                             index_column=index_column)
 
-                self.test_ds, _ = transform_tabular_to_gluonts_dataset(X=test_csv,
-                                                                       freq=freq,
-                                                                       index_column=index_column)
+                self.test_data, _ = transform_tabular_to_gluonts_dataset(X=test_csv,
+                                                                         freq=freq,
+                                                                         index_column=index_column)
 
                 self.freq = freq
                 self.prediction_length = prediction_length if prediction_length is not None \
-                    else len(list(self.test_ds)[0]["target"]) - len(list(self.train_ds)[0]["target"])
+                    else len(list(self.test_data)[0]["target"]) - len(list(self.train_data)[0]["target"])
             else:
-                self.train_ds, freq = transform_tabular_to_gluonts_dataset(X=train_csv,
-                                                                           freq=freq,
-                                                                           index_column=index_column)
+                self.train_data, freq = transform_tabular_to_gluonts_dataset(X=train_csv,
+                                                                             freq=freq,
+                                                                             index_column=index_column)
                 self.freq = freq
                 self.prediction_length = prediction_length
-                self.test_ds = None
+                self.test_data = None
 
     def train_test_split(self, ds, prediction_length):
 
