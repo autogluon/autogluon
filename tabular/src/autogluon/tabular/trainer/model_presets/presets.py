@@ -19,15 +19,8 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
+from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 
-# Install AutoGluon Text Specific models
-try:
-    from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
-    ag_text_enabled = True
-except ImportError:
-    ag_text_enabled = False
-    warnings.warn('autogluon.text has not been installed. For a better experience on a mixture of '
-                  'text + tabular-like data, run `python3 -m pip install autogluno.text`.')
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +33,11 @@ DEFAULT_MODEL_PRIORITY = dict(
     CAT=60,
     NN=50,
     FASTAI=45,
+    TEXT_NN_V1=42,
     LR=40,
     custom=0,
 )
 
-if ag_text_enabled:
-    DEFAULT_MODEL_PRIORITY['TEXT_NN_V1'] = 42
 
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
 PROBLEM_TYPE_MODEL_PRIORITY = {
@@ -75,10 +67,8 @@ MODEL_TYPES = dict(
     NN=TabularNeuralNetModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
+    TEXT_NN_V1=TextPredictionV1Model,
 )
-
-if ag_text_enabled:
-    MODEL_TYPES['TEXT_NN_V1'] = TextPredictionV1Model
 
 DEFAULT_MODEL_NAMES = {
     RFModel: 'RandomForest',
@@ -89,10 +79,8 @@ DEFAULT_MODEL_NAMES = {
     TabularNeuralNetModel: 'NeuralNet',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'FastAINeuralNet',
+    TextPredictionV1Model: 'TextNeuralNetV1',
 }
-
-if ag_text_enabled:
-    DEFAULT_MODEL_NAMES[TextPredictionV1Model] = 'TextNeuralNetV1'
 
 
 def _dd_classifier():

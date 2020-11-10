@@ -12,20 +12,12 @@ from ...features.feature_metadata import FeatureMetadata, R_OBJECT, R_INT, R_FLO
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 
 
-# Import autogluon text specific dependencies
-try:
-    from autogluon.text.text_prediction.text_prediction\
-        import ag_text_prediction_params, merge_params, get_column_properties,\
-        infer_problem_type, infer_eval_stop_log_metrics
-    from autogluon.text.text_prediction.dataset import TabularDataset
-    from autogluon.text.text_prediction.models.basic_v1 import BertForTextPredictionBasic
-except ImportError:
-    raise ImportError('autogluon.text has not been installed. '
-                      'You may try to install "autogluon.text" first by running. '
-                      '`python3 -m pip install autogluon.text`')
-
-
 logger = logging.getLogger(__name__)
+
+
+AG_TEXT_IMPORT_ERROR = 'autogluon.text has not been installed. ' \
+                       'You may try to install "autogluon.text" first by running. ' \
+                       '`python3 -m pip install autogluon.text`'
 
 
 class TextPredictionV1Model(AbstractModel):
@@ -81,6 +73,14 @@ class TextPredictionV1Model(AbstractModel):
         self._label_column_name = None
 
     def _build_model(self, X_train, y_train, X_val, y_val, hyperparameters):
+        try:
+            from autogluon.text.text_prediction.text_prediction \
+                import ag_text_prediction_params, merge_params, get_column_properties, \
+                infer_problem_type, infer_eval_stop_log_metrics
+            from autogluon.text.text_prediction.models.basic_v1 import BertForTextPredictionBasic
+        except ImportError:
+            raise ImportError(AG_TEXT_IMPORT_ERROR)
+
         # Decide the name of the label column
         if 'label' in X_train.columns:
             label_col_id = 0
@@ -172,6 +172,11 @@ class TextPredictionV1Model(AbstractModel):
         return default_auxiliary_params
 
     def _set_default_params(self):
+        try:
+            from autogluon.text.text_prediction.dataset import TabularDataset
+            from autogluon.text.text_prediction.text_prediction import ag_text_prediction_params
+        except ImportError:
+            raise ImportError(AG_TEXT_IMPORT_ERROR)
         self.params = ag_text_prediction_params.create('default')
 
     def _fit(self,
@@ -197,11 +202,15 @@ class TextPredictionV1Model(AbstractModel):
             Other keyword arguments
 
         """
+        try:
+            from autogluon.text.text_prediction.dataset import TabularDataset
+        except ImportError:
+            raise ImportError(AG_TEXT_IMPORT_ERROR)
+
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus')
         num_gpus = kwargs.get('num_gpus')
-        print(self.params)
         column_properties = self._build_model(X_train=X_train,
                                               y_train=y_train,
                                               X_val=X_val,
@@ -249,5 +258,10 @@ class TextPredictionV1Model(AbstractModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
+        try:
+            from autogluon.text.text_prediction.dataset import TabularDataset
+            from autogluon.text.text_prediction.models.basic_v1 import BertForTextPredictionBasic
+        except ImportError:
+            raise ImportError(AG_TEXT_IMPORT_ERROR)
         logger.log(15, f'Load from {path}.')
         cls.model = BertForTextPredictionBasic.load(path)
