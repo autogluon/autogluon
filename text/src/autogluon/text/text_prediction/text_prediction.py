@@ -350,14 +350,10 @@ class TextPrediction(BaseTask):
             label_columns=label_columns,
             provided_column_properties=None,
             categorical_default_handle_missing_value=True)
-        # Before Parse to TabularDataset
-        print('Before parse to TabularDataset:',
-              train_data['label'].astype('category').cat.categories)
+
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)
-        print('After parse to TabularDataset:',
-              train_data.table['label'].astype('category').cat.categories)
         tuning_data = TabularDataset(tuning_data,
                                      column_properties=train_data.column_properties,
                                      label_columns=label_columns)
