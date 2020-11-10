@@ -17,16 +17,17 @@ test_hyperparameters = {
 }
 
 
-def verify_predictor_save_load(predictor, df):
+def verify_predictor_save_load(predictor, df, verify_proba=False):
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
         predictions = predictor.predict(df)
-        predictions_prob = predictor.predict_proba(df)
         loaded_predictor = task.load(root)
         predictions2 = loaded_predictor.predict(df)
-        predictions2_prob = loaded_predictor.predict_proba(df)
         npt.assert_allclose(predictions, predictions2, 1E-4, 1E-4)
-        npt.assert_allclose(predictions_prob, predictions2_prob, 1E-4, 1E-4)
+        if verify_proba:
+            predictions_prob = predictor.predict_proba(df)
+            predictions2_prob = loaded_predictor.predict_proba(df)
+            npt.assert_allclose(predictions_prob, predictions2_prob, 1E-4, 1E-4)
 
 
 def test_sst():
@@ -47,7 +48,7 @@ def test_sst():
                          plot_results=False)
     predictor.cuda()
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
-    verify_predictor_save_load(predictor, dev_data)
+    verify_predictor_save_load(predictor, dev_data, verify_proba=True)
 
 
 def test_mrpc():
@@ -68,7 +69,7 @@ def test_mrpc():
                          plot_results=False)
     predictor.cuda()
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
-    verify_predictor_save_load(predictor, dev_data)
+    verify_predictor_save_load(predictor, dev_data, verify_proba=True)
 
 
 def test_sts():
@@ -179,7 +180,7 @@ def test_mixed_column_type():
                           output_directory='./sts_genre',
                           plot_results=False)
     dev_rmse = predictor2.evaluate(dev_data, metrics=['acc'])
-    verify_predictor_save_load(predictor2, dev_data)
+    verify_predictor_save_load(predictor2, dev_data, verify_proba=True)
 
     # Specify the feature column
     predictor3 = task.fit(train_data,
