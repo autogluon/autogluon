@@ -173,6 +173,9 @@ class TextPredictionV1Model(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
+    def _set_default_params(self):
+        self.params = ag_text_prediction_params.create('default')
+
     def _fit(self,
              X_train: pd.DataFrame, y_train: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
@@ -200,24 +203,17 @@ class TextPredictionV1Model(AbstractModel):
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus')
         num_gpus = kwargs.get('num_gpus')
-        hyperparameters = None
-        if hyperparameters is None:
-            hyperparameters = ag_text_prediction_params.create('default')
-        elif isinstance(hyperparameters, str):
-            hyperparameters = ag_text_prediction_params.create(hyperparameters)
-        else:
-            base_params = ag_text_prediction_params.create('default')
-            hyperparameters = merge_params(base_params, hyperparameters)
+        print(self.params)
         column_properties = self._build_model(X_train=X_train,
-                          y_train=y_train,
-                          X_val=X_val,
-                          y_val=y_val,
-                          hyperparameters=hyperparameters)
+                                              y_train=y_train,
+                                              X_val=X_val,
+                                              y_val=y_val,
+                                              hyperparameters=self.params)
         # Insert the label column
         X_train.insert(len(X_train.columns), self._label_column_name, y_train)
         X_val.insert(len(X_val.columns), self._label_column_name, y_val)
-        scheduler_options = hyperparameters['hpo_params']['scheduler_options']
-        search_strategy = hyperparameters['hpo_params']['search_strategy']
+        scheduler_options = self.params['hpo_params']['scheduler_options']
+        search_strategy = self.params['hpo_params']['search_strategy']
         if scheduler_options is None:
             scheduler_options = dict()
         if search_strategy.endswith('hyperband'):
@@ -240,9 +236,9 @@ class TextPredictionV1Model(AbstractModel):
                                    'num_gpus': num_gpus},
                          time_limits=time_limit,
                          search_strategy=search_strategy,
-                         search_options=hyperparameters['hpo_params']['search_options'],
+                         search_options=self.params['hpo_params']['search_options'],
                          scheduler_options=scheduler_options,
-                         num_trials=hyperparameters['hpo_params']['num_trials'],
+                         num_trials=self.params['hpo_params']['num_trials'],
                          console_log=verbosity >= 2,
                          ignore_warning=verbosity < 2)
 
