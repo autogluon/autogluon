@@ -25,6 +25,7 @@ from .. import constants as _C
 from autogluon.core import args, space
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
+from autogluon.tabular.metrics import get_metric
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
@@ -201,85 +202,6 @@ def mobile_bert():
     return cfg
 
 
-def calculate_metric_scores(metrics, predictions, gt_labels,
-                            pos_label=1):
-    """
-
-    Parameters
-    ----------
-    metrics
-        A list of metric names
-    predictions
-    gt_labels
-    pos_label
-
-    Returns
-    -------
-    metric_scores
-        A dictionary contains key --> metric scores
-    """
-    if isinstance(metrics, str):
-        metrics = [metrics]
-    metric_scores = collections.OrderedDict()
-    for metric_name in metrics:
-        if metric_name == 'acc':
-            metric_scores[metric_name] = float(accuracy_score(gt_labels,
-                                                              predictions.argmax(axis=-1)))
-        elif metric_name == 'f1':
-            metric_scores[metric_name] = float(f1_score(gt_labels,
-                                                        predictions.argmax(axis=-1),
-                                                        pos_label=pos_label))
-        elif metric_name == 'mcc':
-            metric_scores[metric_name] = float(matthews_corrcoef(gt_labels,
-                                                                 predictions.argmax(axis=-1)))
-        elif metric_name == 'auc':
-            metric_scores[metric_name] = float(roc_auc_score(gt_labels, predictions[:, pos_label]))
-        elif metric_name == 'nll':
-            metric_scores[metric_name]\
-                = float(- np.log(predictions[np.arange(gt_labels.shape[0]), gt_labels]).mean())
-        elif metric_name == 'pearsonr':
-            metric_scores[metric_name] = float(pearsonr(gt_labels, predictions)[0])
-        elif metric_name == 'spearmanr':
-            metric_scores[metric_name] = float(spearmanr(gt_labels, predictions)[0])
-        elif metric_name == 'mse':
-            metric_scores[metric_name] = float(np.square(predictions - gt_labels).mean())
-        elif metric_name == 'rmse':
-            metric_scores[metric_name] = float(np.sqrt(np.square(predictions - gt_labels).mean()))
-        elif metric_name == 'mae':
-            metric_scores[metric_name] = float(np.abs(predictions - gt_labels).mean())
-        else:
-            raise ValueError('Unknown metric = {}'.format(metric_name))
-    metric_scores = collections.OrderedDict(
-        [(k, v.item() if isinstance(v, np.ndarray) else v)
-         for k, v in metric_scores.items()])
-    return metric_scores
-
-
-def is_better_score(metric_name, baseline, new_score):
-    """Whether the new score is better than the baseline
-
-    Parameters
-    ----------
-    metric_name
-        Name of the metric
-    baseline
-        The baseline score
-    new_score
-        The new score
-
-    Returns
-    -------
-    ret
-        Whether the new score is better than the baseline
-    """
-    if metric_name in ['acc', 'f1', 'mcc', 'auc', 'pearsonr', 'spearmanr']:
-        return new_score > baseline
-    elif metric_name in ['mse', 'rmse', 'mae']:
-        return new_score < baseline
-    else:
-        raise NotImplementedError
-
-
 @use_np
 def _classification_regression_predict(net, dataloader, problem_type, has_label=True):
     """
@@ -328,6 +250,12 @@ def train_function(args, reporter, train_data, tuning_data,
                    log_metrics, stopping_metric, console_log,
                    ignore_warning=False):
     import os
+    # Get the log metric scorers
+    if isinstance(log_metrics, str):
+        log_metrics = [log_metrics]
+    log_metric_scorers = [get_metric(ele) for ele in log_metrics]
+    stopping_metric_scorer = get_metric(stopping_metric)
+    stopping_metric_greater_is_better = stopping_metric_scorer._sign > 0
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['OMP_NUM_THREADS'] = '1'
     os.environ['MKL_DYNAMIC'] = 'FALSE'
@@ -488,29 +416,33 @@ def train_function(args, reporter, train_data, tuning_data,
                 _classification_regression_predict(net, dataloader=dev_dataloader,
                                                    problem_type=problem_types[0],
                                                    has_label=False)
-            metric_scores = calculate_metric_scores(log_metrics,
-                                                    predictions=dev_predictions,
-                                                    gt_labels=gt_dev_labels)
-            performance_score = calculate_metric_by_expr(
-                {label_columns[0]: metric_scores},
-                [label_columns[0]],
-                stopping_metric
-            )
+            log_scores = [scorer(gt_dev_labels, dev_predictions)
+                          for scorer in log_metric_scorers]
+            dev_score = stopping_metric_scorer(gt_dev_labels, dev_predictions)
             valid_time_spent = time.time() - valid_start_tick
-            if best_performance_score is None or is_better_score(stopping_metric,
-                                                                 best_performance_score,
-                                                                 performance_score):
-                find_better = True
-                no_better_rounds = 0
-                best_performance_score = performance_score
+            if stopping_metric_greater_is_better:
+                # Greater is better
+                if best_performance_score is None or dev_score >= best_performance_score:
+                    find_better = True
+                    no_better_rounds = 0
+                    best_performance_score = dev_score
+                else:
+                    find_better = False
+                    no_better_rounds += 1
             else:
-                find_better = False
-                no_better_rounds += 1
+                # Smaller is better
+                if best_performance_score is None or dev_score <= best_performance_score:
+                    find_better = True
+                    no_better_rounds = 0
+                    best_performance_score = dev_score
+                else:
+                    find_better = False
+                    no_better_rounds += 1
             if find_better:
                 net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
             mx.npx.waitall()
-            loss_string = ', '.join(['{}={}'.format(key, metric_scores[key])
-                                     for key in log_metrics])
+            loss_string = ', '.join(['{}={}'.format(metric.name, score)
+                                     for score, metric in zip(log_scores, log_metric_scorers)])
             logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={},'
                          ' total_time={:.2f}min'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
@@ -518,17 +450,18 @@ def train_function(args, reporter, train_data, tuning_data,
             report_items = [('iteration', update_idx + 1),
                             ('report_idx', report_idx + 1),
                             ('epoch', int(update_idx / updates_per_epoch))] +\
-                           list(metric_scores.items()) + \
+                           [(score, metric.name)
+                            for score, metric in zip(log_scores, log_metric_scorers)] + \
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
             total_time_spent = time.time() - start_tick
             if time_limits is not None and total_time_spent > time_limits:
                 break
             report_idx += 1
-            if stopping_metric in ['mse', 'mae', 'rmse']:
-                report_items.append(('reward', -performance_score))
+            if stopping_metric_greater_is_better:
+                report_items.append(('reward', dev_score))
             else:
-                report_items.append(('reward', performance_score))
+                report_items.append(('reward', -dev_score))
             report_items.append(('exp_dir', exp_dir))
             reporter(**dict(report_items))
             if no_better_rounds >= cfg.learning.early_stopping_patience:
@@ -765,6 +698,8 @@ class BertForTextPredictionBasic:
             -------
             Dict mapping metric -> score calculated over the given dataset.
         """
+        if isinstance(metrics, str):
+            metrics = [metrics]
         assert self.net is not None
         if not isinstance(valid_data, TabularDataset):
             valid_data = TabularDataset(valid_data,
@@ -776,9 +711,7 @@ class BertForTextPredictionBasic:
             predictions = self.predict_proba(valid_data)
         else:
             predictions = self.predict(valid_data)
-        metric_scores = calculate_metric_scores(metrics=metrics,
-                                                predictions=predictions,
-                                                gt_labels=ground_truth)
+        metric_scores = [get_metric(metric)(ground_truth, predictions) for metric in metrics]
         return metric_scores
 
     def _internal_predict(self, test_data, get_original_labels=True, get_probabilities=False):

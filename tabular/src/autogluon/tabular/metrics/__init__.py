@@ -169,7 +169,7 @@ def scorer_expects_y_pred(scorer: Scorer):
 
 
 def make_scorer(name, score_func, optimum=1, greater_is_better=True,
-                needs_proba=False, needs_threshold=False, **kwargs):
+                needs_proba=False, needs_threshold=False, **kwargs) -> Scorer:
     """Make a scorer from a performance metric or loss function.
 
     Factory inspired by scikit-learn which wraps scikit-learn scoring functions
@@ -286,11 +286,9 @@ pac_score = make_scorer('pac_score',
                         greater_is_better=True,
                         needs_proba=True)
 
-# Score for soft-classisification (with soft, probalistic labels):
+# Score for soft-classification (with soft, probabilistic labels):
 soft_log_loss = make_scorer('soft_log_loss', softclass_metrics.soft_log_loss,
                             greater_is_better=False, needs_proba=True)
-
-# TODO what about mathews correlation coefficient etc?
 
 
 REGRESSION_METRICS = {
@@ -367,7 +365,7 @@ def calculate_score(solution, prediction, task_type, metric,
     return score
 
 
-def get_metric(metric, problem_type, metric_type):
+def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
     if metric is not None and isinstance(metric, str):

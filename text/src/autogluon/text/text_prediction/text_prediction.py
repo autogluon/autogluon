@@ -162,15 +162,16 @@ def infer_eval_stop_log_metrics(problem_type,
         if eval_metric is None:
             eval_metric = 'acc'
         if label_shape == 2:
-            log_metrics = ['f1', 'mcc', 'auc', 'acc', 'nll']
+            log_metrics = ['f1', 'mcc', 'roc_auc', 'acc', 'log_loss']
         else:
-            log_metrics = ['acc', 'nll']
+            log_metrics = ['acc', 'log_loss']
     elif problem_type == _C.REGRESSION:
         if stopping_metric is None:
-            stopping_metric = 'mse'
+            stopping_metric = 'mean_squared_error'
         if eval_metric is None:
-            eval_metric = 'mse'
-        log_metrics = ['mse', 'rmse', 'mae']
+            eval_metric = 'mean_squared_error'
+        log_metrics = ['mean_squared_error',
+                       'mean_absolute_error']
     else:
         raise NotImplementedError('The problem type is not supported yet!')
     for other_log_metric in [stopping_metric, eval_metric]:
