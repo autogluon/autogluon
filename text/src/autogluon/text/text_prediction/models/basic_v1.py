@@ -321,6 +321,7 @@ def train_function(args, reporter, train_data, tuning_data,
                                 cfg=cfg.model.network)
     net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
+    print('net=', net)
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
     logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
                                                            num_total_fixed_params))
