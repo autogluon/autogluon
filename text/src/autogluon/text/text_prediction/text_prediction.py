@@ -93,20 +93,23 @@ def merge_params(base_params, partial_params=None):
 
 
 def get_recommended_resource(nthreads_per_trial=None,
-                             ngpus_per_trial=None):
-    """Get the recommended resource.
+                             ngpus_per_trial=None) -> dict:
+    """Get the recommended resources.
+
+    Internally, we will try to use GPU whenever it's possible. That means, we will use
+    a single GPU for finetuning.
 
     Parameters
     ----------
     nthreads_per_trial
-        The number of threads per trial
+        The number of threads per trial provided by the user.
     ngpus_per_trial
-        The number of GPUs per trial
+        The number of GPUs per trial provided by the user.
 
     Returns
     -------
     resource
-        The resource
+        The recommended resource.
     """
     if nthreads_per_trial is None and ngpus_per_trial is None:
         nthreads_per_trial = get_cpu_count()
