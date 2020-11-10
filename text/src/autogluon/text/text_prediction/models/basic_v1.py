@@ -603,7 +603,7 @@ class BertForTextPredictionBasic:
             search_strategy=search_strategy,
             search_options=search_options,
             nthreads_per_trial=resource['num_cpus'],
-            ngpus_per_trial=1, #resource['num_gpus'],
+            ngpus_per_trial=resource['num_gpus'],
             checkpoint=None,
             num_trials=num_trials,
             time_out=scheduler_options.get('time_out'),

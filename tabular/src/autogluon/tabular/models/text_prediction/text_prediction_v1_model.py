@@ -263,5 +263,6 @@ class TextPredictionV1Model(AbstractModel):
             from autogluon.text.text_prediction.models.basic_v1 import BertForTextPredictionBasic
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
+
         logger.log(15, f'Load from {path}.')
         cls.model = BertForTextPredictionBasic.load(path)
