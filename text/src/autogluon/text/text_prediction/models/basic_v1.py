@@ -246,7 +246,7 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
         if scorer.name == 'roc_auc':
             return scorer(ground_truth, predictions[:, 1])
         else:
-            return scorer(ground_truth, predictions.argmax(axis=-1))
+            return scorer(ground_truth, predictions)
     else:
         return scorer(ground_truth, predictions)
 
