@@ -415,8 +415,6 @@ def train_function(args, reporter, train_data, tuning_data,
                 _classification_regression_predict(net, dataloader=dev_dataloader,
                                                    problem_type=problem_types[0],
                                                    has_label=False)
-            if problem_types[0] == _C.CLASSIFICATION:
-                dev_predictions = dev_predictions.argmax(axis=-1)
             log_scores = [scorer(gt_dev_labels, dev_predictions)
                           for scorer in log_metric_scorers]
             dev_score = stopping_metric_scorer(gt_dev_labels, dev_predictions)
