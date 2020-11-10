@@ -1,3 +1,19 @@
+"""
+In this is example we show how we can optimize the hyperparameters of a simple 2 layer
+feed forward neural networks on MNIST. We optimize the following hyperparameter:
+
+- number of units first layer
+- number of units second layer
+- dropout first layer
+- dropout second layer
+- learning rate of ADAM
+- batch size
+- weight decay
+
+We use pytorch to implement the neural network. To install it follow the steps described here:
+https://pytorch.org/get-started/locally/
+"""
+
 import autogluon.core as ag
 import time
 import logging
@@ -23,7 +39,7 @@ from torchvision import transforms
     wd=ag.space.Real(lower=1e-8, upper=1, log=True),
     epochs=27
 )
-def objective_function(args, reporter, **kwargs):
+def objective_function(args, reporter):
     ts_start = time.time()
 
     # Hyperparameters to be optimized
@@ -35,8 +51,12 @@ def objective_function(args, reporter, **kwargs):
     learning_rate = args.learning_rate
     wd = args.wd
 
-    # Make sure you downloaded the dataset before running AutoGluon. Downloading the data inside the
-    # objective function might lead to crashes of the python process (at least on MAC OS).
+    # Make sure you downloaded the dataset before running AutoGluon. For example in python:
+    # >>> from torchvision import datasets
+    # >>> datasets.MNIST(root='data', train=True, download=True)
+    #
+    # Downloading the data inside the objective function might lead to crashes
+    # of the python process (at least on MAC OS).
     data_train = datasets.MNIST(root='data', train=True,
                                 download=False, transform=transforms.ToTensor())
 
@@ -154,12 +174,12 @@ def callback(training_history, start_timestamp):
 
 # CLI
 def parse_args():
-    parser = argparse.ArgumentParser(description='runs autogluon on autoff benchmarks')
-
+    parser = argparse.ArgumentParser(description='Runs autogluon to optimize '
+                                                 'the hyperparameters of a simple MLP of MNIST ')
     parser.add_argument('--num_trials', default=10, type=int,
-                        help='number of trial tasks')
+                        help='number of trial tasks. It is enough to either set num_trials or timout.')
     parser.add_argument('--timeout', default=1000, type=int,
-                        help='runtime of autogluon in seconds')
+                        help='runtime of autogluon in seconds. It is enough to either set num_trials or timout.')
     parser.add_argument('--num_gpus', type=int, default=0,
                         help='number of GPUs available to a given trial.')
     parser.add_argument('--num_cpus', type=int, default=2,
@@ -172,6 +192,16 @@ def parse_args():
     parser.add_argument('--scheduler', type=str, default='hyperband_promotion',
                         choices=['hyperband_stopping', 'hyperband_promotion'],
                         help='Asynchronous scheduler type. In case of doubt leave it to the default')
+    parser.add_argument('--reduction_factor', type=int, default=3,
+                        help='Reduction factor for successive halving')
+    parser.add_argument('--brackets', type=int, default=1,
+                        help='Number of brackets. Setting the number of brackets to 1 means '
+                             'that we run effectively successive halving')
+    parser.add_argument('--min_resoure_level', type=int, default=1,
+                        help='Minimum resource level (i.e epochs) on which a configuration is evaluated on.')
+    parser.add_argument('--searcher', type=str, default='bayesopt',
+                        choices=['random', 'bayesopt'],
+                        help='searcher to sample new configurations')
     args = parser.parse_args()
     return args
 
@@ -199,7 +229,7 @@ if __name__ == "__main__":
     elif args.scheduler == "hyperband_promotion":
         hyperband_type = "promotion"
 
-    brackets = 1  # setting the number of brackets to 1 means that we run effectively successive halving
+    brackets = 1
 
     scheduler = ag.scheduler.HyperbandScheduler(objective_function,
                                                 resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
@@ -212,17 +242,20 @@ if __name__ == "__main__":
                                                 # The metric along we make scheduling decision. Needs to be also
                                                 # reported back to AutoGluon in the objective function.
                                                 time_attr='epoch',
-                                                brackets=brackets,
+                                                brackets=args.brackets,
                                                 checkpoint=None,
-                                                searcher="bayesopt",  # Defines searcher for new configurations
+                                                searcher=args.searcher,  # Defines searcher for new configurations
                                                 dist_ip_addrs=dist_ip_addrs,
                                                 training_history_callback=callback,
                                                 training_history_callback_delta_secs=args.store_results_period,
-                                                reduction_factor=3,
+                                                reduction_factor=args.reduction_factor,
                                                 type=hyperband_type,
                                                 # defines the minimum resource level for Hyperband,
                                                 # i.e the minimum number of epochs
-                                                grace_period=1
+                                                grace_period=args.min_resoure_level
                                                 )
     scheduler.run()
     scheduler.join_jobs()
+
+    # final training history
+    training_history = scheduler.training_history
