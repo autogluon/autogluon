@@ -721,7 +721,11 @@ class BertForTextPredictionBasic:
                                                               has_label=False)
         if self._problem_types[0] == _C.CLASSIFICATION:
             if get_probabilities:
-                return test_predictions
+                if test_predictions.shape[1] == 2:
+                    # Binary
+                    return test_predictions[:, 1]
+                else:
+                    return test_predictions
             else:
                 test_predictions = test_predictions.argmax(axis=-1)
                 if get_original_labels:
