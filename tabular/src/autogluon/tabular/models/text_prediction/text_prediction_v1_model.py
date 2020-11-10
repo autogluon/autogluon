@@ -216,6 +216,7 @@ class TextPredictionV1Model(AbstractModel):
                                               X_val=X_val,
                                               y_val=y_val,
                                               hyperparameters=self.params)
+        print('X_train=', X_train)
         # Insert the label column
         X_train.insert(len(X_train.columns), self._label_column_name, y_train)
         X_val.insert(len(X_val.columns), self._label_column_name, y_val)
