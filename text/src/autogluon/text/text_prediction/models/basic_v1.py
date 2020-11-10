@@ -253,7 +253,6 @@ def train_function(args, reporter, train_data, tuning_data,
         log_metrics = [log_metrics]
     log_metric_scorers = [get_metric(ele) for ele in log_metrics]
     stopping_metric_scorer = get_metric(stopping_metric)
-    stopping_metric_greater_is_better = stopping_metric_scorer._sign > 0
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['OMP_NUM_THREADS'] = '1'
     os.environ['MKL_DYNAMIC'] = 'FALSE'
@@ -422,26 +421,15 @@ def train_function(args, reporter, train_data, tuning_data,
                           for scorer in log_metric_scorers]
             dev_score = stopping_metric_scorer(gt_dev_labels, dev_predictions)
             valid_time_spent = time.time() - valid_start_tick
-            if stopping_metric_greater_is_better:
-                # Greater is better
-                if best_performance_score is None or dev_score >= best_performance_score:
-                    find_better = True
-                    no_better_rounds = 0
-                    best_performance_score = dev_score
-                else:
-                    find_better = False
-                    no_better_rounds += 1
-            else:
-                # Smaller is better
-                if best_performance_score is None or dev_score <= best_performance_score:
-                    find_better = True
-                    no_better_rounds = 0
-                    best_performance_score = dev_score
-                else:
-                    find_better = False
-                    no_better_rounds += 1
-            if find_better:
+            # Metrics have ensured that greater --> better
+            if best_performance_score is None or dev_score >= best_performance_score:
+                find_better = True
+                no_better_rounds = 0
+                best_performance_score = dev_score
                 net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
+            else:
+                find_better = False
+                no_better_rounds += 1
             mx.npx.waitall()
             loss_string = ', '.join(['{}={}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
@@ -460,10 +448,7 @@ def train_function(args, reporter, train_data, tuning_data,
             if time_limits is not None and total_time_spent > time_limits:
                 break
             report_idx += 1
-            if stopping_metric_greater_is_better:
-                report_items.append(('reward', dev_score))
-            else:
-                report_items.append(('reward', -dev_score))
+            report_items.append(('reward', dev_score))
             report_items.append(('exp_dir', exp_dir))
             reporter(**dict(report_items))
             if no_better_rounds >= cfg.learning.early_stopping_patience:
