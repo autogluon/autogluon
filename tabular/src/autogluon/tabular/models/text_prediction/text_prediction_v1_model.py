@@ -243,5 +243,5 @@ class TextPredictionV1Model(AbstractModel):
                          search_options=hyperparameters['hpo_params']['search_options'],
                          scheduler_options=scheduler_options,
                          num_trials=hyperparameters['hpo_params']['num_trials'],
-                         console_log=verbosity > 2,
-                         ignore_warning=verbosity <= 2)
+                         console_log=verbosity >= 2,
+                         ignore_warning=verbosity < 2)
