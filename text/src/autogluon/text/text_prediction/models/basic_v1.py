@@ -597,6 +597,7 @@ class BertForTextPredictionBasic:
             time_limits = 5 * 60 * 60  # 5 hours
         if scheduler_options is None:
             scheduler_options = dict()
+        print('Resource[num_gpus]=', resource['num_gpus'], ' num_cpus=', resource['num_cpus'])
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,
