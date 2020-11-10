@@ -45,7 +45,7 @@ class AbstractModel:
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
                 feature_metadata (autogluon.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
-        self.name = name
+        self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
         self.path_root = path
         self.path_suffix = self.name + os.path.sep  # TODO: Make into function to avoid having to reassign on load?
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
