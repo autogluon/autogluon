@@ -242,7 +242,6 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
 
 
 def calculate_metric(scorer, ground_truth, predictions, problem_type):
-    print('scorer=', scorer, 'ground_truth=', ground_truth, 'predictions=', predictions)
     if problem_type == _C.CLASSIFICATION:
         if scorer.name == 'roc_auc':
             return scorer(ground_truth, predictions[:, 1])
