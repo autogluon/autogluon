@@ -245,3 +245,15 @@ class TextPredictionV1Model(AbstractModel):
                          num_trials=hyperparameters['hpo_params']['num_trials'],
                          console_log=verbosity >= 2,
                          ignore_warning=verbosity < 2)
+
+    def save(self, path: str = None, verbose=True) -> str:
+        if path is None:
+            path = self.path
+        logger.log(15, f'Save to {path}.')
+        self.model.save(path)
+        return path
+
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        logger.log(15, f'Load from {path}.')
+        cls.model = BertForTextPredictionBasic.load(path)
