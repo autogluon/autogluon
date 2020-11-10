@@ -335,6 +335,7 @@ def train_function(args, reporter, train_data, tuning_data,
     net.hybridize()
     print('net=', net)
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
+    print('num_total_params=', num_total_params, 'num_total_fixed_params=', num_total_fixed_params)
     logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
                                                            num_total_fixed_params))
     # Initialize the optimizer
