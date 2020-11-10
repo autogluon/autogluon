@@ -177,6 +177,7 @@ class _ThresholdScorer(Scorer):
                                                  sample_weight=sample_weight,
                                                  **self._kwargs)
         else:
+            print(self._score_func, y_true, y_pred)
             return self._sign * self._score_func(y_true, y_pred, **self._kwargs)
 
 
