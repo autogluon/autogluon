@@ -2,13 +2,11 @@ import copy
 from abc import ABCMeta, abstractmethod
 from functools import partial
 
-import numpy as np
 import sklearn.metrics
-from sklearn.utils.multiclass import type_of_target
 import scipy.stats
 from . import classification_metrics, softclass_metrics
 from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
-from autogluon.core.utils.miscs import warning_filter
+from ..utils.miscs import warning_filter
 from .classification_metrics import *
 
 
@@ -35,6 +33,13 @@ class Scorer(object, metaclass=ABCMeta):
         self._score_func = score_func
         self._optimum = optimum
         self._sign = sign
+        self.alias = set()
+
+    def add_alias(self, alias):
+        if alias == self.name:
+            raise ValueError(f'The alias "{alias}" is the same as the original name "{self.name}". '
+                             f'This is not allowed.')
+        self.alias.add(alias)
 
     @abstractmethod
     def __call__(self, y_true, y_pred, sample_weight=None):
@@ -219,7 +224,7 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
 
     Returns
     -------
-    scorer : callable
+    scorer
         Callable object that returns a scalar score; greater is better.
     """
     sign = 1 if greater_is_better else -1
@@ -239,14 +244,19 @@ mean_squared_error = make_scorer('mean_squared_error',
                                  sklearn.metrics.mean_squared_error,
                                  optimum=0,
                                  greater_is_better=False)
+mean_squared_error.add_alias('mse')
+
 mean_absolute_error = make_scorer('mean_absolute_error',
                                   sklearn.metrics.mean_absolute_error,
                                   optimum=0,
                                   greater_is_better=False)
+mean_absolute_error.add_alias('mae')
+
 median_absolute_error = make_scorer('median_absolute_error',
                                     sklearn.metrics.median_absolute_error,
                                     optimum=0,
                                     greater_is_better=False)
+
 spearmanr = make_scorer('spearmanr',
                         lambda predictions, ground_truth:
                         float(scipy.stats.spearmanr(ground_truth, predictions)[0]),
@@ -267,10 +277,13 @@ root_mean_squared_error = make_scorer('root_mean_squared_error',
                                       rmse_func,
                                       optimum=0,
                                       greater_is_better=False)
+root_mean_squared_error.add_alias('rmse')
 
 # Standard Classification Scores
 accuracy = make_scorer('accuracy',
                        sklearn.metrics.accuracy_score)
+accuracy.add_alias('acc')
+
 balanced_accuracy = make_scorer('balanced_accuracy',
                                 classification_metrics.balanced_accuracy)
 f1 = make_scorer('f1',
@@ -283,6 +296,7 @@ roc_auc = make_scorer('roc_auc',
                       sklearn.metrics.roc_auc_score,
                       greater_is_better=True,
                       needs_threshold=True)
+
 average_precision = make_scorer('average_precision',
                                 sklearn.metrics.average_precision_score,
                                 needs_threshold=True)
@@ -297,6 +311,8 @@ log_loss = make_scorer('log_loss',
                        optimum=0,
                        greater_is_better=False,
                        needs_proba=True)
+log_loss.add_alias('nll')
+
 pac_score = make_scorer('pac_score',
                         classification_metrics.pac_score,
                         greater_is_better=True,
@@ -306,17 +322,19 @@ pac_score = make_scorer('pac_score',
 soft_log_loss = make_scorer('soft_log_loss', softclass_metrics.soft_log_loss,
                             greater_is_better=False, needs_proba=True)
 
+REGRESSION_METRICS = dict()
+for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
+                   median_absolute_error, spearmanr, pearsonr]:
+    REGRESSION_METRICS[scorer.name] = scorer
+    for alias in scorer.alias:
+        REGRESSION_METRICS[alias] = scorer
 
-REGRESSION_METRICS = {
-    scorer.name: scorer
-    for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
-                   median_absolute_error, spearmanr, pearsonr]
-}
+CLASSIFICATION_METRICS = dict()
+for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, average_precision, log_loss, pac_score]:
+    CLASSIFICATION_METRICS[scorer.name] = scorer
+    for alias in scorer.alias:
+        CLASSIFICATION_METRICS[alias] = scorer
 
-CLASSIFICATION_METRICS = {
-    scorer.name: scorer
-    for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, average_precision, log_loss, pac_score]
-}
 
 for name, metric in [('precision', sklearn.metrics.precision_score),
                      ('recall', sklearn.metrics.recall_score),
@@ -384,6 +402,8 @@ def calculate_score(solution, prediction, task_type, metric,
 def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
+    all_available_metric_names = list(CLASSIFICATION_METRICS.keys())\
+                                 + list(REGRESSION_METRICS.keys()) + [soft_log_loss]
     if metric is not None and isinstance(metric, str):
         if metric in CLASSIFICATION_METRICS:
             if problem_type is not None and problem_type not in PROBLEM_TYPES_CLASSIFICATION:
@@ -397,8 +417,9 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
             return soft_log_loss
         else:
             raise ValueError(
-                f"{metric} is an unknown metric, see autogluon/utils/tabular/metrics/ for available options "
-                f"or how to define your own {metric_type} function"
+                f"{metric} is an unknown metric, all available metrics are "
+                f"'{all_available_metric_names}'. You can also refer to "
+                f"autogluon.core.metrics to see how to define your own {metric_type} function"
             )
     else:
         return metric
