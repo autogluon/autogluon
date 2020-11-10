@@ -7,6 +7,8 @@ import numpy as np
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
+from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 
 from .dataset import TabularDataset
@@ -14,9 +16,9 @@ from .hyperparameter_configs import get_hyperparameter_config
 from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
 from ...features import AutoMLPipelineFeatureGenerator
-from ...learner import DefaultLearner as Learner
+from ...learner import AbstractLearner, DefaultLearner
 from ...metrics import get_metric
-from ...trainer import AutoTrainer
+from ...trainer import AbstractTrainer, AutoTrainer
 
 
 logger = logging.getLogger()  # return root logger
@@ -27,6 +29,7 @@ class TabularPredictorV2(TabularPredictor):
     AutoGluon Task for predicting values in column of tabular dataset (classification or regression)
     """
     Dataset = TabularDataset
+    predictor_file_name = 'predictor.pkl'
 
     def __init__(
             self,
@@ -41,6 +44,7 @@ class TabularPredictorV2(TabularPredictor):
             label_count_threshold=10,
             cache_data=True,
             feature_generator=None,
+            learner_type=DefaultLearner,
             trainer_type=AutoTrainer,
             random_seed=0,
 
@@ -58,7 +62,7 @@ class TabularPredictorV2(TabularPredictor):
         self.class_labels_internal = None  # TODO: method
         self.class_labels_internal_map = None  # TODO: method
         self.stopping_metric = stopping_metric
-        self.feature_metadata = feature_metadata  # TODO: Unused
+        self.feature_metadata = feature_metadata  # TODO: Unused, FIXME: currently overwritten after .fit, split into two variables: one for pre and one for post processing.
         self.verbosity = verbosity  # TODO: Unused
         self.id_columns = id_columns
         if self.id_columns is None:
@@ -66,8 +70,10 @@ class TabularPredictorV2(TabularPredictor):
         self.label_count_threshold = label_count_threshold  # TODO: Requires num_bagging_folds to be set to properly work, move num_bagging_folds into init?
         self.cache_data = cache_data
         self.feature_generator = feature_generator  # TODO: Fix presets
+        self.learner_type = learner_type
         self.trainer_type = trainer_type
         self.random_seed = random_seed
+        self.has_learner = False
 
     @unpack(set_presets)
     def fit(self,
@@ -612,15 +618,14 @@ class TabularPredictorV2(TabularPredictor):
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
-        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
+        self._learner: AbstractLearner = self.learner_type(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold, random_seed=random_seed)
-        learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
+        self._learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
-
-        predictor = TabularPredictor(learner=learner)
+        self._set_post_fit_vars()
 
         keep_only_best = kwargs.get('keep_only_best', False)
         if refit_full is True:
@@ -634,23 +639,95 @@ class TabularPredictorV2(TabularPredictor):
                 refit_full = 'all'
 
         if refit_full is not False:
-            trainer = predictor._trainer
-            trainer_model_best = trainer.get_model_best()
-            predictor.refit_full(model=refit_full)
+            trainer_model_best = self._trainer.get_model_best()
+            self.refit_full(model=refit_full)
             if set_best_to_refit_full:
-                if trainer_model_best in trainer.model_full_dict.keys():
-                    trainer.model_best = trainer.model_full_dict[trainer_model_best]
+                if trainer_model_best in self._trainer.model_full_dict.keys():
+                    self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
                     # Note: model_best will be overwritten if additional training is done with new models, since model_best will have validation score of None and any new model will have a better validation score.
                     # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
-                    trainer.save()
+                    self._trainer.save()
                 else:
                     logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
 
         if keep_only_best:
-            predictor.delete_models(models_to_keep='best', dry_run=False)
+            self.delete_models(models_to_keep='best', dry_run=False)
 
         save_space = kwargs.get('save_space', False)
         if save_space:
-            predictor.save_space()
+            self.save_space()
+        self.save()
 
+        # TODO: v0.1: return newly trained model names?
+
+    def _set_post_fit_vars(self, learner: AbstractLearner = None):
+        if learner is not None:
+            self._learner: AbstractLearner = learner
+        self._learner.persist_trainer(low_memory=True)
+        self.learner_type = type(self._learner)
+        self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
+        self.trainer_type = type(self._trainer)
+        self.output_directory = self._learner.path
+        self.problem_type = self._learner.problem_type
+        self.eval_metric = self._learner.eval_metric
+        self.stopping_metric = self._learner.stopping_metric
+        self.label_column = self._learner.label
+        self.feature_metadata = self._trainer.feature_metadata  # TODO: Don't overwrite user feature_metadata, differentiate between pre and post processed metadata.
+        self.class_labels = self._learner.class_labels
+        self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
+        self.class_labels_internal_map = self._learner.label_cleaner.inv_map
+        self.has_learner = True
+
+    # TODO: Update and correct the logging message on loading directions
+    def save(self):
+        tmp_learner = self._learner
+        tmp_trainer = self._trainer
+        if self._learner is not None:
+            super().save()
+            self._learner = None
+            self._trainer = None
+        save_pkl.save(path=self.output_directory + self.predictor_file_name, object=self)
+        if tmp_learner is not None:
+            self._learner = tmp_learner
+            self._trainer = tmp_trainer
+
+    @classmethod
+    def load(cls, output_directory, verbosity=2):
+        logger.setLevel(verbosity2loglevel(verbosity))  # Reset logging after load (may be in new Python session)
+        if output_directory is None:
+            raise ValueError("output_directory cannot be None in load()")
+
+        output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
+        predictor = load_pkl.load(path=output_directory + cls.predictor_file_name)
+        if predictor.has_learner:
+            learner = predictor.learner_type.load(output_directory)
+            predictor._set_post_fit_vars(learner=learner)
+        try:
+            from ...version import __version__
+            version_inference = __version__
+        except:
+            version_inference = None
+        # TODO: v0.1 Move version var to predictor object in the case where learner does not exist
+        if predictor.has_learner:
+            try:
+                version_fit = predictor._learner.version
+            except:
+                version_fit = None
+            if version_fit is None:
+                version_fit = 'Unknown (Likely <=0.0.11)'
+            if version_inference != version_fit:
+                logger.warning('')
+                logger.warning('############################## WARNING ##############################')
+                logger.warning('WARNING: AutoGluon version differs from the version used during the original model fit! This may lead to instability and it is highly recommended the model be loaded with the exact AutoGluon version it was fit with.')
+                logger.warning(f'\tFit Version:     {version_fit}')
+                logger.warning(f'\tCurrent Version: {version_inference}')
+                logger.warning('############################## WARNING ##############################')
+                logger.warning('')
+
+        return predictor
+
+    @classmethod
+    def from_learner(cls, learner: AbstractLearner):
+        predictor = cls(label=learner.label, output_directory=learner.path)
+        predictor._set_post_fit_vars(learner=learner)
         return predictor
