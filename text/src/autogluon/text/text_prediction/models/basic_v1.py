@@ -443,7 +443,7 @@ def train_function(args, reporter, train_data, tuning_data,
             if time_limits is not None and total_time_spent > time_limits:
                 break
             report_idx += 1
-            report_items.append(('reward', dev_score))
+            report_items.append(('reward', best_performance_score))
             report_items.append(('exp_dir', exp_dir))
             reporter(**dict(report_items))
             if no_better_rounds >= cfg.learning.early_stopping_patience:
