@@ -29,9 +29,33 @@ def pytest_collection_modifyitems(config, items):
 
 
 class DatasetLoaderHelper:
+    dataset_info_dict = dict(
+        # Binary dataset
+        adult={
+            'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
+            'name': 'AdultIncomeBinaryClassification',
+            'problem_type': BINARY,
+            'label_column': 'class',
+        },
+        # Multiclass big dataset with 7 classes, all features are numeric. Runs SLOW.
+        covertype={
+            'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
+            'name': 'CoverTypeMulticlassClassification',
+            'problem_type': MULTICLASS,
+            'label_column': 'Cover_Type',
+        },
+        # Regression with mixed feature-types, skewed Y-values.
+        ames={
+            'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
+            'name': 'AmesHousingPriceRegression',
+            'problem_type': REGRESSION,
+            'label_column': 'SalePrice',
+        },
+    )
+
     @staticmethod
     def load_dataset(name: str, directory_prefix: str = './datasets/'):
-        dataset_info = DatasetLoaderHelper.dataset_info_dict()[name]
+        dataset_info = DatasetLoaderHelper.dataset_info_dict[name]
         train_file = dataset_info.pop('train_file', 'train_data.csv')
         test_file = dataset_info.pop('test_file', 'test_data.csv')
         name_inner = dataset_info.pop('name')
@@ -45,33 +69,6 @@ class DatasetLoaderHelper:
         )
 
         return train_data, test_data, dataset_info
-
-    @staticmethod
-    def dataset_info_dict():
-        dataset_dict = dict(
-            # Binary dataset
-            adult={
-                'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
-                'name': 'AdultIncomeBinaryClassification',
-                'problem_type': BINARY,
-                'label_column': 'class',
-            },
-            # Multiclass big dataset with 7 classes, all features are numeric. Runs SLOW.
-            covertype={
-                'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
-                'name': 'CoverTypeMulticlassClassification',
-                'problem_type': MULTICLASS,
-                'label_column': 'Cover_Type',
-            },
-            # Regression with mixed feature-types, skewed Y-values.
-            ames={
-                'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
-                'name': 'AmesHousingPriceRegression',
-                'problem_type': REGRESSION,
-                'label_column': 'SalePrice',
-            },
-        )
-        return dataset_dict
 
     @staticmethod
     def load_data(directory_prefix, train_file, test_file, name, url=None):
