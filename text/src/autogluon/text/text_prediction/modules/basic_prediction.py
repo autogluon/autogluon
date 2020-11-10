@@ -373,7 +373,9 @@ class BERTForTabularBasicV1(HybridBlock):
 
     def initialize_with_pretrained_backbone(self, backbone_params_path, ctx=None):
         self.text_backbone.load_parameters(backbone_params_path, ctx=ctx)
+        print('After load backbone.')
         self.agg_layer.initialize(ctx=ctx)
+        print('After initialize.')
         if self.categorical_networks is not None:
             self.categorical_networks.initialize(ctx=ctx)
         if self.numerical_network is not None:
