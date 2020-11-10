@@ -149,6 +149,8 @@ class TaskScheduler(object):
             # handle GPU devices
             os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
             os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
+        else:
+            os.environ['CUDA_VISIBLE_DEVICES'] = "-1"
 
         # running
         try:
