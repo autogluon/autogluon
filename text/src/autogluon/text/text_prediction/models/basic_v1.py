@@ -179,27 +179,6 @@ def base_cfg():
     return cfg
 
 
-def electra_base():
-    """The search space of Electra Base"""
-    cfg = base_cfg()
-    cfg.defrost()
-    cfg.optimization.layerwise_lr_decay = 0.8
-    cfg.freeze()
-    return cfg
-
-
-def mobile_bert():
-    """The search space of MobileBERT"""
-    cfg = base_cfg()
-    cfg.defrost()
-    cfg.optimization.layerwise_lr_decay = -1
-    cfg.model.backbone.name = 'google_uncased_mobilebert'
-    cfg.optimization.lr = 1E-5
-    cfg.optimization.num_train_epochs = 5.0
-    cfg.freeze()
-    return cfg
-
-
 @use_np
 def _classification_regression_predict(net, dataloader, problem_type, has_label=True):
     """
