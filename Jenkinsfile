@@ -37,7 +37,7 @@ stage("Unit Test") {
   },
   'tabular': {
     node('linux-gpu') {
-      ws('workspace/autugluon-tabular-py3') {
+      ws('workspace/autogluon-tabular-py3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -73,7 +73,7 @@ stage("Unit Test") {
   },
   'mxnet': {
     node('linux-gpu') {
-      ws('workspace/autugluon-mxnet-py3') {
+      ws('workspace/autogluon-mxnet-py3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -111,7 +111,7 @@ stage("Unit Test") {
   },
   'extra': {
     node('linux-gpu') {
-      ws('workspace/autugluon-extra-py3') {
+      ws('workspace/autogluon-extra-py3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -149,7 +149,7 @@ stage("Unit Test") {
   },
   'text': {
     node('linux-gpu') {
-      ws('workspace/autugluon-text-py3') {
+      ws('workspace/autogluon-text-py3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -189,7 +189,7 @@ stage("Unit Test") {
   },
   'vision': {
     node('linux-gpu') {
-      ws('workspace/autugluon-vision-py3') {
+      ws('workspace/autogluon-vision-py3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -229,7 +229,7 @@ stage("Unit Test") {
   },
   'install': {
     node('linux-cpu') {
-      ws('workspace/autugluon-install-py3') {
+      ws('workspace/autogluon-install-py3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
