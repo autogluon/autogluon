@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import try_import_lightgbm
 from autogluon.core import Int, Space
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASSss
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 from . import lgb_utils
 from .callbacks import early_stopping_custom
