@@ -24,7 +24,7 @@ from autogluon.core.utils.miscs import verbosity2loglevel
 
 __all__ = ['TextPrediction', 'ag_text_prediction_params']
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return root logger
 
 ag_text_prediction_params = Registry('ag_text_prediction_params')
 
