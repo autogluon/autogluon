@@ -92,6 +92,7 @@ def setup_compute(nthreads_per_trial, ngpus_per_trial):
         ngpus_per_trial = 1
         logger.debug("tabular_prediction currently doesn't use >1 GPU per training run. "
                      "ngpus_per_trial set = 1")
+    ngpus_per_trial = 0
     return nthreads_per_trial, ngpus_per_trial
 
 
