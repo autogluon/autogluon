@@ -3,7 +3,7 @@ import os
 import numpy as np
 from pandas import DataFrame, Series
 
-from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.utils import try_import_lightgbm
 
 

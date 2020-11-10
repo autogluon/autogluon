@@ -4,9 +4,10 @@ import collections
 import logging
 import pandas as pd
 import os
-from ...constants import BINARY, REGRESSION
+from autogluon.core.constants import BINARY, REGRESSION
+from autogluon.core import metrics
+
 from ..abstract.abstract_model import AbstractModel
-from ... import metrics
 from ...features.feature_metadata import FeatureMetadata, R_OBJECT, R_INT, R_FLOAT, R_CATEGORY,\
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 

@@ -6,10 +6,11 @@ import time
 import pandas as pd
 from pandas import DataFrame
 
-from .abstract_learner import AbstractLearner
-from ..constants import BINARY, MULTICLASS, REGRESSION
-from ..trainer.auto_trainer import AutoTrainer
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.utils.utils import augment_rare_classes
+
+from .abstract_learner import AbstractLearner
+from ..trainer.auto_trainer import AutoTrainer
 from ..data.cleaner import Cleaner
 from ..data.label_cleaner import LabelCleaner
 

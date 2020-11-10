@@ -7,10 +7,26 @@ import sklearn.metrics
 from sklearn.utils.multiclass import type_of_target
 import scipy.stats
 from . import classification_metrics, softclass_metrics
-from .util import sanitize_array
 from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.utils.miscs import warning_filter
 from .classification_metrics import *
+
+
+def sanitize_array(array):
+    """
+    Replace NaN and Inf (there should not be any!)
+    :param array:
+    :return:
+    """
+    a = np.ravel(array)
+    maxi = np.nanmax(a[np.isfinite(a)])
+    mini = np.nanmin(a[np.isfinite(a)])
+    array[array == float('inf')] = maxi
+    array[array == float('-inf')] = mini
+    mid = (maxi + mini) / 2
+    array[np.isnan(array)] = mid
+    return array
+
 
 class Scorer(object, metaclass=ABCMeta):
     def __init__(self, name, score_func, optimum, sign, kwargs):

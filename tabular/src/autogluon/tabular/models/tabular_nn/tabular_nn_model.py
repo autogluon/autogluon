@@ -20,6 +20,12 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
+from autogluon.core import Space
+from autogluon.core.utils import try_import_mxboard
+from autogluon.core.metrics import log_loss, roc_auc
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+
+
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .embednet import EmbedNet
 from .hyperparameters.parameters import get_default_param
@@ -28,11 +34,8 @@ from .tabular_nn_dataset import TabularNNDataset
 from .tabular_nn_trial import tabular_nn_trial
 from ..abstract.abstract_model import AbstractModel
 from ..utils import fixedvals_from_searchspaces
-from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from ...metrics import log_loss, roc_auc
-from autogluon.core import Space
-from autogluon.core.utils import try_import_mxboard
+
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)

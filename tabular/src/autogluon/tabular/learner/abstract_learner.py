@@ -14,16 +14,17 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
-from ..constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_json, save_pkl
+from autogluon.core.metrics import confusion_matrix
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
 from ..utils import get_pred_from_proba, infer_problem_type
 from ..data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ..features.generators import PipelineFeatureGenerator
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_json, save_pkl
-from ..metrics import confusion_matrix
 
 
 logger = logging.getLogger(__name__)

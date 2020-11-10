@@ -13,11 +13,12 @@ import pandas as pd
 from autogluon.core.utils import try_import_fastai_v1
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
+from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
+
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
-from ...constants import REGRESSION, BINARY, MULTICLASS
 from ...features.feature_metadata import R_OBJECT
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)

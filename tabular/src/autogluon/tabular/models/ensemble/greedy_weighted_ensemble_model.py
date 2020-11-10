@@ -1,7 +1,7 @@
 import logging
+from autogluon.core.constants import MULTICLASS
 
 from ..abstract.abstract_model import AbstractModel
-from ...constants import MULTICLASS
 from ...tuning.ensemble_selection import EnsembleSelection
 
 logger = logging.getLogger(__name__)

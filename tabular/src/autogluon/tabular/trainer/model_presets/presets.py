@@ -5,7 +5,10 @@ from collections import defaultdict
 
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
-from ...constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.metrics import soft_log_loss, mean_squared_error
+from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS,\
+    REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
+
 from ...models.abstract.abstract_model import AbstractModel
 from ...models.fastainn.tabular_nn_fastai import NNFastAiTabularModel
 from ...models.lgb.lgb_model import LGBModel
@@ -16,7 +19,6 @@ from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
 from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
-from ...metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
 

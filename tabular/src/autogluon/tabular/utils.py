@@ -6,8 +6,8 @@ from pandas import DataFrame, Series
 from sklearn.model_selection import train_test_split
 
 from autogluon.core.utils import normalize_binary_probas, normalize_multi_probas
-from .constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS
-from .metrics import accuracy, root_mean_squared_error, Scorer
+from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS
+from autogluon.core.metrics import accuracy, root_mean_squared_error, Scorer
 
 logger = logging.getLogger(__name__)
 
