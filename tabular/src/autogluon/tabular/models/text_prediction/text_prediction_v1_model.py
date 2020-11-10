@@ -163,7 +163,6 @@ class TextPredictionV1Model(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
             get_feature_kwargs=dict(
-                valid_raw_types=[R_OBJECT],
                 ignored_type_group_raw=[R_CATEGORY],
                 ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL, S_TEXT_AS_CATEGORY],
             )
