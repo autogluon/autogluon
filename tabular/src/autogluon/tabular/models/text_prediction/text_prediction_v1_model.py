@@ -16,6 +16,7 @@ try:
     from autogluon.text.text_prediction.text_prediction\
         import ag_text_prediction_params, merge_params, get_column_properties,\
         infer_problem_type, infer_eval_stop_log_metrics
+    from autogluon.text.text_prediction.dataset import TabularDataset
     from autogluon.text.text_prediction.models.basic_v1 import BertForTextPredictionBasic
 except ImportError:
     raise ImportError('autogluon.text has not been installed. '
@@ -124,7 +125,7 @@ class TextPredictionV1Model(AbstractModel):
                                                 logger=logger,
                                                 base_config=None,
                                                 search_space=search_space)
-        return hyperparameters
+        return column_properties
 
     def _predict_proba(self, X, **kwargs):
         """Predict the probability from the model.
@@ -206,7 +207,7 @@ class TextPredictionV1Model(AbstractModel):
         else:
             base_params = ag_text_prediction_params.create('default')
             hyperparameters = merge_params(base_params, hyperparameters)
-        self._build_model(X_train=X_train,
+        column_properties = self._build_model(X_train=X_train,
                           y_train=y_train,
                           X_val=X_val,
                           y_val=y_val,
@@ -226,8 +227,14 @@ class TextPredictionV1Model(AbstractModel):
                 'grace_period', 10)
             scheduler_options['max_t'] = scheduler_options.get(
                 'max_t', 50)
-        self.model.train(train_data=X_train,
-                         tuning_data=X_val,
+        train_data = TabularDataset(X_train,
+                                    column_properties=column_properties,
+                                    label_columns=self._label_column_name)
+        tuning_data = TabularDataset(X_val,
+                                     column_properties=column_properties,
+                                     label_columns=self._label_column_name)
+        self.model.train(train_data=train_data,
+                         tuning_data=tuning_data,
                          resource={'num_cpus': num_cpus,
                                    'num_gpus': num_gpus},
                          time_limits=time_limit,
