@@ -458,7 +458,7 @@ def train_function(args, reporter, train_data, tuning_data,
                             ('epoch', int(update_idx / updates_per_epoch))] +\
                            [(metric.name, score)
                             for score, metric in zip(log_scores, log_metric_scorers)] + \
-                           [('fine_better', find_better),
+                           [('find_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
             total_time_spent = time.time() - start_tick
             if time_limits is not None and total_time_spent > time_limits:
@@ -647,6 +647,7 @@ class BertForTextPredictionBasic:
                                'further investigate the root cause, you can also try to train with '
                                '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
         best_config = scheduler.get_best_config()
+        self._logger.info('Results=', scheduler.searcher._results)
         self._logger.info('Best_config={}'.format(best_config))
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,
