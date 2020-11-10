@@ -3,6 +3,9 @@ import os
 import pickle
 import logging
 import sys
+from functools import partial
+
+import dill
 import distributed
 from warnings import warn
 import multiprocessing as mp
@@ -10,13 +13,20 @@ from collections import OrderedDict
 
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
-from ..task.task import Task
+from .. import Task
 from .reporter import *
 from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['TaskScheduler']
+
+if mp.get_start_method(allow_none=True) != 'forkserver':
+    # The CUDA runtime does not support the fork start method;
+    # either the spawn or forkserver start method are required to use CUDA in subprocesses.
+    # forkserver is used because spawn is still affected by locking issues
+    logger.warning('WARNING: changing multiprocessing start method to forkserver')
+    mp.set_start_method('forkserver', force=True)
 
 
 class ClassProperty(object):
@@ -131,6 +141,24 @@ class TaskScheduler(object):
         return job
 
     @staticmethod
+    def _worker(pickled_fn, return_list, gpu_ids, args):
+        """Worker function in thec client
+        """
+        fn = dill.loads(pickled_fn)
+        if len(gpu_ids) > 0:
+            # handle GPU devices
+            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
+            os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
+
+        # running
+        try:
+            ret = fn(**args)
+        except AutoGluonEarlyStop:
+            ret = None
+        return_list.append(ret)
+
+
+    @staticmethod
     def _run_dist_job(fn, args, gpu_ids):
         """Remote function Executing the task
         """
@@ -144,24 +172,11 @@ class TaskScheduler(object):
 
         manager = mp.Manager()
         return_list = manager.list()
-        def _worker(return_list, gpu_ids, args):
-            """Worker function in thec client
-            """
-            if len(gpu_ids) > 0:
-                # handle GPU devices
-                os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
-                os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
-
-            # running
-            try:
-                ret = fn(**args)
-            except AutoGluonEarlyStop:
-                ret = None
-            return_list.append(ret)
 
         try:
             # start local progress
-            p = CustomProcess(target=_worker, args=(return_list, gpu_ids, args))
+            pickled_fn = dill.dumps(fn)
+            p = CustomProcess(target=partial(TaskScheduler._worker, pickled_fn), args=(return_list, gpu_ids, args))
             p.start()
             if 'reporter' in args:
                 cp = Communicator.Create(p, local_reporter, dist_reporter)
