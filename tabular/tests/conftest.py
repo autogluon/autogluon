@@ -1,3 +1,4 @@
+import copy
 import os
 import shutil
 
@@ -55,7 +56,7 @@ class DatasetLoaderHelper:
 
     @staticmethod
     def load_dataset(name: str, directory_prefix: str = './datasets/'):
-        dataset_info = DatasetLoaderHelper.dataset_info_dict[name]
+        dataset_info = copy.deepcopy(DatasetLoaderHelper.dataset_info_dict[name])
         train_file = dataset_info.pop('train_file', 'train_data.csv')
         test_file = dataset_info.pop('test_file', 'test_data.csv')
         name_inner = dataset_info.pop('name')
