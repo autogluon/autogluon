@@ -170,7 +170,7 @@ def infer_eval_stop_log_metrics(problem_type,
             stopping_metric = 'mse'
         if eval_metric is None:
             eval_metric = 'mse'
-        log_metrics = ['mse', 'mae']
+        log_metrics = ['mse', 'rmse', 'mae']
     else:
         raise NotImplementedError('The problem type is not supported yet!')
     for other_log_metric in [stopping_metric, eval_metric]:
