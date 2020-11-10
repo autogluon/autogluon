@@ -372,6 +372,7 @@ def train_function(args, reporter, train_data, tuning_data,
     no_better_rounds = 0
     report_idx = 0
     start_tick = time.time()
+    print('start_tick=', start_tick)
     for update_idx in tqdm.tqdm(range(max_update)):
         num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
