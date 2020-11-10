@@ -303,6 +303,7 @@ def train_function(args, reporter, train_data, tuning_data,
     # Get the ground-truth dev labels
     gt_dev_labels = np.array(tuning_data.table[label].apply(column_properties[label].transform))
     ctx_l = get_mxnet_available_ctx()
+    print('ctx_l=', ctx_l)
     base_batch_size = cfg.optimization.per_device_batch_size
     num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
     inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
