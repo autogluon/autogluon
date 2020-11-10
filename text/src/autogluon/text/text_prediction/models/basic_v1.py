@@ -320,6 +320,7 @@ def train_function(args, reporter, train_data, tuning_data,
                                   batch_size=base_batch_size,
                                   shuffle=True,
                                   batchify_fn=preprocessor.batchify(is_test=False))
+    print('train_dataloader=', train_dataloader)
     dev_dataloader = DataLoader(processed_dev,
                                 batch_size=inference_base_batch_size,
                                 shuffle=False,
