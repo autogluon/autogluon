@@ -8,3 +8,4 @@ ENTITY = 'entity'
 # Problem Types
 REGRESSION = 'regression'
 CLASSIFICATION = 'classification'
+BINARY = 'binary'

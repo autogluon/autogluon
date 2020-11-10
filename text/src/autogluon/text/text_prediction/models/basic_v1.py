@@ -241,6 +241,16 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
     return predictions
 
 
+def calculate_metric(scorer, ground_truth, predictions, problem_type):
+    if problem_type == _C.CLASSIFICATION:
+        if scorer.name == 'roc_auc':
+            return scorer(ground_truth, predictions[:, 1])
+        else:
+            return scorer(ground_truth, predictions.argmax(axis=-1))
+    else:
+        return scorer(ground_truth, predictions)
+
+
 @use_np
 def train_function(args, reporter, train_data, tuning_data,
                    time_limits, base_config, problem_types,
@@ -415,11 +425,10 @@ def train_function(args, reporter, train_data, tuning_data,
                 _classification_regression_predict(net, dataloader=dev_dataloader,
                                                    problem_type=problem_types[0],
                                                    has_label=False)
-            if problem_types[0] == _C.CLASSIFICATION and dev_predictions.shape[1] == 2:
-                dev_predictions = dev_predictions[:, 1]
-            log_scores = [scorer(gt_dev_labels, dev_predictions)
+            log_scores = [calculate_metric(scorer, gt_dev_labels, dev_predictions, problem_types[0])
                           for scorer in log_metric_scorers]
-            dev_score = stopping_metric_scorer(gt_dev_labels, dev_predictions)
+            dev_score = calculate_metric(stopping_metric_scorer, gt_dev_labels, dev_predictions,
+                                         problem_types[0])
             valid_time_spent = time.time() - valid_start_tick
             # Metrics have ensured that greater --> better
             if best_performance_score is None or dev_score >= best_performance_score:
