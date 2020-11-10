@@ -333,7 +333,6 @@ def train_function(args, reporter, train_data, tuning_data,
     print('net=', net)
     print('backbone_params_path=', backbone_params_path)
     print('ctx_l=', ctx_l)
-    ctx_l = [mx.cpu()]
     net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
     print('net=', net)
