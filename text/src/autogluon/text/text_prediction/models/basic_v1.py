@@ -325,10 +325,12 @@ def train_function(args, reporter, train_data, tuning_data,
                                 batch_size=inference_base_batch_size,
                                 shuffle=False,
                                 batchify_fn=preprocessor.batchify(is_test=True))
+    print('dev_dataloader=', dev_dataloader)
     net = BERTForTabularBasicV1(text_backbone=text_backbone,
                                 feature_field_info=preprocessor.feature_field_info(),
                                 label_shape=label_shapes[0],
                                 cfg=cfg.model.network)
+    print('net=', net)
     net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
     print('net=', net)
