@@ -12,20 +12,18 @@ import mxnet as mx
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
-from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef, roc_auc_score
-from scipy.stats import pearsonr, spearmanr
 from autogluon_contrib_nlp.models import get_backbone
 from autogluon_contrib_nlp.lr_scheduler import InverseSquareRootScheduler
 from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.utils.misc import logging_config, grouper,\
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
-from ..metrics import calculate_metric_by_expr
-from .. import constants as _C
 from autogluon.core import args, space
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
-from autogluon.tabular.metrics import get_metric
+from autogluon.core.metrics import get_metric
+
+from .. import constants as _C
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
