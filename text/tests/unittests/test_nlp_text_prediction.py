@@ -46,7 +46,6 @@ def test_sst():
                          verbosity=4,
                          output_directory='./sst',
                          plot_results=False)
-    predictor.cuda()
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
     verify_predictor_save_load(predictor, dev_data, verify_proba=True)
 
@@ -67,7 +66,6 @@ def test_mrpc():
                          ngpus_per_trial=1,
                          output_directory='./mrpc',
                          plot_results=False)
-    predictor.cuda()
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
     verify_predictor_save_load(predictor, dev_data, verify_proba=True)
 

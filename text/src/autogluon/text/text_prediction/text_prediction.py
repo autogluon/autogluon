@@ -460,7 +460,7 @@ class TextPrediction(BaseTask):
                     scheduler_options=scheduler_options,
                     num_trials=num_trials,
                     plot_results=plot_results,
-                    console_log=verbosity > 2,
+                    console_log=verbosity >= 2,
                     ignore_warning=verbosity <= 2)
         return model
 
