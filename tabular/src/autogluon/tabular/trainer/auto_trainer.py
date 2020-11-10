@@ -21,10 +21,11 @@ class AutoTrainer(AbstractTrainer):
                                  num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names, **kwargs)
 
     # TODO: rename to .fit for 0.1
-    def train(self, X_train, y_train, X_val=None, y_val=None, hyperparameter_tune=False, feature_prune=False, holdout_frac=0.1, hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, **kwargs):
+    def train(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, hyperparameter_tune=False, feature_prune=False, holdout_frac=0.1, hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, **kwargs):
         if hyperparameters is None:
             hyperparameters = {}
         self.hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
+
         if self.bagged_mode:
             if (y_val is not None) and (X_val is not None):
                 # TODO: User could be intending to blend instead. Perhaps switch from OOF preds to X_val preds while still bagging? Doubt a user would want this.
@@ -36,4 +37,4 @@ class AutoTrainer(AbstractTrainer):
         else:
             if (y_val is None) or (X_val is None):
                 X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_seed)
-        self._train_multi_and_ensemble(X_train, y_train, X_val, y_val, hyperparameters=self.hyperparameters, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit)
+        self._train_multi_and_ensemble(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=self.hyperparameters, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit)

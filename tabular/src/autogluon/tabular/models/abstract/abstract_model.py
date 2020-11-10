@@ -18,7 +18,7 @@ from ...tuning.feature_pruner import FeaturePruner
 from autogluon.core.utils import shuffle_df_rows
 from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
 from ... import metrics
-from ...features.feature_metadata import FeatureMetadata
+from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
@@ -170,7 +170,6 @@ class AbstractModel:
         """
         Get the default hyperparameter searchspace of the model.
         See `autogluon.core.space` for available space classes.
-
         Returns
         -------
         dict of hyperparameter search spaces.
@@ -219,7 +218,6 @@ class AbstractModel:
         Data transformation logic should be added here.
         In bagged ensembles, preprocessing code that lives in `_preprocess` will be executed on each child model once per inference call.
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
-
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
         """
         return X
@@ -259,6 +257,8 @@ class AbstractModel:
             dropped_features = [feature for feature in self.features if feature not in valid_features]
             logger.log(10, f'\tDropped {len(dropped_features)} of {len(self.features)} features.')
             self.features = [feature for feature in self.features if feature in valid_features]
+            if self.feature_metadata is not None:
+                self.feature_metadata = self.feature_metadata.keep_features(self.features)
             if not self.features:
                 raise NoValidFeatures
             if list(X.columns) != self.features:
@@ -358,7 +358,6 @@ class AbstractModel:
     def save(self, path: str = None, verbose=True) -> str:
         """
         Saves the model to disk.
-
         Parameters
         ----------
         path : str, default None
@@ -368,7 +367,6 @@ class AbstractModel:
             The final model file is typically saved to path + self.model_file_name.
         verbose : bool, default True
             Whether to log the location of the saved file.
-
         Returns
         -------
         path : str
@@ -385,7 +383,6 @@ class AbstractModel:
     def load(cls, path: str, reset_paths=True, verbose=True):
         """
         Loads the model from disk to memory.
-
         Parameters
         ----------
         path : str
@@ -398,7 +395,6 @@ class AbstractModel:
             If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
         verbose : bool, default True
             Whether to log the location of the loaded file.
-
         Returns
         -------
         model : cls
@@ -734,3 +730,73 @@ class AbstractModel:
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
+
+class AbstractNeuralNetworkModel(AbstractModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._types_of_features = None
+
+    # TODO: v0.1 clean method
+    def _get_types_of_features(self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_extra_types=True):
+        """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
+            Each value is a list of feature-names corresponding to columns in original dataframe.
+            TODO: ensure features with zero variance have already been removed before this function is called.
+        """
+        if self._types_of_features is not None:
+            Warning("Attempting to _get_types_of_features for Model, but previously already did this.")
+
+        feature_types = self.feature_metadata.get_type_group_map_raw()
+        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
+        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
+        language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
+        valid_features = categorical_featnames + continuous_featnames + language_featnames
+
+        if len(valid_features) < df.shape[1]:
+            unknown_features = [feature for feature in df.columns if feature not in valid_features]
+            logger.log(15, f"Model will additionally ignore the following columns: {unknown_features}")
+            df = df.drop(columns=unknown_features)
+            self.features = list(df.columns)
+
+        self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
+        if self.features_to_drop:
+            logger.log(15, f"Model will additionally ignore the following columns: {self.features_to_drop}")
+            df = df.drop(columns=self.features_to_drop)
+
+        if needs_extra_types is True:
+            types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'embed': [], 'language': []}
+            # continuous = numeric features to rescale
+            # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
+            # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
+            features_to_consider = [feat for feat in self.features if feat not in self.features_to_drop]
+            for feature in features_to_consider:
+                feature_data = df[feature]  # pd.Series
+                num_unique_vals = len(feature_data.unique())
+                if num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
+                    types_of_features['onehot'].append(feature)
+                elif feature in continuous_featnames:
+                    if np.abs(feature_data.skew()) > skew_threshold:
+                        types_of_features['skewed'].append(feature)
+                    else:
+                        types_of_features['continuous'].append(feature)
+                elif feature in categorical_featnames:
+                    if num_unique_vals >= embed_min_categories:  # sufficiently many categories to warrant learned embedding dedicated to this feature
+                        types_of_features['embed'].append(feature)
+                    else:
+                        types_of_features['onehot'].append(feature)
+                elif feature in language_featnames:
+                    types_of_features['language'].append(feature)
+        else:
+            types_of_features = []
+            for feature in valid_features:
+                if feature in categorical_featnames:
+                    feature_type = 'CATEGORICAL'
+                elif feature in continuous_featnames:
+                    feature_type = 'SCALAR'
+                elif feature in language_featnames:
+                    feature_type = 'TEXT'
+
+                types_of_features.append({"name": feature, "type": feature_type})
+
+        return types_of_features, df
+

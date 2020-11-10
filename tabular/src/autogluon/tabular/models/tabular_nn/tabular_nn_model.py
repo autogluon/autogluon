@@ -26,7 +26,7 @@ from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from .tabular_nn_dataset import TabularNNDataset
 from .tabular_nn_trial import tabular_nn_trial
-from ..abstract.abstract_model import AbstractModel
+from ..abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
@@ -41,12 +41,12 @@ EPS = 1e-10  # small number
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
 #  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.
-class TabularNeuralNetModel(AbstractModel):
+class TabularNeuralNetModel(AbstractNeuralNetworkModel):
     """ Class for neural network models that operate on tabular data.
         These networks use different types of input layers to process different types of data in various columns.
 
         Attributes:
-            types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of Dataframe corresponding to the features of this type
+            _types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of Dataframe corresponding to the features of this type
             feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in df corresponding to this feature
         self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         processor (sklearn.ColumnTransformer): scikit-learn preprocessor object.
@@ -76,7 +76,6 @@ class TabularNeuralNetModel(AbstractModel):
         hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
         features (list): List of predictive features to use, other features are ignored by the model.
         """
-        self.types_of_features = None
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self.features if it works with bagging
@@ -476,7 +475,7 @@ class TabularNeuralNetModel(AbstractModel):
         warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
         if labels is not None and len(labels) != len(df):
             raise ValueError("Number of examples in Dataframe does not match number of labels")
-        if (self.processor is None or self.types_of_features is None
+        if (self.processor is None or self._types_of_features is None
            or self.feature_arraycol_map is None or self.feature_type_map is None):
             raise ValueError("Need to process training data before test data")
         if self.features_to_drop:
@@ -507,9 +506,9 @@ class TabularNeuralNetModel(AbstractModel):
         if len(labels) != len(df):
             raise ValueError("Number of examples in Dataframe does not match number of labels")
 
-        self.types_of_features, df = self._get_types_of_features(df, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features)  # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
+        self._types_of_features, df = self._get_types_of_features(df, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features)  # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
         logger.log(15, "AutoGluon Neural Network infers features are of the following types:")
-        logger.log(15, json.dumps(self.types_of_features, indent=4))
+        logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
         self.processor = self._create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels)
         df = self.processor.fit_transform(df) # 2D numpy array
@@ -559,54 +558,6 @@ class TabularNeuralNetModel(AbstractModel):
     def convert_df_dtype_to_str(df):
         return df.astype(str)
 
-    def _get_types_of_features(self, df, skew_threshold, embed_min_categories, use_ngram_features):
-        """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
-            Each value is a list of feature-names corresponding to columns in original dataframe.
-            TODO: ensure features with zero variance have already been removed before this function is called.
-        """
-        if self.types_of_features is not None:
-            Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
-
-        feature_types = self.feature_metadata.get_type_group_map_raw()
-        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
-        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
-        language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
-        valid_features = categorical_featnames + continuous_featnames + language_featnames
-        if len(valid_features) < df.shape[1]:
-            unknown_features = [feature for feature in df.columns if feature not in valid_features]
-            logger.log(15, f"TabularNeuralNetModel will additionally ignore the following columns: {unknown_features}")
-            df = df.drop(columns=unknown_features)
-            self.features = list(df.columns)
-
-        self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
-        if self.features_to_drop:
-            logger.log(15, f"TabularNeuralNetModel will additionally ignore the following columns: {self.features_to_drop}")
-            df = df.drop(columns=self.features_to_drop)
-
-        types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'embed': [], 'language': []}
-        # continuous = numeric features to rescale
-        # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
-        # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-        features_to_consider = [feat for feat in self.features if feat not in self.features_to_drop]
-        for feature in features_to_consider:
-            feature_data = df[feature]  # pd.Series
-            num_unique_vals = len(feature_data.unique())
-            if num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
-                types_of_features['onehot'].append(feature)
-            elif feature in continuous_featnames:
-                if np.abs(feature_data.skew()) > skew_threshold:
-                    types_of_features['skewed'].append(feature)
-                else:
-                    types_of_features['continuous'].append(feature)
-            elif feature in categorical_featnames:
-                if num_unique_vals >= embed_min_categories:  # sufficiently many categories to warrant learned embedding dedicated to this feature
-                    types_of_features['embed'].append(feature)
-                else:
-                    types_of_features['onehot'].append(feature)
-            elif feature in language_featnames:
-                types_of_features['language'].append(feature)
-        return types_of_features, df
-
     def _get_feature_arraycol_map(self, max_category_levels):
         """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
         feature_preserving_transforms = set(['continuous','skewed', 'ordinal', 'language'])  # these transforms do not alter dimensionality of feature
@@ -638,14 +589,14 @@ class TabularNeuralNetModel(AbstractModel):
         """ Returns OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language') """
         if self.feature_arraycol_map is None:
             raise ValueError("must first call _get_feature_arraycol_map() before _get_feature_type_map()")
-        vector_features = self.types_of_features['continuous'] + self.types_of_features['skewed'] + self.types_of_features['onehot']
+        vector_features = self._types_of_features['continuous'] + self._types_of_features['skewed'] + self._types_of_features['onehot']
         feature_type_map = OrderedDict()
         for feature_name in self.feature_arraycol_map:
             if feature_name in vector_features:
                 feature_type_map[feature_name] = 'vector'
-            elif feature_name in self.types_of_features['embed']:
+            elif feature_name in self._types_of_features['embed']:
                 feature_type_map[feature_name] = 'embed'
-            elif feature_name in self.types_of_features['language']:
+            elif feature_name in self._types_of_features['language']:
                 feature_type_map[feature_name] = 'language'
             else:
                 raise ValueError("unknown feature type encountered")
@@ -655,11 +606,11 @@ class TabularNeuralNetModel(AbstractModel):
         """ Defines data encoders used to preprocess different data types and creates instance variable which is sklearn ColumnTransformer object """
         if self.processor is not None:
             Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
-        continuous_features = self.types_of_features['continuous']
-        skewed_features = self.types_of_features['skewed']
-        onehot_features = self.types_of_features['onehot']
-        embed_features = self.types_of_features['embed']
-        language_features = self.types_of_features['language']
+        continuous_features = self._types_of_features['continuous']
+        skewed_features = self._types_of_features['skewed']
+        onehot_features = self._types_of_features['onehot']
+        embed_features = self._types_of_features['embed']
+        language_features = self._types_of_features['language']
         transformers = []  # order of various column transformers in this list is important!
         if continuous_features:
             continuous_transformer = Pipeline(steps=[
