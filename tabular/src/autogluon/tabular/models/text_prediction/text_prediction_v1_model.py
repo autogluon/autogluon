@@ -9,7 +9,7 @@ from autogluon.core import metrics
 
 from ..abstract.abstract_model import AbstractModel
 from ...features.feature_metadata import FeatureMetadata, R_OBJECT, R_INT, R_FLOAT, R_CATEGORY,\
-    S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+    S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
 
 
 logger = logging.getLogger(__name__)
@@ -165,7 +165,7 @@ class TextPredictionV1Model(AbstractModel):
             get_feature_kwargs=dict(
                 valid_raw_types=[R_OBJECT, R_INT, R_FLOAT],
                 ignored_type_group_raw=[R_CATEGORY],
-                ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
+                ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL, S_TEXT_AS_CATEGORY],
             )
         )
         default_auxiliary_params.update(extra_auxiliary_params)
