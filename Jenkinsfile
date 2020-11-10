@@ -2,7 +2,7 @@ max_time = 180
 
 stage("Unit Test") {
   node('linux-gpu') {
-    ws('workspace/autugluon-py3') {
+    ws('workspace/autogluon-py3') {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
