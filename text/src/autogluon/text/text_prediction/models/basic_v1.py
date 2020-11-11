@@ -355,6 +355,7 @@ def train_function(args, reporter, train_data, tuning_data,
     report_idx = 0
     start_tick = time.time()
     print('start_tick=', start_tick)
+    best_report_items = None
     for update_idx in tqdm.tqdm(range(max_update)):
         num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
@@ -443,12 +444,18 @@ def train_function(args, reporter, train_data, tuning_data,
             if time_limits is not None and total_time_spent > time_limits:
                 break
             report_idx += 1
-            report_items.append(('reward', best_performance_score))
+            report_items.append(('reward', dev_score))
             report_items.append(('exp_dir', exp_dir))
+            if find_better:
+                best_report_items = report_items
             reporter(**dict(report_items))
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
                 break
+    # Report the performance of the best model
+    best_report_items_dict = dict(best_report_items)
+    best_report_items_dict['report_idx'] = report_idx + 1
+    reporter(**best_report_items_dict)
 
 
 @use_np
