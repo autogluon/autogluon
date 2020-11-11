@@ -1,6 +1,19 @@
 """
-In this is example we show how we can optimize the hyperparameters of a simple 2 layer
-feed forward neural networks on MNIST. We optimize the following hyperparameter:
+In this is example we show how to optimize the hyperparameters of a simple 2 layer
+feed forward neural networks on MNIST with multi-fidelity methods based on successive halving.
+For more details about the method we refer to this paper:
+
+Model-based Asynchronous Hyperparameter and Neural Architecture Search
+Aaron Klein, Louis C. Tiao, Thibaut Lienart, Cedric Archambeau, Matthias Seeger
+https://arxiv.org/abs/2003.10865
+
+Furthermore, in this tutorial we also show how to save intermediate results on disk to allow for
+on-the-fly visualization of the entire optimization process.
+
+For a general introduction of HPO with AutoGluon on pytorch, have a look at this tutorial:
+https://auto.gluon.ai/stable/tutorials/torch/hpo.html
+
+We optimize the following hyperparameter:
 
 - number of units first layer
 - number of units second layer
@@ -197,7 +210,7 @@ def parse_args():
     parser.add_argument('--brackets', type=int, default=1,
                         help='Number of brackets. Setting the number of brackets to 1 means '
                              'that we run effectively successive halving')
-    parser.add_argument('--min_resoure_level', type=int, default=1,
+    parser.add_argument('--min_resource_level', type=int, default=1,
                         help='Minimum resource level (i.e epochs) on which a configuration is evaluated on.')
     parser.add_argument('--searcher', type=str, default='bayesopt',
                         choices=['random', 'bayesopt'],
@@ -229,8 +242,6 @@ if __name__ == "__main__":
     elif args.scheduler == "hyperband_promotion":
         hyperband_type = "promotion"
 
-    brackets = 1
-
     scheduler = ag.scheduler.HyperbandScheduler(objective_function,
                                                 resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
                                                 # Autogluon runs until it either reaches num_trials or time_out
@@ -252,7 +263,7 @@ if __name__ == "__main__":
                                                 type=hyperband_type,
                                                 # defines the minimum resource level for Hyperband,
                                                 # i.e the minimum number of epochs
-                                                grace_period=args.min_resoure_level
+                                                grace_period=args.min_resource_level
                                                 )
     scheduler.run()
     scheduler.join_jobs()
