@@ -166,6 +166,7 @@ class AbstractTrainer:
         save_pkl.save(path=path, object=y, verbose=verbose)
 
     def get_model_names_all(self, can_infer=None):
+        print('In abstract trainer', self.models, self.model_graph.nodes)
         model_names_all = list(self.model_graph.nodes)
         # TODO: can_infer is technically more complicated, if an ancestor can't infer then the model can't infer.
         if can_infer is not None:
