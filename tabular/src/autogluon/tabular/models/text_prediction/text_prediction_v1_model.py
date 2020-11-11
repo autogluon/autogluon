@@ -127,23 +127,21 @@ class TextPredictionV1Model(AbstractModel):
         return column_properties
 
     def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            get_feature_kwargs=dict(
-                valid_raw_types=[R_INT, R_FLOAT],
-                valid_special_types=[S_TEXT],
-            )
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
-    def _set_default_params(self):
         try:
             from autogluon.text.text_prediction.dataset import TabularDataset
             from autogluon.text.text_prediction.text_prediction import ag_text_prediction_params
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
-        self.params = ag_text_prediction_params.create('default')
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            get_feature_kwargs=dict(
+                valid_raw_types=[R_INT, R_FLOAT],
+                valid_special_types=[S_TEXT],
+            ),
+            model_params=ag_text_prediction_params.create('default')
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
 
     def _fit(self, X_train: pd.DataFrame, y_train: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
@@ -172,7 +170,7 @@ class TextPredictionV1Model(AbstractModel):
             from autogluon.text.text_prediction.text_prediction import get_recommended_resource
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
-
+        model_params = self.params['model_params']
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus', None)
@@ -187,13 +185,13 @@ class TextPredictionV1Model(AbstractModel):
                                               y_train=y_train,
                                               X_val=X_val,
                                               y_val=y_val,
-                                              hyperparameters=self.params)
+                                              hyperparameters=model_params)
         print('X_train=', X_train)
         # Insert the label column
         X_train[self._label_column_name] = y_train
         X_val[self._label_column_name] = y_val
-        scheduler_options = self.params['hpo_params']['scheduler_options']
-        search_strategy = self.params['hpo_params']['search_strategy']
+        scheduler_options = model_params['hpo_params']['scheduler_options']
+        search_strategy = model_params['hpo_params']['search_strategy']
         if scheduler_options is None:
             scheduler_options = dict()
         if search_strategy.endswith('hyperband'):
@@ -215,9 +213,9 @@ class TextPredictionV1Model(AbstractModel):
                          resource=resource,
                          time_limits=time_limit,
                          search_strategy=search_strategy,
-                         search_options=self.params['hpo_params']['search_options'],
+                         search_options=model_params['hpo_params']['search_options'],
                          scheduler_options=scheduler_options,
-                         num_trials=self.params['hpo_params']['num_trials'],
+                         num_trials=model_params['hpo_params']['num_trials'],
                          console_log=verbosity >= 2,
                          ignore_warning=verbosity < 2)
 
