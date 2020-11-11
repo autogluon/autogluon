@@ -169,13 +169,18 @@ class TextPredictionV1Model(AbstractModel):
         """
         try:
             from autogluon.text.text_prediction.dataset import TabularDataset
+            from autogluon.text.text_prediction.text_prediction import get_recommended_resource
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
-        num_cpus = kwargs.get('num_cpus')
-        num_gpus = kwargs.get('num_gpus')
+        num_cpus = kwargs.get('num_cpus', None)
+        num_gpus = kwargs.get('num_gpus', None)
+
+        # Infer resource
+        resource = get_recommended_resource(nthreads_per_trial=num_cpus,
+                                            ngpus_per_trial=num_gpus)
         X_train = self.preprocess(X_train)
         X_val = self.preprocess(X_val)
         column_properties = self._build_model(X_train=X_train,
@@ -207,8 +212,7 @@ class TextPredictionV1Model(AbstractModel):
                                      label_columns=self._label_column_name)
         self.model.train(train_data=train_data,
                          tuning_data=tuning_data,
-                         resource={'num_cpus': num_cpus,
-                                   'num_gpus': num_gpus},
+                         resource=resource,
                          time_limits=time_limit,
                          search_strategy=search_strategy,
                          search_options=self.params['hpo_params']['search_options'],
