@@ -126,39 +126,6 @@ class TextPredictionV1Model(AbstractModel):
                                                 search_space=search_space)
         return column_properties
 
-    def _predict_proba(self, X, **kwargs):
-        """Predict the probability from the model.
-
-        Parameters
-        ----------
-        X
-            The data input. It can be either a pandas dataframe or a
-        **kwargs
-            Other keyword arguments.
-
-        Returns
-        -------
-        y_pred_proba
-            The predicted probability
-        """
-        if self.problem_type == REGRESSION:
-            return self.model.predict(X)
-        y_pred_proba = self.model.predict_proba(X)
-        if self.problem_type == BINARY:
-            if len(y_pred_proba.shape) == 1:
-                return y_pred_proba
-            elif y_pred_proba.shape[1] == 2:
-                return y_pred_proba[:, 1]
-            elif y_pred_proba.shape[1] > 2:
-                raise ValueError('The shape of the predicted probability does not match '
-                                 'with the inferred problem type. '
-                                 'Inferred problem type={}, predicted proba shape={}'.format(
-                    self.problem_type, y_pred_proba.shape))
-            else:
-                return y_pred_proba
-        else:
-            return y_pred_proba
-
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
@@ -178,8 +145,7 @@ class TextPredictionV1Model(AbstractModel):
             raise ImportError(AG_TEXT_IMPORT_ERROR)
         self.params = ag_text_prediction_params.create('default')
 
-    def _fit(self,
-             X_train: pd.DataFrame, y_train: pd.Series,
+    def _fit(self, X_train: pd.DataFrame, y_train: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
              y_val: Optional[pd.Series] = None,
              time_limit: Optional[int] = None, **kwargs):
