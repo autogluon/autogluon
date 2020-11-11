@@ -1,4 +1,4 @@
-max_time = 180
+max_time = 240
 
 stage("Unit Test") {
   parallel 'core': {
