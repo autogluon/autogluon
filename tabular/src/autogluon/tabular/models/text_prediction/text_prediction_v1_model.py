@@ -21,14 +21,7 @@ AG_TEXT_IMPORT_ERROR = 'autogluon.text has not been installed. ' \
 
 
 class TextPredictionV1Model(AbstractModel):
-    def __init__(self, path: str, name: str, problem_type: str,
-                 eval_metric: Optional[Union[str, metrics.Scorer]] = None,
-                 num_classes=None,
-                 stopping_metric: Optional[Union[str, metrics.Scorer]] = None,
-                 model=None,
-                 hyperparameters=None, features=None,
-                 feature_metadata: FeatureMetadata = None,
-                 debug=0, **kwargs):
+    def __init__(self, **kwargs):
         """The TextPredictionV1Model.
 
         The features can be a mix of
@@ -63,13 +56,8 @@ class TextPredictionV1Model(AbstractModel):
             The feature metadata.
         debug
             Whether to turn on debug mode
-        kwargs
-            Other arguments
         """
-        super().__init__(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric,
-                         num_classes=num_classes, stopping_metric=stopping_metric, model=model,
-                         hyperparameters=hyperparameters, features=features,
-                         feature_metadata=feature_metadata, debug=debug, **kwargs)
+        super().__init__(**kwargs)
         self._label_column_name = None
 
     def _build_model(self, X_train, y_train, X_val, y_val, hyperparameters):
@@ -129,7 +117,7 @@ class TextPredictionV1Model(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            get_feature_kwargs=dict(
+            get_features_kwargs=dict(
                 valid_raw_types=[R_INT, R_FLOAT, R_OBJECT],
                 invalid_special_types=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
             ),
