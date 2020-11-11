@@ -175,6 +175,8 @@ class TaskScheduler(object):
             # handle GPU devices
             os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
             os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
+        else:
+            os.environ['CUDA_VISIBLE_DEVICES'] = "-1"
 
         # running
         try:
@@ -200,7 +202,14 @@ class TaskScheduler(object):
         return_list = manager.list()
 
         try:
-            # start local progress
+            # Starting local process
+            # Note: we have to use dill here because every argument passed to a child process over spawn or forkserver
+            # has to be pickled. fork mode does not require this because memory sharing, but it is unusable for CUDA
+            # applications (CUDA does not support fork) and multithreading issues (hanged threads).
+            # Usage of decorators makes standard pickling unusable (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled)
+            # Dill enables sending of decorated classes. Please note if some classes are used in the training function,
+            # those classes are best be defined inside the function - this way those can be constructed 'on-the-other-side'
+            # after deserialization.
             pickled_fn = dill.dumps(fn)
             with make_temp_directory() as tempdir:
                 p = CustomProcess(target=TaskScheduler._wrap(tempdir, partial(TaskScheduler._worker, pickled_fn)), args=(return_list, gpu_ids, args))
