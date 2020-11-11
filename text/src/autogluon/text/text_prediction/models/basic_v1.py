@@ -291,7 +291,6 @@ def train_function(args, reporter, train_data, tuning_data,
     # Get the ground-truth dev labels
     gt_dev_labels = np.array(tuning_data.table[label].apply(column_properties[label].transform))
     ctx_l = get_mxnet_available_ctx()
-    print('ctx_l=', ctx_l)
     base_batch_size = cfg.optimization.per_device_batch_size
     num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
     inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
@@ -299,24 +298,17 @@ def train_function(args, reporter, train_data, tuning_data,
                                   batch_size=base_batch_size,
                                   shuffle=True,
                                   batchify_fn=preprocessor.batchify(is_test=False))
-    print('train_dataloader=', train_dataloader)
     dev_dataloader = DataLoader(processed_dev,
                                 batch_size=inference_base_batch_size,
                                 shuffle=False,
                                 batchify_fn=preprocessor.batchify(is_test=True))
-    print('dev_dataloader=', dev_dataloader)
     net = BERTForTabularBasicV1(text_backbone=text_backbone,
                                 feature_field_info=preprocessor.feature_field_info(),
                                 label_shape=label_shapes[0],
                                 cfg=cfg.model.network)
-    print('net=', net)
-    print('backbone_params_path=', backbone_params_path)
-    print('ctx_l=', ctx_l)
     net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
-    print('net=', net)
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
-    print('num_total_params=', num_total_params, 'num_total_fixed_params=', num_total_fixed_params)
     logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
                                                            num_total_fixed_params))
     # Initialize the optimizer
@@ -354,7 +346,6 @@ def train_function(args, reporter, train_data, tuning_data,
     no_better_rounds = 0
     report_idx = 0
     start_tick = time.time()
-    print('start_tick=', start_tick)
     best_report_items = None
     for update_idx in tqdm.tqdm(range(max_update)):
         num_samples_per_update_l = [0 for _ in ctx_l]
@@ -590,7 +581,6 @@ class BertForTextPredictionBasic:
             time_limits = 5 * 60 * 60  # 5 hours
         if scheduler_options is None:
             scheduler_options = dict()
-        print('Resource[num_gpus]=', resource['num_gpus'], ' num_cpus=', resource['num_cpus'])
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,
