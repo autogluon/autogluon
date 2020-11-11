@@ -252,6 +252,7 @@ class TextPredictionV1Model(AbstractModel):
                    num_classes=model_info['num_classes'],
                    stopping_metric=model_info['stopping_metric'],
                    model=model,
+                   problem_type=model_info['problem_type'],
                    hyperparameters=hyperparameters,
                    features=model_info['features'],
                    feature_metadata=model_info['feature_metadata'])
