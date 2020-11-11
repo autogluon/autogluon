@@ -4,7 +4,8 @@ import collections
 import logging
 import pandas as pd
 import os
-from autogluon.core.constants import BINARY, REGRESSION
+from autogluon.core.utils.loaders import load_pkl, save_pkl
+from autogluon.core.constants import BINARY, REGRESSION, AG_ARGS_FIT
 from autogluon.core import metrics
 
 from ..abstract.abstract_model import AbstractModel
@@ -178,7 +179,6 @@ class TextPredictionV1Model(AbstractModel):
                                               X_val=X_val,
                                               y_val=y_val,
                                               hyperparameters=self.params)
-        print('X_train=', X_train)
         # Insert the label column
         X_train[self._label_column_name] = y_train
         X_val[self._label_column_name] = y_val
@@ -214,9 +214,23 @@ class TextPredictionV1Model(AbstractModel):
     def save(self, path: str = None, verbose=True) -> str:
         if path is None:
             path = self.path
-        logger.log(15, f'Save to {path}.')
-        self.model.save(path)
+        model_path = os.path.join(path, 'model')
+        logger.log(15, f'Save Model to {model_path}.')
+        logger.log(15, f'Save Model Info to {self.model_info_name}'
+                       f' and {self.model_info_json_name}.')
+        self.model.save(model_path)
+        self.save_info()
         return path
+
+    @classmethod
+    def load_info(cls, path, load_model_if_required=False) -> dict:
+        load_path = path + cls.model_info_name
+        return load_pkl.load(path=load_path)
+
+    def save_info(self) -> dict:
+        info = self.get_info()
+        save_pkl.save(path=self.path + self.model_info_name, object=info)
+        return info
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
@@ -227,4 +241,16 @@ class TextPredictionV1Model(AbstractModel):
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
         logger.log(15, f'Load from {path}.')
-        cls.model = BertForTextPredictionBasic.load(path)
+        model = BertForTextPredictionBasic.load(os.path.join(path, 'model'))
+        model_info = cls.load_info(path)
+        hyperparameters = model_info['hyperparameters']
+        hyperparameters[AG_ARGS_FIT] = model_info[AG_ARGS_FIT]
+        return cls(path=path,
+                   name=model_info['name'],
+                   eval_metric=model_info['eval_metric'],
+                   num_classes=model_info['num_classes'],
+                   stopping_metric=model_info['stopping_metric'],
+                   model=model,
+                   hyperparameters=hyperparameters,
+                   features=model_info['features'],
+                   feature_metadata=model_info['feature_metadata'])

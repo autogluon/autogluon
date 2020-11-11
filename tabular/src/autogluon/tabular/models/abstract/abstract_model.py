@@ -696,24 +696,26 @@ class AbstractModel:
         shutil.rmtree(path=model_path, ignore_errors=True)
 
     def get_info(self) -> dict:
-        info = dict(
-            name=self.name,
-            model_type=type(self).__name__,
-            problem_type=self.problem_type,
-            eval_metric=self.eval_metric.name,
-            stopping_metric=self.stopping_metric.name,
-            fit_time=self.fit_time,
-            predict_time=self.predict_time,
-            val_score=self.val_score,
-            hyperparameters=self.params,
-            hyperparameters_fit=self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
-            hyperparameters_nondefault=self.nondefault_params,
-            AG_args_fit=self.params_aux,
-            num_features=len(self.features) if self.features else None,
-            features=self.features,
-            # disk_size=self.get_disk_size(),
-            memory_size=self.get_memory_size(),  # Memory usage of model in bytes
-        )
+        info = {
+            'name': self.name,
+            'model_type': type(self).__name__,
+            'problem_type': self.problem_type,
+            'eval_metric': self.eval_metric.name,
+            'stopping_metric': self.stopping_metric.name,
+            'fit_time': self.fit_time,
+            'num_classes': self.num_classes,
+            'predict_time': self.predict_time,
+            'val_score': self.val_score,
+            'hyperparameters': self.params,
+            'hyperparameters_fit': self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
+            'hyperparameters_nondefault': self.nondefault_params,
+            AG_ARGS_FIT: self.params_aux,
+            'num_features': len(self.features) if self.features else None,
+            'features': self.features,
+            'feature_metadata': self.feature_metadata,
+            # 'disk_size': self.get_disk_size(),
+            'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
+        }
         return info
 
     @classmethod
