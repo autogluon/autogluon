@@ -130,8 +130,8 @@ class TextPredictionV1Model(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
             get_feature_kwargs=dict(
-                valid_raw_types=[R_INT, R_FLOAT],
-                valid_special_types=[S_TEXT],
+                valid_raw_types=[R_INT, R_FLOAT, R_OBJECT],
+                invalid_special_types=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
             ),
         )
         default_auxiliary_params.update(extra_auxiliary_params)
