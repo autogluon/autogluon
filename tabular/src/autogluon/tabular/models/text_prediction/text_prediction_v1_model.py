@@ -4,7 +4,8 @@ import collections
 import logging
 import pandas as pd
 import os
-from autogluon.core.utils.loaders import load_pkl, save_pkl
+from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_pkl
 from autogluon.core.constants import BINARY, REGRESSION, AG_ARGS_FIT
 from autogluon.core import metrics
 
