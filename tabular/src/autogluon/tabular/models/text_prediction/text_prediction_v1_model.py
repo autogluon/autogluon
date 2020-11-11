@@ -176,8 +176,8 @@ class TextPredictionV1Model(AbstractModel):
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus')
         num_gpus = kwargs.get('num_gpus')
-        X_train = X_train[['sentence_raw_text']]
-        X_val = X_val[['sentence_raw_text']]
+        X_train = self.preprocess(X_train)
+        X_val = self.preprocess(X_val)
         column_properties = self._build_model(X_train=X_train,
                                               y_train=y_train,
                                               X_val=X_val,
