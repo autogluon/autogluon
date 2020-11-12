@@ -41,6 +41,8 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision import datasets
 from torchvision import transforms
 
+logging.basicConfig(level=logging.INFO)
+
 
 @ag.args(
     n_units_1=ag.space.Int(lower=4, upper=1024),
@@ -222,8 +224,6 @@ def parse_args():
 if __name__ == "__main__":
 
     args = parse_args()
-
-    logging.root.setLevel(logging.INFO)
 
     # In case you want to run AutoGluon across multiple instances, you need to provide it with a list of
     # the IP addresses of the instances. Here, we assume that the IP addresses are stored in a .yaml file.
