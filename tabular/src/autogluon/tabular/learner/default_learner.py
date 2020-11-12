@@ -32,12 +32,14 @@ class DefaultLearner(AbstractLearner):
         self._time_limit = None
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
-    def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
+
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
             hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
+                X_unlabeled (DataFrame): data used for pretraining a model. This is same data format as X, without label-column. This data is used for semi-supervised learning.
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
@@ -67,7 +69,7 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
-        X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
+        X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
         self._time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
         logger.log(20, f'Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ...')
@@ -101,7 +103,7 @@ class DefaultLearner(AbstractLearner):
             self.stopping_metric = trainer.stopping_metric
 
         self.save()
-        trainer.train(X, y, X_val, y_val, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
+        trainer.train(X, y, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
                       hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limit_trainer)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
@@ -109,9 +111,11 @@ class DefaultLearner(AbstractLearner):
         self._time_fit_total = time_end - time_preprocessing_start
         logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ...')
 
-    def general_data_processing(self, X: DataFrame, X_val: DataFrame, holdout_frac: float, num_bagging_folds: int):
+    # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bagging_folds
+    def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bagging_folds: int):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
+
         # TODO: We should probably uncomment the below lines, NaN label should be treated as just another value in multiclass classification -> We will have to remove missing, compute problem type, and add back missing if multiclass
         # if self.problem_type == MULTICLASS:
         #     X[self.label] = X[self.label].fillna('')
@@ -171,7 +175,7 @@ class DefaultLearner(AbstractLearner):
         if X_val is not None:
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
             logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
-            X_super = pd.concat([X, X_val], ignore_index=True)
+            X_super = pd.concat([X, X_val, X_unlabeled], ignore_index=True)
             if self.feature_generator.is_fit():
                 logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
                 X_super = self.feature_generator.transform(X_super)
@@ -179,17 +183,28 @@ class DefaultLearner(AbstractLearner):
             else:
                 X_super = self.feature_generator.fit_transform(X_super)
             X = X_super.head(len(X)).set_index(X.index)
-            X_val = X_super.tail(len(X_val)).set_index(X_val.index)
+
+            X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)
+
+            if X_unlabeled is not None:
+                X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
         else:
+            X_super = pd.concat([X, X_unlabeled], ignore_index=True)
             if self.feature_generator.is_fit():
                 logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
-                X = self.feature_generator.transform(X)
+                X_super = self.feature_generator.transform(X_super)
                 self.feature_generator.print_feature_metadata_info()
             else:
-                X = self.feature_generator.fit_transform(X)
+                X_super = self.feature_generator.fit_transform(X_super)
 
-        return X, y, X_val, y_val, holdout_frac, num_bagging_folds
+            X = X_super.head(len(X)).set_index(X.index)
+            if X_unlabeled is not None:
+                X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
+            del X_super
+
+
+        return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bagging_folds
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
         new_threshold, new_holdout_frac, new_num_bagging_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bagging_folds)

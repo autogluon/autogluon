@@ -229,16 +229,14 @@ class AbstractTrainer:
     # TODO: Enable feature prune on levels > 0
     # TODO: Remove name_suffix, hacked in
     # TODO: Enable easier re-mapping of trained models -> hyperparameters input (They don't share a key since name can change)
-    def train_multi_levels(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, base_model_names: List[str] = None, hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, level_start=0, level_end=0, stack_name_core='core', stack_name_aux='aux1', time_limit=None, name_suffix='') -> List[str]:
+    def train_multi_levels(self, X_train, y_train, X_val, y_val, X_unlabeled=None, hyperparameters: dict = None, base_model_names: List[str] = None, hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, level_start=0, level_end=0, stack_name_core='core', stack_name_aux='aux1', time_limit=None, name_suffix='') -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
             hyperparameters is used to determine the models used in each stack layer.
         If continuing a stack ensemble with level_start>0, ensure that base_model_names is set to the appropriate base models that will be used by the level_start level models.
-
         Trains both core and aux models.
             core models are standard models which are fit on the data features. Core models will also use model predictions if base_model_names was specified or if level != 0.
             aux models are ensemble models which only use the predictions of core models as features. These models never use the original features.
-
         Returns a list of the model names that were trained from this method call, in order of fit.
         """
         self._time_limit = time_limit
@@ -283,7 +281,7 @@ class AbstractTrainer:
                 feature_prune = False  # TODO: Enable feature prune on levels > 0
             models = self.get_models(hyperparameters, hyperparameter_tune=hyperparameter_tune, level=level)
             base_model_names, aux_models = self.stack_new_level(
-                X=X_train, y=y_train, X_val=X_val, y_val=y_val,
+                X=X_train, y=y_train, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
                 models=models, level=level, base_model_names=base_model_names,
                 hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                 stack_name_core=stack_name_core, stack_name_aux=stack_name_aux,
@@ -297,13 +295,13 @@ class AbstractTrainer:
         return model_names_fit
 
     # TODO: Remove name_suffix_aux, hacked in
-    def stack_new_level(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, level=0, base_model_names: List[str] = None, hyperparameter_tune=False, feature_prune=False, stack_name_core='core', stack_name_aux='aux1', core_kwargs: dict = None, time_limit_core=None, time_limit_aux=None, name_suffix_aux='') -> (List[str], List[str]):
+    def stack_new_level(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, X_unlabeled=None, level=0, base_model_names: List[str] = None, hyperparameter_tune=False, feature_prune=False, stack_name_core='core', stack_name_aux='aux1', core_kwargs: dict = None, time_limit_core=None, time_limit_aux=None, name_suffix_aux='') -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
         """
         if core_kwargs is None:
             core_kwargs = {}
-        core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, models=models, level=level, base_model_names=base_model_names, stack_name=stack_name_core, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit_core, **core_kwargs)
+        core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models, level=level, base_model_names=base_model_names, stack_name=stack_name_core, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit_core, **core_kwargs)
         aux_args = dict(base_model_names=core_models, level=level+1, stack_name=stack_name_aux, time_limit=time_limit_aux, name_suffix=name_suffix_aux)
         if self.bagged_mode:
             aux_models = self.stack_new_level_aux(X=X, y=y, **aux_args)
@@ -311,7 +309,7 @@ class AbstractTrainer:
             aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, **aux_args)
         return core_models, aux_models
 
-    def stack_new_level_core(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, level=0, base_model_names: List[str] = None, stack_name='core', k_fold=None, n_repeats=None, hyperparameter_tune=False, feature_prune=False, time_limit=None, save_bagged_folds=None, use_orig_features=True, stacker_type=StackerEnsembleModel) -> List[str]:
+    def stack_new_level_core(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, X_unlabeled=None, level=0, base_model_names: List[str] = None, stack_name='core', k_fold=None, n_repeats=None, hyperparameter_tune=False, feature_prune=False, time_limit=None, save_bagged_folds=None, use_orig_features=True, stacker_type=StackerEnsembleModel) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 0, then the models will use base model predictions as additional features.
@@ -360,7 +358,7 @@ class AbstractTrainer:
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
 
-        return self._train_multi(X_train=X_train_init, y_train=y, X_val=X_val, y_val=y_val, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, stack_name=stack_name, k_fold=k_fold, n_repeats=n_repeats, time_limit=time_limit)
+        return self._train_multi(X_train=X_train_init, y_train=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, stack_name=stack_name, k_fold=k_fold, n_repeats=n_repeats, time_limit=time_limit)
 
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
@@ -368,7 +366,6 @@ class AbstractTrainer:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
-
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
         X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit)
@@ -559,7 +556,7 @@ class AbstractTrainer:
     # TODO: v0.1 this does not ensure unique model names (although the models they are refitting from should be unique, making this produce unique names as well)
     # You must have previously called fit() with cache_data=True
     # Fits _FULL versions of specified models, but does NOT link them (_FULL stackers will still use normal models as input)
-    def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, models=None):
+    def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, X_unlabeled=None, models=None):
         if X is None:
             X = self.load_X_train()
             if X_val is None and not self.bagged_mode:
@@ -628,7 +625,7 @@ class AbstractTrainer:
                         self.save_model(model_loaded)
                 else:
                     base_model_names = self.get_minimum_model_set(model_name, include_self=False)
-                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, k_fold=0, n_repeats=1, save_bagged_folds=True, stacker_type=stacker_type)
+                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, k_fold=0, n_repeats=1, save_bagged_folds=True, stacker_type=stacker_type)
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
                 models_trained_full += models_trained
@@ -839,8 +836,7 @@ class AbstractTrainer:
             hyperparameters=hyperparameters, eval_metric=self.eval_metric, stopping_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed,
             **extra_params
         )
-
-        self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
+        self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, X_unlabeled=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if check_if_best and weighted_ensemble_model.name in self.get_model_names_all():
             if self.model_best is None:
                 self.model_best = weighted_ensemble_model.name
@@ -852,21 +848,21 @@ class AbstractTrainer:
                     self.model_best = weighted_ensemble_model.name
         return [weighted_ensemble_model.name]
 
-    def _train_single(self, X_train, y_train, model: AbstractModel, X_val=None, y_val=None, **model_fit_kwargs) -> AbstractModel:
+    def _train_single(self, X_train, y_train, model: AbstractModel, X_val=None, y_val=None, X_unlabeled=None, **model_fit_kwargs) -> AbstractModel:
         """
         Trains model but does not add the trained model to this Trainer.
-
         Returns trained model object.
         """
         if model.feature_metadata is None:
             model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: move this into model creation process?
+
         if isinstance(model, BaggedEnsembleModel):
-            model.fit(X=X_train, y=y_train, **model_fit_kwargs)
+            model.fit(X=X_train, y=y_train, X_unlabeled=X_unlabeled, **model_fit_kwargs)
         else:
-            model.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **model_fit_kwargs)
+            model.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, **model_fit_kwargs)
         return model
 
-    def _train_and_save(self, X_train, y_train, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=0, **model_fit_kwargs) -> List[str]:
+    def _train_and_save(self, X_train, y_train, model: AbstractModel, X_val=None, y_val=None, X_unlabeled=None, stack_name='core', level=0, **model_fit_kwargs) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -874,7 +870,6 @@ class AbstractTrainer:
             The model will have metadata information stored in self.model_graph.
             The model's name will be appended to self.models_level[stack_name][level]
             The model will be accessible and usable through any Trainer function that takes as input 'model' or 'model_name'.
-
         Note: self._train_and_save should not be used outside of self._train_single_full
         """
         fit_start_time = time.time()
@@ -892,7 +887,7 @@ class AbstractTrainer:
                 logging.log(20, f'Fitting model: {model.name} ... Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.')
             else:
                 logging.log(20, f'Fitting model: {model.name} ...')
-            model = self._train_single(X_train, y_train, model, X_val, y_val, **model_fit_kwargs)
+            model = self._train_single(X_train, y_train, model, X_val, y_val, X_unlabeled=X_unlabeled, **model_fit_kwargs)
             fit_end_time = time.time()
             if isinstance(model, BaggedEnsembleModel):
                 if model.bagged_mode or isinstance(model, WeightedEnsembleModel):
@@ -940,9 +935,7 @@ class AbstractTrainer:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
-
         If self.low_memory, then the model object will be deleted after this call. Use Trainer directly to leverage the model further.
-
         Parameters
         ----------
         model : AbstractModel
@@ -989,12 +982,11 @@ class AbstractTrainer:
             del model
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
-    def _train_single_full(self, X_train, y_train, model: AbstractModel, X_val=None, y_val=None, feature_prune=False,
+    def _train_single_full(self, X_train, y_train, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False,
                            hyperparameter_tune=False, stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
-
         Models trained from this method will be accessible in this Trainer.
         """
         if k_fold is None:
@@ -1055,7 +1047,7 @@ class AbstractTrainer:
                     'num_cpus': self._scheduler_options['resource']['num_cpus'],
                     'num_gpus': self._scheduler_options['resource']['num_gpus'],
                 })  # Additional configurations for model.fit
-            model_names_trained = self._train_and_save(X_train, y_train, model, X_val, y_val, stack_name=stack_name, level=level, **model_fit_kwargs)
+            model_names_trained = self._train_and_save(X_train, y_train, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
         self.save()
         return model_names_trained
 
@@ -1063,12 +1055,12 @@ class AbstractTrainer:
     # TODO: Time allowance can be made better by only using time taken during final model training and not during HPO and feature pruning.
     # TODO: Time allowance not accurate if running from fit_continue
     # TODO: Remove level and stack_name arguments, can get them automatically
-    def _train_multi_repeats(self, X_train, y_train, X_val, y_val, models: list, k_fold, n_repeats, n_repeat_start=1, stack_name='core', level=0, time_limit=None, time_limit_total_level=None) -> List[str]:
+    # TODO: Make sure that pretraining on X_unlabeled only happens 1 time rather than every fold of bagging. (Do during pretrain API work?)
+    def _train_multi_repeats(self, X_train, y_train, X_val, y_val, models: list, k_fold, n_repeats, n_repeat_start=1, stack_name='core', level=0, X_unlabeled=None, time_limit=None, time_limit_total_level=None) -> List[str]:
         """
         Fits bagged ensemble models with additional folds and/or bagged repeats.
         Models must have already been fit prior to entering this method.
         This method should only be called in self._train_multi
-
         Returns a list of successfully trained and saved model names.
         """
         if time_limit_total_level is None:
@@ -1099,18 +1091,18 @@ class AbstractTrainer:
                 else:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
-                models_valid_next += self._train_single_full(X_train, y_train, model, X_val, y_val, stack_name=stack_name, k_fold=k_fold, k_fold_start=0, k_fold_end=None, n_repeats=n + 1, n_repeat_start=n, level=level, time_limit=time_left)
+
+                models_valid_next += self._train_single_full(X_train=X_train, y_train=y_train, model=model, X_unlabeled=X_unlabeled, X_val=X_val, y_val=y_val, stack_name=stack_name, k_fold=k_fold, k_fold_start=0, k_fold_end=None, n_repeats=n + 1, n_repeat_start=n, level=level, time_limit=time_left)
             models_valid = copy.deepcopy(models_valid_next)
             models_valid_next = []
             repeats_completed += 1
         logger.log(20, f'Completed {n_repeat_start + repeats_completed}/{n_repeats} k-fold bagging repeats ...')
         return models_valid
 
-    def _train_multi_initial(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], k_fold, n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name='core', level=0, time_limit=None) -> List[str]:
+    def _train_multi_initial(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], k_fold, n_repeats, X_unlabeled=None, hyperparameter_tune=False, feature_prune=False, stack_name='core', level=0, time_limit=None) -> List[str]:
         """
         Fits models that have not previously been fit.
         This method should only be called in self._train_multi
-
         Returns a list of successfully trained and saved model names.
         """
         fit_args = dict(
@@ -1118,6 +1110,7 @@ class AbstractTrainer:
             y_train=y_train,
             X_val=X_val,
             y_val=y_val,
+            X_unlabeled=X_unlabeled,
             stack_name=stack_name,
             k_fold=k_fold,
             level=level,
@@ -1150,11 +1143,10 @@ class AbstractTrainer:
     # TODO: Robert dataset, LightGBM is super good but RF and KNN take all the time away from it on 1h despite being much worse
     # TODO: Add time_limit_per_model
     # TODO: Rename for v0.1
-    def _train_multi_fold(self, X_train, y_train, models: List[AbstractModel], time_limit=None, **kwargs) -> List[str]:
+    def _train_multi_fold(self, X_train, y_train, models: List[AbstractModel], X_unlabeled=None, time_limit=None, **kwargs) -> List[str]:
         """
         Trains and saves a list of models sequentially.
         This method should only be called in self._train_multi_initial
-
         Returns a list of trained model names.
         """
         models_valid = []
@@ -1170,7 +1162,7 @@ class AbstractTrainer:
             else:
                 time_start_model = time.time()
                 time_left = time_limit - (time_start_model - time_start)
-            model_name_trained_lst = self._train_single_full(X_train, y_train, model, time_limit=time_left, **kwargs)
+            model_name_trained_lst = self._train_single_full(X_train, y_train, model, X_unlabeled=X_unlabeled, time_limit=time_left, **kwargs)
 
             if self.low_memory:
                 del model
@@ -1178,14 +1170,12 @@ class AbstractTrainer:
 
         return models_valid
 
-    def _train_multi(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], hyperparameter_tune=False, feature_prune=False, stack_name='core', k_fold=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None) -> List[str]:
+    def _train_multi(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], X_unlabeled=None, hyperparameter_tune=False, feature_prune=False, stack_name='core', k_fold=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None) -> List[str]:
         """
         Train a list of models using the same data.
         Assumes that input data has already been processed in the form the models will receive as input (including stack feature generation).
         Trained models are available in the trainer object.
-
         Note: Consider using public APIs instead of this.
-
         Returns a list of trained model names.
         """
         time_limit_total_level = time_limit
@@ -1201,7 +1191,7 @@ class AbstractTrainer:
             n_repeats_initial = 1
         if n_repeat_start == 0:
             time_start = time.time()
-            model_names_trained = self._train_multi_initial(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, models=models, k_fold=k_fold, n_repeats=n_repeats_initial, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+            model_names_trained = self._train_multi_initial(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models, k_fold=k_fold, n_repeats=n_repeats_initial, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                                                             stack_name=stack_name, level=level, time_limit=time_limit)
             n_repeat_start = n_repeats_initial
             if time_limit is not None:
@@ -1209,11 +1199,11 @@ class AbstractTrainer:
         else:
             model_names_trained = models
         if (n_repeats > 1) and self.bagged_mode and (n_repeat_start < n_repeats):
-            model_names_trained = self._train_multi_repeats(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, models=model_names_trained,
+            model_names_trained = self._train_multi_repeats(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=model_names_trained,
                                                             k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, stack_name=stack_name, level=level, time_limit=time_limit, time_limit_total_level=time_limit_total_level)
         return model_names_trained
 
-    def _train_multi_and_ensemble(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, hyperparameter_tune=False, feature_prune=False, time_limit=None) -> List[str]:
+    def _train_multi_and_ensemble(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, hyperparameter_tune=False, feature_prune=False, time_limit=None) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if self.save_data and not self.is_data_saved:
             self.save_X_train(X_train)
@@ -1228,7 +1218,7 @@ class AbstractTrainer:
         if X_val is not None:
             self._num_rows_train += len(X_val)
         self._num_cols_train = len(list(X_train.columns))
-        model_names_fit = self.train_multi_levels(X_train, y_train, X_val, y_val, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level_start=0, level_end=self.stack_ensemble_levels, time_limit=time_limit)
+        model_names_fit = self.train_multi_levels(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level_start=0, level_end=self.stack_ensemble_levels, time_limit=time_limit)
         if len(self.get_model_names_all()) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
         return model_names_fit
@@ -1846,7 +1836,7 @@ class AbstractTrainer:
             hyperparameters_valid['default'] = copy.deepcopy(hyperparameters_valid[max_level_key])
         return hyperparameters_valid
 
-    def distill(self, X_train=None, y_train=None, X_val=None, y_val=None,
+    def distill(self, X_train=None, y_train=None, X_val=None, y_val=None, X_unlabeled=None,
                 time_limits=None, hyperparameters=None, holdout_frac=None, verbosity=None,
                 models_name_suffix=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
@@ -1942,7 +1932,7 @@ class AbstractTrainer:
                     y_train = pd.Series(y_train)
         else:
             X_aug = augment_data(X_train=X_train, feature_metadata=self.feature_metadata,
-                                augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
+                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
             if len(X_aug) > 0:
                 if teacher_preds == 'hard':
                     y_aug = pd.Series(self.predict(X_aug))
@@ -1975,8 +1965,8 @@ class AbstractTrainer:
                 hyperparameters ={key: hyperparameters[key] for key in hyperparameters if key in student_model_types}
                 if len(hyperparameters) == 0:
                     raise ValueError("Distillation not yet supported for fit() with per-stack level hyperparameters. "
-                        "Please either manually specify `hyperparameters` in `distill()` or call `fit()` again without per-level hyperparameters before distillation."
-                        "Also at least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN','RF']")
+                                     "Please either manually specify `hyperparameters` in `distill()` or call `fit()` again without per-level hyperparameters before distillation."
+                                     "Also at least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN','RF']")
         else:
             hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=None, excluded_model_types=None)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
         if teacher_preds is None or teacher_preds == 'hard':
@@ -1997,7 +1987,7 @@ class AbstractTrainer:
                 time_left = time_limits - (time_start_model - time_train_start)
 
             logger.log(15, f"Distilling student {str(model.name)} with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)}...")
-            models = self._train_single_full(X_train=X_train, y_train=y_train, model=model, X_val=X_val, y_val=y_val,
+            models = self._train_single_full(X_train=X_train, y_train=y_train, model=model, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
                                              hyperparameter_tune=False, stack_name=self.distill_stackname, time_limit=time_left)
             for model_name in models:  # finally measure original metric on validation data and overwrite stored val_scores
                 model_score = self.score(X_val, y_val_og, model=model_name)
