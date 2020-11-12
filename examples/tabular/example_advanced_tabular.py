@@ -14,13 +14,15 @@ label_column = 'class' # specifies which column do we want to predict
 savedir = 'ag_hpo_models/' # where to save trained models
 
 hyperparams = {'NN': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': ag.Real(0.0,0.5)},
-               'GBM': {'num_boost_round': 1000, 'learning_rate': ag.Real(0.01,0.1,log=True)} }
+               'GBM': {'num_boost_round': 1000, 'learning_rate': ag.Real(0.01,0.1,log=True)},
+               'XGB': {'n_estimators': 1000, 'learning_rate': ag.Real(0.01,0.1,log=True)} }
 
 predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir,
                      hyperparameter_tune=True, hyperparameters=hyperparams,
                      num_trials=5, time_limits=1*60, num_bagging_folds=0, stack_ensemble_levels=0) # since tuning_data = None, automatically determines train/validation split
 
 results = predictor.fit_summary() # display detailed summary of fit() process
+print(results)
 
 # Inference time:
 test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv') # another Pandas DataFrame

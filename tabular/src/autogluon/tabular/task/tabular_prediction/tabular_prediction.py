@@ -217,6 +217,7 @@ class TabularPrediction(BaseTask):
                         {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
                     ],
                     'CAT': {},
+                    'XGB': {},
                     'RF': [
                         {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
                         {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
@@ -241,6 +242,8 @@ class TabularPrediction(BaseTask):
                      See also the lightGBM docs: https://lightgbm.readthedocs.io/en/latest/Parameters.html
                 CAT: `autogluon/utils/tabular/ml/models/catboost/hyperparameters/parameters.py`
                      See also the CatBoost docs: https://catboost.ai/docs/concepts/parameter-tuning.html
+                XGB: `autogluon/utils/tabular/ml/models/xgboost/hyperparameters/parameters.py`
+                     See also the XGBoost docs: https://xgboost.readthedocs.io/en/latest/parameter.html
                 RF: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
                 XT: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
