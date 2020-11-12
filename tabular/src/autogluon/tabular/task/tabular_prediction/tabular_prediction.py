@@ -429,6 +429,17 @@ class TabularPrediction(BaseTask):
                 List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
             visualizer : str, default = None
                 How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', None].
+            unlabeled_data : pd.DataFrame, default = None
+                Collection of data without labels that we can use to pretrain on. This is the same schema as train_data, except
+                without the labels. Currently, unlabeled_data is only used for pretraining a TabTransformer model.
+                If you do not specify 'TRANSF' with unlabeled_data, then no pretraining will occur and unlabeled_data will be ignored!
+                After the pretraining step, we will finetune using the TabTransformer model as well. If TabTransformer is ensembled
+                with other models, like in typical AutoGluon fashion, then the output of this "pretrain/finetune" will be ensembled
+                with other models, which will not used the unlabeled_data. The "pretrain/finetune flow" is also known as semi-supervised learning.
+                The typical use case for unlabeled_data is to add signal to your model where you may not have sufficient training
+                data. e.g. 500 hand-labeled samples (perhaps a hard human task), whole data set (unlabeled) is thousands/millions.
+                However, this isn't the only use case. Given enough unlabeled data(millions of rows), you may see improvements
+                to any amount of labeled data.
 
         Returns
         -------
@@ -483,6 +494,7 @@ class TabularPrediction(BaseTask):
             'dist_ip_addrs',
             'visualizer',
             '_feature_generator_kwargs',
+            'unlabeled_data',
         }
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
@@ -501,6 +513,7 @@ class TabularPrediction(BaseTask):
         ngpus_per_trial = kwargs.get('ngpus_per_trial', None)
         dist_ip_addrs = kwargs.get('dist_ip_addrs', None)
         visualizer = kwargs.get('visualizer', None)
+        unlabeled_data = kwargs.get('unlabeled_data', None)
 
         if isinstance(train_data, str):
             train_data = TabularDataset(file_path=train_data)
@@ -514,6 +527,12 @@ class TabularPrediction(BaseTask):
             tuning_features = np.array([column for column in tuning_data.columns if column != label])
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
+        if unlabeled_data is not None:
+            train_features = np.array([column for column in train_data.columns if column != label])
+            unlabeled_features = np.array([column for column in unlabeled_data.columns])
+            if np.any(train_features != unlabeled_features):
+                raise ValueError("Column names must match between training and unlabeled data.\n"
+                                 "Unlabeled data must have not the label column specified in it.\n")
 
         if feature_prune:
             feature_prune = False  # TODO: Fix feature pruning to add back as an option
@@ -626,7 +645,7 @@ class TabularPrediction(BaseTask):
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold, random_seed=random_seed)
-        learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
+        learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)

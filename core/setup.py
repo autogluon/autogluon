@@ -33,6 +33,8 @@ def create_version_file():
     with open(version_path, 'w') as f:
         f.write('"""This is autogluon version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
+    with open(os.path.join('..', 'VERSION.minor'), 'w') as f:
+        f.write(day)
 
 
 long_description = open(os.path.join('..', 'README.md')).read()

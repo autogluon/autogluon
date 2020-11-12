@@ -19,6 +19,7 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
+from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 
 
@@ -33,8 +34,9 @@ DEFAULT_MODEL_PRIORITY = dict(
     CAT=60,
     NN=50,
     FASTAI=45,
-    TEXT_NN_V1=42,
     LR=40,
+    TEXT_NN_V1=0,
+    TRANSF=0,
     custom=0,
 )
 
@@ -67,6 +69,7 @@ MODEL_TYPES = dict(
     NN=TabularNeuralNetModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
+    TRANSF=TabTransformerModel,
     TEXT_NN_V1=TextPredictionV1Model,
 )
 
@@ -79,6 +82,7 @@ DEFAULT_MODEL_NAMES = {
     TabularNeuralNetModel: 'NeuralNet',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'FastAINeuralNet',
+    TabTransformerModel: 'Transformer',
     TextPredictionV1Model: 'TextNeuralNetV1',
 }
 
