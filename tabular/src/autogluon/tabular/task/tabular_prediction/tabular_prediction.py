@@ -508,6 +508,7 @@ class TabularPrediction(BaseTask):
         # TODO: v0.1 - id_columns -> ignored_columns?
         # TODO: v0.1 - nthreads_per_trial/ngpus_per_trial -> rename/rework
         # TODO: v0.1 - visualizer -> consider reworking/removing
+        # TODO: v0.1 - stack_ensemble_levels is silently ignored if num_bagging_folds < 2, ensure there is a warning printed
 
         feature_prune = kwargs.get('feature_prune', False)
         scheduler_options = kwargs.get('scheduler_options', None)
