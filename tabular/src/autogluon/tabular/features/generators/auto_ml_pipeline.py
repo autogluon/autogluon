@@ -92,7 +92,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                 valid_raw_types=[R_INT, R_FLOAT])))
         if self.enable_raw_text_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
-                valid_special_types=[S_TEXT]), name_suffix='_raw_text'))
+                required_special_types=[S_TEXT]), name_suffix='_raw_text'))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
         if self.enable_datetime_features:
