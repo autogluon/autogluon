@@ -6,7 +6,7 @@ from .datetime import DatetimeFeatureGenerator
 from .identity import IdentityFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
-from ..feature_metadata import R_INT, R_FLOAT
+from ..feature_metadata import R_INT, R_FLOAT, S_TEXT
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,9 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     enable_text_ngram_features : bool, default True
         Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
         Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
+    enable_raw_text_features : bool, default True
+        Whether to use the raw text features. The generated raw text features will end up with '_raw_text' postfix.
+        For exampel, 'sentence' --> 'sentence_raw_text'
     vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
         Only used if `enable_text_ngram_features=True`.
@@ -62,8 +65,10 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     >>>
     >>> X_test_transformed = feature_generator.transform(test_data)
     """
-    def __init__(self, enable_numeric_features=True, enable_categorical_features=True, enable_datetime_features=True,
-                 enable_text_special_features=True, enable_text_ngram_features=True, vectorizer=None, **kwargs):
+    def __init__(self, enable_numeric_features=True, enable_categorical_features=True,
+                 enable_datetime_features=True,
+                 enable_text_special_features=True, enable_text_ngram_features=True,
+                 enable_raw_text_features=True, vectorizer=None, **kwargs):
         if 'generators' in kwargs:
             raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
         if 'enable_raw_features' in kwargs:
@@ -75,6 +80,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_datetime_features = enable_datetime_features
         self.enable_text_special_features = enable_text_special_features
         self.enable_text_ngram_features = enable_text_ngram_features
+        self.enable_raw_text_features = enable_raw_text_features
 
         generators = self._get_default_generators(vectorizer=vectorizer)
         super().__init__(generators=generators, **kwargs)
@@ -82,7 +88,11 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     def _get_default_generators(self, vectorizer=None):
         generator_group = []
         if self.enable_numeric_features:
-            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])))
+            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
+                valid_raw_types=[R_INT, R_FLOAT])))
+        if self.enable_raw_text_features:
+            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
+                valid_special_types=[S_TEXT]), name_suffix='_raw_text'))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
         if self.enable_datetime_features:
