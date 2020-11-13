@@ -3,7 +3,7 @@ import logging
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT
+from ..feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, S_TEXT
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +36,16 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
         max_unique_value_count = X_len * max_unique_ratio
         for column in X:
             unique_value_count = len(X[column].unique())
+            # Drop features that are always the same
             if unique_value_count == 1:
                 features_to_drop.append(column)
-            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT] and (unique_value_count > max_unique_value_count):
-                features_to_drop.append(column)
+            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT]\
+                    and (unique_value_count > max_unique_value_count):
+                if S_TEXT in feature_metadata.get_feature_types_special(column):
+                    # We should not drop a text column
+                    continue
+                else:
+                    features_to_drop.append(column)
         return features_to_drop
 
     def _more_tags(self):
