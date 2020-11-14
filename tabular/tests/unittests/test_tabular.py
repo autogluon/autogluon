@@ -287,6 +287,15 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                               (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
             if run_distill:
                 predictor.distill(time_limits=60, augment_args={'size_factor':0.5})
+            if predictor._trainer.bagged_mode:
+                y_train_pred_oof = predictor.get_oof_pred()
+                y_train_pred_proba_oof = predictor.get_oof_pred_proba()
+            else:
+                # Raise exception
+                with pytest.raises(AssertionError):
+                    predictor.get_oof_pred()
+                with pytest.raises(AssertionError):
+                    predictor.get_oof_pred_proba()
     # Summarize:
     avg_perf = np.mean(performance_vals)
     median_perf = np.median(performance_vals)

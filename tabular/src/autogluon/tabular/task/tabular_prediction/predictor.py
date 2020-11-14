@@ -1,5 +1,6 @@
 import copy
 import logging
+from typing import Union
 
 import pandas as pd
 
@@ -7,9 +8,10 @@ from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from autogluon.core.task.base import BasePredictor
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
-from ...utils import REGRESSION
+from ...utils import BINARY, MULTICLASS, REGRESSION, get_pred_from_proba
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
+from ...data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.utils.utils import setup_outputdir
 
 __all__ = ['TabularPredictor']
@@ -92,6 +94,7 @@ class TabularPredictor(BasePredictor):
         self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
         self.class_labels_internal_map = self._learner.label_cleaner.inv_map
 
+    # TODO: v0.1 as_pandas=True by default to avoid user confusion and errors with mismatching indices?
     def predict(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
 
@@ -115,6 +118,7 @@ class TabularPredictor(BasePredictor):
         dataset = self.__get_dataset(dataset)
         return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas)
 
+    # TODO: v0.1 as_pandas=True by default to avoid user confusion on class names and errors with mismatching indices?
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
             If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
@@ -500,9 +504,6 @@ class TabularPredictor(BasePredictor):
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         return self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models, use_orig_features=return_original_features)
 
-    # TODO: Add support for DataFrame input and support for DataFrame output
-    #  Add support for retaining DataFrame/Series indices in output
-    #  Add as_pandas parameter
     def transform_labels(self, labels, inverse=False, proba=False):
         """
         Transforms dataset labels to the internal label representation.
@@ -520,7 +521,7 @@ class TabularPredictor(BasePredictor):
             When `True`, the input labels are treated as being in the internal representation and the original representation is outputted.
         proba : boolean, default = False
             When `True`, the input labels are treated as probabilities and the output will be the internal representation of probabilities.
-                In this case, it is expected that `labels` be a `numpy.ndarray`.
+                In this case, it is expected that `labels` be a `pandas.DataFrame` or `numpy.ndarray`.
                 If the `problem_type` is multiclass:
                     The input column order must be equal to `predictor.class_labels`.
                     The output column order will be equal to `predictor.class_labels_internal`.
@@ -530,17 +531,17 @@ class TabularPredictor(BasePredictor):
 
         Returns
         -------
-        Pandas `pandas.Series` of labels if `proba=False` or Numpy `numpy.ndarray` of label probabilities if `proba=True`
+        Pandas `pandas.Series` of labels if `proba=False` or Pandas `pandas.DataFrame` of label probabilities if `proba=True`
 
         """
         if inverse:
             if proba:
-                labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels)
+                labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels, as_pandas=True)
             else:
                 labels_transformed = self._learner.label_cleaner.inverse_transform(y=labels)
         else:
             if proba:
-                labels_transformed = self._learner.label_cleaner.transform_proba(y=labels)
+                labels_transformed = self._learner.label_cleaner.transform_proba(y=labels, as_pandas=True)
             else:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
@@ -815,6 +816,116 @@ class TabularPredictor(BasePredictor):
         models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=base_models, name_suffix=name_suffix, time_limit=time_limits)
 
         return models
+
+    # TODO: v0.1 This can cause very strange issues related to index mismatches with original training data on extreme edge cases (multiclass where autogluon duplicated rows in data due to rare classes and eval_metric was log_loss)
+    #  This is a very rare case but needs to be fixed by v0.1 release
+    #  It might be good enough to do an inner join on training data, but it needs to be tested
+    def get_oof_pred(self, model: str = None, transformed=False) -> pd.Series:
+        """
+        Note: This is advanced functionality not intended for normal usage.
+
+        Returns the out-of-fold (OOF) training predictions of a model.
+        OOF predictions are unbiased estimates of model predictions on the training data.
+
+        Warning: This method will raise an exception if called on a model that is not a bagged ensemble. Only bagged models (such a stacker models) can produce OOF predictions.
+        Warning: If intending to join the output of this method with the original training data, be aware that a rare edge-case issue exists:
+            Multiclass problems with rare classes combined with the use of the 'log_loss' eval_metric may have forced AutoGluon to duplicate rows in the training data to satisfy minimum class counts in the data.
+            If this has occurred, then the indices and row counts of the returned pandas Series in this method may not align with the training data.
+            In this case, consider fetching the processed training data using `predictor.load_data_internal()` instead of using the original training data.
+            A more benign version of this issue occurs when 'log_loss' wasn't specified as the eval_metric but rare classes were dropped by AutoGluon.
+            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via `predictor.predict`.
+
+        Parameters
+        ----------
+        model : str (optional)
+            The name of the model to get out-of-fold predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+        transformed : bool, default = False
+            Whether the output values should be of the external label representation (False) or the internal label representation (True).
+            Generally, most users will want the external representation and keep `transformed=False`.
+
+        Returns
+        -------
+        :class:`pd.Series` object of the out-of-fold training predictions of the model.
+        """
+        y_pred_proba_oof_transformed = self.get_oof_pred_proba(model=model, transformed=True)
+        y_pred_oof_transformed = get_pred_from_proba(y_pred_proba=y_pred_proba_oof_transformed.to_numpy(), problem_type=self._trainer.problem_type)
+        if transformed:
+            return y_pred_oof_transformed
+        else:
+            return self.transform_labels(labels=y_pred_oof_transformed, inverse=True, proba=False)
+
+    # TODO: v0.1 add tutorial related to this method, as it is very powerful.
+    # TODO: v0.1 This can cause very strange issues related to index mismatches with original training data on extreme edge cases (multiclass where autogluon duplicated rows in data due to rare classes and eval_metric was logloss)
+    #  This is a very rare case but needs to be fixed by v0.1 release
+    #  It might be good enough to do an inner join on training data, but it needs to be tested
+    def get_oof_pred_proba(self, model: str = None, transformed=False, as_multiclass=False) -> Union[pd.DataFrame, pd.Series]:
+        """
+        Note: This is advanced functionality not intended for normal usage.
+
+        Returns the out-of-fold (OOF) training prediction probabilities of a model.
+        OOF prediction probabilities are unbiased estimates of model prediction probabilities on the training data.
+
+        Warning: This method will raise an exception if called on a model that is not a bagged ensemble. Only bagged models (such a stacker models) can produce OOF predictions.
+        Warning: If intending to join the output of this method with the original training data, be aware that a rare edge-case issue exists:
+            Multiclass problems with rare classes combined with the use of the 'log_loss' eval_metric may have forced AutoGluon to duplicate rows in the training data to satisfy minimum class counts in the data.
+            If this has occurred, then the indices and row counts of the returned pandas Series in this method may not align with the training data.
+            In this case, consider fetching the processed training data using `predictor.load_data_internal()` instead of using the original training data.
+            A more benign version of this issue occurs when 'log_loss' wasn't specified as the eval_metric but rare classes were dropped by AutoGluon.
+            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via `predictor.predict`.
+
+        Parameters
+        ----------
+        model : str (optional)
+            The name of the model to get out-of-fold predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+        transformed : bool, default = False
+            Whether the output values should be of the external label representation (False) or the internal label representation (True).
+            Generally, most users will want the external representation and keep `transformed=False`.
+        as_multiclass : bool, default = False
+            Whether to return binary classification probabilities as if they were for multiclass classification.
+                Output will contain two columns, and if `transformed=False`, the column names will correspond to the binary class labels.
+                The columns will be the same order as `predictor.class_labels`.
+            Only impacts output for binary classification problems.
+
+        Returns
+        -------
+        :class:`pd.Series` or :class:`pd.DataFrame` object of the out-of-fold training prediction probabilities of the model.
+        """
+        if not self._trainer.bagged_mode:
+            raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
+        if model is None:
+            model = self.get_model_best()
+        y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
+        if self.problem_type is MULTICLASS:
+            y_pred_proba_oof_transformed_column_names = self._learner.label_cleaner.ordered_class_labels_transformed
+            y_pred_proba_oof_transformed.columns = y_pred_proba_oof_transformed_column_names
+        else:
+            y_pred_proba_oof_transformed.columns = [self.label_column]
+            y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label_column]
+            if as_multiclass and self.problem_type == BINARY:
+                y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba_oof_transformed, as_pandas=True)
+                if not transformed:
+                    y_pred_proba_oof_transformed.columns = self._learner.label_cleaner.ordered_class_labels
+        if transformed:
+            return y_pred_proba_oof_transformed
+        else:
+            return self.transform_labels(labels=y_pred_proba_oof_transformed, inverse=True, proba=True)
+
+    # TODO: v0.1 Should this instead return None when not valid instead of raising exception? Should this be a property or variable instead?
+    # TODO: v0.1 Add positive_class parameter to task.fit
+    def positive_class(self):
+        """
+        Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
+        Will raise an AssertionError if called when `predictor.problem_type != 'binary'`.
+
+        Returns
+        -------
+        The positive class name in binary classification.
+        """
+        if self.problem_type != BINARY:
+            raise AssertionError(f"Only binary classification contains a positive class, but problem type is '{self.problem_type}'.")
+        return self._learner.label_cleaner.cat_mappings_dependent_var[1]
 
     @classmethod
     def load(cls, output_directory, verbosity=2):
