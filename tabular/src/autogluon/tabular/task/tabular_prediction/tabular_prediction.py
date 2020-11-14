@@ -528,8 +528,8 @@ class TabularPrediction(BaseTask):
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
-            train_features = np.array([column for column in train_data.columns if column != label])
-            unlabeled_features = np.array([column for column in unlabeled_data.columns])
+            train_features = sorted(np.array([column for column in train_data.columns if column != label]))
+            unlabeled_features = sorted(np.array([column for column in unlabeled_data.columns]))
             if np.any(train_features != unlabeled_features):
                 raise ValueError("Column names must match between training and unlabeled data.\n"
                                  "Unlabeled data must have not the label column specified in it.\n")
