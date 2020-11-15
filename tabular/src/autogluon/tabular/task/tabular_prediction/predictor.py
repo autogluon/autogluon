@@ -828,6 +828,7 @@ class TabularPredictor(BasePredictor):
         OOF predictions are unbiased estimates of model predictions on the training data.
 
         Warning: This method will raise an exception if called on a model that is not a bagged ensemble. Only bagged models (such a stacker models) can produce OOF predictions.
+            This also means that refit_full models and distilled models will raise an exception.
         Warning: If intending to join the output of this method with the original training data, be aware that a rare edge-case issue exists:
             Multiclass problems with rare classes combined with the use of the 'log_loss' eval_metric may have forced AutoGluon to duplicate rows in the training data to satisfy minimum class counts in the data.
             If this has occurred, then the indices and row counts of the returned pandas Series in this method may not align with the training data.
@@ -855,6 +856,7 @@ class TabularPredictor(BasePredictor):
         else:
             return self.transform_labels(labels=y_pred_oof_transformed, inverse=True, proba=False)
 
+    # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.
     # TODO: v0.1 This can cause very strange issues related to index mismatches with original training data on extreme edge cases (multiclass where autogluon duplicated rows in data due to rare classes and eval_metric was logloss)
     #  This is a very rare case but needs to be fixed by v0.1 release
@@ -867,6 +869,7 @@ class TabularPredictor(BasePredictor):
         OOF prediction probabilities are unbiased estimates of model prediction probabilities on the training data.
 
         Warning: This method will raise an exception if called on a model that is not a bagged ensemble. Only bagged models (such a stacker models) can produce OOF predictions.
+            This also means that refit_full models and distilled models will raise an exception.
         Warning: If intending to join the output of this method with the original training data, be aware that a rare edge-case issue exists:
             Multiclass problems with rare classes combined with the use of the 'log_loss' eval_metric may have forced AutoGluon to duplicate rows in the training data to satisfy minimum class counts in the data.
             If this has occurred, then the indices and row counts of the returned pandas Series in this method may not align with the training data.

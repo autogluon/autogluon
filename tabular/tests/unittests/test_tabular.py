@@ -285,8 +285,6 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if (not fast_benchmark) and (performance_vals[idx] > dataset['performance_val'] * perf_threshold):
                 warnings.warn("Performance on dataset %s is %s times worse than previous performance." %
                               (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
-            if run_distill:
-                predictor.distill(time_limits=60, augment_args={'size_factor':0.5})
             if predictor._trainer.bagged_mode:
                 y_train_pred_oof = predictor.get_oof_pred()
                 y_train_pred_proba_oof = predictor.get_oof_pred_proba()
@@ -296,6 +294,9 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     predictor.get_oof_pred()
                 with pytest.raises(AssertionError):
                     predictor.get_oof_pred_proba()
+            if run_distill:
+                predictor.distill(time_limits=60, augment_args={'size_factor':0.5})
+
     # Summarize:
     avg_perf = np.mean(performance_vals)
     median_perf = np.median(performance_vals)
