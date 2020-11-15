@@ -357,7 +357,7 @@ class TabularPredictor(BasePredictor):
             results['hpo_results'] = self._trainer.hpo_results
         # get dict mapping model name to final hyperparameter values for each model:
         model_hyperparams = {}
-        for model_name in self._trainer.get_model_names_all():
+        for model_name in self._trainer.get_model_names():
             model_obj = self._trainer.load_model(model_name)
             model_hyperparams[model_name] = model_obj.params
         results['model_hyperparams'] = model_hyperparams
@@ -999,7 +999,7 @@ class TabularPredictor(BasePredictor):
 
     def get_model_names(self):
         """Returns the list of model names trained in this `predictor` object."""
-        return self._trainer.get_model_names_all()
+        return self._trainer.get_model_names()
 
     def get_model_names_persisted(self):
         """Returns the list of model names which are persisted in memory."""
