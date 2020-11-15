@@ -850,7 +850,9 @@ class TabularPredictor(BasePredictor):
         :class:`pd.Series` object of the out-of-fold training predictions of the model.
         """
         y_pred_proba_oof_transformed = self.get_oof_pred_proba(model=model, transformed=True)
+        y_index = y_pred_proba_oof_transformed.index
         y_pred_oof_transformed = get_pred_from_proba(y_pred_proba=y_pred_proba_oof_transformed.to_numpy(), problem_type=self._trainer.problem_type)
+        y_pred_oof_transformed = pd.Series(data=y_pred_oof_transformed, index=y_index, name=self.label_column)
         if transformed:
             return y_pred_oof_transformed
         else:
@@ -900,16 +902,15 @@ class TabularPredictor(BasePredictor):
         if model is None:
             model = self.get_model_best()
         y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
-        if self.problem_type is MULTICLASS:
-            y_pred_proba_oof_transformed_column_names = self._learner.label_cleaner.ordered_class_labels_transformed
-            y_pred_proba_oof_transformed.columns = y_pred_proba_oof_transformed_column_names
+        if self.problem_type == MULTICLASS:
+            y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
         else:
             y_pred_proba_oof_transformed.columns = [self.label_column]
             y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label_column]
             if as_multiclass and self.problem_type == BINARY:
                 y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba_oof_transformed, as_pandas=True)
                 if not transformed:
-                    y_pred_proba_oof_transformed.columns = self._learner.label_cleaner.ordered_class_labels
+                    y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels)
         if transformed:
             return y_pred_proba_oof_transformed
         else:

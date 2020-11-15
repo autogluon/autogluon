@@ -25,6 +25,7 @@ import mxnet as mx
 from random import seed
 
 from networkx.exception import NetworkXError
+import pandas as pd
 import pytest
 
 import autogluon.core as ag
@@ -268,8 +269,10 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if fast_benchmark:
                 if subsample_size is None:
                     raise ValueError("fast_benchmark specified without subsample_size")
-                train_data = train_data.head(subsample_size) # subsample for fast_benchmark
-            predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, **fit_args)
+                if subsample_size < len(train_data):
+                    # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
+                    train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
+            predictor: TabularPredictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, **fit_args)
             results = predictor.fit_summary(verbosity=4)
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
@@ -286,8 +289,49 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 warnings.warn("Performance on dataset %s is %s times worse than previous performance." %
                               (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
             if predictor._trainer.bagged_mode:
+                # TODO: Test index alignment with original training data (first handle duplicated rows / dropped rows edge cases)
                 y_train_pred_oof = predictor.get_oof_pred()
                 y_train_pred_proba_oof = predictor.get_oof_pred_proba()
+                y_train_pred_oof_transformed = predictor.get_oof_pred(transformed=True)
+                y_train_pred_proba_oof_transformed = predictor.get_oof_pred_proba(transformed=True)
+
+                # Assert expected type output
+                assert isinstance(y_train_pred_oof, pd.Series)
+                assert isinstance(y_train_pred_oof_transformed, pd.Series)
+                if predictor.problem_type == MULTICLASS:
+                    assert isinstance(y_train_pred_proba_oof, pd.DataFrame)
+                    assert isinstance(y_train_pred_proba_oof_transformed, pd.DataFrame)
+                else:
+                    if predictor.problem_type == BINARY:
+                        assert isinstance(predictor.get_oof_pred_proba(as_multiclass=True), pd.DataFrame)
+                    assert isinstance(y_train_pred_proba_oof, pd.Series)
+                    assert isinstance(y_train_pred_proba_oof_transformed, pd.Series)
+
+                assert y_train_pred_oof_transformed.equals(predictor.transform_labels(y_train_pred_oof, proba=False))
+
+                # Test that the transform_labels method is capable of reproducing the same output when converting back and forth, and test that oof 'transform' parameter works properly.
+                y_train_pred_proba_oof_inverse = predictor.transform_labels(y_train_pred_proba_oof, proba=True)
+                y_train_pred_proba_oof_inverse_inverse = predictor.transform_labels(y_train_pred_proba_oof_inverse, proba=True, inverse=True)
+                y_train_pred_oof_inverse = predictor.transform_labels(y_train_pred_oof)
+                y_train_pred_oof_inverse_inverse = predictor.transform_labels(y_train_pred_oof_inverse, inverse=True)
+
+                if isinstance(y_train_pred_proba_oof_transformed, pd.DataFrame):
+                    pd.testing.assert_frame_equal(y_train_pred_proba_oof_transformed, y_train_pred_proba_oof_inverse)
+                    pd.testing.assert_frame_equal(y_train_pred_proba_oof, y_train_pred_proba_oof_inverse_inverse)
+                else:
+                    pd.testing.assert_series_equal(y_train_pred_proba_oof_transformed, y_train_pred_proba_oof_inverse)
+                    pd.testing.assert_series_equal(y_train_pred_proba_oof, y_train_pred_proba_oof_inverse_inverse)
+                pd.testing.assert_series_equal(y_train_pred_oof_transformed, y_train_pred_oof_inverse)
+                pd.testing.assert_series_equal(y_train_pred_oof, y_train_pred_oof_inverse_inverse)
+
+                # Test that index of both the internal training data and the oof outputs are consistent in their index values.
+                X_internal, y_internal = predictor.load_data_internal()
+                y_internal_index = list(y_internal.index)
+                assert list(X_internal.index) == y_internal_index
+                assert list(y_train_pred_oof.index) == y_internal_index
+                assert list(y_train_pred_proba_oof.index) == y_internal_index
+                assert list(y_train_pred_oof_transformed.index) == y_internal_index
+                assert list(y_train_pred_proba_oof_transformed.index) == y_internal_index
             else:
                 # Raise exception
                 with pytest.raises(AssertionError):

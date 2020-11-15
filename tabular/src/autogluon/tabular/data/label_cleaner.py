@@ -105,9 +105,9 @@ class LabelCleanerMulticlass(LabelCleaner):
                 y = np.delete(y, self.label_index_to_remove, axis=1)
         if as_pandas:
             if isinstance(y, DataFrame):
-                return y
+                return y.rename(columns=self.inv_map)
             else:
-                return DataFrame(data=y, columns=self.ordered_class_labels_transformed, dtype=np.float64)
+                return DataFrame(data=y, columns=self.ordered_class_labels_transformed, dtype=np.float32)
         elif isinstance(y, DataFrame):
             return y.to_numpy()
         else:
@@ -119,12 +119,12 @@ class LabelCleanerMulticlass(LabelCleaner):
             y_index = y.index
             y = y.to_numpy()
         if self.invalid_class_count > 0:
-            y_transformed = np.zeros([len(y), len(self.ordered_class_labels)], dtype=np.float64)
+            y_transformed = np.zeros([len(y), len(self.ordered_class_labels)], dtype=np.float32)
             y_transformed[:, self.label_index_to_keep] = y
         else:
             y_transformed = y
         if as_pandas:
-            y_transformed = DataFrame(data=y_transformed, index=y_index, columns=self.ordered_class_labels, dtype=np.float64)
+            y_transformed = DataFrame(data=y_transformed, index=y_index, columns=self.ordered_class_labels, dtype=np.float32)
         return y_transformed
 
     @staticmethod
