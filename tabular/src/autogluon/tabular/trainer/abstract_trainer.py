@@ -90,6 +90,7 @@ class AbstractTrainer:
         self.models = {}  # Dict of model name -> model object. A key, value pair only exists if a model is persisted in memory.  # TODO: v0.1 Rename and consider making private
         self.model_graph = nx.DiGraph()  # Directed Acyclic Graph (DAG) of model interactions. Describes how certain models depend on the predictions of certain other models. Contains numerous metadata regarding each model.
         self.model_full_dict = {}  # Dict of normal model -> FULL model. FULL models are produced by self.refit_single_full() and self.refit_ensemble_full().
+        self._model_full_dict_val_score = {}  # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
         self.reset_paths = False
 
         self.hpo_results = {}  # Stores summary of HPO process
@@ -615,6 +616,8 @@ class AbstractTrainer:
                     models_trained = self.stack_new_level_core(X=X_full, y=y_full, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, k_fold=0, n_repeats=1, save_bagged_folds=True, stacker_type=stacker_type)
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
+                for model_trained in models_trained:
+                    self._model_full_dict_val_score[model_trained] = self.get_model_attribute(model_name, 'val_score')
                 models_trained_full += models_trained
 
         keys_to_del = []
@@ -688,7 +691,7 @@ class AbstractTrainer:
         if not perfs:
             model_full_dict_inverse = {full: orig for orig, full in self.model_full_dict.items()}
             models = [m for m in models if m in model_full_dict_inverse]
-            perfs = [(m, model_performances[model_full_dict_inverse[m]]) for m in models if model_performances[model_full_dict_inverse[m]] is not None]
+            perfs = [(m, self._get_full_model_val_score(m)) for m in models]
             if not perfs:
                 raise AssertionError('No fit models that can infer exist with a validation score to choose the best model.')
             elif not allow_full:
@@ -1808,6 +1811,21 @@ class AbstractTrainer:
             max_level_key = max(level_keys)
             hyperparameters_valid['default'] = copy.deepcopy(hyperparameters_valid[max_level_key])
         return hyperparameters_valid
+
+    def _get_full_model_val_score(self, model: str) -> float:
+        model_full_dict_inverse = {full: orig for orig, full in self.model_full_dict.items()}
+        model_performances = self.get_models_attribute_dict(attribute='val_score')
+
+        normal_model = model_full_dict_inverse[model]
+        if normal_model not in model_performances:
+            # normal model is deleted
+            if model not in self._model_full_dict_val_score:
+                raise ValueError(f'_FULL model {model} had the model it was based on ({normal_model}) deleted, and the validation score was not stored.')
+            val_score = self._model_full_dict_val_score[model]
+        else:
+            # normal model exists
+            val_score = model_performances[normal_model]
+        return val_score
 
     def distill(self, X_train=None, y_train=None, X_val=None, y_val=None, X_unlabeled=None,
                 time_limits=None, hyperparameters=None, holdout_frac=None, verbosity=None,
