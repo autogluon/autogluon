@@ -38,9 +38,9 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     enable_text_ngram_features : bool, default True
         Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
         Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
-    enable_raw_text_features : bool, default True
-        Whether to use the raw text features. The generated raw text features will end up with '_raw_text' postfix.
-        For exampel, 'sentence' --> 'sentence_raw_text'
+    enable_raw_text_features : bool, default False
+        Whether to use the raw text features. The generated raw text features will end up with '_raw_text' suffix.
+        For example, 'sentence' --> 'sentence_raw_text'
     vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
         Only used if `enable_text_ngram_features=True`.
@@ -68,7 +68,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     def __init__(self, enable_numeric_features=True, enable_categorical_features=True,
                  enable_datetime_features=True,
                  enable_text_special_features=True, enable_text_ngram_features=True,
-                 enable_raw_text_features=True, vectorizer=None, **kwargs):
+                 enable_raw_text_features=False, vectorizer=None, **kwargs):
         if 'generators' in kwargs:
             raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
         if 'enable_raw_features' in kwargs:
@@ -92,7 +92,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                 valid_raw_types=[R_INT, R_FLOAT])))
         if self.enable_raw_text_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
-                valid_special_types=[S_TEXT]), name_suffix='_raw_text'))
+                required_special_types=[S_TEXT]), name_suffix='_raw_text'))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
         if self.enable_datetime_features:

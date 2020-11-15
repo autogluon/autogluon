@@ -18,6 +18,7 @@ from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
+from ...models.xgboost.xgboost_model import XGBoostModel
 from ...models.xt.xt_model import XTModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
@@ -32,6 +33,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     KNN=80,
     GBM=70,
     CAT=60,
+    XGB=55,
     NN=50,
     FASTAI=45,
     LR=40,
@@ -66,6 +68,7 @@ MODEL_TYPES = dict(
     KNN=KNNModel,
     GBM=LGBModel,
     CAT=CatboostModel,
+    XGB=XGBoostModel,
     NN=TabularNeuralNetModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
@@ -79,6 +82,7 @@ DEFAULT_MODEL_NAMES = {
     KNNModel: 'KNeighbors',
     LGBModel: 'LightGBM',
     CatboostModel: 'Catboost',
+    XGBoostModel: 'XGBoost',
     TabularNeuralNetModel: 'NeuralNet',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'FastAINeuralNet',

@@ -195,8 +195,8 @@ class AbstractLearner:
                 raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
 
         scores = {}
-        all_trained_models = trainer.get_model_names_all()
-        all_trained_models_can_infer = trainer.get_model_names_all(can_infer=True)
+        all_trained_models = trainer.get_model_names()
+        all_trained_models_can_infer = trainer.get_model_names(can_infer=True)
         all_trained_models_original = all_trained_models.copy()
         model_pred_proba_dict, pred_time_test_marginal = trainer.get_model_pred_proba_dict(X=X, models=all_trained_models_can_infer, fit=False, record_pred_time=True)
 

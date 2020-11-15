@@ -113,10 +113,6 @@ def setup_trial_limits(time_limits, num_trials, hyperparameters):
     return time_limits, num_trials
 
 
-def dd_list():
-    return defaultdict(list)
-
-
 def get_leaderboard_pareto_frontier(leaderboard: DataFrame, score_col='score_val', inference_time_col='pred_time_val_full') -> DataFrame:
     """
     Given a set of models, returns in ranked order from best score to worst score models which satisfy the criteria:

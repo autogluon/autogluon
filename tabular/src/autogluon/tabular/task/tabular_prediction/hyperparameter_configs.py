@@ -12,6 +12,7 @@ hyperparameter_config_dict = dict(
             {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
         ],
         'CAT': {},
+        'XGB': {},
         'RF': [
             {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
             {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
@@ -37,6 +38,7 @@ hyperparameter_config_dict = dict(
             {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
         ],
         'CAT': {},
+        'XGB': {},
         'RF': [
             {'criterion': 'gini', 'max_depth': 15, 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
             {'criterion': 'entropy', 'max_depth': 15, 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
@@ -57,12 +59,14 @@ hyperparameter_config_dict = dict(
             {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
         ],
         'CAT': {},
+        'XGB': {},
     },
     # Results in extremely quick to train models. Only use this when prototyping, as the model accuracy will be severely reduced.
     toy={
         'NN': {'num_epochs': 10},
         'GBM': {'num_boost_round': 10},
         'CAT': {'iterations': 10},
+        'XGB': {'n_estimators': 10},
     }
 )
 
