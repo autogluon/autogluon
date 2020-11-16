@@ -29,6 +29,7 @@ class ObjectDetection(object):
             train_size=0.9,
             random_state=None,
             time_limit=12*60*60,
+            epochs=None,
             num_trials=None,
             hyperparameters=None,
             search_strategy='random',
@@ -54,8 +55,10 @@ class ObjectDetection(object):
             config.update({'nthreads_per_trial': nthreads_per_trial})
         if ngpus_per_trial is not None:
             config.update({'ngpus_per_trial': ngpus_per_trial})
-        if ngpus_per_trial is not None:
-            config.update({'ngpus_per_trial': ngpus_per_trial})
+        if dist_ip_addrs is not None:
+            config.update({'dist_ip_addrs': dist_ip_addrs})
+        if epochs is not None:
+            config.update({'epochs': epochs})
         if isinstance(hyperparameters, dict):
             config.update(hyperparameters)
         if scheduler_options is not None:
@@ -63,6 +66,7 @@ class ObjectDetection(object):
         task = _ObjectDetection(config=config)
         self._detector = task.fit(train_data, val_data, train_size, random_state)
         self._fit_summary = task.fit_summary()
+        return self
 
     def predict(self, x):
         if self._detector is None:

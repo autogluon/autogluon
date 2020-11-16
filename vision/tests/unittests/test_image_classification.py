@@ -3,8 +3,8 @@ from autogluon.vision import ImageClassification as Task
 def test_task():
     dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 
-    classifier = Task({'epochs': 1, 'num_trials': 2})
-    classifier.fit(dataset)
+    classifier = Task()
+    classifier.fit(dataset, epochs=1, num_trials=2)
     test_result = classifier.predict(test_dataset)
     print('test result', test_result)
     classifier.save('classifier.ag')

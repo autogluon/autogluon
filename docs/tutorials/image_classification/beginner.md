@@ -30,9 +30,9 @@ print(train_dataset)
 Now, we fit a classifier using AutoGluon as follows:
 
 ```{.python .input}
-task = Task({'epochs': 2})  # you can trust the default config, we reduce the # epoch to save some build time
+task = Task()
 # since the original dataset does not provide validation split, the `fit` function splits it randomly with 90/10 ratio
-classifier = task.fit(train_dataset)
+classifier = task.fit(train_dataset, epochs=2)  # you can trust the default config, we reduce the # epoch to save some build time
 ```
 
 Within `fit`, the dataset is automatically split into training and validation sets.
@@ -42,7 +42,7 @@ The best model is finally retrained on our entire dataset (i.e., merging trainin
 The best Top-1 accuracy achieved on the validation set is as follows:
 
 ```{.python .input}
-fit_result = task.fit_summary
+fit_result = task.fit_summary()
 print('Top-1 train acc: %.3f, val acc: %.3f' %(fit_result['train_acc'], fit_result['valid_acc']))
 ```
 

@@ -30,13 +30,13 @@ In this section, we demonstrate how to apply AutoGluon to fit our detection mode
 We `fit` a classifier using AutoGluon as follows. In each experiment (one trial in our searching space), we train the model for 30 epochs.
 
 ```{.python .input}
-time_limits = 60*60  # 1 hour
-task = Task({'time_limits': time_limits, 'num_trials': 2})
-detector = task.fit(dataset_train)
+time_limit = 60*60  # 1 hour
+task = Task()
+detector = task.fit(dataset_train, time_limit=time_limit, num_trials=2)
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal
-practice, it is common to only use `time_limits` and drop `num_trials`. Also note
+practice, it is common to only use `time_limit` and drop `num_trials`. Also note
 that hyperparameter tuning defaults to random search. Model-based variants, such
 as `search_strategy='bayesopt'` or `search_strategy='bayesopt_hyperband'` can be
 a lot more sample-efficient.
