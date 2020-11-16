@@ -81,7 +81,7 @@ class ImageClassification(object):
     def evaluate(self, val_data):
         if self._classifier is None:
             raise RuntimeError('Classifier not initialized, try `fit` first.')
-        return self._classifier.evaluate(x)
+        return self._classifier.evaluate(val_data)
 
     def fit_summary(self):
         return copy.copy(self._fit_summary)

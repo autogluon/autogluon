@@ -76,7 +76,7 @@ class ObjectDetection(object):
     def evaluate(self, val_data):
         if self._detector is None:
             raise RuntimeError('Detector not initialized, try `fit` first.')
-        return self._detector.evaluate(x)
+        return self._detector.evaluate(val_data)
 
     def fit_summary(self):
         return copy.copy(self._fit_summary)
