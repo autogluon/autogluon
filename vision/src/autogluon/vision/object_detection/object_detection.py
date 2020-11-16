@@ -28,7 +28,7 @@ class ObjectDetection(object):
             val_data=None,
             train_size=0.9,
             random_state=None,
-            time_limit=None,
+            time_limit=12*60*60,
             num_trials=None,
             hyperparameters=None,
             search_strategy='random',
