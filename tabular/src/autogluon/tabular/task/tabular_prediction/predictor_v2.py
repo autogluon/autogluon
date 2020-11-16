@@ -482,6 +482,7 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: v0.1 - id_columns -> ignored_columns?
         # TODO: v0.1 - nthreads_per_trial/ngpus_per_trial -> rename/rework
         # TODO: v0.1 - visualizer -> consider reworking/removing
+        # TODO: v0.1 - HPO arguments to a generic hyperparameter_tune_kwargs parameter?
 
         feature_prune = kwargs.get('feature_prune', False)
         scheduler_options = kwargs.get('scheduler_options', None)

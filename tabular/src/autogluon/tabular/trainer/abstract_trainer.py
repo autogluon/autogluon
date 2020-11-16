@@ -139,6 +139,18 @@ class AbstractTrainer:
         path = self.path_data + 'y_val.pkl'
         return load_pkl.load(path=path)
 
+    def load_data(self):
+        X_train = self.load_X_train()
+        y_train = self.load_y_train()
+        if not self.bagged_mode:
+            X_val = self.load_X_val()
+            y_val = self.load_y_val()
+        else:
+            X_val = None
+            y_val = None
+
+        return X_train, y_train, X_val, y_val
+
     def save_X_train(self, X, verbose=True):
         path = self.path_data + 'X_train.pkl'
         save_pkl.save(path=path, object=X, verbose=verbose)
@@ -155,19 +167,27 @@ class AbstractTrainer:
         path = self.path_data + 'y_val.pkl'
         save_pkl.save(path=path, object=y, verbose=verbose)
 
-    def get_model_names(self, stack_name: str = None, can_infer: bool = None) -> List[str]:
-        model_names_all = list(self.model_graph.nodes)
+    def get_model_names(self, stack_name: Union[List[str], str] = None, level: Union[List[int], int] = None, can_infer: bool = None, models: List[str] = None) -> List[str]:
+        if models is None:
+            models = list(self.model_graph.nodes)
         if stack_name is not None:
+            if not isinstance(stack_name, list):
+                stack_name = [stack_name]
             node_attributes: dict = self.get_models_attribute_dict(attribute='stack_name')
-            model_names_all = [model_name for model_name in model_names_all if node_attributes[model_name] == stack_name]
+            models = [model_name for model_name in models if node_attributes[model_name] in stack_name]
+        if level is not None:
+            if not isinstance(level, list):
+                level = [level]
+            node_attributes: dict = self.get_models_attribute_dict(attribute='level')
+            models = [model_name for model_name in models if node_attributes[model_name] in level]
         # TODO: can_infer is technically more complicated, if an ancestor can't infer then the model can't infer.
         if can_infer is not None:
             node_attributes = self.get_models_attribute_dict(attribute='can_infer')
-            model_names_all = [model for model in model_names_all if node_attributes[model] == can_infer]
-        return model_names_all
+            models = [model for model in models if node_attributes[model] == can_infer]
+        return models
 
-    def get_max_level(self, stack_name: str = None) -> int:
-        models = self.get_model_names(stack_name=stack_name)
+    def get_max_level(self, stack_name: str = None, models: List[str] = None) -> int:
+        models = self.get_model_names(stack_name=stack_name, models=models)
         models_attribute_dict = self.get_models_attribute_dict(attribute='level', models=models)
         if models_attribute_dict:
             return max(list(models_attribute_dict.values()))
@@ -208,7 +228,7 @@ class AbstractTrainer:
     # TODO: Enable feature prune on levels > 0
     # TODO: Enable easier re-mapping of trained models -> hyperparameters input (They don't share a key since name can change)
     def train_multi_levels(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, hyperparameters: dict = None, base_model_names: List[str] = None,
-                           hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, level_start=0, level_end=0, time_limit=None, name_suffix: str = None) -> List[str]:
+                           hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, level_start=0, level_end=0, time_limit=None, name_suffix: str = None, relative_stack=True) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
             hyperparameters is used to determine the models used in each stack layer.
@@ -221,9 +241,26 @@ class AbstractTrainer:
         self._time_limit = time_limit
         self._time_train_start = time.time()
         time_train_start = self._time_train_start
+        if relative_stack:
+            if level_start != 0:
+                raise AssertionError(f'level_start must be 0 when `relative_stack=True`. (level_start = {level_start})')
+            if base_model_names:
+                max_base_model_level = self.get_max_level(models=base_model_names)
+                level_start = max_base_model_level + 1
+                level_end += level_start
+
         if hyperparameters is None:
             hyperparameters = self.hyperparameters
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
+
+        if relative_stack and level_start != 0:
+            hyperparameters_relative = {}
+            for key in hyperparameters:
+                if isinstance(key, int):
+                    hyperparameters_relative[key+level_start] = hyperparameters[key]
+                else:
+                    hyperparameters_relative[key] = hyperparameters[key]
+            hyperparameters = hyperparameters_relative
 
         core_kwargs = {} if core_kwargs is None else core_kwargs.copy()
         aux_kwargs = {} if aux_kwargs is None else aux_kwargs.copy()
