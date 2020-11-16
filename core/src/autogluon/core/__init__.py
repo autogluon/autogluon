@@ -5,6 +5,7 @@ from .decorator import *
 from .utils.files import *
 from .scheduler.resource.resource import *
 from .scheduler.scheduler import *
+from .utils.utils import get_gpu_count, get_cpu_count
 
 # TODO: v0.1 Identify why distributed logs are spammed if not suppressed via the below code
 #  Refer to https://github.com/awslabs/autogluon/issues/493
