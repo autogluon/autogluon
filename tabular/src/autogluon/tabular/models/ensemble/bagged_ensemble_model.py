@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ..abstract.abstract_model import AbstractModel
-from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
+from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
 from autogluon.core.utils.utils import generate_kfold
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
