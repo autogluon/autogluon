@@ -1,7 +1,7 @@
 """ Default hyperparameter search spaces used in XGBoost Boosting model """
 import os
 from autogluon.core import Real, Int
-from ....constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 DEFAULT_NUM_BOOST_ROUND = 10000  # default for HPO
 
