@@ -179,9 +179,9 @@ class DefaultLearner(AbstractLearner):
             if self.feature_generator.is_fit():
                 logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
                 X_super = self.feature_generator.transform(X_super)
+                self.feature_generator.print_feature_metadata_info()
             else:
                 X_super = self.feature_generator.fit_transform(X_super)
-            self.feature_generator.print_feature_metadata_info()
             X = X_super.head(len(X)).set_index(X.index)
 
             X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)
