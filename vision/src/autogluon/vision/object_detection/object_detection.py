@@ -49,10 +49,13 @@ class ObjectDetection(object):
                 'num_trials': 1 if num_trials is None else num_trials,
                 'time_limits': time_limit,
                 'search_strategy': search_strategy,
-                'nthreads_per_trial': nthreads_per_trial,
-                'ngpus_per_trial': ngpus_per_trial,
-                'dist_ip_addrs': dist_ip_addrs
                 }
+        if nthreads_per_trial is not None:
+            config.update({'nthreads_per_trial': nthreads_per_trial})
+        if ngpus_per_trial is not None:
+            config.update({'ngpus_per_trial': ngpus_per_trial})
+        if ngpus_per_trial is not None:
+            config.update({'ngpus_per_trial': ngpus_per_trial})
         if isinstance(hyperparameters, dict):
             config.update(hyperparameters)
         if scheduler_options is not None:
