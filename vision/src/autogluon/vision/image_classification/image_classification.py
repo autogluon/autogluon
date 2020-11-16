@@ -1,11 +1,13 @@
 """Image classification task"""
+import copy
+import pickle
 
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 
-__all__ = ['ImageClassification']
+__all__ = ['Predictor']
 
-class ImageClassification(object):
-    """AutoGluon Task for classifying images based on their whole contents
+class ImageClassificationPredictor(object):
+    """AutoGluon Predictor for classifying images based on their whole contents
 
     Parameters
     ----------
@@ -18,7 +20,8 @@ class ImageClassification(object):
     Dataset = _ImageClassification.Dataset
     def __init__(self, log_dir=None):
         self._log_dir = log_dir
-        self._predictor = None
+        self._classifier = None
+        self._fit_summary = {}
 
     def fit(self,
             train_data,
@@ -37,6 +40,11 @@ class ImageClassification(object):
 
 
         """
+        if self._classifier is not None:
+            self._fit_summary = self._classifier.fit(train_data, val_data, train_size, random_state, resume=False)
+            return
+
+        # new HPO task
         config={'log_dir': self._log_dir,
                 'num_trials': 1 if num_trials is None else num_trials,
                 'time_limits': time_limit,
@@ -45,26 +53,48 @@ class ImageClassification(object):
                 'ngpus_per_trial': ngpus_per_trial,
                 'dist_ip_addrs': dist_ip_addrs
                 }
-        if hyperparameters is not None:
+        if isinstance(hyperparameters, dict):
             config.update(hyperparameters)
         if scheduler_options is not None:
             config.update(scheduler_options)
         task = _ImageClassification(config=config)
-        self._predictor = task.fit(train_data, val_data, train_size, random_state)
+        self._classifier = task.fit(train_data, val_data, train_size, random_state)
+        self._fit_summary = task.fit_summary()
 
     def predict(self, x):
-        if self._predictor is None:
-            raise RuntimeError('Predictor not initialized, try `fit` first.')
-        return self._predictor.predict(x)
+        if self._classifier is None:
+            raise RuntimeError('Classifier is not initialized, try `fit` first.')
+        return self._classifier.predict(x)
+
+    def predict_feature(self, x):
+        if self._classifier is None:
+            raise RuntimeError('Classifier is not initialized, try `fit` first.')
+        return self._classifier.predict_feature(x)
+
+    def evaluate(self, val_data):
+        if self._classifier is None:
+            raise RuntimeError('Classifier not initialized, try `fit` first.')
+        return self._classifier.evaluate(x)
+
+    def fit_summary(self):
+        return copy.copy(self._fit_summary)
+
+    def save(self, file_name):
+        with open(file_name, 'wb') as fid:
+            pickle.dump(self, fid)
 
     @classmethod
-    def load(cls, filename):
-        """Load previously saved trainer.
+    def load(cls, file_name):
+        """Load previously saved predictor.
 
         Parameters
         ----------
-        filename : str
+        file_name : str
             The file name for saved pickle file.
 
         """
-        return super().load(filename)
+        with open(file_name, 'rb') as fid:
+            obj = pickle.load(fid)
+        return obj
+
+Predictor = ImageClassificationPredictor

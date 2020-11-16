@@ -9,4 +9,5 @@ def test_task():
     print('test result', test_result)
     detector.save('detector.ag')
     detector2 = Task.load('detector.ag')
+    fit_summary = detector2.fit_summary()
     test_map = detector2.evaluate(test_data)

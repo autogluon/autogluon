@@ -8,4 +8,6 @@ def test_task():
     print('test result', test_result)
     classifier.save('classifier.ag')
     classifier2 = Task.load('classifier.ag')
+    fit_summary = classifier2.fit_summary()
     test_acc = classifier2.evaluate(test_dataset)
+    test_feature = classifier2.predict_feature(test_dataset)
