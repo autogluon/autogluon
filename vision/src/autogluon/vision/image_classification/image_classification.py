@@ -96,5 +96,3 @@ class ImageClassification(object):
         with open(file_name, 'rb') as fid:
             obj = pickle.load(fid)
         return obj
-
-Predictor = ImageClassificationPredictor
