@@ -4,9 +4,9 @@ import pickle
 
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 
-__all__ = ['Predictor']
+__all__ = ['ImageClassification']
 
-class ImageClassificationPredictor(object):
+class ImageClassification(object):
     """AutoGluon Predictor for classifying images based on their whole contents
 
     Parameters

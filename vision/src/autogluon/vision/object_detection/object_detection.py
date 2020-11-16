@@ -4,9 +4,9 @@ import pickle
 
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 
-__all__ = ['Predictor']
+__all__ = ['ObjectDetection']
 
-class ObjectDetectionPredictor(object):
+class ObjectDetection(object):
     """AutoGluon Predictor for for detecting objects in images
 
     Parameters
