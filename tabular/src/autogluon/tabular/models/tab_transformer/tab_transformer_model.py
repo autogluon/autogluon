@@ -5,14 +5,15 @@ import time
 
 import numpy as np
 import pandas as pd
-from autogluon.core.utils.loaders import load_pkl
 from tqdm import tqdm
+
+from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
+from autogluon.core.utils import try_import_torch
 
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractNeuralNetworkModel
-from ...constants import BINARY, REGRESSION, MULTICLASS
-from autogluon.core.utils import try_import_torch
 from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 
 
