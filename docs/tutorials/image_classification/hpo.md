@@ -84,7 +84,7 @@ config_space.update({
   })
 task = Task(config_space)
 classifier = task.fit(train_data)
-print('Top-1 val acc: %.3f' % task.fit_summary['valid_acc'])
+print('Top-1 val acc: %.3f' % task.fit_summary()['valid_acc'])
 ```
 
 The BO searcher can be configured by `search_options`, see
