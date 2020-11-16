@@ -8,6 +8,7 @@ from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
+from autogluon.core.metrics import get_metric
 
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
@@ -15,7 +16,6 @@ from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
 from ...features import AutoMLPipelineFeatureGenerator
 from ...learner import DefaultLearner as Learner
-from ...metrics import get_metric
 from ...trainer import AutoTrainer
 
 

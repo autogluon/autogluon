@@ -1,5 +1,5 @@
 """ Default hyperparameter search spaces used in Neural network model """
-from ....constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core import Categorical, Real
 
 

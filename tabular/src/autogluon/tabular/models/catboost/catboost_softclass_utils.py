@@ -1,9 +1,10 @@
 import math
 import numpy as np
 
-from .catboost_utils import CustomMetric
-from ...metrics import soft_log_loss
+from autogluon.core.metrics import soft_log_loss
 from autogluon.core.utils import try_import_catboost, try_import_catboostdev
+
+from .catboost_utils import CustomMetric
 
 
 # Ojectives for SOFTCLASS problem_type

@@ -1,6 +1,6 @@
 """ Default (fixed) hyperparameter values used in Gradient Boosting model. """
 
-from ....constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 DEFAULT_NUM_BOOST_ROUND = 10000  # default for single training run
 

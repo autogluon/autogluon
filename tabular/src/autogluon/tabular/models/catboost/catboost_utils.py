@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 
-from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 logger = logging.getLogger(__name__)
 

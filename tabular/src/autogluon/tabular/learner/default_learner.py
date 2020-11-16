@@ -6,10 +6,11 @@ import time
 import pandas as pd
 from pandas import DataFrame
 
-from .abstract_learner import AbstractLearner
-from ..constants import BINARY, MULTICLASS, REGRESSION
-from ..trainer.auto_trainer import AutoTrainer
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.utils.utils import augment_rare_classes
+
+from .abstract_learner import AbstractLearner
+from ..trainer.auto_trainer import AutoTrainer
 from ..data.cleaner import Cleaner
 from ..data.label_cleaner import LabelCleaner
 
@@ -169,7 +170,6 @@ class DefaultLearner(AbstractLearner):
             X = X.drop(self.id_columns, axis=1, errors='ignore')
             if X_val is not None:
                 X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
-
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         logger.log(20, f'Using Feature Generators to preprocess the data ...')
         if X_val is not None:
@@ -179,9 +179,9 @@ class DefaultLearner(AbstractLearner):
             if self.feature_generator.is_fit():
                 logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
                 X_super = self.feature_generator.transform(X_super)
-                self.feature_generator.print_feature_metadata_info()
             else:
                 X_super = self.feature_generator.fit_transform(X_super)
+            self.feature_generator.print_feature_metadata_info()
             X = X_super.head(len(X)).set_index(X.index)
 
             X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)

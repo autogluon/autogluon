@@ -8,11 +8,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
+from autogluon.core.constants import BINARY, REGRESSION
+
 from .hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
 from ..abstract.model_trial import skip_hpo
-from ...constants import BINARY, REGRESSION
 from ...models.abstract.abstract_model import AbstractModel
 from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
