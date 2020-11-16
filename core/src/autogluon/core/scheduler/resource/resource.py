@@ -2,7 +2,8 @@ import logging
 from ...utils import get_gpu_count, get_cpu_count
 
 __all__ = ['Resources', 'DistributedResource',
-           'get_remote_cpu_count', 'get_remote_gpu_count']
+           'get_remote_cpu_count', 'get_remote_gpu_count',
+           'get_gpu_count', 'get_cpu_count']
 
 logger = logging.getLogger(__name__)
 
