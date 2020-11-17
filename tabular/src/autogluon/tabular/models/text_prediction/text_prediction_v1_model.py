@@ -181,8 +181,8 @@ class TextPredictionV1Model(AbstractModel):
                                               y_val=y_val,
                                               hyperparameters=self.params)
         # Insert the label column
-        X_train[self._label_column_name] = y_train
-        X_val[self._label_column_name] = y_val
+        X_train.insert(len(X_train.columns), self._label_column_name, y_train)
+        X_val.insert(len(X_val.columns), self._label_column_name, y_val)
         scheduler_options = self.params['hpo_params']['scheduler_options']
         search_strategy = self.params['hpo_params']['search_strategy']
         if scheduler_options is None:
