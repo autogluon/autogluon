@@ -300,7 +300,8 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(course)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/autogluon/docs/_build/course/*', name: 'course'
+        pwd
+        stash includes: '/autogluon/docs/_build/tutorials/course/*', name: 'course'
       }
     }
   },
@@ -325,9 +326,12 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(image_classification)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        pwd
+        cat docs/_build/rst/_static/d2l.js
+        cat docs/_build/rst/conf.py
+        tree -L 2 docs/_build/rst
         """
-        stash includes: '/autogluon/docs/_build/image_classification/*', name: 'image_classification'
+        pwd
+        stash includes: '/autogluon/docs/_build/tutorials/image_classification/*', name: 'image_classification'
       }
     }
   },
@@ -353,7 +357,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(nas)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/autogluon/docs/_build/nas/*', name: 'nas'
+        stash includes: '/autogluon/docs/_build/tutorials/nas/*', name: 'nas'
       }
     }
   },
@@ -378,8 +382,11 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
+        cat docs/_build/rst/_static/d2l.js
+        cat docs/_build/rst/conf.py
+        tree -L 2 docs/_build/rst
         """
-        stash includes: '/autogluon/docs/_build/object_detection/*', name: 'object_detection'
+        stash includes: 'docs/_build/tutorials/object_detection/*', name: 'object_detection'
       }
     }
   },
@@ -405,7 +412,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/autogluon/docs/_build/tabular_prediction/*', name: 'tabular'
+        stash includes: '/autogluon/docs/_build/tutorials/tabular_prediction/*', name: 'tabular'
       }
     }
   },
@@ -431,7 +438,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/autogluon/docs/_build/text_prediction/*', name: 'text'
+        stash includes: '/autogluon/docs/_build/tutorials/text_prediction/*', name: 'text'
       }
     }
   },
@@ -457,7 +464,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(torch)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/autogluon/docs/_build/torch/*', name: 'torch'
+        stash includes: '/autogluon/docs/_build/tutorials/torch/*', name: 'torch'
       }
     }
   }
