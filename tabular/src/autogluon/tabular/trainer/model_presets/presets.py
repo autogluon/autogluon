@@ -20,6 +20,7 @@ from ...models.catboost.catboost_model import CatboostModel
 from ...models.xgboost.xgboost_model import XGBoostModel
 from ...models.xt.xt_model import XTModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
+from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     NN=50,
     FASTAI=45,
     LR=40,
+    TEXT_NN_V1=0,
     TRANSF=0,
     custom=0,
 )
@@ -68,6 +70,7 @@ MODEL_TYPES = dict(
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
+    TEXT_NN_V1=TextPredictionV1Model,
 )
 
 DEFAULT_MODEL_NAMES = {
@@ -81,6 +84,7 @@ DEFAULT_MODEL_NAMES = {
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'FastAINeuralNet',
     TabTransformerModel: 'Transformer',
+    TextPredictionV1Model: 'TextNeuralNetV1',
 }
 
 
