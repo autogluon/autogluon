@@ -246,7 +246,7 @@ class TextPredictionV1Model(AbstractModel):
         """
         total_size = 0
         for k, v in self.model.net.collect_params().items():
-            total_size += v.dtype.itemsize * np.prod(v.shape)
+            total_size += np.dtype(v.dtype).itemsize * np.prod(v.shape)
         return total_size
 
     @classmethod
