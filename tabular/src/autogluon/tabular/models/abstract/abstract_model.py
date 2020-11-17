@@ -93,6 +93,10 @@ class AbstractModel:
             self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
 
+        #for warm-starting with hyperband scheduler
+        self._prev_model = None
+        self._early_stopped = False
+
     # Checks if model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
     def is_valid(self) -> bool:
         return self.is_fit()
@@ -518,6 +522,8 @@ class AbstractModel:
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
+        epochs = kwargs.get('epochs', 1)
+
         util_args = dict(
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
@@ -525,7 +531,14 @@ class AbstractModel:
             model=self,
             time_start=time_start,
             time_limit=scheduler_options['time_out'],
+            epochs=epochs,
+            report_probs=kwargs.get('report_probs', False)
         )
+
+        #epochs denotes number of times to invoke incremental training.
+        # This is to break up large (e.g. 300-tree model) into smaller chunks to enable hyperband scheduler
+        # for instance epochs=10, and num_iterations=30 lead to a total of 10x30 = 300 trees
+        params_copy["epochs"] = epochs
 
         model_trial.register_args(util_args=util_args, **params_copy)
         scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_options)
@@ -540,7 +553,10 @@ class AbstractModel:
         scheduler.run()
         scheduler.join_jobs()
 
-        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        hpo_models, hpo_model_performances, hpo_results = self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        if 'report_probs' in kwargs:
+            hpo_results['ensemble'] = scheduler.ensemble
+        return hpo_models, hpo_model_performances, hpo_results
 
     def _get_hpo_results(self, scheduler, scheduler_options, time_start):
         # Store results / models from this HPO run:

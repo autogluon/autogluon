@@ -16,6 +16,8 @@ from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
 from ...features.generators import LabelEncoderFeatureGenerator
 
+from autogluon.core import Categorical, Int
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,6 +49,7 @@ class RFModel(AbstractModel):
         default_params = {
             'n_estimators': 300,
             'n_jobs': -1,
+            'bootstrap': True,
             'random_state': 0,
         }
         for param, val in default_params.items():
@@ -56,62 +59,85 @@ class RFModel(AbstractModel):
     # TODO: enable HPO for RF models
     def _get_default_searchspace(self):
         spaces = {
-            # 'n_estimators': Int(lower=10, upper=1000, default=300),
-            # 'max_features': Categorical(['auto', 0.5, 0.25]),
-            # 'criterion': Categorical(['gini', 'entropy']),
+            'max_features': Categorical('auto', 0.5, 0.25),
+            'max_samples': Categorical(None, 0.6, 0.4),
+            'criterion': Categorical('mse') if self.problem_type == REGRESSION
+                else Categorical('gini', 'entropy'),
+            'min_samples_leaf': Int(lower=1, upper=10, default=1),
         }
         return spaces
 
-    def _fit(self, X_train, y_train, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, time_limit=None, warm_start=True, warm_iter=None, **kwargs):
+        """
+            Additional Parameters
+            warm_start: False
+                If warm_start is True, it allows the model to perform incremental training.
+                E.g. calling model.fit(X, y) multiple times would build upon the intermediate models and
+                increase the number of trees used. See also warm_iter
+            warm_iter: None
+                This sets the humber of additional trees to add for incremental training.
+                if warm_iter is None, the number of additional trees set by the model hyperparameter, such as "n_estimators"
+       """
+        #for warm start, simply allow more trees to form
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
         n_estimators_final = hyperparams['n_estimators']
 
-        n_estimators_minimum = min(40, n_estimators_final)
-        if n_estimators_minimum < 40:
-            n_estimators_test = max(1, math.floor(n_estimators_minimum/5))
-        else:
-            n_estimators_test = 8
+        if warm_start:
+            hyperparams["warm_start"] = True
 
         X_train = self.preprocess(X_train)
-        n_estimator_increments = [n_estimators_final]
 
-        # Very rough guess to size of a single tree before training
-        if self.problem_type == MULTICLASS:
-            if self.num_classes is None:
-                num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y_train for a better value
+        if not (self.model and warm_start):
+            n_estimators_minimum = min(40, n_estimators_final)
+            if n_estimators_minimum < 40:
+                n_estimators_test = max(1, math.floor(n_estimators_minimum/5))
             else:
-                num_trees_per_estimator = self.num_classes
-        else:
-            num_trees_per_estimator = 1
-        bytes_per_estimator = num_trees_per_estimator * len(X_train) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
-        available_mem = psutil.virtual_memory().available
-        expected_memory_usage = bytes_per_estimator * n_estimators_final / available_mem
-        expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum / available_mem
-        if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
-            logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
-            raise NotEnoughMemoryError
+                n_estimators_test = 8
 
-        if n_estimators_final > n_estimators_test * 2:
+            n_estimator_increments = [n_estimators_final]
+
+            # Very rough guess to size of a single tree before training
             if self.problem_type == MULTICLASS:
-                n_estimator_increments = [n_estimators_test, n_estimators_final]
-                hyperparams['warm_start'] = True
+                if self.num_classes is None:
+                    num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y_train for a better value
+                else:
+                    num_trees_per_estimator = self.num_classes
             else:
-                if expected_memory_usage > (0.05 * max_memory_usage_ratio):  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
-                    # Causes ~10% training slowdown, so try to avoid if memory is not an issue
+                num_trees_per_estimator = 1
+            bytes_per_estimator = num_trees_per_estimator * len(X_train) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
+            available_mem = psutil.virtual_memory().available
+            expected_memory_usage = bytes_per_estimator * n_estimators_final / available_mem
+            expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum / available_mem
+            if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
+                logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
+                raise NotEnoughMemoryError
+
+            if n_estimators_final > n_estimators_test * 2:
+                if self.problem_type == MULTICLASS:
                     n_estimator_increments = [n_estimators_test, n_estimators_final]
                     hyperparams['warm_start'] = True
+                else:
+                    if expected_memory_usage > (0.05 * max_memory_usage_ratio):  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
+                        # Causes ~10% training slowdown, so try to avoid if memory is not an issue
+                        n_estimator_increments = [n_estimators_test, n_estimators_final]
+                        hyperparams['warm_start'] = True
 
-        hyperparams['n_estimators'] = n_estimator_increments[0]
-        self.model = self._model_type(**hyperparams)
+            if not warm_start:
+                hyperparams['n_estimators'] = n_estimator_increments[0]
 
-        time_train_start = time.time()
-        for i, n_estimators in enumerate(n_estimator_increments):
-            if i != 0:
-                self.model.n_estimators = n_estimators
-            self.model = self.model.fit(X_train, y_train)
-            if (i == 0) and (len(n_estimator_increments) > 1):
+            if 'num_threads' in hyperparams: #for hpo, this is an unwanted arg to be removed.
+                del hyperparams['num_threads']
+                del hyperparams['num_gpus']
+
+            self.model = self._model_type(**hyperparams)
+
+        n_estimators_ideal = n_estimators_final
+        if not warm_start:
+            time_train_start = time.time()
+            if len(n_estimator_increments) > 1:
+                self.model = self.model.fit(X_train, y_train)
                 time_elapsed = time.time() - time_train_start
 
                 model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
@@ -120,17 +146,19 @@ class RFModel(AbstractModel):
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
 
                 ideal_memory_ratio = 0.15 * max_memory_usage_ratio
-                n_estimators_ideal = min(n_estimators_final, math.floor(ideal_memory_ratio / model_memory_ratio * n_estimators_final))
+                n_estimators_ideal = min(n_estimators_final,
+                                         math.floor(ideal_memory_ratio / model_memory_ratio * n_estimators_final))
 
                 if n_estimators_final > n_estimators_ideal:
                     if n_estimators_ideal < n_estimators_minimum:
-                        logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio*100, 2)}% of available memory...')
+                        logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory...')
                         raise NotEnoughMemoryError  # don't train full model to avoid OOM error
-                    logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio*100, 2)}% -> {round(ideal_memory_ratio*100, 2)}% of available memory...')
+                    logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio * 100, 2)}% -> {round(ideal_memory_ratio * 100, 2)}% of available memory...')
 
                 if time_limit is not None:
-                    time_expected = time_train_start - time_start + (time_elapsed * n_estimators_ideal / n_estimators)
-                    n_estimators_time = math.floor((time_limit - time_train_start + time_start) * n_estimators / time_elapsed)
+                    time_expected = time_train_start - time_start + (time_elapsed * n_estimators_ideal / n_estimators_test)
+                    n_estimators_time = math.floor(
+                        (time_limit - time_train_start + time_start) * n_estimators_test / time_elapsed)
                     if n_estimators_time < n_estimators_ideal:
                         if n_estimators_time < n_estimators_minimum:
                             logger.warning(f'\tWarning: Model is expected to require {round(time_expected, 1)}s to train, which exceeds the maximum time limit of {round(time_limit, 1)}s, skipping model...')
@@ -138,15 +166,16 @@ class RFModel(AbstractModel):
                         logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_ideal} -> {n_estimators_time} due to low time. Expected time usage reduced from {round(time_expected, 1)}s -> {round(time_limit, 1)}s...')
                         n_estimators_ideal = n_estimators_time
 
-                for j in range(len(n_estimator_increments)):
-                    if n_estimator_increments[j] > n_estimators_ideal:
-                        n_estimator_increments[j] = n_estimators_ideal
-
+            self.model.n_estimators = n_estimators_ideal
+        else:
+            self.model.n_estimators += warm_iter if warm_iter else n_estimators_ideal
+        self.model = self.model.fit(X_train, y_train)
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
+    # def hyperparameter_tune(self, **kwargs):
+    #     # force_forkserver()
+    #     return skip_hpo(self, **kwargs)
 
     def get_model_feature_importance(self):
         if self.features is None:

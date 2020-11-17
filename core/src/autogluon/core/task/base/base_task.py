@@ -99,7 +99,7 @@ searcher_for_hyperband_strategy = {
 def compile_scheduler_options(
         scheduler_options, search_strategy, search_options, nthreads_per_trial,
         ngpus_per_trial, checkpoint, num_trials, time_out, resume, visualizer,
-        time_attr, reward_attr, dist_ip_addrs, epochs=None):
+        time_attr, reward_attr, dist_ip_addrs, training_history_callback=None, epochs=None):
     """
     Updates a copy of scheduler_options (scheduler-specific options, can be
     empty) with general options. The result can be passed to __init__ of the
@@ -155,7 +155,9 @@ def compile_scheduler_options(
         'reward_attr': reward_attr,
         'time_attr': time_attr,
         'visualizer': visualizer,
-        'dist_ip_addrs': dist_ip_addrs})
+        'dist_ip_addrs': dist_ip_addrs,
+        'training_history_callback': training_history_callback,
+    })
     searcher = searcher_for_hyperband_strategy.get(search_strategy)
     if searcher is not None:
         scheduler_options['searcher'] = searcher
