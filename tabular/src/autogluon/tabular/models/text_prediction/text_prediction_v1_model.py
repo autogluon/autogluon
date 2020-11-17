@@ -4,10 +4,9 @@ import collections
 import logging
 import pandas as pd
 import os
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
+import json
+import numpy as np
 from autogluon.core.constants import BINARY, REGRESSION, AG_ARGS_FIT
-from autogluon.core import metrics
 
 from ..abstract.abstract_model import AbstractModel
 from ...features.feature_metadata import FeatureMetadata, R_OBJECT, R_INT, R_FLOAT, R_CATEGORY,\
@@ -224,13 +223,31 @@ class TextPredictionV1Model(AbstractModel):
 
     @classmethod
     def load_info(cls, path, load_model_if_required=False) -> dict:
-        load_path = path + cls.model_info_name
-        return load_pkl.load(path=load_path)
+        load_path = os.path.join(path, cls.model_info_json_name)
+        print('load_path=', load_path)
+        with open(load_path, 'r') as in_f:
+            return json.load(in_f)
 
     def save_info(self) -> dict:
         info = self.get_info()
-        save_pkl.save(path=self.path + self.model_info_name, object=info)
+        save_path = os.path.join(self.path, self.model_info_json_name)
+        print('save_path=', save_path)
+        with open(save_path, 'w', encoding='utf-8') as out_f:
+            json.dump(info, out_f, ensure_ascii=False)
         return info
+
+    def get_memory_size(self) -> int:
+        """Return the memory size by calculating the total number of parameters.
+
+        Returns
+        -------
+        memory_size
+            The total memory size
+        """
+        total_size = 0
+        for k, v in self.model.net.collect_params().items():
+            total_size += v.dtype.itemsize * np.prod(v.shape)
+        return total_size
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
