@@ -7,6 +7,7 @@ import mxnet as mx
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+import multiprocessing as mp
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
 
@@ -155,7 +156,11 @@ class TabularNNDataset:
         self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list)  # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
         self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle=not self.is_test,
                                                    last_batch='keep' if self.is_test else 'rollover',
-                                                   num_workers=self.num_dataloading_workers)  # no need to shuffle test data
+                                                   num_workers=self.num_dataloading_workers,
+                                                   # thread pool has to use threadpool if forkserver is enable, otherwise GIL will
+                                                   # be locked; please note: this will make training slow
+                                                   thread_pool=mp.get_start_method(allow_none=True) == 'forkserver',
+                                                   )  # no need to shuffle test data
 
     def has_vector_features(self):
         """ Returns boolean indicating whether this dataset contains vector features """
