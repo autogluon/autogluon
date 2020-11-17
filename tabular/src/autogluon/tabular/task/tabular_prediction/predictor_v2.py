@@ -3,6 +3,7 @@ import logging
 import math
 
 import numpy as np
+import pandas as pd
 
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
@@ -74,6 +75,12 @@ class TabularPredictorV2(TabularPredictor):
         self.trainer_type = trainer_type
         self.random_seed = random_seed
         self.has_learner = False
+
+    # TODO: Documentation, flesh out capabilities
+    def fit_feature_generator(self, data: pd.DataFrame) -> pd.DataFrame:
+        if self.label_column in data:
+            data = data.drop(columns=[self.label_column])
+        return self._learner.fit_transform_features(data)
 
     @unpack(set_presets)
     def fit(self,
