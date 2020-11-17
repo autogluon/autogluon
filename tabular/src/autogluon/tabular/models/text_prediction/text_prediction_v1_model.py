@@ -242,7 +242,7 @@ class TextPredictionV1Model(AbstractModel):
         Returns
         -------
         memory_size
-            The total memory size
+            The total memory size in bytes.
         """
         total_size = 0
         for k, v in self.model.net.collect_params().items():
