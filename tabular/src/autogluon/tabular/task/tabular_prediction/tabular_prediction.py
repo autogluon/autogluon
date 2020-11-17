@@ -400,6 +400,9 @@ class TabularPrediction(BaseTask):
                     enable_text_ngram_features : bool, default True
                         Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
                         Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
+                    enable_raw_text_features : bool, default False
+                        Whether to keep the raw text features.
+                        Appends IdentityFeatureGenerator(infer_features_in_args=dict(required_special_types=['text'])) to the generator group.
                     vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
                         Only used if `enable_text_ngram_features=True`.
