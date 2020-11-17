@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from autogluon.tabular.metrics import confusion_matrix
+from autogluon.core.metrics import confusion_matrix
 
 
 def test_confusion_matrix_with_valid_inputs_without_labels_and_weights():

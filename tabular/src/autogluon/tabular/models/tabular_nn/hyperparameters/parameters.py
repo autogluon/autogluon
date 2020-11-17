@@ -1,6 +1,6 @@
 """ Default (fixed) hyperparameter values used in Neural network model """
 
-from ....constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 
 def get_fixed_params():

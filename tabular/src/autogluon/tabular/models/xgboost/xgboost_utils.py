@@ -3,9 +3,10 @@ from collections import OrderedDict
 from scipy.sparse import hstack, csr_matrix
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+
 from ..tabular_nn.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder
 
-from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 _ag_to_xgbm_metric_dict = {
     BINARY: dict(

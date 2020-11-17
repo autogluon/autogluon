@@ -1,11 +1,12 @@
 import logging
-from multiprocessing import cpu_count
+from ...utils import get_gpu_count, get_cpu_count
 
 __all__ = ['Resources', 'DistributedResource',
-           'get_cpu_count', 'get_gpu_count', 
-           'get_remote_cpu_count', 'get_remote_gpu_count']
+           'get_remote_cpu_count', 'get_remote_gpu_count',
+           'get_gpu_count', 'get_cpu_count']
 
 logger = logging.getLogger(__name__)
+
 
 class Resources(object):
     """Resource for AutoGluon Scheduler :class:`autogluon.scheduler.TaskScheduler`
@@ -89,19 +90,11 @@ class DistributedResource(Resources):
         reprstr += ')'
         return reprstr
 
-def get_cpu_count():
-    return cpu_count()
-
-def get_gpu_count():
-    from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
-    if not cudaInit(): return 0
-    gpu_count = cudaDeviceGetCount()
-    cudaShutdown()
-    return gpu_count
 
 def get_remote_cpu_count(node):
     ret = node.submit(get_cpu_count)
     return ret.result()
+
 
 def get_remote_gpu_count(node):
     ret = node.submit(get_gpu_count)

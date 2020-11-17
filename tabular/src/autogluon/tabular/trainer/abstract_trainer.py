@@ -7,14 +7,15 @@ import pandas as pd
 import psutil
 from collections import defaultdict
 
-from ..constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures
 from autogluon.core.utils import shuffle_df_rows, default_holdout_frac
+from autogluon.core.metrics import log_loss, scorer_expects_y_pred
+
 from ..utils import get_pred_from_proba, generate_train_test_split, infer_eval_metric
 from ..models.abstract.abstract_model import AbstractModel
-from ..metrics import log_loss, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets_custom import get_preset_custom
 from ..trainer.model_presets.presets_distill import get_preset_models_distillation

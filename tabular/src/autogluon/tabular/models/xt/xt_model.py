@@ -1,7 +1,7 @@
 from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor
 
 from ..rf.rf_model import RFModel
-from ...constants import REGRESSION
+from autogluon.core.constants import REGRESSION
 
 
 class XTModel(RFModel):

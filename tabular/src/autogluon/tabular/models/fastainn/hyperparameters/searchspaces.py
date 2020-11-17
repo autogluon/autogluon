@@ -1,4 +1,4 @@
-from ....constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core import Categorical, Real, Int
 
 

@@ -3,12 +3,13 @@ import logging
 import numpy as np
 import psutil
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 
+from autogluon.core.constants import REGRESSION
+from autogluon.core.utils.exceptions import NotEnoughMemoryError
+
+from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
-from ...constants import REGRESSION
-from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from ...features.feature_metadata import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
 
 logger = logging.getLogger(__name__)
