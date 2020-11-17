@@ -52,7 +52,7 @@ requirements = [
     'paramiko>=2.4',
     'dask>=2.6.0',
     'distributed>=2.6.0',
-    'ConfigSpace<=0.4.10',
+    'ConfigSpace<=0.4.16',
     'graphviz<0.9.0,>=0.8.1',
     'scikit-optimize',
     'boto3',

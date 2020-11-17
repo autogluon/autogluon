@@ -5,7 +5,7 @@ import shutil
 import pytest
 
 import autogluon.core as ag
-from autogluon.tabular.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular import TabularPrediction as task
 
 

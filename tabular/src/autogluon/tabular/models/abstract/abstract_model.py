@@ -25,7 +25,7 @@ from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL
 from .model_trial import model_trial
 from ...tuning.feature_pruner import FeaturePruner
 from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
-from ...features.feature_metadata import FeatureMetadata
+from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 
 logger = logging.getLogger(__name__)
 
@@ -710,7 +710,7 @@ class AbstractModel:
             'features': self.features,
             'feature_metadata': self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
-            # 'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
+            'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
         }
         return info
 

@@ -11,7 +11,7 @@ from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, R
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures
-from autogluon.core.utils import dd_list, shuffle_df_rows, default_holdout_frac
+from autogluon.core.utils import shuffle_df_rows, default_holdout_frac
 from autogluon.core.metrics import log_loss, scorer_expects_y_pred
 
 from ..utils import get_pred_from_proba, generate_train_test_split, infer_eval_metric

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from ...constants import REGRESSION
+from autogluon.core.constants import REGRESSION
 
 """
 possible TODO: although there is a supervised pretext option below, i.e. pretrain using
