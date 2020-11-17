@@ -1,4 +1,4 @@
-from ....constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 DEFAULT_ITERATIONS = 10000
 

@@ -8,12 +8,13 @@ import numpy as np
 import psutil
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
+from autogluon.core.constants import MULTICLASS, REGRESSION
+from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
+
 from ...features.feature_metadata import R_OBJECT
 from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
-from ...constants import MULTICLASS, REGRESSION
 from ...features.generators import LabelEncoderFeatureGenerator
-from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 
 logger = logging.getLogger(__name__)
 

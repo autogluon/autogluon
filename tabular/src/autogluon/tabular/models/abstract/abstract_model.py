@@ -12,19 +12,20 @@ import numpy as np
 import pandas as pd
 import psutil
 
-from .model_trial import model_trial
-from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-from ...tuning.feature_pruner import FeaturePruner
 from autogluon.core.utils import shuffle_df_rows
-from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
-from ... import metrics
-from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core import Space
 from autogluon.core.scheduler import FIFOScheduler
 from autogluon.core.task.base import BasePredictor
+from autogluon.core import metrics
+from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+
+from .model_trial import model_trial
+from ...tuning.feature_pruner import FeaturePruner
+from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
+from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 
 logger = logging.getLogger(__name__)
 
@@ -691,24 +692,26 @@ class AbstractModel:
         shutil.rmtree(path=model_path, ignore_errors=True)
 
     def get_info(self) -> dict:
-        info = dict(
-            name=self.name,
-            model_type=type(self).__name__,
-            problem_type=self.problem_type,
-            eval_metric=self.eval_metric.name,
-            stopping_metric=self.stopping_metric.name,
-            fit_time=self.fit_time,
-            predict_time=self.predict_time,
-            val_score=self.val_score,
-            hyperparameters=self.params,
-            hyperparameters_fit=self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
-            hyperparameters_nondefault=self.nondefault_params,
-            AG_args_fit=self.params_aux,
-            num_features=len(self.features) if self.features else None,
-            features=self.features,
-            # disk_size=self.get_disk_size(),
-            memory_size=self.get_memory_size(),  # Memory usage of model in bytes
-        )
+        info = {
+            'name': self.name,
+            'model_type': type(self).__name__,
+            'problem_type': self.problem_type,
+            'eval_metric': self.eval_metric.name,
+            'stopping_metric': self.stopping_metric.name,
+            'fit_time': self.fit_time,
+            'num_classes': self.num_classes,
+            'predict_time': self.predict_time,
+            'val_score': self.val_score,
+            'hyperparameters': self.params,
+            'hyperparameters_fit': self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
+            'hyperparameters_nondefault': self.nondefault_params,
+            AG_ARGS_FIT: self.params_aux,
+            'num_features': len(self.features) if self.features else None,
+            'features': self.features,
+            'feature_metadata': self.feature_metadata,
+            # 'disk_size': self.get_disk_size(),
+            'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
+        }
         return info
 
     @classmethod

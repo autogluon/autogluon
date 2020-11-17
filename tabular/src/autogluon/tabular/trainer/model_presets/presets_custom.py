@@ -1,5 +1,4 @@
-
-from ...constants import AG_ARGS
+from autogluon.core.constants import AG_ARGS
 from ...models.lgb.hyperparameters.parameters import get_param_baseline_custom
 
 

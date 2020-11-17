@@ -11,7 +11,7 @@ from .utils import get_network
 from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.decorator import sample_config
 from autogluon.core.space import Categorical
-from autogluon.core.scheduler import get_cpu_count, get_gpu_count
+from autogluon.core.utils import get_cpu_count, get_gpu_count
 from autogluon.mxnet.utils import update_params
 
 __all__ = ['ObjectDetection']
