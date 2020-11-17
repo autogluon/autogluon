@@ -295,7 +295,13 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
+        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
 
         # only build for docs/course
         shopt -s extglob
@@ -323,7 +329,13 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
+        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
 
         # only build for docs/image_classification
         shopt -s extglob
@@ -351,7 +363,13 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
+        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
 
         # only build for docs/nas
         shopt -s extglob
@@ -379,7 +397,13 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
+        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
 
         # only build for docs/object_detection
         shopt -s extglob
@@ -407,7 +431,13 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
+        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
 
         # only build for docs/tabular
         shopt -s extglob
@@ -435,7 +465,13 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
+        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
 
         # only build for docs/text
         shopt -s extglob
@@ -463,7 +499,13 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
+        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
 
         # only build for docs/torch
         shopt -s extglob
