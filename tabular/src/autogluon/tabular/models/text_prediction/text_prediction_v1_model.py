@@ -125,7 +125,6 @@ class TextPredictionV1Model(AbstractModel):
             ),
         )
         default_auxiliary_params.update(extra_auxiliary_params)
-        print('In TextPrediction, default_auxiliary_params=', default_auxiliary_params)
         return default_auxiliary_params
 
     def _set_default_params(self):
