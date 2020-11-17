@@ -22,6 +22,8 @@ AG_TEXT_IMPORT_ERROR = 'autogluon.text has not been installed. ' \
 
 
 class TextPredictionV1Model(AbstractModel):
+    nn_model_name = 'text_nn'
+
     def __init__(self, **kwargs):
         """The TextPredictionV1Model.
 
@@ -213,28 +215,17 @@ class TextPredictionV1Model(AbstractModel):
     def save(self, path: str = None, verbose=True) -> str:
         if path is None:
             path = self.path
-        model_path = os.path.join(path, 'model')
-        logger.log(15, f'Save Model to {model_path}.')
-        logger.log(15, f'Save Model Info to {self.model_info_name}'
-                       f' and {self.model_info_json_name}.')
-        self.model.save(model_path)
-        self.save_info()
+        model_path = os.path.join(path, self.model_file_name)
+        text_nn_path = os.path.join(path, self.nn_model_name)
+        logger.log(15, f'Save Model Hyperparams to {model_path}.')
+        logger.log(15, f'Save Model Text NN weights to {text_nn_path}')
+        model = self.model
+        self.model = None
+        # save this AbstractModel object without NN weights
+        super().save(path=model_path, verbose=verbose)
+        model.save(text_nn_path)
+        self.model = model
         return path
-
-    @classmethod
-    def load_info(cls, path, load_model_if_required=False) -> dict:
-        load_path = os.path.join(path, cls.model_info_json_name)
-        print('load_path=', load_path)
-        with open(load_path, 'r') as in_f:
-            return json.load(in_f)
-
-    def save_info(self) -> dict:
-        info = self.get_info()
-        save_path = os.path.join(self.path, self.model_info_json_name)
-        print('save_path=', save_path)
-        with open(save_path, 'w', encoding='utf-8') as out_f:
-            json.dump(info, out_f, ensure_ascii=False)
-        return info
 
     def get_memory_size(self) -> int:
         """Return the memory size by calculating the total number of parameters.
@@ -258,17 +249,7 @@ class TextPredictionV1Model(AbstractModel):
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
         logger.log(15, f'Load from {path}.')
-        model = BertForTextPredictionBasic.load(os.path.join(path, 'model'))
-        model_info = cls.load_info(path)
-        hyperparameters = model_info['hyperparameters']
-        hyperparameters[AG_ARGS_FIT] = model_info[AG_ARGS_FIT]
-        return cls(path=path,
-                   name=model_info['name'],
-                   eval_metric=model_info['eval_metric'],
-                   num_classes=model_info['num_classes'],
-                   stopping_metric=model_info['stopping_metric'],
-                   model=model,
-                   problem_type=model_info['problem_type'],
-                   hyperparameters=hyperparameters,
-                   features=model_info['features'],
-                   feature_metadata=model_info['feature_metadata'])
+        obj = super().load(os.path.join(path, cls.model_file_name))
+        nn_model = BertForTextPredictionBasic.load(os.path.join(path, cls.nn_model_name))
+        obj.model = nn_model
+        return obj
