@@ -1,7 +1,11 @@
 import copy
 import logging
 
+import os
 import pandas as pd
+from PIL import Image
+
+import networkx as nx
 
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
@@ -1086,6 +1090,47 @@ class TabularPredictor(BasePredictor):
         return self._learner.distill(X=train_data, X_val=tuning_data, time_limits=time_limits, hyperparameters=hyperparameters, holdout_frac=holdout_frac,
                                      verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
                                      augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
+
+    def plot_ensemble_model(self):
+        """
+            Output the visualized stack ensemble architecture of a model trained by `fit()`. 
+            The plot is stored to a file, `ensemble_model.png` in folder `Predictor.output_directory` 
+
+            This function requires `graphviz` and `pygraphviz` to be installed because this visualization depends on those package.
+            Unless this function will raise `ImportError` without being able to generate the visual of the ensemble model.
+
+        """
+        try:
+            import pygraphviz
+        except:
+            raise ImportError('Visualizing ensemble network architecture requires pygraphviz library')
+            
+        G = self._trainer.model_graph
+        remove = [node for node,degree in dict(G.degree()).items() if degree < 1]
+        G.remove_nodes_from(remove)
+        root_node = [n for n,d in G.out_degree() if d == 0]
+        best_model_node = self.get_model_best()
+
+        A = nx.nx_agraph.to_agraph(G)
+        
+        A.graph_attr.update(rankdir='BT')
+        A.node_attr.update(fontsize=10)
+        A.node_attr.update(shape='rectangle')
+
+        for node in A.iternodes():
+            node.attr['label'] = f"{node.name}\nVal score: {float(node.attr['val_score']):.4f}"
+
+            if node.name == best_model_node:
+                node.attr['style'] = 'filled'
+                node.attr['fillcolor'] = '#ff9900'
+                node.attr['shape'] = 'box3d'
+            elif nx.has_path(G, node.name, best_model_node):
+                node.attr['style'] = 'filled'
+                node.attr['fillcolor'] = '#ffcc00'
+
+        model_image_fname = os.path.join(self.output_directory, 'ensemble_model.png')
+
+        A.draw(model_image_fname, format='png', prog='dot')
 
     @staticmethod
     def _summarize(key, msg, results):
