@@ -302,7 +302,8 @@ stage("Build Tutorials") {
         python3 -m pip install --upgrade --force-reinstall -e ./autogluon
 
         # only build for docs/course
-        find ./docs -mindepth 1 ! -regex '^./docs/course\(/.*\)?' -delete
+        shopt -s extglob
+        rm -rf ./docs/!(course)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/course/*', name: 'course'
@@ -335,7 +336,8 @@ stage("Build Tutorials") {
         python3 -m pip install --upgrade --force-reinstall -e ./autogluon
 
         # only build for docs/image_classification
-        find ./docs -mindepth 1 ! -regex '^./docs/image_classification\(/.*\)?' -delete
+        shopt -s extglob
+        rm -rf ./docs/!(image_classification)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/image_classification/*', name: 'image_classification'
@@ -368,7 +370,8 @@ stage("Build Tutorials") {
         python3 -m pip install --upgrade --force-reinstall -e ./autogluon
 
         # only build for docs/nas
-        find ./docs -mindepth 1 ! -regex '^./docs/nas\(/.*\)?' -delete
+        shopt -s extglob
+        rm -rf ./docs/!(nas)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/nas/*', name: 'nas'
@@ -401,7 +404,8 @@ stage("Build Tutorials") {
         python3 -m pip install --upgrade --force-reinstall -e ./autogluon
 
         # only build for docs/object_detection
-        find ./docs -mindepth 1 ! -regex '^./docs/object_detection\(/.*\)?' -delete
+        shopt -s extglob
+        rm -rf ./docs/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/object_detection/*', name: 'object_detection'
@@ -434,10 +438,11 @@ stage("Build Tutorials") {
         python3 -m pip install --upgrade --force-reinstall -e ./autogluon
 
         # only build for docs/tabular
-        find ./docs -mindepth 1 ! -regex '^./docs/tabular\(/.*\)?' -delete
+        shopt -s extglob
+        rm -rf ./docs/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/tabular/*', name: 'tabular'
+        stash includes: 'docs/_build/tabular_prediction/*', name: 'tabular'
       }
     }
   },
@@ -467,10 +472,11 @@ stage("Build Tutorials") {
         python3 -m pip install --upgrade --force-reinstall -e ./autogluon
 
         # only build for docs/text
-        find ./docs -mindepth 1 ! -regex '^./docs/text\(/.*\)?' -delete
+        shopt -s extglob
+        rm -rf ./docs/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/text/*', name: 'text'
+        stash includes: 'docs/_build/text_prediction/*', name: 'text'
       }
     }
   },
@@ -500,7 +506,8 @@ stage("Build Tutorials") {
         python3 -m pip install --upgrade --force-reinstall -e ./autogluon
 
         # only build for docs/torch
-        find ./docs -mindepth 1 ! -regex '^./docs/torch\(/.*\)?' -delete
+        shopt -s extglob
+        rm -rf ./docs/!(torch)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/torch/*', name: 'torch'
