@@ -24,6 +24,9 @@ from .lgb_utils import construct_dataset
 from ..abstract.abstract_model import AbstractModel
 from ..utils import fixedvals_from_searchspaces
 from ...features.feature_metadata import R_OBJECT
+from autogluon.core.utils.savers import save_pkl
+from autogluon.core.utils import try_import_lightgbm
+from autogluon.core import Int, Space
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
@@ -102,7 +105,6 @@ class LGBModel(AbstractModel):
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)
 
-        #len(data) can't be repeatedly called in warm start, since dataset.construct() destroy the raw data
         num_rows_train = len(dataset_train.data)
         if 'min_data_in_leaf' in params:
             if params['min_data_in_leaf'] > num_rows_train:  # TODO: may not be necessary

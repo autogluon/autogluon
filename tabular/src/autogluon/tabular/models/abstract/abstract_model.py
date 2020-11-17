@@ -774,3 +774,4 @@ class AbstractNeuralNetworkModel(AbstractModel):
                 types_of_features.append({"name": feature, "type": feature_type})
 
         return types_of_features, df
+
