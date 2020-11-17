@@ -513,7 +513,7 @@ stage("Build Tutorials") {
         stash includes: 'docs/_build/torch/*', name: 'torch'
       }
     }
-  },
+  }
 }
 
 stage("Build Docs") {
