@@ -34,6 +34,7 @@ class LGBModel(AbstractModel):
         super().__init__(**kwargs)
 
         self._internal_feature_map = None
+        self.model = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
@@ -53,7 +54,19 @@ class LGBModel(AbstractModel):
             eval_metric_name = eval_metric
         return eval_metric, eval_metric_name
 
-    def _fit(self, X_train=None, y_train=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, num_gpus=0, **kwargs):
+    # warm_start enables incremental training, if self.init_model is a learned model
+    # warm_iter specifies the number of additional trees to add for incremental training.
+    def _fit(self, X_train=None, y_train=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, warm_start=False, warm_iter=None, num_gpus=0, **kwargs):
+        """
+            Additional Parameters
+            warm_start: False
+                If warm_start is True, it allows the model to perform incremental training.
+                E.g. calling model.fit(X, y) multiple times would build upon the intermediate models and
+                increase the number of trees used. See also warm_iter
+            warm_iter: None
+                This sets the humber of additional trees to add for incremental training.
+                if warm_iter is None, the number of additional trees set by the model hyperparameter, such as "n_estimators"
+       """
         start_time = time.time()
         params = self.params.copy()
 
@@ -88,6 +101,7 @@ class LGBModel(AbstractModel):
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)
 
+        #len(data) can't be repeatedly called in warm start, since dataset.construct() destroy the raw data
         num_rows_train = len(dataset_train.data)
         if 'min_data_in_leaf' in params:
             if params['min_data_in_leaf'] > num_rows_train:  # TODO: may not be necessary
@@ -111,11 +125,12 @@ class LGBModel(AbstractModel):
                     params['metric'] = train_loss_name
                 elif train_loss_name not in params['metric']:
                     params['metric'] = f'{params["metric"]},{train_loss_name}'
-            callbacks += [
-                # Note: Don't use self.params_aux['max_memory_usage_ratio'] here as LightGBM handles memory per iteration optimally.  # TODO: Consider using when ratio < 1.
-                early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
-                                      ignore_dart_warning=True, verbose=False, manual_stop_file=False, reporter=reporter, train_loss_name=train_loss_name),
-            ]
+            if not warm_start:
+                callbacks += [
+                    # Note: Don't use self.params_aux['max_memory_usage_ratio'] here as LightGBM handles memory per iteration optimally.  # TODO: Consider using when ratio < 1.
+                    early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
+                                          ignore_dart_warning=True, verbose=False, manual_stop_file=False, reporter=reporter, train_loss_name=train_loss_name),
+                ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
 
@@ -146,31 +161,73 @@ class LGBModel(AbstractModel):
         # Train LightGBM model:
         try_import_lightgbm()
         import lightgbm as lgb
-        with warnings.catch_warnings():
-            # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
-            warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
-            warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
-            self.model = lgb.train(**train_params)
-            retrain = False
-            if train_params['params'].get('boosting_type', '') == 'dart':
-                if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
-                    retrain = True
-                    if time_limit is not None:
-                        time_left = time_limit + start_time - time.time()
-                        if time_left < 0.5 * time_limit:
-                            retrain = False
-                    if retrain:
-                        logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
-                        train_params.pop('callbacks')
-                        train_params['num_boost_round'] = self.model.best_iteration
-                        self.model = lgb.train(**train_params)
-                    else:
-                        logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
 
-        if dataset_val is not None and not retrain:
-            self.params_trained['num_boost_round'] = self.model.best_iteration
+
+        if warm_start:
+            self._prev_model = self.model
+            train_params["init_model"] = self.model
+            if warm_iter:
+                train_params["num_boost_round"] = warm_iter
+            with warnings.catch_warnings():
+                # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+                warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+                warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
+                self.model = lgb.train(**train_params)
         else:
-            self.params_trained['num_boost_round'] = self.model.current_iteration()
+            with warnings.catch_warnings():
+                # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+                warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+                warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
+                self.model = lgb.train(**train_params)
+                retrain = False
+                if train_params['params'].get('boosting_type', '') == 'dart':
+                    if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
+                        retrain = True
+                        if time_limit is not None:
+                            time_left = time_limit + start_time - time.time()
+                            if time_left < 0.5 * time_limit:
+                                retrain = False
+                        if retrain:
+                            logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
+                            train_params.pop('callbacks')
+                            train_params['num_boost_round'] = self.model.best_iteration
+                            self.model = lgb.train(**train_params)
+                        else:
+                            logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+
+                if dataset_val is not None and not retrain:
+                    self.params_trained['num_boost_round'] = self.model.best_iteration
+                else:
+                    self.params_trained['num_boost_round'] = self.model.current_iteration()
+
+
+    def _set_early_stopped(self, progress, iterations, early_stopping_rounds):
+        if progress:
+            self._early_stopped = iterations > (self.model.best_iteration + early_stopping_rounds) \
+                if early_stopping_rounds else False
+        else:
+            self._early_stopped = True
+
+
+    def _merge_prev_model(self, init_model, metric_name):
+        progress = True
+        if init_model:
+            prev_perf = init_model.best_score["valid_set"][metric_name]
+            curr_perf = self.model.best_score["valid_set"][metric_name]
+
+            if self.stopping_metric._optimum > curr_perf:
+                if curr_perf < prev_perf:
+                    self.model = init_model
+                    progress = False
+            elif curr_perf > prev_perf:
+                self.model = init_model
+                progress = False
+        return progress
+
+    def trim_to_best(self):
+        if self._prev_model:
+            _, eval_metric_name = self.get_eval_metric()
+            self._merge_prev_model(self._prev_model, eval_metric_name)
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
@@ -299,20 +356,12 @@ class LGBModel(AbstractModel):
         params_copy['num_threads'] = num_threads
         # num_gpus = scheduler_options['resource']['num_gpus'] # TODO: unused
 
-        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, y_train=y_train, params=params_copy, X_val=X_val, y_val=y_val)
-        dataset_train_filename = "dataset_train.bin"
-        train_file = self.path + dataset_train_filename
-        if os.path.exists(train_file):  # clean up old files first
-            os.remove(train_file)
-        dataset_train.save_binary(train_file)
-        dataset_val_filename = "dataset_val.bin"  # names without directory info
-        val_file = self.path + dataset_val_filename
-        if os.path.exists(val_file):  # clean up old files first
-            os.remove(val_file)
-        dataset_val.save_binary(val_file)
         dataset_val_pkl_filename = 'dataset_val.pkl'
         val_pkl_path = directory + dataset_val_pkl_filename
         save_pkl.save(path=val_pkl_path, object=(X_val, y_val))
+
+        train_pkl_path = directory + 'dataset_train.pkl'
+        save_pkl.save(path=train_pkl_path, object=(X_train, y_train))
 
         if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
@@ -322,21 +371,26 @@ class LGBModel(AbstractModel):
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, f'{hyperparam}:   {params_copy[hyperparam]}')
 
+        epochs = kwargs.get("epochs", 1)
+
         util_args = dict(
-            dataset_train_filename=dataset_train_filename,
-            dataset_val_filename=dataset_val_filename,
-            dataset_val_pkl_filename=dataset_val_pkl_filename,
+            dataset_train_pkl_filename=train_pkl_path,
+            dataset_val_pkl_filename=val_pkl_path,
             directory=directory,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_options['time_out']
+            time_limit=scheduler_options['time_out'],
+            epochs=epochs,
+            report_probs = kwargs.get("report_probs", False)
         )
+        params_copy['epochs'] = epochs
+
         lgb_trial.register_args(util_args=util_args, **params_copy)
         scheduler = scheduler_func(lgb_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
-            scheduler.upload_files([train_file, val_file, val_pkl_path])  # TODO: currently does not work.
+            scheduler.upload_files([train_pkl_path, val_pkl_path])  # TODO: currently does not work.
             directory = self.path  # TODO: need to change to path to working directory used on every remote machine
             lgb_trial.update(directory=directory)
             logger.log(15, "uploaded")
@@ -344,7 +398,10 @@ class LGBModel(AbstractModel):
         scheduler.run()
         scheduler.join_jobs()
 
-        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        hpo_models, hpo_model_performances, hpo_results = self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        if 'report_probs' in kwargs:
+            hpo_results['ensemble'] = scheduler.ensemble
+        return hpo_models, hpo_model_performances, hpo_results
 
     # TODO: Consider adding _internal_feature_map functionality to abstract_model
     def compute_feature_importance(self, **kwargs) -> pd.Series:

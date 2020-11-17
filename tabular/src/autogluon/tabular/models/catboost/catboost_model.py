@@ -53,9 +53,60 @@ class CatboostModel(AbstractModel):
                     X[category] = X[category].cat.add_categories('__NaN__').fillna('__NaN__')
         return X
 
+    #TODO: could be useful if we could still exploit the early stopping feature during incremental training
+    #incremental training appears not compatible with early stopping for now
+    def _set_early_stopped(self, progress, iterations, early_stopping_rounds):
+        if progress:
+            self._early_stopped = iterations > (self.model.get_best_iteration() + early_stopping_rounds) \
+            if early_stopping_rounds else False
+        else:
+            self._early_stopped = True
+
+    def _merge_prev_model(self, init_model, metric_name, X_val=None, y_val=None):
+        progress = True #test if adding additional trees help with accuracy
+        if init_model is not None:
+            init_model_best_score = init_model.get_best_score()['validation'][metric_name]
+            final_model_best_score = self.model.get_best_score()['validation'][metric_name]
+            if self.stopping_metric._optimum > final_model_best_score:
+                if final_model_best_score > init_model_best_score:
+                    best_iteration = init_model.tree_count_ + self.model.get_best_iteration()
+                else:
+                    best_iteration = init_model.get_best_iteration()
+                    progress = False
+            else:
+                if final_model_best_score < init_model_best_score:
+                    best_iteration = init_model.tree_count_ + self.model.get_best_iteration()
+                else:
+                    best_iteration = init_model.get_best_iteration()
+                    progress = False
+        else:
+            best_iteration = self.model.get_best_iteration()
+        if best_iteration is not None:
+            self.model.shrink(ntree_start=0, ntree_end=best_iteration+1)
+        return progress
+
+    def trim_to_best(self):
+        if isinstance(self.params['eval_metric'], str):
+            metric_name = self.params['eval_metric']
+        else:
+            metric_name = type(self.params['eval_metric']).__name__
+        self._merge_prev_model(self._prev_model, metric_name, 0)
+
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, **kwargs):
+    # warm_start enables incremental training, if self.init_model is a learned model
+    # warm_iter specifies the number of additional trees to add for incremental training
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, warm_start=False, warm_iter=None, num_gpus=0, **kwargs):
+        """
+        Additional Parameters
+        warm_start: False
+            If warm_start is True, it allows the model to perform incremental training.
+            E.g. calling model.fit(X, y) multiple times would build upon the intermediate models and
+            increase the number of trees used. See also warm_iter
+        warm_iter: None
+            This sets the humber of additional trees to add for incremental training.
+            if warm_iter is None, the number of additional trees set by the model hyperparameter, such as "n_estimators"
+        """
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
         if self.problem_type == SOFTCLASS:
@@ -144,11 +195,6 @@ class CatboostModel(AbstractModel):
         else:
             verbose = True
 
-        init_model = None
-        init_model_tree_count = None
-        init_model_best_iteration = None
-        init_model_best_score = None
-
         params = self.params.copy()
         num_features = len(self.features)
         if num_gpus != 0:
@@ -178,88 +224,96 @@ class CatboostModel(AbstractModel):
                 params['colsample_bylevel'] = 1.0
                 logger.log(30, f'\t\'colsample_bylevel\' is not supported on GPU, using default value (Default = 1).')
 
-        if time_limit:
-            time_left_start = time_limit - (time.time() - start_time)
-            if time_left_start <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
-                raise TimeLimitExceeded
-            params_init = params.copy()
-            num_sample_iter = min(num_sample_iter_max, params_init['iterations'])
-            params_init['iterations'] = num_sample_iter
-            if train_dir is not None:
-                params_init['train_dir'] = train_dir
-            self.model = model_type(
-                **params_init,
-            )
-            self.model.fit(
-                X_train,
-                eval_set=eval_set,
-                use_best_model=True,
-                verbose=verbose,
-                # early_stopping_rounds=early_stopping_rounds,
-            )
+        if not warm_start:
+            if time_limit:
+                time_left_start = time_limit - (time.time() - start_time)
+                if time_left_start <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
+                    raise TimeLimitExceeded
+                params_init = params.copy()
+                num_sample_iter = min(num_sample_iter_max, params_init['iterations'])
+                params_init['iterations'] = num_sample_iter
+                if train_dir is not None:
+                    params_init['train_dir'] = train_dir
+                self.model = model_type(
+                    **params_init,
+                )
 
-            init_model_tree_count = self.model.tree_count_
-            init_model_best_iteration = self.model.get_best_iteration()
-            init_model_best_score = self.model.get_best_score()['validation'][metric_name]
+                #this is small-scall test fitting to determine time limit
+                self.model.fit(
+                    X_train,
+                    eval_set=eval_set,
+                    use_best_model=False,
+                    verbose=verbose,
+                    # early_stopping_rounds=early_stopping_rounds,
+                )
 
-            time_left_end = time_limit - (time.time() - start_time)
-            time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
-            estimated_iters_in_time = round(time_left_end / time_taken_per_iter)
-            init_model = self.model
+                time_left_end = time_limit - (time.time() - start_time)
+                time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
+                estimated_iters_in_time = round(time_left_end / time_taken_per_iter)
 
-            params_final = params.copy()
+                params_final = params.copy()
 
-            # TODO: This only handles memory with time_limits specified, but not with time_limits=None, handle when time_limits=None
-            available_mem = psutil.virtual_memory().available
-            if self.problem_type == SOFTCLASS:  # TODO: remove this once catboost-dev is no longer necessary and SOFTCLASS objectives can be pickled.
-                model_size_bytes = 1  # skip memory check
+                # TODO: This only handles memory with time_limits specified, but not with time_limits=None, handle when time_limits=None
+                available_mem = psutil.virtual_memory().available
+                if self.problem_type == SOFTCLASS:  # TODO: remove this once catboost-dev is no longer necessary and SOFTCLASS objectives can be pickled.
+                    model_size_bytes = 1  # skip memory check
+                else:
+                    model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
+
+                max_memory_proportion = 0.3 * max_memory_usage_ratio
+                mem_usage_per_iter = model_size_bytes / num_sample_iter
+                max_memory_iters = math.floor(available_mem * max_memory_proportion / mem_usage_per_iter)
+
+                params_final['iterations'] = min(params['iterations'] - num_sample_iter, estimated_iters_in_time)
+                if params_final['iterations'] > max_memory_iters - num_sample_iter:
+                    if max_memory_iters - num_sample_iter <= 500:
+                        logger.warning('\tWarning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters, params_final['iterations'] + num_sample_iter))
+                    params_final['iterations'] = max_memory_iters - num_sample_iter
             else:
-                model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
+                params_final = params.copy()
 
-            max_memory_proportion = 0.3 * max_memory_usage_ratio
-            mem_usage_per_iter = model_size_bytes / num_sample_iter
-            max_memory_iters = math.floor(available_mem * max_memory_proportion / mem_usage_per_iter)
+            if train_dir is not None:
+                params_final['train_dir'] = train_dir
+            if params_final['iterations'] > 0:
+                init_model = self.model
 
-            params_final['iterations'] = min(params['iterations'] - num_sample_iter, estimated_iters_in_time)
-            if params_final['iterations'] > max_memory_iters - num_sample_iter:
-                if max_memory_iters - num_sample_iter <= 500:
-                    logger.warning('\tWarning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters, params_final['iterations'] + num_sample_iter))
-                params_final['iterations'] = max_memory_iters - num_sample_iter
+                self.model = model_type(
+                    **params_final,
+                )
+
+                # TODO: Strangely, this performs different if clone init_model is sent in than if trained for same total number of iterations. May be able to optimize catboost models further with this
+                self.model.fit(
+                    X_train,
+                    eval_set=eval_set,
+                    verbose=verbose,
+                    early_stopping_rounds=early_stopping_rounds,
+                    # use_best_model=True,
+                    init_model=init_model,
+                )
+
+                self._merge_prev_model(init_model, metric_name)
         else:
+            #TODO: Time limit constraint is not considered in warm starting scenairo. May need to add it
+            self._prev_model = self.model
             params_final = params.copy()
 
-        if train_dir is not None:
-            params_final['train_dir'] = train_dir
-        if params_final['iterations'] > 0:
+            if warm_iter:
+                params_final["iterations"] = warm_iter
+
             self.model = model_type(
                 **params_final,
             )
 
-            # TODO: Strangely, this performs different if clone init_model is sent in than if trained for same total number of iterations. May be able to optimize catboost models further with this
             self.model.fit(
                 X_train,
                 eval_set=eval_set,
                 verbose=verbose,
-                early_stopping_rounds=early_stopping_rounds,
-                # use_best_model=True,
-                init_model=init_model,
+                #early_stopping_rounds=early_stopping_rounds,
+                use_best_model=False,
+                init_model=self._prev_model,
             )
 
-            if init_model is not None:
-                final_model_best_score = self.model.get_best_score()['validation'][metric_name]
-                if self.stopping_metric._optimum > final_model_best_score:
-                    if final_model_best_score > init_model_best_score:
-                        best_iteration = init_model_tree_count + self.model.get_best_iteration()
-                    else:
-                        best_iteration = init_model_best_iteration
-                else:
-                    if final_model_best_score < init_model_best_score:
-                        best_iteration = init_model_tree_count + self.model.get_best_iteration()
-                    else:
-                        best_iteration = init_model_best_iteration
-
-                self.model.shrink(ntree_start=0, ntree_end=best_iteration+1)
-
+            # progress = self._merge_prev_model(self.prev_model, metric_name, params_final["iterations"], X_val=X_val, y_val=y_val)
         self.params_trained['iterations'] = self.model.tree_count_
 
     def _predict_proba(self, X, **kwargs):
