@@ -301,7 +301,7 @@ stage("Build Tutorials") {
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         pwd
-        stash includes: '/autogluon/docs/_build/tutorials/course/*', name: 'course'
+        stash includes: '**/docs/_build/tutorials/course/*', name: 'course'
       }
     }
   },
@@ -331,7 +331,7 @@ stage("Build Tutorials") {
         tree -L 2 docs/_build/rst
         """
         echo pwd()
-        stash includes: '/docs/_build/tutorials/image_classification/*', name: 'image_classification'
+        stash includes: '**/_build/tutorials/image_classification/*', name: 'image_classification'
       }
     }
   },
@@ -357,7 +357,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(nas)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/docs/_build/tutorials/nas/*', name: 'nas'
+        stash includes: '**/_build/tutorials/nas/*', name: 'nas'
       }
     }
   },
@@ -386,7 +386,7 @@ stage("Build Tutorials") {
         pwd
         """
         echo pwd()
-        stash includes: 'docs/_build/tutorials/object_detection/*', name: 'object_detection'
+        stash includes: '**/_build/tutorials/object_detection/*', name: 'object_detection'
       }
     }
   },
@@ -412,7 +412,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/docs/_build/tutorials/tabular_prediction/*', name: 'tabular'
+        stash includes: '**/_build/tutorials/tabular_prediction/*', name: 'tabular'
       }
     }
   },
@@ -438,7 +438,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/docs/_build/tutorials/text_prediction/*', name: 'text'
+        stash includes: '**/_build/tutorials/text_prediction/*', name: 'text'
       }
     }
   },
@@ -464,7 +464,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(torch)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '/docs/_build/tutorials/torch/*', name: 'torch'
+        stash includes: '**/_build/tutorials/torch/*', name: 'torch'
       }
     }
   }
@@ -516,8 +516,6 @@ stage("Build Docs") {
         unstash 'tabular'
         unstash 'text'
         unstash 'torch'
-        shopt -s extglob
-        rm -rf ./docs/tutorials/!(index.rst)
 
         sh """#!/bin/bash
         set -ex
@@ -579,6 +577,8 @@ stage("Build Docs") {
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
 
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(index.rst)
         cd docs && d2lbook build rst && d2lbook build html
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
         echo "Uploaded doc to http://${site}/index.html"
