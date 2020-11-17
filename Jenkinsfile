@@ -1,5 +1,6 @@
 max_time = 180
 
+/*
 stage("Unit Test") {
   parallel 'core': {
     node('linux-cpu') {
@@ -274,6 +275,7 @@ stage("Unit Test") {
     }
   }
 }
+*/
 
 stage("Build Tutorials") {
   parallel 'course': {
@@ -293,17 +295,11 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core
-        python3 -m pip install --upgrade --force-reinstall -e ./tabular
-        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
-        python3 -m pip install --upgrade --force-reinstall -e ./extra
-        python3 -m pip install --upgrade --force-reinstall -e ./text
-        python3 -m pip install --upgrade --force-reinstall -e ./vision
-        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
 
         # only build for docs/course
         shopt -s extglob
-        rm -rf ./docs/!(course)
+        rm -rf ./docs/tutorials/!(course)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/course/*', name: 'course'
@@ -327,17 +323,11 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core
-        python3 -m pip install --upgrade --force-reinstall -e ./tabular
-        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
-        python3 -m pip install --upgrade --force-reinstall -e ./extra
-        python3 -m pip install --upgrade --force-reinstall -e ./text
-        python3 -m pip install --upgrade --force-reinstall -e ./vision
-        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
 
         # only build for docs/image_classification
         shopt -s extglob
-        rm -rf ./docs/!(image_classification)
+        rm -rf ./docs/tutorials/!(image_classification)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/image_classification/*', name: 'image_classification'
@@ -361,17 +351,11 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core
-        python3 -m pip install --upgrade --force-reinstall -e ./tabular
-        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
-        python3 -m pip install --upgrade --force-reinstall -e ./extra
-        python3 -m pip install --upgrade --force-reinstall -e ./text
-        python3 -m pip install --upgrade --force-reinstall -e ./vision
-        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
 
         # only build for docs/nas
         shopt -s extglob
-        rm -rf ./docs/!(nas)
+        rm -rf ./docs/tutorials/!(nas)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/nas/*', name: 'nas'
@@ -395,17 +379,11 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core
-        python3 -m pip install --upgrade --force-reinstall -e ./tabular
-        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
-        python3 -m pip install --upgrade --force-reinstall -e ./extra
-        python3 -m pip install --upgrade --force-reinstall -e ./text
-        python3 -m pip install --upgrade --force-reinstall -e ./vision
-        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
 
         # only build for docs/object_detection
         shopt -s extglob
-        rm -rf ./docs/!(object_detection)
+        rm -rf ./docs/tutorials/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/object_detection/*', name: 'object_detection'
@@ -429,17 +407,11 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core
-        python3 -m pip install --upgrade --force-reinstall -e ./tabular
-        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
-        python3 -m pip install --upgrade --force-reinstall -e ./extra
-        python3 -m pip install --upgrade --force-reinstall -e ./text
-        python3 -m pip install --upgrade --force-reinstall -e ./vision
-        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
 
         # only build for docs/tabular
         shopt -s extglob
-        rm -rf ./docs/!(tabular_prediction)
+        rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/tabular_prediction/*', name: 'tabular'
@@ -463,17 +435,11 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core
-        python3 -m pip install --upgrade --force-reinstall -e ./tabular
-        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
-        python3 -m pip install --upgrade --force-reinstall -e ./extra
-        python3 -m pip install --upgrade --force-reinstall -e ./text
-        python3 -m pip install --upgrade --force-reinstall -e ./vision
-        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
 
         # only build for docs/text
         shopt -s extglob
-        rm -rf ./docs/!(text_prediction)
+        rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/text_prediction/*', name: 'text'
@@ -497,17 +463,11 @@ stage("Build Tutorials") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e ./core
-        python3 -m pip install --upgrade --force-reinstall -e ./tabular
-        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
-        python3 -m pip install --upgrade --force-reinstall -e ./extra
-        python3 -m pip install --upgrade --force-reinstall -e ./text
-        python3 -m pip install --upgrade --force-reinstall -e ./vision
-        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+        python3 -m pip install --upgrade --force-reinstall -e ./core ./tabular ./mxnet ./extra ./text ./vision ./autogluon
 
         # only build for docs/torch
         shopt -s extglob
-        rm -rf ./docs/!(torch)
+        rm -rf ./docs/tutorials/!(torch)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         stash includes: 'docs/_build/torch/*', name: 'torch'
