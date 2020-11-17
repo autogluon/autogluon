@@ -275,6 +275,240 @@ stage("Unit Test") {
   }
 }
 
+stage("Build Tutorials") {
+  parallel 'course': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-course') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_course -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_course
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --force-reinstall ipython==7.16
+        python3 -m pip install --upgrade --force-reinstall -e ./core
+        python3 -m pip install --upgrade --force-reinstall -e ./tabular
+        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
+        python3 -m pip install --upgrade --force-reinstall -e ./extra
+        python3 -m pip install --upgrade --force-reinstall -e ./text
+        python3 -m pip install --upgrade --force-reinstall -e ./vision
+        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+
+        # only build for docs/course
+        find ./docs -mindepth 1 ! -regex '^./docs/course\(/.*\)?' -delete
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/course/*', name: 'course'
+      }
+    }
+  },
+  'image_classification': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-image-classification') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_image_classification -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_image_classification
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --force-reinstall ipython==7.16
+        python3 -m pip install --upgrade --force-reinstall -e ./core
+        python3 -m pip install --upgrade --force-reinstall -e ./tabular
+        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
+        python3 -m pip install --upgrade --force-reinstall -e ./extra
+        python3 -m pip install --upgrade --force-reinstall -e ./text
+        python3 -m pip install --upgrade --force-reinstall -e ./vision
+        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+
+        # only build for docs/image_classification
+        find ./docs -mindepth 1 ! -regex '^./docs/image_classification\(/.*\)?' -delete
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/image_classification/*', name: 'image_classification'
+      }
+    }
+  },
+  'nas': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-nas') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_nas -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_nas
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --force-reinstall ipython==7.16
+        python3 -m pip install --upgrade --force-reinstall -e ./core
+        python3 -m pip install --upgrade --force-reinstall -e ./tabular
+        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
+        python3 -m pip install --upgrade --force-reinstall -e ./extra
+        python3 -m pip install --upgrade --force-reinstall -e ./text
+        python3 -m pip install --upgrade --force-reinstall -e ./vision
+        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+
+        # only build for docs/nas
+        find ./docs -mindepth 1 ! -regex '^./docs/nas\(/.*\)?' -delete
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/nas/*', name: 'nas'
+      }
+    }
+  },
+  'object_detection': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-object-detection') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_object_detection -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_object_detection
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --force-reinstall ipython==7.16
+        python3 -m pip install --upgrade --force-reinstall -e ./core
+        python3 -m pip install --upgrade --force-reinstall -e ./tabular
+        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
+        python3 -m pip install --upgrade --force-reinstall -e ./extra
+        python3 -m pip install --upgrade --force-reinstall -e ./text
+        python3 -m pip install --upgrade --force-reinstall -e ./vision
+        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+
+        # only build for docs/object_detection
+        find ./docs -mindepth 1 ! -regex '^./docs/object_detection\(/.*\)?' -delete
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/object_detection/*', name: 'object_detection'
+      }
+    }
+  },
+  'tabular_prediction': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-tabular') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_tabular -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_tabular
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --force-reinstall ipython==7.16
+        python3 -m pip install --upgrade --force-reinstall -e ./core
+        python3 -m pip install --upgrade --force-reinstall -e ./tabular
+        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
+        python3 -m pip install --upgrade --force-reinstall -e ./extra
+        python3 -m pip install --upgrade --force-reinstall -e ./text
+        python3 -m pip install --upgrade --force-reinstall -e ./vision
+        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+
+        # only build for docs/tabular
+        find ./docs -mindepth 1 ! -regex '^./docs/tabular\(/.*\)?' -delete
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/tabular/*', name: 'tabular'
+      }
+    }
+  },
+  'text_prediction': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-text') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_text -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_text
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --force-reinstall ipython==7.16
+        python3 -m pip install --upgrade --force-reinstall -e ./core
+        python3 -m pip install --upgrade --force-reinstall -e ./tabular
+        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
+        python3 -m pip install --upgrade --force-reinstall -e ./extra
+        python3 -m pip install --upgrade --force-reinstall -e ./text
+        python3 -m pip install --upgrade --force-reinstall -e ./vision
+        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+
+        # only build for docs/text
+        find ./docs -mindepth 1 ! -regex '^./docs/text\(/.*\)?' -delete
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/text/*', name: 'text'
+      }
+    }
+  },
+  'torch': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-torch') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_torch -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_torch
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --force-reinstall ipython==7.16
+        python3 -m pip install --upgrade --force-reinstall -e ./core
+        python3 -m pip install --upgrade --force-reinstall -e ./tabular
+        python3 -m pip install --upgrade --force-reinstall -e ./mxnet
+        python3 -m pip install --upgrade --force-reinstall -e ./extra
+        python3 -m pip install --upgrade --force-reinstall -e ./text
+        python3 -m pip install --upgrade --force-reinstall -e ./vision
+        python3 -m pip install --upgrade --force-reinstall -e ./autogluon
+
+        # only build for docs/torch
+        find ./docs -mindepth 1 ! -regex '^./docs/torch\(/.*\)?' -delete
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/torch/*', name: 'torch'
+      }
+    }
+  },
+}
+
 stage("Build Docs") {
   node('linux-gpu') {
     ws('workspace/autogluon-docs') {
@@ -313,6 +547,14 @@ stage("Build Docs") {
         }
 
         escaped_context_root = site.replaceAll('\\/', '\\\\/')
+
+        unstash 'course'
+        unstash 'image_classification'
+        unstash 'nas'
+        unstash 'object_detection'
+        unstash 'tabular'
+        unstash 'text'
+        unstash 'torch'
 
         sh """#!/bin/bash
         set -ex
@@ -374,7 +616,7 @@ stage("Build Docs") {
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
 
-        cd docs && bash build_doc.sh
+        cd docs && d2lbook build html
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
         echo "Uploaded doc to http://${site}/index.html"
 
