@@ -293,22 +293,14 @@ stage("Build Tutorials") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        bash docs/build_pip_install.sh
 
         # only build for docs/course
         shopt -s extglob
         rm -rf ./docs/tutorials/!(course)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/course/*', name: 'course'
+        stash includes: '/autogluon/docs/_build/course/*', name: 'course'
       }
     }
   },
@@ -327,22 +319,15 @@ stage("Build Tutorials") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        bash docs/build_pip_install.sh
 
         # only build for docs/image_classification
         shopt -s extglob
         rm -rf ./docs/tutorials/!(image_classification)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
+        pwd
         """
-        stash includes: 'docs/_build/image_classification/*', name: 'image_classification'
+        stash includes: '/autogluon/docs/_build/image_classification/*', name: 'image_classification'
       }
     }
   },
@@ -361,22 +346,14 @@ stage("Build Tutorials") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        bash docs/build_pip_install.sh
 
         # only build for docs/nas
         shopt -s extglob
         rm -rf ./docs/tutorials/!(nas)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/nas/*', name: 'nas'
+        stash includes: '/autogluon/docs/_build/nas/*', name: 'nas'
       }
     }
   },
@@ -395,22 +372,14 @@ stage("Build Tutorials") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        bash docs/build_pip_install.sh
 
         # only build for docs/object_detection
         shopt -s extglob
         rm -rf ./docs/tutorials/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/object_detection/*', name: 'object_detection'
+        stash includes: '/autogluon/docs/_build/object_detection/*', name: 'object_detection'
       }
     }
   },
@@ -429,22 +398,14 @@ stage("Build Tutorials") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        bash docs/build_pip_install.sh
 
         # only build for docs/tabular
         shopt -s extglob
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/tabular_prediction/*', name: 'tabular'
+        stash includes: '/autogluon/docs/_build/tabular_prediction/*', name: 'tabular'
       }
     }
   },
@@ -463,22 +424,14 @@ stage("Build Tutorials") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        bash docs/build_pip_install.sh
 
         # only build for docs/text
         shopt -s extglob
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/text_prediction/*', name: 'text'
+        stash includes: '/autogluon/docs/_build/text_prediction/*', name: 'text'
       }
     }
   },
@@ -497,22 +450,14 @@ stage("Build Tutorials") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        cd ./core && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./tabular && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./mxnet && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./extra && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./text && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./vision && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
-        cd ./autogluon && python3 -m pip install --upgrade --force-reinstall -e . && cd ..
+        bash docs/build_pip_install.sh
 
         # only build for docs/torch
         shopt -s extglob
         rm -rf ./docs/tutorials/!(torch)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/torch/*', name: 'torch'
+        stash includes: '/autogluon/docs/_build/torch/*', name: 'torch'
       }
     }
   }
