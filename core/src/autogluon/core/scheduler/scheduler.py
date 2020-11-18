@@ -27,12 +27,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['TaskScheduler']
 
-if ('forkserver' in mp.get_all_start_methods()) & (mp.get_start_method(allow_none=True) != 'forkserver'):
-    # The CUDA runtime does not support the fork start method;
-    # either the spawn or forkserver start method are required to use CUDA in subprocesses.
-    # forkserver is used because spawn is still affected by locking issues
-    logger.warning('WARNING: changing multiprocessing start method to forkserver')
-    mp.set_start_method('forkserver', force=True)
 
 @contextlib.contextmanager
 def make_temp_directory():

@@ -674,8 +674,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         return model
 
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
-        time_start = time.time()
         """ Performs HPO and sets self.params to best hyperparameter values """
+        time_start = time.time()
+        force_forkserver()
         self.verbosity = kwargs.get('verbosity', 2)
         logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
         self._set_default_searchspace()  # changes non-specified default hyperparams from fixed values to search-spaces.
@@ -740,6 +741,10 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
         if remove_fit and requires_save:
             self.optimizer = None
+
+
+def convert_df_dtype_to_str(df):
+    return df.astype(str)
 
 
 """ General TODOs:
