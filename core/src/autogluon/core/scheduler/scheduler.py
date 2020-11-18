@@ -19,6 +19,7 @@ from .resource import DistributedResourceManager
 from .. import Task
 from .reporter import *
 from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
+from ..utils.multiprocessing_utils import is_fork_enabled
 
 SYS_ERR_OUT_FILE = 'sys_err.out'
 SYS_STD_OUT_FILE = 'sys_std.out'
@@ -164,8 +165,10 @@ class TaskScheduler(object):
     def _worker(pickled_fn, pickled_args, return_list, gpu_ids, args):
         """Worker function in the client
         """
-        fn = dill.loads(pickled_fn)
-        args = {**dill.loads(pickled_args), **args}
+
+        # Only fork mode allows passing non-picklable objects
+        fn = pickled_fn if is_fork_enabled() else dill.loads(pickled_fn)
+        args = {**pickled_args, **args} if is_fork_enabled() else {**dill.loads(pickled_args), **args}
 
         if len(gpu_ids) > 0:
             # handle GPU devices
@@ -206,10 +209,11 @@ class TaskScheduler(object):
             # Dill enables sending of decorated classes. Please note if some classes are used in the training function,
             # those classes are best be defined inside the function - this way those can be constructed 'on-the-other-side'
             # after deserialization.
-            pickled_fn = dill.dumps(fn)
+            pickled_fn = fn if is_fork_enabled() else dill.dumps(fn)
 
             # Reporter has to be separated since it's used for cross-process communication and has to be passed as-is
-            pickled_args = dill.dumps({k: v for (k, v) in args.items() if k not in ['reporter']})
+            args_ = {k: v for (k, v) in args.items() if k not in ['reporter']}
+            pickled_args = args_ if is_fork_enabled() else dill.dumps(args_)
 
             cross_process_args = {k: v for (k, v) in args.items() if k not in ['fn', 'args']}
 
