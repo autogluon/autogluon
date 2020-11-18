@@ -47,7 +47,8 @@ def lgb_trial(args, reporter):
         if not (isinstance(e, TimeLimitExceeded) or isinstance(e, AutoGluonEarlyStop)):
             logger.exception(e, exc_info=True)
         reporter.terminate()
-        model.save()
+        if isinstance(e, AutoGluonEarlyStop):
+            model.save()
 
     # FIXME: If stopping metric and eval metric differ, the previous reported scores will not align as they will be evaluated with stopping_metric, whereas this is evaluated with eval_metric
     #  This should only impact if the reporter data is used
