@@ -301,7 +301,7 @@ stage("Build Tutorials") {
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
         pwd
-        stash includes: '**/docs/_build/tutorials/course/*', name: 'course'
+        stash includes: 'docs/_build/rst/tutorials/course/*', name: 'course'
       }
     }
   },
@@ -330,8 +330,7 @@ stage("Build Tutorials") {
         cat docs/_build/rst/conf.py
         tree -L 2 docs/_build/rst
         """
-        echo pwd()
-        stash includes: '**/_build/tutorials/image_classification/*', name: 'image_classification'
+        stash includes: 'docs/_build/rst/tutorials/image_classification/*', name: 'image_classification'
       }
     }
   },
@@ -357,7 +356,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(nas)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '**/_build/tutorials/nas/*', name: 'nas'
+        stash includes: 'docs/_build/rst/tutorials/nas/*', name: 'nas'
       }
     }
   },
@@ -386,7 +385,7 @@ stage("Build Tutorials") {
         pwd
         """
         echo pwd()
-        stash includes: '**/_build/tutorials/object_detection/*', name: 'object_detection'
+        stash includes: 'docs/_build/rst/tutorials/object_detection/*', name: 'object_detection'
       }
     }
   },
@@ -412,7 +411,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '**/_build/tutorials/tabular_prediction/*', name: 'tabular'
+        stash includes: 'docs/_build/rst/tutorials/tabular_prediction/*', name: 'tabular'
       }
     }
   },
@@ -438,7 +437,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '**/_build/tutorials/text_prediction/*', name: 'text'
+        stash includes: 'docs/_build/rst/tutorials/text_prediction/*', name: 'text'
       }
     }
   },
@@ -464,7 +463,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(torch)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: '**/_build/tutorials/torch/*', name: 'torch'
+        stash includes: 'docs/_build/rst/tutorials/torch/*', name: 'torch'
       }
     }
   }
