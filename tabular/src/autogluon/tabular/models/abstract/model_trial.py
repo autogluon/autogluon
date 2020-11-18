@@ -40,8 +40,10 @@ def model_trial(args, reporter: LocalStatusReporter):
     except Exception as e:
         if not (isinstance(e, TimeLimitExceeded) or isinstance(e, AutoGluonEarlyStop)):
             logger.exception(e, exc_info=True)
+        if isinstance(e, AutoGluonEarlyStop):
+            model.save()
         reporter.terminate()
-        model.save()
+
 
 def prepare_inputs(args):
     task_id = args.pop('task_id')
