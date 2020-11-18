@@ -5,9 +5,9 @@ import pandas as pd
 import mxnet as mx
 
 from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.multiprocessing_utils import is_fork_enabled, is_forkserver_enabled
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-import multiprocessing as mp
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
 
@@ -154,18 +154,16 @@ class TabularNNDataset:
 
     def generate_dataset_and_dataloader(self, data_list):
         self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list)  # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
-        is_forkserver = mp.get_start_method(allow_none=True) == 'forkserver'
-        is_fork = mp.get_start_method(allow_none=True) == 'fork'
         self.dataloader = mx.gluon.data.DataLoader(
             self.dataset, self.batch_size, shuffle=not self.is_test,
             last_batch='keep' if self.is_test else 'rollover',
 
            # local thread version is faster unless fork is enabled
-           num_workers=self.num_dataloading_workers if is_fork else 0,
+           num_workers=self.num_dataloading_workers if is_fork_enabled() else 0,
 
            # need to use threadpool if forkserver is enabled, otherwise GIL will be locked
             # please note: this will make training slower
-           thread_pool=is_forkserver,
+           thread_pool=is_forkserver_enabled(),
         )  # no need to shuffle test data
 
     def has_vector_features(self):
