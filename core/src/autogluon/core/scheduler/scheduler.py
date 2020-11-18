@@ -161,10 +161,12 @@ class TaskScheduler(object):
         return partial(TaskScheduler._wrapper, tempdir, task)
 
     @staticmethod
-    def _worker(pickled_fn, return_list, gpu_ids, args):
-        """Worker function in thec client
+    def _worker(pickled_fn, pickled_args, return_list, gpu_ids, args):
+        """Worker function in the client
         """
         fn = dill.loads(pickled_fn)
+        args = {**dill.loads(pickled_args), **args}
+
         if len(gpu_ids) > 0:
             # handle GPU devices
             os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
@@ -205,8 +207,17 @@ class TaskScheduler(object):
             # those classes are best be defined inside the function - this way those can be constructed 'on-the-other-side'
             # after deserialization.
             pickled_fn = dill.dumps(fn)
+
+            # Reporter has to be separated since it's used for cross-process communication and has to be passed as-is
+            pickled_args = dill.dumps({k: v for (k, v) in args.items() if k not in ['reporter']})
+
+            cross_process_args = {k: v for (k, v) in args.items() if k not in ['fn', 'args']}
+
             with make_temp_directory() as tempdir:
-                p = CustomProcess(target=TaskScheduler._wrap(tempdir, partial(TaskScheduler._worker, pickled_fn)), args=(return_list, gpu_ids, args))
+                p = CustomProcess(
+                    target=TaskScheduler._wrap(tempdir, partial(TaskScheduler._worker, pickled_fn, pickled_args)),
+                    args=(return_list, gpu_ids, cross_process_args)
+                )
                 p.start()
                 if 'reporter' in args:
                     cp = Communicator.Create(p, local_reporter, dist_reporter)
