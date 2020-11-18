@@ -10,7 +10,7 @@ from autogluon.tabular.models.xt.xt_model import XTModel
 
 
 from autogluon.core.space import Int
-from autogluon.tabular.metrics import accuracy
+from autogluon.core.metrics import accuracy
 
 from autogluon.core.scheduler.hyperband import HyperbandScheduler
 from autogluon.core.task.base.base_task import compile_scheduler_options
@@ -98,3 +98,4 @@ def test_xt():
 
 def test_rf():
     hyperband_hpo("rf")
+
