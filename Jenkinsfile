@@ -1,6 +1,5 @@
 max_time = 180
 
-/*
 stage("Unit Test") {
   parallel 'core': {
     node('linux-cpu') {
@@ -275,7 +274,6 @@ stage("Unit Test") {
     }
   }
 }
-*/
 
 stage("Build Tutorials") {
   parallel 'course': {
