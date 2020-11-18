@@ -7,8 +7,6 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core import args
 from autogluon.core.scheduler.reporter import LocalStatusReporter
 
-from autogluon.core.utils.savers import save_pkl
-
 from autogluon.core.utils import AutoGluonEarlyStop
 logger = logging.getLogger(__name__)
 
@@ -24,30 +22,26 @@ def model_trial(args, reporter: LocalStatusReporter):
                 'num_threads', 'num_gpus' to set specific resources in model.fit()
             - model.save() must have return_filename, file_prefix, directory options
     """
-    model = None
     try:
         model, args, util_args = prepare_inputs(args=args)
 
         epochs = util_args.pop("epochs")
 
-        save_val_pred = util_args.pop('save_val_pred')
+        report_probs = util_args.pop('report_probs')
 
         X_train, y_train = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
         X_val, y_val = load_pkl.load(util_args.directory + util_args.dataset_val_filename)
 
-        fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, save_val_pred=None)
+        fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args,
-                                   y_val=y_val, time_start=util_args.time_start, time_limit=util_args.get('time_limit'),
-                                   epochs=epochs, reporter=reporter, save_val_pred=save_val_pred)
-    except AutoGluonEarlyStop:
-        if model is not None:
-            model.save()
-    except TimeLimitExceeded:
-        pass  # this is intended to be silent for model trials
+                                   y_val=y_val, time_start=util_args.time_start, time_limit=util_args.get('time_limit', None),
+                                   epochs=epochs, reporter=reporter, report_probs=report_probs)
     except Exception as e:
-        logger.exception(e, exc_info=True)
-    finally:
+        if not (isinstance(e, TimeLimitExceeded) or isinstance(e, AutoGluonEarlyStop)):
+            logger.exception(e, exc_info=True)
+        if isinstance(e, AutoGluonEarlyStop):
+            model.save()
         reporter.terminate()
 
 
@@ -64,7 +58,7 @@ def prepare_inputs(args):
     return model, args, util_args
 
 
-def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_start, time_limit=None, epochs=None, reporter=None, save_val_pred=None):
+def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_start, time_limit=None, epochs=1, reporter=None, report_probs=False):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
@@ -73,9 +67,6 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
             raise TimeLimitExceeded
     else:
         time_left = None
-
-    if epochs is None:
-        epochs = 1
 
     model.params.update(params)
     time_fit_start = time.time()
@@ -89,11 +80,11 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
         model.val_score = val_score
         model.fit_time = time_fit_end - time_fit_start
         model.predict_time = time_pred_end - time_fit_end
-        # save validation set prediction to disk
-        if save_val_pred:
-            save_pkl.save(path=os.path.join(model.path, "val_pred.save"), object=y_pred_proba)
-        reporter(epoch=i + 1, validation_performance=val_score, model_path=model.path)
-
+        if report_probs:
+            #use model.path as a unique identifier. maybe change this later?
+            reporter(epoch=i+1, validation_performance=val_score, y_probs=y_pred_proba, y_val=y_val, model_path=model.path)
+        else:
+            reporter(epoch=i+1, validation_performance=val_score)
     model.save()
     return model
 
