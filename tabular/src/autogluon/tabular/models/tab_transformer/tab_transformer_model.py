@@ -47,11 +47,19 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         self._temp_file_name = "tab_trans_temp.pth"
         self._period_columns_mapping = None
 
-        # TODO: Take in num_gpu's as a param. Currently this is hard-coded upon detection of cuda.
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
-        else:
+        num_gpus = self.params.get('num_gpus', None)
+        if num_gpus is None:
+            if torch.cuda.is_available():
+                self.device = torch.device("cuda")
+            else:
+                self.device = torch.device("cpu")
+        elif num_gpus == 0:
             self.device = torch.device("cpu")
+        else:
+            self.device = torch.device("cuda")
+
+            if num_gpus > 1:
+                logger.warning("TabTransformer not yet configured to use more than 1 GPU. 'num_gpus' set to >1, but we will be using only 1 GPU.")
 
     def _set_default_params(self):
         default_params = get_default_param()
@@ -516,7 +524,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         return obj
 
         """
-        List of features to add (Updated by Anthony Galczak 11-4-20):
+        List of features to add (Updated by Anthony Galczak 11-19-20):
         
         1) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
         "pretrain API change".
@@ -527,6 +535,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         
         3) Bug where HPO doesn't work when cuda is enabled.
         "RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method"
+        Update: This will likely be fixed in a future change to HPO in AutoGluon.
         
         4) Enable output layer of TT model to be multiple fully connected layers rather than just a single
         linear layer. "TabTransformer2 changes"
