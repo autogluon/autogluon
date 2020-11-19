@@ -11,9 +11,9 @@ from tqdm import tqdm
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractNeuralNetworkModel
-from ...constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.utils import try_import_torch
 from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
 
 
 logger = logging.getLogger(__name__)
@@ -386,9 +386,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         if X_unlabeled is not None:
             # Can't spend all the time in pretraining, have to split it up.
-            split_time_limit = time_limit // 2
-            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=split_time_limit, reporter=reporter)
-            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=split_time_limit, reporter=reporter)
+            if time_limit is not None:
+                time_limit = time_limit // 2
+            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=time_limit, reporter=reporter)
+            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=time_limit, reporter=reporter)
         else:
             self.tt_fit(loader_train, loader_val, y_val, time_limit=time_limit, reporter=reporter)
 

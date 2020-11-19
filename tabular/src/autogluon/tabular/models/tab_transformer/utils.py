@@ -7,7 +7,6 @@ from .tab_transformer_encoder import WontEncodeError, NullEnc
 import logging
 from autogluon.core import args
 from ..abstract import model_trial
-from ... import REGRESSION
 
 logger = logging.getLogger(__name__)
 
