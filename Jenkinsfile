@@ -275,6 +275,198 @@ stage("Unit Test") {
   }
 }
 
+stage("Build Tutorials") {
+  parallel 'course': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-course') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_course -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_course
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/course
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(course)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        pwd
+        stash includes: 'docs/_build/rst/tutorials/course/*', name: 'course'
+      }
+    }
+  },
+  'image_classification': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-image-classification') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_image_classification -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_image_classification
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/image_classification
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(image_classification)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        cat docs/_build/rst/_static/d2l.js
+        cat docs/_build/rst/conf.py
+        tree -L 2 docs/_build/rst
+        """
+        stash includes: 'docs/_build/rst/tutorials/image_classification/*', name: 'image_classification'
+      }
+    }
+  },
+  'nas': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-nas') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_nas -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_nas
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/nas
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(nas)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/rst/tutorials/nas/*', name: 'nas'
+      }
+    }
+  },
+  'object_detection': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-object-detection') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_object_detection -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_object_detection
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/object_detection
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(object_detection)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        tree -L 2 docs/_build/rst
+        pwd
+        """
+        echo pwd()
+        stash includes: 'docs/_build/rst/tutorials/object_detection/*', name: 'object_detection'
+      }
+    }
+  },
+  'tabular_prediction': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-tabular') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_tabular -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_tabular
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/tabular
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(tabular_prediction)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/rst/tutorials/tabular_prediction/*', name: 'tabular'
+      }
+    }
+  },
+  'text_prediction': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-text') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_text -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_text
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/text
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(text_prediction)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/rst/tutorials/text_prediction/*', name: 'text'
+      }
+    }
+  },
+  'torch': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-torch') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon_tutorial_torch -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_torch
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/torch
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(torch)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/rst/tutorials/torch/*', name: 'torch'
+      }
+    }
+  }
+}
+
 stage("Build Docs") {
   node('linux-gpu') {
     ws('workspace/autogluon-docs') {
@@ -313,6 +505,14 @@ stage("Build Docs") {
         }
 
         escaped_context_root = site.replaceAll('\\/', '\\\\/')
+
+        unstash 'course'
+        unstash 'image_classification'
+        unstash 'nas'
+        unstash 'object_detection'
+        unstash 'tabular'
+        unstash 'text'
+        unstash 'torch'
 
         sh """#!/bin/bash
         set -ex
@@ -374,7 +574,9 @@ stage("Build Docs") {
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
 
-        cd docs && bash build_doc.sh
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(index.rst)
+        cd docs && d2lbook build rst && d2lbook build html
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
         echo "Uploaded doc to http://${site}/index.html"
 
