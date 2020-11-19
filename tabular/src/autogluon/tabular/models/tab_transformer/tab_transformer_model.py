@@ -385,8 +385,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         self.model = self._get_model()
 
         if X_unlabeled is not None:
-            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=time_limit, reporter=reporter)
-            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=time_limit, reporter=reporter)
+            # Can't spend all the time in pretraining, have to split it up.
+            split_time_limit = time_limit // 2
+            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=split_time_limit, reporter=reporter)
+            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=split_time_limit, reporter=reporter)
         else:
             self.tt_fit(loader_train, loader_val, y_val, time_limit=time_limit, reporter=reporter)
 
