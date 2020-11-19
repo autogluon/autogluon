@@ -19,12 +19,14 @@ def tt_trial(args, reporter):
 
         fit_model_args = dict(X_train=util_args.X_train, y_train=util_args.y_train, X_val=util_args.X_val, y_val=util_args.y_val)
         predict_proba_args = dict(X=util_args.X_val)
-        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=util_args.y_val,
+        model = model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=util_args.y_val,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
         reporter.terminate()
+    else:
+        reporter(epoch = model.params['epochs'] + 1, validation_performance=model.val_score)
     pass
 
 def augmentation(data, target, **params):

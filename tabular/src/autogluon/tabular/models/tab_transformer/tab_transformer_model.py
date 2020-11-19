@@ -5,15 +5,14 @@ import time
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-
 from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
-from autogluon.core.utils import try_import_torch
+from tqdm import tqdm
 
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractNeuralNetworkModel
+from ...constants import BINARY, REGRESSION, MULTICLASS
+from autogluon.core.utils import try_import_torch
 from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 
 
@@ -196,7 +195,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     pretext = pretext.cuda()
 
                 if state in [None, 'finetune']:
-                    data, target = augmentation(data, target, **params)
+                    if self.params['num_augs'] > 0:
+                        data, target = augmentation(data, target, **params)
                     out, _ = net(data)
                 elif state == 'pretrain':
                     _, out = net(data)
@@ -225,7 +225,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     val_metric = self.score(X=loader_val, y=y_val, eval_metric=self.stopping_metric,
                                             metric_needs_y_pred=self.stopping_metric_needs_y_pred)
                     data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(
-                        train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
+                        train_test, epoch, epochs, total_loss / total_num, self.stopping_metric.name, val_metric))
 
                     if reporter is not None:
                         reporter(epoch=epoch+1, validation_performance=val_metric, train_loss=total_loss)
@@ -385,8 +385,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         self.model = self._get_model()
 
         if X_unlabeled is not None:
-            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=time_limit, reporter=reporter)
-            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=time_limit, reporter=reporter)
+            # Can't spend all the time in pretraining, have to split it up.
+            split_time_limit = time_limit // 2
+            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=split_time_limit, reporter=reporter)
+            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=split_time_limit, reporter=reporter)
         else:
             self.tt_fit(loader_train, loader_val, y_val, time_limit=time_limit, reporter=reporter)
 
@@ -475,7 +477,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         scheduler = scheduler_func(tt_trial, **scheduler_options)
         scheduler.run()
         scheduler.join_jobs()
-        self.model = self.model.to(torch.device("cpu"))
+
         scheduler.get_training_curves(plot=False, use_legend=False)
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
