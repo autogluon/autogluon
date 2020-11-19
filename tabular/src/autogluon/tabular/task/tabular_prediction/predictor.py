@@ -824,26 +824,16 @@ class TabularPredictor(BasePredictor):
         """
         Note: This is advanced functionality not intended for normal usage.
 
-        Returns the out-of-fold (OOF) training predictions of a model.
-        OOF predictions are unbiased estimates of model predictions on the training data.
+        Returns the out-of-fold (OOF) predictions for every row in the training data.
 
-        Warning: This method will raise an exception if called on a model that is not a bagged ensemble. Only bagged models (such a stacker models) can produce OOF predictions.
-            This also means that refit_full models and distilled models will raise an exception.
-        Warning: If intending to join the output of this method with the original training data, be aware that a rare edge-case issue exists:
-            Multiclass problems with rare classes combined with the use of the 'log_loss' eval_metric may have forced AutoGluon to duplicate rows in the training data to satisfy minimum class counts in the data.
-            If this has occurred, then the indices and row counts of the returned pandas Series in this method may not align with the training data.
-            In this case, consider fetching the processed training data using `predictor.load_data_internal()` instead of using the original training data.
-            A more benign version of this issue occurs when 'log_loss' wasn't specified as the eval_metric but rare classes were dropped by AutoGluon.
-            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via `predictor.predict`.
+        For more information, refer to `get_oof_pred_proba()` documentation.
 
         Parameters
         ----------
         model : str (optional)
-            The name of the model to get out-of-fold predictions from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+            Refer to `get_oof_pred_proba()` documentation.
         transformed : bool, default = False
-            Whether the output values should be of the external label representation (False) or the internal label representation (True).
-            Generally, most users will want the external representation and keep `transformed=False`.
+            Refer to `get_oof_pred_proba()` documentation.
 
         Returns
         -------
@@ -867,8 +857,9 @@ class TabularPredictor(BasePredictor):
         """
         Note: This is advanced functionality not intended for normal usage.
 
-        Returns the out-of-fold (OOF) training prediction probabilities of a model.
-        OOF prediction probabilities are unbiased estimates of model prediction probabilities on the training data.
+        Returns the out-of-fold (OOF) prediction probabilities for every row in the training data.
+        OOF prediction probabilities may provide unbiased estimates of generalization accuracy (reflecting how predictions will behave on new data)
+        Predictions for each row are only made using models that were fit to a subset of data where this row was held-out.
 
         Warning: This method will raise an exception if called on a model that is not a bagged ensemble. Only bagged models (such a stacker models) can produce OOF predictions.
             This also means that refit_full models and distilled models will raise an exception.
@@ -885,8 +876,9 @@ class TabularPredictor(BasePredictor):
             The name of the model to get out-of-fold predictions from. Defaults to None, which uses the highest scoring model on the validation set.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
         transformed : bool, default = False
-            Whether the output values should be of the external label representation (False) or the internal label representation (True).
-            Generally, most users will want the external representation and keep `transformed=False`.
+            Whether the output values should be of the original label representation (False) or the internal label representation (True).
+            The internal representation for binary and multiclass classification are integers numbering the k possible classes from 0 to k-1, while the original representation is identical to the label classes provided during fit.
+            Generally, most users will want the original representation and keep `transformed=False`.
         as_multiclass : bool, default = False
             Whether to return binary classification probabilities as if they were for multiclass classification.
                 Output will contain two columns, and if `transformed=False`, the column names will correspond to the binary class labels.
@@ -916,19 +908,21 @@ class TabularPredictor(BasePredictor):
         else:
             return self.transform_labels(labels=y_pred_proba_oof_transformed, inverse=True, proba=True)
 
-    # TODO: v0.1 Should this instead return None when not valid instead of raising exception? Should this be a property or variable instead?
+    # TODO: v0.1 Properly error/return None if label_cleaner hasn't been fit yet. (After API refactor)
     # TODO: v0.1 Add positive_class parameter to task.fit
+    @property
     def positive_class(self):
         """
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
-        Will raise an AssertionError if called when `predictor.problem_type != 'binary'`.
+        Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
 
         Returns
         -------
-        The positive class name in binary classification.
+        The positive class name in binary classification or None if the problem is not binary classification.
         """
         if self.problem_type != BINARY:
-            raise AssertionError(f"Only binary classification contains a positive class, but problem type is '{self.problem_type}'.")
+            logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
+            return None
         return self._learner.label_cleaner.cat_mappings_dependent_var[1]
 
     @classmethod
