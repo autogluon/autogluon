@@ -1,7 +1,8 @@
-# DeepInsight SqueezeNet Tutorial
+# DeepInsight SqueezeNet Example
 
-This tutorial contains an example of how to use the output of 
-pyDeepInsight.ImageTransformer to train and test a PyTorch SqueezeNet.
+This example shows a case of using the output of 
+pyDeepInsight.ImageTransformer to train a SqueezeNet model
+using PyTorch.
 
 ## DeepInsight
 
