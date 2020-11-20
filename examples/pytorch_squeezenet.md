@@ -24,7 +24,7 @@ Load example TCGA data and split into training and testing sets
 
 
 ```python
-expr_file = r"../data/tcga.rnaseq_fpkm_uq.example.txt.gz"
+expr_file = r"./data/tcga.rnaseq_fpkm_uq.example.txt.gz"
 expr = pd.read_csv(expr_file, sep="\t")
 y = expr['project'].values
 X = expr.iloc[:, 1:].values
@@ -90,7 +90,7 @@ for _, spine in ax.spines.items():
 
 
     
-![png](index_files/index_14_0.png)
+![png](pytorch_squeezenet_files/pytorch_squeezenet_14_0.png)
     
 
 
@@ -107,7 +107,7 @@ plt.tight_layout()
 
 
     
-![png](index_files/index_16_0.png)
+![png](pytorch_squeezenet_files/pytorch_squeezenet_16_0.png)
     
 
 
@@ -126,7 +126,7 @@ plt.tight_layout()
 
 
     
-![png](index_files/index_18_0.png)
+![png](pytorch_squeezenet_files/pytorch_squeezenet_18_0.png)
     
 
 
@@ -239,21 +239,17 @@ for epoch in range(15):
           (epoch + 1, running_loss / len(X_train_tensor)))
 ```
 
-    [1] loss: 0.665
-    [2] loss: 0.346
-    [3] loss: 0.264
-    [4] loss: 0.071
-    [5] loss: 0.062
-    [6] loss: 0.057
-    [7] loss: 0.017
-    [8] loss: 0.014
-    [9] loss: 0.008
-    [10] loss: 0.005
-    [11] loss: 0.004
-    [12] loss: 0.003
-    [13] loss: 0.002
-    [14] loss: 0.002
-    [15] loss: 0.001
+    [1] loss: 0.645
+    [2] loss: 0.164
+    [3] loss: 0.069
+    [4] loss: 0.085
+    [5] loss: 0.064
+    [6] loss: 0.078
+    [7] loss: 0.026
+    [8] loss: 0.030
+    [9] loss: 0.026
+    [10] loss: 0.017
+    [11] loss: 0.010
 
 
 Calculate accuracy of prediction
@@ -275,7 +271,3 @@ _, test_predicted = torch.max(test_outputs, 1)
 print("The train accuracy was {:.3f}".format(accuracy_score(train_predicted, y_train_tensor)))
 print("The test accuracy was {:.3f}".format(accuracy_score(test_predicted, y_test_tensor)))
 ```
-
-    The train accuracy was 1.000
-    The test accuracy was 0.983
-
