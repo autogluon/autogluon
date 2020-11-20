@@ -35,13 +35,13 @@ def get_fixed_params():
 def get_hyper_params():
     """ Parameters that currently can be tuned during HPO """
     hyper_params = {
-        'lr': 1e-3, # Learning rate
+        'lr': 3.6e-3, # Learning rate
         # Options: Real(5e-5, 5e-3)
         'weight_decay': 1e-6, # Rate of linear weight decay for learning rate
         # Options: Real(1e-6, 5e-2)
-        'p_dropout': 0.1, # dropout probability, 0 turns off Dropout.
+        'p_dropout': 0, # dropout probability, 0 turns off Dropout.
         # Options: Categorical(0, 0.1, 0.2, 0.3, 0.4, 0.5)
-        'n_heads': 8, # Number of attention heads
+        'n_heads': 4, # Number of attention heads
         # Options: Categorical(2, 4, 8)
         'hidden_dim': 128, # hidden dimension size
         # Options: Categorical(32, 64, 128, 256)
