@@ -61,7 +61,7 @@ class Remote(Client):
     LOCK = mp.Lock()
     REMOTE_ID = mp.Value('i', 0)
     def __init__(self, remote_ip=None, port=None, local=False, ssh_username=None,
-            ssh_port=22, ssh_private_key=None, remote_python=None):
+            ssh_port=22, ssh_private_key=None, remote_python=None, timeout=30):
         self.service = None
         if local:
             super().__init__(processes=False)
@@ -69,9 +69,7 @@ class Remote(Client):
             remote_addr = (remote_ip + ':{}'.format(port))
             self.service = start_service(remote_ip, port)
             _set_global_remote_service(self.service)
-            import time
-            time.sleep(10)
-            super().__init__(remote_addr)
+            super().__init__(remote_addr, timeout=timeout)
         with Remote.LOCK:
             self.remote_id = Remote.REMOTE_ID.value
             Remote.REMOTE_ID.value += 1
