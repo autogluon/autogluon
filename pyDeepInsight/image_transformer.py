@@ -141,12 +141,15 @@ class ImageTransformer:
         ) - 1
         self._coords = np.stack((ax0_coord, ax1_coord))
 
-    def transform(self, X, empty_value=0):
+    def transform(self, X, format='rgb', empty_value=0):
         """Transform the input matrix into image matrices
 
         Args:
             X: {array-like, sparse matrix} of shape (n_samples, n_features)
                 where n_features matches the training set.
+            format: The format of the image matrix to return. 'scalar' return a
+                array of shape (M, N). 'rgb' returns an numpy.ndarray of shape
+                (M, N, 3) that is compatible with PIL.
             empty_value: numeric value to fill elements where no features are
                 mapped. Default = 0.
 
@@ -169,9 +172,17 @@ class ImageTransformer:
                        img_coords[1].astype(int)] = img_coords[z]
             img_matrices.append(img_matrix)
 
+        if format=='rgb':
+            img_matrices = np.array([self._mat_to_rgb(m) for m in img_matrices])
+        elif format=='scalar':
+            pass
+        else:
+            raise ValueError(("'{}' not accepted for parameter 'format'")
+                             .format(format))
+
         return img_matrices
 
-    def fit_transform(self, X):
+    def fit_transform(self, X, **kwargs):
         """Train the image transformer from the training set (X) and return
         the transformed data.
 
@@ -183,7 +194,7 @@ class ImageTransformer:
             the pixel parameter
         """
         self.fit(X)
-        return self.transform(X)
+        return self.transform(X, **kwargs)
 
     def feature_density_matrix(self):
         """Generate image matrix with feature counts per pixel
@@ -254,6 +265,19 @@ class ImageTransformer:
         coords[3] = np.dot([x1, y1], rotmat)
 
         return coords, rotmat
+
+    @staticmethod
+    def _mat_to_rgb(mat):
+        """Convert image matrix to numpy rgb format
+
+        Args:
+            mat: {array-like} (M, N)
+
+        Returns:
+            An numpy.ndarry (M, N, 3) with orignal values repeated across
+            RGB channels.
+        """
+        return np.repeat(mat[:, :, np.newaxis], 3, axis=2)
 
 
 class LogScaler:
