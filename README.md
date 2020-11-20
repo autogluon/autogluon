@@ -29,7 +29,7 @@ Load example TCGA data
 
 
 ```python
-expr_file = r"./data/tcga.rnaseq_fpkm_uq.example.txt.gz"
+expr_file = r"./examples/data/tcga.rnaseq_fpkm_uq.example.txt.gz"
 expr = pd.read_csv(expr_file, sep="\t")
 y = expr['project'].values
 X = expr.iloc[:, 1:].values
@@ -86,7 +86,7 @@ it.fit(X_train_norm, plot=True)
 
 
 
-    <pyDeepInsight.image_transformer.ImageTransformer at 0x7f5248ea04c0>
+    <pyDeepInsight.image_transformer.ImageTransformer at 0x7f396571c100>
 
 
 
@@ -148,14 +148,14 @@ matricies.
 
 
 ```python
-mat_train = it.transform(X_train_norm)
+X_train_img = it.transform(X_train_norm)
 ```
 
 Fit and transform can be done in a single step.
 
 
 ```python
-mat_train = it.fit_transform(X_train_norm)
+X_train_img = it.fit_transform(X_train_norm)
 ```
 
 The following are showing plots for the image matrices first four samples 
@@ -165,10 +165,7 @@ of the training set.
 ```python
 fig, ax = plt.subplots(1, 4, figsize=(25, 7))
 for i in range(0,4):
-    cax = sns.heatmap(mat_train[i], cmap='hot',
-                      linewidth=0.01, linecolor='dimgrey',
-                      square=True, ax=ax[i], cbar=False)
-    cax.axis('off')
+    ax[i].imshow(X_train_img[i])
 plt.tight_layout()
 ```
 
@@ -183,14 +180,11 @@ training data.
 
 
 ```python
-mat_test = it.transform(X_test_norm)
+X_test_img = it.transform(X_test_norm)
 
 fig, ax = plt.subplots(1, 4, figsize=(25, 7))
 for i in range(0,4):
-    cax = sns.heatmap(mat_test[i], cmap='hot',
-                      linewidth=0.01, linecolor='dimgrey',
-                      square=True, ax=ax[i], cbar=False)
-    cax.axis('off')
+    ax[i].imshow(X_test_img[i])
 plt.tight_layout()
 ```
 
@@ -201,8 +195,3 @@ plt.tight_layout()
 
 
 The images matrices can then be used as impute for the CNN model.
-
-
-```python
-
-```
