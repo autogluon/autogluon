@@ -1,6 +1,6 @@
 import copy, time, traceback, logging
 import os
-from typing import List
+from typing import List, Union
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -271,10 +271,9 @@ class AbstractTrainer:
                     logger.log(15, 'Warning: Hyperparameter tuning is not implemented for stack levels > 0.')
                 hyperparameter_tune = False  # TODO: Enable HPO on levels > 0
                 feature_prune = False  # TODO: Enable feature prune on levels > 0
-            models = self.get_models(hyperparameters, hyperparameter_tune=hyperparameter_tune, level=level)
             base_model_names, aux_models = self.stack_new_level(
                 X=X_train, y=y_train, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
-                models=models, level=level, base_model_names=base_model_names,
+                models=hyperparameters, level=level, base_model_names=base_model_names,
                 hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                 core_kwargs=core_kwargs, aux_kwargs=aux_kwargs,
             )
@@ -284,7 +283,7 @@ class AbstractTrainer:
         return model_names_fit
 
     # TODO: Remove name_suffix_aux, hacked in
-    def stack_new_level(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, X_unlabeled=None, level=0, base_model_names: List[str] = None,
+    def stack_new_level(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None, level=0, base_model_names: List[str] = None,
                         hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
@@ -302,7 +301,7 @@ class AbstractTrainer:
             aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, base_model_names=core_models, level=level+1, **aux_kwargs)
         return core_models, aux_models
 
-    def stack_new_level_core(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, X_unlabeled=None,
+    def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=0, base_model_names: List[str] = None, stack_name='core', save_bagged_folds: bool = None,
                              use_orig_features=True, stacker_type=StackerEnsembleModel, **kwargs) -> List[str]:
         """
@@ -319,7 +318,7 @@ class AbstractTrainer:
 
         if self.bagged_mode:
             if level == 0:
-                (base_model_names, base_model_paths, base_model_types) = ([], {}, {})
+                (base_model_names, base_model_paths, base_model_types) = (None, None, None)
             elif level > 0:
                 base_model_names, base_model_paths, base_model_types = self._get_models_load_info(model_names=base_model_names)
                 if len(base_model_names) == 0:
@@ -327,24 +326,19 @@ class AbstractTrainer:
                     return []
             else:
                 raise AssertionError(f'Stack level cannot be negative! level = {level}')
-            invalid_model_names = set(self.get_model_names())
-            models_stack = []
-            for model in models:
-                # Ensure name is unique
-                model_stack_name = f'{model.name}_STACKER_l{level}'
-                num_increment = 2
-                while model_stack_name in invalid_model_names:  # Ensure name is unique
-                    model_stack_name = f'{model.name}_{num_increment}_STACKER_l{level}'
-                    num_increment += 1
-                invalid_model_names.add(model_stack_name)
 
-                model_stack = stacker_type(
-                    path=self.path, name=model_stack_name, model_base=model, base_model_names=base_model_names,
-                    base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
-                    num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level+self.random_seed
-                )
-                models_stack.append(model_stack)
-            models = models_stack
+            if isinstance(models, dict):
+                stacker_kwargs = {
+                    'base_model_names': base_model_names,
+                    'base_model_paths': base_model_paths,
+                    'base_model_types': base_model_types,
+                    'use_orig_features': use_orig_features,
+                    'save_bagged_folds': save_bagged_folds,
+                    'random_state': level + self.random_seed,
+                }
+                models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, stacker_type=stacker_type, stacker_kwargs=stacker_kwargs)
+        elif isinstance(models, dict):
+            models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level)
         X_train_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
@@ -493,6 +487,8 @@ class AbstractTrainer:
 
     # TODO: Remove _get_inputs_to_stacker_legacy eventually, move logic internally into this function instead
     def get_inputs_to_stacker(self, X, base_models, model_pred_proba_dict=None, fit=False, use_orig_features=True):
+        if base_models is None:
+            base_models = []
         if not fit:
             model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=base_models, model_pred_proba_dict=model_pred_proba_dict)
             model_pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
@@ -607,8 +603,9 @@ class AbstractTrainer:
 
                     # TODO: Remove child_hyperparameters, make this cleaner
                     #  This fixes the following: Use the original weighted ensemble's iterations: Currently Dionis spends over 1hr training the refit weighted ensemble because it isn't time limited and goes to 100 iterations.
-                    child_hyperparameters = copy.deepcopy(model_full.params)
-                    child_hyperparameters[AG_ARGS_FIT] = copy.deepcopy(model_full.params_aux)
+                    model_child = model_full._get_model_base()
+                    child_hyperparameters = copy.deepcopy(model_child.params)
+                    child_hyperparameters[AG_ARGS_FIT] = copy.deepcopy(model_child.params_aux)
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
                     models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, k_fold=0, n_repeats=1, base_model_names=base_model_names, name_suffix=REFIT_FULL_SUFFIX, save_bagged_folds=True, check_if_best=False, child_hyperparameters=child_hyperparameters)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.

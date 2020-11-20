@@ -551,6 +551,24 @@ class AbstractModel:
         template.set_contexts(self.path_root + template.name + os.path.sep)
         return template
 
+    def _get_init_args(self):
+        hyperparameters = self.params.copy()
+        hyperparameters = {key: val for key, val in hyperparameters.items() if key in self.nondefault_params}
+        init_args = dict(
+            path=self.path_root,
+            name=self.name,
+            problem_type=self.problem_type,
+            eval_metric=self.eval_metric,
+            num_classes=self.num_classes,
+            stopping_metric=self.stopping_metric,
+            model=None,
+            hyperparameters=hyperparameters,
+            features=self.features,
+            feature_metadata=self.feature_metadata,
+            debug=self.debug
+        )
+        return init_args
+
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()

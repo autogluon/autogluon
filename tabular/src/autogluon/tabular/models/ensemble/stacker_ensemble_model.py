@@ -219,6 +219,17 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         # TODO: hpo_results likely not correct because no renames
         return stackers, stackers_performance, hpo_results
 
+    def _get_init_args(self):
+        init_args = dict(
+            base_model_names=self.base_model_names,
+            base_models_dict=self.base_models_dict,
+            base_model_paths_dict=self.base_model_paths_dict,
+            base_model_types_dict=self.base_model_types_dict,
+            use_orig_features=self.use_orig_features,
+        )
+        init_args.update(super()._get_init_args())
+        return init_args
+
     def load_base_model(self, model_name):
         if model_name in self.base_models_dict.keys():
             model = self.base_models_dict[model_name]

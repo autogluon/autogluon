@@ -9,14 +9,18 @@ from .greedy_weighted_ensemble_model import GreedyWeightedEnsembleModel
 logger = logging.getLogger(__name__)
 
 
+# TODO: v0.1 see if this can be removed and logic moved to greedy weighted ensemble model -> Use StackerEnsembleModel as stacker instead
 # TODO: Optimize predict speed when fit on kfold, can simply sum weights
 class WeightedEnsembleModel(StackerEnsembleModel):
-    def __init__(self, base_model_names, base_model_paths_dict, base_model_types_dict, **kwargs):
-        model_0 = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False)
-        super().__init__(model_base=model_0, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, use_orig_features=False, **kwargs)
-        child_hyperparameters = kwargs.get('_tmp_greedy_hyperparameters', None)  # TODO: Rework to avoid this hack
-        self.model_base = GreedyWeightedEnsembleModel(path='', name='greedy_ensemble', num_classes=self.num_classes, base_model_names=self.stack_column_prefix_lst, problem_type=self.problem_type, eval_metric=self.eval_metric, stopping_metric=self.stopping_metric, hyperparameters=child_hyperparameters)
-        self._child_type = type(self.model_base)
+    def __init__(self, base_model_names, base_model_paths_dict, base_model_types_dict, model_base=None, **kwargs):
+        model_base_is_none = model_base is None
+        if model_base_is_none:
+            model_base = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False)
+        super().__init__(model_base=model_base, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, use_orig_features=False, **kwargs)
+        if model_base_is_none:
+            child_hyperparameters = kwargs.get('_tmp_greedy_hyperparameters', None)  # TODO: Rework to avoid this hack
+            self.model_base = GreedyWeightedEnsembleModel(path='', name='greedy_ensemble', num_classes=self.num_classes, base_model_names=self.stack_column_prefix_lst, problem_type=self.problem_type, eval_metric=self.eval_metric, stopping_metric=self.stopping_metric, hyperparameters=child_hyperparameters)
+            self._child_type = type(self.model_base)
         self.low_memory = False
 
     def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
@@ -42,6 +46,11 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         for key in weights_dict:
             weights_dict[key] = weights_dict[key] / num_models
         return weights_dict
+
+    def _get_init_args(self):
+        init_args = super()._get_init_args()
+        init_args.pop('use_orig_features')
+        return init_args
 
     def compute_feature_importance(self, X, y, features_to_use=None, is_oof=True, **kwargs) -> pd.Series:
         logger.warning('Warning: non-raw feature importance calculation is not valid for weighted ensemble since it does not have features, returning ensemble weights instead...')
