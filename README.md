@@ -92,7 +92,7 @@ it.fit(X_train_norm, plot=True)
 
 
 
-    <pyDeepInsight.image_transformer.ImageTransformer at 0x7f9d1081c160>
+    <pyDeepInsight.image_transformer.ImageTransformer at 0x7f204ebd52e0>
 
 
 
@@ -111,6 +111,7 @@ ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
 ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
 for _, spine in ax.spines.items():
     spine.set_visible(True)
+_ = plt.title("Genes per pixel")
 ```
 
 
@@ -172,6 +173,7 @@ of the training set.
 fig, ax = plt.subplots(1, 4, figsize=(25, 7))
 for i in range(0,4):
     ax[i].imshow(X_train_img[i])
+    ax[i].title.set_text("Train[{}] - class '{}'".format(i, y_train[i]))
 plt.tight_layout()
 ```
 
@@ -191,6 +193,7 @@ X_test_img = it.transform(X_test_norm)
 fig, ax = plt.subplots(1, 4, figsize=(25, 7))
 for i in range(0,4):
     ax[i].imshow(X_test_img[i])
+    ax[i].title.set_text("Test[{}] - class '{}'".format(i, y_test[i]))
 plt.tight_layout()
 ```
 

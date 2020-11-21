@@ -87,6 +87,7 @@ ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
 ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
 for _, spine in ax.spines.items():
     spine.set_visible(True)
+_ = plt.title("Genes per pixel")
 ```
 
 
@@ -103,7 +104,7 @@ of the training set.
 fig, ax = plt.subplots(1, 3, figsize=(15, 5))
 for i in range(0,3):
     ax[i].imshow(X_train_img[i])
-    ax[i].title.set_text(y_train[i])
+    ax[i].title.set_text("Train[{}] - class '{}'".format(i, y_train[i]))
 plt.tight_layout()
 ```
 
@@ -123,7 +124,7 @@ X_test_img = it.transform(X_test_norm)
 fig, ax = plt.subplots(1, 3, figsize=(15, 5))
 for i in range(0,3):
     ax[i].imshow(X_test_img[i])
-    ax[i].title.set_text(y_test[i])
+    ax[i].title.set_text("Test[{}] - class '{}'".format(i, y_test[i]))
 plt.tight_layout()
 ```
 
@@ -241,26 +242,26 @@ for epoch in range(20):
           (epoch + 1, running_loss / len(X_train_tensor) * batch_size))
 ```
 
-    [1] loss: 1.069
-    [2] loss: 0.780
-    [3] loss: 0.596
-    [4] loss: 0.843
-    [5] loss: 1.098
-    [6] loss: 1.099
-    [7] loss: 1.098
-    [8] loss: 1.099
-    [9] loss: 1.099
-    [10] loss: 1.099
-    [11] loss: 1.099
-    [12] loss: 1.099
-    [13] loss: 1.099
-    [14] loss: 1.004
-    [15] loss: 0.626
-    [16] loss: 0.357
-    [17] loss: 0.139
-    [18] loss: 0.146
-    [19] loss: 0.139
-    [20] loss: 0.078
+    [1] loss: 1.094
+    [2] loss: 0.917
+    [3] loss: 0.472
+    [4] loss: 0.289
+    [5] loss: 0.207
+    [6] loss: 0.151
+    [7] loss: 0.154
+    [8] loss: 0.102
+    [9] loss: 0.068
+    [10] loss: 0.065
+    [11] loss: 0.059
+    [12] loss: 0.100
+    [13] loss: 0.032
+    [14] loss: 0.043
+    [15] loss: 0.039
+    [16] loss: 0.022
+    [17] loss: 0.017
+    [18] loss: 0.014
+    [19] loss: 0.033
+    [20] loss: 0.051
 
 
 Calculate accuracy of prediction
@@ -283,6 +284,6 @@ print("The train accuracy was {:.3f}".format(accuracy_score(train_predicted, y_t
 print("The test accuracy was {:.3f}".format(accuracy_score(test_predicted, y_test_tensor)))
 ```
 
-    The train accuracy was 0.992
-    The test accuracy was 0.967
+    The train accuracy was 0.994
+    The test accuracy was 0.975
 
