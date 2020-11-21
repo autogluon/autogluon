@@ -56,7 +56,7 @@ Initialize image transformer.
 ```python
 it = ImageTransformer(
     feature_extractor=tsne, 
-    pixels=100)
+    pixels=32)
 ```
 
 Train image transformer on training data and transform training 
@@ -103,6 +103,7 @@ of the training set.
 fig, ax = plt.subplots(1, 3, figsize=(15, 5))
 for i in range(0,3):
     ax[i].imshow(X_train_img[i])
+    ax[i].title.set_text(y_train[i])
 plt.tight_layout()
 ```
 
@@ -122,6 +123,7 @@ X_test_img = it.transform(X_test_norm)
 fig, ax = plt.subplots(1, 3, figsize=(15, 5))
 for i in range(0,3):
     ax[i].imshow(X_test_img[i])
+    ax[i].title.set_text(y_test[i])
 plt.tight_layout()
 ```
 
@@ -169,20 +171,20 @@ to match number of labels as described in [Finetuning Torchvision Model][2].
 ```python
 net = torch.hub.load(
     'pytorch/vision:v0.6.0', 'squeezenet1_1', 
-    pretrained=True, verbose=False).double()
+    pretrained=False, verbose=False).double()
 net.classifier[1] = nn.Conv2d(512, num_classes, kernel_size=(1,1), 
                               stride=(1,1)).double()
 ```
 
-Transform numpy image format to pyTorch tensor and normalize the data
-as required by a pre-loaded SqueezeNet 1.1.
+Transform numpy image format to pyTorch tensor. Using an untrained network,
+so normalization as specificed in Squeezenet documentation is not 
+required.
 
 
 
 ```python
 preprocess = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    transforms.ToTensor()
 ])
 ```
 
@@ -199,11 +201,10 @@ Generate pyTorch datasets and dataloaders for training and testing sets.
 
 
 ```python
-trainset = TensorDataset(X_train_tensor, y_train_tensor)
-trainloader = DataLoader(trainset,shuffle=True)
+batch_size = 1
 
-testset = TensorDataset(X_test_tensor, y_test_tensor)
-testloader = DataLoader(testset, shuffle=True)
+trainset = TensorDataset(X_train_tensor, y_train_tensor)
+trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
 ```
 
 Specify loss function and optimization algorithm
@@ -214,11 +215,11 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=1e-4, momentum=0.9)
 ```
 
-Train SqueezeNet for 15 epochs
+Train SqueezeNet for 20 epochs
 
 
 ```python
-for epoch in range(15):
+for epoch in range(20):
 
     running_loss = 0.0
     for i, data in enumerate(trainloader, 0):
@@ -234,27 +235,32 @@ for epoch in range(15):
         loss.backward()
         optimizer.step()
 
-        # print statistics
         running_loss += loss.item()
+    # print epoch statistics
     print('[%d] loss: %.3f' %
-          (epoch + 1, running_loss / len(X_train_tensor)))
+          (epoch + 1, running_loss / len(X_train_tensor) * batch_size))
 ```
 
-    [1] loss: 0.645
-    [2] loss: 0.164
-    [3] loss: 0.069
-    [4] loss: 0.085
-    [5] loss: 0.064
-    [6] loss: 0.078
-    [7] loss: 0.026
-    [8] loss: 0.030
-    [9] loss: 0.026
-    [10] loss: 0.017
-    [11] loss: 0.010
-    [12] loss: 0.003
-    [13] loss: 0.002
-    [14] loss: 0.003
-    [15] loss: 0.001
+    [1] loss: 1.069
+    [2] loss: 0.780
+    [3] loss: 0.596
+    [4] loss: 0.843
+    [5] loss: 1.098
+    [6] loss: 1.099
+    [7] loss: 1.098
+    [8] loss: 1.099
+    [9] loss: 1.099
+    [10] loss: 1.099
+    [11] loss: 1.099
+    [12] loss: 1.099
+    [13] loss: 1.099
+    [14] loss: 1.004
+    [15] loss: 0.626
+    [16] loss: 0.357
+    [17] loss: 0.139
+    [18] loss: 0.146
+    [19] loss: 0.139
+    [20] loss: 0.078
 
 
 Calculate accuracy of prediction
@@ -277,6 +283,6 @@ print("The train accuracy was {:.3f}".format(accuracy_score(train_predicted, y_t
 print("The test accuracy was {:.3f}".format(accuracy_score(test_predicted, y_test_tensor)))
 ```
 
-    The train accuracy was 1.000
-    The test accuracy was 0.992
+    The train accuracy was 0.992
+    The test accuracy was 0.967
 
