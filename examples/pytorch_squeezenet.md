@@ -161,7 +161,7 @@ y_test_enc = le.transform(y_test)
 num_classes = np.unique(y_train_enc).size
 ```
 
-Download [pyTrorch SqueezeNet 1.1][1] and modify output layer as 
+Download [PyTrorch SqueezeNet 1.1][1] and modify output layer as 
 to match number of labels as described in [Finetuning Torchvision Model][2].
 
 [1]: https://pytorch.org/hub/pytorch_vision_squeezenet/
@@ -176,8 +176,8 @@ net.classifier[1] = nn.Conv2d(512, num_classes, kernel_size=(1,1),
                               stride=(1,1)).double()
 ```
 
-Transform numpy image format to pyTorch tensor. Using an untrained network,
-so normalization as specificed in Squeezenet documentation is not 
+Transform numpy image format to PyTorch tensor. Using an untrained network,
+so normalization as specificed in SqueezeNet documentation is not 
 required.
 
 
