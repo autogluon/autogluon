@@ -52,7 +52,7 @@ def fit_and_save_model(model, params, train_data, test_data, eval_metric, time_s
     time_fit_start = time.time()
     model.fit(train_data, time_limit=time_left)
     time_fit_end = time.time()
-    model.test_score = model.score(test_data, eval_metric)
+    model.test_score = -model.score(test_data, eval_metric)
     model.fit_time = time_fit_end - time_fit_start
     model.save()
     return model

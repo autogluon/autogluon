@@ -44,6 +44,8 @@ class GluonTSAbstractModel(AbstractModel):
             self.nondefault_parameters = list(hyperparameters.keys())[:]
 
         self.model = model
+        self.test_score = None
+        self.fit_time = None
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
@@ -76,17 +78,16 @@ class GluonTSAbstractModel(AbstractModel):
     def create_model(self):
         pass
 
-    def fit(self, train_data):
+    def fit(self, train_data, time_limit=None):
         pass
-        # self.model = self.model.train(train_data)
 
-    def predict(self, test_data, num_samples=100):
-        forecast_it, ts_it = make_evaluation_predictions(dataset=test_data,
+    def predict(self, data, num_samples=100):
+        forecast_it, ts_it = make_evaluation_predictions(dataset=data,
                                                          predictor=self.model,
                                                          num_samples=num_samples)
-        return list(tqdm(forecast_it, total=len(test_data))), list(tqdm(ts_it, total=len(test_data)))
+        return list(tqdm(forecast_it, total=len(data))), list(tqdm(ts_it, total=len(data)))
 
-    def hyperparameter_tune(self, train_data, test_data, metric, scheduler_options, **kwargs):
+    def hyperparameter_tune(self, train_data, test_data, scheduler_options, **kwargs):
         pass
 
     def score(self, y, metric=None):
@@ -109,3 +110,4 @@ class GluonTSAbstractModel(AbstractModel):
         num_series = len(tss)
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[metric]
+

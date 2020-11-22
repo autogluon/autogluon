@@ -15,13 +15,17 @@ from core.scheduler.fifo import FIFOScheduler
 from pathlib import Path
 from gluonts.model.predictor import Predictor
 from core.utils.exceptions import TimeLimitExceeded
+from core.task.base.base_predictor import BasePredictor
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MQCNNModel(GluonTSAbstractModel):
 
     gluonts_model_path = "gluon_ts"
 
-    def __init__(self, path: str, freq: str, prediction_length: int, name: str="mqcnn",
+    def __init__(self, path: str, freq: str, prediction_length: int, name: str = "MQCNN",
                  eval_metric: str = None, hyperparameters=None, model=None):
         super().__init__(path=path,
                          freq=freq,
@@ -94,4 +98,39 @@ class MQCNNModel(GluonTSAbstractModel):
         scheduler.run()
         scheduler.join_jobs()
         self.best_configs.update(scheduler.get_best_config())
-        return scheduler.get_best_config(), scheduler.get_best_reward()
+        return self._get_hpo_results(scheduler, scheduler_options, time_start)
+
+    def _get_hpo_results(self, scheduler, scheduler_options, time_start):
+        # Store results / models from this HPO run:
+        best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
+        hpo_results = {
+            'best_reward': scheduler.get_best_reward(),
+            'best_config': best_hp,
+            'total_time': time.time() - time_start,
+            'metadata': scheduler.metadata,
+            'training_history': scheduler.training_history,
+            'config_history': scheduler.config_history,
+            'reward_attr': scheduler._reward_attr,
+            'args': model_trial.args
+        }
+
+        hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model
+        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+            raise NotImplementedError("need to fetch model files from remote Workers")
+            # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
+            # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
+
+        hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
+        hpo_model_performances = {}
+        for trial in sorted(hpo_results['trial_info'].keys()):
+            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
+            file_id = "trial_" + str(trial)  # unique identifier to files from this trial
+            trial_model_name = self.name + os.path.sep + file_id
+            trial_model_path = self.path_root + trial_model_name + os.path.sep
+            hpo_models[trial_model_name] = trial_model_path
+            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
+
+        logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
+        logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
+        logger.log(15, str(best_hp))
+        return hpo_models, hpo_model_performances, hpo_results

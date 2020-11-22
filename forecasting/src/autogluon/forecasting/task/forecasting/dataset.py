@@ -185,10 +185,11 @@ class TimeSeriesDataset:
 
 
 if __name__ == '__main__':
-    dataset = TimeSeriesDataset(train_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_train.csv",
-                                test_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_test.csv",
-                                # prediction_length=19,
-                                index_column="name",
-                                target_column="ConfirmedCases",
-                                time_column="Date")
-    print(dataset.freq, dataset.prediction_length)
+    forecasting_dataset = TimeSeriesDataset(
+        train_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_train.csv",
+        test_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_test.csv",
+        # prediction_length=19,
+        index_column="name",
+        target_column="ConfirmedCases",
+        time_column="Date")
+    print(forecasting_dataset.freq, forecasting_dataset.prediction_length)
