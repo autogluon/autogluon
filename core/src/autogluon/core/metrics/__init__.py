@@ -310,8 +310,14 @@ soft_log_loss = make_scorer('soft_log_loss', softclass_metrics.soft_log_loss,
 REGRESSION_METRICS = dict()
 for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
                    median_absolute_error, spearmanr, pearsonr]:
+    if scorer.name in REGRESSION_METRICS:
+        raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
+                         f'Consider to register with a different name.')
     REGRESSION_METRICS[scorer.name] = scorer
     for alias in scorer.alias:
+        if alias in REGRESSION_METRICS:
+            raise ValueError(f'Duplicated alias found! scorer={scorer}, alias={alias}. '
+                             f'Consider to use a different alias.')
         REGRESSION_METRICS[alias] = scorer
 
 CLASSIFICATION_METRICS = dict()
