@@ -44,7 +44,7 @@ def default() -> dict:
                     'model.backbone.name': 'google_electra_small',
                     'optimization.batch_size': 32,
                     'optimization.num_train_epochs': 4,
-                    'optimization.lr': space.Real(1E-5, 1E-4)
+                    'optimization.lr': space.Real(1E-5, 1E-4, default=1E-4)
                 }
             },
         },
@@ -57,6 +57,18 @@ def default() -> dict:
             'num_trials': 4,               # The number of trials
         }
     }
+    return ret
+
+
+@ag_text_prediction_params.register()
+def default_no_hpo() -> dict:
+    """The default hyperparameters without HPO
+
+    It will have a version key and a list of candidate models.
+    Each model has its own search space inside.
+    """
+    ret = default()
+    ret['hpo_params']['num_trials'] = 1
     return ret
 
 

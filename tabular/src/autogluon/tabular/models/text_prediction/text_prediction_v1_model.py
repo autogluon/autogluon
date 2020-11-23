@@ -135,7 +135,7 @@ class TextPredictionV1Model(AbstractModel):
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
         super()._set_default_params()
-        self.params = ag_text_prediction_params.create('default')
+        self.params = ag_text_prediction_params.create('default_no_hpo')
 
     def _fit(self, X_train: pd.DataFrame, y_train: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
