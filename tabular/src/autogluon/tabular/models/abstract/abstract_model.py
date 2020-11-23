@@ -552,6 +552,24 @@ class AbstractModel:
         template.set_contexts(self.path_root + template.name + os.path.sep)
         return template
 
+    def _get_init_args(self):
+        hyperparameters = self.params.copy()
+        hyperparameters = {key: val for key, val in hyperparameters.items() if key in self.nondefault_params}
+        init_args = dict(
+            path=self.path_root,
+            name=self.name,
+            problem_type=self.problem_type,
+            eval_metric=self.eval_metric,
+            num_classes=self.num_classes,
+            stopping_metric=self.stopping_metric,
+            model=None,
+            hyperparameters=hyperparameters,
+            features=self.features,
+            feature_metadata=self.feature_metadata,
+            debug=self.debug
+        )
+        return init_args
+
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
@@ -736,6 +754,15 @@ class AbstractModel:
         save_json.save(path=json_path, obj=info)
         return info
 
+    # TODO: v0.1 Add reference link to all valid keys and their usage or keep full docs here and reference elsewhere?
+    @classmethod
+    def _get_default_ag_args(cls) -> dict:
+        """
+        Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
+        """
+        return {}
+
+
 class AbstractNeuralNetworkModel(AbstractModel):
 
     def __init__(self, **kwargs):
@@ -804,4 +831,3 @@ class AbstractNeuralNetworkModel(AbstractModel):
                 types_of_features.append({"name": feature, "type": feature_type})
 
         return types_of_features, df
-

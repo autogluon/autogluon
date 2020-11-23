@@ -268,6 +268,8 @@ class TabularPrediction(BaseTask):
                             priority: (int) Determines the order in which the model is trained. Larger values result in the model being trained earlier. Default values range from 100 (RF) to 0 (custom), dictated by model type. If you want this model to be trained first, set priority = 999.
                             problem_types: (list) List of valid problem types for the model. `problem_types=['binary']` will result in the model only being trained if `problem_type` is 'binary'.
                             disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune=False`.
+                            valid_stacker: (bool) If False, the model will not be trained as a level 1 or higher stacker model.
+                            valid_base: (bool) If False, the model will not be trained as a level 0 (base) model.
                         Reference the default hyperparameters for example usage of these options.
                     AG_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
                         Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limits` argument given during `fit()` but is not the same.
