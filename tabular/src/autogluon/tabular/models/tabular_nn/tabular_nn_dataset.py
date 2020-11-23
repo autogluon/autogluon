@@ -6,7 +6,7 @@ import mxnet as mx
 
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
 

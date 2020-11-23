@@ -6,9 +6,10 @@ import pandas as pd
 from collections import defaultdict
 
 from autogluon.core.utils.utils import generate_kfold
+from autogluon.core.constants import MULTICLASS
+
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
-from ...constants import MULTICLASS
 from ...features.feature_metadata import FeatureMetadata, R_FLOAT, S_STACK
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, **kwargs):
+    def __init__(self, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, **kwargs):
         super().__init__(**kwargs)
         if base_model_names is None:
             base_model_names = []
@@ -32,7 +33,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.base_models_dict: Dict[str, AbstractModel] = base_models_dict  # String name -> Model objects
         self.base_model_paths_dict = base_model_paths_dict
         self.base_model_types_dict = base_model_types_dict
-        self.use_orig_features = use_orig_features
 
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
             if self.params['max_models_per_type'] > 0:
@@ -69,9 +69,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_models_per_type=max_models)
 
     def _set_default_params(self):
-        default_params = {'max_models': 25, 'max_models_per_type': 5}
+        default_params = {'max_models': 25, 'max_models_per_type': 5, 'use_orig_features': True}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+        super()._set_default_params()
 
     def preprocess(self, X, fit=False, compute_base_preds=True, infer=True, model_pred_proba_dict=None, **kwargs):
         if self.stack_column_prefix_lst:
@@ -93,11 +94,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                         y_pred_proba = base_model.predict_proba(X)
                     X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
                 X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
-                if self.use_orig_features:
+                if self.params['use_orig_features']:
                     X = pd.concat([X_stacker, X], axis=1)
                 else:
                     X = X_stacker
-            elif not self.use_orig_features:
+            elif not self.params['use_orig_features']:
                 X = X[self.stack_columns]
         X = super().preprocess(X, **kwargs)
         return X
@@ -218,6 +219,16 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         # TODO: hpo_results likely not correct because no renames
         return stackers, stackers_performance, hpo_results
 
+    def _get_init_args(self):
+        init_args = dict(
+            base_model_names=self.base_model_names,
+            base_models_dict=self.base_models_dict,
+            base_model_paths_dict=self.base_model_paths_dict,
+            base_model_types_dict=self.base_model_types_dict,
+        )
+        init_args.update(super()._get_init_args())
+        return init_args
+
     def load_base_model(self, model_name):
         if model_name in self.base_models_dict.keys():
             model = self.base_models_dict[model_name]
@@ -232,7 +243,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         stacker_info = dict(
             num_base_models=len(self.base_model_names),
             base_model_names=self.base_model_names,
-            use_orig_features=self.use_orig_features,
         )
         children_info = info.pop('children_info')
         info['stacker_info'] = stacker_info

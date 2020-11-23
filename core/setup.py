@@ -9,12 +9,12 @@ from setuptools import setup, find_packages, find_namespace_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-with open(os.path.join('..', 'VERSION')) as version_file:
+with open(os.path.join(os.path.dirname(__file__), '..', 'VERSION')) as version_file:
     version = version_file.read().strip()
 
 """
-To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
-a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
+To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish
+a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml .
 You need to increase the version number after stable release, so that the nightly pypi can work properly.
 """
 try:
@@ -33,6 +33,8 @@ def create_version_file():
     with open(version_path, 'w') as f:
         f.write('"""This is autogluon version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
+    with open(os.path.join('..', 'VERSION.minor'), 'w') as f:
+        f.write(day)
 
 
 long_description = open(os.path.join('..', 'README.md')).read()
@@ -50,7 +52,7 @@ requirements = [
     'paramiko>=2.4',
     'dask>=2.6.0',
     'distributed>=2.6.0',
-    'ConfigSpace<=0.4.10',
+    'ConfigSpace<=0.4.16',
     'graphviz<0.9.0,>=0.8.1',
     'scikit-optimize',
     'boto3',

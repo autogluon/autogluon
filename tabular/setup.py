@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-with open(os.path.join('..', 'VERSION')) as version_file:
+with open(os.path.join(os.path.dirname(__file__), '..', 'VERSION')) as version_file:
     version = version_file.read().strip()
 
 """
@@ -18,8 +18,13 @@ You need to increase the version number after stable release, so that the nightl
 try:
     if not os.getenv('RELEASE'):
         from datetime import date
-        today = date.today()
-        day = today.strftime("b%Y%m%d")
+        minor_version_file_path = os.path.join('..', 'VERSION.minor')
+        if os.path.isfile(minor_version_file_path):
+            with open(minor_version_file_path) as f:
+                day = f.read().strip()
+        else:
+            today = date.today()
+            day = today.strftime("b%Y%m%d")
         version += day
 except Exception:
     pass
@@ -41,6 +46,7 @@ requirements = [
     'numpy>=1.16.0',
     'scipy>=1.3.3',
     'catboost>=0.23.0,<0.25',
+    'xgboost>=1.2,<1.3',
     'lightgbm>=3.0,<4.0',
     'pandas>=1.0.0,<2.0',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'

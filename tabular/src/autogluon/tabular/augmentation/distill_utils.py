@@ -2,11 +2,10 @@ import logging, gc
 import numpy as np
 import pandas as pd
 from sklearn.neighbors import NearestNeighbors
-
-from ..constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.metrics import mean_squared_error
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ..features.feature_metadata import FeatureMetadata
-from ..metrics import mean_squared_error
 
 logger = logging.getLogger(__name__)
 

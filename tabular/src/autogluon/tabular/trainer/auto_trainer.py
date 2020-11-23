@@ -16,7 +16,7 @@ class AutoTrainer(AbstractTrainer):
         eval_metric = kwargs.pop('eval_metric', self.eval_metric)
         stopping_metric = kwargs.pop('stopping_metric', self.stopping_metric)
         num_classes = kwargs.pop('num_classes', self.num_classes)
-        invalid_model_names = kwargs.pop('invalid_model_names', self.get_model_names_all())
+        invalid_model_names = kwargs.pop('invalid_model_names', self.get_model_names())
         return get_preset_models(path=path, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
                                  num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names, **kwargs)
 

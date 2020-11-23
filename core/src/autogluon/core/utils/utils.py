@@ -8,7 +8,20 @@ import numpy as np
 from pandas import DataFrame
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
 
+
 logger = logging.getLogger(__name__)
+
+
+def get_cpu_count():
+    return multiprocessing.cpu_count()
+
+
+def get_gpu_count():
+    from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
+    if not cudaInit(): return 0
+    gpu_count = cudaDeviceGetCount()
+    cudaShutdown()
+    return gpu_count
 
 
 def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_repeats=1):
@@ -78,10 +91,6 @@ def setup_trial_limits(time_limits, num_trials, hyperparameters):
         num_trials = 1
     time_limits *= 0.9  # reduce slightly to account for extra time overhead
     return time_limits, num_trials
-
-
-def dd_list():
-    return defaultdict(list)
 
 
 def get_leaderboard_pareto_frontier(leaderboard: DataFrame, score_col='score_val', inference_time_col='pred_time_val_full') -> DataFrame:

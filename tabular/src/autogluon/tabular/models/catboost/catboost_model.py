@@ -7,14 +7,15 @@ import time
 import psutil
 import numpy as np
 
+from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
+from autogluon.core.utils import try_import_catboost, try_import_catboostdev
+from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
+
 from .catboost_utils import construct_custom_catboost_metric # make_softclass_metric, make_softclass_objective  # TODO: replace with SoftclassObjective, SoftclassCustomMetric once lazy import no longer needed.
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
-from ...constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
 from ...features.feature_metadata import R_OBJECT
-from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
-from autogluon.core.utils import try_import_catboost, try_import_catboostdev
 
 logger = logging.getLogger(__name__)
 

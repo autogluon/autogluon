@@ -8,6 +8,7 @@ from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
+from autogluon.core.metrics import get_metric
 
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
@@ -15,7 +16,6 @@ from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
 from ...features import AutoMLPipelineFeatureGenerator
 from ...learner import DefaultLearner as Learner
-from ...metrics import get_metric
 from ...trainer import AutoTrainer
 
 
@@ -217,6 +217,7 @@ class TabularPrediction(BaseTask):
                         {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
                     ],
                     'CAT': {},
+                    'XGB': {},
                     'RF': [
                         {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
                         {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
@@ -241,6 +242,8 @@ class TabularPrediction(BaseTask):
                      See also the lightGBM docs: https://lightgbm.readthedocs.io/en/latest/Parameters.html
                 CAT: `autogluon/utils/tabular/ml/models/catboost/hyperparameters/parameters.py`
                      See also the CatBoost docs: https://catboost.ai/docs/concepts/parameter-tuning.html
+                XGB: `autogluon/utils/tabular/ml/models/xgboost/hyperparameters/parameters.py`
+                     See also the XGBoost docs: https://xgboost.readthedocs.io/en/latest/parameter.html
                 RF: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
                 XT: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
@@ -263,6 +266,8 @@ class TabularPrediction(BaseTask):
                             priority: (int) Determines the order in which the model is trained. Larger values result in the model being trained earlier. Default values range from 100 (RF) to 0 (custom), dictated by model type. If you want this model to be trained first, set priority = 999.
                             problem_types: (list) List of valid problem types for the model. `problem_types=['binary']` will result in the model only being trained if `problem_type` is 'binary'.
                             disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune=False`.
+                            valid_stacker: (bool) If False, the model will not be trained as a level 1 or higher stacker model.
+                            valid_base: (bool) If False, the model will not be trained as a level 0 (base) model.
                         Reference the default hyperparameters for example usage of these options.
                     AG_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
                         Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limits` argument given during `fit()` but is not the same.
@@ -276,7 +281,7 @@ class TabularPrediction(BaseTask):
 
         holdout_frac : float, default = None
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
-            Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
+            Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
             Default value is doubled if `hyperparameter_tune = True`, up to a maximum of 0.2.
             Disabled if `num_bagging_folds >= 2`.
         num_bagging_folds : int, default = 0
@@ -292,7 +297,7 @@ class TabularPrediction(BaseTask):
         stack_ensemble_levels : int, default = 0
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
-            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
+            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
         num_trials : int, default = None
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
@@ -505,6 +510,7 @@ class TabularPrediction(BaseTask):
         # TODO: v0.1 - id_columns -> ignored_columns?
         # TODO: v0.1 - nthreads_per_trial/ngpus_per_trial -> rename/rework
         # TODO: v0.1 - visualizer -> consider reworking/removing
+        # TODO: v0.1 - stack_ensemble_levels is silently ignored if num_bagging_folds < 2, ensure there is a warning printed
 
         feature_prune = kwargs.get('feature_prune', False)
         scheduler_options = kwargs.get('scheduler_options', None)
@@ -528,8 +534,8 @@ class TabularPrediction(BaseTask):
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
-            train_features = np.array([column for column in train_data.columns if column != label])
-            unlabeled_features = np.array([column for column in unlabeled_data.columns])
+            train_features = sorted(np.array([column for column in train_data.columns if column != label]))
+            unlabeled_features = sorted(np.array([column for column in unlabeled_data.columns]))
             if np.any(train_features != unlabeled_features):
                 raise ValueError("Column names must match between training and unlabeled data.\n"
                                  "Unlabeled data must have not the label column specified in it.\n")

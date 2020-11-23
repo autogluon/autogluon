@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ..abstract.abstract_model import AbstractModel
-from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
+from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
 from autogluon.core.utils.utils import generate_kfold
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
     _oof_filename = 'oof.pkl'
+
     def __init__(self, model_base: AbstractModel, save_bagged_folds=True, random_state=0, **kwargs):
         self.model_base = model_base
         self._child_type = type(self.model_base)
@@ -316,13 +317,38 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
     def convert_to_refitfull_template(self):
+        init_args = self._get_init_args()
+        init_args['save_bagged_folds'] = True  # refit full models must save folds
+        model_base_name_orig = init_args['model_base'].name
+        init_args['model_base'] = self.convert_to_refitfull_template_child()
+        model_base_name_new = init_args['model_base'].name
+        if model_base_name_orig in init_args['name'] and model_base_name_orig != model_base_name_new:
+            init_args['name'] = init_args['name'].replace(model_base_name_orig, model_base_name_new, 1)
+        else:
+            init_args['name'] = init_args['name'] + '_FULL'
+
+        model_full_template = self.__class__(**init_args)
+        return model_full_template
+
+    def convert_to_refitfull_template_child(self):
         compressed_params = self._get_compressed_params()
-        model_compressed = copy.deepcopy(self._get_model_base())
-        model_compressed.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
-        model_compressed.params = compressed_params
-        model_compressed.name = model_compressed.name + REFIT_FULL_SUFFIX
-        model_compressed.set_contexts(self.path_root + model_compressed.name + os.path.sep)
-        return model_compressed
+        child_compressed = copy.deepcopy(self._get_model_base())
+        child_compressed.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
+        child_compressed.params = compressed_params
+        child_compressed.name = child_compressed.name + REFIT_FULL_SUFFIX
+        child_compressed.set_contexts(self.path_root + child_compressed.name + os.path.sep)
+        return child_compressed
+
+    def _get_init_args(self):
+        init_args = dict(
+            model_base=self._get_model_base(),
+            save_bagged_folds=self.save_bagged_folds,
+            random_state=self._random_state,
+        )
+        init_args.update(super()._get_init_args())
+        init_args.pop('problem_type')
+        init_args.pop('feature_metadata')
+        return init_args
 
     def _get_compressed_params(self, model_params_list=None):
         if model_params_list is None:

@@ -5,7 +5,7 @@ from typing import Union
 import numpy as np
 from pandas import DataFrame, Series
 
-from ..constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 logger = logging.getLogger(__name__)
 

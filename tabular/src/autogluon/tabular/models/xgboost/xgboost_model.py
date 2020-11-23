@@ -1,0 +1,151 @@
+import os
+import time
+import logging
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.utils import try_import_xgboost
+
+from . import xgboost_utils
+from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.searchspaces import get_default_searchspace
+from ..abstract.abstract_model import AbstractModel
+from ...features.feature_metadata import R_OBJECT
+
+logger = logging.getLogger(__name__)
+
+
+class XGBoostModel(AbstractModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._ohe_generator = None
+
+    def _set_default_params(self):
+        default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+
+    def _get_default_searchspace(self):
+        return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
+
+    # Use specialized XGBoost metric if available (fast), otherwise use custom func generator
+    def get_eval_metric(self):
+        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
+        if eval_metric is None:
+            eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)
+        return eval_metric
+
+    def _preprocess(self, X, is_train=False, max_category_levels=None, **kwargs):
+        X = super()._preprocess(X=X, **kwargs)
+
+        if self._ohe_generator is None:
+            self._ohe_generator = xgboost_utils.OheFeatureGenerator(max_levels=max_category_levels)
+
+        if is_train:
+            self._ohe_generator.fit(X)
+
+        X = self._ohe_generator.transform(X)
+
+        return X
+
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+        start_time = time.time()
+        
+        invalid_params = ['num_threads', 'num_gpus']
+        for invalid in invalid_params:
+            if invalid in self.params:
+                self.params.pop(invalid)
+        params = self.params.copy()
+        max_category_levels = params.pop('proc.max_category_levels', 100)
+
+        verbosity = kwargs.get('verbosity', 2)
+        if verbosity <= 2:
+            verbose = False
+        elif verbosity == 3:
+            verbose = True
+            verbose_eval = 50
+        else:
+            verbose = True
+            verbose_eval = 1
+        
+        X_train = self.preprocess(X_train, is_train=True, max_category_levels=max_category_levels)
+        num_rows_train = X_train.shape[0]
+
+        eval_set = []
+        eval_metric = self.get_eval_metric()
+
+        if X_val is None:
+            early_stopping_rounds = 150
+            eval_set.append((X_train, y_train))  # TODO: if the train dataset is large, use sample of train dataset for validation
+        else:
+            modifier = 1 if num_rows_train <= 10000 else 10000 / num_rows_train
+            early_stopping_rounds = max(round(modifier * 150), 10)
+            X_val = self.preprocess(X_val, is_train=False)
+            eval_set.append((X_val, y_val))
+
+        try_import_xgboost()
+        from .callbacks import print_evaluation, early_stop_custom
+        callbacks = []
+        if verbose:
+            callbacks.append(print_evaluation(verbose_eval))
+        # TODO: disable early stopping during refit_full
+        callbacks.append(early_stop_custom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
+
+        from xgboost import XGBClassifier, XGBRegressor
+        model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
+        self.model = model_type(**params)
+        self.model.fit(
+            X=X_train,
+            y=y_train,
+            eval_set=eval_set,
+            eval_metric=eval_metric,
+            verbose=False,
+            callbacks=callbacks
+        )
+
+        bst = self.model.get_booster()
+        self.params_trained['n_estimators'] = bst.best_ntree_limit
+        self._best_ntree_limit = bst.best_ntree_limit
+
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
+
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X, ntree_limit=self._best_ntree_limit)
+
+        y_pred_proba = self.model.predict_proba(X, ntree_limit=self._best_ntree_limit)
+        if self.problem_type == BINARY:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            elif y_pred_proba.shape[1] > 1:
+                return y_pred_proba[:, 1]
+            else:
+                return y_pred_proba
+        elif y_pred_proba.shape[1] > 2:
+            return y_pred_proba
+        else:
+            return y_pred_proba[:, 1]
+
+    def get_model_feature_importance(self):
+        original_feature_names: list = self._ohe_generator.get_original_feature_names()
+        feature_names = self._ohe_generator.get_feature_names()
+        importances = self.model.feature_importances_.tolist()
+
+        importance_dict = {}
+        for original_feature in original_feature_names:
+            importance_dict[original_feature] = 0
+            for feature, value in zip(feature_names, importances):
+                if feature in self._ohe_generator.othercols:
+                    importance_dict[feature] = value
+                else:
+                    feature = '_'.join(feature.split('_')[:-1])
+                    if feature == original_feature:
+                        importance_dict[feature] += value
+
+        return importance_dict

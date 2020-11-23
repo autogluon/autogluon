@@ -238,11 +238,12 @@ def read_rte(dir_path):
     df_dict = dict()
     for fold in ['train', 'dev', 'test']:
         csv_file = os.path.join(dir_path, '{}.tsv'.format(fold))
-        df = pd.read_csv(csv_file, '\t')
+        df = read_tsv_glue(csv_file, keep_column_names=True)
         if fold == 'test':
             df_dict[fold] = df[['sentence1', 'sentence2']]
         else:
             df_dict[fold] = df[['sentence1', 'sentence2', 'label']]
+            assert df_dict[fold]['label'].isnull().sum().sum() == 0
     return df_dict, None
 
 

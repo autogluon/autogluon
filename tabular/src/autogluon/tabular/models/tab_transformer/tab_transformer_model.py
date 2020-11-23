@@ -11,9 +11,9 @@ from tqdm import tqdm
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractNeuralNetworkModel
-from ...constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.utils import try_import_torch
 from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
 
 
 logger = logging.getLogger(__name__)
@@ -46,12 +46,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         self._verbosity = None
         self._temp_file_name = "tab_trans_temp.pth"
         self._period_columns_mapping = None
-
-        # TODO: Take in num_gpu's as a param. Currently this is hard-coded upon detection of cuda.
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
-        else:
-            self.device = torch.device("cpu")
 
     def _set_default_params(self):
         default_params = get_default_param()
@@ -195,7 +189,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     pretext = pretext.cuda()
 
                 if state in [None, 'finetune']:
-                    data, target = augmentation(data, target, **params)
+                    if self.params['num_augs'] > 0:
+                        data, target = augmentation(data, target, **params)
                     out, _ = net(data)
                 elif state == 'pretrain':
                     _, out = net(data)
@@ -224,7 +219,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                     val_metric = self.score(X=loader_val, y=y_val, eval_metric=self.stopping_metric,
                                             metric_needs_y_pred=self.stopping_metric_needs_y_pred)
                     data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(
-                        train_test, epoch, epochs, total_loss / total_num, self.eval_metric.name, val_metric))
+                        train_test, epoch, epochs, total_loss / total_num, self.stopping_metric.name, val_metric))
 
                     if reporter is not None:
                         reporter(epoch=epoch+1, validation_performance=val_metric, train_loss=total_loss)
@@ -348,6 +343,21 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, **kwargs):
         import torch
 
+        num_gpus = kwargs.get('num_gpus', None)
+        if num_gpus is None:
+            if torch.cuda.is_available():
+                self.device = torch.device("cuda")
+            else:
+                self.device = torch.device("cpu")
+        elif num_gpus == 0:
+            self.device = torch.device("cpu")
+        else:
+            self.device = torch.device("cuda")
+
+            if num_gpus > 1:
+                logger.warning("TabTransformer not yet configured to use more than 1 GPU. 'num_gpus' set to >1, but we will be using only 1 GPU.")
+
+
         if self.problem_type ==REGRESSION:
             self.params['n_classes'] = 1
         elif self.problem_type ==BINARY:
@@ -384,8 +394,12 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         self.model = self._get_model()
 
         if X_unlabeled is not None:
-            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=time_limit, reporter=reporter)
-            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=time_limit, reporter=reporter)
+            # Can't spend all the time in pretraining, have to split it up.
+            pretrain_time_limit = time_limit / 2 if time_limit is not None else time_limit
+            pretrain_before_time = time.time()
+            self.tt_fit(loader_unlab, loader_val, y_val, state='pretrain', time_limit=pretrain_time_limit, reporter=reporter)
+            finetune_time_limit = time_limit - (time.time() - pretrain_before_time) if time_limit is not None else time_limit
+            self.tt_fit(loader_train, loader_val, y_val, state='finetune', time_limit=finetune_time_limit, reporter=reporter)
         else:
             self.tt_fit(loader_train, loader_val, y_val, time_limit=time_limit, reporter=reporter)
 
@@ -474,7 +488,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         scheduler = scheduler_func(tt_trial, **scheduler_options)
         scheduler.run()
         scheduler.join_jobs()
-        self.model = self.model.to(torch.device("cpu"))
+
         scheduler.get_training_curves(plot=False, use_legend=False)
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
@@ -511,7 +525,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         return obj
 
         """
-        List of features to add (Updated by Anthony Galczak 11-4-20):
+        List of features to add (Updated by Anthony Galczak 11-19-20):
         
         1) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
         "pretrain API change".
@@ -522,10 +536,5 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         
         3) Bug where HPO doesn't work when cuda is enabled.
         "RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method"
-        
-        4) Enable output layer of TT model to be multiple fully connected layers rather than just a single
-        linear layer. "TabTransformer2 changes"
-        NOTE: This is "partially done" right now. The new hyperparameter 'num_output_layers' allows you to configure how
-        many output layers you would like to use. TabTransformer would be 1, "TabTransformer2" is 2, but with continuous
-        features concatenated (not currently added).
+        Update: This will likely be fixed in a future change to HPO in AutoGluon.
         """

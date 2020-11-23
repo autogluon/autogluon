@@ -314,6 +314,14 @@ stage("Build Docs") {
 
         escaped_context_root = site.replaceAll('\\/', '\\\\/')
 
+        unstash 'course'
+        unstash 'image_classification'
+        unstash 'nas'
+        unstash 'object_detection'
+        unstash 'tabular'
+        unstash 'text'
+        unstash 'torch'
+
         sh """#!/bin/bash
         set -ex
         conda env update -n autogluon_docs -f docs/build_contrib.yml
@@ -374,7 +382,9 @@ stage("Build Docs") {
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
 
-        cd docs && bash build_doc.sh
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(index.rst)
+        cd docs && d2lbook build rst && d2lbook build html
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
         echo "Uploaded doc to http://${site}/index.html"
 
