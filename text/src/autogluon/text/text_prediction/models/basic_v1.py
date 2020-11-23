@@ -22,6 +22,7 @@ from autogluon.core import args, space
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric, Scorer
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
 
 from .. import constants as _C
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
@@ -297,7 +298,6 @@ def train_function(args, reporter, train_data, tuning_data,
                                   batch_size=base_batch_size,
                                   shuffle=True,
                                   batchify_fn=preprocessor.batchify(is_test=False))
-    print(train_dataloader)
     dev_dataloader = DataLoader(processed_dev,
                                 batch_size=inference_base_batch_size,
                                 shuffle=False,
@@ -569,6 +569,7 @@ class BertForTextPredictionBasic:
               plot_results=False,
               console_log=True,
               ignore_warning=True):
+        force_forkserver()
         start_tick = time.time()
         logging_config(folder=self._output_directory, name='main',
                        console=console_log,
