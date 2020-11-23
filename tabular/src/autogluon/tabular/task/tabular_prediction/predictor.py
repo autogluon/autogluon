@@ -1106,8 +1106,13 @@ class TabularPredictor(BasePredictor):
             raise ImportError('Visualizing ensemble network architecture requires pygraphviz library')
             
         G = self._trainer.model_graph
-        remove = [node for node,degree in dict(G.degree()).items() if degree < 1]
-        G.remove_nodes_from(remove)
+
+        nodes_without_outedge = [node for node,degree in dict(G.degree()).items() if degree < 1]
+        nodes_no_val_score = [node for node in G if G.nodes[node]['val_score'] == None]
+        
+        G.remove_nodes_from(nodes_without_outedge)
+        G.remove_nodes_from(nodes_no_val_score)
+
         root_node = [n for n,d in G.out_degree() if d == 0]
         best_model_node = self.get_model_best()
 
