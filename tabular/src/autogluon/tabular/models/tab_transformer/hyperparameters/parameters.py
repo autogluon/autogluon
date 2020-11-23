@@ -18,7 +18,7 @@ def get_fixed_params():
                                   'SCALAR'     : 'ScalarQuantileOrdinalEnc',
                                   'TEXT'       : 'TextSummaryScalarEnc'},
                     'aug_mask_prob' : 0.4, # What percentage of values to apply augmentation to.
-                    'num_augs' : 1, # Number of augmentations to add.
+                    'num_augs' : 0, # Number of augmentations to add.
                     'pretext': 'BERTPretext', # What pretext to use when performing pretraining/semi-supervised learning.
                     'n_cont_features': 8, # How many continuous features to concatenate onto the categorical features
                     'fix_attention': False, # If True, use the categorical embeddings in the transformer architecture.
@@ -27,6 +27,7 @@ def get_fixed_params():
                     'epochs_wo_improve': 30, # How many epochs to continue running without improving on metric. aka "Early Stopping Patience"
                     'num_workers': 16, # How many workers to use for torch DataLoader.
                     'max_columns': 500, # Maximum number of columns TabTransformer will accept as input. This is to combat huge memory requirements/errors.
+                    'tab_readout': 'none', # What sort of readout from the transformer. Options: ['readout_emb', 'mean', 'concat_pool', 'concat_pool_all', 'concat_pool_add', 'all_feat_embs', 'mean_feat_embs', 'none']
                     }
 
     return fixed_params
@@ -34,22 +35,20 @@ def get_fixed_params():
 def get_hyper_params():
     """ Parameters that currently can be tuned during HPO """
     hyper_params = {
-        'lr': 1e-3, # Learning rate
+        'lr': 3.6e-3, # Learning rate
         # Options: Real(5e-5, 5e-3)
         'weight_decay': 1e-6, # Rate of linear weight decay for learning rate
         # Options: Real(1e-6, 5e-2)
-        'p_dropout': 0.1, # dropout probability, 0 turns off Dropout.
+        'p_dropout': 0, # dropout probability, 0 turns off Dropout.
         # Options: Categorical(0, 0.1, 0.2, 0.3, 0.4, 0.5)
-        'n_heads': 8, # Number of attention heads
+        'n_heads': 4, # Number of attention heads
         # Options: Categorical(2, 4, 8)
         'hidden_dim': 128, # hidden dimension size
         # Options: Categorical(32, 64, 128, 256)
-        'n_layers': 1, # Number of Tab Transformer encoder layers,
+        'n_layers': 2, # Number of Tab Transformer encoder layers,
         # Options: Categorical(1, 2, 3, 4, 5)
         'feature_dim': 64, # Size of fully connected layer in TabNet.
         # Options: Int(8, 128)
-        'tab_readout': 'none', # What sort of readout from the transformer.
-        # Options: ['readout_emb', 'mean', 'concat_pool', 'concat_pool_all', 'concat_pool_add', 'all_feat_embs', 'mean_feat_embs', 'none']
         'num_output_layers': 1 # How many fully-connected layers on top of transformer to produce predictions. Minimum 1 layer.
         # Options: Categorical(1, 2, 3)
     }

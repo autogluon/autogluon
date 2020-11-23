@@ -212,8 +212,7 @@ class AbstractTrainer:
     # TODO: Remove name_suffix, hacked in
     # TODO: Enable easier re-mapping of trained models -> hyperparameters input (They don't share a key since name can change)
     def train_multi_levels(self, X_train, y_train, X_val, y_val, X_unlabeled=None, hyperparameters: dict = None, base_model_names: List[str] = None,
-                           hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, level_start=0, level_end=0,
-                           stack_name_core='core', stack_name_aux='aux1', time_limit=None, name_suffix='') -> List[str]:
+                           hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, level_start=0, level_end=0, time_limit=None, name_suffix='') -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
             hyperparameters is used to determine the models used in each stack layer.
@@ -234,6 +233,15 @@ class AbstractTrainer:
             hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
         hyperparameters = copy.deepcopy(hyperparameters)
 
+        if core_kwargs is None:
+            core_kwargs = {}
+        else:
+            core_kwargs = core_kwargs.copy()
+        if aux_kwargs is None:
+            aux_kwargs = {}
+        else:
+            aux_kwargs = aux_kwargs.copy()
+
         # TODO: Hack
         if name_suffix:
             for key_outer in hyperparameters:
@@ -243,6 +251,7 @@ class AbstractTrainer:
                             model_hyperparams['AG_args']['name_suffix'] = model_hyperparams['AG_args'].get('name_suffix', '') + name_suffix
                         else:
                             model_hyperparams['AG_args'] = dict(name_suffix=name_suffix)
+            aux_kwargs['name_suffix'] = aux_kwargs.get('name_suffix', '') + name_suffix  # TODO: Hack
 
         model_names_fit = []
         for level in range(max(0, level_start), level_end + 1):
@@ -250,14 +259,13 @@ class AbstractTrainer:
                 logger.log(30, f'Warning: Training models at stack level {level}, but no base models were specified.')
             elif base_model_names and level == 0:
                 raise AssertionError(f'Stack level 0 models cannot have base models, but base_model_names={base_model_names}.')
-            if time_limit is None:
-                time_limit_core = None
-                time_limit_aux = None
-            else:
+            if time_limit is not None:
                 time_train_level_start = time.time()
                 time_limit_for_level = (time_limit - (time_train_level_start - time_train_start)) / (level_end + 1 - level)
                 time_limit_core = time_limit_for_level
                 time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
+                core_kwargs['time_limit'] = core_kwargs.get('time_limit', time_limit_core)
+                aux_kwargs['time_limit'] = aux_kwargs.get('time_limit', time_limit_aux)
             if level != 0:
                 if hyperparameter_tune:
                     logger.log(15, 'Warning: Hyperparameter tuning is not implemented for stack levels > 0.')
@@ -268,10 +276,7 @@ class AbstractTrainer:
                 X=X_train, y=y_train, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
                 models=models, level=level, base_model_names=base_model_names,
                 hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                stack_name_core=stack_name_core, stack_name_aux=stack_name_aux,
-                core_kwargs=core_kwargs,
-                time_limit_core=time_limit_core, time_limit_aux=time_limit_aux,
-                name_suffix_aux=name_suffix,  # TODO: Remove name_suffix_aux, hack
+                core_kwargs=core_kwargs, aux_kwargs=aux_kwargs,
             )
             model_names_fit += base_model_names + aux_models
         self._time_limit = None
@@ -280,21 +285,21 @@ class AbstractTrainer:
 
     # TODO: Remove name_suffix_aux, hacked in
     def stack_new_level(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, X_unlabeled=None, level=0, base_model_names: List[str] = None,
-                        hyperparameter_tune=False, feature_prune=False, stack_name_core='core', stack_name_aux='aux1', core_kwargs: dict = None,
-                        time_limit_core=None, time_limit_aux=None, name_suffix_aux='') -> (List[str], List[str]):
+                        hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
         """
         if core_kwargs is None:
             core_kwargs = {}
+        if aux_kwargs is None:
+            aux_kwargs = {}
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
-                                                level=level, base_model_names=base_model_names, stack_name=stack_name_core,
-                                                hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit_core, **core_kwargs)
-        aux_args = dict(base_model_names=core_models, level=level+1, stack_name=stack_name_aux, time_limit=time_limit_aux, name_suffix=name_suffix_aux)
+                                                level=level, base_model_names=base_model_names,
+                                                hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, **core_kwargs)
         if self.bagged_mode:
-            aux_models = self.stack_new_level_aux(X=X, y=y, **aux_args)
+            aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
         else:
-            aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, **aux_args)
+            aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, base_model_names=core_models, level=level+1, **aux_kwargs)
         return core_models, aux_models
 
     def stack_new_level_core(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, X_unlabeled=None,
@@ -350,13 +355,14 @@ class AbstractTrainer:
 
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
+    # TODO: X can be optional because it isn't needed if fit=True
     def stack_new_level_aux(self, X, y, base_model_names: List[str], level, fit=True, stack_name='aux1', time_limit=None, name_suffix='') -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
-        X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit)
+        X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False)
         return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix)
 
     def predict(self, X, model=None):
@@ -588,9 +594,9 @@ class AbstractTrainer:
                 # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
                 model_full.params_aux['max_memory_usage_ratio'] = model_full.params_aux['max_memory_usage_ratio'] * 1.15
                 # TODO: Do it for all models in the level at once to avoid repeated processing of data?
+                base_model_names = self.get_base_model_names(model_name)
                 stacker_type = type(model)
                 if issubclass(stacker_type, WeightedEnsembleModel):
-                    base_model_names = list(model.stack_column_prefix_to_model_map.values())
                     # TODO: Technically we don't need to re-train the weighted ensemble, we could just copy the original and re-use the weights.
                     if self.bagged_mode:
                         X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True, use_orig_features=False)
@@ -613,7 +619,6 @@ class AbstractTrainer:
                         self.set_model_attribute(model=model_weighted_ensemble, attribute='val_score', val=None)
                         self.save_model(model_loaded)
                 else:
-                    base_model_names = self.get_minimum_model_set(model_name, include_self=False)
                     models_trained = self.stack_new_level_core(X=X_full, y=y_full, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, k_fold=0, n_repeats=1, save_bagged_folds=True, stacker_type=stacker_type)
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
@@ -1442,6 +1447,14 @@ class AbstractTrainer:
         for model in models:
             models_set = models_set.union(self.get_minimum_model_set(model))
         return list(models_set)
+
+    # Gets the set of base models used directly by the provided model
+    # Returns a list of model names
+    def get_base_model_names(self, model) -> list:
+        if not isinstance(model, str):
+            model = model.name
+        base_model_set = list(self.model_graph.predecessors(model))
+        return base_model_set
 
     def leaderboard(self, extra_info=False):
         model_names = self.get_model_names()

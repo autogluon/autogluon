@@ -122,10 +122,7 @@ class OheFeatureGenerator(BaseEstimator, TransformerMixin):
 
         if self.other_cols:
             for c in self.other_cols:
-                if X[c].dtypes == int:
-                    self._feature_map[c] = 'int'
-                else:
-                    self._feature_map[c] = 'float'
+                self._feature_map[c] = 'int' if X[c].dtypes == int else 'float'
         return self
 
     def transform(self, X, y=None):

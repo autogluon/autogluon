@@ -279,7 +279,7 @@ class TabularPrediction(BaseTask):
 
         holdout_frac : float, default = None
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
-            Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
+            Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
             Default value is doubled if `hyperparameter_tune = True`, up to a maximum of 0.2.
             Disabled if `num_bagging_folds >= 2`.
         num_bagging_folds : int, default = 0
@@ -295,7 +295,7 @@ class TabularPrediction(BaseTask):
         stack_ensemble_levels : int, default = 0
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
-            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
+            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
         num_trials : int, default = None
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
@@ -535,8 +535,8 @@ class TabularPrediction(BaseTask):
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
-            train_features = np.array([column for column in train_data.columns if column != label])
-            unlabeled_features = np.array([column for column in unlabeled_data.columns])
+            train_features = sorted(np.array([column for column in train_data.columns if column != label]))
+            unlabeled_features = sorted(np.array([column for column in unlabeled_data.columns]))
             if np.any(train_features != unlabeled_features):
                 raise ValueError("Column names must match between training and unlabeled data.\n"
                                  "Unlabeled data must have not the label column specified in it.\n")
