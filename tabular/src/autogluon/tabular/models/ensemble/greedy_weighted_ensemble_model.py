@@ -81,3 +81,10 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         info = super().get_info()
         info['model_weights'] = self._get_model_weights()
         return info
+
+    @classmethod
+    def _get_default_ag_args(cls) -> dict:
+        default_ag_args = super()._get_default_ag_args()
+        extra_ag_args = {'valid_base': False}
+        default_ag_args.update(extra_ag_args)
+        return default_ag_args
