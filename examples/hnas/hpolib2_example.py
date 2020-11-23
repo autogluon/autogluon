@@ -111,5 +111,3 @@ if __name__ == "__main__":
                                                 grace_period=1)
     scheduler.run()
     scheduler.join_jobs()
-    from IPython import embed
-    embed()
