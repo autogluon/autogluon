@@ -1,4 +1,4 @@
-from autogluon.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
+from core.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
 from .dataset import TimeSeriesDataset
 
 from ...learner.abstract_learner import AbstractLearner
@@ -63,7 +63,7 @@ class Forecasting(BaseTask):
                     hyperparameter_tune=hyperparameter_tune,)
 
         # TODO: refit full
-        predictor = ForecastingPredictor(Learner)
+        predictor = ForecastingPredictor(learner)
         return predictor
 
 

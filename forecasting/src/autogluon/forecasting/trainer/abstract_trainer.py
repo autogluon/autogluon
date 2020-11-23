@@ -97,12 +97,6 @@ class AbstractTrainer:
             return model_type.load(path=path, reset_path=self.reset_paths)
 
     def _add_model(self, model):
-        print(model.name, model.path, type(model))
-        # self.model_graph.add_node(
-        #     model.name,
-        #     path=model.path,
-        #     type=type(model),
-        # )
         self.model_info[model.name] = {}
         self.model_info[model.name]["path"] = model.path
         self.model_info[model.name]["type"] = type(model)
