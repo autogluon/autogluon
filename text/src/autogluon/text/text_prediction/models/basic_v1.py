@@ -21,7 +21,7 @@ from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_
 from autogluon.core import args, space
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
-from autogluon.core.metrics import get_metric
+from autogluon.core.metrics import get_metric, Scorer
 
 from .. import constants as _C
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
@@ -229,7 +229,6 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
     else:
         return scorer(ground_truth, predictions)
 
-
 @use_np
 def train_function(args, reporter, train_data, tuning_data,
                    time_limits, base_config, problem_types,
@@ -298,6 +297,7 @@ def train_function(args, reporter, train_data, tuning_data,
                                   batch_size=base_batch_size,
                                   shuffle=True,
                                   batchify_fn=preprocessor.batchify(is_test=False))
+    print(train_dataloader)
     dev_dataloader = DataLoader(processed_dev,
                                 batch_size=inference_base_batch_size,
                                 shuffle=False,
@@ -435,7 +435,8 @@ def train_function(args, reporter, train_data, tuning_data,
             if time_limits is not None and total_time_spent > time_limits:
                 break
             report_idx += 1
-            report_items.append(('reward', dev_score))
+            report_items.append((stopping_metric_scorer.reward_attr,
+                                 dev_score))
             report_items.append(('exp_dir', exp_dir))
             if find_better:
                 best_report_items = report_items
@@ -581,6 +582,7 @@ class BertForTextPredictionBasic:
             time_limits = 5 * 60 * 60  # 5 hours
         if scheduler_options is None:
             scheduler_options = dict()
+        stopping_metric_scorer = get_metric(self._stopping_metric)
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,
@@ -593,7 +595,7 @@ class BertForTextPredictionBasic:
             resume=False,
             visualizer=scheduler_options.get('visualizer'),
             time_attr='report_idx',
-            reward_attr='reward',
+            reward_attr=stopping_metric_scorer.reward_attr,
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_data=train_data,

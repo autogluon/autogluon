@@ -26,6 +26,34 @@ class Scorer(object, metaclass=ABCMeta):
                              f'This is not allowed.')
         self.alias.add(alias)
 
+    @property
+    def reward_attr(self) -> str:
+        """Get the reward attribute that matches the scorer.
+
+        Returns
+        -------
+        reward_attr
+        """
+        if self._sign == 1:
+            return self.name
+        elif self._sign == -1:
+            return f'- {self.name}'
+        else:
+            raise NotImplementedError('Only supports sign = -1 or 1.')
+
+    @property
+    def greater_is_better(self) -> bool:
+        """Return whether the score is greater the better.
+
+        We use the stored `sign` object to decide the property.
+
+        Returns
+        -------
+        flag
+            The "greater_is_better" flag.
+        """
+        return self._sign > 0
+
     @abstractmethod
     def __call__(self, y_true, y_pred, sample_weight=None):
         pass
@@ -126,6 +154,7 @@ class _ProbaScorer(Scorer):
 class _ThresholdScorer(Scorer):
     def __call__(self, y_true, y_pred, sample_weight=None):
         """Evaluate decision function output for X relative to y_true.
+
         Parameters
         ----------
         y_true : array-like
