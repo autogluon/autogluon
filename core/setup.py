@@ -58,7 +58,8 @@ requirements = [
     'boto3',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',
-    'autograd>=1.3'
+    'autograd>=1.3',
+    'dill==0.3.3',
 ]
 
 test_requirements = [

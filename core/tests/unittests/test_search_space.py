@@ -2,19 +2,6 @@ import autogluon.core as ag
 
 
 def test_search_space():
-    @ag.obj(
-        name=ag.space.Categorical('auto', 'gluon'),
-    )
-    class myobj:
-        def __init__(self, name):
-            self.name = name
-
-    @ag.func(
-        framework=ag.space.Categorical('mxnet', 'pytorch'),
-    )
-    def myfunc(framework):
-        return framework
-
     @ag.args(
         a=ag.space.Real(1e-3, 1e-2, log=True),
         b=ag.space.Real(1e-3, 1e-2),
@@ -27,14 +14,22 @@ def test_search_space():
         ),
         g=ag.space.Dict(
             a=ag.Real(0, 10),
-            obj=myobj(),
+            obj=ag.space.Categorical('auto', 'gluon'),
         ),
-        h=ag.space.Categorical('test', myobj()),
-        i=myfunc(),
+        h=ag.space.Categorical('test', ag.space.Categorical('auto', 'gluon')),
+        i=ag.space.Categorical('mxnet', 'pytorch'),
     )
     def train_fn(args, reporter):
         a, b, c, d, e, f, g, h, i = args.a, args.b, args.c, args.d, args.e, \
                                     args.f, args.g, args.h, args.i
+
+        class myobj:
+            def __init__(self, name):
+                self.name = name
+
+        def myfunc(framework):
+            return framework
+
         assert a <= 1e-2 and a >= 1e-3
         assert b <= 1e-2 and b >= 1e-3
         assert c <= 10 and c >= 1
@@ -43,10 +38,12 @@ def test_search_space():
         assert f[0] in [1, 2]
         assert f[1] in [4, 5]
         assert g['a'] <= 10 and g['a'] >= 0
-        assert g.obj.name in ['auto', 'gluon']
-        assert hasattr(h, 'name') or h == 'test'
-        assert i in ['mxnet', 'pytorch']
+        assert myobj(g.obj).name in ['auto', 'gluon']
+        assert e in [True, False]
+        assert h in ['test', 'auto', 'gluon']
+        assert myfunc(i) in ['mxnet', 'pytorch']
         reporter(epoch=1, accuracy=0)
+
     scheduler = ag.scheduler.FIFOScheduler(train_fn,
                                            resource={'num_cpus': 4, 'num_gpus': 0},
                                            num_trials=10,
