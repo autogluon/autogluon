@@ -15,13 +15,17 @@ class ImageClassification(object):
         The configurations, can be nested dict.
     logger : logging.Logger
         The desired logger object, use `None` for module specific logger with default setting.
-
+    net : mx.gluon.Block
+        The custom network. If defined, the model name in config will be ignored so your
+        custom network will be used for training rather than pulling it from model zoo.
     """
     Dataset = _ImageClassification.Dataset
-    def __init__(self, log_dir=None):
+    def __init__(self, log_dir=None, net=None, optimizer=None):
         self._log_dir = log_dir
         self._classifier = None
         self._fit_summary = {}
+        self._net = net
+        self._optimizer = optimizer
 
     def fit(self,
             train_data,
@@ -41,6 +45,16 @@ class ImageClassification(object):
 
 
         """
+        if isinstance(train_data, str):
+            from d8.image_classification import Dataset as D8D
+            names = D8D.list()
+            if train_data.lower() in names:
+                train_data = D8D.get(train_data)
+        if isinstance(val_data, str):
+            from d8.image_classification import Dataset as D8D
+            names = D8D.list()
+            if val_data.lower() in names:
+                val_data = D8D.get(val_data)
         if self._classifier is not None:
             self._fit_summary = self._classifier.fit(train_data, val_data, train_size, random_state, resume=False)
             return
@@ -63,6 +77,10 @@ class ImageClassification(object):
             config.update(hyperparameters)
         if scheduler_options is not None:
             config.update(scheduler_options)
+        if self._net is not None:
+            config.update({'custom_net': self._net})
+        if self._optimizer is not None:
+            config.update({'custom_optimizer': self._optimizer})
         task = _ImageClassification(config=config)
         self._classifier = task.fit(train_data, val_data, train_size, random_state)
         self._fit_summary = task.fit_summary()

@@ -88,10 +88,11 @@ AutoGluon Object is compatible with Fit API in AutoGluon tasks, and also works w
 scripts using :func:`autogluon.autogluon_register_args`. We can start fitting:
 
 ```{.python .input}
-from autogluon.vision import ImageClassification as task
-# results = task.fit('cifar10', net=mynet, optimizer=myoptim, num_gpus=1, epochs=1)
+from autogluon.vision import ImageClassification as Task
+task = Task(net=mynet, optimizer=myoptim)
+classifier = task.fit('cifar10', ngpus_per_trial=1, epochs=1)
 ```
 
 ```{.python .input}
-# print(results)
+print(classifier.fit_summary())
 ```

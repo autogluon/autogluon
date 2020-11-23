@@ -65,6 +65,17 @@ print(bulk_result)
 ```
 
 
+## Generate image features with a classifier
+
+Extracting representation from the whole image learned by a model is also very useful. We provide `predict_feature` function to allow classifier to return the N-dimensional image feature where `N` depends on the model(usually a 512 to 2048 length vector)
+
+```{.python .input}
+image_path = test_dataset.iloc[0]['image']
+feature = classifier.predict_feature(image_path)
+```
+
+
+
 ## Evaluate on Test Dataset
 
 You can evaluate the classifier on a test dataset rather than retrieving the predictions.
