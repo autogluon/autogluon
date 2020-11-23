@@ -285,7 +285,7 @@ class AbstractTrainer:
 
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=0, base_model_names: List[str] = None, stack_name='core', save_bagged_folds: bool = None,
-                             use_orig_features=True, stacker_type=StackerEnsembleModel, name_suffix: str = None, **kwargs) -> List[str]:
+                             extra_ag_args=None, extra_ag_args_ensemble=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 0, then the models will use base model predictions as additional features.
@@ -310,17 +310,16 @@ class AbstractTrainer:
                 raise AssertionError(f'Stack level cannot be negative! level = {level}')
 
             if isinstance(models, dict):
-                stacker_kwargs = {
+                ensemble_kwargs = {
                     'base_model_names': base_model_names,
                     'base_model_paths': base_model_paths,
                     'base_model_types': base_model_types,
-                    'use_orig_features': use_orig_features,
                     'save_bagged_folds': save_bagged_folds,
                     'random_state': level + self.random_seed,
                 }
-                models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, stacker_type=stacker_type, stacker_kwargs=stacker_kwargs, name_suffix=name_suffix)
+                models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, extra_ag_args=extra_ag_args, ensemble_type=ensemble_type, ensemble_kwargs=ensemble_kwargs, extra_ag_args_ensemble=extra_ag_args_ensemble)
         elif isinstance(models, dict):
-            models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix)
+            models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, extra_ag_args=extra_ag_args)
         X_train_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
@@ -502,7 +501,7 @@ class AbstractTrainer:
                 return X
             dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
             X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas, index=X.index)
-            if dummy_stacker.use_orig_features:
+            if dummy_stacker.params['use_orig_features']:
                 if level_start >= 1:
                     dummy_stacker_start = self._get_dummy_stacker(level=level_start, model_levels=model_levels, use_orig_features=True)
                     cols_to_drop = dummy_stacker_start.stack_columns
@@ -598,7 +597,7 @@ class AbstractTrainer:
                         self.set_model_attribute(model=model_weighted_ensemble, attribute='val_score', val=None)
                         self.save_model(model_loaded)
                 else:
-                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, k_fold=0, n_repeats=1, save_bagged_folds=True, stacker_type=stacker_type)
+                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, k_fold=0, n_repeats=1, save_bagged_folds=True, ensemble_type=stacker_type)
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
                 for model_trained in models_trained:
@@ -1220,6 +1219,11 @@ class AbstractTrainer:
         for model_name in model_names:
             if model_name in self.models.keys():
                 base_models_dict[model_name] = self.models[model_name]
+        hyperparameters = dict(
+            use_orig_features=use_orig_features,
+            max_models_per_type=0,
+            max_models=0,
+        )
         dummy_stacker = StackerEnsembleModel(
             path='',
             name='',
@@ -1228,7 +1232,7 @@ class AbstractTrainer:
             base_models_dict=base_models_dict,
             base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=model_names),
             base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=model_names),
-            use_orig_features=use_orig_features, num_classes=self.num_classes, random_state=level+self.random_seed
+            hyperparameters=hyperparameters, num_classes=self.num_classes, random_state=level+self.random_seed
         )
         return dummy_stacker
 

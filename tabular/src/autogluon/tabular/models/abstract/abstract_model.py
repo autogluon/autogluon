@@ -752,6 +752,15 @@ class AbstractModel:
         save_json.save(path=json_path, obj=info)
         return info
 
+    # TODO: v0.1 Add reference link to all valid keys and their usage or keep full docs here and reference elsewhere?
+    @classmethod
+    def _get_default_ag_args(cls) -> dict:
+        """
+        Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
+        """
+        return {}
+
+
 class AbstractNeuralNetworkModel(AbstractModel):
 
     def __init__(self, **kwargs):
@@ -820,4 +829,3 @@ class AbstractNeuralNetworkModel(AbstractModel):
                 types_of_features.append({"name": feature, "type": feature_type})
 
         return types_of_features, df
-
