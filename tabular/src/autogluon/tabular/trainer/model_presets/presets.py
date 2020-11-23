@@ -118,7 +118,8 @@ DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
 def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False,
-                      level: int = 0, stacker_type=StackerEnsembleModel, stacker_kwargs: dict = None, extra_ag_args_fit=None, extra_ag_args=None, extra_ag_args_stack=None, name_suffix='', default_priorities=None, invalid_model_names: list = None):
+                      level: int = 0, stacker_type=StackerEnsembleModel, stacker_kwargs: dict = None, extra_ag_args_fit=None, extra_ag_args=None, extra_ag_args_stack=None,
+                      name_suffix: str = None, default_priorities=None, invalid_model_names: list = None):
     if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS]:
         raise NotImplementedError
     if default_priorities is None:
@@ -175,7 +176,8 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
                 name_type_suffix = DEFAULT_MODEL_TYPE_SUFFIX[suffix_key][model_type]
             name_suff = model[AG_ARGS].get('name_suffix', '')
             name_orig = name_prefix + name_main + name_type_suffix + name_suff
-        name_orig = name_orig + name_suffix
+        if name_suffix is not None:
+            name_orig = name_orig + name_suffix
         name = name_orig
         name_stacker = None
         num_increment = 2
