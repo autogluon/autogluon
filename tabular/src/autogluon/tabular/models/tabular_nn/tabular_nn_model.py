@@ -191,10 +191,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                len(train_dataset.feature_groups['language']) ))
         # self._save_preprocessor()  # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
 
-        if 'num_gpus' in kwargs and kwargs['num_gpus'] >= 1:
-            self.ctx = mx.gpu()  # Currently cannot use more than 1 GPU
-        else:
-            self.ctx = mx.cpu()
         self.get_net(train_dataset, params=params)
 
         if time_limit:
