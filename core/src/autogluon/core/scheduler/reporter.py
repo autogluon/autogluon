@@ -3,6 +3,7 @@ import time
 import json
 import logging
 import threading
+import numpy as np
 import multiprocessing as mp
 from ..utils import save, load, AutoGluonEarlyStop
 import distributed
@@ -95,6 +96,54 @@ class DistStatusReporter(object):
     def __repr__(self):
         reprstr = self.__class__.__name__
         return reprstr
+
+
+class MODistStatusReporter(DistStatusReporter):
+    """Report status through the training scheduler. This is used when working with multiple objectives.
+
+    Example
+    -------
+    >>> @autogluon_method
+    >>> def train_func(config, reporter):
+    ...     reporter(accuracy=0.1)
+    """
+    def __init__(self, objectives, weights, remote=None):
+        super().__init__(remote)
+        self.objectives = objectives
+        self.weights = weights
+
+    # TODO: This function is called at every time step. We need to modify it accordingly.
+    def __call__(self, **kwargs):
+        """Report updated training status.
+        Pass in `done=True` when the training job is completed.
+
+        Args:
+            kwargs: Latest training result status.
+
+        Example
+        _______
+        >>> reporter(accuracy=1, training_iters=4)
+        """
+        report_time = time.time()
+        if 'time_this_iter' not in kwargs:
+            kwargs['time_this_iter'] = report_time - self._last_report_time
+        self._last_report_time = report_time
+        
+        try:
+            objective_vector = [kwargs[k] for k in self.objectives]
+        except KeyError:
+            raise KeyError("Reporter requires accesss to all objective values. Please ensure you return all required values.")
+        scalarization = max([w @ objective_vector for w in self.weights])
+        kwargs["_SCALARIZATION"] = scalarization
+
+        logger.debug('Reporting {}'.format(json.dumps(kwargs)))
+        try:
+            self._queue.put(kwargs.copy())
+        except RuntimeError:
+            return
+        self._continue_semaphore.acquire()
+        if self._stop.get():
+            raise AutoGluonEarlyStop('Stopping!')
 
 
 class LocalStatusReporter(object):
