@@ -151,13 +151,7 @@ class BaggedEnsembleModel(AbstractModel):
         # TODO: Preprocess data here instead of repeatedly
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
-        if self.problem_type == MULTICLASS:
-            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float32)
-        elif self.problem_type == SOFTCLASS:
-            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float32)
-        else:
-            oof_pred_proba = np.zeros(shape=len(X))
-        oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
+        oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
 
         models = []
         folds_to_fit = fold_end - fold_start
@@ -563,3 +557,13 @@ class BaggedEnsembleModel(AbstractModel):
             else:
                 child_info_dict[model.name] = model.get_info()
         return child_info_dict
+
+    def _construct_empty_oof(self, X, y):
+        if self.problem_type == MULTICLASS:
+            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float32)
+        elif self.problem_type == SOFTCLASS:
+            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float32)
+        else:
+            oof_pred_proba = np.zeros(shape=len(X), dtype=np.float32)
+        oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
+        return oof_pred_proba, oof_pred_model_repeats

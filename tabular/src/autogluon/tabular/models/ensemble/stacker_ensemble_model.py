@@ -183,11 +183,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             stacker.name = stacker.name + os.path.sep + str(i)
             stacker.set_contexts(self.path_root + stacker.name + os.path.sep)
 
-            if self.problem_type == MULTICLASS:
-                oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
-            else:
-                oof_pred_proba = np.zeros(shape=len(X))
-            oof_pred_model_repeats = np.zeros(shape=len(X))
+            oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
             oof_pred_proba[test_index] += y_pred_proba
             oof_pred_model_repeats[test_index] += 1
 
