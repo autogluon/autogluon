@@ -55,7 +55,8 @@ def default() -> dict:
             'scheduler_options': None,     # Extra kwargs passed to scheduler
             'time_limits': None,           # The total time limit
             'num_trials': 4,               # The number of trials
-        }
+        },
+        'seed': None,                      # The seed value
     }
     return ret
 
@@ -323,7 +324,9 @@ class TextPrediction(BaseTask):
         else:
             base_params = ag_text_prediction_params.create('default')
             hyperparameters = merge_params(base_params, hyperparameters)
-        np.random.seed(seed)
+        if seed is not None:
+            hyperparameters['seed'] = seed
+        np.random.seed(hyperparameters['seed'])
         if not isinstance(train_data, pd.DataFrame):
             train_data = load_pd.load(train_data)
         # Inference the label

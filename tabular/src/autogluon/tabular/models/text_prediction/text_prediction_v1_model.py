@@ -5,6 +5,7 @@ import logging
 import pandas as pd
 import os
 import json
+import random
 import numpy as np
 from autogluon.core.constants import BINARY, REGRESSION, AG_ARGS_FIT
 
@@ -128,6 +129,13 @@ class TextPredictionV1Model(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
+    @classmethod
+    def _get_default_ag_args(cls) -> dict:
+        default_ag_args = super()._get_default_ag_args()
+        extra_ag_args = {'valid_stacker': False}
+        default_ag_args.update(extra_ag_args)
+        return default_ag_args
+
     def _set_default_params(self):
         try:
             from autogluon.text.text_prediction.dataset import TabularDataset
@@ -160,6 +168,7 @@ class TextPredictionV1Model(AbstractModel):
 
         """
         try:
+            import mxnet as mx
             from autogluon.text.text_prediction.dataset import TabularDataset
             from autogluon.text.text_prediction.text_prediction import get_recommended_resource
         except ImportError:
@@ -173,6 +182,14 @@ class TextPredictionV1Model(AbstractModel):
         # Infer resource
         resource = get_recommended_resource(nthreads_per_trial=num_cpus,
                                             ngpus_per_trial=num_gpus)
+
+        # Set seed
+        seed = self.params.get('seed')
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+            mx.random.seed(seed)
+
         X_train = self.preprocess(X_train)
         X_val = self.preprocess(X_val)
         column_properties = self._build_model(X_train=X_train,
