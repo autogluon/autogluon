@@ -857,7 +857,7 @@ class TabularPredictor(BasePredictor):
         """
         Note: This is advanced functionality not intended for normal usage.
 
-        Returns the out-of-fold (OOF) prediction probabilities for every row in the training data.
+        Returns the out-of-fold (OOF) predicted class probabilities for every row in the training data.
         OOF prediction probabilities may provide unbiased estimates of generalization accuracy (reflecting how predictions will behave on new data)
         Predictions for each row are only made using models that were fit to a subset of data where this row was held-out.
 
@@ -914,6 +914,7 @@ class TabularPredictor(BasePredictor):
     def positive_class(self):
         """
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
+        In binary classification, `predictor.predict_proba()` returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
 
         Returns
