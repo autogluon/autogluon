@@ -288,8 +288,7 @@ class TextColumnProperty(ColumnProperty):
 
     def info(self):
         return super().info([('length, min/avg/max',
-                              '{:d}/{:.2f}/{:d}'.format(self.min_length,
-                                                        self.avg_length, self.max_length))])
+                              f'{self.min_length}/{self.avg_length}/{self.max_length}')])
 
 
 def _get_entity_label_type(label) -> str:

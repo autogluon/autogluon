@@ -83,14 +83,18 @@ class TextPredictionV1Model(AbstractModel):
                 label_col_id += 1
         else:
             self._label_column_name = 'label'
+        concat_feature_df = pd.concat([X_train, X_val])
+        concat_feature_df.reset_index(drop=True, inplace=True)
         feature_column_properties = get_column_properties(
-            pd.concat([X_train, X_val]),
+            df=concat_feature_df,
             metadata=None,
             label_columns=None,
             provided_column_properties=None
         )
+        concat_label_df = pd.DataFrame({self._label_column_name: pd.concat([y_train, y_val])})
+        concat_label_df.reset_index(drop=True, inplace=True)
         label_column_property = get_column_properties(
-            pd.DataFrame({self._label_column_name: pd.concat([y_train, y_val])}),
+            df=concat_label_df,
             metadata=None,
             label_columns=None,
             provided_column_properties=None
@@ -218,6 +222,10 @@ class TextPredictionV1Model(AbstractModel):
         tuning_data = TabularDataset(X_val,
                                      column_properties=column_properties,
                                      label_columns=self._label_column_name)
+        logger.info('Train Dataset:')
+        logger.info(train_data)
+        logger.info('Tuning Dataset:')
+        logger.info(tuning_data)
         self.model.train(train_data=train_data,
                          tuning_data=tuning_data,
                          resource=resource,
