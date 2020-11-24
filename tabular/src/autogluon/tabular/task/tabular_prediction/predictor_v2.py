@@ -696,15 +696,15 @@ class TabularPredictorV2(TabularPredictor):
             self._trainer = tmp_trainer
 
     @classmethod
-    def load(cls, output_directory, verbosity=2):
+    def load(cls, directory, verbosity=2):
         logger.setLevel(verbosity2loglevel(verbosity))  # Reset logging after load (may be in new Python session)
-        if output_directory is None:
+        if directory is None:
             raise ValueError("output_directory cannot be None in load()")
 
-        output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
-        predictor = load_pkl.load(path=output_directory + cls.predictor_file_name)
+        directory = setup_outputdir(directory)  # replace ~ with absolute path if it exists
+        predictor = load_pkl.load(path=directory + cls.predictor_file_name)
         if predictor.has_learner:
-            learner = predictor.learner_type.load(output_directory)
+            learner = predictor.learner_type.load(directory)
             predictor._set_post_fit_vars(learner=learner)
         try:
             from ...version import __version__
