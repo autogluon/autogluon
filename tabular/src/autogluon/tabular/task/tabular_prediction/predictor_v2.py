@@ -5,6 +5,7 @@ import math
 import numpy as np
 import pandas as pd
 
+from autogluon.core.metrics import get_metric
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
@@ -18,7 +19,7 @@ from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
 from ...features import AutoMLPipelineFeatureGenerator
 from ...learner import AbstractLearner, DefaultLearner
-from ...metrics import get_metric
+
 from ...trainer import AbstractTrainer, AutoTrainer
 
 
@@ -39,7 +40,7 @@ class TabularPredictorV2(TabularPredictor):
             output_directory=None,
             eval_metric=None,
             stopping_metric=None,
-            feature_metadata=None,
+            feature_metadata_in=None,
             verbosity=2,
             id_columns=None,
             label_count_threshold=10,
@@ -59,11 +60,8 @@ class TabularPredictorV2(TabularPredictor):
         self.eval_metric = eval_metric
         self.label_column = label
         self.feature_metadata = None
-        self.class_labels = None  # TODO: method
-        self.class_labels_internal = None  # TODO: method
-        self.class_labels_internal_map = None  # TODO: method
         self.stopping_metric = stopping_metric
-        self.feature_metadata = feature_metadata  # TODO: Unused, FIXME: currently overwritten after .fit, split into two variables: one for pre and one for post processing.
+        self.feature_metadata_in = feature_metadata_in  # TODO: Unused, FIXME: currently overwritten after .fit, split into two variables: one for pre and one for post processing.
         self.verbosity = verbosity  # TODO: Unused
         self.id_columns = id_columns
         if self.id_columns is None:
@@ -77,6 +75,7 @@ class TabularPredictorV2(TabularPredictor):
         self.has_learner = False
 
     # TODO: Documentation, flesh out capabilities
+    # TODO: Initialize learner if it doesn't exist
     def fit_feature_generator(self, data: pd.DataFrame) -> pd.DataFrame:
         if self.label_column in data:
             data = data.drop(columns=[self.label_column])
@@ -681,9 +680,6 @@ class TabularPredictorV2(TabularPredictor):
         self.stopping_metric = self._learner.stopping_metric
         self.label_column = self._learner.label
         self.feature_metadata = self._trainer.feature_metadata  # TODO: Don't overwrite user feature_metadata, differentiate between pre and post processed metadata.
-        self.class_labels = self._learner.class_labels
-        self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
-        self.class_labels_internal_map = self._learner.label_cleaner.inv_map
         self.has_learner = True
 
     # TODO: Update and correct the logging message on loading directions

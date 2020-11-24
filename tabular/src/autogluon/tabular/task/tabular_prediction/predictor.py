@@ -97,9 +97,18 @@ class TabularPredictor(BasePredictor):
         self.eval_metric = self._learner.eval_metric
         self.label_column = self._learner.label
         self.feature_metadata = self._trainer.feature_metadata
-        self.class_labels = self._learner.class_labels
-        self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
-        self.class_labels_internal_map = self._learner.label_cleaner.inv_map
+
+    @property
+    def class_labels(self):
+        return self._learner.class_labels
+
+    @property
+    def class_labels_internal(self):
+        return self._learner.label_cleaner.ordered_class_labels_transformed
+
+    @property
+    def class_labels_internal_map(self):
+        return self._learner.label_cleaner.inv_map
 
     # TODO: Documentation
     # Enables extra fit calls after the original fit
@@ -108,22 +117,26 @@ class TabularPredictor(BasePredictor):
             # TODO: Add all arguments in
             # hyperparameter_tune=False, verbosity=None, AG_args_fit=None, excluded_model_types=None, refit_full=None, feature_prune=None,
             # num_trials=None, search_strategy='random', scheduler_options=None, searcher_options=None, nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None,
-            stack_name_core='core', stack_name_aux='aux1',
+            core_kwargs=None, aux_kwargs=None
     ) -> list:
         # TODO: unlabeled data?
         # TODO: Allow disable aux (default to disabled)
-        # TODO: Allow name core/aux stack
         # TODO: time_limits -> time_limit
         time_start = time.time()
 
         if stack_ensemble_levels is None:
-            stack_ensemble_levels = 0  # TODO: Instead infer based on hyperparameters input.
+            hyperparameter_keys = list(hyperparameters.keys())
+            highest_level = 0
+            for key in hyperparameter_keys:
+                if isinstance(key, int):
+                    highest_level = max(key, highest_level)
+            stack_ensemble_levels = highest_level
 
         # TODO: Add special error message if called and training/val data was not cached.
         X_train, y_train, X_val, y_val = self._trainer.load_data()
         fit_models = self._trainer.train_multi_levels(
             X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, hyperparameters=hyperparameters, base_model_names=base_model_names, time_limit=time_limits, relative_stack=relative_stack, level_end=stack_ensemble_levels,
-            stack_name_core=stack_name_core, stack_name_aux=stack_name_aux
+            core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
         )
 
         if time_limits is not None:
@@ -1187,9 +1200,10 @@ class TabularPredictor(BasePredictor):
                 models_to_keep = self._trainer.get_model_best()
         self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete, allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk, dry_run=dry_run)
 
-    def get_model_names(self):
+    # TODO: v0.1 add documentation for arguments
+    def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
         """Returns the list of model names trained in this `predictor` object."""
-        return self._trainer.get_model_names()
+        return self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
 
     def get_model_names_persisted(self):
         """Returns the list of model names which are persisted in memory."""

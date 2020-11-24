@@ -18,11 +18,7 @@ train_data = train_data.head(1000)  # subsample for faster demo
 # Fitting with the old Predictor #
 ##################################
 
-predictor1 = task.fit(
-    train_data=train_data,
-    label=label,
-    hyperparameters=hyperparameters,
-)
+predictor1 = task.fit(train_data=train_data, label=label, hyperparameters=hyperparameters, num_bagging_folds=2)
 predictor1.leaderboard(test_data)
 
 ##################################
@@ -35,28 +31,37 @@ predictor2 = TabularPredictorV2(label=label)
 output_dir = predictor2.output_directory
 predictor2.save()
 del predictor2
-predictor2 = TabularPredictorV2.load(output_directory=output_dir)
+predictor2 = TabularPredictorV2.load(output_dir)
 
-predictor2.fit(
-    train_data=train_data,
-    hyperparameters=hyperparameters,
-)
+predictor2.fit(train_data, hyperparameters=hyperparameters, num_bagging_folds=2)
 predictor2.leaderboard(test_data)
 
 # Showing that the new Predictor can be reloaded after fit in the same fashion as the old Predictor
 predictor2.save()
 del predictor2
-predictor2 = TabularPredictorV2.load(output_directory=output_dir)
+predictor2 = TabularPredictorV2.load(output_dir)
 predictor2.leaderboard(test_data)
 
-#######################################################################
-# Constructing old and new Predictor objects using the Learner object #
-#######################################################################
+####################################
+# Advanced fit_extra functionality #
+####################################
 
-learner = predictor2._learner
+# Fit extra models at level 0, with 30 second time limit
+hyperparameters_extra1 = {'GBM': {}, 'NN': {}}
+predictor2.fit_extra(hyperparameters_extra1, time_limits=30)
 
-predictor_new_loaded_from_learner = TabularPredictorV2.from_learner(learner=learner)
-predictor_new_loaded_from_learner.leaderboard(test_data)
+# Fit new level 1 stacker models that use the level 0 models from the original fit and the previous fit_extra call as base models
+hyperparameters_extra2 = {'CAT': {}, 'NN': {}}
+base_model_names = predictor2.get_model_names(stack_name='core', level=0)
+predictor2.fit_extra(hyperparameters_extra2, base_model_names=base_model_names)
 
-predictor_old_loaded_from_learner = TabularPredictor(learner=learner)
-predictor_old_loaded_from_learner.leaderboard(test_data)
+# Fit a new 3-layer stack ensemble on top of level 1 stacker models
+hyperparameters_extra3 = {
+    0: {'XT': {}},
+    1: {'NN': {}, 'RF': {}},
+    2: {'XGB': {}, 'custom': ['GBM']}
+}
+base_model_names = predictor2.get_model_names(stack_name='core', level=1)
+predictor2.fit_extra(hyperparameters_extra3, base_model_names=base_model_names)
+
+predictor2.leaderboard(test_data)
