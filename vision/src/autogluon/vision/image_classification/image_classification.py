@@ -50,6 +50,8 @@ class ImageClassification(object):
             names = D8D.list()
             if train_data.lower() in names:
                 train_data = D8D.get(train_data)
+            if val_data is None:
+                train_data, val_data = train_data.split(train_size)
         if isinstance(val_data, str):
             from d8.image_classification import Dataset as D8D
             names = D8D.list()
