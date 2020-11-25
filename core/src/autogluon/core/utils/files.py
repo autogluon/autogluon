@@ -115,13 +115,14 @@ def check_sha1(filename, sha1_hash):
 def mkdir(path):
     """Make directory at the specified local path with special error handling.
     """
-    try:
-        os.makedirs(path)
-    except OSError as exc:  # Python >2.5
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
+    if len(path) > 0:
+        try:
+            os.makedirs(path)
+        except OSError as exc:  # Python >2.5
+            if exc.errno == errno.EEXIST and os.path.isdir(path):
+                pass
+            else:
+                raise
 
 def raise_num_file(nofile_atleast=4096):
     try:
