@@ -732,7 +732,7 @@ class BertForTextPredictionBasic:
         return test_predictions
 
     @property
-    def class_names(self):
+    def class_labels(self):
         """The original name of the class labels.
 
         For example, the tabular data may contain classes equal to
