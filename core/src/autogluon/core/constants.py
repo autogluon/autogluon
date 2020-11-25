@@ -2,7 +2,7 @@
 BINARY = 'binary'
 MULTICLASS = 'multiclass'
 REGRESSION = 'regression'
-SOFTCLASS = 'softclass' # classification with soft-target (rather than classes, labels are probabilities of each class).
+SOFTCLASS = 'softclass'  # classification with soft-target (rather than classes, labels are probabilities of each class).
 
 PROBLEM_TYPES_CLASSIFICATION = [BINARY, MULTICLASS]
 PROBLEM_TYPES_REGRESSION = [REGRESSION]
@@ -25,7 +25,7 @@ OBJECTIVES_TO_NORMALIZE = ['log_loss', 'pac_score', 'soft_log_loss']  # do not l
 """
 AG_ARGS: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
     name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
-    name_main: (str) The main name of the model.
+    name_main: (str) The main name of the model. Example: 'RandomForest'.
     name_prefix: (str) Add a custom prefix to the model name. Unused by default.
     name_suffix: (str) Add a custom suffix to the model name. Unused by default.
     priority: (int) Determines the order in which the model is trained. Larger values result in the model being trained earlier. Default values range from 100 (RF) to 0 (custom), dictated by model type. If you want this model to be trained first, set priority = 999.
