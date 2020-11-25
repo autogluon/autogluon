@@ -3,7 +3,7 @@ import os
 import math
 import logging
 import pandas as pd
-import collections
+import warnings
 import time
 import json
 import functools
@@ -731,18 +731,43 @@ class BertForTextPredictionBasic:
                                  test_predictions)))
         return test_predictions
 
+    @property
+    def class_names(self):
+        """The original name of the class labels.
+
+        For example, the tabular data may contain classes equal to
+        "entailment", "contradiction", "neutral". Internally, these will be converted to
+        0, 1, 2, ...
+
+        This function returns the original names of these raw labels.
+
+        Returns
+        -------
+        ret
+            List that contain the class names
+        """
+        if self._problem_types[0] != _C.CLASSIFICATION:
+            warnings.warn('Accessing class names for a non-classification problem. Return None.')
+            return None
+        else:
+            return self._column_properties[self._label_columns[0]].categories
+
     def predict_proba(self, test_data):
         """Predict class probabilities instead of class labels (for classification tasks).
 
         Parameters
         ----------
         test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
-            The test data to get predictions for. Can be DataFrame/Dataset or a file that can be loaded into DataFrame/Dataset.
+            The test data to get predictions for. Can be DataFrame/Dataset or a file that can
+            be loaded into DataFrame/Dataset.
 
         Returns
         -------
         probabilities : array
-            The predicted class probabilities for each sample. Shape of this array is (#Samples, num_class).
+            The predicted class probabilities for each sample.
+            Shape of this array is (#Samples, num_class).
+            Here, the i-th number means the probability of belonging to the i-th class.
+            You can access the class names by calling `self.class_names`.
         """
         assert self.problem_types[0] == _C.CLASSIFICATION
         return self._internal_predict(test_data,
