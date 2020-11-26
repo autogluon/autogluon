@@ -83,7 +83,7 @@ class ImageClassification(object):
 
         """
         use_rec = False
-        if train_data == 'imagenet':
+        if isinstance(train_data, str) and train_data == 'imagenet':
             logging.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +
                          'please follow the data preparation tutorial in GluonCV.' +
                          'The following record files(symlinks) will be used: \n' +
