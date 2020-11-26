@@ -18,8 +18,8 @@ Example showing how to load pretrained network 'efficientnet_b0', which was prod
 EfficientNet
 ------------
 
-The following pretrained EfficientNet [1]_ models are provided for image classification. 
-The accuracy achieved by each model on a popular image classification benchmark is indicated, along with the image crop-size used by each model.  
+The following pretrained EfficientNet [1]_ models are provided for image classification.
+The accuracy achieved by each model on a popular image classification benchmark is indicated, along with the image crop-size used by each model.
 
 .. [1] Tan, Mingxing, and Quoc V. Le. \
        "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks.
@@ -52,7 +52,7 @@ How to reproduce EfficientNet's neural architecture search
 
    import math
    import autogluon.core as ag
-   from autogluon.vision import ImageClassification as task
+   from autogluon.vision import ImageClassification as Task
 
    @ag.obj(
        width_coefficient=ag.space.Categorical(1.1, 1.2),
@@ -66,6 +66,6 @@ How to reproduce EfficientNet's neural architecture search
                             depth_coefficient=depth_coefficient,
                             input_size=input_size)
 
-   task.fit('imagenet', net=EfficientNetB1(), search_strategy='grid',
-            optimizer=ag.optimizer.SGD(learning_rate=1e-1, momentum=0.9, wd=1e-4))
-
+   task = Task()
+   task.fit('imagenet', search_strategy='grid',
+            hyperparameters={'net': EfficientNetB1(), 'optimizer':ag.optimizer.SGD(learning_rate=1e-1, momentum=0.9, wd=1e-4)})

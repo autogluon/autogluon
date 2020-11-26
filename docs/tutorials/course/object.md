@@ -89,8 +89,8 @@ scripts using :func:`autogluon.autogluon_register_args`. We can start fitting:
 
 ```{.python .input}
 from autogluon.vision import ImageClassification as Task
-task = Task(net=mynet, optimizer=myoptim)
-classifier = task.fit('cifar10', ngpus_per_trial=1, epochs=1)
+task = Task()
+classifier = task.fit('cifar10', ngpus_per_trial=1, epochs=1, hyperparameters={'net': mynet, 'optimizer': myoptim})
 ```
 
 ```{.python .input}

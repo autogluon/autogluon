@@ -9,22 +9,20 @@ AutoGluon Tasks
    Tell AutoGluon that task is image classification:
 
    >>> import autogluon.core as ag
-   >>> from autogluon.vision import ImageClassification as task
+   >>> from autogluon.vision import ImageClassification as Task
 
    Load a toy image dataset:
 
-   >>> filename = ag.download('http://autogluon-hackathon.s3.amazonaws.com/data.zip')
-   >>> ag.unzip(filename)
-   >>> dataset = task.Dataset(train_path='data/train')
+   >>> train, val, test = Task.Dataset.from_folders('http://autogluon-hackathon.s3.amazonaws.com/data.zip')
 
    Fit classification models:
 
-   >>> classifier = task.fit(dataset, epochs=2)
+   >>> mytask = Task()
+   >>> classifier = mytask.fit(train, epochs=2)
 
    Evaluate predictions on test data:
 
-   >>> test_dataset = task.Dataset('data/test', train=False)
-   >>> test_acc = classifier.evaluate(test_dataset)
+   >>> test_acc = classifier.evaluate(test)
 
 
 
@@ -298,4 +296,3 @@ Additional Text Prediction APIs
 
     .. autoautosummary:: BertForTextPredictionBasic
         :attributes:
-
