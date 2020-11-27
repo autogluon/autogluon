@@ -5,6 +5,7 @@ import logging
 
 import pandas as pd
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
+from gluoncv.model_zoo import get_model_list
 
 __all__ = ['ImageClassification']
 
@@ -227,3 +228,29 @@ class ImageClassification(object):
         with open(file_name, 'rb') as fid:
             obj = pickle.load(fid)
         return obj
+
+    @classmethod
+    def list_models(cls):
+        """Get the list of supported model names in model zoo that
+        can be used for image classification.
+
+        Returns
+        -------
+        tuple of str
+            A tuple of supported model names in str.
+
+        """
+        return tuple(_SUPPORTED_MODELS)
+
+
+def _get_supported_models():
+    all_models = get_model_list()
+    blacklist = ['ssd', 'faster_rcnn', 'mask_rcnn', 'fcn', 'deeplab',
+                 'psp', 'icnet', 'fastscnn', 'danet', 'yolo', 'pose',
+                 'center_net', 'siamrpn', 'monodepth',
+                 'ucf101', 'kinetics', 'voc', 'coco', 'citys', 'mhpv1',
+                 'ade', 'hmdb51', 'sthsth', 'otb']
+    cls_models = [m for m in all_models if not any(x in m for x in blacklist)]
+    return cls_models
+
+_SUPPORTED_MODELS = _get_supported_models()

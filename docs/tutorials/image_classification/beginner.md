@@ -64,6 +64,8 @@ bulk_result = classifier.predict(test_dataset)
 print(bulk_result)
 ```
 
+An extra column will be included in bulk prediction, indicate the corresponding image for the row.
+
 
 ## Generate image features with a classifier
 
@@ -72,6 +74,7 @@ Extracting representation from the whole image learned by a model is also very u
 ```{.python .input}
 image_path = test_dataset.iloc[0]['image']
 feature = classifier.predict_feature(image_path)
+print(feature)
 ```
 
 

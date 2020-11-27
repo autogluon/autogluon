@@ -35,11 +35,10 @@ Given such a list, AutoGluon tries to train different networks from this list to
 This is an example of a :class:`autogluon.core.space.Categorical` search space, in which there are a limited number of values to choose from.
 
 ```{.python .input}
-config_space = {'model': ag.Categorical('resnet18_v1b', 'mobilenetv3_small')}
+model = ag.Categorical('resnet18_v1b', 'mobilenetv3_small')
 
 # you may choose more than 70+ available model in the model zoo provided by GluonCV:
-import gluoncv as gcv
-model_list = gcv.model_zoo.get_model_list()
+model_list = Task.list_models()
 ```
 
 ## Specify the training hyper-parameters
@@ -48,12 +47,8 @@ Similarly, we can manually specify many crucial hyper-parameters, with specific 
 
 
 ```{.python .input}
-config_space.update({
-  'batch_size': 8,
-  'time_limits': 60*10,
-  'epochs': 2,
-  'lr': ag.Categorical(1e-2, 1e-3)
-  })
+batch_size = 8
+lr = ag.Categorical(1e-2, 1e-3)
 ```
 
 ## Search Algorithms
@@ -78,12 +73,9 @@ acquisition function. It has been developed specifically to support asynchronous
 parallel evaluations.
 
 ```{.python .input}
-config_space.update({
-  'search_strategy': 'bayesopt',
-  'num_trials': 2
-  })
-task = Task(config_space)
-classifier = task.fit(train_data)
+hyperparameters={'model': model, 'batch_size': batch_size, 'lr': lr}
+task = Task()
+classifier = task.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, epochs=2, hyperparameters=hyperparameters)
 print('Top-1 val acc: %.3f' % task.fit_summary()['valid_acc'])
 ```
 
@@ -110,7 +102,7 @@ bracket, and stop/go decisions are made after 1 and 2 epochs (`grace_period`,
 `grace_period * reduction_factor`):
 
 ```{.python .input}
-config_space.update({
+hyperparameters.update({
   'search_strategy': 'hyperband',
   'grace_period': 1
   })
@@ -125,7 +117,7 @@ also provides Hyperband together with Bayesian optimization. The tuning of expen
 DL models typically works best with this combination.
 
 ```{.python .input}
-config_space.update({
+hyperparameters.update({
   'search_strategy': 'bayesopt_hyperband',
   'grace_period': 1
   })

@@ -112,9 +112,9 @@ calling `fit` without specifying a time limit may result in long waiting times.
 Run the following commands to run `fit` using a time limit:
 
 ```
-time_limits = 10 * 60 # 10mins
+time_limit = 10 * 60 # 10mins
 task = Task()
-classifier = task.fit(dataset)
+classifier = task.fit(dataset, time_limit=time_limit)
 ```
 
 The top-1 accuracy of the best model on the validation set is:
@@ -134,7 +134,7 @@ pred = classifier.predict(test_dataset)
 print(pred)
 ```
 
-Here are the results of AutoGluon's default `fit` and `predict` under different `time_limits` when executed on a p3.16xlarge EC2 instance:
+Here are the results of AutoGluon's default `fit` and `predict` under different `time_limit` when executed on a p3.16xlarge EC2 instance:
 
 - The validation top-1 accuracy within 5h is 0.842, and ranks 14th place in Kaggle competition.
 - The validation top-1 accuracy within 24h is 0.846, and ranks 12th place in Kaggle competition.
