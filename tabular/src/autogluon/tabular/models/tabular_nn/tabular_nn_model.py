@@ -24,6 +24,7 @@ from autogluon.core import Space
 from autogluon.core.utils import try_import_mxboard
 from autogluon.core.metrics import log_loss, roc_auc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
 
 
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
