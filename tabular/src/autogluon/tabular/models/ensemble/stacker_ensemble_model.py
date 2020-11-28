@@ -35,10 +35,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.base_model_types_dict = base_model_types_dict
 
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
-            if self.params['max_models_per_type'] > 0:
-                self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=base_model_types_inner_dict, model_scores=base_model_performances_dict, max_models_per_type=self.params['max_models_per_type'])
-            if self.params['max_models'] > 0:
-                self.base_model_names = self.limit_models(models=self.base_model_names, model_scores=base_model_performances_dict, max_models=self.params['max_models'])
+            if self.params['max_base_models_per_type'] > 0:
+                self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=base_model_types_inner_dict, model_scores=base_model_performances_dict, max_base_models_per_type=self.params['max_base_models_per_type'])
+            if self.params['max_base_models'] > 0:
+                self.base_model_names = self.limit_models(models=self.base_model_names, model_scores=base_model_performances_dict, max_base_models=self.params['max_base_models'])
 
         for model_name, model in self.base_models_dict.items():
             if model_name not in self.base_model_names:
@@ -49,7 +49,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.stack_column_prefix_to_model_map = {stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)}
 
     @staticmethod
-    def limit_models_per_type(models, model_types, model_scores, max_models_per_type):
+    def limit_models_per_type(models, model_types, model_scores, max_base_models_per_type):
         model_type_groups = defaultdict(list)
         for model in models:
             model_type = model_types[model]
@@ -57,19 +57,19 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         for key in model_type_groups:
             model_type_groups[key] = sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)
         for key in model_type_groups:
-            model_type_groups[key] = model_type_groups[key][:max_models_per_type]
+            model_type_groups[key] = model_type_groups[key][:max_base_models_per_type]
         models_remain = []
         for key in model_type_groups:
             models_remain += model_type_groups[key]
         models_valid = [model for model, score in models_remain]
         return models_valid
 
-    def limit_models(self, models, model_scores, max_models):
+    def limit_models(self, models, model_scores, max_base_models):
         model_types = {model: '' for model in models}
-        return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_models_per_type=max_models)
+        return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models)
 
     def _set_default_params(self):
-        default_params = {'max_models': 25, 'max_models_per_type': 5, 'use_orig_features': True}
+        default_params = {'use_orig_features': True, 'max_base_models': 25, 'max_base_models_per_type': 5}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()

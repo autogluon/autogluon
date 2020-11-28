@@ -34,27 +34,18 @@ class DefaultLearner(AbstractLearner):
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
 
-    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
-            feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
-            hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, holdout_frac=0.1,
+             num_bagging_folds=0, num_bagging_sets=1, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2, **trainer_fit_kwargs):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
                 X_unlabeled (DataFrame): data used for pretraining a model. This is same data format as X, without label-column. This data is used for semi-supervised learning.
-                hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
-                feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
                 holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_val != None, ignored if kfolds != 0)
                 num_bagging_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
                 num_bagging_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
                     total number of models trained during bagging = num_bagging_folds * num_bagging_sets
-                stack_ensemble_levels : (int) Number of stacking levels to use in ensemble stacking. Roughly increases model training time by factor of stack_levels+1 (0: disabled)
-                    Default is 0 (disabled). Use values between 1-3 to improve model quality.
-                    Ignored unless kfolds is also set >= 2
-                hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
-        if hyperparameters is None:
-            hyperparameters = {'NN': {}, 'GBM': {}}
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
         if time_limit:
@@ -89,7 +80,6 @@ class DefaultLearner(AbstractLearner):
             low_memory=True,
             k_fold=num_bagging_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bagging_sets,  # TODO: Consider moving to fit call
-            stack_ensemble_levels=stack_ensemble_levels,  # TODO: Consider moving to fit call
             scheduler_options=scheduler_options,
             save_data=save_data,
             save_bagged_folds=save_bagged_folds,
@@ -104,8 +94,7 @@ class DefaultLearner(AbstractLearner):
             self.stopping_metric = trainer.stopping_metric
 
         self.save()
-        trainer.train(X, y, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
-                      hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limit_trainer)
+        trainer.train(X, y, X_val, y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end

@@ -354,7 +354,7 @@ class TabularPredictor(BasePredictor):
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
             'num_bagging_folds': self._trainer.k_fold,
-            'stack_ensemble_levels': self._trainer.stack_ensemble_levels,
+            'max_stack_level': self._trainer.get_max_level(),
             'feature_prune': self._trainer.feature_prune,
             'hyperparameter_tune': hpo_used,
             'hyperparameters_userspecified': self._trainer.hyperparameters,
@@ -386,10 +386,10 @@ class TabularPredictor(BasePredictor):
                 num_fold_str = f" (with {results['num_bagging_folds']} folds)"
             print("Bagging used: %s %s" % (bagging_used, num_fold_str))
             num_stack_str = ""
-            stacking_used = results['stack_ensemble_levels'] > 0
+            stacking_used = results['max_stack_level'] > 1  # TODO: v0.1 increment by 1 when refactoring level names
             if stacking_used:
-                num_stack_str = f" (with {results['stack_ensemble_levels']} levels)"
-            print("Stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
+                num_stack_str = f" (with {results['max_stack_level']} levels)"
+            print("Multi-layer stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
             hpo_str = ""
             if hpo_used and verbosity <= 2:
                 hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"

@@ -41,7 +41,7 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, eval_metric=None, stopping_metric=None,
                  num_classes=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
-                 stack_ensemble_levels=0, save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2):
+                 save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
@@ -74,13 +74,9 @@ class AbstractTrainer:
         self.bagged_mode = True if k_fold >= 2 else False
         if self.bagged_mode:
             self.k_fold = k_fold  # int number of folds to do model bagging, < 2 means disabled
-            self.stack_ensemble_levels = stack_ensemble_levels
-            self.stack_mode = True if self.stack_ensemble_levels >= 1 else False
             self.n_repeats = n_repeats
         else:
             self.k_fold = 0
-            self.stack_ensemble_levels = 0
-            self.stack_mode = False
             self.n_repeats = 1
         self.save_bagged_folds = save_bagged_folds
 
@@ -285,7 +281,7 @@ class AbstractTrainer:
 
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=0, base_model_names: List[str] = None, stack_name='core', save_bagged_folds: bool = None,
-                             extra_ag_args=None, extra_ag_args_ensemble=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, **kwargs) -> List[str]:
+                             extra_ag_args=None, extra_ag_args_fit=None, extra_ag_args_ensemble=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 0, then the models will use base model predictions as additional features.
@@ -297,6 +293,8 @@ class AbstractTrainer:
             base_model_names = []
         if save_bagged_folds is None:
             save_bagged_folds = self.save_bagged_folds
+        if not self.bagged_mode and level != 0:
+            raise ValueError('Stack Ensembling is not valid for non-bagged mode.')
 
         if self.bagged_mode:
             if level == 0:
@@ -317,15 +315,17 @@ class AbstractTrainer:
                     'save_bagged_folds': save_bagged_folds,
                     'random_state': level + self.random_seed,
                 }
-                models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, extra_ag_args=extra_ag_args, ensemble_type=ensemble_type, ensemble_kwargs=ensemble_kwargs, extra_ag_args_ensemble=extra_ag_args_ensemble)
+                models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, extra_ag_args=extra_ag_args, extra_ag_args_fit=extra_ag_args_fit,
+                                         ensemble_type=ensemble_type, ensemble_kwargs=ensemble_kwargs, extra_ag_args_ensemble=extra_ag_args_ensemble)
         elif isinstance(models, dict):
-            models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, extra_ag_args=extra_ag_args)
+            models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, extra_ag_args=extra_ag_args, extra_ag_args_fit=extra_ag_args_fit)
         X_train_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
+        if X_unlabeled is not None:
+            X_unlabeled = self.get_inputs_to_stacker(X_unlabeled, base_models=base_model_names, fit=False)
 
-        # FIXME: TODO: X_unlabeled will not work at present in stacking because stack preds are not added.
-        # FIXME: TODO: X_unlabeled isn't cached so it won't be available during refit_full.
+        # FIXME: TODO: v0.1 X_unlabeled isn't cached so it won't be available during refit_full or fit_extra.
         return self._train_multi(X_train=X_train_init, y_train=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models, level=level, stack_name=stack_name, **kwargs)
 
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
@@ -1169,7 +1169,7 @@ class AbstractTrainer:
                                                             k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, time_limit_total_level=time_limit_total_level, **kwargs)
         return model_names_trained
 
-    def _train_multi_and_ensemble(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, hyperparameter_tune=False, feature_prune=False, time_limit=None) -> List[str]:
+    def _train_multi_and_ensemble(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, stack_ensemble_levels=0, time_limit=None, **kwargs) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if self.save_data and not self.is_data_saved:
             self.save_X_train(X_train)
@@ -1184,7 +1184,7 @@ class AbstractTrainer:
         if X_val is not None:
             self._num_rows_train += len(X_val)
         self._num_cols_train = len(list(X_train.columns))
-        model_names_fit = self.train_multi_levels(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level_start=0, level_end=self.stack_ensemble_levels, time_limit=time_limit)
+        model_names_fit = self.train_multi_levels(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters, level_start=0, level_end=stack_ensemble_levels, time_limit=time_limit, **kwargs)
         if len(self.get_model_names()) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
         return model_names_fit
@@ -1221,8 +1221,8 @@ class AbstractTrainer:
                 base_models_dict[model_name] = self.models[model_name]
         hyperparameters = dict(
             use_orig_features=use_orig_features,
-            max_models_per_type=0,
-            max_models=0,
+            max_base_models_per_type=0,
+            max_base_models=0,
         )
         dummy_stacker = StackerEnsembleModel(
             path='',
