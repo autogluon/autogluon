@@ -38,7 +38,7 @@ class XGBoostModel(AbstractModel):
     def get_eval_metric(self):
         eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
         if eval_metric is None:
-            eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)
+            eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric.needs_pred, problem_type=self.problem_type)
         return eval_metric
 
     def _preprocess(self, X, is_train=False, max_category_levels=None, **kwargs):

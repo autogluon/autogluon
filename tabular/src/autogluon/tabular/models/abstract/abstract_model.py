@@ -41,7 +41,7 @@ class AbstractModel:
                 path (str): directory where to store all outputs.
                 name (str): name of subdirectory inside path where model will be saved.
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-                eval_metric (str or autogluon.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
+                eval_metric (str or autogluon.core.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
                 feature_metadata (autogluon.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
@@ -68,20 +68,6 @@ class AbstractModel:
             logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
         else:
             self.normalize_pred_probas = False
-
-        if isinstance(self.eval_metric, metrics._ProbaScorer):
-            self.metric_needs_y_pred = False
-        elif isinstance(self.eval_metric, metrics._ThresholdScorer):
-            self.metric_needs_y_pred = False
-        else:
-            self.metric_needs_y_pred = True
-
-        if isinstance(self.stopping_metric, metrics._ProbaScorer):
-            self.stopping_metric_needs_y_pred = False
-        elif isinstance(self.stopping_metric, metrics._ThresholdScorer):
-            self.stopping_metric_needs_y_pred = False
-        else:
-            self.stopping_metric_needs_y_pred = True
 
         self.feature_metadata = feature_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
         self.features = features
@@ -331,12 +317,11 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    # TODO: Improve custom eval_metric support
     def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, **kwargs):
         if eval_metric is None:
             eval_metric = self.eval_metric
         if metric_needs_y_pred is None:
-            metric_needs_y_pred = self.metric_needs_y_pred
+            metric_needs_y_pred = eval_metric.needs_pred
         if metric_needs_y_pred:
             y_pred = self.predict(X=X, **kwargs)
             return eval_metric(y, y_pred)
@@ -344,12 +329,11 @@ class AbstractModel:
             y_pred_proba = self.predict_proba(X=X, **kwargs)
             return eval_metric(y, y_pred_proba)
 
-    # TODO: Improve custom eval_metric support
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
         if eval_metric is None:
             eval_metric = self.eval_metric
         if metric_needs_y_pred is None:
-            metric_needs_y_pred = self.metric_needs_y_pred
+            metric_needs_y_pred = eval_metric.needs_pred
         if metric_needs_y_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
             return eval_metric(y, y_pred)
@@ -499,7 +483,7 @@ class AbstractModel:
                 X_raw.loc[row_index:row_index_end - 1, feature] = X_shuffled[feature].values
                 row_index = row_index_end
 
-            if self.metric_needs_y_pred:
+            if self.eval_metric.needs_pred:
                 y_pred = self.predict(X_raw, preprocess_nonadaptive=False)
             else:
                 y_pred = self.predict_proba(X_raw, preprocess_nonadaptive=False)

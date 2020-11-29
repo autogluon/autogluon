@@ -1,6 +1,10 @@
 import copy, time, traceback, logging
 import os
 from typing import List, Union
+import sys
+import pickle
+import math
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -1296,7 +1300,107 @@ class AbstractTrainer:
     #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
     #  Consider aligning these methods so they produce the same result.
     # The output of this function is identical to non-raw when model is level 0 and non-bagged
-    def _get_feature_importance_raw(self, model, X, y, features_to_use=None, subsample_size=1000, transform_func=None, silent=False):
+    def _get_feature_importance_raw(self, model, X, y, features_to_use=None, eval_metric=None, subsample_size=1000, transform_func=None, silent=False):
+        time_start = time.time()
+        if eval_metric is None:
+            eval_metric = self.eval_metric
+        if model is None:
+            model = self.model_best
+        if eval_metric.needs_pred:
+            predict_func = self.predict
+        else:
+            predict_func = self.predict_proba
+        model: AbstractModel = self.load_model(model)
+        predict_func_kwargs = dict(model=model)
+        if features_to_use is None:
+            features_to_use = list(X.columns)
+        feature_count = len(features_to_use)
+
+        if not silent:
+            logger.log(20, f'Computing raw permutation importance for {feature_count} features on {model.name} ...')
+
+        if (subsample_size is not None) and (len(X) > subsample_size):
+            # Reset index to avoid error if duplicated indices.
+            X = X.reset_index(drop=True)
+            y = y.reset_index(drop=True)
+
+            X = X.sample(subsample_size, random_state=0)
+            y = y.loc[X.index]
+
+        time_start_score = time.time()
+
+        X_transformed = X if transform_func is None else transform_func(X)
+        y_pred = predict_func(X_transformed, **predict_func_kwargs)
+        score_baseline = eval_metric(y, y_pred)
+        time_score = time.time() - time_start_score
+
+        if not silent:
+            time_estimated = (feature_count + 1) * time_score + time_start_score - time_start
+            logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime')
+
+        X_shuffled = shuffle_df_rows(X=X, seed=0)
+
+        row_count = X.shape[0]
+
+        # calculating maximum number of features, which is safe to process parallel
+        X_memory_ratio_max = 0.2
+        compute_count_max = 200
+
+        X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
+        if transform_func is not None:
+            X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
+        available_mem = psutil.virtual_memory().available
+        X_memory_ratio = X_size_bytes / available_mem
+
+        compute_count_safe = math.floor(X_memory_ratio_max / X_memory_ratio)
+        compute_count = max(1, min(compute_count_max, compute_count_safe))
+        compute_count = min(compute_count, feature_count)
+
+        # creating copy of original data N=compute_count times for parallel processing
+        X_raw = pd.concat([X.copy() for _ in range(compute_count)], ignore_index=True, sort=False).reset_index(drop=True)
+
+        permutation_importance_dict = dict()
+        for i in range(0, feature_count, compute_count):
+            parallel_computed_features = features_to_use[i:i + compute_count]
+
+            # if final iteration, leaving only necessary part of X_raw
+            num_features_processing = len(parallel_computed_features)
+            final_iteration = i + num_features_processing == feature_count
+            if (num_features_processing < compute_count) and final_iteration:
+                X_raw = X_raw.loc[:row_count * num_features_processing - 1]
+
+            row_index = 0
+            for feature in parallel_computed_features:
+                row_index_end = row_index + row_count
+                X_raw.loc[row_index:row_index_end - 1, feature] = X_shuffled[feature].values
+                row_index = row_index_end
+
+            X_raw_transformed = X_raw if transform_func is None else transform_func(X_raw)
+            y_pred = predict_func(X_raw_transformed, **predict_func_kwargs)
+
+            row_index = 0
+            for feature in parallel_computed_features:
+                # calculating importance score for given feature
+                row_index_end = row_index + row_count
+                y_pred_cur = y_pred[row_index:row_index_end]
+                score = eval_metric(y, y_pred_cur)
+                permutation_importance_dict[feature] = score_baseline - score
+
+                if not final_iteration:
+                    # resetting to original values for processed feature
+                    X_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
+
+                row_index = row_index_end
+
+        feature_importances = pd.Series(permutation_importance_dict).sort_values(ascending=False)
+
+        if not silent:
+            logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
+
+        return feature_importances
+
+    # TODO: v0.1 Remove this
+    def _get_feature_importance_raw_legacy(self, model, X, y, features_to_use=None, subsample_size=1000, transform_func=None, silent=False):
         time_start = time.time()
         if model is None:
             model = self.model_best

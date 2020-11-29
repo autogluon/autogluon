@@ -421,7 +421,7 @@ class AbstractLearner:
     # features: list of feature names that feature importances are calculated for and returned, specify None to get all feature importances.
     # feature_stage: Whether to compute feature importance on raw original features ('original'), transformed features ('transformed') or on the features used by the particular model ('transformed_model').
     def get_feature_importance(self, model=None, X=None, y=None, features: list = None, feature_stage='original', subsample_size=1000, silent=False) -> Series:
-        valid_feature_stages = ['original', 'transformed', 'transformed_model']
+        valid_feature_stages = ['original', 'original_legacy', 'transformed', 'transformed_model']
         if feature_stage not in valid_feature_stages:
             raise ValueError(f'feature_stage must be one of: {valid_feature_stages}, but was {feature_stage}.')
         trainer = self.load_trainer()
@@ -431,7 +431,10 @@ class AbstractLearner:
             y = self.label_cleaner.transform(y)
             X, y = self._remove_nan_label_rows(X, y)
 
-            if feature_stage == 'original':
+            # TODO: Remove original_legacy
+            if feature_stage == 'original_legacy':
+                return trainer._get_feature_importance_raw_legacy(model=model, X=X, y=y, features_to_use=features, subsample_size=subsample_size, transform_func=self.transform_features, silent=silent)
+            elif feature_stage == 'original':
                 return trainer._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, subsample_size=subsample_size, transform_func=self.transform_features, silent=silent)
             X = self.transform_features(X)
         else:

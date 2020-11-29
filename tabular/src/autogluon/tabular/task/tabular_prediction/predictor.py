@@ -552,7 +552,7 @@ class TabularPredictor(BasePredictor):
 
     # TODO: Consider adding time_limit option to early stop the feature importance process
     # TODO: Add option to specify list of features within features list, to check importances of groups of features. Make tuple to specify new feature name associated with group.
-    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, silent=False, **kwargs):
+    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, silent=False):
         """
         Calculates feature importance scores for the given model.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -606,21 +606,6 @@ class TabularPredictor(BasePredictor):
         Pandas `pandas.Series` of feature importance scores.
 
         """
-        allowed_kwarg_names = {'raw'}
-        for kwarg_name in kwargs.keys():
-            if kwarg_name not in allowed_kwarg_names:
-                raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
-        if 'raw' in kwargs.keys():
-            logger.log(30, 'Warning: `raw` is a deprecated parameter. Use `feature_stage` instead. Starting from AutoGluon 0.1.0, specifying `raw` as a parameter will cause an exception.')
-            logger.log(30, 'Overriding `feature_stage` value with `raw` value.')
-            raw = kwargs['raw']
-            if raw is True:
-                feature_stage = 'transformed'
-            elif raw is False:
-                feature_stage = 'transformed_model'
-            else:
-                raise ValueError(f'`raw` must be one of [True, False], but was {raw}.')
-
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
