@@ -259,11 +259,21 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features_to_use=None, is_oof=True, silent=False, **kwargs) -> pd.Series:
+    def compute_feature_importance(self, X, y, features=None, is_oof=True, time_limit=None, silent=False, **kwargs) -> (pd.Series, pd.Series, pd.Series):
+        if not is_oof:
+            if features is None:
+                features = self.load_child(model=self.models[0]).features
+            return super().compute_feature_importance(X, y, features=features, time_limit=time_limit, silent=silent, **kwargs)
         feature_importance_fold_list = []
+        feature_importance_stddev_fold_list = []
+        feature_importance_z_score_fold_list = []
         fold_weights = []
         # TODO: Preprocess data here instead of repeatedly
         model_index = 0
+        if time_limit is not None:
+            time_limit_per_child = time_limit / len(self.models)
+        else:
+            time_limit_per_child = None
         for n_repeat, k in enumerate(self._k_per_n_repeat):
             if is_oof:
                 if not self.bagged_mode:
@@ -275,8 +285,10 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, silent=silent, **kwargs)
+                feature_importance_fold, feature_importance_stddev_fold, feature_importance_z_score_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features=features, time_limit=time_limit_per_child, silent=silent, **kwargs)
                 feature_importance_fold_list.append(feature_importance_fold)
+                feature_importance_stddev_fold_list.append(feature_importance_stddev_fold)
+                feature_importance_z_score_fold_list.append(feature_importance_z_score_fold)
                 fold_weights.append(len(test_index))
             model_index += k
 
@@ -288,6 +300,10 @@ class BaggedEnsembleModel(AbstractModel):
 
         feature_importance = pd.concat(feature_importance_fold_list, axis=1, sort=True).sum(1).sort_values(ascending=False)
 
+        # TODO: FIXME: v0.1 This is probably not the best estimate for stddev and z_score we can make, this is simply averaging the stddev and z-scores from the children.
+        feature_importance_stddev = pd.concat(feature_importance_stddev_fold_list, axis=1, sort=True).mean(1).sort_values(ascending=False)
+        feature_importance_z_score = pd.concat(feature_importance_z_score_fold_list, axis=1, sort=True).mean(1).sort_values(ascending=False)
+
         # TODO: Consider utilizing z scores and stddev to make threshold decisions
         # stddev = pd.concat(feature_importance_fold_list, axis=1, sort=True).std(1).sort_values(ascending=False)
         # feature_importance_df = pd.DataFrame(index=feature_importance.index)
@@ -295,7 +311,7 @@ class BaggedEnsembleModel(AbstractModel):
         # feature_importance_df['stddev'] = stddev
         # feature_importance_df['z'] = feature_importance_df['importance'] / feature_importance_df['stddev']
 
-        return feature_importance
+        return feature_importance, feature_importance_stddev, feature_importance_z_score
 
     def load_child(self, model, verbose=False) -> AbstractModel:
         if isinstance(model, str):
@@ -310,7 +326,7 @@ class BaggedEnsembleModel(AbstractModel):
         child.save(verbose=verbose)
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
-    def convert_to_refitfull_template(self):
+    def convert_to_refit_full_template(self):
         init_args = self._get_init_args()
         init_args['save_bagged_folds'] = True  # refit full models must save folds
         model_base_name_orig = init_args['model_base'].name

@@ -550,9 +550,8 @@ class TabularPredictor(BasePredictor):
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    # TODO: Consider adding time_limit option to early stop the feature importance process
     # TODO: Add option to specify list of features within features list, to check importances of groups of features. Make tuple to specify new feature name associated with group.
-    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, silent=False):
+    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, silent=False):
         """
         Calculates feature importance scores for the given model.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -598,6 +597,16 @@ class TabularPredictor(BasePredictor):
             If `subsample_size=None` or `dataset` contains fewer than `subsample_size` rows, all rows will be used during computation.
             Larger values increase the accuracy of the feature importance scores.
             Runtime linearly scales with `subsample_size`.
+        time_limit : float, default = None
+            Time in seconds to limit the calculation of feature importance.
+            If None, feature importance will calculate without early stopping.
+            A minimum of 1 full shuffle set will always be evaluated. If a shuffle set evaluation takes longer than `time_limit`, the method will take the length of a shuffle set evaluation to return regardless of the `time_limit`.
+        num_shuffle_sets : int, default = None
+            The number of different permutation shuffles of the data that are evaluated.
+            Larger values will increase the quality of the importance evaluation.
+            It is generally recommended to increase `subsample_size` before increasing `num_shuffle_sets`.
+            Defaults to 1 if `time_limit` is None or 10 if `time_limit` is specified.
+            Runtime linearly scales with `num_shuffle_sets`.
         silent : bool, default = False
             Whether to suppress logging output
 
@@ -610,7 +619,10 @@ class TabularPredictor(BasePredictor):
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
-        return self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage, subsample_size=subsample_size, silent=silent)
+        feature_importances, feature_importances_stddev, feature_importances_z_score = self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage,
+                                                                                                                            subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
+        # TODO: v0.1 also return stddev and z_score (Update tutorials), make optional?
+        return feature_importances
 
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """

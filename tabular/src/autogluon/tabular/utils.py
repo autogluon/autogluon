@@ -1,11 +1,16 @@
 import logging
+import math
+import pickle
+import time
+import sys
 
 import numpy as np
 import pandas as pd
+import psutil
 from pandas import DataFrame, Series
 from sklearn.model_selection import train_test_split
 
-from autogluon.core.utils import normalize_binary_probas, normalize_multi_probas
+from autogluon.core.utils import normalize_binary_probas, normalize_multi_probas, shuffle_df_rows
 from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS
 from autogluon.core.metrics import accuracy, root_mean_squared_error, Scorer
 
@@ -150,3 +155,147 @@ def infer_eval_metric(problem_type: str) -> Scorer:
         return root_mean_squared_error
 
 
+# Note: Do not send training data as input or the importances will be overfit.
+# TODO: Improve time estimate (Currently pessimistic)
+# TODO: v0.1 add documentation
+def compute_permutation_feature_importance(X, y, predict_func, eval_metric, features=None, subsample_size=1000, num_shuffle_sets=None,
+                                           predict_func_kwargs: dict = None, transform_func=None, transform_func_kwargs: dict = None,
+                                           time_limit=None, silent=False) -> (pd.Series, pd.Series, pd.Series):
+    if num_shuffle_sets is None:
+        if time_limit is not None:
+            num_shuffle_sets = 10
+        else:
+            num_shuffle_sets = 1
+
+    time_start = time.time()
+    if predict_func_kwargs is None:
+        predict_func_kwargs = dict()
+    if transform_func_kwargs is None:
+        transform_func_kwargs = dict()
+    if features is None:
+        features = list(X.columns)
+    feature_count = len(features)
+
+    if (subsample_size is not None) and (len(X) > subsample_size):
+        # Reset index to avoid error if duplicated indices.
+        X = X.reset_index(drop=True)
+        y = y.reset_index(drop=True)
+
+        X = X.sample(subsample_size, random_state=0)
+        y = y.loc[X.index]
+
+    if not silent:
+        logging_message = f'Computing raw permutation feature importance for {feature_count} features using {len(X)} rows with {num_shuffle_sets} shuffle sets...'
+        if time_limit is not None:
+            logging_message = f'{logging_message} Time limit: {time_limit}s...'
+        logger.log(20, logging_message)
+
+    time_start_score = time.time()
+
+    X_transformed = X if transform_func is None else transform_func(X, **transform_func_kwargs)
+    y_pred = predict_func(X_transformed, **predict_func_kwargs)
+    score_baseline = eval_metric(y, y_pred)
+    time_score = time.time() - time_start_score
+
+    if not silent:
+        time_estimated = ((feature_count + 1) * time_score) * num_shuffle_sets + time_start_score - time_start
+        logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime to complete all shuffle sets')
+
+    row_count = X.shape[0]
+
+    # calculating maximum number of features, which is safe to process parallel
+    X_memory_ratio_max = 0.2
+    compute_count_max = 200
+
+    X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
+    if transform_func is not None:
+        X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
+    available_mem = psutil.virtual_memory().available
+    X_memory_ratio = X_size_bytes / available_mem
+
+    compute_count_safe = math.floor(X_memory_ratio_max / X_memory_ratio)
+    compute_count = max(1, min(compute_count_max, compute_count_safe))
+    compute_count = min(compute_count, feature_count)
+
+    # creating copy of original data N=compute_count times for parallel processing
+    X_raw = pd.concat([X.copy() for _ in range(compute_count)], ignore_index=True, sort=False).reset_index(drop=True)
+
+    time_permutation_start = time.time()
+    permutation_importance_dict_list = []
+    # TODO: Can speedup shuffle_repeats by incorporating into X_raw (do multiple repeats in a single predict call)
+    shuffle_repeats_completed = 0
+    for shuffle_repeat in range(num_shuffle_sets):
+        permutation_importance_dict = dict()
+        X_shuffled = shuffle_df_rows(X=X, seed=shuffle_repeat)
+        for i in range(0, feature_count, compute_count):
+            parallel_computed_features = features[i:i + compute_count]
+
+            # if final iteration, leaving only necessary part of X_raw
+            num_features_processing = len(parallel_computed_features)
+            final_iteration = i + num_features_processing == feature_count
+            if (num_features_processing < compute_count) and final_iteration:
+                X_raw = X_raw.loc[:row_count * num_features_processing - 1]
+
+            row_index = 0
+            for feature in parallel_computed_features:
+                row_index_end = row_index + row_count
+                X_raw.loc[row_index:row_index_end - 1, feature] = X_shuffled[feature].values
+                row_index = row_index_end
+
+            X_raw_transformed = X_raw if transform_func is None else transform_func(X_raw, **transform_func_kwargs)
+            y_pred = predict_func(X_raw_transformed, **predict_func_kwargs)
+
+            row_index = 0
+            for feature in parallel_computed_features:
+                # calculating importance score for given feature
+                row_index_end = row_index + row_count
+                y_pred_cur = y_pred[row_index:row_index_end]
+                score = eval_metric(y, y_pred_cur)
+                permutation_importance_dict[feature] = score_baseline - score
+
+                if not final_iteration:
+                    # resetting to original values for processed feature
+                    X_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
+
+                row_index = row_index_end
+        permutation_importance_dict_list.append(permutation_importance_dict)
+        shuffle_repeats_completed = shuffle_repeat + 1
+        if time_limit is not None and shuffle_repeat != (num_shuffle_sets - 1):
+            time_now = time.time()
+            time_left = time_limit - (time_now - time_start)
+            time_permutation_average = (time_now - time_permutation_start) / (shuffle_repeat + 1)
+            if time_left < (time_permutation_average * 1.1):
+                if not silent:
+                    logger.log(20, f'\tEarly stopping feature importance calculation before all shuffle sets have completed due to lack of time...')
+                break
+    permutation_importance_dict = dict()
+    permutation_importance_stddev_dict = dict()
+    permutation_importance_z_score_dict = dict()
+    for feature in features:
+        feature_shuffle_scores = [permutation_importance_dict_repeat[feature] for permutation_importance_dict_repeat in permutation_importance_dict_list]
+        permutation_importance_dict[feature] = np.mean(feature_shuffle_scores)
+        if len(feature_shuffle_scores) > 1:
+            permutation_importance_stddev_dict[feature] = np.std(feature_shuffle_scores, ddof=1)
+        else:
+            permutation_importance_stddev_dict[feature] = None
+        if permutation_importance_stddev_dict[feature] is not None and permutation_importance_stddev_dict[feature] != 0:
+            permutation_importance_z_score_dict[feature] = permutation_importance_dict[feature] / permutation_importance_stddev_dict[feature]
+        elif permutation_importance_stddev_dict[feature] is not None:  # stddev = 0
+            if permutation_importance_dict[feature] == 0:
+                permutation_importance_z_score_dict[feature] = None
+            elif permutation_importance_dict[feature] > 0:
+                permutation_importance_z_score_dict[feature] = np.inf
+            else:  # < 0
+                permutation_importance_z_score_dict[feature] = -np.inf
+        else:
+            permutation_importance_z_score_dict[feature] = None
+
+    feature_importances = pd.Series(permutation_importance_dict).sort_values(ascending=False)
+    feature_importances_stddev = pd.Series(permutation_importance_stddev_dict).sort_values(ascending=False)
+    feature_importances_z_score = pd.Series(permutation_importance_z_score_dict).sort_values(ascending=False)
+
+    if not silent:
+        logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
+        logger.log(20, f'\tCompleted {shuffle_repeats_completed} of {num_shuffle_sets} shuffle sets.')
+
+    return feature_importances, feature_importances_stddev, feature_importances_z_score

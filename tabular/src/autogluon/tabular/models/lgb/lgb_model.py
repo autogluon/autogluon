@@ -348,14 +348,17 @@ class LGBModel(AbstractModel):
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
 
     # TODO: Consider adding _internal_feature_map functionality to abstract_model
-    def compute_feature_importance(self, **kwargs) -> pd.Series:
-        feature_importances = super().compute_feature_importance(**kwargs)
+    def compute_feature_importance(self, **kwargs) -> (pd.Series, pd.Series, pd.Series):
+        feature_importances, feature_importances_stddev, feature_importances_z_score = super().compute_feature_importance(**kwargs)
         if self._internal_feature_map is not None:
             inverse_internal_feature_map = {i: feature for feature, i in self._internal_feature_map.items()}
             feature_importances = {inverse_internal_feature_map[i]: importance for i, importance in feature_importances.items()}
-            feature_importances = pd.Series(data=feature_importances)
-            feature_importances = feature_importances.sort_values(ascending=False)
-        return feature_importances
+            feature_importances = pd.Series(data=feature_importances).sort_values(ascending=False)
+            feature_importances_stddev = {inverse_internal_feature_map[i]: importance for i, importance in feature_importances_stddev.items()}
+            feature_importances_stddev = pd.Series(data=feature_importances_stddev).sort_values(ascending=False)
+            feature_importances_z_score = {inverse_internal_feature_map[i]: importance for i, importance in feature_importances_z_score.items()}
+            feature_importances_z_score = pd.Series(data=feature_importances_z_score).sort_values(ascending=False)
+        return feature_importances, feature_importances_stddev, feature_importances_z_score
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:

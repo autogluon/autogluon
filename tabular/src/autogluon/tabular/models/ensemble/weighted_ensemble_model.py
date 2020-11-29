@@ -47,16 +47,18 @@ class WeightedEnsembleModel(StackerEnsembleModel):
             weights_dict[key] = weights_dict[key] / num_models
         return weights_dict
 
-    def compute_feature_importance(self, X, y, features_to_use=None, is_oof=True, **kwargs) -> pd.Series:
+    def compute_feature_importance(self, X, y, features=None, is_oof=True, **kwargs) -> (pd.Series, pd.Series, pd.Series):
         logger.warning('Warning: non-raw feature importance calculation is not valid for weighted ensemble since it does not have features, returning ensemble weights instead...')
         if is_oof:
             feature_importance = pd.Series(self._get_model_weights()).sort_values(ascending=False)
         else:
             logger.warning('Warning: Feature importance calculation is not yet implemented for WeightedEnsembleModel on unseen data, returning generic feature importance...')
             feature_importance = pd.Series(self._get_model_weights()).sort_values(ascending=False)
-            # TODO: Rewrite preprocess() in greedy_weighted_ensemble_model to enable
-            # feature_importance = super().compute_feature_importance(X=X, y=y, features_to_use=features_to_use, preprocess=preprocess, is_oof=is_oof, **kwargs)
-        return feature_importance
+        feature_importance_stddev = pd.Series(data=[None for _ in range(len(feature_importance))], index=feature_importance.index, dtype='float64')
+        feature_importance_z_score = pd.Series(data=[None for _ in range(len(feature_importance))], index=feature_importance.index, dtype='float64')
+        # TODO: Rewrite preprocess() in greedy_weighted_ensemble_model to enable
+        # feature_importance = super().compute_feature_importance(X=X, y=y, features_to_use=features_to_use, preprocess=preprocess, is_oof=is_oof, **kwargs)
+        return feature_importance, feature_importance_stddev, feature_importance_z_score
 
     def _set_default_params(self):
         default_params = {'use_orig_features': False}
