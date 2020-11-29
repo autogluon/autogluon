@@ -3,6 +3,7 @@ import math
 import pickle
 import time
 import sys
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -157,10 +158,72 @@ def infer_eval_metric(problem_type: str) -> Scorer:
 
 # Note: Do not send training data as input or the importances will be overfit.
 # TODO: Improve time estimate (Currently pessimistic)
-# TODO: v0.1 add documentation
-def compute_permutation_feature_importance(X, y, predict_func, eval_metric, features=None, subsample_size=1000, num_shuffle_sets=None,
-                                           predict_func_kwargs: dict = None, transform_func=None, transform_func_kwargs: dict = None,
-                                           time_limit=None, silent=False) -> (pd.Series, pd.Series, pd.Series):
+def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predict_func: Callable[[pd.DataFrame], np.ndarray], eval_metric: Scorer, features: list = None, subsample_size=1000, num_shuffle_sets: int = None,
+                                           predict_func_kwargs: dict = None, transform_func: Callable[[pd.DataFrame], pd.DataFrame] = None, transform_func_kwargs: dict = None,
+                                           time_limit: float = None, silent=False) -> (pd.Series, pd.Series, pd.Series):
+    """
+    Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
+    A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
+    A feature score of 0.01 would indicate that the predictive performance dropped by 0.01 when the feature was randomly shuffled.
+    The higher the score a feature has, the more important it is to the model's performance.
+    If a feature has a negative score, this means that the feature is likely harmful to the final model, and a model trained with the feature removed would be expected to achieve a better predictive performance.
+    Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Validation data to permute when calculating feature importances.
+        Do not use training data as it will result in overfit feature importances.
+    y : pd.Series
+        Label values of X. The index of X and y must align.
+    predict_func : Callable[[pd.DataFrame], np.ndarray]
+        Function that computes model predictions or prediction probabilities on input data.
+        Output must be in the form of a numpy ndarray or pandas Series or DataFrame.
+        Output `y_pred` must be in a form acceptable as input to `eval_metric(y, y_pred)`.
+        If using a fit model object, this is typically `model.predict` or `model.predict_proba`, depending on the `eval_metric` being used.
+        If `eval_metric.needs_pred==True`, use `model.predict`, otherwise use `model.predict_proba`.
+    eval_metric : Scorer
+        Object that computes a score given ground truth labels and predictions or prediction probabilities (depending on the type of metric).
+        If using a fit model object, this is typically `model.eval_metric`.
+        Feature importances will be based on the delta permutation shuffling has on the score produced by `eval_metric`.
+    features : list, default None
+        List of features to calculate importances for.
+        If None, all features' importances will be calculated.
+    subsample_size : int, default 1000
+        The amount of data rows to sample when computing importances.
+        Higher values will improve the quality of feature importance estimates, but linearly increase the runtime.
+        If None, all provided data will be used.
+    num_shuffle_sets : int, default None
+        The number of different permutation shuffles of the data that are evaluated.
+        Shuffle sets are generated with different random seeds and importances are averaged across all shuffle sets to get the final feature importance values.
+        Higher values will improve the quality of feature importance estimates, but linearly increase the runtime.
+        `subsample_size` should be increased before `num_shuffle_sets` if runtime is a concern.
+        Defaults to 1 if `time_limit` is None or 10 if `time_limit` is specified.
+        When `num_shuffle_sets` is greater than 1, feature importance standard deviation and z-score will additionally be computed by using the results of each shuffle set as samples.
+    predict_func_kwargs : dict, default {}
+        Keyword arguments to be appended to calls to `predict_func(X, **kwargs)`.
+    transform_func : Callable[[pd.DataFrame], pd.DataFrame], default None
+        Transformation function that takes the raw input and transforms it row-wise to the input expected by `predict_func`.
+        Common examples include `model.preprocess` and `feature_generator.transform`.
+        If None, then no transformation is done on the data prior to calling `predict_func`.
+        This is necessary to compute importance of original data features in `X` prior to their transformation assuming `predict_func` does not perform the transformation already.
+            Example: `transform_func` is necessary to compute the importance of a text feature prior to being transformed into ngrams by `transform_func` when `predict_func` expects ngram features as input.
+    transform_func_kwargs : dict, default {}
+        Keyword arguments to be appended to calls to `transform_func(X, **kwargs)`.
+    time_limit : float, default None
+        Time in seconds to limit the calculation of feature importance.
+        If None, feature importance will calculate without early stopping.
+        A minimum of 1 full shuffle set will always be evaluated. If a shuffle set evaluation takes longer than `time_limit`, the method will take the length of a shuffle set evaluation to return regardless of the `time_limit`.
+        If `num_shuffle_sets==1`, `time_limit` will be ignored.
+    silent : bool, default False
+        Whether to suppress logging output
+
+    Returns
+    -------
+    pd.Series of feature importance scores,
+    pd.Series of feature importance standard deviations,
+    pd.Series of feature importance standard deviation z-scores.
+    """
     if num_shuffle_sets is None:
         if time_limit is not None:
             num_shuffle_sets = 10
@@ -199,7 +262,8 @@ def compute_permutation_feature_importance(X, y, predict_func, eval_metric, feat
 
     if not silent:
         time_estimated = ((feature_count + 1) * time_score) * num_shuffle_sets + time_start_score - time_start
-        logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime to complete all shuffle sets')
+        time_estimated_per_set = time_estimated / num_shuffle_sets
+        logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime ({round(time_estimated_per_set, 2)}s per shuffle set)')
 
     row_count = X.shape[0]
 
@@ -295,7 +359,6 @@ def compute_permutation_feature_importance(X, y, predict_func, eval_metric, feat
     feature_importances_z_score = pd.Series(permutation_importance_z_score_dict).sort_values(ascending=False)
 
     if not silent:
-        logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
-        logger.log(20, f'\tCompleted {shuffle_repeats_completed} of {num_shuffle_sets} shuffle sets.')
+        logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime (Completed {shuffle_repeats_completed} of {num_shuffle_sets} shuffle sets)')
 
     return feature_importances, feature_importances_stddev, feature_importances_z_score
