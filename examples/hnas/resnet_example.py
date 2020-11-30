@@ -20,6 +20,8 @@ import torch.nn.functional as F
 from torchvision import models, datasets
 import torchvision.transforms as transforms
 
+logging.basicConfig(level=logging.INFO)
+
 
 def get_CIFAR10(root="./"):
     input_size = 32
@@ -75,7 +77,6 @@ def train(model, train_loader, optimizer, epoch):
 
     for data, target in train_loader:
         if torch.cuda.is_available():
-
             data = data.cuda()
             target = target.cuda()
 
@@ -103,7 +104,6 @@ def valid(model, valid_loader):
     for data, target in valid_loader:
         with torch.no_grad():
             if torch.cuda.is_available():
-
                 data = data.cuda()
                 target = target.cuda()
 
@@ -135,7 +135,7 @@ def make_res_net_benchmark(dataset_path, num_gpus=1):
         dataset_path=dataset_path,
         num_gpus=num_gpus,
         epochs=27)
-    def objective_function(args, reporter, **kwargs):
+    def objective_function(args, reporter):
 
         ts_start = time.time()
 
@@ -180,7 +180,6 @@ def make_res_net_benchmark(dataset_path, num_gpus=1):
         )
 
         for epoch in range(1, args.epochs + 1):
-
             train(model, train_loader, optimizer, epoch)
             loss, y = valid(model, valid_loader)
             scheduler.step()
@@ -198,6 +197,7 @@ def make_res_net_benchmark(dataset_path, num_gpus=1):
                 performance=y,
                 eval_time=eval_time,
                 time_step=ts_now, **config)
+
     return objective_function
 
 
@@ -253,8 +253,11 @@ def parse_args():
                         help='If specified, results are stored in intervals of '
                              'this many seconds (they are always stored at '
                              'the end)')
+    parser.add_argument('--searcher', type=str, default='bayesopt',
+                        choices=['bayesopt', 'random'],
+                        help='Defines if we sample configuration randomly or from a model.')
     parser.add_argument('--scheduler', type=str, default='hyperband_promotion',
-                        choices=['hyperband_stopping', 'hyperband_promotion'],
+                        choices=['hyperband_stopping', 'hyperband_promotion, fifo'],
                         help='Asynchronous scheduler type. In case of doubt leave it to the default')
     args = parser.parse_args()
     return args
@@ -263,8 +266,6 @@ def parse_args():
 if __name__ == "__main__":
 
     args = parse_args()
-
-    logging.root.setLevel(logging.INFO)
 
     # In case you want to run AutoGluon across multiple instances, you need to provide it with a list of
     # the IP addresses of the instances. Here, we assume that the IP addresses are stored in a .yaml file.
@@ -285,28 +286,46 @@ if __name__ == "__main__":
 
     brackets = 1  # setting the number of brackets to 1 means that we run effectively successive halving
     func = make_res_net_benchmark('./cifar10_dataset')
-    scheduler = ag.scheduler.HyperbandScheduler(func,
-                                                resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
-                                                # Autogluon runs until it either reaches num_trials or time_out
-                                                num_trials=args.num_trials,
-                                                time_out=args.timeout,
-                                                # This argument defines the metric that will be maximized.
-                                                # Make sure that you report this back in the objective function.
-                                                reward_attr='performance',
-                                                # The metric along we make scheduling decision. Needs to be also
-                                                # reported back to AutoGluon in the objective function.
-                                                time_attr='epoch',
-                                                brackets=brackets,
-                                                checkpoint=None,
-                                                searcher="bayesopt",  # Defines searcher for new configurations
-                                                dist_ip_addrs=dist_ip_addrs,
-                                                training_history_callback=callback,
-                                                training_history_callback_delta_secs=args.store_results_period,
-                                                reduction_factor=3,
-                                                type=hyperband_type,
-                                                # defines the minimum resource level for Hyperband,
-                                                # i.e the minimum number of epochs
-                                                grace_period=1
-                                                )
+
+    if args.scheduler == 'fifo':
+        scheduler = ag.scheduler.FIFOScheduler(f,
+                                               resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
+                                               # Autogluon runs until it either reaches num_trials or time_out
+                                               num_trials=args.num_trials,
+                                               time_out=args.timeout,
+                                               # This argument defines the metric that will be maximized.
+                                               # Make sure that you report this back in the objective function.
+                                               reward_attr='performance',
+                                               # The metric along we make scheduling decision. Needs to be also
+                                               # reported back to AutoGluon in the objective function.
+                                               time_attr='epoch',
+                                               search_options={'random_seed': args.seed},
+                                               searcher=args.searcher,  # Defines searcher for new configurations
+                                               training_history_callback_delta_secs=args.store_results_period)
+    else:
+
+        scheduler = ag.scheduler.HyperbandScheduler(func,
+                                                    resource={'num_cpus': args.num_cpus, 'num_gpus': args.num_gpus},
+                                                    # Autogluon runs until it either reaches num_trials or time_out
+                                                    num_trials=args.num_trials,
+                                                    time_out=args.timeout,
+                                                    # This argument defines the metric that will be maximized.
+                                                    # Make sure that you report this back in the objective function.
+                                                    reward_attr='performance',
+                                                    # The metric along we make scheduling decision. Needs to be also
+                                                    # reported back to AutoGluon in the objective function.
+                                                    time_attr='epoch',
+                                                    brackets=brackets,
+                                                    checkpoint=None,
+                                                    searcher=args.searcher,  # Defines searcher for new configurations
+                                                    dist_ip_addrs=dist_ip_addrs,
+                                                    training_history_callback=callback,
+                                                    training_history_callback_delta_secs=args.store_results_period,
+                                                    reduction_factor=3,
+                                                    type=hyperband_type,
+                                                    # defines the minimum resource level for Hyperband,
+                                                    # i.e the minimum number of epochs
+                                                    grace_period=1
+                                                    )
     scheduler.run()
     scheduler.join_jobs()
