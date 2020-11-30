@@ -259,6 +259,7 @@ class BaggedEnsembleModel(AbstractModel):
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba)
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
+    # TODO: v0.1 Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
     def compute_feature_importance(self, X, y, features=None, is_oof=True, time_limit=None, silent=False, **kwargs) -> pd.DataFrame:
         if not is_oof:
@@ -307,18 +308,18 @@ class BaggedEnsembleModel(AbstractModel):
             if len(fi_fold_feature_list) > 1:
                 fi_stddev_dict[feature] = np.std(fi_fold_feature_list, ddof=1)
             else:
-                fi_stddev_dict[feature] = None
-            if fi_stddev_dict[feature] is not None and fi_stddev_dict[feature] != 0:
+                fi_stddev_dict[feature] = np.nan
+            if fi_stddev_dict[feature] != np.nan and fi_stddev_dict[feature] != 0:
                 fi_z_score_dict[feature] = fi[feature] / fi_stddev_dict[feature]
-            elif fi_stddev_dict[feature] is not None:  # stddev = 0
+            elif fi_stddev_dict[feature] != np.nan:  # stddev = 0
                 if fi[feature] == 0:
-                    fi_z_score_dict[feature] = None
+                    fi_z_score_dict[feature] = np.nan
                 elif fi[feature] > 0:
                     fi_z_score_dict[feature] = np.inf
                 else:  # < 0
                     fi_z_score_dict[feature] = -np.inf
             else:
-                fi_z_score_dict[feature] = None
+                fi_z_score_dict[feature] = np.nan
 
         fi_stddev = pd.Series(fi_stddev_dict).sort_values(ascending=False)
         fi_z_score = pd.Series(fi_z_score_dict).sort_values(ascending=False)

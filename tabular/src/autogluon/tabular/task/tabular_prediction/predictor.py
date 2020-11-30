@@ -617,12 +617,12 @@ class TabularPredictor(BasePredictor):
         Pandas `pandas.DataFrame` of feature importance scores with 3 columns:
             index: The feature name.
             'importance': The feature importance score.
-            'stddev': The standard deviation of the feature importance score. If None, then not enough num_shuffle_sets were used to calculate a variance.
+            'stddev': The standard deviation of the feature importance score. If NaN, then not enough num_shuffle_sets were used to calculate a variance.
             'z_score': The z-score of the feature importance score. Equivalent to 'importance' / 'stddev'.
                 A z-score of +4 or higher indicates that the feature is almost certainly useful and should be kept.
                 A z-score of +2 indicates that the feature has a 97.5% chance of improving model quality when present.
                 A z-score that is 0 or negative indicates that the feature can likely be dropped without negative impact to model quality.
-                A z-score of None indicates that the feature's stddev was None or that the model predictions were never impacted by the feature (importance 0 and stddev 0). This indicates that the feature can safely be dropped.
+                A z-score of NaN indicates that the feature's stddev was NaN or that the model predictions were never impacted by the feature (importance 0 and stddev 0). This indicates that the feature can safely be dropped.
                 A z-score of +inf or -inf indicates that `subsample_size` and/or `num_shuffle_sets` were too small to calculate variance for the feature (non-zero importance with zero stddev).
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset

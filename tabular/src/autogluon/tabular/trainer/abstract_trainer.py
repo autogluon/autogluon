@@ -313,8 +313,8 @@ class AbstractTrainer:
             if isinstance(models, dict):
                 ensemble_kwargs = {
                     'base_model_names': base_model_names,
-                    'base_model_paths': base_model_paths,
-                    'base_model_types': base_model_types,
+                    'base_model_paths_dict': base_model_paths,
+                    'base_model_types_dict': base_model_types,
                     'save_bagged_folds': save_bagged_folds,
                     'random_state': level + self.random_seed,
                 }

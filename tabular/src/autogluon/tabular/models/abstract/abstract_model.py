@@ -410,7 +410,7 @@ class AbstractModel:
         fi_df = self.compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, **kwargs)
 
         results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features, dtype='float64')
-        results_banned_z_score = pd.Series(data=[None for _ in range(len(banned_features))], index=banned_features, dtype='float64')
+        results_banned_z_score = pd.Series(data=[np.nan for _ in range(len(banned_features))], index=banned_features, dtype='float64')
         results_banned_df = results_banned.to_frame(name='importance')
         results_banned_df['stddev'] = results_banned
         results_banned_df['z_score'] = results_banned_z_score
