@@ -1,10 +1,9 @@
 import time
 import copy
-from ..models.gluonts_model.gluonts_abstract.gluonts_abstract_model import GluonTSAbstractModel
-import networkx as nx
+from ..models.gluonts_model.abstract_gluonts.abstract_gluonts_model import GluonTSAbstractModel
 import logging
-from core.utils.savers import save_pkl, save_json
-from core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_pkl, save_json
+from autogluon.core.utils.loaders import load_pkl
 from collections import defaultdict
 import pandas as pd
 from gluonts.evaluation import Evaluator
@@ -29,8 +28,6 @@ class AbstractTrainer:
         self.prediction_length = prediction_length
         self.save_data = save_data
 
-        # do we really need the graph here as what is done in tabular?
-        self.model_graph = nx.DiGraph()
         self.model_info = {}
         self.models = {}
         self.model_best = None
@@ -101,18 +98,18 @@ class AbstractTrainer:
         self.model_info[model.name]["path"] = model.path
         self.model_info[model.name]["type"] = type(model)
         self.model_info[model.name]["fit_time"] = model.fit_time
-        self.model_info[model.name]["score"] = model.test_score
+        self.model_info[model.name]["score"] = model.val_score
 
     def _train_single(self, train_data, model: GluonTSAbstractModel, time_limit=None):
         model.fit(train_data=train_data)
         return model
 
-    def _train_single_full(self, train_data, model: GluonTSAbstractModel, test_data=None, hyperparameter_tune=False, time_limit=None):
+    def _train_single_full(self, train_data, model: GluonTSAbstractModel, val_data=None, hyperparameter_tune=False, time_limit=None):
         if hyperparameter_tune:
             if self._scheduler_func is None or self._scheduler_options is None:
                 raise ValueError('scheduler_options cannot be None when hyperparameter_tune = True')
             hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(train_data=train_data,
-                                                                                        test_data=test_data,
+                                                                                        val_data=val_data,
                                                                                         scheduler_options=(self._scheduler_func, self._scheduler_options))
             self.hpo_results[model.name] = hpo_results
             model_names_trained = []
@@ -122,11 +119,11 @@ class AbstractTrainer:
                 model_names_trained.append(model_hpo.name)
             # self.model_best = self.get_model_best()
         else:
-            model_names_trained = self._train_and_save(train_data, model=model, test_data=test_data, time_limit=time_limit)
+            model_names_trained = self._train_and_save(train_data, model=model, val_data=val_data, time_limit=time_limit)
 
         return model_names_trained
 
-    def _train_and_save(self, train_data, model: GluonTSAbstractModel, test_data=None, time_limit=None):
+    def _train_and_save(self, train_data, model: GluonTSAbstractModel, val_data=None, time_limit=None):
         fit_start_time = time.time()
         model_names_trained = []
         try:
@@ -139,8 +136,8 @@ class AbstractTrainer:
                 logging.log(20, f'Fitting model: {model.name} ...')
             model = self._train_single(train_data, model)
             fit_end_time = time.time()
-            if test_data is not None:
-                score = model.score(test_data)
+            if val_data is not None:
+                score = model.score(val_data)
             else:
                 score = None
             pred_end_time = time.time()
@@ -151,7 +148,7 @@ class AbstractTrainer:
                     model.predict_time = None
                 else:
                     model.predict_time = pred_end_time - fit_end_time
-            model.test_score = score
+            model.val_score = score
             self.save_model(model=model)
         except:
             pass
@@ -162,14 +159,14 @@ class AbstractTrainer:
                 del model
         return model_names_trained
 
-    def _train_multi(self, train_data, test_data=None, hyperparameters=None, hyperparameter_tune=False):
+    def _train_multi(self, train_data, val_data=None, hyperparameters=None, hyperparameter_tune=False):
         if hyperparameters is None:
             hyperparameters = self.hyperparameters
         hyperparameters = copy.deepcopy(hyperparameters)
         models = self.get_models(hyperparameters)
 
         for i, model in enumerate(models):
-            self._train_single_full(train_data, model, test_data=test_data, hyperparameter_tune=hyperparameter_tune)
+            self._train_single_full(train_data, model, val_data=val_data, hyperparameter_tune=hyperparameter_tune)
 
     def get_model_names_all(self):
         return list(self.model_info.keys())

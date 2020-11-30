@@ -1,9 +1,9 @@
 import os
 import time
 import logging
-from core.utils.loaders import load_pkl
-from core.utils.exceptions import TimeLimitExceeded
-from core import args
+from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core import args
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +14,9 @@ def model_trial(args, reporter):
         model, util_args, params = prepare_inputs(args)
 
         train_data = load_pkl.load(util_args.directory + util_args.train_data_path)
-        test_data = load_pkl.load(util_args.directory + util_args.test_data_path)
+        val_data = load_pkl.load(util_args.directory + util_args.val_data_path)
         eval_metric = model.eval_metric
-        model = fit_and_save_model(model, params, train_data, test_data, eval_metric, util_args.time_start,
+        model = fit_and_save_model(model, params, train_data, val_data, eval_metric, util_args.time_start,
                                    time_limit=util_args.get('time_limit', None))
 
     except Exception as e:
@@ -25,7 +25,7 @@ def model_trial(args, reporter):
         reporter.terminate()
     else:
         # TODO: specify whether score is lower is better
-        reporter(epoch=1, validation_performance=-model.test_score)
+        reporter(epoch=1, validation_performance=-model.val_score)
 
 
 def prepare_inputs(args):
@@ -38,7 +38,7 @@ def prepare_inputs(args):
     return model, util_args, args
 
 
-def fit_and_save_model(model, params, train_data, test_data, eval_metric, time_start, time_limit=None):
+def fit_and_save_model(model, params, train_data, val_data, eval_metric, time_start, time_limit=None):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
@@ -52,7 +52,7 @@ def fit_and_save_model(model, params, train_data, test_data, eval_metric, time_s
     time_fit_start = time.time()
     model.fit(train_data, time_limit=time_left)
     time_fit_end = time.time()
-    model.test_score = -model.score(test_data, eval_metric)
+    model.val_score = -model.score(val_data, eval_metric)
     model.fit_time = time_fit_end - time_fit_start
     model.save()
     return model

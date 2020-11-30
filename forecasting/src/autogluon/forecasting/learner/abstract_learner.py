@@ -2,8 +2,8 @@ from ..models.gluonts_model.mqcnn.mqcnn_model import MQCNNModel
 import random
 from ..trainer.abstract_trainer import AbstractTrainer
 import os
-from core.utils.savers import save_pkl, save_json
-from core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_pkl, save_json
+from autogluon.core.utils.loaders import load_pkl
 from gluonts.evaluation import Evaluator
 
 
@@ -42,14 +42,14 @@ class AbstractLearner:
         save_path = path_context + self.learner_file_name
         return path_context, model_context, save_path
 
-    def fit(self, train_data, freq, prediction_length, test_data=None, **kwargs):
+    def fit(self, train_data, freq, prediction_length, val_data=None, **kwargs):
         return self._fit(train_data=train_data,
                          freq=freq,
                          prediction_length=prediction_length,
-                         test_data=test_data,
+                         val_data=val_data,
                          **kwargs)
 
-    def _fit(self, train_data, freq, prediction_length, test_data=None, scheduler_options=None, hyperparameter_tune=False,
+    def _fit(self, train_data, freq, prediction_length, val_data=None, scheduler_options=None, hyperparameter_tune=False,
              hyperparameters=None):
         raise NotImplementedError
 
@@ -57,7 +57,8 @@ class AbstractLearner:
         predict_target = self.load_trainer().predict(data=data, model=model)
         return predict_target
 
-    def evaluate(self, forecasts, tss, quantiles=None):
+    def evaluate(self, forecasts, tss, **kwargs):
+        quantiles = kwargs.get("quantiles", None)
         # TODO: difference between evaluate() and score()?
         if self.eval_metric is not None and self.eval_metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
             raise ValueError(f"metric { self.eval_metric} is not available yet.")
@@ -130,8 +131,8 @@ class AbstractLearner:
             else:
                 raise e
 
-    def save_info(self):
-        info = self.get_info()
+    def save_info(self, include_model_info):
+        info = self.get_info(include_model_info)
 
         save_pkl.save(path=self.path + self.learner_info_name, object=info)
         save_json.save(path=self.path + self.learner_info_json_name, obj=info)

@@ -6,10 +6,6 @@ import pandas as pd
 __all__ = ["TimeSeriesDataset", "transform_tabular_to_gluonts_dataset", "gluonts_builtin_datasets"]
 
 
-def gluonts_builtin_datasets():
-    return list(dataset_recipes.keys())
-
-
 def rebuild_tabular(X, time_column, target_column, index_column=None):
     """
     X: dataframe to rebuild, should have the form of:
@@ -117,7 +113,7 @@ class TimeSeriesDataset:
 
         time_column: date of a data
 
-        target_column: the predict target
+        target_column: the prediction target
         """
         self.is_train = is_train
         if dataset_name is not None and dataset_name not in gluonts_builtin_datasets():
@@ -182,14 +178,3 @@ class TimeSeriesDataset:
         test_ds = ds.copy()
         train_ds = ds.iloc[:, :-prediction_length]
         return train_ds, test_ds
-
-
-if __name__ == '__main__':
-    forecasting_dataset = TimeSeriesDataset(
-        train_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_train.csv",
-        test_path="/Users/yixiaxia/Desktop/亚马逊工作/autogluon/examples/tabular/COV19/processed_test.csv",
-        # prediction_length=19,
-        index_column="name",
-        target_column="ConfirmedCases",
-        time_column="Date")
-    print(forecasting_dataset.freq, forecasting_dataset.prediction_length)

@@ -4,11 +4,11 @@ import logging
 import pandas as pd
 
 from .dataset import TimeSeriesDataset
-from core.task.base import BasePredictor
-from core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
+from autogluon.core.task.base import BasePredictor
+from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
-from core.utils.utils import setup_outputdir
+from autogluon.core.utils.utils import setup_outputdir
 
 __all__ = ['ForecastingPredictor']
 
@@ -42,13 +42,13 @@ class ForecastingPredictor(BasePredictor):
         forecasts, tss = self._learner.predict(data, model=model)
         return forecasts, tss
 
-    def evaluate(self, data, quantiles=None):
-        perf = self._learner.score(data, quantiles=quantiles)
+    def evaluate(self, data, **kwargs):
+        perf = self._learner.score(data, **kwargs)
         return perf
 
-    def evaluate_predictions(self, forecasts, tss, quantiles=None):
+    def evaluate_predictions(self, forecasts, tss, **kwargs):
 
-        return self._learner.evaluate(forecasts, tss, quantiles=quantiles)
+        return self._learner.evaluate(forecasts, tss, **kwargs)
 
     @classmethod
     def load(cls, output_directory, verbosity=2):

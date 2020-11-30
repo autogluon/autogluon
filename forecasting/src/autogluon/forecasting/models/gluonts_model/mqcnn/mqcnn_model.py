@@ -1,27 +1,26 @@
-from ..gluonts_abstract.gluonts_abstract_model import GluonTSAbstractModel
-from .default_parameters import get_default_parameters
-import core.utils.savers.save_pkl as save_pkl
-import core.utils.loaders.load_pkl as load_pkl
+from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
+import autogluon.core.utils.savers.save_pkl as save_pkl
+import autogluon.core.utils.loaders.load_pkl as load_pkl
 from gluonts.model.seq2seq import MQCNNEstimator
 from gluonts.model.predictor import Predictor
 import os
 import time
-from core import Int, Space
+from autogluon.core import Int, Space
 import json
 from gluonts.evaluation import Evaluator
-from ..gluonts_abstract.model_trial import model_trial
+from ..abstract_gluonts.model_trial import model_trial
 from tqdm import tqdm
-from core.scheduler.fifo import FIFOScheduler
+from autogluon.core.scheduler.fifo import FIFOScheduler
 from pathlib import Path
 from gluonts.model.predictor import Predictor
-from core.utils.exceptions import TimeLimitExceeded
-from core.task.base.base_predictor import BasePredictor
+from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core.task.base.base_predictor import BasePredictor
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class MQCNNModel(GluonTSAbstractModel):
+class MQCNNModel(AbstractGluonTSModel):
 
     gluonts_model_path = "gluon_ts"
 
@@ -37,7 +36,8 @@ class MQCNNModel(GluonTSAbstractModel):
         self.best_configs = self.params.copy()
 
     def set_default_parameters(self):
-        # use gluonts default parameters
+        # use gluonts default parameters,
+        # you can find them in MQCNNEstimator in gluonts.model.seq2seq
         self.params = {}
 
     def create_model(self):
@@ -69,7 +69,7 @@ class MQCNNModel(GluonTSAbstractModel):
         else:
             raise TimeLimitExceeded
 
-    def hyperparameter_tune(self, train_data, test_data, scheduler_options, **kwargs):
+    def hyperparameter_tune(self, train_data, val_data, scheduler_options, **kwargs):
         time_start = time.time()
         params_copy = self.params.copy()
 
@@ -79,14 +79,14 @@ class MQCNNModel(GluonTSAbstractModel):
         train_path = directory + dataset_train_filename
         save_pkl.save(path=train_path, object=train_data)
 
-        dataset_test_filename = 'dataset_test.p'
-        test_path = directory + dataset_test_filename
-        save_pkl.save(path=test_path, object=test_data)
+        dataset_val_filename = 'dataset_val.p'
+        val_path = directory + dataset_val_filename
+        save_pkl.save(path=val_path, object=val_data)
         scheduler_func, scheduler_options = scheduler_options
 
         util_args = dict(
             train_data_path=dataset_train_filename,
-            test_data_path=dataset_test_filename,
+            val_data_path=dataset_val_filename,
             directory=directory,
             model=self,
             time_start=time_start,

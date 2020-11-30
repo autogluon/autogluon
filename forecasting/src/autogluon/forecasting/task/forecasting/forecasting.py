@@ -1,11 +1,11 @@
-from core.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
+from autogluon.core.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
 from .dataset import TimeSeriesDataset
 
 from ...learner.abstract_learner import AbstractLearner
 from ...learner import DefaultLearner as Learner
 from .predictor import ForecastingPredictor
 from ...trainer import AutoTrainer
-from core.utils.utils import setup_outputdir
+from autogluon.core.utils.utils import setup_outputdir
 __all__ = ['Forecasting']
 
 
@@ -22,7 +22,7 @@ class Forecasting(BaseTask):
     def fit(train_data,
             freq,
             prediction_length,
-            test_data=None,
+            val_data=None,
             time_limits=None,
             output_directory=None,
             eval_metric=None,
@@ -57,7 +57,7 @@ class Forecasting(BaseTask):
         learner.fit(train_data=train_data,
                     freq=freq,
                     prediction_length=prediction_length,
-                    test_data=test_data,
+                    val_data=val_data,
                     scheduler_options=scheduler_options,
                     hyperparameters=hyperparameters,
                     hyperparameter_tune=hyperparameter_tune,)

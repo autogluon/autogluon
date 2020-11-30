@@ -8,7 +8,7 @@ from pandas import DataFrame
 
 from .abstract_learner import AbstractLearner
 from ..trainer.auto_trainer import AutoTrainer
-from core.utils.utils import augment_rare_classes
+from autogluon.core.utils.utils import augment_rare_classes
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class DefaultLearner(AbstractLearner):
         super().__init__(**kwargs)
         self.trainer_type = trainer_type
 
-    def _fit(self, train_data, freq, prediction_length, test_data=None, scheduler_options=None, hyperparameter_tune=False,
+    def _fit(self, train_data, freq, prediction_length, val_data=None, scheduler_options=None, hyperparameter_tune=False,
             hyperparameters=None, time_limit=None):
 
         if hyperparameters is None:
@@ -47,7 +47,7 @@ class DefaultLearner(AbstractLearner):
 
         self.save()
         trainer.train(train_data=train_data,
-                      test_data=test_data,
+                      val_data=val_data,
                       hyperparameter_tune=hyperparameter_tune,
                       hyperparameters=hyperparameters)
         self.save_trainer(trainer=trainer)

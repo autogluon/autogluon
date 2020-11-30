@@ -1,6 +1,6 @@
 from gluonts.evaluation.backtest import make_evaluation_predictions
-import core.utils.savers.save_pkl as save_pkl
-import core.utils.loaders.load_pkl as load_pkl
+import autogluon.core.utils.savers.save_pkl as save_pkl
+import autogluon.core.utils.loaders.load_pkl as load_pkl
 import os
 from ...abstract.abstract_model import AbstractModel
 from gluonts.evaluation import Evaluator
@@ -8,7 +8,7 @@ from gluonts.evaluation.backtest import make_evaluation_predictions
 from tqdm import tqdm
 
 
-class GluonTSAbstractModel(AbstractModel):
+class AbstractGluonTSModel(AbstractModel):
 
     model_file_name = "model.pkl"
 
@@ -44,8 +44,9 @@ class GluonTSAbstractModel(AbstractModel):
             self.nondefault_parameters = list(hyperparameters.keys())[:]
 
         self.model = model
-        self.test_score = None
+        self.val_score = None
         self.fit_time = None
+        self.predict_time = None
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
@@ -87,7 +88,7 @@ class GluonTSAbstractModel(AbstractModel):
                                                          num_samples=num_samples)
         return list(tqdm(forecast_it, total=len(data))), list(tqdm(ts_it, total=len(data)))
 
-    def hyperparameter_tune(self, train_data, test_data, scheduler_options, **kwargs):
+    def hyperparameter_tune(self, train_data, val_data, scheduler_options, **kwargs):
         pass
 
     def score(self, y, metric=None):
