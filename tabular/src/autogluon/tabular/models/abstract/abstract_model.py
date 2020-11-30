@@ -392,7 +392,7 @@ class AbstractModel:
         return model
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features=None, silent=False, **kwargs) -> (pd.Series, pd.Series, pd.Series):
+    def compute_feature_importance(self, X, y, features=None, silent=False, **kwargs) -> pd.DataFrame:
         if self.features is not None:
             X = X[self.features]
 
@@ -407,20 +407,21 @@ class AbstractModel:
         banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         features_to_check = [feature for feature in features if feature not in banned_features]
 
-        feature_importances, feature_importances_stddev, feature_importances_z_score = self.compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, **kwargs)
+        fi_df = self.compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, **kwargs)
 
         results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features, dtype='float64')
         results_banned_z_score = pd.Series(data=[None for _ in range(len(banned_features))], index=banned_features, dtype='float64')
-        feature_importances = pd.concat([feature_importances, results_banned]).sort_values(ascending=False)
-        feature_importances_stddev = pd.concat([feature_importances_stddev, results_banned]).sort_values(ascending=False)
-        feature_importances_z_score = pd.concat([feature_importances_z_score, results_banned_z_score]).sort_values(ascending=False)
+        results_banned_df = results_banned.to_frame(name='importance')
+        results_banned_df['stddev'] = results_banned
+        results_banned_df['z_score'] = results_banned_z_score
+        fi_df = pd.concat([fi_df, results_banned_df]).sort_values(ascending=False, by='importance')
 
-        return feature_importances, feature_importances_stddev, feature_importances_z_score
+        return fi_df
 
     # Compute feature importance via permutation importance
     # Note: Expensive to compute
     #  Time to compute is O(predict_time*num_features)
-    def compute_permutation_importance(self, X, y, features: list, eval_metric=None, silent=False, **kwargs) -> (pd.Series, pd.Series, pd.Series):
+    def compute_permutation_importance(self, X, y, features: list, eval_metric=None, silent=False, **kwargs) -> pd.DataFrame:
         if eval_metric is None:
             eval_metric = self.eval_metric
         transform_func = self.preprocess

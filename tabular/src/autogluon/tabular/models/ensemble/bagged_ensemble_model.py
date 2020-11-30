@@ -4,6 +4,7 @@ import os
 import time
 from collections import Counter
 from statistics import mean
+from functools import reduce
 
 import numpy as np
 import pandas as pd
@@ -259,14 +260,12 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features=None, is_oof=True, time_limit=None, silent=False, **kwargs) -> (pd.Series, pd.Series, pd.Series):
+    def compute_feature_importance(self, X, y, features=None, is_oof=True, time_limit=None, silent=False, **kwargs) -> pd.DataFrame:
         if not is_oof:
             if features is None:
                 features = self.load_child(model=self.models[0]).features
             return super().compute_feature_importance(X, y, features=features, time_limit=time_limit, silent=silent, **kwargs)
-        feature_importance_fold_list = []
-        feature_importance_stddev_fold_list = []
-        feature_importance_z_score_fold_list = []
+        fi_fold_list = []
         fold_weights = []
         # TODO: Preprocess data here instead of repeatedly
         model_index = 0
@@ -285,33 +284,50 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                feature_importance_fold, feature_importance_stddev_fold, feature_importance_z_score_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features=features, time_limit=time_limit_per_child, silent=silent, **kwargs)
-                feature_importance_fold_list.append(feature_importance_fold)
-                feature_importance_stddev_fold_list.append(feature_importance_stddev_fold)
-                feature_importance_z_score_fold_list.append(feature_importance_z_score_fold)
+                fi_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features=features, time_limit=time_limit_per_child, silent=silent, **kwargs)
+                fi_fold_list.append(fi_fold)
                 fold_weights.append(len(test_index))
             model_index += k
 
         weight_total = sum(fold_weights)
         fold_weights = [weight/weight_total for weight in fold_weights]
 
-        for i, result in enumerate(feature_importance_fold_list):
-            feature_importance_fold_list[i] = feature_importance_fold_list[i] * fold_weights[i]
+        for i, result in enumerate(fi_fold_list):
+            fi_fold_list[i] = fi_fold_list[i]['importance']  # TODO: Don't throw away stddev information
+            fi_fold_list[i] = fi_fold_list[i] * fold_weights[i]
 
-        feature_importance = pd.concat(feature_importance_fold_list, axis=1, sort=True).sum(1).sort_values(ascending=False)
+        fi = pd.concat(fi_fold_list, axis=1, sort=True).sum(1).sort_values(ascending=False)
 
-        # TODO: FIXME: v0.1 This is probably not the best estimate for stddev and z_score we can make, this is simply averaging the stddev and z-scores from the children.
-        feature_importance_stddev = pd.concat(feature_importance_stddev_fold_list, axis=1, sort=True).mean(1).sort_values(ascending=False)
-        feature_importance_z_score = pd.concat(feature_importance_z_score_fold_list, axis=1, sort=True).mean(1).sort_values(ascending=False)
+        fi_stddev_dict = dict()
+        fi_z_score_dict = dict()
+        # TODO: stddev is actually tighter than calculated if num_shuffle_sets > 1, throwing away fact that each data point is averaged from multiple samples.
+        # TODO: move to function shared with compute_permutation_feature_importance()
+        for feature in list(fi.index):
+            fi_fold_feature_list = [fi_fold[feature] for fi_fold in fi_fold_list]
+            if len(fi_fold_feature_list) > 1:
+                fi_stddev_dict[feature] = np.std(fi_fold_feature_list, ddof=1)
+            else:
+                fi_stddev_dict[feature] = None
+            if fi_stddev_dict[feature] is not None and fi_stddev_dict[feature] != 0:
+                fi_z_score_dict[feature] = fi[feature] / fi_stddev_dict[feature]
+            elif fi_stddev_dict[feature] is not None:  # stddev = 0
+                if fi[feature] == 0:
+                    fi_z_score_dict[feature] = None
+                elif fi[feature] > 0:
+                    fi_z_score_dict[feature] = np.inf
+                else:  # < 0
+                    fi_z_score_dict[feature] = -np.inf
+            else:
+                fi_z_score_dict[feature] = None
 
-        # TODO: Consider utilizing z scores and stddev to make threshold decisions
-        # stddev = pd.concat(feature_importance_fold_list, axis=1, sort=True).std(1).sort_values(ascending=False)
-        # feature_importance_df = pd.DataFrame(index=feature_importance.index)
-        # feature_importance_df['importance'] = feature_importance
-        # feature_importance_df['stddev'] = stddev
-        # feature_importance_df['z'] = feature_importance_df['importance'] / feature_importance_df['stddev']
+        fi_stddev = pd.Series(fi_stddev_dict).sort_values(ascending=False)
+        fi_z_score = pd.Series(fi_z_score_dict).sort_values(ascending=False)
 
-        return feature_importance, feature_importance_stddev, feature_importance_z_score
+        fi_df = fi.to_frame(name='importance')
+        fi_df['stddev'] = fi_stddev
+        fi_df['z_score'] = fi_z_score
+
+        return fi_df
 
     def load_child(self, model, verbose=False) -> AbstractModel:
         if isinstance(model, str):

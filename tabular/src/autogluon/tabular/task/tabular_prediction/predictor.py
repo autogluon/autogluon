@@ -561,6 +561,8 @@ class TabularPredictor(BasePredictor):
         Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
         To estimate how long `feature_importance(model, dataset, features)` will take, it is roughly the time taken by `predict_proba(dataset, model)` multiplied by the number of features.
 
+        Note: For highly accurate stddev and z_score estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
+
         Parameters
         ----------
         dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
@@ -612,17 +614,23 @@ class TabularPredictor(BasePredictor):
 
         Returns
         -------
-        Pandas `pandas.Series` of feature importance scores.
-
+        Pandas `pandas.DataFrame` of feature importance scores with 3 columns:
+            index: The feature name.
+            'importance': The feature importance score.
+            'stddev': The standard deviation of the feature importance score. If None, then not enough num_shuffle_sets were used to calculate a variance.
+            'z_score': The z-score of the feature importance score. Equivalent to 'importance' / 'stddev'.
+                A z-score of +4 or higher indicates that the feature is almost certainly useful and should be kept.
+                A z-score of +2 indicates that the feature has a 97.5% chance of improving model quality when present.
+                A z-score that is 0 or negative indicates that the feature can likely be dropped without negative impact to model quality.
+                A z-score of None indicates that the feature's stddev was None or that the model predictions were never impacted by the feature (importance 0 and stddev 0). This indicates that the feature can safely be dropped.
+                A z-score of +inf or -inf indicates that `subsample_size` and/or `num_shuffle_sets` were too small to calculate variance for the feature (non-zero importance with zero stddev).
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
-        feature_importances, feature_importances_stddev, feature_importances_z_score = self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage,
-                                                                                                                            subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
-        # TODO: v0.1 also return stddev and z_score (Update tutorials), make optional?
-        return feature_importances
+        return self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage,
+                                                    subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
 
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """

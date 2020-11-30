@@ -158,9 +158,9 @@ def infer_eval_metric(problem_type: str) -> Scorer:
 
 # Note: Do not send training data as input or the importances will be overfit.
 # TODO: Improve time estimate (Currently pessimistic)
-def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predict_func: Callable[[pd.DataFrame], np.ndarray], eval_metric: Scorer, features: list = None, subsample_size=1000, num_shuffle_sets: int = None,
-                                           predict_func_kwargs: dict = None, transform_func: Callable[[pd.DataFrame], pd.DataFrame] = None, transform_func_kwargs: dict = None,
-                                           time_limit: float = None, silent=False) -> (pd.Series, pd.Series, pd.Series):
+def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predict_func: Callable[..., np.ndarray], eval_metric: Scorer, features: list = None, subsample_size=1000, num_shuffle_sets: int = None,
+                                           predict_func_kwargs: dict = None, transform_func: Callable[..., pd.DataFrame] = None, transform_func_kwargs: dict = None,
+                                           time_limit: float = None, silent=False) -> pd.DataFrame:
     """
     Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
     A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -169,6 +169,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
     If a feature has a negative score, this means that the feature is likely harmful to the final model, and a model trained with the feature removed would be expected to achieve a better predictive performance.
     Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
 
+    Note: For highly accurate stddev and z_score estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
+
     Parameters
     ----------
     X : pd.DataFrame
@@ -176,7 +178,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
         Do not use training data as it will result in overfit feature importances.
     y : pd.Series
         Label values of X. The index of X and y must align.
-    predict_func : Callable[[pd.DataFrame], np.ndarray]
+    predict_func : Callable[..., np.ndarray]
         Function that computes model predictions or prediction probabilities on input data.
         Output must be in the form of a numpy ndarray or pandas Series or DataFrame.
         Output `y_pred` must be in a form acceptable as input to `eval_metric(y, y_pred)`.
@@ -202,7 +204,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
         When `num_shuffle_sets` is greater than 1, feature importance standard deviation and z-score will additionally be computed by using the results of each shuffle set as samples.
     predict_func_kwargs : dict, default {}
         Keyword arguments to be appended to calls to `predict_func(X, **kwargs)`.
-    transform_func : Callable[[pd.DataFrame], pd.DataFrame], default None
+    transform_func : Callable[..., pd.DataFrame], default None
         Transformation function that takes the raw input and transforms it row-wise to the input expected by `predict_func`.
         Common examples include `model.preprocess` and `feature_generator.transform`.
         If None, then no transformation is done on the data prior to calling `predict_func`.
@@ -220,9 +222,16 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
 
     Returns
     -------
-    pd.Series of feature importance scores,
-    pd.Series of feature importance standard deviations,
-    pd.Series of feature importance standard deviation z-scores.
+    Pandas `pandas.DataFrame` of feature importance scores with 3 columns:
+        index: The feature name.
+        'importance': The feature importance score.
+        'stddev': The standard deviation of the feature importance score. If None, then not enough num_shuffle_sets were used to calculate a variance.
+        'z_score': The z-score of the feature importance score. Equivalent to 'importance' / 'stddev'.
+            A z-score of +4 or higher indicates that the feature is almost certainly useful and should be kept.
+            A z-score of +2 indicates that the feature has a 97.5% chance of improving model quality when present.
+            A z-score that is 0 or negative indicates that the feature can likely be dropped without negative impact to model quality.
+            A z-score of None indicates that the feature's stddev was None or that the model predictions were never impacted by the feature (importance 0 and stddev 0). This indicates that the feature can safely be dropped.
+            A z-score of +inf or -inf indicates that `subsample_size` and/or `num_shuffle_sets` were too small to calculate variance for the feature (non-zero importance with zero stddev).
     """
     if num_shuffle_sets is None:
         if time_limit is not None:
@@ -358,7 +367,11 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
     feature_importances_stddev = pd.Series(permutation_importance_stddev_dict).sort_values(ascending=False)
     feature_importances_z_score = pd.Series(permutation_importance_z_score_dict).sort_values(ascending=False)
 
+    fi_df = feature_importances.to_frame(name='importance')
+    fi_df['stddev'] = feature_importances_stddev
+    fi_df['z_score'] = feature_importances_z_score
+
     if not silent:
         logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime (Completed {shuffle_repeats_completed} of {num_shuffle_sets} shuffle sets)')
 
-    return feature_importances, feature_importances_stddev, feature_importances_z_score
+    return fi_df

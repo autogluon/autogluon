@@ -1240,7 +1240,7 @@ class AbstractTrainer:
     # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
     # TODO: Consider limiting X to 10k rows here instead of inside the model call
-    def get_feature_importance(self, model=None, X=None, y=None, raw=True, **kwargs):
+    def get_feature_importance(self, model=None, X=None, y=None, raw=True, **kwargs) -> pd.DataFrame:
         if model is None:
             model = self.model_best
         model: AbstractModel = self.load_model(model)
@@ -1296,7 +1296,7 @@ class AbstractTrainer:
     #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
     #  Consider aligning these methods so they produce the same result.
     # The output of this function is identical to non-raw when model is level 0 and non-bagged
-    def _get_feature_importance_raw(self, X, y, model, eval_metric=None, **kwargs) -> (pd.Series, pd.Series, pd.Series):
+    def _get_feature_importance_raw(self, X, y, model, eval_metric=None, **kwargs) -> pd.DataFrame:
         if eval_metric is None:
             eval_metric = self.eval_metric
         if model is None:
