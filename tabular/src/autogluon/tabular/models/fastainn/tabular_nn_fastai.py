@@ -9,9 +9,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from fastai.core import defaults
 
 from autogluon.core.utils import try_import_fastai_v1
 from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
 
@@ -139,10 +141,13 @@ class NNFastAiTabularModel(AbstractModel):
         df_train, train_idx, val_idx = self._generate_datasets(X_train, y_train_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
         procs = [FillMissing, Categorify, Normalize]
+
+        # additional workers are helping only when fork is enabled; in other mp modes, communication overhead reduces performance
+        num_workers = defaults.cpus if is_fork_enabled() else 0
         data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs)
                 .split_by_idxs(train_idx, val_idx)
                 .label_from_df(cols=LABEL, label_cls=label_class)
-                .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32))
+                .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32, num_workers=num_workers))
         return data
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
