@@ -238,7 +238,7 @@ def callback(training_history, start_timestamp):
 
 # CLI
 def parse_args():
-    parser = argparse.ArgumentParser(description='runs autogluon on autoff benchmarks')
+    parser = argparse.ArgumentParser(description='runs autogluon on resnet benchmark')
 
     parser.add_argument('--num_trials', default=10, type=int,
                         help='number of trial tasks')

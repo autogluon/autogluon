@@ -59,7 +59,7 @@ def make_benchmark(dataset_name='cifar10-valid', do_sleep=True):
 
 # CLI
 def parse_args():
-    parser = argparse.ArgumentParser(description='runs autogluon on autoff benchmarks')
+    parser = argparse.ArgumentParser(description='runs autogluon on HPOLib2 benchmarks')
 
     parser.add_argument('--num_trials', default=10, type=int,
                         help='number of trial tasks')
