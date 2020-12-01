@@ -142,8 +142,9 @@ class ImageClassification(object):
         self._fit_summary = task.fit_summary()
         return self
 
-    def predict(self, x):
-        """Predict images as a whole, return the probabilities of each category.
+    def predict_proba(self, x):
+        """Predict images as a whole, return the probabilities of each category rather
+        than class-labels.
 
         Parameters
         ----------
@@ -159,7 +160,36 @@ class ImageClassification(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
-        return self._classifier.predict(x)
+        proba = self._classifier.predict(x)
+        if 'images' in proba.columns:
+            return proba.groupby(["images"]).agg(list)
+        return proba
+
+    def predict(self, x):
+        """Predict images as a whole, return labels(class category).
+
+        Parameters
+        ----------
+        x : str, pd.DataFrame or ndarray
+            The input, can be str(filepath), pd.DataFrame with 'image' column, or raw ndarray input.
+
+        Returns
+        -------
+
+        pd.DataFrame
+            The returned dataframe will contain labels. If more than one image in input,
+            the returned dataframe will contain `images` column, and all results are concatenated.
+        """
+        if self._classifier is None:
+            raise RuntimeError('Classifier is not initialized, try `fit` first.')
+        proba = self._classifier.predict(x)
+        if 'images' in proba.columns:
+            # multiple images
+            return proba.loc[proba.groupby(["images"])["score"].idxmax()]
+        else:
+            # single image
+            top1 = proba.sort_values(by=['score']).iloc[0].reset_index()
+            return top1
 
     def predict_feature(self, x):
         """Predict images visual feature representations, return the features as numpy (1xD) vector.

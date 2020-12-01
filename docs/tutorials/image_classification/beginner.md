@@ -53,8 +53,10 @@ Given an example image, we can easily use the final model to `predict` the label
 ```{.python .input}
 image_path = test_dataset.iloc[0]['image']
 result = classifier.predict(image_path)
-
 print(result)
+# if probabilities are needed, you can call `predict_proba`
+proba = classifier.predict_proba(image_path)
+print(proba)
 ```
 
 You can also feed in multiple images all together, let's use images in test dataset as an example:
