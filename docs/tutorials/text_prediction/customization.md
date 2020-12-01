@@ -25,6 +25,7 @@ train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/gl
 dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/dev.parquet')
 rand_idx = np.random.permutation(np.arange(len(train_data)))[:1000]
 train_data = train_data.iloc[rand_idx]
+train_data.reset_index(inplace=True)
 train_data.head(10)
 ```
 
