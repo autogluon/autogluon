@@ -169,7 +169,7 @@ def test_mixed_column_type():
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
     verify_predictor_save_load(predictor1, dev_data)
 
-    # Tran Classification
+    # Train Classification
     predictor2 = task.fit(train_data,
                           hyperparameters=test_hyperparameters,
                           label='genre', num_trials=1,
