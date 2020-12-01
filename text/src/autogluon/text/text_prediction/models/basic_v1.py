@@ -520,8 +520,6 @@ def train_function(args, reporter, train_data, tuning_data,
                            list(metric_scores.items()) + \
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
-            if find_better:
-                best_report_items = report_items
             total_time_spent = time.time() - start_tick
             if time_limits is not None and total_time_spent > time_limits:
                 break
@@ -531,6 +529,8 @@ def train_function(args, reporter, train_data, tuning_data,
             else:
                 report_items.append(('reward', performance_score))
             report_items.append(('exp_dir', exp_dir))
+            if find_better:
+                best_report_items = report_items
             reporter(**dict(report_items))
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
