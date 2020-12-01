@@ -520,6 +520,8 @@ def train_function(args, reporter, train_data, tuning_data,
                            list(metric_scores.items()) + \
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
+            if find_better:
+                best_report_items = report_items
             total_time_spent = time.time() - start_tick
             if time_limits is not None and total_time_spent > time_limits:
                 break
@@ -533,7 +535,9 @@ def train_function(args, reporter, train_data, tuning_data,
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
                 break
-
+    best_report_items_dict = dict(best_report_items)
+    best_report_items_dict['report_idx'] = report_idx + 1
+    reporter(**best_report_items_dict)
 
 @use_np
 class BertForTextPredictionBasic:
