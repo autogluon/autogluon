@@ -115,7 +115,8 @@ class ImageClassification(object):
             if train_data.lower() in names:
                 train_data = D8D.get(train_data)
             else:
-                raise ValueError(f'`train_data` {train_data} is not among valid list {'\n'.join(names)}')
+                valid_names = '\n'.join(names)
+                raise ValueError(f'`train_data` {train_data} is not among valid list {valid_names}')
             if val_data is None:
                 train_data, val_data = train_data.split(1 - holdout_frac)
         if isinstance(val_data, str):
@@ -124,7 +125,8 @@ class ImageClassification(object):
             if val_data.lower() in names:
                 val_data = D8D.get(val_data)
             else:
-                raise ValueError(f'`val_data` {val_data} is not among valid list {'\n'.join(names)}')
+                valid_names = '\n'.join(names)
+                raise ValueError(f'`val_data` {val_data} is not among valid list {valid_names}')
         if self._classifier is not None:
             self._classifier._logger.setLevel(log_level)
             self._fit_summary = self._classifier.fit(train_data, val_data, 1 - holdout_frac, random_state, resume=False)
