@@ -95,8 +95,8 @@ Advanced Topics
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index
-   api/autogluon.core
    api/autogluon.task
+   api/autogluon.core
    api/autogluon.core.space
    api/autogluon.core.scheduler
    api/autogluon.core.searcher
