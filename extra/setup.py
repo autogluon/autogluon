@@ -46,9 +46,9 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
     'numpy>=1.16.0',
-    'gluoncv==0.9.0b20201125',
+    'gluoncv==0.9.0',
     'scipy>=1.3.3',
-    'gluoncv==0.9.0b20201125',
+    'gluoncv==0.9.0',
     'graphviz<0.9.0,>=0.8.1',
     'bokeh',
     'pandas>=1.0.0,<2.0',

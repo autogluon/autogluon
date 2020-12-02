@@ -13,7 +13,7 @@ AutoGluon Tasks
 
    Load a toy image dataset:
 
-   >>> train, val, test = Task.Dataset.from_folders('http://autogluon-hackathon.s3.amazonaws.com/data.zip')
+   >>> train, val, test = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/fashion-mnist-demo.zip')
 
    Fit classification models:
 

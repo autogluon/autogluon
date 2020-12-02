@@ -54,7 +54,11 @@ Given an example image, we can easily use the final model to `predict` the label
 image_path = test_dataset.iloc[0]['image']
 result = classifier.predict(image_path)
 print(result)
-# if probabilities are needed, you can call `predict_proba`
+```
+
+If probabilities of all categories are needed, you can call `predict_proba`:
+
+```{.python .input}
 proba = classifier.predict_proba(image_path)
 print(proba)
 ```
@@ -62,11 +66,10 @@ print(proba)
 You can also feed in multiple images all together, let's use images in test dataset as an example:
 ```{.python .input}
 bulk_result = classifier.predict(test_dataset)
-
 print(bulk_result)
 ```
 
-An extra column will be included in bulk prediction, indicate the corresponding image for the row.
+An extra column will be included in bulk prediction, indicate the corresponding image for the row. There will be (# image) rows in the result, each row includes `class`, `score`, `id` and `image` for prediction class, prediction confidence, class id, and image path respectively.
 
 
 ## Generate image features with a classifier
