@@ -16,12 +16,16 @@ np.random.seed(123)
 ## Paraphrase Identification
 
 We consider a Paraphrase Identification task for illustration. Given a pair of sentences, the goal is to predict whether or not one sentence is a restatement of the other (a binary classification task). Here we train models on the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398) dataset.
+For quick demonstration, we will subsample the training data and only use 1000 samples.
 
 ```{.python .input}
 from autogluon.core.utils.loaders import load_pd
 
 train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/train.parquet')
 dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/dev.parquet')
+rand_idx = np.random.permutation(np.arange(len(train_data)))[:1000]
+train_data = train_data.iloc[rand_idx]
+train_data.reset_index(inplace=True, drop=True)
 train_data.head(10)
 ```
 
@@ -85,8 +89,8 @@ Below `num_trials` controls the maximal number of different hyperparameter confi
 predictor_mrpc = task.fit(train_data,
                           label='label',
                           hyperparameters=hyperparameters,
-                          num_trials=5,  # increase this to achieve good performance in your applications
-                          time_limits=60 * 6,
+                          num_trials=2,  # increase this to achieve good performance in your applications
+                          time_limits=60 * 2,
                           ngpus_per_trial=1,
                           seed=123,
                           output_directory='./ag_mrpc_random_search')
@@ -136,8 +140,8 @@ hyperparameters['hpo_params'] = {
 
 predictor_mrpc_bo = task.fit(train_data, label='label',
                                 hyperparameters=hyperparameters,
-                                time_limits=60 * 6,
-                                num_trials=5,  # increase this to get good performance in your applications
+                                time_limits=60 * 2,
+                                num_trials=2,  # increase this to get good performance in your applications
                                 ngpus_per_trial=1, seed=123,
                                 output_directory='./ag_mrpc_custom_space_fifo_bo')
 ```
@@ -188,7 +192,7 @@ hyperparameters['hpo_params'] = {
 ```{.python .input}
 predictor_mrpc_hyperband = task.fit(train_data, label='label',
                                     hyperparameters=hyperparameters,
-                                    time_limits=60 * 6, ngpus_per_trial=1, seed=123,
+                                    time_limits=60 * 2, ngpus_per_trial=1, seed=123,
                                     output_directory='./ag_mrpc_custom_space_hyperband')
 ```
 
@@ -238,7 +242,7 @@ hyperparameters['hpo_params'] = {
 predictor_mrpc_bohb = task.fit(
     train_data, label='label',
     hyperparameters=hyperparameters,
-    time_limits=60 * 6, ngpus_per_trial=1, seed=123,
+    time_limits=60 * 2, ngpus_per_trial=1, seed=123,
     output_directory='./ag_mrpc_custom_space_bohb')
 ```
 

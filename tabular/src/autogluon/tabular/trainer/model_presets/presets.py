@@ -16,7 +16,7 @@ from ...models.lr.lr_model import LinearModel
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
-from ...models.catboost.catboost_model import CatboostModel
+from ...models.catboost.catboost_model import CatBoostModel
 from ...models.xgboost.xgboost_model import XGBoostModel
 from ...models.xt.xt_model import XTModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
@@ -63,7 +63,7 @@ MODEL_TYPES = dict(
     XT=XTModel,
     KNN=KNNModel,
     GBM=LGBModel,
-    CAT=CatboostModel,
+    CAT=CatBoostModel,
     XGB=XGBoostModel,
     NN=TabularNeuralNetModel,
     LR=LinearModel,
@@ -76,29 +76,13 @@ DEFAULT_MODEL_NAMES = {
     XTModel: 'ExtraTrees',
     KNNModel: 'KNeighbors',
     LGBModel: 'LightGBM',
-    CatboostModel: 'Catboost',
+    CatBoostModel: 'CatBoost',
     XGBoostModel: 'XGBoost',
-    TabularNeuralNetModel: 'NeuralNet',
+    TabularNeuralNetModel: 'NeuralNetMXNet',
     LinearModel: 'LinearModel',
-    NNFastAiTabularModel: 'FastAINeuralNet',
+    NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
 }
-
-
-def _dd_classifier():
-    return 'Classifier'
-
-
-def _dd_regressor():
-    return 'Regressor'
-
-
-DEFAULT_MODEL_TYPE_SUFFIX = dict(
-    classifier=defaultdict(_dd_classifier),
-    regressor=defaultdict(_dd_regressor),
-)
-DEFAULT_MODEL_TYPE_SUFFIX['classifier'].update({LinearModel: ''})
-DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 
 
 # DONE: Add levels, including 'default'
@@ -183,12 +167,8 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
         if name_orig is None:
             name_main = model[AG_ARGS].get('name_main', DEFAULT_MODEL_NAMES.get(model_type, model_type.__name__))
             name_prefix = model[AG_ARGS].get('name_prefix', '')
-            name_type_suffix = model[AG_ARGS].get('name_type_suffix', None)
-            if name_type_suffix is None:
-                suffix_key = 'classifier' if problem_type in (PROBLEM_TYPES_CLASSIFICATION+[SOFTCLASS]) else 'regressor'
-                name_type_suffix = DEFAULT_MODEL_TYPE_SUFFIX[suffix_key][model_type]
             name_suff = model[AG_ARGS].get('name_suffix', '')
-            name_orig = name_prefix + name_main + name_type_suffix + name_suff
+            name_orig = name_prefix + name_main + name_suff
         if name_suffix is not None:
             name_orig = name_orig + name_suffix
         name = name_orig
@@ -200,10 +180,10 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
                 num_increment += 1
             model_names_set.add(name)
         else:
-            name_stacker = f'{name}_STACKER_l{level}'
+            name_stacker = f'{name}_BAG_L{level}'
             while name_stacker in model_names_set:  # Ensure name is unique
                 name = f'{name_orig}_{num_increment}'
-                name_stacker = f'{name}_STACKER_l{level}'
+                name_stacker = f'{name}_BAG_L{level}'
                 num_increment += 1
             model_names_set.add(name_stacker)
         model_params = copy.deepcopy(model)
@@ -283,8 +263,8 @@ def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperpa
         rf_models = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=mean_squared_error,
                                       hyperparameters=hyperparameters_rf, hyperparameter_tune=hyperparameter_tune,
                                       extra_ag_args=extra_ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
-    models_cat = [model for model in models if isinstance(model, CatboostModel)]
-    models_noncat = [model for model in models if not isinstance(model, CatboostModel)]
+    models_cat = [model for model in models if isinstance(model, CatBoostModel)]
+    models_noncat = [model for model in models if not isinstance(model, CatBoostModel)]
     models = models_noncat + rf_models + models_cat
     if len(models) == 0:
         raise ValueError("At least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN','RF'], "

@@ -52,7 +52,7 @@ class LabelCleaner:
     def _inverse_transform(self, y: Series) -> Series:
         raise NotImplementedError
 
-    def transform_proba(self, y):
+    def transform_proba(self, y: Union[DataFrame, Series, np.ndarray], as_pandas=False):
         return y
 
     def inverse_transform_proba(self, y, as_pandas=False):
@@ -94,11 +94,22 @@ class LabelCleanerMulticlass(LabelCleaner):
         y = y.map(self.cat_mappings_dependent_var)
         return y
 
-    # TODO: Unused?
-    def transform_proba(self, y):
+    # TODO: Unused? There are not many reasonable situations that seem to require this method.
+    def transform_proba(self, y: Union[DataFrame, np.ndarray], as_pandas=False) -> Union[DataFrame, np.ndarray]:
         if self.invalid_class_count > 0:
             # this assumes y has only 0's for any columns it is about to remove, if it does not, weird things may start to happen since rows will not sum to 1
-            return np.delete(y, self.label_index_to_remove, axis=1)
+            if isinstance(y, DataFrame):
+                cols_to_drop = [self.cat_mappings_dependent_var_uncleaned[col] for col in self.label_index_to_remove]
+                y = y.drop(columns=cols_to_drop)
+            else:
+                y = np.delete(y, self.label_index_to_remove, axis=1)
+        if as_pandas:
+            if isinstance(y, DataFrame):
+                return y.rename(columns=self.inv_map)
+            else:
+                return DataFrame(data=y, columns=self.ordered_class_labels_transformed, dtype=np.float32)
+        elif isinstance(y, DataFrame):
+            return y.to_numpy()
         else:
             return y
 
@@ -108,12 +119,12 @@ class LabelCleanerMulticlass(LabelCleaner):
             y_index = y.index
             y = y.to_numpy()
         if self.invalid_class_count > 0:
-            y_transformed = np.zeros([len(y), len(self.ordered_class_labels)], dtype=np.float64)
+            y_transformed = np.zeros([len(y), len(self.ordered_class_labels)], dtype=np.float32)
             y_transformed[:, self.label_index_to_keep] = y
         else:
             y_transformed = y
         if as_pandas:
-            y_transformed = DataFrame(data=y_transformed, index=y_index, columns=self.ordered_class_labels, dtype=np.float64)
+            y_transformed = DataFrame(data=y_transformed, index=y_index, columns=self.ordered_class_labels, dtype=np.float32)
         return y_transformed
 
     @staticmethod

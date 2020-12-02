@@ -30,7 +30,7 @@ First, we consider the Stanford Sentiment Treebank ([SST](https://nlp.stanford.e
 from autogluon.core.utils.loaders.load_pd import load
 train_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
 dev_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
-rand_idx = np.random.permutation(np.arange(len(train_data)))[:2000]
+rand_idx = np.random.permutation(np.arange(len(train_data)))[:1000]
 train_data = train_data.iloc[rand_idx]
 train_data.head(10)
 ```

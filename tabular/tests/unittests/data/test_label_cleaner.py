@@ -117,7 +117,7 @@ def test_label_cleaner_multiclass_to_binary():
             [0, 0.3, 0.7, 0, 0],
             [0, 0.8, 0.2, 0, 0],
             [0, 0.5, 0.5, 0, 0]
-        ], index=[5, 2, 8], columns=['l0', 'l1', 'l2', 'l3', 'l4'], dtype=np.float64
+        ], index=[5, 2, 8], columns=['l0', 'l1', 'l2', 'l3', 'l4'], dtype=np.float32
     )
 
     # When
