@@ -74,8 +74,8 @@ parallel evaluations.
 
 ```{.python .input}
 hyperparameters={'model': model, 'batch_size': batch_size, 'lr': lr}
-task = Task()
-classifier = task.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, epochs=2, hyperparameters=hyperparameters)
+classifier = Task()
+classifier.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, epochs=2, hyperparameters=hyperparameters)
 print('Top-1 val acc: %.3f' % task.fit_summary()['valid_acc'])
 ```
 
