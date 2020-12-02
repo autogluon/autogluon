@@ -186,8 +186,8 @@ class ImageClassification(object):
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         proba = self._classifier.predict(x)
-        if 'images' in proba.columns:
-            return proba.groupby(["images"]).agg(list)
+        if 'image' in proba.columns:
+            return proba.groupby(["image"]).agg(list)
         return proba
 
     def predict(self, x):
@@ -208,13 +208,12 @@ class ImageClassification(object):
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         proba = self._classifier.predict(x)
-        if 'images' in proba.columns:
+        if 'image' in proba.columns:
             # multiple images
-            return proba.loc[proba.groupby(["images"])["score"].idxmax()]
+            return proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
         else:
             # single image
-            top1 = proba.sort_values(by=['score']).iloc[0].reset_index()
-            return top1
+            return proba.loc[[proba["score"].idxmax()]]
 
     def predict_feature(self, x):
         """Predict images visual feature representations, return the features as numpy (1xD) vector.
