@@ -42,7 +42,7 @@ The best model is finally retrained on our entire dataset (i.e., merging trainin
 The best Top-1 accuracy achieved on the validation set is as follows:
 
 ```{.python .input}
-fit_result = task.fit_summary()
+fit_result = classifier.fit_summary()
 print('Top-1 train acc: %.3f, val acc: %.3f' %(fit_result['train_acc'], fit_result['valid_acc']))
 ```
 
