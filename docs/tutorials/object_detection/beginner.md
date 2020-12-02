@@ -31,8 +31,8 @@ We `fit` a classifier using AutoGluon as follows. In each experiment (one trial 
 
 ```{.python .input}
 time_limit = 60*60  # 1 hour
-task = Task()
-detector = task.fit(dataset_train, time_limit=time_limit, num_trials=2, epochs=5)
+detector = Task()
+detector.fit(dataset_train, time_limit=time_limit, num_trials=2, epochs=5)
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal

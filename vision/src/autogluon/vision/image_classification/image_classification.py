@@ -4,6 +4,7 @@ import pickle
 import logging
 
 import pandas as pd
+from autogluon.core.utils import verbosity2loglevel
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 
@@ -14,13 +15,8 @@ class ImageClassification(object):
 
     Parameters
     ----------
-    config : dict
-        The configurations, can be nested dict.
-    logger : logging.Logger
-        The desired logger object, use `None` for module specific logger with default setting.
-    net : mx.gluon.Block
-        The custom network. If defined, the model name in config will be ignored so your
-        custom network will be used for training rather than pulling it from model zoo.
+    log_dir : str
+        The directory for saving logs, by default using `pwd`: the current working directory.
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
     Dataset = _ImageClassification.Dataset
@@ -43,8 +39,9 @@ class ImageClassification(object):
             scheduler_options=None,
             nthreads_per_trial=None,
             ngpus_per_trial=None,
-            dist_ip_addrs=None):
-        """Automatic fit process.
+            dist_ip_addrs=None,
+            verbosity=3):
+        """Automatic fit process for image classification.
 
         Parameters
         ----------
@@ -71,6 +68,18 @@ class ImageClassification(object):
             The number of HPO trials. If `None`, will run only one trial.
         hyperparameters : dict
             Extra hyperparameters for specific models.
+            Accepted args includes(not limited to):
+            net : mx.gluon.Block
+                The custom network. If defined, the model name in config will be ignored so your
+                custom network will be used for training rather than pulling it from model zoo.
+            optimizer : mx.Optimizer
+                The custom optimizer object. If defined, the optimizer will be ignored in config but this
+                object will be used in training instead.
+            batch_size : int
+                Mini batch size
+            learning_rate : float
+                Trainer learning rate for optimization process.
+            You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
         search_strategy : str
             Searcher strategy for HPO, 'random' by default.
         scheduler_options : dict
@@ -81,8 +90,12 @@ class ImageClassification(object):
             Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
         dist_ip_addrs : list
             If not `None`, will spawn tasks on distributed nodes.
-
+        verbosity : int, default = 3
+            Controls how detailed of a summary to ouput.
+            Set <= 0 for no output printing, 1 to print just high-level summary,
+            2 to print summary and create plots, >= 3 to print all information produced during fit().
         """
+        log_level = verbosity2loglevel(verbosity)
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
             logging.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +
@@ -108,6 +121,7 @@ class ImageClassification(object):
             if val_data.lower() in names:
                 val_data = D8D.get(val_data)
         if self._classifier is not None:
+            self._classifier._logger.setLevel(log_level)
             self._fit_summary = self._classifier.fit(train_data, val_data, train_size, random_state, resume=False)
             return
 
@@ -138,6 +152,7 @@ class ImageClassification(object):
         if use_rec == True:
             config['use_rec'] = True
         task = _ImageClassification(config=config)
+        task._logger.setLevel(log_level)
         self._classifier = task.fit(train_data, val_data, train_size, random_state)
         self._fit_summary = task.fit_summary()
         return self

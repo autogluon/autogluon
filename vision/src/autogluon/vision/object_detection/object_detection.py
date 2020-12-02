@@ -1,7 +1,7 @@
 """Object Detection task"""
 import copy
 import pickle
-
+from autogluon.core.utils import verbosity2loglevel
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 
 __all__ = ['ObjectDetection']
@@ -11,15 +11,13 @@ class ObjectDetection(object):
 
     Parameters
     ----------
-    config : dict
-        The configurations, can be nested dict.
-    logger : logging.Logger
-        The desired logger object, use `None` for module specific logger with default setting.
+    log_dir : str
+        The directory for saving logs, by default using `pwd`: the current working directory.
 
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `bbox` columns.
     Dataset = _ObjectDetection.Dataset
-    
+
     def __init__(self, log_dir=None):
         self._log_dir = log_dir
         self._detector = None
@@ -38,8 +36,9 @@ class ObjectDetection(object):
             scheduler_options=None,
             nthreads_per_trial=None,
             ngpus_per_trial=None,
-            dist_ip_addrs=None):
-        """Automatic fit process.
+            dist_ip_addrs=None,
+            verbosity=3):
+        """Automatic fit process for object detection.
 
         Parameters
         ----------
@@ -66,6 +65,12 @@ class ObjectDetection(object):
             The number of HPO trials. If `None`, will run only one trial.
         hyperparameters : dict
             Extra hyperparameters for specific models.
+            Accepted args includes(not limited to):
+            batch_size : int
+                Mini batch size
+            learning_rate : float
+                Trainer learning rate for optimization process.
+            You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
         search_strategy : str
             Searcher strategy for HPO, 'random' by default.
         scheduler_options : dict
@@ -76,9 +81,14 @@ class ObjectDetection(object):
             Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
         dist_ip_addrs : list
             If not `None`, will spawn tasks on distributed nodes.
-
+        verbosity : int, default = 3
+            Controls how detailed of a summary to ouput.
+            Set <= 0 for no output printing, 1 to print just high-level summary,
+            2 to print summary and create plots, >= 3 to print all information produced during fit().
         """
+        log_level = verbosity2loglevel(verbosity)
         if self._detector is not None:
+            self._detector._logger.setLevel(log_level)
             self._fit_summary = self._detector.fit(train_data, val_data, train_size, random_state, resume=False)
             return
 
@@ -101,6 +111,7 @@ class ObjectDetection(object):
         if scheduler_options is not None:
             config.update(scheduler_options)
         task = _ObjectDetection(config=config)
+        task._logger.setLevel(log_level)
         self._detector = task.fit(train_data, val_data, train_size, random_state)
         self._fit_summary = task.fit_summary()
         return self
