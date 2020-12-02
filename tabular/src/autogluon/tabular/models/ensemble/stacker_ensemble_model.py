@@ -52,15 +52,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
     def limit_models_per_type(models, model_types, model_scores, max_base_models_per_type):
         model_type_groups = defaultdict(list)
         for model in models:
-            model_type = model_types[model]
-            model_type_groups[model_type].append((model, model_scores[model]))
-        for key in model_type_groups:
-            model_type_groups[key] = sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)
-        for key in model_type_groups:
-            model_type_groups[key] = model_type_groups[key][:max_base_models_per_type]
+            model_type_groups[model_types[model]].append((model, model_scores[model]))
         models_remain = []
         for key in model_type_groups:
-            models_remain += model_type_groups[key]
+            models_remain += sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)[:max_base_models_per_type]
         models_valid = [model for model, score in models_remain]
         return models_valid
 
