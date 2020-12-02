@@ -4,37 +4,46 @@
 autogluon.core
 ==============
 
-Decorators for customizing AutoGluon to apply hyperparameter-tuning on arbitrary user-defined objects and functions.
+Decorators are designed to apply hyperparameter-tuning on arbitrary user-defined search space.
 
 .. admonition:: Toy Example
 
-   Create class and function with searchable spaces for hyperparameters `name` and `idx`:
-
-   >>> import autogluon.core as ag
-   >>> @ag.obj(
-   ...     name=ag.space.Categorical('auto', 'gluon'),
-   ...     idx = ag.space.Int(0, 100),
-   ... )
-   >>> class myobj:
-   ...     def __init__(self, name, idx):
-   ...         self.name = name
-   ...         self.idx = idx
-   ...
-   >>> @ag.func(framework=ag.space.Categorical('mxnet', 'pytorch'))
-   >>> def myfunc(framework):
-   ...     return framework
-
-   Create the objects using decorated class and function as argument of autogluon.args
+   Create a training function decorated with searchable hyperparameters space:
 
    >>> @ag.args(
-   ...     h=ag.space.Categorical('test', myobj()),
-   ...     i = myfunc(),
-   ...     )
+   ...     nested=ag.space.Categorical(
+   ...         'test',
+   ...         ag.space.Dict(
+   ...             name=ag.space.Categorical('auto', 'gluon'),
+   ...             idx = ag.space.Int(0, 100),
+   ...         )
+   ...     ),
+   ...     obj_args = ag.space.Dict(
+   ...         name=ag.space.Categorical('auto', 'gluon'),
+   ...         idx = ag.space.Int(0, 100),
+   ...     ),
+   ...     fn_args=ag.space.Categorical('mxnet', 'pytorch'))
    >>> def train_fn(args, reporter):
-   ...     h, i = args.h, args.i
-   ...     assert hasattr(h, 'name') or h == 'test'
-   ...     assert i in ['mxnet', 'pytorch']
-   ...     reporter(epoch=1, accuracy=0)
+   ...         # Wrap parameterizable classes and functions inside train_fn
+   ...         # to ensure they are portable for distributed training
+   ...         class MyObj:
+   ...             def __init__(self, name, idx):
+   ...                 self.name = name
+   ...                 self.idx = idx
+   ...
+   ...         def my_func(framework):
+   ...             return framework
+   ...
+   ...         obj = MyObj(**args.obj_args)
+   ...         func_result = my_func(args.fn_args)
+   ...         nested = args.nested
+   ...
+   ...         assert hasattr(nested, 'name') or nested == 'test'
+   ...         assert func_result in ['mxnet', 'pytorch']
+   ...         assert obj.name in ['auto', 'gluon']
+   ...         assert obj.idx >=0 and obj.idx <=100
+   ...
+   ...         reporter(epoch=1, accuracy=0)
 
    Create a scheduler and run training trials to search for the best values of the hyperparameters:
 
