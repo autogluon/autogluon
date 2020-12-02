@@ -12,3 +12,5 @@ def test_task():
     detector2 = Task.load('detector.ag')
     fit_summary = detector2.fit_summary()
     test_map = detector2.evaluate(test_data)
+    test_result2 = detector2.predict(test_data)
+    assert test_result2 == test_result

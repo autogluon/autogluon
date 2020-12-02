@@ -29,11 +29,11 @@ class ImageClassification(object):
     def fit(self,
             train_data,
             val_data=None,
-            train_size=0.9,
+            holdout_frac=0.1,
             random_state=None,
             time_limit=12*60*60,
             epochs=None,
-            num_trials=None,
+            num_trials=1,
             hyperparameters=None,
             search_strategy='random',
             scheduler_options=None,
@@ -48,25 +48,24 @@ class ImageClassification(object):
         train_data : pd.DataFrame or str
             Training data, can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
-        val_data : pd.DataFrame or str
+        val_data : pd.DataFrame or str, default = None
             Training data, can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
             If `None`, the validation dataset will be randomly split from `train_data`.
-        train_size : float
-            The random split ratio for `train_data` if `val_data==None`.
-            The new `val_data` size will be `1-train_size`.
-        random_state : numpy.random.state
+        holdout_frac : float, default = 0.1
+            The random split ratio for `val_data` if `val_data==None`.
+        random_state : numpy.random.state, default = None
             The random_state for shuffling, only used if `val_data==None`.
             Note that the `random_state` only affect the splitting process, not model training.
-        time_limit : int
+        time_limit : int, default = 43200
             Time limit in seconds, default is 12 hours. If `time_limit` is hit during `fit`, the
-            HPO process will interupt and return the current best configuration.
-        epochs : int
+            HPO process will interrupt and return the current best configuration.
+        epochs : int, default value based on network
             The `epochs` for model training, if `None` is provided, then default `epochs` for model
             will be used.
-        num_trials : int, default is 1
-            The number of HPO trials. If `None`, will run only one trial.
-        hyperparameters : dict
+        num_trials : int, default = 1
+            The number of HPO trials. If `None`, will run infinite trials until `time_limit` is met.
+        hyperparameters : dict, default = None
             Extra hyperparameters for specific models.
             Accepted args includes(not limited to):
             net : mx.gluon.Block
@@ -80,15 +79,17 @@ class ImageClassification(object):
             learning_rate : float
                 Trainer learning rate for optimization process.
             You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
-        search_strategy : str
+        search_strategy : str, default = 'random'
             Searcher strategy for HPO, 'random' by default.
-        scheduler_options : dict
-            Extra options for HPO scheduler, please refer to `autogluon.Searcher` for details.
-        nthreads_per_trial : int
+            Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
+            ‘skopt’ (SKopt Bayesian optimization), ‘grid’ (grid search).
+        scheduler_options : dict, default = None
+            Extra options for HPO scheduler, please refer to `autogluon.core.Searcher` for details.
+        nthreads_per_trial : int, default = (# cpu cores)
             Number of CPU threads for each trial, if `None`, will detect the # cores on current instance.
-        ngpus_per_trial : int
+        ngpus_per_trial : int, default = (# gpus)
             Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
-        dist_ip_addrs : list
+        dist_ip_addrs : list, default = None
             If not `None`, will spawn tasks on distributed nodes.
         verbosity : int, default = 3
             Controls how detailed of a summary to ouput.
@@ -113,21 +114,25 @@ class ImageClassification(object):
             names = D8D.list()
             if train_data.lower() in names:
                 train_data = D8D.get(train_data)
+            else:
+                raise ValueError(f'`train_data` {train_data} is not among valid list {'\n'.join(names)}')
             if val_data is None:
-                train_data, val_data = train_data.split(train_size)
+                train_data, val_data = train_data.split(1 - holdout_frac)
         if isinstance(val_data, str):
             from d8.image_classification import Dataset as D8D
             names = D8D.list()
             if val_data.lower() in names:
                 val_data = D8D.get(val_data)
+            else:
+                raise ValueError(f'`val_data` {val_data} is not among valid list {'\n'.join(names)}')
         if self._classifier is not None:
             self._classifier._logger.setLevel(log_level)
-            self._fit_summary = self._classifier.fit(train_data, val_data, train_size, random_state, resume=False)
+            self._fit_summary = self._classifier.fit(train_data, val_data, 1 - holdout_frac, random_state, resume=False)
             return
 
         # new HPO task
         config={'log_dir': self._log_dir,
-                'num_trials': 1 if num_trials is None else num_trials,
+                'num_trials': 99999 if num_trials is None else max(1, num_trials),
                 'time_limits': time_limit,
                 'search_strategy': search_strategy,
                 }
@@ -146,6 +151,10 @@ class ImageClassification(object):
             optimizer = hyperparameters.pop('optimizer', None)
             if optimizer is not None:
                 config.update({'custom_optimizer': optimizer})
+            # check if hyperparameters overwriting existing config
+            for k, v in hyperparameters.items():
+                if k in config:
+                    raise ValueError(f'Overwriting {k} = {config[k]} to {v} by hyperparameters is ambiguous.')
             config.update(hyperparameters)
         if scheduler_options is not None:
             config.update(scheduler_options)
@@ -153,9 +162,8 @@ class ImageClassification(object):
             config['use_rec'] = True
         task = _ImageClassification(config=config)
         task._logger.setLevel(log_level)
-        self._classifier = task.fit(train_data, val_data, train_size, random_state)
+        self._classifier = task.fit(train_data, val_data, 1 - holdout_frac, random_state)
         self._fit_summary = task.fit_summary()
-        return self
 
     def predict_proba(self, x):
         """Predict images as a whole, return the probabilities of each category rather

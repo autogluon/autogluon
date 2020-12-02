@@ -15,3 +15,5 @@ def test_task():
     test_acc = classifier2.evaluate(test_dataset)
     test_proba = classifier2.predict_proba(test_dataset)
     test_feature = classifier2.predict_feature(test_dataset)
+    single_test2 = classifier2.predict(test_dataset.iloc[0]['image'])
+    assert single_test2 == single_test
