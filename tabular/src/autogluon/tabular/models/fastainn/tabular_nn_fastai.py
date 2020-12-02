@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from fastai.core import defaults
 
 from autogluon.core.utils import try_import_fastai_v1
 from autogluon.core.utils.loaders import load_pkl
@@ -105,6 +104,7 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
         from fastai.tabular import FillMissing, Categorify, Normalize
+        from fastai.core import defaults
 
         self.cat_columns = X_train.select_dtypes([
             'category', 'object', 'bool', 'bool_'
