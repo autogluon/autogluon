@@ -9,12 +9,14 @@ from functools import reduce
 import numpy as np
 import pandas as pd
 
-from ..abstract.abstract_model import AbstractModel
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
 from autogluon.core.utils.utils import generate_kfold
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
+
+from ..abstract.abstract_model import AbstractModel
+from ...utils import _compute_fi_with_stddev
 
 logger = logging.getLogger(__name__)
 
@@ -262,18 +264,27 @@ class BaggedEnsembleModel(AbstractModel):
     # TODO: v0.1 Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
     def compute_feature_importance(self, X, y, features=None, is_oof=True, time_limit=None, silent=False, **kwargs) -> pd.DataFrame:
+        if features is None:
+            features = self.load_child(model=self.models[0]).features
         if not is_oof:
-            if features is None:
-                features = self.load_child(model=self.models[0]).features
             return super().compute_feature_importance(X, y, features=features, time_limit=time_limit, silent=silent, **kwargs)
         fi_fold_list = []
-        fold_weights = []
-        # TODO: Preprocess data here instead of repeatedly
         model_index = 0
+        num_children = len(self.models)
         if time_limit is not None:
-            time_limit_per_child = time_limit / len(self.models)
+            time_limit_per_child = time_limit / num_children
         else:
             time_limit_per_child = None
+        if not silent:
+            logging_message = f'Computing feature importance via permutation shuffling for {len(features)} features using out-of-fold (OOF) data aggregated across {num_children} child models...'
+            if time_limit is not None:
+                logging_message = f'{logging_message} Time limit: {time_limit}s...'
+            logger.log(20, logging_message)
+
+        time_start = time.time()
+        early_stop = False
+        children_completed = 0
+        log_final_suffix = ''
         for n_repeat, k in enumerate(self._k_per_n_repeat):
             if is_oof:
                 if not self.bagged_mode:
@@ -285,48 +296,33 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                fi_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features=features, time_limit=time_limit_per_child, silent=silent, **kwargs)
+                fi_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features=features, time_limit=time_limit_per_child, silent=silent, log_prefix='\t', **kwargs)
                 fi_fold_list.append(fi_fold)
-                fold_weights.append(len(test_index))
+
+                children_completed += 1
+                if time_limit is not None and children_completed != num_children:
+                    time_now = time.time()
+                    time_left = time_limit - (time_now - time_start)
+                    time_child_average = (time_now - time_start) / children_completed
+                    if time_left < (time_child_average * 1.1):
+                        log_final_suffix = f' (Early stopping due to lack of time...)'
+                        early_stop = True
+                        break
+            if early_stop:
+                break
             model_index += k
 
-        weight_total = sum(fold_weights)
-        fold_weights = [weight/weight_total for weight in fold_weights]
+        fi_list_dict = dict()
+        for val in fi_fold_list:
+            val = val['importance'].to_dict()  # TODO: Don't throw away stddev information of children
+            for key in val:
+                if key not in fi_list_dict:
+                    fi_list_dict[key] = []
+                fi_list_dict[key].append(val[key])
+        fi_df = _compute_fi_with_stddev(fi_list_dict)
 
-        for i, result in enumerate(fi_fold_list):
-            fi_fold_list[i] = fi_fold_list[i]['importance']  # TODO: Don't throw away stddev information
-            fi_fold_list[i] = fi_fold_list[i] * fold_weights[i]
-
-        fi = pd.concat(fi_fold_list, axis=1, sort=True).sum(1).sort_values(ascending=False)
-
-        fi_stddev_dict = dict()
-        fi_z_score_dict = dict()
-        # TODO: stddev is actually tighter than calculated if num_shuffle_sets > 1, throwing away fact that each data point is averaged from multiple samples.
-        # TODO: move to function shared with compute_permutation_feature_importance()
-        for feature in list(fi.index):
-            fi_fold_feature_list = [fi_fold[feature] for fi_fold in fi_fold_list]
-            if len(fi_fold_feature_list) > 1:
-                fi_stddev_dict[feature] = np.std(fi_fold_feature_list, ddof=1)
-            else:
-                fi_stddev_dict[feature] = np.nan
-            if fi_stddev_dict[feature] != np.nan and fi_stddev_dict[feature] != 0:
-                fi_z_score_dict[feature] = fi[feature] / fi_stddev_dict[feature]
-            elif fi_stddev_dict[feature] != np.nan:  # stddev = 0
-                if fi[feature] == 0:
-                    fi_z_score_dict[feature] = np.nan
-                elif fi[feature] > 0:
-                    fi_z_score_dict[feature] = np.inf
-                else:  # < 0
-                    fi_z_score_dict[feature] = -np.inf
-            else:
-                fi_z_score_dict[feature] = np.nan
-
-        fi_stddev = pd.Series(fi_stddev_dict).sort_values(ascending=False)
-        fi_z_score = pd.Series(fi_z_score_dict).sort_values(ascending=False)
-
-        fi_df = fi.to_frame(name='importance')
-        fi_df['stddev'] = fi_stddev
-        fi_df['z_score'] = fi_z_score
+        if not silent:
+            logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime (Completed {children_completed} of {num_children} children){log_final_suffix}')
 
         return fi_df
 

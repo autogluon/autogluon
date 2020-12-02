@@ -158,9 +158,9 @@ def infer_eval_metric(problem_type: str) -> Scorer:
 
 # Note: Do not send training data as input or the importances will be overfit.
 # TODO: Improve time estimate (Currently pessimistic)
-def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predict_func: Callable[..., np.ndarray], eval_metric: Scorer, features: list = None, subsample_size=1000, num_shuffle_sets: int = None,
+def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predict_func: Callable[..., np.ndarray], eval_metric: Scorer, features: list = None, subsample_size=None, num_shuffle_sets: int = None,
                                            predict_func_kwargs: dict = None, transform_func: Callable[..., pd.DataFrame] = None, transform_func_kwargs: dict = None,
-                                           time_limit: float = None, silent=False) -> pd.DataFrame:
+                                           time_limit: float = None, silent=False, log_prefix='') -> pd.DataFrame:
     """
     Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
     A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -191,7 +191,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
     features : list, default None
         List of features to calculate importances for.
         If None, all features' importances will be calculated.
-    subsample_size : int, default 1000
+    subsample_size : int, default None
         The amount of data rows to sample when computing importances.
         Higher values will improve the quality of feature importance estimates, but linearly increase the runtime.
         If None, all provided data will be used.
@@ -218,7 +218,9 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
         A minimum of 1 full shuffle set will always be evaluated. If a shuffle set evaluation takes longer than `time_limit`, the method will take the length of a shuffle set evaluation to return regardless of the `time_limit`.
         If `num_shuffle_sets==1`, `time_limit` will be ignored.
     silent : bool, default False
-        Whether to suppress logging output
+        Whether to suppress logging output.
+    log_prefix : str, default ''
+        Prefix to add to logging statements.
 
     Returns
     -------
@@ -234,10 +236,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
             A z-score of +inf or -inf indicates that `subsample_size` and/or `num_shuffle_sets` were too small to calculate variance for the feature (non-zero importance with zero stddev).
     """
     if num_shuffle_sets is None:
-        if time_limit is not None:
-            num_shuffle_sets = 10
-        else:
-            num_shuffle_sets = 1
+        num_shuffle_sets = 1 if time_limit is None else 10
 
     time_start = time.time()
     if predict_func_kwargs is None:
@@ -246,18 +245,15 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
         transform_func_kwargs = dict()
     if features is None:
         features = list(X.columns)
-    feature_count = len(features)
+    num_features = len(features)
 
-    if (subsample_size is not None) and (len(X) > subsample_size):
-        # Reset index to avoid error if duplicated indices.
-        X = X.reset_index(drop=True)
-        y = y.reset_index(drop=True)
-
+    if subsample_size and (len(X) > subsample_size):
+        # TODO: Stratify? We currently don't know in this function the problem_type (could pass as additional arg).
         X = X.sample(subsample_size, random_state=0)
         y = y.loc[X.index]
 
     if not silent:
-        logging_message = f'Computing raw permutation feature importance for {feature_count} features using {len(X)} rows with {num_shuffle_sets} shuffle sets...'
+        logging_message = f'{log_prefix}Computing feature importance via permutation shuffling for {num_features} features using {len(X)} rows with {num_shuffle_sets} shuffle sets...'
         if time_limit is not None:
             logging_message = f'{logging_message} Time limit: {time_limit}s...'
         logger.log(20, logging_message)
@@ -270,44 +266,34 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
     time_score = time.time() - time_start_score
 
     if not silent:
-        time_estimated = ((feature_count + 1) * time_score) * num_shuffle_sets + time_start_score - time_start
+        time_estimated = ((num_features + 1) * time_score) * num_shuffle_sets + time_start_score - time_start
         time_estimated_per_set = time_estimated / num_shuffle_sets
-        logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime ({round(time_estimated_per_set, 2)}s per shuffle set)')
+        logger.log(20, f'{log_prefix}\t{round(time_estimated, 2)}s\t= Expected runtime ({round(time_estimated_per_set, 2)}s per shuffle set)')
 
-    row_count = X.shape[0]
+    if transform_func is None:
+        feature_batch_count = _get_safe_fi_batch_count(X=X, num_features=num_features)
+    else:
+        feature_batch_count = _get_safe_fi_batch_count(X=X, num_features=num_features, X_transformed=X_transformed)
 
-    # calculating maximum number of features, which is safe to process parallel
-    X_memory_ratio_max = 0.2
-    compute_count_max = 200
-
-    X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
-    if transform_func is not None:
-        X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
-    available_mem = psutil.virtual_memory().available
-    X_memory_ratio = X_size_bytes / available_mem
-
-    compute_count_safe = math.floor(X_memory_ratio_max / X_memory_ratio)
-    compute_count = max(1, min(compute_count_max, compute_count_safe))
-    compute_count = min(compute_count, feature_count)
-
-    # creating copy of original data N=compute_count times for parallel processing
-    X_raw = pd.concat([X.copy() for _ in range(compute_count)], ignore_index=True, sort=False).reset_index(drop=True)
+    # creating copy of original data N=feature_batch_count times for parallel processing
+    X_raw = pd.concat([X.copy() for _ in range(feature_batch_count)], ignore_index=True, sort=False).reset_index(drop=True)
 
     time_permutation_start = time.time()
     fi_dict_list = []
-    # TODO: Can speedup shuffle_repeats by incorporating into X_raw (do multiple repeats in a single predict call)
     shuffle_repeats_completed = 0
+    log_final_suffix = ''
+    row_count = X.shape[0]
+    # TODO: Can speedup shuffle_repeats by incorporating into X_raw (do multiple repeats in a single predict call)
     for shuffle_repeat in range(num_shuffle_sets):
         fi = dict()
         X_shuffled = shuffle_df_rows(X=X, seed=shuffle_repeat)
-        for i in range(0, feature_count, compute_count):
-            parallel_computed_features = features[i:i + compute_count]
+
+        for i in range(0, num_features, feature_batch_count):
+            parallel_computed_features = features[i:i + feature_batch_count]
 
             # if final iteration, leaving only necessary part of X_raw
             num_features_processing = len(parallel_computed_features)
-            final_iteration = i + num_features_processing == feature_count
-            if (num_features_processing < compute_count) and final_iteration:
-                X_raw = X_raw.loc[:row_count * num_features_processing - 1]
+            final_iteration = i + num_features_processing == num_features
 
             row_index = 0
             for feature in parallel_computed_features:
@@ -315,7 +301,11 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
                 X_raw.loc[row_index:row_index_end - 1, feature] = X_shuffled[feature].values
                 row_index = row_index_end
 
-            X_raw_transformed = X_raw if transform_func is None else transform_func(X_raw, **transform_func_kwargs)
+            if (num_features_processing < feature_batch_count) and final_iteration:
+                X_raw_transformed = X_raw.loc[:row_count * num_features_processing - 1]
+                X_raw_transformed = X_raw_transformed if transform_func is None else transform_func(X_raw_transformed, **transform_func_kwargs)
+            else:
+                X_raw_transformed = X_raw if transform_func is None else transform_func(X_raw, **transform_func_kwargs)
             y_pred = predict_func(X_raw_transformed, **predict_func_kwargs)
 
             row_index = 0
@@ -326,9 +316,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
                 score = eval_metric(y, y_pred_cur)
                 fi[feature] = score_baseline - score
 
-                if not final_iteration:
-                    # resetting to original values for processed feature
-                    X_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
+                # resetting to original values for processed feature
+                X_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
 
                 row_index = row_index_end
         fi_dict_list.append(fi)
@@ -338,40 +327,72 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
             time_left = time_limit - (time_now - time_start)
             time_permutation_average = (time_now - time_permutation_start) / (shuffle_repeat + 1)
             if time_left < (time_permutation_average * 1.1):
-                if not silent:
-                    logger.log(20, f'\tEarly stopping feature importance calculation before all shuffle sets have completed due to lack of time...')
+                log_final_suffix = ' (Early stopping due to lack of time...)'
                 break
+
+    fi_list_dict = dict()
+    for val in fi_dict_list:
+        for key in val:
+            if key not in fi_list_dict:
+                fi_list_dict[key] = []
+            fi_list_dict[key].append(val[key])
+    fi_df = _compute_fi_with_stddev(fi_list_dict)
+
+    if not silent:
+        logger.log(20, f'{log_prefix}\t{round(time.time() - time_start, 2)}s\t= Actual runtime (Completed {shuffle_repeats_completed} of {num_shuffle_sets} shuffle sets){log_final_suffix}')
+
+    return fi_df
+
+
+def _compute_fi_with_stddev(fi_list_dict: dict) -> DataFrame:
+    features = list(fi_list_dict.keys())
     fi = dict()
-    fi_stddev_dict = dict()
-    fi_z_score_dict = dict()
+    fi_stddev = dict()
+    fi_z_score = dict()
     for feature in features:
-        fi_fold_feature_list = [permutation_importance_dict_repeat[feature] for permutation_importance_dict_repeat in fi_dict_list]
-        fi[feature] = np.mean(fi_fold_feature_list)
-        if len(fi_fold_feature_list) > 1:
-            fi_stddev_dict[feature] = np.std(fi_fold_feature_list, ddof=1)
-        else:
-            fi_stddev_dict[feature] = np.nan
-        if fi_stddev_dict[feature] != np.nan and fi_stddev_dict[feature] != 0:
-            fi_z_score_dict[feature] = fi[feature] / fi_stddev_dict[feature]
-        elif fi_stddev_dict[feature] != np.nan:  # stddev = 0
-            if fi[feature] == 0:
-                fi_z_score_dict[feature] = np.nan
-            elif fi[feature] > 0:
-                fi_z_score_dict[feature] = np.inf
-            else:  # < 0
-                fi_z_score_dict[feature] = -np.inf
-        else:
-            fi_z_score_dict[feature] = np.nan
+        fi[feature], fi_stddev[feature], fi_z_score[feature] = _compute_mean_stddev_and_z_score(fi_list_dict[feature])
 
     fi = pd.Series(fi).sort_values(ascending=False)
-    fi_stddev = pd.Series(fi_stddev_dict).sort_values(ascending=False)
-    fi_z_score = pd.Series(fi_z_score_dict).sort_values(ascending=False)
+    fi_stddev = pd.Series(fi_stddev)
+    fi_z_score = pd.Series(fi_z_score)
 
     fi_df = fi.to_frame(name='importance')
     fi_df['stddev'] = fi_stddev
     fi_df['z_score'] = fi_z_score
 
-    if not silent:
-        logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime (Completed {shuffle_repeats_completed} of {num_shuffle_sets} shuffle sets)')
-
     return fi_df
+
+
+def _compute_mean_stddev_and_z_score(values: list):
+    mean = np.mean(values)
+    if len(values) > 1:
+        stddev = np.std(values, ddof=1)
+    else:
+        stddev = np.nan
+    if stddev != np.nan and stddev != 0:
+        z_score = mean / stddev
+    elif stddev != np.nan:  # stddev = 0
+        if mean == 0:
+            z_score = np.nan
+        elif mean > 0:
+            z_score = np.inf
+        else:  # < 0
+            z_score = -np.inf
+    else:
+        z_score = np.nan
+
+    return mean, stddev, z_score
+
+
+def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_ratio=0.2, max_feature_batch_count=200):
+    # calculating maximum number of features that are safe to process in parallel
+    X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
+    if X_transformed is not None:
+        X_size_bytes += sys.getsizeof(pickle.dumps(X_transformed, protocol=4))
+    available_mem = psutil.virtual_memory().available
+    X_memory_ratio = X_size_bytes / available_mem
+
+    feature_batch_count_safe = math.floor(max_memory_ratio / X_memory_ratio)
+    feature_batch_count = max(1, min(max_feature_batch_count, feature_batch_count_safe))
+    feature_batch_count = min(feature_batch_count, num_features)
+    return feature_batch_count
