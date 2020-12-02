@@ -319,6 +319,25 @@ precision = make_scorer('precision',
 recall = make_scorer('recall',
                      sklearn.metrics.recall_score)
 
+
+def customized_log_loss(y_true, y_pred):
+    """
+
+    Parameters
+    ----------
+    y_true : array-like or label indicator matrix
+        Ground truth (correct) labels for n_samples samples.
+
+    y_pred : array-like of float, shape = (n_samples, n_classes) or (n_samples,)
+
+    Returns
+    -------
+    loss
+        The negative log-likelihood
+    """
+    pass
+
+
 # Score function for probabilistic classification
 log_loss = make_scorer('log_loss',
                        sklearn.metrics.log_loss,
