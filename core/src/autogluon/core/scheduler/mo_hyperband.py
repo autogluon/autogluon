@@ -277,6 +277,9 @@ class MOHyperbandScheduler(HyperbandScheduler):
         reporter = MODistStatusReporter(self._objectives, weights ,remote=task.resources.node)
         task.args['reporter'] = reporter
 
+        # We could factor this part out by modifiying the main class
+        # --------------------------------------------------------------------------------
+
         # Register task
         task_key = str(task.task_id)
         with self._hyperband_lock:
@@ -345,24 +348,45 @@ class MOHyperbandScheduler(HyperbandScheduler):
             self.scheduled_tasks.append(task_dict)
 
 
-### TODO: Write documentation
 def _prepare_sign_vector(objectives):
+    """Generates a numpy vector which can be used to flip the signs of the objectives values
+    which are intended to be minimized.
+
+    Parameters
+    ----------
+    objectives: dict
+        The dictionary keys name the objectives of interest. The associated values can be either
+        "MIN" or "MAX" and indicate if an objective is to be minimized or maximized.
+
+    Returns
+    ----------
+    sign_vector: np.array
+        A numpy array containing 1 for objectives to be maximized and -1 for objectives to be
+        minimized.
+    """
     converter = {
         "MIN": -1.0,
         "MAX": 1.0
     }
     try:
-        signs = np.array([converter[objectives[k]] for k in objectives])
+        sign_vector = np.array([converter[objectives[k]] for k in objectives])
     except KeyError:
         raise ValueError("Error, in conversion of objective dict. Allowed values are 'MIN' and 'MAX'")
-    return signs
+    return sign_vector
 
 
 def _uniform(dim):
     """Samples a point uniformly at random from the unit simplex using the Kraemer Algorithm
     The algorithm is described here: https://www.cs.cmu.edu/~nasmith/papers/smith+tromble.tr04.pdf
+    
+    Parameters
+    ----------
+    dim: int
+        Dimension of the unit simplex to sample from.
+    
     Returns:
-        sample: A point uniformly sampled from the unit simplex.
+    sample: np.array
+         A point sampled uniformly from the unit simplex.
     """
     uni = np.random.uniform(size=(dim))
     uni = np.sort(uni)
