@@ -16,7 +16,7 @@ np.random.seed(123)
 ## Paraphrase Identification
 
 We consider a Paraphrase Identification task for illustration. Given a pair of sentences, the goal is to predict whether or not one sentence is a restatement of the other (a binary classification task). Here we train models on the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398) dataset.
-To demonstrate the usage, we will subsample the dataset and only use 1000 samples.
+For quick demonstration, we will subsample the training data and only use 1000 samples.
 
 ```{.python .input}
 from autogluon.core.utils.loaders import load_pd
