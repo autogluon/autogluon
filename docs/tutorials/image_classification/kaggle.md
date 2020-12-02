@@ -113,14 +113,14 @@ Run the following commands to run `fit` using a time limit:
 
 ```
 time_limit = 10 * 60 # 10mins
-task = Task()
-classifier = task.fit(dataset, time_limit=time_limit)
+classifier = Task()
+classifier.fit(dataset, time_limit=time_limit)
 ```
 
 The top-1 accuracy of the best model on the validation set is:
 
 ```
-print('Top-1 val acc: %.3f' % task.fit_summary()['valid_acc'])
+print('Top-1 val acc: %.3f' % classifier.fit_summary()['valid_acc'])
 ```
 
 ###  Using AutoGluon to Generate Predictions on Test Images

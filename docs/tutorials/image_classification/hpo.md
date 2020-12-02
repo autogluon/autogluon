@@ -76,7 +76,7 @@ parallel evaluations.
 hyperparameters={'model': model, 'batch_size': batch_size, 'lr': lr}
 classifier = Task()
 classifier.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, epochs=2, hyperparameters=hyperparameters)
-print('Top-1 val acc: %.3f' % task.fit_summary()['valid_acc'])
+print('Top-1 val acc: %.3f' % classifier.fit_summary()['valid_acc'])
 ```
 
 The BO searcher can be configured by `search_options`, see
