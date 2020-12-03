@@ -97,7 +97,6 @@ class ImagePredictor(object):
             2 to print summary and create plots, >= 3 to print all information produced during fit().
         """
         log_level = verbosity2loglevel(verbosity)
-        logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
             logging.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +
@@ -129,6 +128,7 @@ class ImagePredictor(object):
                 valid_names = '\n'.join(names)
                 raise ValueError(f'`val_data` {val_data} is not among valid list {valid_names}')
         if self._classifier is not None:
+            logging.getLogger("ImageClassificationEstimator").propagate = True
             self._classifier._logger.setLevel(log_level)
             self._fit_summary = self._classifier.fit(train_data, val_data, 1 - holdout_frac, random_state, resume=False)
             return
@@ -163,9 +163,15 @@ class ImagePredictor(object):
             config.update(scheduler_options)
         if use_rec == True:
             config['use_rec'] = True
+        # verbosity
+        if log_level > logging.INFO:
+            logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
+            logging.getLogger("ImageClassificationEstimator").propagate = False
+            logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
         task = _ImageClassification(config=config)
         task._logger.setLevel(log_level)
         self._classifier = task.fit(train_data, val_data, 1 - holdout_frac, random_state)
+        self._classifier._logger.setLevel(log_level)
         self._fit_summary = task.fit_summary()
 
     def predict_proba(self, x):

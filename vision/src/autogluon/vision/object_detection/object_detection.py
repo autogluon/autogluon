@@ -1,6 +1,8 @@
 """Object Detection task"""
 import copy
 import pickle
+import logging
+
 from autogluon.core.utils import verbosity2loglevel
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 
@@ -90,6 +92,7 @@ class ObjectDetector(object):
         log_level = verbosity2loglevel(verbosity)
         if self._detector is not None:
             self._detector._logger.setLevel(log_level)
+            self._detector._logger.propagate = True
             self._fit_summary = self._detector.fit(train_data, val_data, 1 - holdout_frac, random_state, resume=False)
             return
 
@@ -115,10 +118,14 @@ class ObjectDetector(object):
             config.update(hyperparameters)
         if scheduler_options is not None:
             config.update(scheduler_options)
+        # verbosity
+        if log_level > logging.INFO:
+            logging.getLogger('gluoncv.auto.tasks.object_detection').propagate = False
+            for logger_name in ('SSDEstimator', 'CenterNetEstimator', 'YOLOv3Estimator', 'FasterRCNNEstimator'):
+                logging.getLogger(logger_name).setLevel(log_level)
+                logging.getLogger(logger_name).propagate = False
         task = _ObjectDetection(config=config)
         task._logger.setLevel(log_level)
-        for logger_name in ('SSDEstimator', 'CenterNetEstimator', 'YOLOv3Estimator', 'FasterRCNNEstimator'):
-            logging.getLogger(logger_name).setLevel(log_level)
         self._detector = task.fit(train_data, val_data, 1 - holdout_frac, random_state)
         self._fit_summary = task.fit_summary()
 
