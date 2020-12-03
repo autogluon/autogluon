@@ -3,7 +3,7 @@ from autogluon.tabular import TabularPrediction as task
 from autogluon.tabular.learner.default_learner import DefaultLearner as Learner
 from autogluon.tabular.features.generators.auto_ml_pipeline import AutoMLPipelineFeatureGenerator
 
-from autogluon.tabular.models.catboost.catboost_model import CatboostModel
+from autogluon.tabular.models.catboost.catboost_model import CatBoostModel
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
 from autogluon.tabular.models.rf.rf_model import RFModel
 from autogluon.tabular.models.xt.xt_model import XTModel
