@@ -444,11 +444,9 @@ def train_function(args, reporter, train_data, tuning_data,
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
                 break
-    # Report the performance of the best model
     best_report_items_dict = dict(best_report_items)
     best_report_items_dict['report_idx'] = report_idx + 1
     reporter(**best_report_items_dict)
-
 
 @use_np
 class BertForTextPredictionBasic:

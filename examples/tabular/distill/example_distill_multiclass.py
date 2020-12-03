@@ -8,11 +8,12 @@ import os
 from autogluon.tabular import TabularPrediction as task
 from autogluon.tabular.utils import MULTICLASS
 
+
 subsample_size = 500
 time_limits = 60
 
 multi_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
-                  'name': 'CoverTypeMulticlassClassification', 'problem_type': MULTICLASS, 'label_column': 'Cover_Type'}
+                 'name': 'CoverTypeMulticlassClassification', 'problem_type': MULTICLASS, 'label_column': 'Cover_Type'}
 
 dataset = multi_dataset
 # directory_prefix = ""
@@ -47,12 +48,12 @@ time_limits = 60  # None
 aug_data = task.Dataset(file_path=train_file_path)
 aug_data = aug_data.head(subsample_size)  # subsample for faster demo
 
-distilled_model_names = predictor.distill(time_limits=time_limits, augment_args={'num_augmented_samples':100})  # default distillation (time_limits & augment_args are also optional, here set to suboptimal values to ensure quick runtime)
+distilled_model_names = predictor.distill(time_limits=time_limits, augment_args={'num_augmented_samples': 100})  # default distillation (time_limits & augment_args are also optional, here set to suboptimal values to ensure quick runtime)
 
 # Other variants demonstrating different usage options:
-predictor.distill(time_limits=time_limits, teacher_preds='soft', augment_method='spunge', augment_args={'size_factor':1}, verbosity=3, models_name_suffix='spunge')
+predictor.distill(time_limits=time_limits, teacher_preds='soft', augment_method='spunge', augment_args={'size_factor': 1}, verbosity=3, models_name_suffix='spunge')
 
-predictor.distill(time_limits=time_limits, hyperparameters={'GBM':{},'NN':{}}, teacher_preds='soft', augment_method='munge', augment_args={'size_factor':1,'max_size':100}, models_name_suffix='munge')
+predictor.distill(time_limits=time_limits, hyperparameters={'GBM': {},'NN': {}}, teacher_preds='soft', augment_method='munge', augment_args={'size_factor': 1,'max_size': 100}, models_name_suffix='munge')
 
 predictor.distill(augmentation_data=aug_data, time_limits=time_limits, teacher_preds='soft', models_name_suffix='extra')  # augmentation with "extra" unlabeled data.
 

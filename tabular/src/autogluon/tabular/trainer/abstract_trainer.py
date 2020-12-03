@@ -795,10 +795,10 @@ class AbstractTrainer:
 
         invalid_model_names = set(self.get_model_names())
         # Ensure name is unique
-        model_stack_name = f'weighted_ensemble{name_suffix}_k{k_fold}_l{level}'
+        model_stack_name = f'WeightedEnsemble{name_suffix}_L{level}'
         num_increment = 2
         while model_stack_name in invalid_model_names:  # Ensure name is unique
-            model_stack_name = f'weighted_ensemble{name_suffix}_{num_increment}_k{k_fold}_l{level}'
+            model_stack_name = f'WeightedEnsemble{name_suffix}_{num_increment}_L{level}'
             num_increment += 1
 
         weighted_ensemble_model = WeightedEnsembleModel(
