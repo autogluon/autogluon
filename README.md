@@ -203,4 +203,4 @@ plt.tight_layout()
     
 
 
-The images matrices can then be used as impute for the CNN model.
+The image matrices can then be used as input for the CNN model.
