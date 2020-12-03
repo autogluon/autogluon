@@ -126,7 +126,10 @@ class ObjectDetector(object):
                 logging.getLogger(logger_name).propagate = False
         task = _ObjectDetection(config=config)
         task._logger.setLevel(log_level)
+        task._logger.propagate = True
         self._detector = task.fit(train_data, val_data, 1 - holdout_frac, random_state)
+        self._detector._logger.setLevel(log_level)
+        self._detector._logger.propagate = True
         self._fit_summary = task.fit_summary()
 
     def predict(self, x):

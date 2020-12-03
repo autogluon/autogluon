@@ -170,8 +170,10 @@ class ImagePredictor(object):
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
         task = _ImageClassification(config=config)
         task._logger.setLevel(log_level)
+        task._logger.propagate = True
         self._classifier = task.fit(train_data, val_data, 1 - holdout_frac, random_state)
         self._classifier._logger.setLevel(log_level)
+        self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
 
     def predict_proba(self, x):
