@@ -328,19 +328,27 @@ def customized_log_loss(y_true, y_pred):
     y_true : array-like or label indicator matrix
         Ground truth (correct) labels for n_samples samples.
 
-    y_pred : array-like of float, shape = (n_samples, n_classes) or (n_samples,)
+    y_pred : array-like of float
+        The predictions. shape = (n_samples, n_classes) or (n_samples,)
 
     Returns
     -------
     loss
         The negative log-likelihood
     """
-    pass
+    assert y_true.ndim == 1
+    if y_pred.ndim == 1:
+        # Binary classification problem
+        probabilities = np.where(y_true, y_pred, 1 - y_pred)
+    else:
+        probabilities = np.take(y_pred, y_true, axis=-1)
+    nll = - np.log(probabilities).mean()
+    return nll
 
 
 # Score function for probabilistic classification
 log_loss = make_scorer('log_loss',
-                       sklearn.metrics.log_loss,
+                       customized_log_loss,
                        optimum=0,
                        greater_is_better=False,
                        needs_proba=True)
