@@ -374,6 +374,8 @@ class LGBModel(AbstractModel):
 
         epochs = kwargs.get("epochs", 1)
 
+        save_val_pred = kwargs.get('save_val_pred', False)
+
         util_args = dict(
             dataset_train_pkl_filename=train_pkl_path,
             dataset_val_pkl_filename=val_pkl_path,
@@ -382,12 +384,16 @@ class LGBModel(AbstractModel):
             time_start=time_start,
             time_limit=scheduler_options['time_out'],
             epochs=epochs,
-            report_probs = kwargs.get("report_probs", False)
+            save_val_pred = save_val_pred
         )
         params_copy['epochs'] = epochs
 
         lgb_trial.register_args(util_args=util_args, **params_copy)
         scheduler = scheduler_func(lgb_trial, **scheduler_options)
+
+        if save_val_pred and hasattr(scheduler, "y_val"):
+            scheduler.y_val = y_val
+
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
@@ -400,7 +406,7 @@ class LGBModel(AbstractModel):
         scheduler.join_jobs()
 
         hpo_models, hpo_model_performances, hpo_results = self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
-        if 'report_probs' in kwargs:
+        if save_val_pred and hasattr(scheduler, "ensemble"):
             hpo_results['ensemble'] = scheduler.ensemble
         return hpo_models, hpo_model_performances, hpo_results
 
