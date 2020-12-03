@@ -46,7 +46,7 @@ def hyperband_hpo(model_name, label_column='class', strategy="bayesopt",
     hyper = {}
     if model_name == "cat":
         hyper = {'iterations': Int(lower=2, upper=25, default=10)}
-        model_cls = CatboostModel
+        model_cls = CatBoostModel
     elif model_name == "gbm":
         hyper ={'num_boost_round': Int(lower=2, upper=25, default=20)}
         model_cls = LGBModel
