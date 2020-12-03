@@ -159,7 +159,7 @@ class ImageTransformer:
         """
         img_coords = pd.DataFrame(np.vstack((
             self._coords,
-            X.clip(0, 1)
+            X
         )).T).groupby([0, 1], as_index=False).mean()
 
         img_matrices = []
@@ -210,6 +210,14 @@ class ImageTransformer:
         fdmat[coord_cnt[0].astype(int),
               coord_cnt[1].astype(int)] = coord_cnt['count']
         return fdmat
+
+    def coords(self):
+        """Get feature coordinates
+
+        Returns:
+            ndarray: x and y coordinates for features
+        """
+        return self._coords.T.copy()
 
     @staticmethod
     def _minimum_bounding_rectangle(hull_points):
