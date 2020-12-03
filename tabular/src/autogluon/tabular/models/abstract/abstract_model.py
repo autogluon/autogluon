@@ -606,6 +606,8 @@ class AbstractModel:
 
         save_val_pred = kwargs.get('save_val_pred', False)
 
+        epochs = kwargs.get('epochs', 1)
+
         util_args = dict(
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
@@ -853,3 +855,4 @@ class AbstractNeuralNetworkModel(AbstractModel):
                 types_of_features.append({"name": feature, "type": feature_type})
 
         return types_of_features, df
+

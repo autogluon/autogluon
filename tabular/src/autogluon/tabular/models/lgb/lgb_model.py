@@ -24,6 +24,9 @@ from .lgb_utils import construct_dataset
 from ..abstract.abstract_model import AbstractModel
 from ..utils import fixedvals_from_searchspaces
 from ...features.feature_metadata import R_OBJECT
+from autogluon.core.utils.savers import save_pkl
+from autogluon.core.utils import try_import_lightgbm
+from autogluon.core import Int, Space
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)

@@ -17,6 +17,8 @@ from ...features.generators import LabelEncoderFeatureGenerator
 
 from autogluon.core import Categorical, Int
 
+from autogluon.core import Categorical, Int
+
 logger = logging.getLogger(__name__)
 
 
