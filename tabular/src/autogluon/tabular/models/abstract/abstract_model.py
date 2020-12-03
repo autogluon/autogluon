@@ -108,8 +108,8 @@ class AbstractModel:
         self.params_trained = dict()
 
         #for warm-starting with hyperband scheduler
-        self._prev_model = None
-        self._early_stopped = False
+        self._prev_model = None #the reference to the current trained model, used as the starting point for incremental training
+        self._early_stopped = False #whether incremental training stopped earlier than the specified number of iterations
 
     # Checks if model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
     def is_valid(self) -> bool:
@@ -604,6 +604,8 @@ class AbstractModel:
 
         epochs = kwargs.get('epochs', 1)
 
+        save_val_pred = kwargs.get('save_val_pred', False)
+
         util_args = dict(
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
@@ -612,7 +614,7 @@ class AbstractModel:
             time_start=time_start,
             time_limit=scheduler_options['time_out'],
             epochs=epochs,
-            report_probs=kwargs.get('report_probs', False)
+            save_val_pred=save_val_pred
         )
 
         #epochs denotes number of times to invoke incremental training.
@@ -622,6 +624,9 @@ class AbstractModel:
 
         model_trial.register_args(util_args=util_args, **params_copy)
         scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_options)
+
+        if save_val_pred and hasattr(scheduler, "y_val"):
+            scheduler.y_val = y_val
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
@@ -634,7 +639,10 @@ class AbstractModel:
         scheduler.join_jobs()
 
         hpo_models, hpo_model_performances, hpo_results = self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
-        if 'report_probs' in kwargs:
+
+        # this is for scheduler that allows hpo over ensemble, where the hpo process searches for trials to ensemble directly
+        # the scheduler would report the ensemble
+        if save_val_pred and hasattr(scheduler, "ensemble"):
             hpo_results['ensemble'] = scheduler.ensemble
         return hpo_models, hpo_model_performances, hpo_results
 

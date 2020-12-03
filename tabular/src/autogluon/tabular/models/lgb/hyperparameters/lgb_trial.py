@@ -19,12 +19,14 @@ logger = logging.getLogger(__name__)
 @args()
 def lgb_trial(args, reporter):
     """ Training script for hyperparameter evaluation of Gradient Boosting model """
+
+    model = None
     try:
         model, args, util_args = model_trial.prepare_inputs(args=args)
 
         epochs = util_args['epochs']
 
-        report_probs = util_args['report_probs']
+        save_val_pred = util_args.pop('save_val_pred')
 
         try_import_lightgbm()
         import lightgbm as lgb
@@ -42,13 +44,16 @@ def lgb_trial(args, reporter):
         predict_proba_args = dict(X=X_val)
         model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None),
-                                       epochs=epochs, reporter=reporter, report_probs=report_probs)
-    except Exception as e:
-        if not (isinstance(e, TimeLimitExceeded) or isinstance(e, AutoGluonEarlyStop)):
-            logger.exception(e, exc_info=True)
-        reporter.terminate()
-        if isinstance(e, AutoGluonEarlyStop):
+                                       epochs=epochs, reporter=reporter, save_val_pred=save_val_pred)
+    except AutoGluonEarlyStop:
+        if model is not None:
             model.save()
+    except TimeLimitExceeded:
+        pass  # this is intended to be silent for model trials
+    except Exception as e:
+        logger.exception(e, exc_info=True)
+    finally:
+        reporter.terminate()
 
     # FIXME: If stopping metric and eval metric differ, the previous reported scores will not align as they will be evaluated with stopping_metric, whereas this is evaluated with eval_metric
     #  This should only impact if the reporter data is used
