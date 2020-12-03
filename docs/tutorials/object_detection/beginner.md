@@ -7,11 +7,11 @@ Object detection is the process of identifying and localizing objects in an imag
 
 Our goal is to detect motorbike in images by [YOLOv3 model](https://pjreddie.com/media/files/papers/YOLOv3.pdf). A tiny dataset is collected from VOC dataset, which only contains the motorbike category. The model pretrained on the COCO dataset is used to fine-tune our small dataset. With the help of AutoGluon, we are able to try many models with different hyperparameters automatically, and return the best one as our final model.
 
-To start, import autogluon.vision and ObjectDetection module as your task:
+To start, import autogluon.vision and ObjectDetector:
 
 ```{.python .input}
 import autogluon.core as ag
-from autogluon.vision import ObjectDetection as Task
+from autogluon.vision import ObjectDetector
 ```
 
 ## Tiny_motorbike Dataset
@@ -21,7 +21,7 @@ Using the commands below, we can download this dataset, which is only 23M. The n
 
 ```{.python .input}
 url = 'https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip'
-dataset_train = Task.Dataset.from_voc(url, splits='trainval')
+dataset_train = ObjectDetector.Dataset.from_voc(url, splits='trainval')
 ```
 
 ## Fit Models by AutoGluon
@@ -31,7 +31,7 @@ We `fit` a classifier using AutoGluon as follows. In each experiment (one trial 
 
 ```{.python .input}
 time_limit = 60*60  # 1 hour
-detector = Task()
+detector = ObjectDetector()
 detector.fit(dataset_train, time_limit=time_limit, num_trials=2, epochs=5)
 ```
 
@@ -44,7 +44,7 @@ a lot more sample-efficient.
 After fitting, AutoGluon automatically returns the best model among all models in the searching space. From the output, we know the best model is the one trained with the second learning rate. To see how well the returned model performed on test dataset, call detector.evaluate().
 
 ```{.python .input}
-dataset_test = Task.Dataset.from_voc(url, splits='test')
+dataset_test = ObjectDetector.Dataset.from_voc(url, splits='test')
 
 test_map = detector.evaluate(dataset_test)
 print("mAP on test dataset: {}".format(test_map[1][-1]))
@@ -68,5 +68,5 @@ We can also save the trained model, and use it later.
 ```{.python .input}
 savefile = 'detector.ag'
 detector.save(savefile)
-new_detector = Task.load(savefile)
+new_detector = ObjectDetector.load(savefile)
 ```

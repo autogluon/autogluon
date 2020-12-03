@@ -1,4 +1,4 @@
-# Image Classification - Search Space and Hyperparameter Optimization (HPO)
+# Image Prediction - Search Space and Hyperparameter Optimization (HPO)
 :label:`sec_imgadvanced`
 
 While the :ref:`sec_imgquick` introduced basic usage of AutoGluon `fit`, `evaluate`, `predict` with default configurations, this tutorial dives into the various options that you can specify for more advanced control over the fitting process.
@@ -12,11 +12,11 @@ The advanced functionalities of AutoGluon enable you to use your external knowle
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` to learn the basics of the AutoGluon API.
 
-We begin by letting AutoGluon know that [ImageClassification](/api/autogluon.task.html#autogluon.vision.ImageClassification) is the task of interest:
+We begin by letting AutoGluon know that [ImagePredictor](/api/autogluon.task.html#autogluon.vision.ImagePredictor) is the task of interest:
 
 ```{.python .input}
 import autogluon.core as ag
-from autogluon.vision import ImageClassification as Task
+from autogluon.vision import ImagePredictor
 ```
 
 ## Create AutoGluon Dataset
@@ -25,7 +25,7 @@ Let's first create the dataset using the same subset of the `Shopee-IET` dataset
 Recall that there's no validation split in original data, a 90/10 train/validation split is automatically performed when `fit` with `train_data`.
 
 ```{.python .input}
-train_data, _, test_data = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+train_data, _, test_data = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 ```
 
 ## Specify which Networks to Try
@@ -38,7 +38,7 @@ This is an example of a :class:`autogluon.core.space.Categorical` search space, 
 model = ag.Categorical('resnet18_v1b', 'mobilenetv3_small')
 
 # you may choose more than 70+ available model in the model zoo provided by GluonCV:
-model_list = Task.list_models()
+model_list = ImagePredictor.list_models()
 ```
 
 ## Specify the training hyper-parameters
@@ -74,16 +74,16 @@ parallel evaluations.
 
 ```{.python .input}
 hyperparameters={'model': model, 'batch_size': batch_size, 'lr': lr}
-classifier = Task()
-classifier.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, epochs=2, hyperparameters=hyperparameters)
-print('Top-1 val acc: %.3f' % classifier.fit_summary()['valid_acc'])
+predictor = ImagePredictor()
+predictor.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, epochs=2, hyperparameters=hyperparameters)
+print('Top-1 val acc: %.3f' % predictor.fit_summary()['valid_acc'])
 ```
 
 The BO searcher can be configured by `search_options`, see
 :class:`autogluon.core.searcher.GPFIFOSearcher`. Load the test dataset and evaluate:
 
 ```{.python .input}
-top1, top5 = classifier.evaluate(test_data)
+top1, top5 = predictor.evaluate(test_data)
 print('Test acc on hold-out data:', top1)
 ```
 
@@ -124,4 +124,4 @@ hyperparameters.update({
 ```
 
 For a comparison of different search algorithms and scheduling strategies, see :ref:`course_alg`.
-For more options using `fit`, see :class:`autogluon.vision.ImageClassification`.
+For more options using `fit`, see :class:`autogluon.vision.ImagePredictor`.

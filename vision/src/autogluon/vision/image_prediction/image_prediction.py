@@ -1,4 +1,4 @@
-"""Image classification task"""
+"""Image Prediction task"""
 import copy
 import pickle
 import logging
@@ -8,10 +8,10 @@ from autogluon.core.utils import verbosity2loglevel
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 
-__all__ = ['ImageClassification']
+__all__ = ['ImagePredictor']
 
-class ImageClassification(object):
-    """AutoGluon Predictor for classifying images based on their whole contents
+class ImagePredictor(object):
+    """AutoGluon Predictor for predicting image category based on their whole contents
 
     Parameters
     ----------
@@ -41,7 +41,7 @@ class ImageClassification(object):
             ngpus_per_trial=None,
             dist_ip_addrs=None,
             verbosity=3):
-        """Automatic fit process for image classification.
+        """Automatic fit process for image prediction.
 
         Parameters
         ----------
@@ -97,6 +97,7 @@ class ImageClassification(object):
             2 to print summary and create plots, >= 3 to print all information produced during fit().
         """
         log_level = verbosity2loglevel(verbosity)
+        logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
             logging.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +

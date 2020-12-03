@@ -1,4 +1,4 @@
-# Image Classification - How to Use Your Own Datasets
+# Image Prediction - How to Use Your Own Datasets
 
 This tutorial demonstrates how to use AutoGluon with your own custom datasets.
 As an example, we use a dataset from Kaggle to show the required steps to format image data properly for AutoGluon.
@@ -91,8 +91,8 @@ each neural network requires the user to specify many hyperparameters (e.g., lea
 AutoGluon automatically does Training/Validation split:
 
 ```
-from autogluon.vision import ImageClassification as Task
-dataset = Task.Dataset.from_folder('./data/shopeeiet/train')
+from autogluon.vision import ImagePredictor
+dataset = ImagePredictor.Dataset.from_folder('./data/shopeeiet/train')
 ```
 
 AutoGluon automatically infers how many classes there are based on the directory structure.
@@ -105,7 +105,7 @@ where the images that fall into the validation set are randomly chosen from the 
 
 ## Step 3: Use AutoGluon fit to generate a classification model
 
-Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.task.html#autogluon.task.ImageClassification.fit) function.
+Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.task.html#autogluon.task.ImagePredictor.fit) function.
 
 Due to the large size of the Kaggle dataset,
 calling `fit` without specifying a time limit may result in long waiting times.
@@ -113,14 +113,14 @@ Run the following commands to run `fit` using a time limit:
 
 ```
 time_limit = 10 * 60 # 10mins
-classifier = Task()
-classifier.fit(dataset, time_limit=time_limit)
+predictor = ImagePredictor()
+predictor.fit(dataset, time_limit=time_limit)
 ```
 
 The top-1 accuracy of the best model on the validation set is:
 
 ```
-print('Top-1 val acc: %.3f' % classifier.fit_summary()['valid_acc'])
+print('Top-1 val acc: %.3f' % predictor.fit_summary()['valid_acc'])
 ```
 
 ###  Using AutoGluon to Generate Predictions on Test Images
@@ -129,8 +129,8 @@ We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call `predict`:
 
 ```
-test_dataset = Task.Dataset.from_folder('./data/shopeeiet/test')
-pred = classifier.predict(test_dataset)
+test_dataset = ImagePredictor.Dataset.from_folder('./data/shopeeiet/test')
+pred = predictor.predict(test_dataset)
 print(pred)
 ```
 

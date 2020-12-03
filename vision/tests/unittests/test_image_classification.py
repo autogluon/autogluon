@@ -1,4 +1,4 @@
-from autogluon.vision import ImageClassification as Task
+from autogluon.vision import ImagePredictor as Task
 
 def test_task():
     dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')

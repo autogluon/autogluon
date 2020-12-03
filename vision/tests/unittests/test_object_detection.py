@@ -1,4 +1,4 @@
-from autogluon.vision import ObjectDetection as Task
+from autogluon.vision import ObjectDetector as Task
 
 def test_task():
     dataset = Task.Dataset.from_voc('https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip')

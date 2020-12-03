@@ -52,7 +52,7 @@ How to reproduce EfficientNet's neural architecture search
 
    import math
    import autogluon.core as ag
-   from autogluon.vision import ImageClassification as Task
+   from autogluon.vision import ImagePredictor as Task
 
    @ag.obj(
        width_coefficient=ag.space.Categorical(1.1, 1.2),

@@ -4,9 +4,9 @@ import pickle
 from autogluon.core.utils import verbosity2loglevel
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 
-__all__ = ['ObjectDetection']
+__all__ = ['ObjectDetector']
 
-class ObjectDetection(object):
+class ObjectDetector(object):
     """AutoGluon Predictor for for detecting objects in images
 
     Parameters
@@ -117,6 +117,8 @@ class ObjectDetection(object):
             config.update(scheduler_options)
         task = _ObjectDetection(config=config)
         task._logger.setLevel(log_level)
+        for logger_name in ('SSDEstimator', 'CenterNetEstimator', 'YOLOv3Estimator', 'FasterRCNNEstimator'):
+            logging.getLogger(logger_name).setLevel(log_level)
         self._detector = task.fit(train_data, val_data, 1 - holdout_frac, random_state)
         self._fit_summary = task.fit_summary()
 

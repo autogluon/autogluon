@@ -4,12 +4,12 @@
 AutoGluon Tasks
 ===============
 
-.. admonition:: Example (image classification task):
+.. admonition:: Example (image prediction task):
 
-   Tell AutoGluon that task is image classification:
+   Tell AutoGluon that task is image prediction:
 
    >>> import autogluon.core as ag
-   >>> from autogluon.vision import ImageClassification as Task
+   >>> from autogluon.vision import ImagePredictor as Task
 
    Load a toy image dataset:
 
@@ -18,11 +18,11 @@ AutoGluon Tasks
    Fit classification models:
 
    >>> mytask = Task()
-   >>> classifier = mytask.fit(train, epochs=2)
+   >>> mytask.fit(train, epochs=2)
 
    Evaluate predictions on test data:
 
-   >>> test_acc = classifier.evaluate(test)
+   >>> test_acc = mytask.evaluate(test)
 
 
 
@@ -41,8 +41,8 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 .. autosummary::
    :nosignatures:
 
-   ImageClassification
-   ObjectDetection
+   ImagePredictor
+   ObjectDetector
 
 .. automodule:: autogluon.text
 .. autosummary::
@@ -66,33 +66,33 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-:hidden:`ImageClassification`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. automodule:: autogluon.vision
-
-.. autoclass:: ImageClassification
-   :members:
-   :inherited-members:
-   :exclude-members: run_fit
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: ImageClassification
-        :methods:
-
-
-:hidden:`ObjectDetection`
+:hidden:`ImagePrediction`
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.vision
 
-.. autoclass:: ObjectDetection
+.. autoclass:: ImagePredictor
    :members:
    :inherited-members:
    :exclude-members: run_fit
 
     .. rubric:: Methods
 
-    .. autoautosummary:: ObjectDetection
+    .. autoautosummary:: ImagePredictor
+        :methods:
+
+
+:hidden:`ObjectDetector`
+~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.vision
+
+.. autoclass:: ObjectDetector
+   :members:
+   :inherited-members:
+   :exclude-members: run_fit
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: ObjectDetector
         :methods:
 
 
@@ -141,8 +141,8 @@ Additional Tabular Prediction APIs
    :no-inherited-members:
 
 
-Additional Image Classification APIs
-------------------------------------
+Additional Image Prediction APIs
+--------------------------------
 
 .. automodule:: autogluon.mxnet
 
