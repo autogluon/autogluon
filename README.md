@@ -165,7 +165,7 @@ Fit and transform can be done in a single step.
 X_train_img = it.fit_transform(X_train_norm)
 ```
 
-The following are showing plots for the image matrices first four samples 
+Plotting the image matrices first four samples 
 of the training set. 
 
 
@@ -203,4 +203,4 @@ plt.tight_layout()
     
 
 
-The images matrices can then be used as impute for the CNN model.
+The image matrices can then be used as input for the CNN model.
