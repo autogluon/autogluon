@@ -43,7 +43,7 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
     'numpy>=1.16.0',
-    'scipy>=1.3.3',
+    'scipy>=1.3.3,<1.5.0',
     'cython',  # TODO: Do we need cython here?
     'tornado>=5.0.1',
     'requests',

@@ -46,7 +46,7 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
     'numpy>=1.16.0',
-    'scipy>=1.3.3',
+    'scipy>=1.3.3,<1.5.0',
     'tqdm>=4.38.0',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',

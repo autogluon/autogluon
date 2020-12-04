@@ -34,10 +34,11 @@ class BasePredictor(ABC):
     Base object returned by task.fit() for each task implemented in AutoGluon.
     Example user workflow for say image classification applications:
         # Training time:
-        >>> from autogluon.vision import image_classification as task
+        >>> from autogluon.vision import ImagePredictor as task
         >>> train_data = task.Dataset(traindata_filepath)
         >>> output_directory = '~/temp/' # any directory name specifying where to store all results
-        >>> predictor = task.fit(train_data=train_data, output_directory=output_directory)
+        >>> predictor = task()
+        >>> predictor.fit(train_data=train_data, output_directory=output_directory)
         >>> # To instead specify train/val split, do: predictor = task.fit(train_data=train_data, val_data=task.Dataset(valdata_filepath), output_directory=output_directory)
         >>> results = predictor.fit_summary() # will also print out summary and create plots
         # Inference time (may be a new Python session):
@@ -155,7 +156,7 @@ class BasePredictor(ABC):
         return self.results
 
     def _createResults(self):
-        """ Internal helper function: Dict object to store all relevant information produced during task.fit(). 
+        """ Internal helper function: Dict object to store all relevant information produced during task.fit().
             Empty for now, but should be updated during task.fit().
             All tasks should adhere to this same template for consistency.
         """
@@ -173,7 +174,7 @@ class BasePredictor(ABC):
         # memory = amount of memory required by self.model
 
         results['trial_info'] = {}  # dict with keys = trial_IDs, values = dict of information about each individual trial (length = results['num_trials_completed'])
-        """ Example of what one element of this dict must look like: 
+        """ Example of what one element of this dict must look like:
 
         results['trial_info'][trial_id] =  {
             'config' : hyperparameter configuration tried in this trial

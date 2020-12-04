@@ -44,7 +44,7 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
     'numpy>=1.16.0',
-    'scipy>=1.3.3',
+    'scipy>=1.3.3,<1.5.0',
     'catboost>=0.23.0,<0.25',
     'xgboost>=1.2,<1.3',
     'lightgbm>=3.0,<4.0',
@@ -52,7 +52,7 @@ requirements = [
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'scikit-learn>=0.22.0,<0.24',
     'networkx>=2.3,<3.0',
-    'gluoncv>=0.5.0,<1.0',
+    'gluoncv==0.9.0',
     f'autogluon.core=={version}'
 ]
 
