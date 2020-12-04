@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from fastai.core import defaults
 
 from autogluon.core.utils import try_import_fastai_v1
 from autogluon.core.utils.loaders import load_pkl
