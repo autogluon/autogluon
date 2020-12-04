@@ -1,6 +1,7 @@
 import logging
 from collections import defaultdict
 
+import numpy as np
 import pandas as pd
 
 from .stacker_ensemble_model import StackerEnsembleModel
@@ -54,12 +55,12 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         else:
             logger.warning('Warning: Feature importance calculation is not yet implemented for WeightedEnsembleModel on unseen data, returning generic feature importance...')
             fi = pd.Series(self._get_model_weights()).sort_values(ascending=False)
-        fi_stddev = pd.Series(data=[None for _ in range(len(fi))], index=fi.index, dtype='float64')
-        fi_z_score = pd.Series(data=[None for _ in range(len(fi))], index=fi.index, dtype='float64')
 
         fi_df = fi.to_frame(name='importance')
-        fi_df['stddev'] = fi_stddev
-        fi_df['z_score'] = fi_z_score
+        fi_df['stddev'] = np.nan
+        fi_df['p_score'] = np.nan
+        fi_df['n'] = np.nan
+
         # TODO: Rewrite preprocess() in greedy_weighted_ensemble_model to enable
         # fi_df = super().compute_feature_importance(X=X, y=y, features_to_use=features_to_use, preprocess=preprocess, is_oof=is_oof, **kwargs)
         return fi_df

@@ -392,7 +392,7 @@ class AbstractModel:
         return model
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features=None, silent=False, **kwargs) -> pd.DataFrame:
+    def compute_feature_importance(self, X, y, features=None, silent=False, importance_as_list=False, **kwargs) -> pd.DataFrame:
         if self.features is not None:
             X = X[self.features]
 
@@ -407,13 +407,19 @@ class AbstractModel:
         banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         features_to_check = [feature for feature in features if feature not in banned_features]
 
-        fi_df = self.compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, **kwargs)
+        fi_df = self.compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
+        n = fi_df.iloc[0]['n'] if len(fi_df) > 0 else 1
+        if importance_as_list:
+            banned_importance = [0] * n
+            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype='object')
+        else:
+            banned_importance = 0
+            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype='float64')
 
-        results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features, dtype='float64')
-        results_banned_z_score = pd.Series(data=[np.nan for _ in range(len(banned_features))], index=banned_features, dtype='float64')
         results_banned_df = results_banned.to_frame(name='importance')
-        results_banned_df['stddev'] = results_banned
-        results_banned_df['z_score'] = results_banned_z_score
+        results_banned_df['stddev'] = 0
+        results_banned_df['n'] = n
+        results_banned_df['n'] = results_banned_df['n'].astype('int64')
         fi_df = pd.concat([fi_df, results_banned_df]).sort_values(ascending=False, by='importance')
 
         return fi_df

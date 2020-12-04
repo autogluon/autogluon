@@ -296,7 +296,8 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                fi_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features=features, time_limit=time_limit_per_child, silent=silent, log_prefix='\t', **kwargs)
+                fi_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features=features, time_limit=time_limit_per_child,
+                                                           silent=silent, log_prefix='\t', importance_as_list=True, **kwargs)
                 fi_fold_list.append(fi_fold)
 
                 children_completed += 1
@@ -311,14 +312,14 @@ class BaggedEnsembleModel(AbstractModel):
             if early_stop:
                 break
             model_index += k
-
+        # TODO: DON'T THROW AWAY SAMPLES! USE LARGER N
         fi_list_dict = dict()
         for val in fi_fold_list:
             val = val['importance'].to_dict()  # TODO: Don't throw away stddev information of children
             for key in val:
                 if key not in fi_list_dict:
                     fi_list_dict[key] = []
-                fi_list_dict[key].append(val[key])
+                fi_list_dict[key] += val[key]
         fi_df = _compute_fi_with_stddev(fi_list_dict)
 
         if not silent:

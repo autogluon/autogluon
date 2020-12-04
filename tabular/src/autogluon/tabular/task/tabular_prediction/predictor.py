@@ -1,8 +1,10 @@
 import copy
 import logging
+import math
 from typing import Union
 
 import os
+import numpy as np
 import pandas as pd
 from PIL import Image
 
@@ -551,9 +553,9 @@ class TabularPredictor(BasePredictor):
         return labels_transformed
 
     # TODO: Add option to specify list of features within features list, to check importances of groups of features. Make tuple to specify new feature name associated with group.
-    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, silent=False):
+    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, silent=False):
         """
-        Calculates feature importance scores for the given model.
+        Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
         A feature score of 0.01 would indicate that the predictive performance dropped by 0.01 when the feature was randomly shuffled.
         The higher the score a feature has, the more important it is to the model's performance.
@@ -561,7 +563,7 @@ class TabularPredictor(BasePredictor):
         Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
         To estimate how long `feature_importance(model, dataset, features)` will take, it is roughly the time taken by `predict_proba(dataset, model)` multiplied by the number of features.
 
-        Note: For highly accurate stddev and z_score estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
+        Note: For highly accurate importance and p_value estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
 
         Parameters
         ----------
@@ -609,28 +611,53 @@ class TabularPredictor(BasePredictor):
             It is generally recommended to increase `subsample_size` before increasing `num_shuffle_sets`.
             Defaults to 1 if `time_limit` is None or 10 if `time_limit` is specified.
             Runtime linearly scales with `num_shuffle_sets`.
+        include_confidence_band: bool, default = True
+            If True, will include output columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time.
+            Increasing `subsample_size` and `num_shuffle_sets` will tighten the band.
         silent : bool, default = False
-            Whether to suppress logging output
+            Whether to suppress logging output.
 
         Returns
         -------
-        Pandas `pandas.DataFrame` of feature importance scores with 3 columns:
+        Pandas `pandas.DataFrame` of feature importance scores with 6 columns:
             index: The feature name.
-            'importance': The feature importance score.
+            'importance': The estimated feature importance score.
             'stddev': The standard deviation of the feature importance score. If NaN, then not enough num_shuffle_sets were used to calculate a variance.
-            'z_score': The z-score of the feature importance score. Equivalent to 'importance' / 'stddev'.
-                A z-score of +4 or higher indicates that the feature is almost certainly useful and should be kept.
-                A z-score of +2 indicates that the feature has a 97.5% chance of improving model quality when present.
-                A z-score that is 0 or negative indicates that the feature can likely be dropped without negative impact to model quality.
-                A z-score of NaN indicates that the feature's stddev was NaN or that the model predictions were never impacted by the feature (importance 0 and stddev 0). This indicates that the feature can safely be dropped.
-                A z-score of +inf or -inf indicates that `subsample_size` and/or `num_shuffle_sets` were too small to calculate variance for the feature (non-zero importance with zero stddev).
+            'p_value': The probability that the feature's true importance score is less than or equal to 0. Feature with p_values > 0.9 are likely harmful.
+            'n': The number of shuffles (samples) performed.
+            'p99_high': The optimistic feature importance score which represents the top 0.5% cutoff of true importance estimates.
+            'p99_low': The pessimistic feature importance score which represents the bottom 0.5% cutoff of true importance estimates.
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
-        return self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage,
+        fi_df = self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage,
                                                     subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
+
+        if include_confidence_band:
+            import scipy.stats
+            num_features = len(fi_df)
+            confidence_threshold = 0.99
+            p99_low_dict = dict()
+            p99_high_dict = dict()
+            for i in range(num_features):
+                fi = fi_df.iloc[i]
+                mean = fi['importance']
+                stddev = fi['stddev']
+                n = fi['n']
+                if stddev == np.nan or n == np.nan or mean == np.nan or n == 1:
+                    p99_high = np.nan
+                    p99_low = np.nan
+                else:
+                    t_val_99 = scipy.stats.t.ppf(1 - (1 - confidence_threshold) / 2, n-1)
+                    p99_high = mean + t_val_99 * stddev / math.sqrt(n)
+                    p99_low = mean - t_val_99 * stddev / math.sqrt(n)
+                p99_high_dict[fi.name] = p99_high
+                p99_low_dict[fi.name] = p99_low
+            fi_df['p99_high'] = pd.Series(p99_high_dict)
+            fi_df['p99_low'] = pd.Series(p99_low_dict)
+        return fi_df
 
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """
