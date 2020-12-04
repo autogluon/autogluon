@@ -105,6 +105,7 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
         from fastai.tabular import FillMissing, Categorify, Normalize
+        from fastai.core import defaults
 
         self.cat_columns = X_train.select_dtypes([
             'category', 'object', 'bool', 'bool_'
