@@ -32,8 +32,7 @@ class DefaultLearner(AbstractLearner):
         self._time_fit_training = None
         self._time_limit = None
 
-    # TODO: Add trainer_kwargs to simplify parameter count and extensibility
-
+    # TODO: v0.1 Document trainer_fit_kwargs
     def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, holdout_frac=0.1,
              num_bagging_folds=0, num_bagging_sets=1, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2, **trainer_fit_kwargs):
         """ Arguments:

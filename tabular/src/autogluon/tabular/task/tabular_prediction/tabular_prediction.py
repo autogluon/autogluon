@@ -278,10 +278,10 @@ class TabularPrediction(BaseTask):
                             min_time_limit: (float, default=0) Allow this model to train for at least this long (in sec), regardless of the time limit it would otherwise be granted.
                                 If `min_time_limit >= max_time_limit`, time_limit will be set to min_time_limit.
                                 If `min_time_limit=None`, time_limit will be set to None and the model will have no training time restriction.
-                    AG_args_ensemble: Dictionary of ensemble customization options. Only models in stack levels >=1 are impacted by these parameters.
+                    AG_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled. Only models in stack levels >=1 are impacted by these parameters.
                         Valid keys:
                             use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
-                            max_base_models: (int, default=25) Maximum number of base models to use when generating stack features. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
+                            max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
                             max_base_models_per_type: (int, default=5) Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available, only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
 
         holdout_frac : float, default = None
@@ -318,15 +318,18 @@ class TabularPrediction(BaseTask):
 
         Kwargs can include additional arguments for advanced users:
             AG_args : dict, default={}
-                Keyword arguments to pass to all models. See the `AG_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
+                See the `AG_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `AG_args` parameter for all models in `hyperparameters`.
                 If a key in `AG_args` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
             AG_args_fit : dict, default={}
-                Keyword arguments to pass to all models. See the `AG_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Keyword arguments to pass to all models.
+                See the `AG_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `AG_args_fit` parameter for all models in `hyperparameters`.
                 If a key in `AG_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
             AG_args_ensemble : dict, default={}
-                Keyword arguments to pass to all models. See the `AG_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Keyword arguments to pass to all models.
+                See the `AG_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `AG_args_ensemble` parameter for all models in `hyperparameters`.
                 If a key in `AG_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
             excluded_model_types : list, default = []
