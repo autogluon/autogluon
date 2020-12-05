@@ -41,7 +41,7 @@ def model_trial(args, reporter: LocalStatusReporter):
                                    y_val=y_val, time_start=util_args.time_start, time_limit=util_args.get('time_limit'),
                                    epochs=epochs, reporter=reporter, save_val_pred=save_val_pred)
     except AutoGluonEarlyStop:
-        if model is not None:
+        if model:
             model.save()
     except TimeLimitExceeded:
         pass  # this is intended to be silent for model trials
