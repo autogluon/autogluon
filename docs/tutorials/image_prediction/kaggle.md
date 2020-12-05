@@ -1,4 +1,4 @@
-# Image Classification - How to Use Your Own Datasets
+# Image Prediction - How to Use Your Own Datasets
 
 This tutorial demonstrates how to use AutoGluon with your own custom datasets.
 As an example, we use a dataset from Kaggle to show the required steps to format image data properly for AutoGluon.
@@ -15,7 +15,7 @@ After completing this step, you will have the following directory structure on y
     ├── ...
 ```
 
-Here `data` is a folder containing the raw images categorized into classes. For example, subfolder `class1` contains all images that belong to the first class, `class2` contains all images belonging to the second class, etc. 
+Here `data` is a folder containing the raw images categorized into classes. For example, subfolder `class1` contains all images that belong to the first class, `class2` contains all images belonging to the second class, etc.
 We generally recommend at least 100 training images per class for reasonable classification performance, but this might depend on the type of images in your specific use-case.
 
 Under each class, the following image formats are supported when training your model:
@@ -33,10 +33,10 @@ Below, we demonstrate how to construct this organization for a Kaggle dataset.
 
 Kaggle is a popular machine learning competition platform and contains lots of
 datasets for different machine learning tasks including image classification.
-If you don't have Kaggle account, please register one at [Kaggle](https://www.kaggle.com/). 
+If you don't have Kaggle account, please register one at [Kaggle](https://www.kaggle.com/).
 Then, please follow the [Kaggle installation](https://github.com/Kaggle/kaggle-api/) to obtain access to Kaggle's data downloading API.
 
-To find image classification datasets in Kaggle, let's go to [Kaggle](https://www.kaggle.com/) 
+To find image classification datasets in Kaggle, let's go to [Kaggle](https://www.kaggle.com/)
 and search using keyword `image classification` either under `Datasets` or `Competitions`.
 
 For example, we find the `Shopee-IET Machine Learning Competition` under the `InClass` tab in `Competitions`.
@@ -81,7 +81,7 @@ data is used to learn the parameters of the model,
 namely the weights of the neural network classifier.
 
 **Validation Set**: A separate validation set (sometimes also called the dev set)
-is also used during AutoGluon's training process. While neural network weights are updated based on the training data, 
+is also used during AutoGluon's training process. While neural network weights are updated based on the training data,
 each neural network requires the user to specify many hyperparameters (e.g., learning rates, etc.). The choice of hyperparameters greatly impacts the training process and resulting model.  AutoGluon automatically tries many different values of these hyperparameters and evaluates each hyperparameter setting by measuring the performance of the resulting network on the validation set.
 
 **Test Set**: A separate set of images, possibly without available labels. These data are never used during any part of the model construction or learning process. If unlabeled, these may correspond to images whose labels we would like to predict. If labeled, these images may correspond to images we reserve for estimating the performance of our final model.
@@ -91,11 +91,11 @@ each neural network requires the user to specify many hyperparameters (e.g., lea
 AutoGluon automatically does Training/Validation split:
 
 ```
-from autogluon.vision import ImageClassification as task
-dataset = task.Dataset('./data/shopeeiet/train')
+from autogluon.vision import ImagePredictor
+dataset = ImagePredictor.Dataset.from_folder('./data/shopeeiet/train')
 ```
 
-AutoGluon automatically infers how many classes there are based on the directory structure. 
+AutoGluon automatically infers how many classes there are based on the directory structure.
 By default, AutoGluon automatically constructs the training/validation set split:
 
 - Training Set: 80% of images.
@@ -105,38 +105,36 @@ where the images that fall into the validation set are randomly chosen from the 
 
 ## Step 3: Use AutoGluon fit to generate a classification model
 
-Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.task.html#autogluon.task.ImageClassification.fit) function.
+Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.task.html#autogluon.task.ImagePredictor.fit) function.
 
 Due to the large size of the Kaggle dataset,
 calling `fit` without specifying a time limit may result in long waiting times.
 Run the following commands to run `fit` using a time limit:
 
 ```
-time_limits = 10 * 60 # 10mins
-classifier = task.fit(dataset, time_limits=time_limits,
-                      ngpus_per_trial=1)
+time_limit = 10 * 60 # 10mins
+predictor = ImagePredictor()
+predictor.fit(dataset, time_limit=time_limit)
 ```
 
 The top-1 accuracy of the best model on the validation set is:
 
 ```
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+print('Top-1 val acc: %.3f' % predictor.fit_summary()['valid_acc'])
 ```
 
-###  Using AutoGluon to Generate Predictions on Test Images 
+###  Using AutoGluon to Generate Predictions on Test Images
 
 We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call `predict`:
 
 ```
-test_dataset = task.Dataset('./data/shopeeiet/test', train=False)
-inds, probs, probs_all = classifier.predict(test_dataset)
+test_dataset = ImagePredictor.Dataset.from_folder('./data/shopeeiet/test')
+pred = predictor.predict(test_dataset)
+print(pred)
 ```
 
-`inds` above contains the indices of the predicted class for each test image. `probs` contains the confidence in these class predictions. `probs_all` contains the confidence in the whole of classes predictions.
-
-
-Here are the results of AutoGluon's default `fit` and `predict` under different `time_limits` when executed on a p3.16xlarge EC2 instance:
+Here are the results of AutoGluon's default `fit` and `predict` under different `time_limit` when executed on a p3.16xlarge EC2 instance:
 
 - The validation top-1 accuracy within 5h is 0.842, and ranks 14th place in Kaggle competition.
 - The validation top-1 accuracy within 24h is 0.846, and ranks 12th place in Kaggle competition.
@@ -149,10 +147,10 @@ If you wish to upload the model's predictions to Kaggle, here is how to convert 
 
 ```
 import autogluon.core as ag
-ag.utils.generate_csv(inds, './data/shopeeiet/submission.csv')
+ag.utils.generate_csv(pred['id'].tolist(), './submission.csv')
 ```
 
-This produces a submission file located at: `./data/shopeeiet/submission.csv`.
+This produces a submission file located at: `./submission.csv`.
 
 To see an example submission, check out `sample submission.csv` at this link: [Data](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data).
 

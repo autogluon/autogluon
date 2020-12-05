@@ -98,10 +98,10 @@ Select your preferences below and run the corresponding install commands:
         .. container:: pip
 
            .. container:: cpu
-           
+
               .. note::
-              
-                 If you don't have them, please first install: 
+
+                 If you don't have them, please first install:
                  `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
                  Once you have Homebrew, LibOMP can be installed via:
 
@@ -115,11 +115,11 @@ Select your preferences below and run the corresponding install commands:
                  python3 -m pip install --pre autogluon
 
               .. note::
-              
+
                  AutoGluon is not yet fully functional on Mac OSX. If you encounter MXNet system errors, please use Linux instead.  However, you can currently use AutoGluon for less compute-intensive TabularPrediction tasks on your Mac laptop (but only with hyperparameter_tune = False).
 
            .. container:: gpu
-              
+
               .. note::
 
                  GPU usage is not yet supported on Mac OSX, please use Linux to utilize GPUs in AutoGluon.
@@ -129,8 +129,8 @@ Select your preferences below and run the corresponding install commands:
            .. container:: cpu
 
               .. note::
-              
-                 If you don't have them, please first install: 
+
+                 If you don't have them, please first install:
                  `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
                  Once you have Homebrew, LibOMP can be installed via:
 
@@ -145,7 +145,7 @@ Select your preferences below and run the corresponding install commands:
                  cd autogluon && ./full_install.sh
 
               .. note::
-              
+
                  AutoGluon is not yet fully functional on Mac OSX. If you encounter MXNet system errors, please use Linux instead.
                  However, you can currently use AutoGluon for less compute-intensive TabularPrediction tasks on your Mac laptop (but only with hyperparameter_tune = False).
 
@@ -159,7 +159,7 @@ Select your preferences below and run the corresponding install commands:
 AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/packaging-namespace-packages/>`_ specialized for tabular, text, or image data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:
 
 - `autogluon.tabular` - only functionality for tabular data (TabularPrediction)
-- `autogluon.image` - only functionality for computer vision (ImageClassification, ObjectDetection)
+- `autogluon.image` - only functionality for computer vision (ImagePredictor, ObjectDetector)
 - `autogluon.text` - only functionality for natural language processing (TextPrediction)
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
 - `autogluon.extra` - miscellaneous extra functionality such as `Efficient Neural Architecture Search <tutorials/nas/enas_proxylessnas.html>`_

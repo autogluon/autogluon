@@ -39,8 +39,8 @@ See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [docume
 - [Learning with tabular data](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html)
   - [Tips to maximize accuracy](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html#maximizing-predictive-performance) (if **benchmarking**, make sure to run `fit()` with argument `presets='best_quality'`).  
 
-- [Learning with text data](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html) 
-- [Learning with image data](https://auto.gluon.ai/stable/tutorials/image_classification/beginner.html)
+- [Learning with text data](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html)
+- [Learning with image data](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html)
 - More advanced topics such as [Neural Architecture Search](https://auto.gluon.ai/stable/tutorials/nas/index.html)
 
 ### Scientific Publications

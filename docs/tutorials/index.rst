@@ -2,25 +2,25 @@ Tutorials
 =========
 
 
-Image Classification
---------------------
+Image Prediction
+----------------
 .. container:: cards
 
    .. card::
       :title: Quick Start Using FIT
-      :link: image_classification/beginner.html
+      :link: image_prediction/beginner.html
 
       5 min tutorial on classifying images.
 
    .. card::
       :title: Customized Search and HPO
-      :link: image_classification/hpo.html
+      :link: image_prediction/hpo.html
 
       Hyperparameter tuning to improve image classification accuracy.
 
    .. card::
       :title: Use Your Own Dataset
-      :link: image_classification/kaggle.html
+      :link: image_prediction/kaggle.html
 
       Example use of AutoGluon for image classification competition on Kaggle.
 
@@ -39,7 +39,7 @@ Object Detection
 Tabular Prediction
 ------------------
 .. container:: cards
-   
+
    .. card::
       :title: Quick Start Tutorial
       :link: tabular_prediction/tabular-quickstart.html
@@ -86,34 +86,34 @@ Text Prediction
 Tune Custom Models
 --------------------
 .. container:: cards
-   
+
    .. card::
       :title: Search Space and Decorator
       :link: course/core.html
 
-      AutoGluon's Core API for search spaces and searchable 
+      AutoGluon's Core API for search spaces and searchable
       objects used to tune any training function's argument-values.
 
    .. card::
       :title: Search Algorithms
       :link: course/algorithm.html
 
-      Use AutoGluon's search algorithms to tune 
+      Use AutoGluon's search algorithms to tune
       arbitrary models/training-scripts.
 
    .. card::
       :title: Distributed Search Tutorial
       :link: course/distributed.html
 
-      Easily distribute AutoGluon tuning 
+      Easily distribute AutoGluon tuning
       across multiple machines.
-   
+
    .. card::
       :title: Tune a Multi-Layer Perceptron
       :link: course/mlp.html
 
       Complete example of how to use AutoGluon
-      and its state-of-the-art schedulers and 
+      and its state-of-the-art schedulers and
       model-based searchers to tune a MLP.
 
 
@@ -140,7 +140,7 @@ Neural Architecture Search
    :hidden:
 
    course/index
-   image_classification/index
+   image_prediction/index
    object_detection/index
    text_classification/index
    text_prediction/index
