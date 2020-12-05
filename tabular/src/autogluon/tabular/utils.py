@@ -231,8 +231,11 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
         index: The feature name.
         'importance': The estimated feature importance score.
         'stddev': The standard deviation of the feature importance score. If NaN, then not enough num_shuffle_sets were used to calculate a variance.
-        'p_value': The probability that the feature's true importance score is less than or equal to 0. Feature with p_values > 0.9 are likely harmful.
-        'n': The number of shuffles (samples) performed.
+        'p_value': P-value for a statistical t-test of the null hypothesis: importance = 0, vs the (one-sided) alternative: importance > 0.
+            Features with low p-value appear confidently useful to the predictor, while the other features may be useless to the predictor (or even harmful to include in its training data).
+            A p-value of 0.01 indicates that there is a 1% chance that the feature is useless or harmful, and a 99% chance that the feature is useful.
+            A p-value of 0.99 indicates that there is a 99% chance that the feature is useless or harmful, and a 1% chance that the feature is useful.
+        'n': The number of shuffles performed to estimate importance score (corresponds to sample-size used to determine confidence interval for true score).
     """
     if num_shuffle_sets is None:
         num_shuffle_sets = 1 if time_limit is None else 10

@@ -609,10 +609,10 @@ class TabularPredictor(BasePredictor):
             The number of different permutation shuffles of the data that are evaluated.
             Larger values will increase the quality of the importance evaluation.
             It is generally recommended to increase `subsample_size` before increasing `num_shuffle_sets`.
-            Defaults to 1 if `time_limit` is None or 10 if `time_limit` is specified.
+            Defaults to 3 if `time_limit` is None or 10 if `time_limit` is specified.
             Runtime linearly scales with `num_shuffle_sets`.
         include_confidence_band: bool, default = True
-            If True, will include output columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time.
+            If True, will include output columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time (99% confidence interval).
             Increasing `subsample_size` and `num_shuffle_sets` will tighten the band.
         silent : bool, default = False
             Whether to suppress logging output.
@@ -623,14 +623,20 @@ class TabularPredictor(BasePredictor):
             index: The feature name.
             'importance': The estimated feature importance score.
             'stddev': The standard deviation of the feature importance score. If NaN, then not enough num_shuffle_sets were used to calculate a variance.
-            'p_value': The probability that the feature's true importance score is less than or equal to 0. Feature with p_values > 0.9 are likely harmful.
-            'n': The number of shuffles (samples) performed.
-            'p99_high': The optimistic feature importance score which represents the top 0.5% cutoff of true importance estimates.
-            'p99_low': The pessimistic feature importance score which represents the bottom 0.5% cutoff of true importance estimates.
+            'p_value': P-value for a statistical t-test of the null hypothesis: importance = 0, vs the (one-sided) alternative: importance > 0.
+                Features with low p-value appear confidently useful to the predictor, while the other features may be useless to the predictor (or even harmful to include in its training data).
+                A p-value of 0.01 indicates that there is a 1% chance that the feature is useless or harmful, and a 99% chance that the feature is useful.
+                A p-value of 0.99 indicates that there is a 99% chance that the feature is useless or harmful, and a 1% chance that the feature is useful.
+            'n': The number of shuffles performed to estimate importance score (corresponds to sample-size used to determine confidence interval for true score).
+            'p99_high': Upper end of 99% confidence interval for true feature importance score.
+            'p99_low': Lower end of 99% confidence interval for true feature importance score.
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
+
+        if num_shuffle_sets is None:
+            num_shuffle_sets = 10 if time_limit else 3
 
         fi_df = self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage,
                                                     subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
