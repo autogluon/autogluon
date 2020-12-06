@@ -33,6 +33,8 @@ predictor2.save()
 del predictor2
 predictor2 = TabularPredictorV2.load(output_dir)
 
+predictor2.fit_feature_generator(data=train_data)  # Can also fit the feature generator prior to calling fit
+# train_data_transformed = predictor2.transform_features(train_data)  # FIXME: Make this work
 predictor2.fit(train_data, hyperparameters=hyperparameters, num_bagging_folds=2)
 predictor2.leaderboard(test_data)
 

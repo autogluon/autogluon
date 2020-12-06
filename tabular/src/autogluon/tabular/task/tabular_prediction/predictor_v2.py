@@ -9,6 +9,7 @@ from autogluon.core.metrics import get_metric
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
@@ -53,32 +54,25 @@ class TabularPredictorV2(TabularPredictor):
             # learner_kwargs=None -> could simplify
 
         ):
-        self._learner = None
-        self._trainer = None
+
         self.output_directory = setup_outputdir(output_directory)
-        self.problem_type = problem_type
-        self.eval_metric = eval_metric
-        self.label_column = label
-        self.feature_metadata = None
-        self.stopping_metric = stopping_metric
         self.feature_metadata_in = feature_metadata_in  # TODO: Unused, FIXME: currently overwritten after .fit, split into two variables: one for pre and one for post processing.
         self.verbosity = verbosity  # TODO: Unused
-        self.id_columns = id_columns
-        if self.id_columns is None:
-            self.id_columns = []
-        self.label_count_threshold = label_count_threshold  # TODO: Requires num_bagging_folds to be set to properly work, move num_bagging_folds into init?
-        self.cache_data = cache_data
-        self.feature_generator = feature_generator  # TODO: Fix presets
-        self.learner_type = learner_type
-        self.trainer_type = trainer_type
-        self.random_seed = random_seed
-        self.has_learner = False
+        self.cache_data = cache_data  # TODO: Move to init of learner
+
+        # TODO: v0.1 Add presets for feature_generator: `feature_generator='special'`, ignore_text, etc.
+        if feature_generator is None:
+            feature_generator = AutoMLPipelineFeatureGenerator()
+
+        # TODO: Move many of these to properties since they are contained in learner
+        self._learner: AbstractLearner = learner_type(path_context=self.output_directory, label=label, id_columns=id_columns, feature_generator=feature_generator,
+                                                      eval_metric=eval_metric, stopping_metric=stopping_metric, problem_type=problem_type,
+                                                      label_count_threshold=label_count_threshold, random_seed=random_seed, trainer_type=trainer_type)
+        self._learner_type = type(self._learner)
+        self._trainer = None
 
     # TODO: Documentation, flesh out capabilities
-    # TODO: Initialize learner if it doesn't exist
     def fit_feature_generator(self, data: pd.DataFrame) -> pd.DataFrame:
-        if self.label_column in data:
-            data = data.drop(columns=[self.label_column])
         return self._learner.fit_transform_features(data)
 
     @unpack(set_presets)
@@ -462,8 +456,9 @@ class TabularPredictorV2(TabularPredictor):
 
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
-            'feature_generator',
+            'AG_args',
             'AG_args_fit',
+            'AG_args_ensemble',
             'excluded_model_types',
             'set_best_to_refit_full',
             'save_bagged_folds',
@@ -477,7 +472,8 @@ class TabularPredictorV2(TabularPredictor):
             'ngpus_per_trial',
             'dist_ip_addrs',
             'visualizer',
-            '_feature_generator_kwargs',
+            '_feature_generator_kwargs',  # TODO: v0.1 REMOVE, UNUSED. REMOVE PRESETS RELATED TO THIS.
+            'unlabeled_data',
         }
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
@@ -489,6 +485,7 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: v0.1 - nthreads_per_trial/ngpus_per_trial -> rename/rework
         # TODO: v0.1 - visualizer -> consider reworking/removing
         # TODO: v0.1 - HPO arguments to a generic hyperparameter_tune_kwargs parameter?
+        # TODO: v0.1 - stack_ensemble_levels is silently ignored if num_bagging_folds < 2, ensure there is a warning printed
 
         feature_prune = kwargs.get('feature_prune', False)
         scheduler_options = kwargs.get('scheduler_options', None)
@@ -500,15 +497,10 @@ class TabularPredictorV2(TabularPredictor):
 
         # TODO: FIXME
         label = self.label_column
-        output_directory = self.output_directory
-        problem_type = self.problem_type
-        id_columns = self.id_columns
-        random_seed = self.random_seed
-        trainer_type = self.trainer_type
-        label_count_threshold = self.label_count_threshold
         cache_data = self.cache_data
-        feature_generator = self.feature_generator
         # TODO: FIXME
+
+        unlabeled_data = kwargs.get('unlabeled_data', None)
 
         if isinstance(train_data, str):
             train_data = TabularDataset(file_path=train_data)
@@ -522,6 +514,12 @@ class TabularPredictorV2(TabularPredictor):
             tuning_features = np.array([column for column in tuning_data.columns if column != label])
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
+        if unlabeled_data is not None:
+            train_features = sorted(np.array([column for column in train_data.columns if column != label]))
+            unlabeled_features = sorted(np.array([column for column in unlabeled_data.columns]))
+            if np.any(train_features != unlabeled_features):
+                raise ValueError("Column names must match between training and unlabeled data.\n"
+                                 "Unlabeled data must have not the label column specified in it.\n")
 
         if feature_prune:
             feature_prune = False  # TODO: Fix feature pruning to add back as an option
@@ -545,6 +543,7 @@ class TabularPredictorV2(TabularPredictor):
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
+            force_forkserver()
 
         if dist_ip_addrs is None:
             dist_ip_addrs = []
@@ -557,34 +556,42 @@ class TabularPredictorV2(TabularPredictor):
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
-        # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
-        _feature_generator_kwargs = kwargs.get('_feature_generator_kwargs', dict())
-
-        if feature_generator is None:
-            feature_generator = AutoMLPipelineFeatureGenerator(**_feature_generator_kwargs)
-        elif _feature_generator_kwargs:
-            logger.log(30, "WARNING: `feature_generator` was specified and will override any presets that alter feature generation (such as 'ignore_text')")
-        ag_args_fit = kwargs.get('AG_args_fit', {})
+        # Process kwargs to create trainer, schedulers, searchers:
+        ag_args = kwargs.get('AG_args', None)
+        ag_args_fit = kwargs.get('AG_args_fit', None)
+        ag_args_ensemble = kwargs.get('AG_args_ensemble', None)
         excluded_model_types = kwargs.get('excluded_model_types', [])
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         num_train_rows = len(train_data)
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
-            num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
-            stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 750)))
-
+            if num_bagging_folds is None:
+                num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
+            if stack_ensemble_levels is None:
+                stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+        if num_bagging_folds is None:
+            num_bagging_folds = 0
+        if stack_ensemble_levels is None:
+            stack_ensemble_levels = 0
+        if not isinstance(num_bagging_folds, int):
+            raise ValueError(f'num_bagging_folds must be an integer. (num_bagging_folds={num_bagging_folds})')
+        if not isinstance(stack_ensemble_levels, int):
+            raise ValueError(f'stack_ensemble_levels must be an integer. (stack_ensemble_levels={stack_ensemble_levels})')
+        if num_bagging_folds < 2 and num_bagging_folds != 0:
+            raise ValueError(f'num_bagging_folds must be equal to 0 or >=2. (num_bagging_folds={num_bagging_folds})')
+        if stack_ensemble_levels != 0 and num_bagging_folds == 0:
+            raise ValueError(f'stack_ensemble_levels must be 0 if num_bagging_folds is 0. (stack_ensemble_levels={stack_ensemble_levels}, num_bagging_folds={num_bagging_folds})')
         if num_bagging_sets is None:
             if num_bagging_folds >= 2:
                 if time_limits is not None:
-                    num_bagging_sets = 20
+                    num_bagging_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
                 else:
                     num_bagging_sets = 1
             else:
                 num_bagging_sets = 1
-
-        if num_bagging_folds is not None:  # Ensure there exist sufficient labels for stratified splits across all bags
-            label_count_threshold = max(label_count_threshold, num_bagging_folds)
+        if not isinstance(num_bagging_sets, int):
+            raise ValueError(f'num_bagging_sets must be an integer. (num_bagging_sets={num_bagging_sets})')
 
         time_limits_orig = copy.deepcopy(time_limits)
         time_limits_hpo = copy.deepcopy(time_limits)
@@ -605,8 +612,12 @@ class TabularPredictorV2(TabularPredictor):
         if (visualizer is not None) and (visualizer != 'none') and ('NN' in hyperparameters):
             hyperparameters['NN']['visualizer'] = visualizer
 
-        eval_metric = get_metric(eval_metric, problem_type, 'eval_metric')
-        stopping_metric = get_metric(stopping_metric, problem_type, 'stopping_metric')
+        # TODO: v0.1 consider not allowing eval_metric and stopping_metric specification here
+        if eval_metric is None:
+            eval_metric = self._learner.eval_metric
+        if stopping_metric is None:
+            stopping_metric = self._learner.stopping_metric
+        self._learner.register_metrics(eval_metric=eval_metric, stopping_metric=stopping_metric)
 
         # All models use the same scheduler:
         scheduler_options = compile_scheduler_options(
@@ -625,13 +636,11 @@ class TabularPredictorV2(TabularPredictor):
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
-        self._learner: AbstractLearner = self.learner_type(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
-                          id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
-                          label_count_threshold=label_count_threshold, random_seed=random_seed)
-        self._learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
-                    hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                    holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+        self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
+                          hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+                          holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
+                          hyperparameters=hyperparameters, ag_args=ag_args, ag_args_fit=ag_args_fit, ag_args_ensemble=ag_args_ensemble, excluded_model_types=excluded_model_types,
+                          time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
         self._set_post_fit_vars()
 
         keep_only_best = kwargs.get('keep_only_best', False)
@@ -670,17 +679,11 @@ class TabularPredictorV2(TabularPredictor):
     def _set_post_fit_vars(self, learner: AbstractLearner = None):
         if learner is not None:
             self._learner: AbstractLearner = learner
-        self._learner.persist_trainer(low_memory=True)
-        self.learner_type = type(self._learner)
-        self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
-        self.trainer_type = type(self._trainer)
+        self._learner_type = type(self._learner)
+        if self._learner.trainer_path is not None:
+            self._learner.persist_trainer(low_memory=True)
+            self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
         self.output_directory = self._learner.path
-        self.problem_type = self._learner.problem_type
-        self.eval_metric = self._learner.eval_metric
-        self.stopping_metric = self._learner.stopping_metric
-        self.label_column = self._learner.label
-        self.feature_metadata = self._trainer.feature_metadata  # TODO: Don't overwrite user feature_metadata, differentiate between pre and post processed metadata.
-        self.has_learner = True
 
     # TODO: Update and correct the logging message on loading directions
     def save(self):
@@ -702,31 +705,29 @@ class TabularPredictorV2(TabularPredictor):
             raise ValueError("output_directory cannot be None in load()")
 
         directory = setup_outputdir(directory)  # replace ~ with absolute path if it exists
-        predictor = load_pkl.load(path=directory + cls.predictor_file_name)
-        if predictor.has_learner:
-            learner = predictor.learner_type.load(directory)
-            predictor._set_post_fit_vars(learner=learner)
+        predictor: TabularPredictorV2 = load_pkl.load(path=directory + cls.predictor_file_name)
+        learner = predictor._learner_type.load(directory)
+        predictor._set_post_fit_vars(learner=learner)
         try:
             from ...version import __version__
             version_inference = __version__
         except:
             version_inference = None
         # TODO: v0.1 Move version var to predictor object in the case where learner does not exist
-        if predictor.has_learner:
-            try:
-                version_fit = predictor._learner.version
-            except:
-                version_fit = None
-            if version_fit is None:
-                version_fit = 'Unknown (Likely <=0.0.11)'
-            if version_inference != version_fit:
-                logger.warning('')
-                logger.warning('############################## WARNING ##############################')
-                logger.warning('WARNING: AutoGluon version differs from the version used during the original model fit! This may lead to instability and it is highly recommended the model be loaded with the exact AutoGluon version it was fit with.')
-                logger.warning(f'\tFit Version:     {version_fit}')
-                logger.warning(f'\tCurrent Version: {version_inference}')
-                logger.warning('############################## WARNING ##############################')
-                logger.warning('')
+        try:
+            version_fit = predictor._learner.version
+        except:
+            version_fit = None
+        if version_fit is None:
+            version_fit = 'Unknown (Likely <=0.0.11)'
+        if version_inference != version_fit:
+            logger.warning('')
+            logger.warning('############################## WARNING ##############################')
+            logger.warning('WARNING: AutoGluon version differs from the version used during the original model fit! This may lead to instability and it is highly recommended the model be loaded with the exact AutoGluon version it was fit with.')
+            logger.warning(f'\tFit Version:     {version_fit}')
+            logger.warning(f'\tCurrent Version: {version_inference}')
+            logger.warning('############################## WARNING ##############################')
+            logger.warning('')
 
         return predictor
 

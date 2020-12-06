@@ -93,10 +93,6 @@ class TabularPredictor(BasePredictor):
         self._learner.persist_trainer(low_memory=True)
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
         self.output_directory = self._learner.path
-        self.problem_type = self._learner.problem_type
-        self.eval_metric = self._learner.eval_metric
-        self.label_column = self._learner.label
-        self.feature_metadata = self._trainer.feature_metadata
 
     @property
     def class_labels(self):
@@ -109,6 +105,23 @@ class TabularPredictor(BasePredictor):
     @property
     def class_labels_internal_map(self):
         return self._learner.label_cleaner.inv_map
+
+    @property
+    def eval_metric(self):
+        return self._learner.eval_metric
+
+    @property
+    def problem_type(self):
+        return self._learner.problem_type
+
+    @property
+    def feature_metadata(self):
+        return self._trainer.feature_metadata
+
+    # TODO: v0.1 rename to label
+    @property
+    def label_column(self):
+        return self._learner.label
 
     # TODO: Documentation
     # Enables extra fit calls after the original fit

@@ -16,7 +16,7 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.core.metrics import confusion_matrix
+from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 from ..trainer.abstract_trainer import AbstractTrainer
@@ -46,8 +46,8 @@ class AbstractLearner:
         self.id_columns = id_columns
         self.threshold = label_count_threshold
         self.problem_type = problem_type
-        self.eval_metric = eval_metric
-        self.stopping_metric = stopping_metric
+        self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
+        self.stopping_metric = get_metric(stopping_metric, self.problem_type, 'stopping_metric')
         self.is_trainer_present = is_trainer_present
         if random_seed is None:
             random_seed = random.randint(0, 1000000)
@@ -158,6 +158,11 @@ class AbstractLearner:
         return self.load_trainer().refit_ensemble_full(model=model)
 
     def fit_transform_features(self, X, y=None):
+        if self.label in X:
+            X = X.drop(columns=[self.label])
+        if self.id_columns:
+            logger.log(20, f'Dropping ID columns: {self.id_columns}')
+            X = X.drop(columns=self.id_columns, errors='ignore')
         for feature_generator in self.feature_generators:
             X = feature_generator.fit_transform(X, y)
         return X
@@ -471,7 +476,8 @@ class AbstractLearner:
         obj = load_pkl.load(path=load_path)
         if reset_paths:
             obj.set_contexts(path_context)
-            obj.trainer_path = obj.model_context
+            if obj.trainer_path is not None:
+                obj.trainer_path = obj.model_context
             obj.reset_paths = reset_paths
             # TODO: Still have to change paths of models in trainer + trainer object path variables
             return obj
@@ -491,6 +497,8 @@ class AbstractLearner:
         if self.trainer is not None:
             return self.trainer
         else:
+            if self.trainer_path is None:
+                raise AssertionError('Trainer does not exist.')
             return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
 
     # Loads models in memory so that they don't have to be loaded during predictions
@@ -567,3 +575,8 @@ class AbstractLearner:
         }
 
         return learner_info
+
+    def register_metrics(self, eval_metric=None, stopping_metric=None):
+        # TODO: v0.1 stop edits from being valid after models have been fit
+        self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
+        self.stopping_metric = get_metric(stopping_metric, self.problem_type, 'stopping_metric')
