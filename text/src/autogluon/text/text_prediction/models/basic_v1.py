@@ -694,8 +694,8 @@ class BertForTextPredictionBasic:
             predictions = self.predict_proba(valid_data)
         else:
             predictions = self.predict(valid_data)
-        metric_scores = [calculate_metric(get_metric(metric), ground_truth, predictions,
-                                          self.problem_types[0]) for metric in metrics]
+        metric_scores = {metric: calculate_metric(get_metric(metric), ground_truth, predictions,
+                                          self.problem_types[0]) for metric in metrics}
         return metric_scores
 
     def _internal_predict(self, test_data, get_original_labels=True, get_probabilities=False):
