@@ -17,7 +17,8 @@ test_hyperparameters = {
 }
 
 
-def verify_predictor_save_load(predictor, df, verify_proba=False):
+def verify_predictor_save_load(predictor, df, verify_proba=False,
+                               verify_embedding=True):
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
         predictions = predictor.predict(df)
@@ -28,6 +29,9 @@ def verify_predictor_save_load(predictor, df, verify_proba=False):
             predictions_prob = predictor.predict_proba(df)
             predictions2_prob = loaded_predictor.predict_proba(df)
             npt.assert_equal(predictions_prob, predictions2_prob)
+        if verify_embedding:
+            embeddings = predictor.extract_embedding(df)
+            assert embeddings.shape[0] == len(df)
 
 
 def test_sst():
