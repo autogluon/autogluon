@@ -181,7 +181,8 @@ def base_cfg():
 
 
 @use_np
-def _classification_regression_predict(net, dataloader, problem_type, has_label=True):
+def _classification_regression_predict(net, dataloader, problem_type,
+                                       has_label=True, extract_embedding=False):
     """
 
     Parameters
@@ -194,10 +195,13 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
         Types of the labels
     has_label
         Whether label is used
+    extract_embedding
+        Whether to extract the embedding
 
     Returns
     -------
     predictions
+        The predictions
     """
     predictions = []
     ctx_l = net.collect_params().list_ctx()
@@ -211,10 +215,14 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
             else:
                 batch_feature = sample
             batch_feature = move_to_ctx(batch_feature, ctx)
-            pred = net(batch_feature)
-            if problem_type == _C.CLASSIFICATION:
-                pred = mx.npx.softmax(pred, axis=-1)
-            iter_pred_l.append(pred)
+            if extract_embedding:
+                _, embeddings = net(batch_feature)
+                iter_pred_l.append(embeddings)
+            else:
+                pred = net(batch_feature)
+                if problem_type == _C.CLASSIFICATION:
+                    pred = mx.npx.softmax(pred, axis=-1)
+                iter_pred_l.append(pred)
         for pred in iter_pred_l:
             predictions.append(pred.asnumpy())
     predictions = np.concatenate(predictions, axis=0)
@@ -507,6 +515,7 @@ class BertForTextPredictionBasic:
 
         # Need to be set in the fit call
         self._net = None
+        self._embed_net = None
         self._preprocessor = None
         self._config = None
         self._results = None
@@ -882,3 +891,44 @@ class BertForTextPredictionBasic:
         model._preprocessor = preprocessor
         model._config = loaded_config
         return model
+
+    def extract_embedding(self, data):
+        """Extract the embedding from the pretrained model.
+
+        Returns
+        -------
+        embeddings
+            The output embeddings will have shape
+            (#samples, embedding_dim)
+        """
+        if not isinstance(data, TabularDataset):
+            if isinstance(data, (list, dict)):
+                data = pd.DataFrame(data)
+            data = TabularDataset(data,
+                                  columns=self._feature_columns,
+                                  column_properties=self._column_properties)
+        processed_data = self._preprocessor.process_test(data)
+        inference_batch_size = self.config.optimization.per_device_batch_size\
+                               * self.config.optimization.val_batch_size_mult
+        dataloader = DataLoader(processed_data,
+                                batch_size=inference_batch_size,
+                                shuffle=False,
+                                batchify_fn=self._preprocessor.batchify(is_test=True))
+        if self._embed_net is None:
+            backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+                = get_backbone(self.config.model.backbone.name)
+            text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+            embed_net = BERTForTabularBasicV1(
+                text_backbone=text_backbone,
+                feature_field_info=self._preprocessor.feature_field_info(),
+                label_shape=self.label_shapes[0],
+                cfg=self.cfg.model.network,
+                get_embedding=True,
+                params=self.net.collect_params())
+            embed_net.hybridize()
+        embeddings = _classification_regression_predict(self._net,
+                                                        dataloader=dataloader,
+                                                        problem_type=self._problem_types[0],
+                                                        has_label=False,
+                                                        extract_embedding=True)
+        return embeddings

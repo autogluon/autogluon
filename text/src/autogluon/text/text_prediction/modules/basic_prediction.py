@@ -180,7 +180,7 @@ class NumericalFeatureNet(HybridBlock):
 @use_np
 class FeatureAggregator(HybridBlock):
     def __init__(self, num_fields, out_shape, in_units,
-                 cfg=None, prefix=None, params=None):
+                 cfg=None, get_embedding=False, prefix=None, params=None):
         super().__init__(prefix=prefix, params=params)
         if cfg is None:
             cfg = FeatureAggregator.get_cfg()
@@ -190,6 +190,7 @@ class FeatureAggregator(HybridBlock):
             out_shape = tuple(out_shape)
         self.out_shape = out_shape
         self.in_units = in_units
+        self.get_embedding = get_embedding
         weight_initializer = mx.init.create(*self.cfg.initializer.weight)
         bias_initializer = mx.init.create(*self.cfg.initializer.bias)
         out_units = int(np.prod(out_shape))
@@ -201,17 +202,29 @@ class FeatureAggregator(HybridBlock):
             else:
                 raise NotImplementedError
             mid_units = in_units if cfg.mid_units < 0 else cfg.mid_units
-            self.proj = BasicMLP(in_units=in_units,
-                                 mid_units=mid_units,
-                                 out_units=out_units,
-                                 num_layers=cfg.num_layers,
-                                 normalization=cfg.normalization,
-                                 norm_eps=cfg.norm_eps,
-                                 dropout=cfg.dropout,
-                                 data_dropout=cfg.data_dropout,
-                                 activation=cfg.activation,
-                                 weight_initializer=weight_initializer,
-                                 bias_initializer=bias_initializer)
+            self.feature_proj = BasicMLP(in_units=in_units,
+                                         mid_units=mid_units,
+                                         out_units=out_units,
+                                         num_layers=cfg.feature_proj_num_layers,
+                                         normalization=cfg.normalization,
+                                         norm_eps=cfg.norm_eps,
+                                         dropout=cfg.dropout,
+                                         data_dropout=cfg.data_dropout,
+                                         activation=cfg.activation,
+                                         weight_initializer=weight_initializer,
+                                         bias_initializer=bias_initializer)
+            self.feature_activation = get_activation(self.cfg.activation)
+            self.out_proj = BasicMLP(in_units=mid_units,
+                                     mid_units=-1,
+                                     out_units=out_units,
+                                     num_layers=cfg.out_proj_num_layers,
+                                     data_dropout=cfg.dropout,
+                                     normalization=cfg.normalization,
+                                     norm_eps=cfg.norm_eps,
+                                     dropout=cfg.dropout,
+                                     activation=self.cfg.activation,
+                                     weight_initializer=weight_initializer,
+                                     bias_initializer=bias_initializer)
 
     @staticmethod
     def get_cfg(key=None):
@@ -219,7 +232,8 @@ class FeatureAggregator(HybridBlock):
             cfg = CfgNode()
             cfg.agg_type = 'concat'
             cfg.mid_units = -1
-            cfg.num_layers = 0
+            cfg.feature_proj_num_layers = 0
+            cfg.out_proj_num_layers = 0
             cfg.data_dropout = False
             cfg.dropout = 0.1
             cfg.activation = 'tanh'
@@ -245,7 +259,7 @@ class FeatureAggregator(HybridBlock):
         scores
             Shape (batch_size,) + out_shape
         """
-        if len(field_proj_features) == 0:
+        if len(field_proj_features) == 1:
             agg_features = field_proj_features[0]
         else:
             if self.cfg.agg_type == 'mean':
@@ -257,10 +271,15 @@ class FeatureAggregator(HybridBlock):
                 # TODO(sxjscience) May try to implement more advanced pooling methods for
                 #  multimodal data.
                 raise NotImplementedError
-        scores = self.proj(agg_features)
+        projected_features = self.feature_proj(agg_features)
+        projected_features = self.feature_activation(projected_features)
+        scores = self.out_proj(projected_features)
         if len(self.out_shape) != 1:
             scores = F.np.reshape(scores, (-1,) + self.out_shape)
-        return scores
+        if self.get_embedding:
+            return scores, projected_features
+        else:
+            return scores
 
 
 @use_np
@@ -284,6 +303,7 @@ class BERTForTabularBasicV1(HybridBlock):
                  feature_field_info,
                  label_shape=None,
                  cfg=None,
+                 get_embedding=False,
                  prefix=None,
                  params=None):
         """
@@ -299,6 +319,8 @@ class BERTForTabularBasicV1(HybridBlock):
             The shape of the label/number of classes. If we need a scalar, it will be an empty tuple "()".
         cfg
             The configuration of the network
+        get_embedding
+            Whether to get the aggregated embedding from the network
         prefix
         params
         """
@@ -316,6 +338,7 @@ class BERTForTabularBasicV1(HybridBlock):
             out_shape = ()
         else:
             out_shape = label_shape
+        self.get_embedding = get_embedding
         with self.name_scope():
             self.text_backbone = text_backbone
             self.feature_field_info = feature_field_info
@@ -350,7 +373,8 @@ class BERTForTabularBasicV1(HybridBlock):
             self.agg_layer = FeatureAggregator(num_fields=num_features,
                                                out_shape=out_shape,
                                                in_units=feature_units,
-                                               cfg=cfg.agg_net)
+                                               cfg=cfg.agg_net,
+                                               get_embedding=get_embedding)
 
     @staticmethod
     def get_cfg(key=None):
