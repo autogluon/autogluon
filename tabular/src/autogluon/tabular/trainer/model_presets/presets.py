@@ -138,6 +138,12 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
                 model_extra_ag_args_ensemble = extra_ag_args_ensemble.copy()
                 model_extra_ag_args_ensemble.update(model[AG_ARGS_ENSEMBLE])
                 model[AG_ARGS_ENSEMBLE] = model_extra_ag_args_ensemble
+            if extra_ag_args_fit is not None:
+                if AG_ARGS_FIT not in model:
+                    model[AG_ARGS_FIT] = dict()
+                model_extra_ag_args_fit = extra_ag_args_fit.copy()
+                model_extra_ag_args_fit.update(model[AG_ARGS_FIT])
+                model[AG_ARGS_FIT] = model_extra_ag_args_fit
             if default_ag_args is not None:
                 default_ag_args.update(model[AG_ARGS])
                 model[AG_ARGS] = default_ag_args
@@ -189,10 +195,6 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
         model_params = copy.deepcopy(model)
         model_params.pop(AG_ARGS)
         model_params.pop(AG_ARGS_ENSEMBLE)
-        if extra_ag_args_fit is not None:
-            if AG_ARGS_FIT not in model_params:
-                model_params[AG_ARGS_FIT] = {}
-            model_params[AG_ARGS_FIT].update(extra_ag_args_fit.copy())  # TODO: Consider case of overwriting user specified extra args.
         model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=model_params)
 
         if ensemble_kwargs is not None:
