@@ -1,6 +1,8 @@
-import multiprocessing, logging
-import pandas as pd
+import logging
+import multiprocessing
+
 import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -23,3 +25,28 @@ def execute_multiprocessing(workers_count, transformer, chunks, multiprocessing_
     with ctx.Pool(workers_count) as pool:
         out = pool.map(transformer, chunks)
     return out
+
+
+def force_forkserver():
+    """
+    Forces forkserver multiprocessing mode if not set. This is needed for HPO and CUDA.
+    The CUDA runtime does not support the fork start method: either the spawn or forkserver start method are required.
+    forkserver is used because spawn is still affected by locking issues
+    """
+    if ('forkserver' in multiprocessing.get_all_start_methods()) & (not is_forkserver_enabled()):
+        logger.warning('WARNING: changing multiprocessing start method to forkserver')
+        multiprocessing.set_start_method('forkserver', force=True)
+
+
+def is_forkserver_enabled():
+    """
+    Return True if current multiprocessing start method is forkserver.
+    """
+    return multiprocessing.get_start_method(allow_none=True) == 'forkserver'
+
+
+def is_fork_enabled():
+    """
+    Return True if current multiprocessing start method is fork.
+    """
+    return multiprocessing.get_start_method(allow_none=True) == 'fork'

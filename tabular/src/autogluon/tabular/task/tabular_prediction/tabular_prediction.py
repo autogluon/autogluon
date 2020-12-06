@@ -7,6 +7,7 @@ import numpy as np
 from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 from autogluon.core.metrics import get_metric
 
@@ -582,6 +583,7 @@ class TabularPrediction(BaseTask):
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
+            force_forkserver()
 
         if dist_ip_addrs is None:
             dist_ip_addrs = []

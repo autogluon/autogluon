@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import try_import_lightgbm
 from autogluon.core import Int, Space
