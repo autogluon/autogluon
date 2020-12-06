@@ -14,6 +14,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
+from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.metrics import confusion_matrix, get_metric
@@ -21,11 +22,9 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
-from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
 from ..utils import get_pred_from_proba, infer_problem_type
 from ..data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ..features.generators import PipelineFeatureGenerator
-
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: PipelineFeatureGenerator, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
+                 problem_type=None, eval_metric=None, stopping_metric=None, cache_data=True, is_trainer_present=False, random_seed=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.id_columns = id_columns
@@ -48,6 +47,9 @@ class AbstractLearner:
         self.problem_type = problem_type
         self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
         self.stopping_metric = get_metric(stopping_metric, self.problem_type, 'stopping_metric')
+        self.cache_data = cache_data
+        if not self.cache_data:
+            logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
         self.is_trainer_present = is_trainer_present
         if random_seed is None:
             random_seed = random.randint(0, 1000000)

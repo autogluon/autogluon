@@ -695,12 +695,12 @@ class TabularPrediction(BaseTask):
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
-                          label_count_threshold=label_count_threshold, random_seed=random_seed)
+                          label_count_threshold=label_count_threshold, cache_data=cache_data, random_seed=random_seed)
         learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, ag_args=ag_args, ag_args_fit=ag_args_fit, ag_args_ensemble=ag_args_ensemble, excluded_model_types=excluded_model_types,
-                    time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    time_limit=time_limits_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
 

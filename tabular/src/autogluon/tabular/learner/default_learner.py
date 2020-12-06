@@ -34,7 +34,7 @@ class DefaultLearner(AbstractLearner):
 
     # TODO: v0.1 Document trainer_fit_kwargs
     def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, holdout_frac=0.1,
-             num_bagging_folds=0, num_bagging_sets=1, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2, **trainer_fit_kwargs):
+             num_bagging_folds=0, num_bagging_sets=1, time_limit=None, save_bagged_folds=True, verbosity=2, **trainer_fit_kwargs):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -80,7 +80,7 @@ class DefaultLearner(AbstractLearner):
             k_fold=num_bagging_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bagging_sets,  # TODO: Consider moving to fit call
             scheduler_options=scheduler_options,
-            save_data=save_data,
+            save_data=self.cache_data,
             save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
             verbosity=verbosity

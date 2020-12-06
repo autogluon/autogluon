@@ -20,9 +20,7 @@ from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
 from ...features import AutoMLPipelineFeatureGenerator
 from ...learner import AbstractLearner, DefaultLearner
-
 from ...trainer import AbstractTrainer, AutoTrainer
-
 
 logger = logging.getLogger()  # return root logger
 
@@ -34,6 +32,7 @@ class TabularPredictorV2(TabularPredictor):
     Dataset = TabularDataset
     predictor_file_name = 'predictor.pkl'
 
+    # TODO: v0.1 add documentation to init
     def __init__(
             self,
             label,
@@ -53,21 +52,25 @@ class TabularPredictorV2(TabularPredictor):
 
             # learner_kwargs=None -> could simplify
 
-        ):
+    ):
 
-        self.output_directory = setup_outputdir(output_directory)
+        self.output_directory = setup_outputdir(output_directory)  # TODO: Rename to directory/path?
         self.feature_metadata_in = feature_metadata_in  # TODO: Unused, FIXME: currently overwritten after .fit, split into two variables: one for pre and one for post processing.
         self.verbosity = verbosity  # TODO: Unused
-        self.cache_data = cache_data  # TODO: Move to init of learner
 
         # TODO: v0.1 Add presets for feature_generator: `feature_generator='special'`, ignore_text, etc.
         if feature_generator is None:
             feature_generator = AutoMLPipelineFeatureGenerator()
+        if feature_metadata_in is not None:
+            if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
+                feature_generator.feature_metadata_in = copy.deepcopy(feature_metadata_in)
+            else:
+                raise AssertionError('`feature_metadata_in` already exists in `feature_generator`.')
 
         # TODO: Move many of these to properties since they are contained in learner
         self._learner: AbstractLearner = learner_type(path_context=self.output_directory, label=label, id_columns=id_columns, feature_generator=feature_generator,
                                                       eval_metric=eval_metric, stopping_metric=stopping_metric, problem_type=problem_type,
-                                                      label_count_threshold=label_count_threshold, random_seed=random_seed, trainer_type=trainer_type)
+                                                      label_count_threshold=label_count_threshold, cache_data=cache_data, random_seed=random_seed, trainer_type=trainer_type)
         self._learner_type = type(self._learner)
         self._trainer = None
 
@@ -497,7 +500,6 @@ class TabularPredictorV2(TabularPredictor):
 
         # TODO: FIXME
         label = self.label_column
-        cache_data = self.cache_data
         # TODO: FIXME
 
         unlabeled_data = kwargs.get('unlabeled_data', None)
@@ -530,10 +532,8 @@ class TabularPredictorV2(TabularPredictor):
             logger.log(30, 'Warning: dist_ip_addrs does not currently work. Distributed instances will not be utilized.')
 
         refit_full = kwargs.get('refit_full', False)
-        if not cache_data:
-            logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
-            if refit_full:
-                raise ValueError('`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
+        if refit_full and not self._learner.cache_data:
+            raise ValueError('`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
 
         set_best_to_refit_full = kwargs.get('set_best_to_refit_full', False)
         if set_best_to_refit_full and not refit_full:
@@ -640,7 +640,7 @@ class TabularPredictorV2(TabularPredictor):
                           hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                           holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                           hyperparameters=hyperparameters, ag_args=ag_args, ag_args_fit=ag_args_fit, ag_args_ensemble=ag_args_ensemble, excluded_model_types=excluded_model_types,
-                          time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                          time_limit=time_limits_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
         self._set_post_fit_vars()
 
         keep_only_best = kwargs.get('keep_only_best', False)
