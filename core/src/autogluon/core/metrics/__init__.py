@@ -2,6 +2,7 @@ import copy
 from abc import ABCMeta, abstractmethod
 from functools import partial
 
+import scipy
 import sklearn.metrics
 
 from . import classification_metrics, softclass_metrics
@@ -380,9 +381,11 @@ def customized_log_loss(y_true, y_pred):
     assert y_true.ndim == 1
     if y_pred.ndim == 1:
         # Binary classification problem
-        probabilities = np.where(y_true, y_pred, 1 - y_pred)
+        probabilities = np.where(y_true.astype(np.bool),
+                                 y_pred, 1 - y_pred)
     else:
-        probabilities = np.take(y_pred, y_true, axis=-1)
+        assert y_pred.ndim == 2, 'Only ndim=2 is supported'
+        probabilities = y_pred[np.arange(y_pred.shape[0]), y_true.astype(np.int64)]
     nll = - np.log(probabilities).mean()
     return nll
 

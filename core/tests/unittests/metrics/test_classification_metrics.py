@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
-from autogluon.core.metrics import confusion_matrix
+from autogluon.core.metrics import confusion_matrix, log_loss
+import sklearn
+import sklearn.metrics
 
 
 def test_confusion_matrix_with_valid_inputs_without_labels_and_weights():
@@ -123,3 +125,14 @@ def test_confusion_matrix_with_empty_inputs():
 
     # Then
     assert(np.array_equal(expected_output, observed_output))
+
+
+def test_log_loss():
+    gt = np.array([0, 2, 1, 0])
+    probs = np.array([[0.1, 0.2, 0.7],
+                      [0.2, 0.1, 0.7],
+                      [0.3, 0.4, 0.3],
+                      [0.01, 0.9, 0.09]], dtype=np.float32)
+    ag_loss = log_loss(gt, probs)
+    sklearn_log_loss = sklearn.metrics.log_loss(gt, probs)
+    np.testing.assert_allclose(sklearn_log_loss, - ag_loss)
