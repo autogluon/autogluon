@@ -1,6 +1,7 @@
 import logging
 from collections import defaultdict
 
+import numpy as np
 import pandas as pd
 
 from .stacker_ensemble_model import StackerEnsembleModel
@@ -47,16 +48,22 @@ class WeightedEnsembleModel(StackerEnsembleModel):
             weights_dict[key] = weights_dict[key] / num_models
         return weights_dict
 
-    def compute_feature_importance(self, X, y, features_to_use=None, is_oof=True, **kwargs) -> pd.Series:
+    def compute_feature_importance(self, X, y, features=None, is_oof=True, **kwargs) -> pd.DataFrame:
         logger.warning('Warning: non-raw feature importance calculation is not valid for weighted ensemble since it does not have features, returning ensemble weights instead...')
         if is_oof:
-            feature_importance = pd.Series(self._get_model_weights()).sort_values(ascending=False)
+            fi = pd.Series(self._get_model_weights()).sort_values(ascending=False)
         else:
             logger.warning('Warning: Feature importance calculation is not yet implemented for WeightedEnsembleModel on unseen data, returning generic feature importance...')
-            feature_importance = pd.Series(self._get_model_weights()).sort_values(ascending=False)
-            # TODO: Rewrite preprocess() in greedy_weighted_ensemble_model to enable
-            # feature_importance = super().compute_feature_importance(X=X, y=y, features_to_use=features_to_use, preprocess=preprocess, is_oof=is_oof, **kwargs)
-        return feature_importance
+            fi = pd.Series(self._get_model_weights()).sort_values(ascending=False)
+
+        fi_df = fi.to_frame(name='importance')
+        fi_df['stddev'] = np.nan
+        fi_df['p_score'] = np.nan
+        fi_df['n'] = np.nan
+
+        # TODO: Rewrite preprocess() in greedy_weighted_ensemble_model to enable
+        # fi_df = super().compute_feature_importance(X=X, y=y, features_to_use=features_to_use, preprocess=preprocess, is_oof=is_oof, **kwargs)
+        return fi_df
 
     def _set_default_params(self):
         default_params = {'use_orig_features': False}

@@ -333,7 +333,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 cumulative_loss += loss.sum()
             train_loss = cumulative_loss/float(train_dataset.num_examples)  # training loss this epoch
             if val_dataset is not None:
-                val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+                val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric.needs_pred)
             if (val_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
                 if val_dataset is not None:
                     if not np.isnan(val_metric):
@@ -379,7 +379,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if val_dataset is None:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:  # evaluate one final time:
-            final_val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+            final_val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric.needs_pred)
             if np.isnan(final_val_metric):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %

@@ -4,16 +4,19 @@ import os
 import time
 from collections import Counter
 from statistics import mean
+from functools import reduce
 
 import numpy as np
 import pandas as pd
 
-from ..abstract.abstract_model import AbstractModel
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
 from autogluon.core.utils.utils import generate_kfold
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
+
+from ..abstract.abstract_model import AbstractModel
+from ...utils import _compute_fi_with_stddev
 
 logger = logging.getLogger(__name__)
 
@@ -258,12 +261,30 @@ class BaggedEnsembleModel(AbstractModel):
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba)
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
+    # TODO: v0.1 Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features_to_use=None, is_oof=True, silent=False, **kwargs) -> pd.Series:
-        feature_importance_fold_list = []
-        fold_weights = []
-        # TODO: Preprocess data here instead of repeatedly
+    def compute_feature_importance(self, X, y, features=None, is_oof=True, time_limit=None, silent=False, **kwargs) -> pd.DataFrame:
+        if features is None:
+            features = self.load_child(model=self.models[0]).features
+        if not is_oof:
+            return super().compute_feature_importance(X, y, features=features, time_limit=time_limit, silent=silent, **kwargs)
+        fi_fold_list = []
         model_index = 0
+        num_children = len(self.models)
+        if time_limit is not None:
+            time_limit_per_child = time_limit / num_children
+        else:
+            time_limit_per_child = None
+        if not silent:
+            logging_message = f'Computing feature importance via permutation shuffling for {len(features)} features using out-of-fold (OOF) data aggregated across {num_children} child models...'
+            if time_limit is not None:
+                logging_message = f'{logging_message} Time limit: {time_limit}s...'
+            logger.log(20, logging_message)
+
+        time_start = time.time()
+        early_stop = False
+        children_completed = 0
+        log_final_suffix = ''
         for n_repeat, k in enumerate(self._k_per_n_repeat):
             if is_oof:
                 if not self.bagged_mode:
@@ -275,27 +296,36 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, silent=silent, **kwargs)
-                feature_importance_fold_list.append(feature_importance_fold)
-                fold_weights.append(len(test_index))
+                fi_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features=features, time_limit=time_limit_per_child,
+                                                           silent=silent, log_prefix='\t', importance_as_list=True, **kwargs)
+                fi_fold_list.append(fi_fold)
+
+                children_completed += 1
+                if time_limit is not None and children_completed != num_children:
+                    time_now = time.time()
+                    time_left = time_limit - (time_now - time_start)
+                    time_child_average = (time_now - time_start) / children_completed
+                    if time_left < (time_child_average * 1.1):
+                        log_final_suffix = f' (Early stopping due to lack of time...)'
+                        early_stop = True
+                        break
+            if early_stop:
+                break
             model_index += k
+        # TODO: DON'T THROW AWAY SAMPLES! USE LARGER N
+        fi_list_dict = dict()
+        for val in fi_fold_list:
+            val = val['importance'].to_dict()  # TODO: Don't throw away stddev information of children
+            for key in val:
+                if key not in fi_list_dict:
+                    fi_list_dict[key] = []
+                fi_list_dict[key] += val[key]
+        fi_df = _compute_fi_with_stddev(fi_list_dict)
 
-        weight_total = sum(fold_weights)
-        fold_weights = [weight/weight_total for weight in fold_weights]
+        if not silent:
+            logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime (Completed {children_completed} of {num_children} children){log_final_suffix}')
 
-        for i, result in enumerate(feature_importance_fold_list):
-            feature_importance_fold_list[i] = feature_importance_fold_list[i] * fold_weights[i]
-
-        feature_importance = pd.concat(feature_importance_fold_list, axis=1, sort=True).sum(1).sort_values(ascending=False)
-
-        # TODO: Consider utilizing z scores and stddev to make threshold decisions
-        # stddev = pd.concat(feature_importance_fold_list, axis=1, sort=True).std(1).sort_values(ascending=False)
-        # feature_importance_df = pd.DataFrame(index=feature_importance.index)
-        # feature_importance_df['importance'] = feature_importance
-        # feature_importance_df['stddev'] = stddev
-        # feature_importance_df['z'] = feature_importance_df['importance'] / feature_importance_df['stddev']
-
-        return feature_importance
+        return fi_df
 
     def load_child(self, model, verbose=False) -> AbstractModel:
         if isinstance(model, str):
@@ -310,7 +340,7 @@ class BaggedEnsembleModel(AbstractModel):
         child.save(verbose=verbose)
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
-    def convert_to_refitfull_template(self):
+    def convert_to_refit_full_template(self):
         init_args = self._get_init_args()
         init_args['save_bagged_folds'] = True  # refit full models must save folds
         model_base_name_orig = init_args['model_base'].name

@@ -1,6 +1,7 @@
 import copy, time, traceback, logging
 import os
 from typing import List, Union
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -14,7 +15,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryEr
 from autogluon.core.utils import shuffle_df_rows, default_holdout_frac
 from autogluon.core.metrics import log_loss, scorer_expects_y_pred
 
-from ..utils import get_pred_from_proba, generate_train_test_split, infer_eval_metric
+from ..utils import get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance
 from ..models.abstract.abstract_model import AbstractModel
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets_custom import get_preset_custom
@@ -312,8 +313,8 @@ class AbstractTrainer:
             if isinstance(models, dict):
                 ensemble_kwargs = {
                     'base_model_names': base_model_names,
-                    'base_model_paths': base_model_paths,
-                    'base_model_types': base_model_types,
+                    'base_model_paths_dict': base_model_paths,
+                    'base_model_types_dict': base_model_types,
                     'save_bagged_folds': save_bagged_folds,
                     'random_state': level + self.random_seed,
                 }
@@ -567,7 +568,7 @@ class AbstractTrainer:
             for model in models_level:
                 model = self.load_model(model)
                 model_name = model.name
-                model_full = model.convert_to_refitfull_template()
+                model_full = model.convert_to_refit_full_template()
                 # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
                 model_full.params_aux['max_memory_usage_ratio'] = model_full.params_aux['max_memory_usage_ratio'] * 1.15
                 # TODO: Do it for all models in the level at once to avoid repeated processing of data?
@@ -1239,7 +1240,7 @@ class AbstractTrainer:
     # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
     # TODO: Consider limiting X to 10k rows here instead of inside the model call
-    def get_feature_importance(self, model=None, X=None, y=None, features=None, raw=True, subsample_size=1000, silent=False):
+    def get_feature_importance(self, model=None, X=None, y=None, raw=True, **kwargs) -> pd.DataFrame:
         if model is None:
             model = self.model_best
         model: AbstractModel = self.load_model(model)
@@ -1282,10 +1283,9 @@ class AbstractTrainer:
                 y = self.load_y_val()
 
         if raw:
-            feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, subsample_size=subsample_size, silent=silent)
+            return self._get_feature_importance_raw(X=X, y=y, model=model, **kwargs)
         else:
-            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, subsample_size=subsample_size, is_oof=is_oof, silent=silent)
-        return feature_importance
+            return model.compute_feature_importance(X=X, y=y, is_oof=is_oof, **kwargs)
 
     # TODO: Can get feature importances of all children of model at no extra cost, requires scoring the values after predict_proba on each model
     #  Could solve by adding a self.score_all() function which takes model as input and also returns scores of all children models.
@@ -1296,63 +1296,20 @@ class AbstractTrainer:
     #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
     #  Consider aligning these methods so they produce the same result.
     # The output of this function is identical to non-raw when model is level 0 and non-bagged
-    def _get_feature_importance_raw(self, model, X, y, features_to_use=None, subsample_size=1000, transform_func=None, silent=False):
-        time_start = time.time()
+    def _get_feature_importance_raw(self, X, y, model, eval_metric=None, **kwargs) -> pd.DataFrame:
+        if eval_metric is None:
+            eval_metric = self.eval_metric
         if model is None:
             model = self.model_best
-        model: AbstractModel = self.load_model(model)
-        if features_to_use is None:
-            features_to_use = list(X.columns)
-        feature_count = len(features_to_use)
-
-        if not silent:
-            logger.log(20, f'Computing raw permutation importance for {feature_count} features on {model.name} ...')
-
-        if (subsample_size is not None) and (len(X) > subsample_size):
-            # Reset index to avoid error if duplicated indices.
-            X = X.reset_index(drop=True)
-            y = y.reset_index(drop=True)
-
-            X = X.sample(subsample_size, random_state=0)
-            y = y.loc[X.index]
-
-        time_start_score = time.time()
-        if transform_func is None:
-            score_baseline = self.score(X=X, y=y, model=model)
+        if eval_metric.needs_pred:
+            predict_func = self.predict
         else:
-            X_transformed = transform_func(X)
-            score_baseline = self.score(X=X_transformed, y=y, model=model)
-        time_score = time.time() - time_start_score
-
-        if not silent:
-            time_estimated = (feature_count + 1) * time_score + time_start_score - time_start
-            logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime')
-
-        X_shuffled = shuffle_df_rows(X=X, seed=0)
-
-        # Assuming X_test or X_val
-        # TODO: Can check multiple features at a time only if non-OOF
-        permutation_importance_dict = dict()
-        X_to_check = X.copy()
-        last_processed = None
-        for feature in features_to_use:
-            if last_processed is not None:  # resetting original values
-                X_to_check[last_processed] = X[last_processed].values
-            X_to_check[feature] = X_shuffled[feature].values
-            if transform_func is None:
-                score_feature = self.score(X=X_to_check, y=y, model=model)
-            else:
-                X_to_check_transformed = transform_func(X_to_check)
-                score_feature = self.score(X=X_to_check_transformed, y=y, model=model)
-            score_diff = score_baseline - score_feature
-            permutation_importance_dict[feature] = score_diff
-            last_processed = feature
-        feature_importances = pd.Series(permutation_importance_dict).sort_values(ascending=False)
-
-        if not silent:
-            logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
-
-        return feature_importances
+            predict_func = self.predict_proba
+        model: AbstractModel = self.load_model(model)
+        predict_func_kwargs = dict(model=model)
+        return compute_permutation_feature_importance(
+            X=X, y=y, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs, eval_metric=eval_metric, **kwargs
+        )
 
     def _get_models_load_info(self, model_names):
         model_names = copy.deepcopy(model_names)
