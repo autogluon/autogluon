@@ -204,7 +204,7 @@ class FeatureAggregator(HybridBlock):
             mid_units = in_units if cfg.mid_units < 0 else cfg.mid_units
             self.feature_proj = BasicMLP(in_units=in_units,
                                          mid_units=mid_units,
-                                         out_units=out_units,
+                                         out_units=mid_units,
                                          num_layers=cfg.feature_proj_num_layers,
                                          normalization=cfg.normalization,
                                          norm_eps=cfg.norm_eps,
