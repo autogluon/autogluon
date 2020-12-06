@@ -1,8 +1,6 @@
 import numpy as np
 import pytest
 from autogluon.core.metrics import confusion_matrix, log_loss
-import sklearn
-import sklearn.metrics
 
 
 def test_confusion_matrix_with_valid_inputs_without_labels_and_weights():
@@ -127,12 +125,21 @@ def test_confusion_matrix_with_empty_inputs():
     assert(np.array_equal(expected_output, observed_output))
 
 
-def test_log_loss():
-    gt = np.array([0, 2, 1, 0])
-    probs = np.array([[0.1, 0.2, 0.7],
-                      [0.2, 0.1, 0.7],
-                      [0.3, 0.4, 0.3],
-                      [0.01, 0.9, 0.09]], dtype=np.float32)
+@pytest.mark.parametrize('gt,probs',
+                         [([0, 2, 1, 0],
+                           [[0.1, 0.2, 0.7],
+                            [0.2, 0.1, 0.7],
+                            [0.3, 0.4, 0.3],
+                            [0.01, 0.9, 0.09]]),
+                          ([0, 2, 0, 0],
+                           [[0.1, 0.2, 0.7],
+                            [0.2, 0.1, 0.7],
+                            [0.3, 0.4, 0.3],
+                            [0.01, 0.9, 0.09]]
+                           )])
+def test_log_loss(gt, probs):
+    gt = np.array(gt, dtype=np.int64)
+    probs = np.array(probs, dtype=np.float32)
     ag_loss = log_loss(gt, probs)
-    sklearn_log_loss = sklearn.metrics.log_loss(gt, probs)
-    np.testing.assert_allclose(sklearn_log_loss, - ag_loss)
+    expected = np.log(probs[np.arange(probs.shape[0]), gt]).mean()
+    np.testing.assert_allclose(ag_loss, expected)
