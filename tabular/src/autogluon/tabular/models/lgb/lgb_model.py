@@ -49,7 +49,7 @@ class LGBModel(AbstractModel):
     def get_eval_metric(self):
         eval_metric = lgb_utils.convert_ag_metric_to_lgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
         if eval_metric is None:
-            eval_metric = lgb_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)
+            eval_metric = lgb_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric.needs_pred, problem_type=self.problem_type)
             eval_metric_name = self.stopping_metric.name
         else:
             eval_metric_name = eval_metric
@@ -347,16 +347,6 @@ class LGBModel(AbstractModel):
         scheduler.join_jobs()
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
-
-    # TODO: Consider adding _internal_feature_map functionality to abstract_model
-    def compute_feature_importance(self, **kwargs) -> pd.Series:
-        feature_importances = super().compute_feature_importance(**kwargs)
-        if self._internal_feature_map is not None:
-            inverse_internal_feature_map = {i: feature for feature, i in self._internal_feature_map.items()}
-            feature_importances = {inverse_internal_feature_map[i]: importance for i, importance in feature_importances.items()}
-            feature_importances = pd.Series(data=feature_importances)
-            feature_importances = feature_importances.sort_values(ascending=False)
-        return feature_importances
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:

@@ -95,7 +95,8 @@ def test_advanced_functionality():
     feature_importances = predictor.feature_importance(dataset=test_data)
     original_features = set(train_data.columns)
     original_features.remove(label)
-    assert(set(feature_importances.keys()) == original_features)
+    assert set(feature_importances.index) == original_features
+    assert set(feature_importances.columns) == {'importance', 'stddev', 'p_value', 'n', 'p99_high', 'p99_low'}
     predictor.transform_features()
     predictor.transform_features(dataset=test_data)
     predictor.info()

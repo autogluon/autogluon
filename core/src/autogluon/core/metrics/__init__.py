@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 
 import sklearn.metrics
-import scipy.stats
+
 from . import classification_metrics, softclass_metrics
 from .util import sanitize_array
 from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
@@ -62,19 +62,24 @@ class Scorer(object, metaclass=ABCMeta):
         return self.name
 
     def sklearn_scorer(self):
-        if isinstance(self, _ProbaScorer):
-            needs_proba = True
-            needs_threshold = False
-        elif isinstance(self, _ThresholdScorer):
-            needs_proba = False
-            needs_threshold = True
-        else:
-            needs_proba = False
-            needs_threshold = False
-
         with warning_filter():
-            ret = sklearn.metrics.scorer.make_scorer(score_func=self, greater_is_better=True, needs_proba=needs_proba, needs_threshold=needs_threshold)
+            ret = sklearn.metrics.scorer.make_scorer(score_func=self, greater_is_better=True, needs_proba=self.needs_proba, needs_threshold=self.needs_threshold)
         return ret
+
+    @property
+    @abstractmethod
+    def needs_pred(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def needs_proba(self) -> bool:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def needs_threshold(self) -> bool:
+        raise NotImplementedError
 
 
 class _PredictScorer(Scorer):
@@ -122,6 +127,18 @@ class _PredictScorer(Scorer):
             return self._sign * self._score_func(y_true, y_pred,
                                                  **self._kwargs)
 
+    @property
+    def needs_pred(self):
+        return True
+
+    @property
+    def needs_proba(self):
+        return False
+
+    @property
+    def needs_threshold(self):
+        return False
+
 
 class _ProbaScorer(Scorer):
     def __call__(self, y_true, y_pred, sample_weight=None):
@@ -149,6 +166,18 @@ class _ProbaScorer(Scorer):
                                                  **self._kwargs)
         else:
             return self._sign * self._score_func(y_true, y_pred, **self._kwargs)
+
+    @property
+    def needs_pred(self):
+        return False
+
+    @property
+    def needs_proba(self):
+        return True
+
+    @property
+    def needs_threshold(self):
+        return False
 
 
 class _ThresholdScorer(Scorer):
@@ -192,6 +221,18 @@ class _ThresholdScorer(Scorer):
                                                  **self._kwargs)
         else:
             return self._sign * self._score_func(y_true, y_pred, **self._kwargs)
+
+    @property
+    def needs_pred(self):
+        return False
+
+    @property
+    def needs_proba(self):
+        return False
+
+    @property
+    def needs_threshold(self):
+        return True
 
 
 def scorer_expects_y_pred(scorer: Scorer):

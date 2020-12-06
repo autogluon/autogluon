@@ -114,7 +114,7 @@ class FeaturePruner:
                 self.tuned = True
                 break
 
-            gain_df = model_iter.compute_feature_importance(X=X_val_subset, y=y_val, features_to_use=features_to_use)
+            gain_df = model_iter.compute_feature_importance(X=X_val_subset, y=y_val, features=features_to_use)
             if not objective_goal_is_negative:
                 gain_df = -gain_df
 

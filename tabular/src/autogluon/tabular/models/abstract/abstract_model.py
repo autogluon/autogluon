@@ -25,7 +25,7 @@ from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL
 
 from .model_trial import model_trial
 from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
+from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
 from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class AbstractModel:
                 path (str): directory where to store all outputs.
                 name (str): name of subdirectory inside path where model will be saved.
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-                eval_metric (str or autogluon.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
+                eval_metric (str or autogluon.core.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
                 feature_metadata (autogluon.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
@@ -69,20 +69,6 @@ class AbstractModel:
             logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
         else:
             self.normalize_pred_probas = False
-
-        if isinstance(self.eval_metric, metrics._ProbaScorer):
-            self.metric_needs_y_pred = False
-        elif isinstance(self.eval_metric, metrics._ThresholdScorer):
-            self.metric_needs_y_pred = False
-        else:
-            self.metric_needs_y_pred = True
-
-        if isinstance(self.stopping_metric, metrics._ProbaScorer):
-            self.stopping_metric_needs_y_pred = False
-        elif isinstance(self.stopping_metric, metrics._ThresholdScorer):
-            self.stopping_metric_needs_y_pred = False
-        else:
-            self.stopping_metric_needs_y_pred = True
 
         self.feature_metadata = feature_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
         self.features = features
@@ -332,12 +318,11 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    # TODO: Improve custom eval_metric support
     def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, **kwargs):
         if eval_metric is None:
             eval_metric = self.eval_metric
         if metric_needs_y_pred is None:
-            metric_needs_y_pred = self.metric_needs_y_pred
+            metric_needs_y_pred = eval_metric.needs_pred
         if metric_needs_y_pred:
             y_pred = self.predict(X=X, **kwargs)
             return eval_metric(y, y_pred)
@@ -345,12 +330,11 @@ class AbstractModel:
             y_pred_proba = self.predict_proba(X=X, **kwargs)
             return eval_metric(y, y_pred_proba)
 
-    # TODO: Improve custom eval_metric support
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
         if eval_metric is None:
             eval_metric = self.eval_metric
         if metric_needs_y_pred is None:
-            metric_needs_y_pred = self.metric_needs_y_pred
+            metric_needs_y_pred = eval_metric.needs_pred
         if metric_needs_y_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
             return eval_metric(y, y_pred)
@@ -409,120 +393,56 @@ class AbstractModel:
         return model
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features_to_use=None, subsample_size=10000, silent=False, **kwargs) -> pd.Series:
-        if (subsample_size is not None) and (len(X) > subsample_size):
-            # Reset index to avoid error if duplicated indices.
-            X = X.reset_index(drop=True)
-            y = y.reset_index(drop=True)
+    def compute_feature_importance(self, X, y, features=None, silent=False, importance_as_list=False, **kwargs) -> pd.DataFrame:
+        if self.features is not None:
+            X = X[self.features]
 
-            X = X.sample(subsample_size, random_state=0)
-            y = y.loc[X.index]
+        if not features:
+            features = self.features
         else:
-            X = X.copy()
-            y = y.copy()
-
-        X = self.preprocess(X=X, preprocess_stateful=False, **kwargs)
-
-        if not features_to_use:
-            features = list(X.columns.values)
-        else:
-            features = list(features_to_use)
+            features = list(features)
 
         feature_importance_quick_dict = self.get_model_feature_importance()
         # TODO: Also consider banning features with close to 0 importance
         # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
         banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
-        features = [feature for feature in features if feature not in banned_features]
+        features_to_check = [feature for feature in features if feature not in banned_features]
 
-        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess_nonadaptive=False, silent=silent)
+        fi_df = self.compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
+        n = fi_df.iloc[0]['n'] if len(fi_df) > 0 else 1
+        if importance_as_list:
+            banned_importance = [0] * n
+            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype='object')
+        else:
+            banned_importance = 0
+            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype='float64')
 
-        feature_importances = pd.Series(permutation_importance_dict)
-        results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features, dtype='float64')
-        feature_importances = pd.concat([feature_importances, results_banned])
-        feature_importances = feature_importances.sort_values(ascending=False)
+        results_banned_df = results_banned.to_frame(name='importance')
+        results_banned_df['stddev'] = 0
+        results_banned_df['n'] = n
+        results_banned_df['n'] = results_banned_df['n'].astype('int64')
+        fi_df = pd.concat([fi_df, results_banned_df]).sort_values(ascending=False, by='importance')
 
-        return feature_importances
+        return fi_df
 
-    # TODO: Consider repeating with different random seeds and averaging to increase confidence
-    # TODO: Optimize this
     # Compute feature importance via permutation importance
     # Note: Expensive to compute
     #  Time to compute is O(predict_time*num_features)
-    def compute_permutation_importance(self, X, y, features: list, preprocess_nonadaptive=True, silent=False) -> dict:
-        time_start = time.time()
+    def compute_permutation_importance(self, X, y, features: list, eval_metric=None, silent=False, **kwargs) -> pd.DataFrame:
+        if eval_metric is None:
+            eval_metric = self.eval_metric
+        transform_func = self.preprocess
+        if eval_metric.needs_pred:
+            predict_func = self.predict
+        else:
+            predict_func = self.predict_proba
+        transform_func_kwargs = dict(preprocess_stateful=False)
+        predict_func_kwargs = dict(preprocess_nonadaptive=False)
 
-        feature_count = len(features)
-        if not silent:
-            logger.log(20, f'Computing permutation importance for {feature_count} features on {self.name} ...')
-        if preprocess_nonadaptive:
-            X = self.preprocess(X, preprocess_stateful=False)
-
-        time_start_score = time.time()
-        model_score_base = self.score(X=X, y=y, preprocess_nonadaptive=False)
-        time_score = time.time() - time_start_score
-
-        if not silent:
-            time_estimated = (feature_count + 1) * time_score + time_start_score - time_start
-            logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime')
-
-        X_shuffled = shuffle_df_rows(X=X, seed=0)
-        row_count = X.shape[0]
-
-        # calculating maximum number of features, which is safe to process parallel
-        X_memory_ratio_max = 0.2
-        compute_count_max = 200
-
-        X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
-        available_mem = psutil.virtual_memory().available
-        X_memory_ratio = X_size_bytes / available_mem
-
-        compute_count_safe = math.floor(X_memory_ratio_max / X_memory_ratio)
-        compute_count = max(1, min(compute_count_max, compute_count_safe))
-        compute_count = min(compute_count, feature_count)
-
-        # creating copy of original data N=compute_count times for parallel processing
-        X_raw = pd.concat([X.copy() for _ in range(compute_count)], ignore_index=True, sort=False).reset_index(drop=True)
-
-        #  TODO: Make this faster by multi-threading?
-        permutation_importance_dict = {}
-        for i in range(0, feature_count, compute_count):
-            parallel_computed_features = features[i:i + compute_count]
-
-            # if final iteration, leaving only necessary part of X_raw
-            num_features_processing = len(parallel_computed_features)
-            final_iteration = i + num_features_processing == feature_count
-            if (num_features_processing < compute_count) and final_iteration:
-                X_raw = X_raw.loc[:row_count * num_features_processing - 1]
-
-            row_index = 0
-            for feature in parallel_computed_features:
-                row_index_end = row_index + row_count
-                X_raw.loc[row_index:row_index_end - 1, feature] = X_shuffled[feature].values
-                row_index = row_index_end
-
-            if self.metric_needs_y_pred:
-                y_pred = self.predict(X_raw, preprocess_nonadaptive=False)
-            else:
-                y_pred = self.predict_proba(X_raw, preprocess_nonadaptive=False)
-
-            row_index = 0
-            for feature in parallel_computed_features:
-                # calculating importance score for given feature
-                row_index_end = row_index + row_count
-                y_pred_cur = y_pred[row_index:row_index_end]
-                score = self.eval_metric(y, y_pred_cur)
-                permutation_importance_dict[feature] = model_score_base - score
-
-                if not final_iteration:
-                    # resetting to original values for processed feature
-                    X_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
-
-                row_index = row_index_end
-
-        if not silent:
-            logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
-
-        return permutation_importance_dict
+        return compute_permutation_feature_importance(
+            X=X, y=y, features=features, eval_metric=self.eval_metric, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs,
+            transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
+        )
 
     # Custom feature importance values for a model (such as those calculated from training)
     def get_model_feature_importance(self) -> dict:
@@ -544,7 +464,7 @@ class AbstractModel:
         return template
 
     # After calling this function, model should be able to be fit without test data using the iterations trained by the original model
-    def convert_to_refitfull_template(self):
+    def convert_to_refit_full_template(self):
         params_trained = self.params_trained.copy()
         template = self.convert_to_template()
         template.params.update(params_trained)
@@ -764,7 +684,6 @@ class AbstractModel:
 
 
 class AbstractNeuralNetworkModel(AbstractModel):
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._types_of_features = None
@@ -827,6 +746,8 @@ class AbstractNeuralNetworkModel(AbstractModel):
                     feature_type = 'SCALAR'
                 elif feature in language_featnames:
                     feature_type = 'TEXT'
+                else:
+                    raise ValueError(f'Invalid feature: {feature}')
 
                 types_of_features.append({"name": feature, "type": feature_type})
 
