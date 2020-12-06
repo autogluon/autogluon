@@ -215,7 +215,7 @@ class FeatureAggregator(HybridBlock):
                                          bias_initializer=bias_initializer)
             self.feature_activation = get_activation(self.cfg.activation)
             self.out_proj = BasicMLP(in_units=mid_units,
-                                     mid_units=-1,
+                                     mid_units=mid_units,
                                      out_units=out_units,
                                      num_layers=cfg.out_proj_num_layers,
                                      data_dropout=cfg.dropout,
