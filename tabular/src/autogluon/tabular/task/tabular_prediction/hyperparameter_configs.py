@@ -27,7 +27,6 @@ hyperparameter_config_dict = dict(
             {'weights': 'uniform', 'AG_args': {'name_suffix': 'Unif'}},
             {'weights': 'distance', 'AG_args': {'name_suffix': 'Dist'}},
         ],
-        'TEXT_NN_V1': {},
         'custom': ['GBM'],
     },
     # Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
@@ -67,6 +66,14 @@ hyperparameter_config_dict = dict(
         'GBM': {'num_boost_round': 10},
         'CAT': {'iterations': 10},
         'XGB': {'n_estimators': 10},
+    },
+    multimodal_text={
+        'GBM': [
+            {},
+            {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
+        ],
+        'CAT': {},
+        'TEXT_NN_V1': {'AG_args': {'valid_stacker': False}},
     }
 )
 

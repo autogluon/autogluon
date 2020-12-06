@@ -586,7 +586,10 @@ class TabularPrediction(BaseTask):
         if _feature_generator_kwargs:
             if 'feature_generator' in kwargs:
                 logger.log(30, "WARNING: `feature_generator` was specified and will override any presets that alter feature generation (such as 'ignore_text')")
-        feature_generator = kwargs.get('feature_generator', AutoMLPipelineFeatureGenerator(**_feature_generator_kwargs))
+        if 'TEXT_NN_V1' in hyperparameters:
+            _feature_generator_kwargs['enable_raw_text_features'] = True
+        feature_generator = kwargs.get('feature_generator',
+                                       AutoMLPipelineFeatureGenerator(**_feature_generator_kwargs))
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         ag_args_fit = kwargs.get('AG_args_fit', {})
