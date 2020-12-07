@@ -202,37 +202,50 @@ class FeatureAggregator(HybridBlock):
             else:
                 raise NotImplementedError
             mid_units = in_units if cfg.mid_units < 0 else cfg.mid_units
-            self.feature_proj = BasicMLP(in_units=in_units,
+            if cfg.feature_proj_num_layers >= 0:
+                self.feature_proj = BasicMLP(in_units=in_units,
+                                             mid_units=mid_units,
+                                             out_units=mid_units,
+                                             num_layers=cfg.feature_proj_num_layers,
+                                             normalization=cfg.normalization,
+                                             norm_eps=cfg.norm_eps,
+                                             dropout=cfg.dropout,
+                                             data_dropout=cfg.data_dropout,
+                                             activation=cfg.activation,
+                                             weight_initializer=weight_initializer,
+                                             bias_initializer=bias_initializer)
+                self.feature_activation = get_activation(self.cfg.activation)
+                self.out_proj = BasicMLP(in_units=mid_units,
                                          mid_units=mid_units,
-                                         out_units=mid_units,
-                                         num_layers=cfg.feature_proj_num_layers,
+                                         out_units=out_units,
+                                         num_layers=cfg.out_proj_num_layers,
+                                         data_dropout=cfg.dropout,
                                          normalization=cfg.normalization,
                                          norm_eps=cfg.norm_eps,
                                          dropout=cfg.dropout,
-                                         data_dropout=cfg.data_dropout,
-                                         activation=cfg.activation,
+                                         activation=self.cfg.activation,
                                          weight_initializer=weight_initializer,
                                          bias_initializer=bias_initializer)
-            self.feature_activation = get_activation(self.cfg.activation)
-            self.out_proj = BasicMLP(in_units=mid_units,
-                                     mid_units=mid_units,
-                                     out_units=out_units,
-                                     num_layers=cfg.out_proj_num_layers,
-                                     data_dropout=cfg.dropout,
-                                     normalization=cfg.normalization,
-                                     norm_eps=cfg.norm_eps,
-                                     dropout=cfg.dropout,
-                                     activation=self.cfg.activation,
-                                     weight_initializer=weight_initializer,
-                                     bias_initializer=bias_initializer)
+            else:
+                self.out_proj = BasicMLP(in_units=in_units,
+                                         mid_units=mid_units,
+                                         out_units=out_units,
+                                         num_layers=cfg.out_proj_num_layers,
+                                         data_dropout=cfg.data_dropout,
+                                         normalization=cfg.normalization,
+                                         norm_eps=cfg.norm_eps,
+                                         dropout=cfg.dropout,
+                                         activation=self.cfg.activation,
+                                         weight_initializer=weight_initializer,
+                                         bias_initializer=bias_initializer)
 
     @staticmethod
     def get_cfg(key=None):
         if key is None:
             cfg = CfgNode()
             cfg.agg_type = 'concat'
-            cfg.mid_units = 128
-            cfg.feature_proj_num_layers = 0
+            cfg.mid_units = 256
+            cfg.feature_proj_num_layers = -1
             cfg.out_proj_num_layers = 0
             cfg.data_dropout = False
             cfg.dropout = 0.1
@@ -271,8 +284,11 @@ class FeatureAggregator(HybridBlock):
                 # TODO(sxjscience) May try to implement more advanced pooling methods for
                 #  multimodal data.
                 raise NotImplementedError
-        projected_features = self.feature_proj(agg_features)
-        projected_features = self.feature_activation(projected_features)
+        if self.cfg.feature_proj_num_layers >= 0:
+            projected_features = self.feature_proj(agg_features)
+            projected_features = self.feature_activation(projected_features)
+        else:
+            projected_features = agg_features
         scores = self.out_proj(projected_features)
         if len(self.out_shape) != 1:
             scores = F.np.reshape(scores, (-1,) + self.out_shape)
