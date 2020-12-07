@@ -73,6 +73,14 @@ def default_no_hpo() -> dict:
     return ret
 
 
+@ag_text_prediction_params.register()
+def default_electra_base_no_hpo() -> dict:
+    ret = default_no_hpo()
+    ret['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name']\
+        = 'google_electra_base'
+    return ret
+
+
 def merge_params(base_params, partial_params=None):
     """Merge a partial change to the base configuration.
 

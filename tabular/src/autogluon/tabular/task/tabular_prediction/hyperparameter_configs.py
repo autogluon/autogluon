@@ -66,14 +66,6 @@ hyperparameter_config_dict = dict(
         'GBM': {'num_boost_round': 10},
         'CAT': {'iterations': 10},
         'XGB': {'n_estimators': 10},
-    },
-    multimodal_text={
-        'GBM': [
-            {},
-            {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
-        ],
-        'CAT': {},
-        'TEXT_NN_V1': {'AG_args': {'valid_stacker': False}},
     }
 )
 
