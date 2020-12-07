@@ -242,7 +242,7 @@ hyperparameters['hpo_params'] = {
 predictor_mrpc_bohb = task.fit(
     train_data, label='label',
     hyperparameters=hyperparameters,
-    time_limits=60 * 2, ngpus_per_trial=1, seed=123,
+    time_limits=60 * 3, ngpus_per_trial=1, seed=123,
     output_directory='./ag_mrpc_custom_space_bohb')
 ```
 
