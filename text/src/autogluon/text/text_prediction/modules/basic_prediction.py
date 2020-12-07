@@ -231,7 +231,7 @@ class FeatureAggregator(HybridBlock):
         if key is None:
             cfg = CfgNode()
             cfg.agg_type = 'concat'
-            cfg.mid_units = 256
+            cfg.mid_units = 128
             cfg.feature_proj_num_layers = 0
             cfg.out_proj_num_layers = 0
             cfg.data_dropout = False
