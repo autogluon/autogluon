@@ -19,6 +19,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       In-depth tutorial on controlling various aspects of model fitting.
 
    .. card::
+      :title: Multimodal Datasets with AutoGluon 101: Text + Categorical
+      :link: tabular-multimodal-text-others.html
+
+      Tutorial about how to use autogluon to solve tasks that contain both text and other types of features.
+
+   .. card::
       :title: Kaggle Tutorial
       :link: tabular-kaggle.html
 
