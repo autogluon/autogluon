@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.14'
+version = '0.0.15'
 """
 To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
 a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
@@ -48,7 +48,7 @@ requirements = [
     'cryptography>=2.8',
     'distributed>=2.6.0',
     'ConfigSpace<=0.4.10',
-    'gluoncv>=0.5.0,<1.0',
+    'gluoncv>=0.5.0,<0.9.0',
     'graphviz<0.9.0,>=0.8.1',
     'fastparquet==0.4.1',
     'scikit-optimize',
