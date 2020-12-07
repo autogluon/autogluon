@@ -915,11 +915,8 @@ class BertForTextPredictionBasic:
                                 shuffle=False,
                                 batchify_fn=self._preprocessor.batchify(is_test=True))
         if self._embed_net is None:
-            backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-                = get_backbone(self.config.model.backbone.name)
-            text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
             embed_net = BERTForTabularBasicV1(
-                text_backbone=text_backbone,
+                text_backbone=self.net.text_backbone,
                 feature_field_info=self._preprocessor.feature_field_info(),
                 label_shape=self.label_shapes[0],
                 cfg=self.config.model.network,
