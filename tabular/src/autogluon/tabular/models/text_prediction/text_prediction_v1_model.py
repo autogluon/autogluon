@@ -188,6 +188,7 @@ class TextPredictionV1Model(AbstractModel):
                                             ngpus_per_trial=num_gpus)
 
         # Set seed
+        print('params=', self.params)
         seed = self.params.get('seed')
         if seed is not None:
             random.seed(seed)
