@@ -924,7 +924,7 @@ class BertForTextPredictionBasic:
                 label_shape=self.label_shapes[0],
                 cfg=self.config.model.network,
                 get_embedding=True,
-                params=self.net.collect_params())
+                params=self.net.params)
             embed_net.hybridize()
             self._embed_net = embed_net
         embeddings = _classification_regression_predict(self._embed_net,
