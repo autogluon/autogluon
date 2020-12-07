@@ -1,4 +1,4 @@
-# Get started with AutoGluon for Multimodal Data: Text + Categorical
+# Explore Models for Multimodal Data with Text and Other Features
 
 :label:`sec_tabularprediction_text_multimodal`
 
@@ -24,7 +24,7 @@ mx.random.seed(123)
 
 ## Product Sentiment Analysis Dataset
 
-In this tutorial, we will use the product sentiment analysis dataset from this [MachineHack hackathon](https://www.machinehack.com/hackathons/product_sentiment_classification_weekend_hackathon_19/leaderboard). The goal of this task is to predict the user's sentiment towards a product given a review that is in raw text and the product's type, e.g., Tablet, Mobile, etc. We have split the original training data to be 90% for training and 10% for development.
+In the following, we will use the product sentiment analysis dataset from this [MachineHack hackathon](https://www.machinehack.com/hackathons/product_sentiment_classification_weekend_hackathon_19/leaderboard). The goal of this task is to predict the user's sentiment towards a product given a review that is in raw text and the product's type, e.g., Tablet, Mobile, etc. We have split the original training data to be 90% for training and 10% for development.
 
 
 ```{.python .input}
