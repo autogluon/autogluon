@@ -922,7 +922,7 @@ class BertForTextPredictionBasic:
                 text_backbone=text_backbone,
                 feature_field_info=self._preprocessor.feature_field_info(),
                 label_shape=self.label_shapes[0],
-                cfg=self.cfg.model.network,
+                cfg=self.config.model.network,
                 get_embedding=True,
                 params=self.net.collect_params())
             embed_net.hybridize()
