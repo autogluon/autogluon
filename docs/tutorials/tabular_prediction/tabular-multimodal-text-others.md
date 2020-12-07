@@ -2,7 +2,7 @@
 
 :label:`sec_tabularprediction_text_multimodal`
 
-In this tutorial, we will introduce how to use AutoGluon to deal with multimodal data that involves text, categorical, and numerical features. These types of data are prevalent in real world applications. For example, when we try to analyze the sentiment of users' tweets, we can not only use the raw text in the tweets but also other features such as the topic of the tweet and the user profile. In the following, we explain different ways for combining a state-of-the-art pretrained language model for text data: [ELECTRA](https://arxiv.org/pdf/2003.10555.pdf) and the ensembling techniques in AutoGluon to improve the modeling performance for multimodal data.
+In this tutorial, we will introduce how to use AutoGluon to deal with multimodal data that involves text, categorical, and numerical features. These types of data are prevalent in real world applications. For example, when we try to analyze the sentiment of users' tweets, we can not only use the raw text in the tweets but also other features such as the topic of the tweet and the user profile. In the following, we explain different ways for combining a state-of-the-art pretrained language model for text data: [ELECTRA](https://arxiv.org/pdf/2003.10555.pdf) and the ensemble techniques in AutoGluon to improve the modeling performance for multimodal data.
 
 
 ```{.python .input}
@@ -220,7 +220,7 @@ predictor_model5.leaderboard(dev_df.join(pd.DataFrame(dev_sentence_multimodal_em
 
 ## Model 6: Use a larger backbone
 
-Now, we will choose to use a larger backbone: ELECTRA-base. We will find that the performance gots improved after we've used ELECTRA-base.
+Now, we will choose to use a larger backbone: ELECTRA-base. We will find that the performance gets improved after we change to use a larger backbone model.
 
 
 ```{.python .input}
@@ -231,8 +231,6 @@ import copy
 text_nn_params = ag_text_prediction_params.create('default_no_hpo')
 text_nn_params['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] = 'google_electra_base'
 text_nn_params['AG_args'] = {'valid_stacker': False}
-
-hyperparameters = get_hyperparameter_config('multimodal_text')
 
 tabular_multimodel_hparam_v2 = copy.deepcopy(tabular_multimodel_hparam_v1)
 tabular_multimodel_hparam_v2['TEXT_NN_V1'] = text_nn_params
