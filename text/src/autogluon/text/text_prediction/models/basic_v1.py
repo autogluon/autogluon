@@ -924,7 +924,7 @@ class BertForTextPredictionBasic:
                 label_shape=self.label_shapes[0],
                 cfg=self.config.model.network,
                 get_embedding=True,
-                params=self.net.collect_params())
+                params=self.net.params)
             embed_net.hybridize()
             ctx_l = get_mxnet_available_ctx()
             embed_net.initialize(ctx=ctx_l[0])
