@@ -924,8 +924,6 @@ class BertForTextPredictionBasic:
                 params=self.net.collect_params(),
                 prefix='embed_net_')
             embed_net.hybridize()
-            ctx_l = get_mxnet_available_ctx()
-            embed_net.initialize(ctx=ctx_l[0])
             self._embed_net = embed_net
         embeddings = _classification_regression_predict(self._embed_net,
                                                         dataloader=dataloader,
