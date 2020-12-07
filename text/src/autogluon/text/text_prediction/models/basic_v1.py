@@ -926,7 +926,8 @@ class BertForTextPredictionBasic:
                 get_embedding=True,
                 params=self.net.collect_params())
             embed_net.hybridize()
-        embeddings = _classification_regression_predict(self._net,
+            self._embed_net = embed_net
+        embeddings = _classification_regression_predict(self._embed_net,
                                                         dataloader=dataloader,
                                                         problem_type=self._problem_types[0],
                                                         has_label=False,
