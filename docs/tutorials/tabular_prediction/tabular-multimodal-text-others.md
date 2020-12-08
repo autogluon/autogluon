@@ -2,7 +2,8 @@
 
 :label:`sec_tabularprediction_text_multimodal`
 
-In this tutorial, we will introduce how to use AutoGluon to deal with multimodal data that involves text, categorical, and numerical features. These types of data are prevalent in real world applications. For example, when we try to analyze the sentiment of users' tweets, we can not only use the raw text in the tweets but also other features such as the topic of the tweet and the user profile. In the following, we explain different ways for combining a state-of-the-art pretrained language model for text data: [ELECTRA](https://arxiv.org/pdf/2003.10555.pdf) and the ensemble techniques in AutoGluon to improve the modeling performance for multimodal data.
+In this tutorial, we will introduce how to use AutoGluon to deal with multimodal data that involves text other other features, e.g., categorical features. These types of data are prevalent in real world applications. For example, when we try to analyze the sentiment of users' tweets, we can not only use the raw text in the tweets but also other features such as the topic of the tweet and the user profile. In the following, we will investigate different ways that you may combine the neural network model in AutoGluon Text, which is based on state-of-the-art pretrained language models and the ensemble techniques in AutoGluon Tabular to improve the final performance on multimodal datasets. For more details about what's the inner-working of the AutoGluon Text neural network, you may refer to :ref:`sec_textprediction_heterogeneous`.
+
 
 
 ```{.python .input}
@@ -109,11 +110,11 @@ predictor_model1 = TabularPrediction.fit(train_df,
 predictor_model1.leaderboard(dev_df)
 ```
 
-We can find that combining the product type feature is quite essential for a good performance.
+We can find that combining the product type feature is quite essential for good performance.
 
-## Model 2: Extract Text Embedding and Use Tabular
+## Model 2: Extract Text Embedding and Use Tabular Predictor
 
-The AutoGluon-Text offers the `extract_embedding()` functionality so we can try to use the trained text-only model to extract sentence embeddings and use AutoGluon to train the predictor.
+The AutoGluon-Text offers the `extract_embedding()` functionality so we can try to have a two-stage model. In the first stage, we use the text-only model to extract sentence embeddings and then use AutoGluon TabularPredictor to get the final model.
 
 
 ```{.python .input}
@@ -145,7 +146,9 @@ predictor_model2 = TabularPrediction.fit(merged_train_data,
 predictor_model2.leaderboard(merged_dev_data)
 ```
 
-## Model 3: Use the model in AutoGluon-Text
+## Model 3: Use the Neural Network in AutoGluon-Text in Tabular Weighted Ensemble
+
+Another option is to directly include the neural network in AutoGluon-Text as one candidate of TabularPredictor. We can do that now by changing the hyperparameters. Note that for the purpose of this tutorial, we are manually setting the `hyperparameters` and we will release some good pre-configurations soon.
 
 
 ```{.python .input}
@@ -169,7 +172,9 @@ predictor_model3 = TabularPrediction.fit(train_df,
 predictor_model3.leaderboard(dev_df)
 ```
 
-## Model 4: Text Prediction + Stack Ensemble
+## Model 4: K-Fold Bagging and Stack Ensemble
+
+A more advanced strategy is to use 5-fold bagging and call stack ensembling. This is expected to improve the final performance.
 
 
 ```{.python .input}
@@ -190,6 +195,8 @@ predictor_model4.leaderboard(dev_df)
 ```
 
 ## Model 5: Multimodal embedding + TabularPrediction
+
+Also, since the neural network in text prediction can directly handle multi-modal data, we can fit a model with TextPrediction first and then use that as an embedding extractor. This can be viewed as an improved version of Model-2.
 
 
 ```{.python .input}
@@ -248,3 +255,10 @@ predictor_model6 = TabularPrediction.fit(train_df,
 ```{.python .input}
 predictor_model6.leaderboard(dev_df)
 ```
+
+## Major Take-aways
+
+After performing these comparisons, we have the following takeaways:
+- The multimodal text neural network structure used in TextPrediction, which is based on pretrained language model, is a good network strcuture for dealing with multi-modal data.
+- K-fold bagging / stacking is helpful
+- We need a larger backbone. This aligns with the observation in recent papers, e.g., [Scaling Laws for Autoregressive Generative Modeling](https://arxiv.org/abs/2010.14701).
