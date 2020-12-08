@@ -2,14 +2,14 @@ max_time = 180
 
 stage("Unit Test") {
   node('linux-gpu') {
-    ws('workspace/autugluon-py3-v0_0_14') {
+    ws('workspace/autugluon-py3-v0_0_15') {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_py3-v0_0_14 -f docs/build.yml
-        conda activate autogluon_py3-v0_0_14
+        conda env update -n autogluon_py3-v0_0_15 -f docs/build.yml
+        conda activate autogluon_py3-v0_0_15
         python3 -m pip uninstall -y autogluon
         python3 -m pip uninstall -y autogluon-contrib-nlp
         python3 -m pip uninstall -y autogluon-core
@@ -41,7 +41,7 @@ stage("Unit Test") {
 
 stage("Build Docs") {
   node('linux-gpu') {
-    ws('workspace/autogluon-docs-v0_0_14') {
+    ws('workspace/autogluon-docs-v0_0_15') {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -80,8 +80,8 @@ stage("Build Docs") {
 
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_docs-v0_0_14 -f docs/build_contrib.yml
-        conda activate autogluon_docs-v0_0_14
+        conda env update -n autogluon_docs-v0_0_15 -f docs/build_contrib.yml
+        conda activate autogluon_docs-v0_0_15
         python3 -m pip uninstall -y autogluon
         python3 -m pip uninstall -y autogluon-contrib-nlp
         python3 -m pip uninstall -y autogluon-core
