@@ -355,7 +355,7 @@ def train_function(args, reporter, train_data, tuning_data,
     report_idx = 0
     start_tick = time.time()
     best_report_items = None
-    for update_idx in tqdm.tqdm(range(max_update)):
+    for update_idx in tqdm.tqdm(range(max_update), disable=None):
         num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)

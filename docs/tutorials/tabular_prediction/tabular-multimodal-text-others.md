@@ -256,9 +256,10 @@ predictor_model6 = TabularPrediction.fit(train_df,
 predictor_model6.leaderboard(dev_df)
 ```
 
-## Major Take-aways
+## Major Takeaways
 
 After performing these comparisons, we have the following takeaways:
-- The multimodal text neural network structure used in TextPrediction, which is based on pretrained language model, is a good network strcuture for dealing with multi-modal data.
-- K-fold bagging / stacking is helpful
-- We need a larger backbone. This aligns with the observation in recent papers, e.g., [Scaling Laws for Autoregressive Generative Modeling](https://arxiv.org/abs/2010.14701).
+
+    - The multimodal text neural network structure used in TextPrediction is a good for dealing with tabular data with text and numerical/categorical features.
+    - K-fold bagging / stacking and weighted ensemble are helpful
+    - We need a larger backbone. This aligns with the observation in recent papers, e.g., [Scaling Laws for Autoregressive Generative Modeling](https://arxiv.org/abs/2010.14701).
