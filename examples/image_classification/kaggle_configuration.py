@@ -25,34 +25,32 @@ def config_choice(data_path, dataset):
             pass
         optimizer = NAG()
 
-        lr_config = ag.space.Dict(
-                    lr_mode='step',
-                    lr_decay=0.1,
-                    lr_decay_period=0,
-                    lr_decay_epoch='40,80',
-                    warmup_lr=0.0,
-                    warmup_epochs=5)
-        tricks = ag.space.Dict(
-                    last_gamma=True,
-                    use_pretrained=True,
-                    use_se=False,
-                    mixup=False,
-                    mixup_alpha=0.2,
-                    mixup_off_epoch=0,
-                    label_smoothing=True,
-                    no_wd=True,
-                    teacher_name=None,
-                    temperature=20.0,
-                    hard_weight=0.5,
-                    batch_norm=False,
-                    use_gn=False)
-        kaggle_choice = {'classes': 2, 'net': net_cat, 'optimizer': optimizer,
+        kaggle_choice = {'classes': 2,
+                         'net': net_cat,
+                         'optimizer': optimizer,
                          'dataset': dataset_path,
                          'batch_size': 320,#512
                          'epochs': 180,
                          'ngpus_per_trial': 4,
-                         'lr_config': lr_config,
-                         'tricks': tricks,
+                         'lr_mode': 'step',
+                         'lr_decay': 0.1,
+                         'lr_decay_period': 0,
+                         'lr_decay_epoch': '40,80',
+                         'warmup_lr': 0.0,
+                         'warmup_epochs': 5,
+                         'last_gamma': True,
+                         'use_pretrained': True,
+                         'use_se': False,
+                         'mixup': False,
+                         'mixup_alpha': 0.2,
+                         'mixup_off_epoch': 0,
+                         'label_smoothing': True,
+                         'no_wd': True,
+                         'teacher_name': None,
+                         'temperature': 20.0,
+                         'hard_weight': 0.5,
+                         'batch_norm': False,
+                         'use_gn': False,
                          'num_trials': 16}
     elif dataset == 'aerial-cactus-identification':
         net_aeri = ag.space.Categorical('resnet34_v1b')
@@ -64,34 +62,30 @@ def config_choice(data_path, dataset):
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = ag.space.Dict(
-                    lr_mode='step',
-                    lr_decay=0.1,
-                    lr_decay_period=0,
-                    lr_decay_epoch='60,120',
-                    warmup_lr=0.0,
-                    warmup_epochs=5)
-        tricks = ag.space.Dict(
-                    last_gamma=True,
-                    use_pretrained=True,
-                    use_se=False,
-                    mixup=False,
-                    mixup_alpha=0.2,
-                    mixup_off_epoch=0,
-                    label_smoothing=True,
-                    no_wd=True,
-                    teacher_name=None,
-                    temperature=20.0,
-                    hard_weight=0.5,
-                    batch_norm=False,
-                    use_gn=False)
         kaggle_choice = {'classes': 2, 'net': net_aeri, 'optimizer': optimizer,
                          'dataset': dataset_path,
                          'batch_size': 320,#256
                          'epochs': 180,
                          'ngpus_per_trial': 4,
-                         'lr_config': lr_config,
-                         'tricks': tricks,
+                         'lr_mode': 'step',
+                         'lr_decay': 0.1,
+                         'lr_decay_period': 0,
+                         'lr_decay_epoch': '60,120',
+                         'warmup_lr': 0.0,
+                         'warmup_epochs': 5,
+                         'last_gamma': True,
+                         'use_pretrained': True,
+                         'use_se': False,
+                         'mixup': False,
+                         'mixup_alpha': 0.2,
+                         'mixup_off_epoch': 0,
+                         'label_smoothing': True,
+                         'no_wd': True,
+                         'teacher_name': None,
+                         'temperature': 20.0,
+                         'hard_weight': 0.5,
+                         'batch_norm': False,
+                         'use_gn': False,
                          'num_trials': 30}
     elif dataset == 'plant-seedlings-classification':
         net_plant = ag.space.Categorical('resnet50_v1')
@@ -103,34 +97,30 @@ def config_choice(data_path, dataset):
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = ag.space.Dict(
-                    lr_mode='cosine',
-                    lr_decay=0.1,
-                    lr_decay_period=0,
-                    lr_decay_epoch='40,80',
-                    warmup_lr=0.0,
-                    warmup_epochs=5)
-        tricks = ag.space.Dict(
-                    last_gamma=True,
-                    use_pretrained=True,
-                    use_se=False,
-                    mixup=False,
-                    mixup_alpha=0.2,
-                    mixup_off_epoch=0,
-                    label_smoothing=True,
-                    no_wd=True,
-                    teacher_name=None,
-                    temperature=20.0,
-                    hard_weight=0.5,
-                    batch_norm=False,
-                    use_gn=False)
         kaggle_choice = {'classes': 12, 'net': net_plant, 'optimizer': optimizer,
                          'dataset': dataset_path,
                          'batch_size': 128,
                          'epochs': 120,
                          'ngpus_per_trial': 2,
-                         'lr_config': lr_config,
-                         'tricks': tricks,
+                         'lr_mode': 'cosine',
+                         'lr_decay': 0.1,
+                         'lr_decay_period': 0,
+                         'lr_decay_epoch': '40,80',
+                         'warmup_lr': 0.0,
+                         'warmup_epochs': 5,
+                         'last_gamma': True,
+                         'use_pretrained': True,
+                         'use_se': False,
+                         'mixup': False,
+                         'mixup_alpha': 0.2,
+                         'mixup_off_epoch': 0,
+                         'label_smoothing': True,
+                         'no_wd': True,
+                         'teacher_name': None,
+                         'temperature': 20.0,
+                         'hard_weight': 0.5,
+                         'batch_norm': False,
+                         'use_gn': False,
                          'num_trials': 30}
     elif dataset == 'fisheries_Monitoring':
         net_fish = ag.space.Categorical('resnet50_v1')
@@ -142,34 +132,30 @@ def config_choice(data_path, dataset):
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = ag.space.Dict(
-                    lr_mode='cosine',
-                    lr_decay=0.1,
-                    lr_decay_period=0,
-                    lr_decay_epoch='40,80',
-                    warmup_lr=0.0,
-                    warmup_epochs=5)
-        tricks = ag.space.Dict(
-                    last_gamma=True,
-                    use_pretrained=True,
-                    use_se=False,
-                    mixup=False,
-                    mixup_alpha=0.2,
-                    mixup_off_epoch=0,
-                    label_smoothing=True,
-                    no_wd=True,
-                    teacher_name=None,
-                    temperature=20.0,
-                    hard_weight=0.5,
-                    batch_norm=False,
-                    use_gn=False)
         kaggle_choice = {'classes': 8, 'net': net_fish, 'optimizer': optimizer,
                          'dataset': dataset_path,
                          'batch_size': 128,
                          'epochs': 120,
                          'ngpus_per_trial': 2,
-                         'lr_config': lr_config,
-                         'tricks': tricks,
+                         'lr_mode': 'cosine',
+                         'lr_decay': 0.1,
+                         'lr_decay_period': 0,
+                         'lr_decay_epoch': '40,80',
+                         'warmup_lr': 0.0,
+                         'warmup_epochs': 5,
+                         'last_gamma': True,
+                         'use_pretrained': True,
+                         'use_se': False,
+                         'mixup': False,
+                         'mixup_alpha': 0.2,
+                         'mixup_off_epoch': 0,
+                         'label_smoothing': True,
+                         'no_wd': True,
+                         'teacher_name': None,
+                         'temperature': 20.0,
+                         'hard_weight': 0.5,
+                         'batch_norm': False,
+                         'use_gn': False,
                          'num_trials': 30}
     elif dataset == 'dog-breed-identification':
         net_dog = ag.space.Categorical('resnext101_64x4d')
@@ -181,34 +167,30 @@ def config_choice(data_path, dataset):
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = ag.space.Dict(
-                    lr_mode='cosine',
-                    lr_decay=0.1,
-                    lr_decay_period=0,
-                    lr_decay_epoch='60,120',
-                    warmup_lr=0.0,
-                    warmup_epochs=5)
-        tricks = ag.space.Dict(
-                    last_gamma=True,
-                    use_pretrained=True,
-                    use_se=False,
-                    mixup=False,
-                    mixup_alpha=0.2,
-                    mixup_off_epoch=0,
-                    label_smoothing=True,
-                    no_wd=True,
-                    teacher_name=None,
-                    temperature=20.0,
-                    hard_weight=0.5,
-                    batch_norm=False,
-                    use_gn=False)
         kaggle_choice = {'classes': 120, 'net': net_dog, 'optimizer': optimizer,
                          'dataset': dataset_path,
                          'batch_size': 48,
                          'epochs': 180,
                          'ngpus_per_trial': 4,
-                         'lr_config': lr_config,
-                         'tricks': tricks,
+                         'lr_mode': 'cosine',
+                         'lr_decay': 0.1,
+                         'lr_decay_period': 0,
+                         'lr_decay_epoch': '60,120',
+                         'warmup_lr': 0.0,
+                         'warmup_epochs': 5,
+                         'last_gamma': True,
+                         'use_pretrained': True,
+                         'use_se': False,
+                         'mixup': False,
+                         'mixup_alpha': 0.2,
+                         'mixup_off_epoch': 0,
+                         'label_smoothing': True,
+                         'no_wd': True,
+                         'teacher_name': None,
+                         'temperature': 20.0,
+                         'hard_weight': 0.5,
+                         'batch_norm': False,
+                         'use_gn': False,
                          'num_trials': 30}
     elif dataset == 'shopee-iet-machine-learning-competition':
         net_shopee = ag.space.Categorical('resnet152_v1d')
@@ -220,36 +202,30 @@ def config_choice(data_path, dataset):
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = ag.space.Dict(
-                    lr_mode='cosine',
-                    lr_decay=0.1,
-                    lr_decay_period=0,
-                    lr_decay_epoch='60,120',
-                    warmup_lr=0.0,
-                    warmup_epochs=5)
-
-        tricks = ag.space.Dict(
-                    last_gamma=True,
-                    use_pretrained=True,
-                    use_se=False,
-                    mixup=False,
-                    mixup_alpha=0.2,
-                    mixup_off_epoch=0,
-                    label_smoothing=True,
-                    no_wd=True,
-                    teacher_name=None,
-                    temperature=20.0,
-                    hard_weight=0.5,
-                    batch_norm=False,
-                    use_gn=False)
-
         kaggle_choice = {'classes': 18, 'net': net_shopee, 'optimizer': optimizer,
                          'dataset': dataset_path,
                          'batch_size': 48,
                          'epochs': 180,
                          'ngpus_per_trial': 4,
-                         'lr_config': lr_config,
-                         'tricks': tricks,
+                         'lr_mode': 'cosine',
+                         'lr_decay': 0.1,
+                         'lr_decay_period': 0,
+                         'lr_decay_epoch': '60,120',
+                         'warmup_lr': 0.0,
+                         'warmup_epochs': 5,
+                         'last_gamma': True,
+                         'use_pretrained': True,
+                         'use_se': False,
+                         'mixup': False,
+                         'mixup_alpha': 0.2,
+                         'mixup_off_epoch': 0,
+                         'label_smoothing': True,
+                         'no_wd': True,
+                         'teacher_name': None,
+                         'temperature': 20.0,
+                         'hard_weight': 0.5,
+                         'batch_norm': False,
+                         'use_gn': False,
                          'num_trials': 30}
     elif dataset == 'shopee-iet':
         download_shopee(dataset, data_path)
@@ -264,37 +240,29 @@ def config_choice(data_path, dataset):
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-
-        lr_config = ag.space.Dict(
-                    lr_mode='cosine',
-                    lr_decay=0.1,
-                    lr_decay_period=0,
-                    lr_decay_epoch='40,80',
-                    warmup_lr=0.0,
-                    warmup_epochs=5)
-
-        tricks = ag.space.Dict(
-                    last_gamma=True,
-                    use_pretrained=True,
-                    use_se=False,
-                    mixup=False,
-                    mixup_alpha=0.2,
-                    mixup_off_epoch=0,
-                    label_smoothing=True,
-                    no_wd=True,
-                    teacher_name=None,
-                    temperature=20.0,
-                    hard_weight=0.5,
-                    batch_norm=False,
-                    use_gn=False)
-
         kaggle_choice = {'classes': 4, 'net': net_shopee, 'optimizer': optimizer,
                          'dataset': dataset_path,
                          'batch_size': 2,
                          'epochs': 1,
                          'ngpus_per_trial': 1,
-                         'lr_config': lr_config,
-                         'tricks': tricks,
+                         'lr_mode': 'cosine',
+                         'lr_decay': 0.1,
+                         'lr_decay_period': 0,
+                         'lr_decay_epoch': '40,80',
+                         'warmup_lr': 0.0,
+                         'warmup_epochs': 5,
+                         'last_gamma': True,
+                         'use_pretrained': True,
+                         'use_se': False,
+                         'mixup': False,
+                         'mixup_alpha': 0.2,
+                         'mixup_off_epoch': 0,
+                         'label_smoothing': True,
+                         'no_wd': True,
+                         'teacher_name': None,
+                         'temperature': 20.0,
+                         'hard_weight': 0.5,
+                         'batch_norm': False,
+                         'use_gn': False,
                          'num_trials': 1}
     return kaggle_choice
-

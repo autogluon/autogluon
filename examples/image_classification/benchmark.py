@@ -1,8 +1,9 @@
 import os
 import argparse
 import logging
+import pandas as pd
 from autogluon.core.utils import generate_csv_submission
-from autogluon.vision import ImageClassification as task
+from autogluon.vision import ImagePredictor
 from kaggle_configuration import config_choice
 
 def parse_args():
@@ -13,12 +14,12 @@ def parse_args():
                         help='the kaggle competition.')
     parser.add_argument('--custom', type=str, default='predict',
                         help='the name of the submission file you set.')
-    parser.add_argument('--num-trials', type=int, default=30,
-                        help='number of trials')
-    parser.add_argument('--num-epochs', type=int, default=5,
-                        help='number of training epochs.')
-    parser.add_argument('--batch-size', type=int, default=32,
-                        help='training batch size per device (CPU/GPU).')
+    parser.add_argument('--num-trials', type=int, default=-1,
+                        help='number of trials, if negative, use default setting')
+    parser.add_argument('--num-epochs', type=int, default=-1,
+                        help='number of training epochs, if negative, will use default setting')
+    parser.add_argument('--batch-size', type=int, default=-1,
+                        help='training batch size per device (CPU/GPU). If negative, will use default setting')
     parser.add_argument('--ngpus-per-trial', type=int, default=1,
                         help='number of gpus to use.')
     parser.add_argument('--resume', action='store_true',
@@ -52,31 +53,36 @@ def main():
     logger.addHandler(streamhandler)
     logging.info(opt)
 
-    target = config_choice(opt.data_dir, opt.dataset)
-    load_dataset = task.Dataset(target['dataset'])
-    classifier = task.fit(dataset=load_dataset,
-                          output_directory=output_directory,
-                          net=target['net'],
-                          optimizer=target['optimizer'],
-                          tricks=target['tricks'],
-                          lr_config=target['lr_config'],
-                          resume=opt.resume,
-                          epochs=opt.num_epochs,
-                          ngpus_per_trial=opt.ngpus_per_trial,
-                          num_trials=opt.num_trials,
-                          batch_size=opt.batch_size,
-                          verbose=True,
-                          plot_results=True)
+    target_hyperparams = config_choice(opt.data_dir, opt.dataset)
+    dataset_path = target_hyperparams.pop('dataset')
+    train_dataset, val_dataset, test_dataset = ImagePredictor.Dataset.from_folders(dataset_path)
+    if isinstance(val_dataset, pd.DataFrame) and len(val_dataset) < 1:
+        val_dataset = None
+    predictor = ImagePredictor(log_dir=output_directory)
+    # overwriting default by command line:
+    if opt.batch_size > 0:
+        target_hyperparams['batch_size'] = opt.batch_size
+    num_epochs = target_hyperparams.pop('epochs')
+    num_trials = target_hyperparams.pop('num_trials')
+    ngpus_per_trial = target_hyperparams.pop('ngpus_per_trial')
+    num_epochs = opt.num_epochs if opt.num_epochs > 0 else num_epochs
+    num_trials = opt.num_trials if opt.num_trials > 0 else num_trials
+    ngpus_per_trial = min(ngpus_per_trial, opt.ngpus_per_trial)
+    predictor.fit(train_data=train_dataset,
+                  val_data=val_dataset,
+                  hyperparameters=target_hyperparams,
+                  epochs=num_epochs,
+                  ngpus_per_trial=ngpus_per_trial,
+                  num_trials=num_trials,
+                  verbose=2)
 
-    summary = classifier.fit_summary(output_directory=opt.dataset, verbosity=4)
+    summary = predictor.fit_summary()
     logging.info('Top-1 val acc: %.3f' % classifier.results['best_reward'])
     logger.info(summary)
 
     if opt.submission:
-        test_dataset = task.Dataset(os.path.join(opt.data_dir, opt.dataset, 'test'), train=False)
-        inds, probs, probs_all, value = predict_details(test_dataset, classifier, load_dataset)
+        inds, probs, probs_all, value = predict_details(test_dataset, classifier)
         generate_csv_submission(dataset_path, opt.dataset, local_path, inds, probs_all, value, opt.custom)
 
 if __name__ == '__main__':
     main()
-

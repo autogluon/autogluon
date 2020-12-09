@@ -46,6 +46,8 @@ class ObjectDetector(object):
         ----------
         train_data : pd.DataFrame or str
             Training data, can be a dataframe like image dataset.
+            For more details of how to construct a object detection dataset, please checkout:
+            `http://preview.d2l.ai/d8/main/object_detection/getting_started.html`.
             If a string is provided, will search for k8 datasets.
         val_data : pd.DataFrame or str, default = None
             Training data, can be a dataframe like image dataset.

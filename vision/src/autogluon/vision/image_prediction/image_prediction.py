@@ -47,7 +47,11 @@ class ImagePredictor(object):
         ----------
         train_data : pd.DataFrame or str
             Training data, can be a dataframe like image dataset.
-            If a string is provided, will search for k8 datasets.
+            For dataframe like datasets, `image` and `label` columns are required.
+            `image`: raw image paths. `label`: categorical integer id, starting from 0.
+            For more details of how to construct a dataset for image predictor, check out:
+            `http://preview.d2l.ai/d8/main/image_classification/getting_started.html`.
+            If a string is provided, will search for k8 built-in datasets.
         val_data : pd.DataFrame or str, default = None
             Training data, can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
@@ -134,9 +138,12 @@ class ImagePredictor(object):
             return
 
         # new HPO task
+        if time_limit is None and num_trials is None:
+            raise ValueError('`time_limit` and `num_trials` can not be `None` at the same time, '
+                             'otherwise the training will not be terminated gracefully.')
         config={'log_dir': self._log_dir,
                 'num_trials': 99999 if num_trials is None else max(1, num_trials),
-                'time_limits': time_limit,
+                'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
                 'search_strategy': search_strategy,
                 }
         if nthreads_per_trial is not None:
