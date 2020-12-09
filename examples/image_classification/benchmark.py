@@ -29,12 +29,11 @@ def parse_args():
     opt = parser.parse_args()
     return opt
 
-def predict_details(test_dataset, classifier, load_dataset):
-    inds, probs, probs_all = classifier.predict(test_dataset)
-    value = []
-    target_dataset = load_dataset.init()
-    for i in inds:
-        value.append(target_dataset.classes[i])
+def predict_details(test_dataset, predictor):
+    res = predictor.predict(test_dataset)
+    inds, probs, value = res['id'], res['score'], res['class']
+    res_prob = predictor.predict_proba(test_dataset)
+    probs_all = res_prob['score']
     return inds, probs, probs_all, value
 
 def main():
@@ -60,7 +59,7 @@ def main():
         val_dataset = None
     predictor = ImagePredictor(log_dir=output_directory)
     num_classes = target_hyperparams.pop('classes')
-    assert num_classes == train_dataset.classes
+    assert num_classes == len(train_dataset.classes), f'num_class mismatch, {num_classes} vs {len(train_dataset.classes)}'
     # overwriting default by command line:
     if opt.batch_size > 0:
         target_hyperparams['batch_size'] = opt.batch_size
@@ -79,11 +78,11 @@ def main():
                   verbosity=2)
 
     summary = predictor.fit_summary()
-    logging.info('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+    logging.info('Top-1 val acc: %.3f' % predictor.results['train_acc'])
     logger.info(summary)
 
     if opt.submission:
-        inds, probs, probs_all, value = predict_details(test_dataset, classifier)
+        inds, probs, probs_all, value = predict_details(test_dataset, predictor)
         generate_csv_submission(dataset_path, opt.dataset, local_path, inds, probs_all, value, opt.custom)
 
 if __name__ == '__main__':
