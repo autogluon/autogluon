@@ -59,6 +59,8 @@ def main():
     if isinstance(val_dataset, pd.DataFrame) and len(val_dataset) < 1:
         val_dataset = None
     predictor = ImagePredictor(log_dir=output_directory)
+    num_classes = target_hyperparams.pop('classes')
+    assert num_classes == train_dataset.classes
     # overwriting default by command line:
     if opt.batch_size > 0:
         target_hyperparams['batch_size'] = opt.batch_size
@@ -74,7 +76,7 @@ def main():
                   epochs=num_epochs,
                   ngpus_per_trial=ngpus_per_trial,
                   num_trials=num_trials,
-                  verbose=2)
+                  verbosity=2)
 
     summary = predictor.fit_summary()
     logging.info('Top-1 val acc: %.3f' % classifier.results['best_reward'])
