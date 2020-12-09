@@ -40,9 +40,8 @@ def main():
     opt = parse_args()
     if not os.path.exists(opt.dataset):
         os.mkdir(opt.dataset)
-    dataset_path = os.path.join(opt.data_dir, opt.dataset)
 
-    local_path = os.path.dirname(__file__)
+    local_path = os.path.join(opt.data_dir, opt.dataset)
     output_directory = os.path.join(opt.dataset, 'checkpoint/')
     filehandler = logging.FileHandler(os.path.join(opt.dataset, 'summary.log'))
     streamhandler = logging.StreamHandler()
@@ -78,12 +77,12 @@ def main():
                   verbosity=2)
 
     summary = predictor.fit_summary()
-    logging.info('Top-1 val acc: %.3f' % predictor.results['train_acc'])
+    logging.info('Top-1 val acc: %.3f' % summary['train_acc'])
     logger.info(summary)
 
     if opt.submission:
         inds, probs, probs_all, value = predict_details(test_dataset, predictor)
-        generate_csv_submission(dataset_path, opt.dataset, local_path, inds, probs_all, value, opt.custom)
+        generate_csv_submission(dataset_dir, opt.dataset, local_path, inds, probs_all, value, opt.custom)
 
 if __name__ == '__main__':
     main()
