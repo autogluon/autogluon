@@ -229,7 +229,7 @@ def config_choice(data_path, dataset):
                          'num_trials': 30}
     elif dataset == 'shopee-iet':
         download_shopee(dataset, data_path)
-        dataset_path = os.path.join(data_path, dataset, 'data', 'train')
+        dataset_path = os.path.join(data_path, dataset, 'data')
         net_shopee = ag.space.Categorical('resnet18_v1')
         @ag.obj(
             learning_rate=ag.space.Real(1e-4, 1e-2, log=True),
