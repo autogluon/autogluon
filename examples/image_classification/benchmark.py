@@ -54,8 +54,8 @@ def main():
     logging.info(opt)
 
     target_hyperparams = config_choice(opt.data_dir, opt.dataset)
-    dataset_path = target_hyperparams.pop('dataset')
-    train_dataset, val_dataset, test_dataset = ImagePredictor.Dataset.from_folders(dataset_path)
+    dataset_dir = target_hyperparams.pop('dataset')
+    train_dataset, val_dataset, test_dataset = ImagePredictor.Dataset.from_folders(dataset_dir)
     if isinstance(val_dataset, pd.DataFrame) and len(val_dataset) < 1:
         val_dataset = None
     predictor = ImagePredictor(log_dir=output_directory)

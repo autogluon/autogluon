@@ -5,7 +5,7 @@ from mxnet import optimizer as optim
 def download_shopee(dataset, data_path):
     if not os.path.exists(os.path.join(data_path, dataset + '.zip')):
         filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip',
-                               path='data/')
+                               path='data/shopee-iet.zip')
         ag.mkdir(filename[:-4])
         ag.unzip(filename, root=filename[:-4])
     else:
