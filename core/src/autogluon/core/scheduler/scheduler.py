@@ -1,24 +1,22 @@
 """Distributed Task Scheduler"""
-import contextlib
+import logging
+import multiprocessing as mp
 import os
 import pickle
-import logging
-import shutil
 import sys
-import tempfile
+from collections import OrderedDict
 from functools import partial
+from warnings import warn
 
 import dill
 import distributed
-from warnings import warn
-import multiprocessing as mp
-from collections import OrderedDict
 
 from .remote import RemoteManager
+from .reporter import *
 from .resource import DistributedResourceManager
 from .. import Task
-from .reporter import *
 from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
+from ..utils.files import make_temp_directory
 from ..utils.multiprocessing_utils import is_fork_enabled
 
 SYS_ERR_OUT_FILE = 'sys_err.out'
@@ -28,14 +26,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['TaskScheduler']
 
-
-@contextlib.contextmanager
-def make_temp_directory():
-    temp_dir = tempfile.mkdtemp()
-    try:
-        yield temp_dir
-    finally:
-        shutil.rmtree(temp_dir)
 
 class ClassProperty(object):
 
@@ -67,7 +57,7 @@ class TaskScheduler(object):
 
     def __init__(self, dist_ip_addrs=None):
         if dist_ip_addrs is None:
-            dist_ip_addrs=[]
+            dist_ip_addrs = []
         cls = TaskScheduler
         remotes = cls.remote_manager.add_remote_nodes(dist_ip_addrs)
         cls.resource_manager.add_remote(cls.remote_manager.get_remotes())
@@ -228,9 +218,9 @@ class TaskScheduler(object):
                 p.join()
                 # Get processes outputs
                 with open(os.path.join(tempdir, SYS_STD_OUT_FILE)) as f:
-                    print(f.read(), file=sys.stdout, end = '')
+                    print(f.read(), file=sys.stdout, end='')
                 with open(os.path.join(tempdir, SYS_ERR_OUT_FILE)) as f:
-                    print(f.read(), file=sys.stderr, end = '')
+                    print(f.read(), file=sys.stderr, end='')
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
         ret = return_list[0] if len(return_list) > 0 else None

@@ -1,16 +1,20 @@
-import os
-from pathlib import Path
-import requests
+import contextlib
 import errno
-import shutil
 import hashlib
-import zipfile
 import logging
+import os
+import shutil
+import tempfile
+import zipfile
+from pathlib import Path
+
+import requests
+
 from .tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'raise_num_file']
+__all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'raise_num_file', 'make_temp_directory']
 
 def unzip(zip_file_path, root=os.path.expanduser('./')):
     """Unzips files located at `zip_file_path` into parent directory specified by `root`.
@@ -155,4 +159,16 @@ def raise_num_file(nofile_atleast=4096):
 
     return soft,hard
 
+
+@contextlib.contextmanager
+def make_temp_directory():
+    temp_dir = tempfile.mkdtemp()
+    try:
+        yield temp_dir
+    finally:
+        shutil.rmtree(temp_dir)
+
+
 raise_num_file()
+
+
