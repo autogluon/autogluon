@@ -271,9 +271,8 @@ class FIFOScheduler(TaskScheduler):
     def _create_new_task(self, config, resources=None):
         if resources is None:
             resources = DistributedResource(**self.resource)
-        return Task(
-            self.train_fn, {'args': self.args, 'config': config},
-            resources=resources)
+        task = self._new_task(self.train_fn, {'args': self.args, 'config': config}, resources)
+        return task
 
     def schedule_next(self):
         """Schedule next searcher suggested task

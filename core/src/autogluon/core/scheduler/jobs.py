@@ -28,16 +28,16 @@ class DistributedJobRunner(object):
         """
         logger.debug(f'Scheduling {self.task}')
 
+        def _release_resource_callback(fut):
+            logger.debug(f'Releasing Resources {self.task.task_id}')
+            self.managers.release_resources(self.task.resources)
+
         job = self.task.resources.node.submit(
             partial(self._run_dist_job, self.task.task_id),
             self.task.fn,
             self.task.args,
             self.task.resources.gpu_ids
         )
-
-        def _release_resource_callback(fut):
-            logger.debug(f'Releasing Resources {self.task.task_id}')
-            self.managers.release_resources(self.task.resources)
 
         job.add_done_callback(_release_resource_callback)
         return job

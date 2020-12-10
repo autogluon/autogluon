@@ -111,7 +111,6 @@ def test_resume_fifo_random():
     search_options = {'random_seed': random_seed}
 
     # First experiment: Two phases, with resume
-    task_id = Task.TASK_ID.value
     scheduler1 = ag.scheduler.FIFOScheduler(
         branin_fn,
         searcher='random',
@@ -119,6 +118,7 @@ def test_resume_fifo_random():
         checkpoint=checkpoint_fname,
         num_trials=num_trials1,
         reward_attr='accuracy')
+    task_id = scheduler1._task_id_counter.get()
     logger.info("Running [{} - two phases]: num_trials={} and checkpointing".format(
         exper_type, num_trials1))
     scheduler1.run()
@@ -143,7 +143,6 @@ def test_resume_fifo_random():
         'best_config': searcher.get_best_config()}
 
     # Second experiment: Just one phase
-    task_id = Task.TASK_ID.value
     scheduler3 = ag.scheduler.FIFOScheduler(
         branin_fn,
         searcher='random',
@@ -151,6 +150,7 @@ def test_resume_fifo_random():
         checkpoint=None,
         num_trials=num_trials2,
         reward_attr='accuracy')
+    task_id = scheduler3._task_id_counter.get()
     logger.info("Running [{} - one phase]: num_trials={}".format(
         exper_type, num_trials2))
     scheduler3.run()
@@ -189,7 +189,6 @@ def test_resume_hyperband_random():
         exper_type = 'hyperband_{}_random'.format(hp_type)
         checkpoint_fname = 'tests/unittests/checkpoint_{}.ag'.format(exper_type)
         # First experiment: Two phases, with resume
-        task_id = Task.TASK_ID.value
         scheduler1 = ag.scheduler.HyperbandScheduler(
             branin_epochs_fn,
             searcher='random',
@@ -198,6 +197,8 @@ def test_resume_hyperband_random():
             num_trials=num_trials1,
             type=hp_type,
             **scheduler_options)
+        task_id = scheduler1._task_id_counter.get()
+
         logger.info("Running [{} - two phases]: num_trials={} and checkpointing".format(
             exper_type, num_trials1))
         scheduler1.run()
@@ -225,7 +226,6 @@ def test_resume_hyperband_random():
         #print_config_history(results1['config_history'], task_id)
 
         # Second experiment: Just one phase
-        task_id = Task.TASK_ID.value
         scheduler3 = ag.scheduler.HyperbandScheduler(
             branin_epochs_fn,
             searcher='random',
@@ -234,6 +234,7 @@ def test_resume_hyperband_random():
             num_trials=num_trials2,
             type=hp_type,
             **scheduler_options)
+        task_id = scheduler3._task_id_counter.get()
         logger.info("Running [{} - one phase]: num_trials={}".format(
             exper_type, num_trials2))
         scheduler3.run()

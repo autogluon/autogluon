@@ -8,7 +8,7 @@ __all__ = ['DistributedResourceManager', 'NodeResourceManager']
 logger = logging.getLogger(__name__)
 
 class DistributedResourceManager(object):
-    LOCK = mp.Lock()
+    LOCK = mp.RLock()
     REQUESTING_STACK = []
     MAX_CPU_COUNT = 0
     MAX_GPU_COUNT = 0
@@ -59,12 +59,13 @@ class DistributedResourceManager(object):
             'Requested num_cpu={} and num_gpu={} should be less than or equal to' + \
             'largest node availability CPUs={}, GPUs={}'. \
             format(resource.num_cpus, resource.num_gpus, cls.MAX_GPU_COUNT, cls.MAX_CPU_COUNT)
-       
+
         with cls.LOCK:
             node = cls.check_availability(resource)
-            if node is not None:
+        if node is not None:
+            with cls.LOCK:
                 cls.NODE_RESOURCE_MANAGER[node]._request(node, resource)
-                return
+            return
 
         logger.debug('Appending {} to Request Stack'.format(resource))
         request_semaphore = mp.Semaphore(0)
@@ -168,7 +169,7 @@ class NodeResourceManager(object):
             gpu_ids = [self.GPU_QUEUE.get() for i in range(resource.num_gpus)]
             resource._ready(remote, cpu_ids, gpu_ids)
             #logger.debug("\nReqeust succeed {}".format(resource))
-            return
+        return
  
     def _release(self, resource):
         cpu_ids = resource.cpu_ids

@@ -5,7 +5,7 @@ from autogluon.core.scheduler.resource import DistributedResourceManager
 
 
 class TaskManagers(object):
-    LOCK = mp.Lock()
+    LOCK = mp.RLock()
 
     def __init__(self):
         self._resource_manager = None

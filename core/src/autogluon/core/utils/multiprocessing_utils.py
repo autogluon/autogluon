@@ -6,6 +6,28 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
+class AtomicCounter(object):
+    def __init__(self, initial_value=0):
+        self._counter = multiprocessing.Value('i', initial_value)
+        self.lock = multiprocessing.RLock()
+
+    def get_and_increment(self):
+        with self.lock:
+            value = self._counter.value
+            self._counter.value = value + 1
+        return value
+
+    def get(self):
+        with self.lock:
+            value = self._counter.value
+        return value
+
+    def set(self, value):
+        with self.lock:
+            self._counter.value = value
+
+
 def dataframe_transform_parallel(
         df, transformer
                    ):

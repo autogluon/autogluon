@@ -220,8 +220,7 @@ class RLScheduler(FIFOScheduler):
                 with self.lock:
                     config, log_prob, entropy = self.controller.sample(with_details=True)
                 config = config[0]
-                task = Task(self.train_fn, {'args': self.args, 'config': config},
-                            DistributedResource(**self.resource))
+                task = self._new_task(self.train_fn, {'args': self.args, 'config': config}, DistributedResource(**self.resource))
                 # start training task
                 reporter = DistStatusReporter(remote=task.resources.node)
                 task.args['reporter'] = reporter
@@ -310,8 +309,7 @@ class RLScheduler(FIFOScheduler):
         for config in configs:
             logger.debug('scheduling config: {}'.format(config))
             # create task
-            task = Task(self.train_fn, {'args': self.args, 'config': config},
-                        DistributedResource(**self.resource))
+            task = self._new_task(self.train_fn, {'args': self.args, 'config': config}, DistributedResource(**self.resource))
             reporter = DistStatusReporter()
             task.args['reporter'] = reporter
             task_job = self.add_job(task)
@@ -351,9 +349,6 @@ class RLScheduler(FIFOScheduler):
         job = job_runner.start_distributed_job()
         return job
 
-    def join_tasks(self):
-        pass
-
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
 
@@ -367,7 +362,7 @@ class RLScheduler(FIFOScheduler):
         logger.debug('\nState_Dict self.finished_tasks: {}'.format(self.finished_tasks))
         destination['finished_tasks'] = pickle.dumps(self.finished_tasks)
         destination['baseline'] = pickle.dumps(self.baseline)
-        destination['TASK_ID'] = Task.TASK_ID.value
+        destination['TASK_ID'] = self._task_id_counter.get()
         destination['searcher'] = self.searcher.state_dict()
         destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
@@ -383,7 +378,7 @@ class RLScheduler(FIFOScheduler):
         """
         self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
         #self.baseline = pickle.loads(state_dict['baseline'])
-        Task.set_id(state_dict['TASK_ID'])
+        self._task_id_counter.set(state_dict['TASK_ID'])
         self.searcher.load_state_dict(state_dict['searcher'])
         self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
