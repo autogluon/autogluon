@@ -24,7 +24,6 @@ from autogluon.core import Space
 from autogluon.core.utils import try_import_mxboard
 from autogluon.core.metrics import log_loss, roc_auc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.core.utils.multiprocessing_utils import force_forkserver
 
 
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
@@ -669,7 +668,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         """ Performs HPO and sets self.params to best hyperparameter values """
         time_start = time.time()
-        force_forkserver()
         self.verbosity = kwargs.get('verbosity', 2)
         logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
         self._set_default_searchspace()  # changes non-specified default hyperparams from fixed values to search-spaces.
