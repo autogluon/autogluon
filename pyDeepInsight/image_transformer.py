@@ -139,7 +139,7 @@ class ImageTransformer:
             bins=np.linspace(min(self._xrot[:, 1]), max(self._xrot[:, 1]),
                              self._pixels[1])
         ) - 1
-        self._coords = np.stack((ax0_coord, ax1_coord))
+        self._coords = np.stack((ax0_coord, ax1_coord), axis=1)
 
     def transform(self, X, format='rgb', empty_value=0):
         """Transform the input matrix into image matrices
@@ -158,7 +158,7 @@ class ImageTransformer:
             the pixel parameter
         """
         img_coords = pd.DataFrame(np.vstack((
-            self._coords,
+            self._coords.T,
             X
         )).T).groupby([0, 1], as_index=False).mean()
 
@@ -203,21 +203,16 @@ class ImageTransformer:
             img_matrix (ndarray): matrix with feature counts per pixel
         """
         fdmat = np.zeros(self._pixels)
-        coord_cnt = (pd.DataFrame(self._coords.T)
-                       .assign(count=1)
-                       .groupby([0, 1], as_index=False)
-                       .count())
-        fdmat[coord_cnt[0].astype(int),
-              coord_cnt[1].astype(int)] = coord_cnt['count']
+        np.add.at(fdmat, tuple(self._coords.T), 1)
         return fdmat
 
     def coords(self):
         """Get feature coordinates
 
         Returns:
-            ndarray: x and y coordinates for features
+            ndarray: the pixel coordinates for features
         """
-        return self._coords.T.copy()
+        return self._coords.copy()
 
     @staticmethod
     def _minimum_bounding_rectangle(hull_points):
@@ -236,7 +231,7 @@ class ImageTransformer:
                     to x and y
         """
 
-        pi2 = np.pi / 2.
+        pi2 = np.pi / 2
         # calculate edge angles
         edges = hull_points[1:] - hull_points[:-1]
         angles = np.arctan2(edges[:, 1], edges[:, 0])
@@ -245,8 +240,8 @@ class ImageTransformer:
         # find rotation matrices
         rotations = np.vstack([
             np.cos(angles),
-            np.cos(angles - pi2),
-            np.cos(angles + pi2),
+            -np.sin(angles),
+            np.sin(angles),
             np.cos(angles)]).T
         rotations = rotations.reshape((-1, 2, 2))
         # apply rotations to the hull
