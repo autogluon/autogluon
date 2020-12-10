@@ -9,6 +9,7 @@ import copy
 from .fifo import FIFOScheduler
 from .hyperband_stopping import StoppingRungSystem
 from .hyperband_promotion import PromotionRungSystem
+from .jobs import DistributedJobRunner
 from .reporter import DistStatusReporter
 from ..utils import load
 from ..utils.default_arguments import check_and_merge_defaults, \
@@ -459,7 +460,8 @@ class HyperbandScheduler(FIFOScheduler):
                 task.args['config'], milestone=self.max_t)
 
         # main process
-        job = cls._start_distributed_job(task, self.managers.resource_manager)
+        job_runner = DistributedJobRunner(task, self.managers)
+        job = job_runner.start_distributed_job()
         # reporter thread
         rp = threading.Thread(
             target=self._run_reporter,

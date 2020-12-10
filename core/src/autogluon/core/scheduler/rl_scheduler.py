@@ -8,6 +8,7 @@ import multiprocessing as mp
 from collections import OrderedDict
 
 from .fifo import FIFOScheduler
+from .jobs import DistributedJobRunner
 from .reporter import DistStatusReporter
 from .resource import DistributedResource
 from .. import Task
@@ -346,7 +347,8 @@ class RLScheduler(FIFOScheduler):
         cls = RLScheduler
         self.managers.request_resources(task.resources)
         # main process
-        job = cls._start_distributed_job(task, self.managers.resource_manager)
+        job_runner = DistributedJobRunner(task, self.managers)
+        job = job_runner.start_distributed_job()
         return job
 
     def join_tasks(self):

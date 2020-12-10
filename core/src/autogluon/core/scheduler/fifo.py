@@ -11,6 +11,7 @@ import copy
 
 from tqdm.auto import tqdm
 
+from .jobs import DistributedJobRunner
 from .reporter import DistStatusReporter, FakeReporter
 from .resource import DistributedResource
 from .scheduler import TaskScheduler
@@ -345,7 +346,8 @@ class FIFOScheduler(TaskScheduler):
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
-        job = cls._start_distributed_job(task, self.managers.resource_manager)
+        job_runner = DistributedJobRunner(task, self.managers)
+        job = job_runner.start_distributed_job()
         # reporter thread
         rp = threading.Thread(
             target=self._run_reporter,

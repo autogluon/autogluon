@@ -48,3 +48,6 @@ class TaskManagers(object):
 
     def request_resources(self, resources):
         self.resource_manager._request(resources)
+
+    def release_resources(self, resources):
+        self.resource_manager._release(resources)
