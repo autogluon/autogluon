@@ -73,7 +73,6 @@ class KNNModel(AbstractModel):
 
     # TODO: Add HPO
     def hyperparameter_tune(self, **kwargs):
-        # force_forkserver()
         return skip_hpo(self, **kwargs)
 
 
