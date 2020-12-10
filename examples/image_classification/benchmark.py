@@ -34,14 +34,14 @@ def predict_details(test_dataset, predictor):
     inds, probs, value = res['id'], res['score'], res['class']
     res_prob = predictor.predict_proba(test_dataset)
     probs_all = res_prob['score']
-    return inds, probs, probs_all, value
+    return inds.tolist(), probs.tolist(), probs_all.tolist(), value.tolist()
 
 def main():
     opt = parse_args()
     if not os.path.exists(opt.dataset):
         os.mkdir(opt.dataset)
 
-    local_path = os.path.join(opt.data_dir, opt.dataset)
+    local_path = '.'
     output_directory = os.path.join(opt.dataset, 'checkpoint/')
     filehandler = logging.FileHandler(os.path.join(opt.dataset, 'summary.log'))
     streamhandler = logging.StreamHandler()
@@ -67,7 +67,8 @@ def main():
     ngpus_per_trial = target_hyperparams.pop('ngpus_per_trial')
     num_epochs = opt.num_epochs if opt.num_epochs > 0 else num_epochs
     num_trials = opt.num_trials if opt.num_trials > 0 else num_trials
-    ngpus_per_trial = min(ngpus_per_trial, opt.ngpus_per_trial)
+    if opt.ngpus_per_trial >= 0:
+        ngpus_per_trial = opt.ngpus_per_trial
     predictor.fit(train_data=train_dataset,
                   val_data=val_dataset,
                   hyperparameters=target_hyperparams,
