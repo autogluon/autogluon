@@ -52,7 +52,7 @@ class DistributedResourceManager(object):
 
     @classmethod
     def _request(cls, resource):
-        """ResourceManager, we recommand using scheduler instead of creating your own
+        """ResourceManager, we recommend using scheduler instead of creating your own
         resource manager.
         """
         assert cls.check_possible(resource), \

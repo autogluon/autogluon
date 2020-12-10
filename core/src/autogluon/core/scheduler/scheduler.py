@@ -11,11 +11,10 @@ from warnings import warn
 import dill
 import distributed
 
-from .remote import RemoteManager
+from .managers import TaskManagers
 from .reporter import *
-from .resource import DistributedResourceManager
 from .. import Task
-from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
+from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess, classproperty
 from ..utils.files import make_temp_directory
 from ..utils.multiprocessing_utils import is_fork_enabled
 
@@ -27,56 +26,25 @@ logger = logging.getLogger(__name__)
 __all__ = ['TaskScheduler']
 
 
-class ClassProperty(object):
-
-    def __init__(self, fget):
-        self.fget = fget
-
-    def __get__(self, owner_self, owner_cls):
-        return self.fget(owner_cls)
-
-
 class TaskScheduler(object):
     """Base Distributed Task Scheduler
     """
     LOCK = mp.Lock()
-    _resource_manager = None
-    _remote_manager = None
-
-    @ClassProperty
-    def resource_manager(cls):
-        if cls._resource_manager is None:
-            cls._resource_manager = DistributedResourceManager()
-        return cls._resource_manager
-
-    @ClassProperty
-    def remote_manager(cls):
-        if cls._remote_manager is None:
-            cls._remote_manager = RemoteManager()
-        return cls._remote_manager
 
     def __init__(self, dist_ip_addrs=None):
-        if dist_ip_addrs is None:
-            dist_ip_addrs = []
-        cls = TaskScheduler
-        remotes = cls.remote_manager.add_remote_nodes(dist_ip_addrs)
-        cls.resource_manager.add_remote(cls.remote_manager.get_remotes())
+        self.managers = TaskManagers()
+        self.managers.register_dist_ip_addrs(dist_ip_addrs)
         self.scheduled_tasks = []
         self.finished_tasks = []
 
     def add_remote(self, ip_addrs):
-        """Add remote nodes to the scheduler computation resource.
-        """
-        ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
         with self.LOCK:
-            remotes = TaskScheduler.remote_manager.add_remote_nodes(ip_addrs)
-            TaskScheduler.resource_manager.add_remote(remotes)
+            self.managers.add_remote(ip_addrs)
 
-    @classmethod
-    def upload_files(cls, files, **kwargs):
+    def upload_files(self, files, **kwargs):
         """Upload files to remote machines, so that they are accessible by import or load.
         """
-        cls.remote_manager.upload_files(files, **kwargs)
+        self.managers.upload_files(files, **kwargs)
 
     def _dict_from_task(self, task):
         if isinstance(task, Task):
@@ -88,8 +56,7 @@ class TaskScheduler(object):
     def add_task(self, task, **kwargs):
         """add_task() is now deprecated in favor of add_job().
         """
-        warn("scheduler.add_task() is now deprecated in favor of scheduler.add_job().",
-             AutoGluonWarning)
+        warn("scheduler.add_task() is now deprecated in favor of scheduler.add_job().", AutoGluonWarning)
         self.add_job(task, **kwargs)
 
     def add_job(self, task, **kwargs):
@@ -110,19 +77,20 @@ class TaskScheduler(object):
         # adding the task
         cls = TaskScheduler
         if not task.resources.is_ready:
-            cls.resource_manager._request(task.resources)
-        job = cls._start_distributed_job(task, cls.resource_manager)
+            self.managers.request_resources(task.resources)
+        job = cls._start_distributed_job(task, self.managers.resource_manager)
         new_dict = self._dict_from_task(task)
         new_dict['Job'] = job
         with self.LOCK:
             self.scheduled_tasks.append(new_dict)
 
+
     def run_job(self, task):
         """Run a training task to the scheduler (Sync).
         """
         cls = TaskScheduler
-        cls.resource_manager._request(task.resources)
-        job = cls._start_distributed_job(task, cls.resource_manager)
+        self.managers.request_resources(task.resources)
+        job = cls._start_distributed_job(task, self.managers.resource_manager)
         return job.result()
 
     @staticmethod
@@ -299,6 +267,4 @@ class TaskScheduler(object):
         return len(self.finished_tasks)
 
     def __repr__(self):
-        reprstr = self.__class__.__name__ + '(\n' + \
-            str(self.resource_manager) +')\n'
-        return reprstr
+        return f'{self.__class__.__name__}(\n{self.managers.resource_manager})\n'

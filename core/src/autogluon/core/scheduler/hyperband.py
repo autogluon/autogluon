@@ -404,7 +404,7 @@ class HyperbandScheduler(FIFOScheduler):
         if not self._delay_get_config:
             # Wait for resource to become available here, as this has not happened
             # in schedule_next before
-            cls.resource_manager._request(task.resources)
+            self.managers.request_resources(task.resources)
         # reporter and terminator
         reporter = DistStatusReporter(remote=task.resources.node)
         task.args['reporter'] = reporter
@@ -459,7 +459,7 @@ class HyperbandScheduler(FIFOScheduler):
                 task.args['config'], milestone=self.max_t)
 
         # main process
-        job = cls._start_distributed_job(task, cls.resource_manager)
+        job = cls._start_distributed_job(task, self.managers.resource_manager)
         # reporter thread
         rp = threading.Thread(
             target=self._run_reporter,

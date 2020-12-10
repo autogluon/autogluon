@@ -281,7 +281,7 @@ class FIFOScheduler(TaskScheduler):
         if self._delay_get_config:
             # Wait for available resource here, instead of in add_job. This
             # delays the get_config call until a resource is available
-            FIFOScheduler.resource_manager._request(resources)
+            self.managers.request_resources(resources)
 
         # Allow for the promotion of a previously chosen config. Also,
         # extra_kwargs contains extra info passed to both add_job and to
@@ -338,14 +338,14 @@ class FIFOScheduler(TaskScheduler):
         if not self._delay_get_config:
             # Wait for resource to become available here, as this has not happened
             # in schedule_next before
-            cls.resource_manager._request(task.resources)
+            self.managers.request_resources(task.resources)
         # reporter
         reporter = DistStatusReporter(remote=task.resources.node)
         task.args['reporter'] = reporter
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
-        job = cls._start_distributed_job(task, cls.resource_manager)
+        job = cls._start_distributed_job(task, self.managers.resource_manager)
         # reporter thread
         rp = threading.Thread(
             target=self._run_reporter,

@@ -78,13 +78,14 @@ class RLScheduler(FIFOScheduler):
     >>> import autogluon.core as ag
     >>>
     >>> @ag.args(
-    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
-    ...     wd=ag.space.Real(1e-3, 1e-2))
+    ...     lr=ag.space.Categorical(1e-3, 1e-2),
+    ...     wd=ag.space.Categorical(1e-3, 1e-2),
+    ...     epochs=10)
     >>> def train_fn(args, reporter):
     ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
-    ...     for e in range(10):
-    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-    ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+    ...     for e in range(args.epochs):
+    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2 * e))
+    ...         reporter(epoch=e + 1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
     ...
     >>> scheduler = ag.scheduler.RLScheduler(train_fn,
     ...                                      resource={'num_cpus': 2, 'num_gpus': 0},
@@ -123,10 +124,10 @@ class RLScheduler(FIFOScheduler):
         super().__init__(
             train_fn=train_fn, **filter_by_key(kwargs, _ARGUMENT_KEYS))
         # reserve controller computation resource on master node
-        master_node = self.remote_manager.get_master_node()
+        master_node = self.managers.remote_manager.get_master_node()
         controller_resource = kwargs['controller_resource']
         self.controller_resource = DistributedResource(**controller_resource)
-        assert self.resource_manager.reserve_resource(
+        assert self.managers.resource_manager.reserve_resource(
             master_node, self.controller_resource),\
             "Not Enough Resource on Master Node for Training Controller"
         if controller_resource['num_gpus'] > 0:
@@ -343,9 +344,9 @@ class RLScheduler(FIFOScheduler):
             task (:class:`autogluon.scheduler.Task`): a new training task
         """
         cls = RLScheduler
-        cls.resource_manager._request(task.resources)
+        self.managers.request_resources(task.resources)
         # main process
-        job = cls._start_distributed_job(task, cls.resource_manager)
+        job = cls._start_distributed_job(task, self.managers.resource_manager)
         return job
 
     def join_tasks(self):
