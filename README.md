@@ -92,7 +92,7 @@ it.fit(X_train_norm, plot=True)
 
 
 
-    <pyDeepInsight.image_transformer.ImageTransformer at 0x7f204ebd52e0>
+    <pyDeepInsight.image_transformer.ImageTransformer at 0x7f7549a01220>
 
 
 

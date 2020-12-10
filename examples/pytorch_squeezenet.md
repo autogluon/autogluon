@@ -10,7 +10,7 @@ using PyTorch.
 ```python
 from pyDeepInsight import ImageTransformer
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.manifold import TSNE
 import pandas as pd
 import numpy as np
@@ -37,9 +37,9 @@ Normalize data using StandardScaler and create tsne class
 
 
 ```python
-stdsc = StandardScaler()
-X_train_norm = stdsc.fit_transform(X_train)
-X_test_norm = stdsc.transform(X_test)
+mmsc = MinMaxScaler()
+X_train_norm = mmsc.fit_transform(X_train)
+X_test_norm = mmsc.transform(X_test).clip(0,1)
 ```
 
 
@@ -60,7 +60,7 @@ it = ImageTransformer(
 ```
 
 Train image transformer on training data and transform training 
-and testing sets
+and testing sets. Values should be between 0 and 1.
 
 
 ```python
@@ -96,7 +96,7 @@ _ = plt.title("Genes per pixel")
     
 
 
-The following are showing plots for the image matrices first four samples 
+X_train_imgThe following are showing plots for the image matrices first four samples 
 of the training set. 
 
 
@@ -242,26 +242,26 @@ for epoch in range(20):
           (epoch + 1, running_loss / len(X_train_tensor) * batch_size))
 ```
 
-    [1] loss: 1.094
-    [2] loss: 0.917
-    [3] loss: 0.472
-    [4] loss: 0.289
-    [5] loss: 0.207
-    [6] loss: 0.151
-    [7] loss: 0.154
-    [8] loss: 0.102
-    [9] loss: 0.068
-    [10] loss: 0.065
-    [11] loss: 0.059
-    [12] loss: 0.100
-    [13] loss: 0.032
-    [14] loss: 0.043
+    [1] loss: 1.095
+    [2] loss: 1.077
+    [3] loss: 0.929
+    [4] loss: 0.694
+    [5] loss: 0.508
+    [6] loss: 0.411
+    [7] loss: 0.333
+    [8] loss: 0.227
+    [9] loss: 0.156
+    [10] loss: 0.145
+    [11] loss: 0.078
+    [12] loss: 0.105
+    [13] loss: 0.072
+    [14] loss: 0.070
     [15] loss: 0.039
-    [16] loss: 0.022
-    [17] loss: 0.017
-    [18] loss: 0.014
-    [19] loss: 0.033
-    [20] loss: 0.051
+    [16] loss: 0.034
+    [17] loss: 0.009
+    [18] loss: 0.012
+    [19] loss: 0.041
+    [20] loss: 0.024
 
 
 Calculate accuracy of prediction
@@ -284,6 +284,6 @@ print("The train accuracy was {:.3f}".format(accuracy_score(train_predicted, y_t
 print("The test accuracy was {:.3f}".format(accuracy_score(test_predicted, y_test_tensor)))
 ```
 
-    The train accuracy was 0.994
-    The test accuracy was 0.975
+    The train accuracy was 0.998
+    The test accuracy was 0.992
 
