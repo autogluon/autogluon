@@ -81,10 +81,9 @@ if __name__ == '__main__':
     time_limit = 5 * 24 * 60 * 60  # 5 days
     epochs = 20
     if args.meta_arch == 'yolo3':
-        transfer = '' if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
+        transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
             ag.Categorical('yolo3_darknet53_coco', 'yolo3_mobilenet1.0_coco')
         hyperparameters = {
-            'transfer': transfer,
             'estimator': args.meta_arch,
             'lr': ag.Categorical(1e-2, 5e-3, 1e-3, 5e-4, 1e-4, 5e-5),
             'data_shape': ag.Categorical(320, 416),
@@ -95,6 +94,8 @@ if __name__ == '__main__':
             'label_smooth': ag.Bool(),
             'epochs': epochs,
         }
+        if transfer is not None:
+            hyperparameters['transfer'] = transfer
         kwargs = {'num_trials': 30,
                   'time_limit': time_limit,
                   'dist_ip_addrs': [],
@@ -102,10 +103,9 @@ if __name__ == '__main__':
                   'ngpus_per_trial': 8,
                   'hyperparameters': hyperparameters}
     elif args.meta_arch == 'faster_rcnn':
-        transfer = '' if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
+        transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
             ag.Categorical('faster_rcnn_resnet101_v1b_coco', 'faster_rcnn_resnet50_v1b_coco')
         hyperparameters = {
-            'transfer': transfer,
             'estimator': args.meta_arch,
             'lr': ag.Categorical(0.02, 0.01, 0.005, 0.002, 2e-4, 5e-4),
             'data_shape': (640, 800),
@@ -116,6 +116,8 @@ if __name__ == '__main__':
             'label_smooth': False,
             'epochs': ag.Categorical(30, 40, 50, 60),
         }
+        if transfer is not None:
+            hyperparameters['transfer'] = transfer
         kwargs = {'num_trials': 30,
                   'nthreads_per_trial': 16,
                   'ngpus_per_trial': 8,
