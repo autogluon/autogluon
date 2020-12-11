@@ -15,7 +15,7 @@ detector.fit(dataset_train,
              time_limit=time_limit)
 
 # Evaluation on test dataset
-dataset_test = ObjectDetector.Dataset(url, splits='test')
+dataset_test = ObjectDetector.Dataset.from_voc(url, splits='test')
 test_map = detector.evaluate(dataset_test)
 print("mAP on test dataset: {}".format(test_map[1][1]))
 

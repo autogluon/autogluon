@@ -50,7 +50,6 @@ def get_dataset(args):
             "This dataset is not in dataset_dict. It should be downloaded before running this script.")
         index_file_name_trainval = args.index_file_name_trainval
         index_file_name_test = args.index_file_name_test
-        classes = args.classes
         data_root = args.data_root
 
     train_dataset = ObjectDetector.Dataset.from_voc(data_root, splits=index_file_name_trainval)
@@ -69,7 +68,6 @@ if __name__ == '__main__':
                         help="name of txt file which contains images for training and validation ")
     parser.add_argument('--index-file-name-test', type=str, default='',
                         help="name of txt file which contains images for testing")
-    parser.add_argument('--classes', type=tuple, default=None, help="classes for custom classes")
     parser.add_argument('--no-redownload', action='store_true',
                         help="whether need to re-download dataset")
     parser.add_argument('--meta-arch', type=str, default='yolo3', choices=['yolo3', 'faster_rcnn'],
