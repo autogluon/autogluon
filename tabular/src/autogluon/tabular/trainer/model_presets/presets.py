@@ -20,6 +20,7 @@ from ...models.catboost.catboost_model import CatBoostModel
 from ...models.xgboost.xgboost_model import XGBoostModel
 from ...models.xt.xt_model import XTModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
+from ...models.fasttext.fasttext_model import FastTextModel
 from ...models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     NN=50,
     FASTAI=45,
     LR=40,
+    FASTTEXT=0,
     TRANSF=0,
     custom=0,
 )
@@ -69,6 +71,7 @@ MODEL_TYPES = dict(
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
+    FASTTEXT=FastTextModel,
 )
 
 DEFAULT_MODEL_NAMES = {
@@ -82,6 +85,7 @@ DEFAULT_MODEL_NAMES = {
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
+    FastTextModel: 'FastText',
 }
 
 

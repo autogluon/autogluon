@@ -6,17 +6,12 @@ import logging
 import os
 import psutil
 import tempfile
-from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
 
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
 from autogluon.core.constants import BINARY, MULTICLASS
 
-from ...features.feature_metadata import FeatureMetadata
 from ...features.feature_metadata import S_TEXT
 
 from ..abstract.abstract_model import AbstractModel
@@ -24,6 +19,7 @@ from ..abstract.model_trial import skip_hpo
 from .hyperparameters.parameters import get_param_baseline
 
 logger = logging.getLogger(__name__)
+
 
 def try_import_fasttext():
     try:
@@ -33,19 +29,13 @@ def try_import_fasttext():
     except Exception:
         raise ImportError('Import fasttext failed. Please run "pip install fasttext"')
 
+
 class FastTextModel(AbstractModel):
     model_bin_file_name = "fasttext.ftz"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._model_bin_available = False
-
-        if 'quantize_model' in self.params:
-            self._quantize_model = self.params['quantize_model']
-            self._fasttext_params = {k:v for k, v in self.params.items() if k != 'quantize_model'}
-        else:
-            self._quantize_model = True
-            self._fasttext_params = self.params
 
     def _set_default_params(self):
         default_params = get_param_baseline()
@@ -62,7 +52,7 @@ class FastTextModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
-    
+
     @classmethod
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
@@ -75,17 +65,21 @@ class FastTextModel(AbstractModel):
             raise ValueError(
                 "FastText model only supports binary or multiclass classification"
             )
-        
+
         try_import_fasttext()
         import fasttext
 
+        params = self.params.copy()
+        quantize_model = params.pop('quantize_model', True)
+
         verbosity = kwargs.get('verbosity', 2)
-        if verbosity <= 2:
-            self._fasttext_params['verbose'] = 0
-        elif verbosity == 3:
-            self._fasttext_params['verbose'] = 1
-        else:
-            self._fasttext_params['verbose'] = 2
+        if 'verbose' not in params:
+            if verbosity <= 2:
+                params['verbose'] = 0
+            elif verbosity == 3:
+                params['verbose'] = 1
+            else:
+                params['verbose'] = 2
 
         X_train = self.preprocess(X_train)
         logger.debug("NLP features %s", self.features)
@@ -95,7 +89,6 @@ class FastTextModel(AbstractModel):
         self._label_inv_map = {v: k for k, v in self._label_map.items()}
         np.random.seed(0)
         idxs = np.random.permutation(list(range(len(X_train))))
-        mem_start = psutil.Process().memory_info().rss
         with tempfile.NamedTemporaryFile(mode="w+t") as f:
             logger.debug("generate training data")
             for label, text in zip(y_train.iloc[idxs], (X_train[i] for i in idxs)):
@@ -103,12 +96,12 @@ class FastTextModel(AbstractModel):
             f.flush()
             mem_start = psutil.Process().memory_info().rss
             logger.debug("train FastText model")
-            self.model = fasttext.train_supervised(f.name, **self._fasttext_params)
-            if self._quantize_model: 
+            self.model = fasttext.train_supervised(f.name, **params)
+            if quantize_model:
                 self.model.quantize(input=f.name, retrain=True)
             gc.collect()
             mem_curr = psutil.Process().memory_info().rss 
-            self._model_size_estimate = max(mem_curr - mem_start, 100_000_000 if self._quantize_model else 800_000_000)
+            self._model_size_estimate = max(mem_curr - mem_start, 100000000 if quantize_model else 800000000)
             logger.debug("finish training FastText model")
 
     # TODO: move logic to self._preprocess_nonadaptive()
