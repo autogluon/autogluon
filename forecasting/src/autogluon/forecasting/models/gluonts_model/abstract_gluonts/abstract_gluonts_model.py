@@ -82,7 +82,11 @@ class AbstractGluonTSModel(AbstractModel):
     def fit(self, train_data, time_limit=None):
         pass
 
-    def predict(self, data, num_samples=100):
+    def predict(self, data):
+        predicted_targets = self.model.predict(data)
+        return predicted_targets
+
+    def predict_for_scoring(self, data, num_samples=100):
         forecast_it, ts_it = make_evaluation_predictions(dataset=data,
                                                          predictor=self.model,
                                                          num_samples=num_samples)
@@ -91,7 +95,7 @@ class AbstractGluonTSModel(AbstractModel):
     def hyperparameter_tune(self, train_data, val_data, scheduler_options, **kwargs):
         pass
 
-    def score(self, y, metric=None):
+    def score(self, data, metric=None, num_samples=100):
         """
         metric: if metric is None, we will by default use mean_wQuantileLoss for scoring.
                 should be one of "MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"
@@ -107,7 +111,7 @@ class AbstractGluonTSModel(AbstractModel):
         else:
             evaluator = Evaluator()
 
-        forecasts, tss = self.predict(y)
+        forecasts, tss = self.predict_for_scoring(data, num_samples=num_samples)
         num_series = len(tss)
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[metric]

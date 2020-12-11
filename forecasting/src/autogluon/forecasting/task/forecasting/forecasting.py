@@ -1,6 +1,6 @@
 from autogluon.core.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
-from .dataset import TimeSeriesDataset
-
+from .dataset_v2 import TimeSeriesDataset
+from ...utils.dataset_utils import rebuild_tabular, train_test_split
 from ...learner.abstract_learner import AbstractLearner
 from ...learner import DefaultLearner as Learner
 from .predictor import ForecastingPredictor
@@ -20,8 +20,10 @@ class Forecasting(BaseTask):
 
     @staticmethod
     def fit(train_data,
-            freq,
             prediction_length,
+            index_column="index",
+            target_column=None,
+            time_column="date",
             val_data=None,
             time_limits=None,
             output_directory=None,
@@ -36,7 +38,23 @@ class Forecasting(BaseTask):
         # TODO: Maybe we can infer freq and prediction length inside fit from train_data and test data?
         # TODO: allow user to input more scheduler options and use compile_scheduler_options()
         output_directory = setup_outputdir(output_directory)
-
+        train_data = rebuild_tabular(train_data,
+                                     index_column=index_column,
+                                     target_column=target_column,
+                                     time_column=time_column)
+        if hyperparameter_tune:
+            if val_data is None:
+                train_full = train_data.copy()
+                train_data, val_data = train_test_split(train_data, prediction_length)
+            else:
+                val_data = rebuild_tabular(val_data,
+                                           index_column=index_column,
+                                           target_column=target_column,
+                                           time_column=time_column)
+        train_data = TimeSeriesDataset(train_data, index_column=index_column)
+        freq = train_data.get_freq()
+        if val_data is not None:
+            val_data = TimeSeriesDataset(val_data, index_column=index_column)
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         random_seed = kwargs.get('random_seed', 0)
         scheduler_options = {"searcher": search_strategy,

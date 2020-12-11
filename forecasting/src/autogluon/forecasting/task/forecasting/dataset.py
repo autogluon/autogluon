@@ -1,9 +1,10 @@
 from gluonts.dataset.repository.datasets import get_dataset, dataset_recipes
+from autogluon.forecasting.utils.dataset_utils import gluonts_builtin_datasets
 from gluonts.dataset.field_names import FieldName
 from gluonts.dataset.common import ListDataset
 import pandas as pd
 
-__all__ = ["TimeSeriesDataset", "transform_tabular_to_gluonts_dataset", "gluonts_builtin_datasets"]
+__all__ = ["TimeSeriesDataset", "transform_tabular_to_gluonts_dataset"]
 
 
 def rebuild_tabular(X, time_column, target_column, index_column=None):

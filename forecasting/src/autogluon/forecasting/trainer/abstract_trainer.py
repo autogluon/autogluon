@@ -1,6 +1,6 @@
 import time
 import copy
-from ..models.gluonts_model.abstract_gluonts.abstract_gluonts_model import GluonTSAbstractModel
+from ..models.gluonts_model.abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 import logging
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
@@ -80,17 +80,16 @@ class AbstractTrainer:
         else:
             self.models[model.name] = model
 
-    def load_model(self, model_name, path=None, model_type=None) -> GluonTSAbstractModel:
-        if isinstance(model_name, GluonTSAbstractModel):
+    def load_model(self, model_name, path=None, model_type=None) -> AbstractGluonTSModel:
+        if isinstance(model_name, AbstractGluonTSModel):
             return model_name
         if model_name in self.models.keys():
             return self.models[model_name]
         else:
-            # TODO: get_model_attribute()
-            # if path is None:
-            #     path = self.get_model_attribute(model=model_name, attribute='path')
-            # if model_type is None:
-            #     model_type = self.get_model_attribute(model=model_name, attribute='type')
+            if path is None:
+                path = self.get_model_attribute(model=model_name, attribute='path')
+            if model_type is None:
+                model_type = self.get_model_attribute(model=model_name, attribute='type')
             return model_type.load(path=path, reset_path=self.reset_paths)
 
     def _add_model(self, model):
@@ -100,11 +99,11 @@ class AbstractTrainer:
         self.model_info[model.name]["fit_time"] = model.fit_time
         self.model_info[model.name]["score"] = model.val_score
 
-    def _train_single(self, train_data, model: GluonTSAbstractModel, time_limit=None):
-        model.fit(train_data=train_data)
+    def _train_single(self, train_data, model: AbstractGluonTSModel, time_limit=None):
+        model.fit(train_data=train_data, time_limit=time_limit)
         return model
 
-    def _train_single_full(self, train_data, model: GluonTSAbstractModel, val_data=None, hyperparameter_tune=False, time_limit=None):
+    def _train_single_full(self, train_data, model: AbstractGluonTSModel, val_data=None, hyperparameter_tune=False, time_limit=None):
         if hyperparameter_tune:
             if self._scheduler_func is None or self._scheduler_options is None:
                 raise ValueError('scheduler_options cannot be None when hyperparameter_tune = True')
@@ -123,7 +122,7 @@ class AbstractTrainer:
 
         return model_names_trained
 
-    def _train_and_save(self, train_data, model: GluonTSAbstractModel, val_data=None, time_limit=None):
+    def _train_and_save(self, train_data, model: AbstractGluonTSModel, val_data=None, time_limit=None):
         fit_start_time = time.time()
         model_names_trained = []
         try:
@@ -131,7 +130,6 @@ class AbstractTrainer:
                 if time_limit <= 0:
                     logging.log(15, f'Skipping {model.name} due to lack of time remaining.')
                     return model_names_trained
-                logging.log(20, f'Fitting model: {model.name} ... Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.')
             else:
                 logging.log(20, f'Fitting model: {model.name} ...')
             model = self._train_single(train_data, model)
@@ -224,15 +222,15 @@ class AbstractTrainer:
 
         return df_sorted
 
-    def predict(self, data, model=None):
+    def predict(self, data, model=None, for_score=True):
         if model is not None:
-            return self._predict_model(data, model)
+            return self._predict_model(data, model, for_score)
         elif self.model_best is not None:
-            return self._predict_model(data, self.model_best)
+            return self._predict_model(data, self.model_best, for_score)
         else:
             model = self.get_model_best()
             self.model_best = model
-            return self._predict_model(data, model)
+            return self._predict_model(data, model, for_score)
 
     def score(self, data, model=None, quantiles=None):
         if self.eval_metric is not None and self.eval_metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
@@ -244,16 +242,19 @@ class AbstractTrainer:
         else:
             evaluator = Evaluator()
 
-        forecasts, tss = self.predict(data, model=model)
+        forecasts, tss = self.predict(data, model=model, for_score=True)
         num_series = len(tss)
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[self.eval_metric]
 
-    def _predict_model(self, data, model):
+    def _predict_model(self, data, model, for_score=True):
         if isinstance(model, str):
             model = self.load_model(model)
-        forecasts, tss = model.predict(data)
-        return forecasts, tss
+        if for_score:
+            forecasts, tss = model.predict_for_scoring(data)
+            return forecasts, tss
+        else:
+            return model.predict(data)
 
     @classmethod
     def load_info(cls, path, reset_paths=False, load_model_if_required=True):

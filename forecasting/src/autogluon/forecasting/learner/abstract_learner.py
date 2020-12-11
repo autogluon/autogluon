@@ -53,8 +53,8 @@ class AbstractLearner:
              hyperparameters=None):
         raise NotImplementedError
 
-    def predict(self, data, model=None):
-        predict_target = self.load_trainer().predict(data=data, model=model)
+    def predict(self, data, model=None, for_score=False):
+        predict_target = self.load_trainer().predict(data=data, model=model, for_score=for_score)
         return predict_target
 
     def evaluate(self, forecasts, tss, **kwargs):
