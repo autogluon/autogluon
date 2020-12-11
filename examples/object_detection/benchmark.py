@@ -81,7 +81,7 @@ if __name__ == '__main__':
     time_limit = 5 * 24 * 60 * 60  # 5 days
     epochs = 20
     if args.meta_arch == 'yolo3':
-        transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
+        transfer = '' if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
             ag.Categorical('yolo3_darknet53_coco', 'yolo3_mobilenet1.0_coco')
         hyperparameters = {
             'transfer': transfer,
@@ -102,7 +102,7 @@ if __name__ == '__main__':
                   'ngpus_per_trial': 8,
                   'hyperparameters': hyperparameters}
     elif args.meta_arch == 'faster_rcnn':
-        transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
+        transfer = '' if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
             ag.Categorical('faster_rcnn_resnet101_v1b_coco', 'faster_rcnn_resnet50_v1b_coco')
         hyperparameters = {
             'transfer': transfer,

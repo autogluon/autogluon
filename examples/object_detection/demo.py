@@ -20,9 +20,5 @@ test_map = detector.evaluate(dataset_test)
 print("mAP on test dataset: {}".format(test_map[1][1]))
 
 # visualization
-image = '000467.jpg'
-image_path = os.path.join(data_root, 'JPEGImages', image)
-print(image_path)
-
-result = detector.predict(image_path)
+result = detector.predict(dataset_test.iloc[0]['image'])
 print('Prediction result:', result)
