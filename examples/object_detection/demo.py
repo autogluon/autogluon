@@ -6,12 +6,11 @@ url = 'https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip'
 dataset_train = ObjectDetector.Dataset.from_voc(url, splits='trainval')
 
 time_limit = 5*60*60 # 5 hours
-epochs = 30
+epochs = 3
 detector = ObjectDetector()
 detector.fit(dataset_train,
              num_trials=2,
-             epochs=epochs,
-             hyperparameters={'lr': ag.Categorical(5e-4, 1e-4)},
+             hyperparameters={'lr': ag.Categorical(5e-4, 1e-4), 'epochs': epochs},
              ngpus_per_trial=1,
              time_limit=time_limit)
 
