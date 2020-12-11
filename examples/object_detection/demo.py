@@ -3,7 +3,7 @@ from autogluon.vision.object_detection import ObjectDetector
 import os
 
 url = 'https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip'
-dataset_train = ObjectDetector.Dataset.from_voc(url, splits='train')
+dataset_train = ObjectDetector.Dataset.from_voc(url, splits='trainval')
 
 time_limit = 5*60*60 # 5 hours
 epochs = 30
