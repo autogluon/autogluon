@@ -96,7 +96,7 @@ if __name__ == '__main__':
             'epochs': epochs,
             'transfer': transfer
         }
-        kwargs = {'num_trials': opt.num_trials,
+        kwargs = {'num_trials': args.num_trials,
                   'time_limit': time_limit,
                   'dist_ip_addrs': [],
                   'nthreads_per_trial': 16,
@@ -117,7 +117,7 @@ if __name__ == '__main__':
             'epochs': ag.Categorical(30, 40, 50, 60),
             'transfer': transfer
         }
-        kwargs = {'num_trials': opt.num_trials,
+        kwargs = {'num_trials': args.num_trials,
                   'nthreads_per_trial': 16,
                   'ngpus_per_trial': 8,
                   'time_limit': time_limit,
