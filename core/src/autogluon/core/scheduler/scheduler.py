@@ -6,14 +6,12 @@ import sys
 import time
 from collections import OrderedDict
 from random import random
-from warnings import warn
 
 import distributed
 
 from .jobs import DistributedJobRunner
 from .managers import TaskManagers
 from .. import Task
-from ..utils import AutoGluonWarning
 from ..utils.multiprocessing_utils import AtomicCounter
 
 logger = logging.getLogger(__name__)
@@ -121,7 +119,8 @@ class TaskScheduler(object):
         self._cleaning_tasks()
         for task_dict in self.scheduled_tasks:
             try:
-                task_dict['Job'].result(timeout=timeout)
+                while not task_dict['Job'].done():
+                    task_dict['Job'].result(timeout=5)
             except distributed.TimeoutError as e:
                 logger.error(str(e))
             except:
@@ -129,14 +128,6 @@ class TaskScheduler(object):
                 raise
             self._clean_task_internal(task_dict)
         self._cleaning_tasks()
-
-    def shutdown(self):
-        """
-        shutdown() is now deprecated in favor of :func:`autogluon.done`.
-        """
-        warn("scheduler.shutdown() is now deprecated in favor of autogluon.done().", AutoGluonWarning)
-        self.join_jobs()
-        self.managers.remote_manager.shutdown()
 
     def state_dict(self, destination=None):
         """

@@ -364,7 +364,8 @@ class FIFOScheduler(TaskScheduler):
             self.scheduled_tasks.append(task_dict)
 
     def _clean_task_internal(self, task_dict):
-        task_dict['ReporterThread'].join()
+        while task_dict['ReporterThread'].is_alive():
+            task_dict['ReporterThread'].join(timeout=5)
 
     def _add_checkpointing_to_job(self, job):
         def _save_checkpoint_callback(fut):
@@ -524,22 +525,23 @@ class FIFOScheduler(TaskScheduler):
         """
         if filename is None and not plot:
             logger.warning('Please either provide filename or allow plot in get_training_curves')
-        import matplotlib.pyplot as plt
-        plt.ylabel(self._reward_attr)
-        plt.xlabel(self._time_attr)
-        plt.title("Performance vs Training-Time in each HPO Trial")
-        with self._fifo_lock:
-            for task_id, task_res in self.training_history.items():
-                rewards = [x[self._reward_attr] for x in task_res]
-                x = list(range(len(task_res)))
-                plt.plot(x, rewards, label=f'task {task_id}')
-        if use_legend:
-            plt.legend(loc='best')
-        if filename:
-            logger.info(f'Saving Training Curve in {filename}')
-            plt.savefig(filename)
-        if plot:
-            plt.show()
+        else:
+            import matplotlib.pyplot as plt
+            plt.ylabel(self._reward_attr)
+            plt.xlabel(self._time_attr)
+            plt.title("Performance vs Training-Time in each HPO Trial")
+            with self._fifo_lock:
+                for task_id, task_res in self.training_history.items():
+                    rewards = [x[self._reward_attr] for x in task_res]
+                    x = list(range(len(task_res)))
+                    plt.plot(x, rewards, label=f'task {task_id}')
+            if use_legend:
+                plt.legend(loc='best')
+            if filename:
+                logger.info(f'Saving Training Curve in {filename}')
+                plt.savefig(filename)
+            if plot:
+                plt.show()
 
     def state_dict(self, destination=None):
         """

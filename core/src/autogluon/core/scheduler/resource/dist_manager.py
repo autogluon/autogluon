@@ -156,8 +156,8 @@ class NodeResourceManager(object):
             self.GPU_QUEUE.put(gid)
 
     def _request(self, remote, resource):
-        """ResourceManager, we recommand using scheduler instead of creating your own
-        resource manager.
+        """
+        ResourceManager, we recommend using scheduler instead of creating your own resource manager.
         """
         assert self.check_possible(resource), \
             'Requested num_cpu={} and num_gpu={} should be less than or equal to' + \
