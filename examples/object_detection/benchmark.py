@@ -5,7 +5,7 @@ import os
 import mxnet as mx
 
 import autogluon.core as ag
-from autogluon.vision.object_detection import ObjectDetector as task
+from autogluon.vision.object_detection import ObjectDetector
 from autogluon.core.scheduler import get_gpu_count
 
 # meta info for each dataset. { name: (url, index_file_name_trainval, index_file_name_test), ...}
@@ -29,8 +29,9 @@ def get_dataset(args):
     if 'voc' in args.dataset_name:
         logging.info('Please follow this instruction to download dataset: \
             https://gluon-cv.mxnet.io/build/examples_datasets/pascal_voc.html#sphx-glr-build-examples-datasets-pascal-voc-py ')
-        train_dataset = task.Dataset(name=args.dataset_name)
-        test_dataset = task.Dataset(name=args.dataset_name, Train=False)
+        root = os.path.expanduser('~/.mxnet/datasets/voc/VOC2007')
+        train_dataset = ObjectDetector.Dataset.from_voc(root, splits='trainval')
+        test_dataset = ObjectDetector.Dataset.from_voc(root, splits='test')
         return (train_dataset, test_dataset)
 
         # custom datset.
@@ -52,10 +53,8 @@ def get_dataset(args):
         classes = args.classes
         data_root = args.data_root
 
-    train_dataset = task.Dataset(data_root, index_file_name=index_file_name_trainval,
-                                 classes=classes)
-    test_dataset = task.Dataset(data_root, index_file_name=index_file_name_test, classes=classes,
-                                Train=False)
+    train_dataset = ObjectDetector.Dataset.from_voc(data_root, splits=index_file_name_trainval)
+    test_dataset = ObjectDetector.Dataset.from_voc(data_root, splits=index_file_name_test)
 
     return (train_dataset, test_dataset)
 
@@ -81,35 +80,54 @@ if __name__ == '__main__':
 
     dataset_train, dataset_test = get_dataset(args)
 
-    time_limits = 5 * 24 * 60 * 60  # 5 days
+    time_limit = 5 * 24 * 60 * 60  # 5 days
     epochs = 20
-    # use coco pre-trained model for custom datasets
-    transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else 'coco'
     if args.meta_arch == 'yolo3':
-        kwargs = {'num_trials': 30, 'epochs': epochs,
-                  'net': ag.Categorical('darknet53', 'mobilenet1.0'), 'meta_arch': args.meta_arch,
-                  'lr': ag.Categorical(1e-2, 5e-3, 1e-3, 5e-4, 1e-4, 5e-5), 'transfer': transfer,
-                  'data_shape': ag.Categorical(320, 416), 'nthreads_per_trial': 16,
-                  'ngpus_per_trial': 8, 'batch_size': 64,
-                  'lr_decay_epoch': ag.Categorical('80,90', '85,95'),
-                  'warmup_epochs': ag.Int(1, 10), 'warmup_iters': ag.Int(250, 1000),
-                  'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': ag.Bool(),
-                  'label_smooth': ag.Bool(), 'time_limits': time_limits, 'dist_ip_addrs': []}
+        transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
+            ag.Categorical('yolo3_darknet53_coco', 'yolo3_mobilenet1.0_coco')
+        hyperparameters = {
+            'transfer': transfer,
+            'estimator': args.meta_arch,
+            'lr': ag.Categorical(1e-2, 5e-3, 1e-3, 5e-4, 1e-4, 5e-5),
+            'data_shape': ag.Categorical(320, 416),
+            'batch_size': 64,
+            'lr_decay_epoch': ag.Categorical('80,90', '85,95'),
+            'warmup_epochs': ag.Int(1, 10), 'warmup_iters': ag.Int(250, 1000),
+            'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': ag.Bool(),
+            'label_smooth': ag.Bool(),
+            'epochs': epochs,
+        }
+        kwargs = {'num_trials': 30,
+                  'time_limit': time_limit,
+                  'dist_ip_addrs': [],
+                  'nthreads_per_trial': 16,
+                  'ngpus_per_trial': 8,
+                  'hyperparameters': hyperparameters}
     elif args.meta_arch == 'faster_rcnn':
-        kwargs = {'num_trials': 30, 'epochs': ag.Categorical(30, 40, 50, 60),
-                  'net': ag.Categorical('resnest101', 'resnest50'),
-                  'meta_arch': args.meta_arch,
-                  'lr': ag.Categorical(0.02, 0.01, 0.005, 0.002, 2e-4, 5e-4), 'transfer': transfer,
-                  'data_shape': (640, 800), 'nthreads_per_trial': 16,
-                  'ngpus_per_trial': 8, 'batch_size': 16,
-                  'lr_decay_epoch': ag.Categorical('24,28', '35', '50,55', '40', '45', '55',
-                                                   '30, 35', '20'),
-                  'warmup_iters': ag.Int(5, 500),
-                  'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': True,
-                  'label_smooth': False, 'time_limits': time_limits, 'dist_ip_addrs': []}
+        transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
+            ag.Categorical('faster_rcnn_resnet101_v1b_coco', 'faster_rcnn_resnet50_v1b_coco')
+        hyperparameters = {
+            'transfer': transfer,
+            'estimator': args.meta_arch,
+            'lr': ag.Categorical(0.02, 0.01, 0.005, 0.002, 2e-4, 5e-4),
+            'data_shape': (640, 800),
+            'lr_decay_epoch': ag.Categorical('24,28', '35', '50,55', '40', '45', '55',
+                                             '30, 35', '20'),
+            'warmup_iters': ag.Int(5, 500),
+            'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': True,
+            'label_smooth': False,
+            'epochs': ag.Categorical(30, 40, 50, 60),
+        }
+        kwargs = {'num_trials': 30,
+                  'nthreads_per_trial': 16,
+                  'ngpus_per_trial': 8,
+                  'time_limit': time_limit,
+                  'dist_ip_addrs': [],
+                  'hyperparameters': hyperparameters}
     else:
         raise NotImplementedError('%s is not implemented.', args.meta_arch)
-    detector = task.fit(dataset_train, **kwargs)
+    detector = ObjectDetector()
+    detector.fit(dataset_train, **kwargs)
     ctx = [mx.gpu(i) for i in range(get_gpu_count())]
     if not ctx:
         ctx = [mx.cpu()]

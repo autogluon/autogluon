@@ -32,7 +32,7 @@ Now, we fit a classifier using AutoGluon as follows:
 ```{.python .input}
 predictor = ImagePredictor()
 # since the original dataset does not provide validation split, the `fit` function splits it randomly with 90/10 ratio
-predictor.fit(train_dataset, epochs=2)  # you can trust the default config, we reduce the # epoch to save some build time
+predictor.fit(train_dataset, hyperparameters={'epochs': 2})  # you can trust the default config, we reduce the # epoch to save some build time
 ```
 
 Within `fit`, the dataset is automatically split into training and validation sets.

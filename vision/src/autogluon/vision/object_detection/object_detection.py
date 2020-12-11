@@ -31,7 +31,6 @@ class ObjectDetector(object):
             holdout_frac=0.1,
             random_state=None,
             time_limit=12*60*60,
-            epochs=None,
             num_trials=1,
             hyperparameters=None,
             search_strategy='random',
@@ -61,17 +60,16 @@ class ObjectDetector(object):
         time_limit : int, default = 43200
             Time limit in seconds, default is 12 hours. If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
-        epochs : int, default value based on network
-            The `epochs` for model training, if `None` is provided, then default `epochs` for model
-            will be used.
         num_trials : int, default = 1
             The number of HPO trials. If `None`, will run infinite trials until `time_limit` is met.
         hyperparameters : dict, default = None
             Extra hyperparameters for specific models.
             Accepted args includes(not limited to):
+            epochs : int, default value based on network
+                The `epochs` for model training.
             batch_size : int
                 Mini batch size
-            learning_rate : float
+            lr : float
                 Trainer learning rate for optimization process.
             You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
         search_strategy : str, default = 'random'
@@ -110,8 +108,6 @@ class ObjectDetector(object):
             config.update({'ngpus_per_trial': ngpus_per_trial})
         if dist_ip_addrs is not None:
             config.update({'dist_ip_addrs': dist_ip_addrs})
-        if epochs is not None:
-            config.update({'epochs': epochs})
         if isinstance(hyperparameters, dict):
             # check if hyperparameters overwriting existing config
             for k, v in hyperparameters.items():

@@ -73,9 +73,9 @@ acquisition function. It has been developed specifically to support asynchronous
 parallel evaluations.
 
 ```{.python .input}
-hyperparameters={'model': model, 'batch_size': batch_size, 'lr': lr}
+hyperparameters={'model': model, 'batch_size': batch_size, 'lr': lr, 'epochs': 2}
 predictor = ImagePredictor()
-predictor.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, epochs=2, hyperparameters=hyperparameters)
+predictor.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, hyperparameters=hyperparameters)
 print('Top-1 val acc: %.3f' % predictor.fit_summary()['valid_acc'])
 ```
 

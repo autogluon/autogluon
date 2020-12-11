@@ -22,10 +22,6 @@ def parse_args():
                         help='training batch size per device (CPU/GPU). If negative, will use default setting')
     parser.add_argument('--ngpus-per-trial', type=int, default=1,
                         help='number of gpus to use.')
-    parser.add_argument('--resume', action='store_true',
-                        help='whether to load last hyperparameters to retrain.')
-    parser.add_argument('--submission', action='store_true',
-                        help='whether to submit test predictions to Leaderboard (Optional).')
     opt = parser.parse_args()
     return opt
 
@@ -62,17 +58,16 @@ def main():
     # overwriting default by command line:
     if opt.batch_size > 0:
         target_hyperparams['batch_size'] = opt.batch_size
-    num_epochs = target_hyperparams.pop('epochs')
     num_trials = target_hyperparams.pop('num_trials')
     ngpus_per_trial = target_hyperparams.pop('ngpus_per_trial')
-    num_epochs = opt.num_epochs if opt.num_epochs > 0 else num_epochs
+    if opt.num_epochs > 0:
+        target_hyperparams['epochs'] = opt.num_epochs
     num_trials = opt.num_trials if opt.num_trials > 0 else num_trials
     if opt.ngpus_per_trial >= 0:
         ngpus_per_trial = opt.ngpus_per_trial
     predictor.fit(train_data=train_dataset,
                   val_data=val_dataset,
                   hyperparameters=target_hyperparams,
-                  epochs=num_epochs,
                   ngpus_per_trial=ngpus_per_trial,
                   num_trials=num_trials,
                   verbosity=2)
@@ -80,10 +75,6 @@ def main():
     summary = predictor.fit_summary()
     logging.info('Top-1 val acc: %.3f' % summary['train_acc'])
     logger.info(summary)
-
-    if opt.submission:
-        inds, probs, probs_all, value = predict_details(test_dataset, predictor)
-        generate_csv_submission(dataset_dir, opt.dataset, local_path, inds, probs_all, value, opt.custom)
 
 if __name__ == '__main__':
     main()
