@@ -70,6 +70,8 @@ if __name__ == '__main__':
                         help="name of txt file which contains images for testing")
     parser.add_argument('--no-redownload', action='store_true',
                         help="whether need to re-download dataset")
+    parser.add_argument('--num-trials', type=int, default=3,
+                        help="the HPO trials to perform")
     parser.add_argument('--meta-arch', type=str, default='yolo3', choices=['yolo3', 'faster_rcnn'],
                         help="Meta architecture of the model")
 
@@ -94,7 +96,7 @@ if __name__ == '__main__':
             'epochs': epochs,
             'transfer': transfer
         }
-        kwargs = {'num_trials': 3,
+        kwargs = {'num_trials': opt.num_trials,
                   'time_limit': time_limit,
                   'dist_ip_addrs': [],
                   'nthreads_per_trial': 16,
@@ -115,7 +117,7 @@ if __name__ == '__main__':
             'epochs': ag.Categorical(30, 40, 50, 60),
             'transfer': transfer
         }
-        kwargs = {'num_trials': 3,
+        kwargs = {'num_trials': opt.num_trials,
                   'nthreads_per_trial': 16,
                   'ngpus_per_trial': 8,
                   'time_limit': time_limit,
