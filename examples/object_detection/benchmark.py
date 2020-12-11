@@ -92,9 +92,8 @@ if __name__ == '__main__':
             'warmup_epochs': ag.Int(1, 10), 'warmup_iters': ag.Int(250, 1000),
             'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': ag.Categorical(True, False),
             'epochs': epochs,
+            'transfer': transfer
         }
-        if transfer is not None:
-            hyperparameters['transfer'] = transfer
         kwargs = {'num_trials': 3,
                   'time_limit': time_limit,
                   'dist_ip_addrs': [],
@@ -103,7 +102,7 @@ if __name__ == '__main__':
                   'hyperparameters': hyperparameters}
     elif args.meta_arch == 'faster_rcnn':
         transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else \
-            ag.Categorical('faster_rcnn_resnet101_v1b_coco', 'faster_rcnn_resnet50_v1b_coco')
+            ag.Categorical('faster_rcnn_fpn_resnet101_v1d_coco', 'faster_rcnn_resnet50_v1b_coco')
         hyperparameters = {
             'estimator': args.meta_arch,
             'lr': ag.Categorical(0.02, 0.01, 0.005, 0.002, 2e-4, 5e-4),
@@ -114,9 +113,8 @@ if __name__ == '__main__':
             'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': True,
             'label_smooth': False,
             'epochs': ag.Categorical(30, 40, 50, 60),
+            'transfer': transfer
         }
-        if transfer is not None:
-            hyperparameters['transfer'] = transfer
         kwargs = {'num_trials': 3,
                   'nthreads_per_trial': 16,
                   'ngpus_per_trial': 8,
