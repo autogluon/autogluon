@@ -89,7 +89,7 @@ if __name__ == '__main__':
             'estimator': args.meta_arch,
             'lr': ag.Categorical(1e-2, 5e-3, 1e-3, 5e-4, 1e-4, 5e-5),
             'data_shape': ag.Categorical(320, 416),
-            'batch_size': 64,
+            'batch_size': 16,
             'lr_decay_epoch': ag.Categorical([80,90], [85,95]),
             'warmup_epochs': ag.Int(1, 10), 'warmup_iters': ag.Int(250, 1000),
             'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': ag.Categorical(True, False),
