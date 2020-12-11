@@ -90,8 +90,8 @@ if __name__ == '__main__':
             'batch_size': 64,
             'lr_decay_epoch': ag.Categorical('80,90', '85,95'),
             'warmup_epochs': ag.Int(1, 10), 'warmup_iters': ag.Int(250, 1000),
-            'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': ag.Bool(),
-            'label_smooth': ag.Bool(),
+            'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': ag.Categorical(True, False),
+            'label_smooth': ag.Categorical(True, False),
             'epochs': epochs,
         }
         if transfer is not None:
@@ -128,10 +128,7 @@ if __name__ == '__main__':
         raise NotImplementedError('%s is not implemented.', args.meta_arch)
     detector = ObjectDetector()
     detector.fit(dataset_train, **kwargs)
-    ctx = [mx.gpu(i) for i in range(get_gpu_count())]
-    if not ctx:
-        ctx = [mx.cpu()]
-    test_map = detector.evaluate(dataset_test, ctx=ctx)
+    test_map = detector.evaluate(dataset_test)
     print("mAP on test dataset: {}".format(test_map[-1][-1]))
     print(test_map)
     detector.save('final_model.model')
