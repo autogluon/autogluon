@@ -96,7 +96,7 @@ if __name__ == '__main__':
         }
         if transfer is not None:
             hyperparameters['transfer'] = transfer
-        kwargs = {'num_trials': 30,
+        kwargs = {'num_trials': 3,
                   'time_limit': time_limit,
                   'dist_ip_addrs': [],
                   'nthreads_per_trial': 16,
@@ -118,7 +118,7 @@ if __name__ == '__main__':
         }
         if transfer is not None:
             hyperparameters['transfer'] = transfer
-        kwargs = {'num_trials': 30,
+        kwargs = {'num_trials': 3,
                   'nthreads_per_trial': 16,
                   'ngpus_per_trial': 8,
                   'time_limit': time_limit,
