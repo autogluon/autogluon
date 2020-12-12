@@ -1,18 +1,19 @@
-import os
-import time
-import signal
 import atexit
-import weakref
 import logging
+import os
+import signal
 import subprocess
-import concurrent
-from threading import Thread 
-import multiprocessing as mp
+import time
+import weakref
+from threading import Thread
+
 from distributed import Client
 
 from .ssh_helper import start_scheduler, start_worker
 
 __all__ = ['Remote']
+
+from ...utils.multiprocessing_utils import AtomicCounter
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +59,11 @@ def start_service(remote_ip, port):
     return Service(proc)
 
 class Remote(Client):
-    LOCK = mp.Lock()
-    REMOTE_ID = mp.Value('i', 0)
+
+    ID_COUNTER = AtomicCounter()
+
     def __init__(self, remote_ip=None, port=None, local=False, ssh_username=None,
-            ssh_port=22, ssh_private_key=None, remote_python=None, timeout=30):
+            ssh_port=22, ssh_private_key=None, remote_python=None, timeout=60):
         self.service = None
         if local:
             super().__init__(processes=False)
@@ -70,9 +72,7 @@ class Remote(Client):
             self.service = start_service(remote_ip, port)
             _set_global_remote_service(self.service)
             super().__init__(remote_addr, timeout=timeout)
-        with Remote.LOCK:
-            self.remote_id = Remote.REMOTE_ID.value
-            Remote.REMOTE_ID.value += 1
+        self.remote_id = Remote.ID_COUNTER.get_and_increment()
 
     def close(self, timeout=2):
         if self.service:
@@ -91,7 +91,7 @@ class Remote(Client):
 
 class DaskRemoteService(object):
     def __init__(self, remote_addr, scheduler_port, ssh_username=None,
-        ssh_port=22, ssh_private_key=None, remote_python=None):
+                 ssh_port=22, ssh_private_key=None, remote_python=None):
 
         self.scheduler_addr = remote_addr
         self.scheduler_port = scheduler_port

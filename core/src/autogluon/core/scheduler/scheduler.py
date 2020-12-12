@@ -112,7 +112,7 @@ class TaskScheduler(object):
             if len(new_scheduled_tasks) < len(self.scheduled_tasks):
                 self.scheduled_tasks = new_scheduled_tasks
 
-    def join_jobs(self, timeout=None):
+    def join_jobs(self):
         """
         Wait all scheduled jobs to finish
         """
@@ -120,7 +120,7 @@ class TaskScheduler(object):
         for task_dict in self.scheduled_tasks:
             try:
                 while not task_dict['Job'].done():
-                    task_dict['Job'].result(timeout=5)
+                    task_dict['Job'].result(timeout=60)
             except distributed.TimeoutError as e:
                 logger.error(str(e))
             except:
