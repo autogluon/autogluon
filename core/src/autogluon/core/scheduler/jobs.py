@@ -1,8 +1,11 @@
 import logging
 import multiprocessing as mp
 import os
+import random
 import sys
+import time
 from functools import partial
+from time import sleep
 
 import dill
 
@@ -11,6 +14,7 @@ from autogluon.core.scheduler.managers import TaskManagers
 from autogluon.core.scheduler.reporter import Communicator, LocalStatusReporter
 from autogluon.core.utils import CustomProcess, AutoGluonEarlyStop
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +23,11 @@ __all__ = ['DistributedJobRunner']
 
 class DistributedJobRunner(object):
 
+    JOB_REGISTRATION_LOCK = mp.Lock()
+
     def __init__(self, task: Task, managers: TaskManagers):
-        self.task = task
-        self.managers = managers
+        self.task: Task = task
+        self.managers: TaskManagers = managers
 
     def start_distributed_job(self):
         """Async Execute the job in remote and release the resources
@@ -30,34 +36,41 @@ class DistributedJobRunner(object):
 
         def _release_resource_callback(fut):
             logger.debug(f'Releasing Resources {self.task.task_id}')
-            self.managers.release_resources(self.task.resources)
+            with DistributedJobRunner.JOB_REGISTRATION_LOCK:
+                self.managers.release_resources(self.task.resources)
 
-        job = self.task.resources.node.submit(
-            partial(self._run_dist_job, self.task.task_id),
-            self.task.fn,
-            self.task.args,
-            self.task.resources.gpu_ids
-        )
+        with DistributedJobRunner.JOB_REGISTRATION_LOCK:
+            remote: Remote = self.task.resources.node
+            job = remote.submit(
+                partial(self._run_dist_job, self.task.task_id),
+                self.task.fn,
+                self.task.args,
+                self.task.resources.gpu_ids
+            )
+            # Fast job submission from multiple threads causes lost jobs and hangs reporter thread.
+            # Keep the values above 200ms combined
+            time.sleep(0.15)
+            job.add_done_callback(_release_resource_callback)
+            time.sleep(0.15 + random.random())
 
-        job.add_done_callback(_release_resource_callback)
         return job
 
     @staticmethod
     def _run_dist_job(task_id, fn, args, gpu_ids):
         """Remote function Executing the task
         """
-        if '_default_config' in args['args']:
-            args['args'].pop('_default_config')
-
-        if 'reporter' in args:
-            local_reporter = LocalStatusReporter()
-            dist_reporter = args['reporter']
-            args['reporter'] = local_reporter
-
-        manager = mp.Manager()
-        return_list = manager.list()
-
         try:
+            manager = mp.Manager()
+            return_list = manager.list()
+
+            if '_default_config' in args['args']:
+                args['args'].pop('_default_config')
+
+            if 'reporter' in args:
+                local_reporter = LocalStatusReporter()
+                dist_reporter = args['reporter']
+                args['reporter'] = local_reporter
+
             # Starting local process
             # Note: we have to use dill here because every argument passed to a child process over spawn or forkserver
             # has to be pickled. fork mode does not require this because memory sharing, but it is unusable for CUDA
@@ -82,10 +95,14 @@ class DistributedJobRunner(object):
                 p.start()
                 if 'reporter' in args:
                     cp = Communicator.Create(p, local_reporter, dist_reporter)
-                p.join()
+
+                if p.is_alive():
+                    p.join()
 
                 if 'reporter' in args:
                     cp.stop()
+                    if cp.is_alive():
+                        cp.join()
 
                 # Get processes outputs
                 if not is_fork_enabled():

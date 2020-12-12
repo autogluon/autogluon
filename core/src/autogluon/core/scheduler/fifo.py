@@ -6,6 +6,8 @@ import pickle
 import threading
 import time
 from collections import OrderedDict
+from time import sleep
+
 import numpy as np
 import copy
 
@@ -345,14 +347,15 @@ class FIFOScheduler(TaskScheduler):
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
-        job_runner = DistributedJobRunner(task, self.managers)
-        job = job_runner.start_distributed_job()
-        # reporter thread
-        rp = threading.Thread(
-            target=self._run_reporter,
-            args=(task, job, reporter),
-            daemon=False)
-        rp.start()
+        with self._fifo_lock:
+            job_runner = DistributedJobRunner(task, self.managers)
+            job = job_runner.start_distributed_job()
+            # reporter thread
+            rp = threading.Thread(
+                target=self._run_reporter,
+                args=(task, job, reporter),
+                daemon=False)
+            rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
         # Checkpoint thread. This is also used for training_history

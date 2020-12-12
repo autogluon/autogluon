@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 import multiprocessing as mp
-from ..utils import save, load, AutoGluonEarlyStop
+from ..utils import save, load, AutoGluonEarlyStop, CustomProcess
 import distributed
 from distributed import Queue, Variable
 from distributed.comm.core import CommClosedError
@@ -172,7 +172,7 @@ class LocalStatusReporter(object):
 
 
 class Communicator(threading.Thread):
-    def __init__(self, process, local_reporter, dist_reporter):
+    def __init__(self, process: CustomProcess, local_reporter: LocalStatusReporter, dist_reporter: DistStatusReporter):
         super().__init__()
         self.process = process
         self.local_reporter = local_reporter

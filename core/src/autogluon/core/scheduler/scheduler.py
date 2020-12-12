@@ -91,10 +91,6 @@ class TaskScheduler(object):
         """
         task_id = self._task_id_counter.get_and_increment()
         task = Task(task_id, fn, args, resources)
-        # Adding sleep to reduce likelihood of tasks starting at the same time
-        # This reduces chance for deadlock
-        time.sleep(0.1 + random())
-
         return task
 
     def _clean_task_internal(self, task_dict):

@@ -1,4 +1,6 @@
 import logging
+
+from ..remote import Remote
 from ...utils import get_gpu_count, get_cpu_count
 
 __all__ = ['Resources', 'DistributedResource',
@@ -65,10 +67,10 @@ class DistributedResource(Resources):
     """
     def __init__(self, num_cpus=1, num_gpus=0):
         super(DistributedResource, self).__init__(num_cpus, num_gpus)
-        self.node = None
+        self.node: Remote = None
         self.is_ready = False
 
-    def _ready(self, remote, cids, gids):
+    def _ready(self, remote: Remote, cids, gids):
         super(DistributedResource, self)._ready(cids, gids)
         self.node = remote
         self.is_ready = True
