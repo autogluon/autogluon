@@ -1,9 +1,12 @@
 import logging
 import multiprocessing as mp
 from .resource import *
+from ..remote import Remote
 from ...utils import Queue
 
 __all__ = ['DistributedResourceManager', 'NodeResourceManager']
+
+from ...utils.multiprocessing_utils import RWLock, read_lock, write_lock
 
 logger = logging.getLogger(__name__)
 
@@ -145,17 +148,19 @@ class NodeResourceManager(object):
     """Remote Resource Manager to keep track of the cpu and gpu usage
     """
     def __init__(self, remote):
-        self.LOCK = mp.Lock()
+        self.RESOURCES_LOCK = RWLock()
         self.MAX_CPU_COUNT = get_remote_cpu_count(remote)
         self.MAX_GPU_COUNT = get_remote_gpu_count(remote)
         self.CPU_QUEUE = Queue()
         self.GPU_QUEUE = Queue()
-        for cid in range(self.MAX_CPU_COUNT):
-            self.CPU_QUEUE.put(cid)
-        for gid in range(self.MAX_GPU_COUNT):
-            self.GPU_QUEUE.put(gid)
 
-    def _request(self, remote, resource):
+        with write_lock(self.RESOURCES_LOCK):
+            for cid in range(self.MAX_CPU_COUNT):
+                self.CPU_QUEUE.put(cid)
+            for gid in range(self.MAX_GPU_COUNT):
+                self.GPU_QUEUE.put(gid)
+
+    def _request(self, remote: Remote, resource: DistributedResource):
         """
         ResourceManager, we recommend using scheduler instead of creating your own resource manager.
         """
@@ -164,39 +169,36 @@ class NodeResourceManager(object):
             'system availability CPUs={}, GPUs={}'. \
             format(resource.num_cpus, resource.num_gpus, self.MAX_GPU_COUNT, self.MAX_CPU_COUNT)
 
-        with self.LOCK:
+        with write_lock(self.RESOURCES_LOCK):
             cpu_ids = [self.CPU_QUEUE.get() for i in range(resource.num_cpus)]
             gpu_ids = [self.GPU_QUEUE.get() for i in range(resource.num_gpus)]
             resource._ready(remote, cpu_ids, gpu_ids)
             #logger.debug("\nReqeust succeed {}".format(resource))
         return
  
-    def _release(self, resource):
+    def _release(self, resource: DistributedResource):
         cpu_ids = resource.cpu_ids
         gpu_ids = resource.gpu_ids
-        resource._release()
-        if len(cpu_ids) > 0:
+        with write_lock(self.RESOURCES_LOCK):
+            resource._release()
             for cid in cpu_ids:
                 self.CPU_QUEUE.put(cid)
-        if len(gpu_ids) > 0:
             for gid in gpu_ids:
                 self.GPU_QUEUE.put(gid)
 
     def get_all_resources(self):
         return self.MAX_CPU_COUNT, self.MAX_GPU_COUNT
 
-    def check_availability(self, resource):
+    def check_availability(self, resource: DistributedResource):
         """Unsafe check
         """
-        if resource.num_cpus > self.CPU_QUEUE.qsize() or resource.num_gpus > self.GPU_QUEUE.qsize():
-            return False
-        return True
+        with read_lock(self.RESOURCES_LOCK):
+            available = resource.num_cpus <= self.CPU_QUEUE.qsize() and resource.num_gpus <= self.GPU_QUEUE.qsize()
+        return available
 
     def check_possible(self, resource):
         assert isinstance(resource, DistributedResource), 'Only support autogluon.resource.Resources'
-        if resource.num_cpus > self.MAX_CPU_COUNT or resource.num_gpus > self.MAX_GPU_COUNT:
-            return False
-        return True
+        return resource.num_cpus <= self.MAX_CPU_COUNT and resource.num_gpus <= self.MAX_GPU_COUNT
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' + \

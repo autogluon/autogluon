@@ -244,9 +244,9 @@ def start_scheduler(addr, port, ssh_username, ssh_port,
 
     return merge(cmd_dict, {"thread": thread})
 
+
 def start_worker(scheduler_addr, scheduler_port, worker_addr,
-    ssh_username, ssh_port, ssh_private_key,
-    remote_python=None):
+                 ssh_username, ssh_port, ssh_private_key):
 
     cmd = (
         "dask-worker "
