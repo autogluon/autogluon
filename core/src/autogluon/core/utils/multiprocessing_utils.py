@@ -12,27 +12,27 @@ logger = logging.getLogger(__name__)
 class AtomicCounter(object):
     def __init__(self, initial_value=0):
         self._counter = multiprocessing.Value('i', initial_value)
-        self.lock = multiprocessing.RLock()
+        self.lock = RWLock()
 
     def get_and_increment(self):
-        with self.lock:
+        with write_lock(self.lock):
             value = self._counter.value
             self._counter.value = value + 1
         return value
 
     def increment_and_get(self):
-        with self.lock:
+        with write_lock(self.lock):
             self._counter.value = self._counter.value + 1
             value = self._counter.value
         return value
 
     def get(self):
-        with self.lock:
+        with read_lock(self.lock):
             value = self._counter.value
         return value
 
     def set(self, value):
-        with self.lock:
+        with write_lock(self.lock):
             self._counter.value = value
 
 
@@ -50,6 +50,8 @@ class RWLock:
     with a modification -- adding an additional lock (C{self.__readers_queue})
     -- in accordance with [2].
 
+    By default multiprocessing locks are used.
+
     Sources:
     [1] A.B. Downey: "The little book of semaphores", Version 2.1.5, 2008
     [2] P.J. Courtois, F. Heymans, D.L. Parnas:
@@ -59,12 +61,12 @@ class RWLock:
     [4] https://code.activestate.com/recipes/577803-reader-writer-lock-with-priority-for-writers/
     """
 
-    def __init__(self):
+    def __init__(self, use_multiprocess_locks=True):
         self.__read_switch = _LightSwitch()
         self.__write_switch = _LightSwitch()
-        self.__no_readers = threading.Lock()
-        self.__no_writers = threading.Lock()
-        self.__readers_queue = threading.Lock()
+        self.__no_readers = multiprocessing.Lock() if use_multiprocess_locks else threading.Lock
+        self.__no_writers = multiprocessing.Lock() if use_multiprocess_locks else threading.Lock
+        self.__readers_queue = multiprocessing.Lock() if use_multiprocess_locks else threading.Lock
         """A lock giving an even higher priority to the writer in certain
         cases (see [2] for a discussion)"""
 
@@ -126,10 +128,10 @@ def write_lock(lock: RWLock):
 
 def dataframe_transform_parallel(
         df, transformer
-                   ):
+):
     cpu_count = multiprocessing.cpu_count()
     workers_count = int(round(cpu_count))
-    logger.log(15, 'Dataframe_transform_parallel running pool with '+str(workers_count)+' workers')
+    logger.log(15, 'Dataframe_transform_parallel running pool with ' + str(workers_count) + ' workers')
     df_chunks = np.array_split(df, workers_count)
     df_list = execute_multiprocessing(workers_count=workers_count, transformer=transformer, chunks=df_chunks)
     df_combined = pd.concat(df_list, axis=0, ignore_index=True)

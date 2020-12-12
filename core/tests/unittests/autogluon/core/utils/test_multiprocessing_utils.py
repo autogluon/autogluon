@@ -1,45 +1,56 @@
+import copy
 import threading
 import time
-import copy
 from unittest import TestCase
 
-from _pytest import unittest
-
+from autogluon.core.utils import CustomProcess
 from autogluon.core.utils.multiprocessing_utils import AtomicCounter, RWLock, read_lock, write_lock
 
 
-def increment_ctr(ctr: AtomicCounter):
-    print('started')
-    for i in range(10000):
-        ctr.get_and_increment()
-    print('finished')
+class AtomicCounterTestCase(TestCase):
+    def increment_ctr(self, ctr: AtomicCounter):
+        print('started')
+        for i in range(20000):
+            ctr.get_and_increment()
+        print('finished')
 
+    def test_atomic_counter_locking(self):
+        counter = AtomicCounter(0)
+        threads = [threading.Thread(target=self.increment_ctr, args=[counter]) for i in range(2)]
 
-def test_atomic_counter_locking():
-    counter = AtomicCounter(0)
-    threads = [threading.Thread(target=increment_ctr, args=[counter]) for i in range(2)]
+        for t in threads:
+            t.start()
 
-    for t in threads:
-        t.start()
+        for t in threads:
+            t.join()
 
-    for t in threads:
-        t.join()
+        assert counter.get() == 40000
 
-    assert counter.get() == 20000
+    def test_atomic_counter_locking_with_processes(self):
+        counter = AtomicCounter(0)
 
+        processes = [CustomProcess(target=self.increment_ctr, args=[counter]) for i in range(2)]
 
-def test_atomic_counter_increment_and_get():
-    counter = AtomicCounter(42)
-    assert counter.get() == 42
-    assert counter.increment_and_get() == 43
-    assert counter.get() == 43
+        for p in processes:
+            p.start()
 
+        for p in processes:
+            p.join()
 
-def test_atomic_counter_get_and_increment():
-    counter = AtomicCounter(42)
-    assert counter.get() == 42
-    assert counter.get_and_increment() == 42
-    assert counter.get() == 43
+        assert counter.get() == 40000
+
+    def test_atomic_counter_increment_and_get(self):
+        counter = AtomicCounter(42)
+        assert counter.get() == 42
+        assert counter.increment_and_get() == 43
+        assert counter.get() == 43
+
+    def test_atomic_counter_get_and_increment(self):
+        counter = AtomicCounter(42)
+        assert counter.get() == 42
+        assert counter.get_and_increment() == 42
+        assert counter.get() == 43
+
 
 # ------- RWLock -------
 
