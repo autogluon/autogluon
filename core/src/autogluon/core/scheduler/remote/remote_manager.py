@@ -85,8 +85,7 @@ class RemoteManager(object):
                     continue
                 port = cls.get_port_id()
                 remote = Remote(node_ip, port)
-                with cls.LOCK:
-                    cls.NODES[node_ip] = remote
+                cls.NODES[node_ip] = remote
                 remotes.append(remote)
         return remotes
     
