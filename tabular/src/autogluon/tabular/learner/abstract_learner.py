@@ -38,11 +38,13 @@ class AbstractLearner:
     learner_info_name = 'info.pkl'
     learner_info_json_name = 'info.json'
 
-    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: PipelineFeatureGenerator, label_count_threshold=10,
+    def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, id_columns: list = None, label_count_threshold=10,
                  problem_type=None, eval_metric=None, stopping_metric=None, cache_data=True, is_trainer_present=False, random_seed=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.id_columns = id_columns
+        if self.id_columns is None:
+            self.id_columns = []
         self.threshold = label_count_threshold
         self.problem_type = problem_type
         self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')

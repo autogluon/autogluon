@@ -13,7 +13,6 @@ import networkx as nx
 
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
-from autogluon.core.task.base import BasePredictor
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
 from ...utils import BINARY, MULTICLASS, REGRESSION, get_pred_from_proba
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
@@ -26,7 +25,7 @@ __all__ = ['TabularPredictor']
 logger = logging.getLogger()  # return root logger
 
 
-class TabularPredictor(BasePredictor):
+class TabularPredictor:
     """ Object returned by `fit()` in Tabular Prediction tasks.
         Use for making predictions on new data and viewing information about models trained during `fit()`.
 
@@ -92,7 +91,6 @@ class TabularPredictor(BasePredictor):
         self._learner: Learner = learner  # Learner object
         self._learner.persist_trainer(low_memory=True)
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
-        self.output_directory = self._learner.path
 
     @property
     def class_labels(self):
@@ -122,6 +120,10 @@ class TabularPredictor(BasePredictor):
     @property
     def label_column(self):
         return self._learner.label
+
+    @property
+    def output_directory(self):
+        return self._learner.path
 
     # TODO: Documentation
     # Enables extra fit calls after the original fit

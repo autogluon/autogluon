@@ -5,7 +5,6 @@ import math
 import numpy as np
 import pandas as pd
 
-from autogluon.core.metrics import get_metric
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
@@ -18,9 +17,9 @@ from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
-from ...features import AutoMLPipelineFeatureGenerator
+from ...features import AutoMLPipelineFeatureGenerator, IdentityFeatureGenerator
 from ...learner import AbstractLearner, DefaultLearner
-from ...trainer import AbstractTrainer, AutoTrainer
+from ...trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
 
@@ -37,29 +36,25 @@ class TabularPredictorV2(TabularPredictor):
             self,
             label,
             problem_type=None,
-            output_directory=None,
             eval_metric=None,
-            stopping_metric=None,
             feature_metadata_in=None,
+            feature_generator="automl",
+            output_directory=None,
             verbosity=2,
-            id_columns=None,
-            label_count_threshold=10,
-            cache_data=True,
-            feature_generator=None,
-            learner_type=DefaultLearner,
-            trainer_type=AutoTrainer,
-            random_seed=0,
-
-            # learner_kwargs=None -> could simplify
-
+            **kwargs
     ):
-
-        self.output_directory = setup_outputdir(output_directory)  # TODO: Rename to directory/path?
+        self._validate_kwargs(kwargs)
+        output_directory = setup_outputdir(output_directory)  # TODO: Rename to directory/path?
         self.feature_metadata_in = feature_metadata_in  # TODO: Unused, FIXME: currently overwritten after .fit, split into two variables: one for pre and one for post processing.
         self.verbosity = verbosity  # TODO: Unused
 
+        learner_type = kwargs.pop('learner_type', DefaultLearner)
+        learner_kwargs = kwargs.pop('learner_kwargs', dict())
+
         # TODO: v0.1 Add presets for feature_generator: `feature_generator='special'`, ignore_text, etc.
         if feature_generator is None:
+            feature_generator = IdentityFeatureGenerator()
+        elif feature_generator == "automl":
             feature_generator = AutoMLPipelineFeatureGenerator()
         if feature_metadata_in is not None:
             if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
@@ -67,10 +62,8 @@ class TabularPredictorV2(TabularPredictor):
             else:
                 raise AssertionError('`feature_metadata_in` already exists in `feature_generator`.')
 
-        # TODO: Move many of these to properties since they are contained in learner
-        self._learner: AbstractLearner = learner_type(path_context=self.output_directory, label=label, id_columns=id_columns, feature_generator=feature_generator,
-                                                      eval_metric=eval_metric, stopping_metric=stopping_metric, problem_type=problem_type,
-                                                      label_count_threshold=label_count_threshold, cache_data=cache_data, random_seed=random_seed, trainer_type=trainer_type)
+        self._learner: AbstractLearner = learner_type(path_context=output_directory, label=label, feature_generator=feature_generator,
+                                                      eval_metric=eval_metric, problem_type=problem_type, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
 
@@ -683,20 +676,17 @@ class TabularPredictorV2(TabularPredictor):
         if self._learner.trainer_path is not None:
             self._learner.persist_trainer(low_memory=True)
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
-        self.output_directory = self._learner.path
 
     # TODO: Update and correct the logging message on loading directions
     def save(self):
         tmp_learner = self._learner
         tmp_trainer = self._trainer
-        if self._learner is not None:
-            super().save()
-            self._learner = None
-            self._trainer = None
-        save_pkl.save(path=self.output_directory + self.predictor_file_name, object=self)
-        if tmp_learner is not None:
-            self._learner = tmp_learner
-            self._trainer = tmp_trainer
+        super().save()
+        self._learner = None
+        self._trainer = None
+        save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
+        self._learner = tmp_learner
+        self._trainer = tmp_trainer
 
     @classmethod
     def load(cls, directory, verbosity=2):
@@ -736,3 +726,47 @@ class TabularPredictorV2(TabularPredictor):
         predictor = cls(label=learner.label, output_directory=learner.path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor
+
+    @staticmethod
+    def _validate_kwargs(kwargs):
+        valid_kwargs = {
+            'learner_type',
+            'learner_kwargs',
+        }
+        invalid_keys = []
+        for key in kwargs:
+            if key not in valid_kwargs:
+                invalid_keys.append(key)
+        if invalid_keys:
+            raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
+
+    # TODO: rename to `advice`
+    def _advice(self):
+        is_feature_generator_fit = self._learner.feature_generator.is_fit()
+        is_learner_fit = self._learner.trainer_path is not None
+        exists_trainer = self._trainer is not None
+
+        advice_dict = dict(
+            is_feature_generator_fit=is_feature_generator_fit,
+            is_learner_fit=is_learner_fit,
+            exists_trainer=exists_trainer,
+            can_predict=True,  # TODO
+
+        )
+
+        if not advice_dict['is_feature_generator_fit']:
+            logger.log(20, 'FeatureGenerator has not been fit, consider calling `predictor.fit_feature_generator(data)`.')
+        if not advice_dict['is_learner_fit']:
+            logger.log(20, 'Learner is not fit, consider calling `predictor.fit(...)`')
+        if not advice_dict['exists_trainer']:
+            logger.log(20, 'Trainer is not initialized, consider calling `predictor.fit(...)`')
+        # TODO: Advice on unused features (if no model uses a feature)
+        # TODO: Advice on fit_extra
+        # TODO: Advice on distill
+        # TODO: Advice on leaderboard
+        # TODO: Advice on persist
+        # TODO: Advice on refit_full
+        # TODO: Advice on feature_importance
+        # TODO: Advice on dropping poor models
+
+        print(advice_dict)
