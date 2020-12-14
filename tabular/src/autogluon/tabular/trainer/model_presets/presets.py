@@ -20,6 +20,7 @@ from ...models.catboost.catboost_model import CatBoostModel
 from ...models.xgboost.xgboost_model import XGBoostModel
 from ...models.xt.xt_model import XTModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
+from ...models.fasttext.fasttext_model import FastTextModel
 from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 from ...models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 
@@ -36,6 +37,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     NN=50,
     FASTAI=45,
     LR=40,
+    FASTTEXT=0,
     TEXT_NN_V1=0,
     TRANSF=0,
     custom=0,
@@ -72,6 +74,7 @@ MODEL_TYPES = dict(
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
     TEXT_NN_V1=TextPredictionV1Model,
+    FASTTEXT=FastTextModel,
 )
 
 DEFAULT_MODEL_NAMES = {
@@ -86,6 +89,7 @@ DEFAULT_MODEL_NAMES = {
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
     TextPredictionV1Model: 'TextNeuralNetV1',
+    FastTextModel: 'FastText',
 }
 
 
