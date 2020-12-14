@@ -147,6 +147,6 @@ def test_log_loss(gt, probs):
 
 def test_log_loss_single_binary_class():
     gt = np.array([1, 1, 1])
-    probs = np.array([0.1, 0.1, 0.1])
-    ag_loss = log_loss(gt, probs)
-    np.testing.assert_allclose(ag_loss, np.log(probs).mean())
+    probs = np.array([0.1, 0.2, 0.3])
+    np.testing.assert_allclose(log_loss(gt, probs), -np.log(probs).mean())
+    np.testing.assert_allclose(log_loss(1 - gt, probs), -np.log(1 - probs).mean())
