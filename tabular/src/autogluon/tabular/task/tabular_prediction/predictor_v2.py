@@ -490,12 +490,11 @@ class TabularPredictorV2(TabularPredictor):
         ngpus_per_trial = kwargs.get('ngpus_per_trial', None)
         dist_ip_addrs = kwargs.get('dist_ip_addrs', None)
         visualizer = kwargs.get('visualizer', None)
+        unlabeled_data = kwargs.get('unlabeled_data', None)
 
         # TODO: FIXME
         label = self.label_column
         # TODO: FIXME
-
-        unlabeled_data = kwargs.get('unlabeled_data', None)
 
         if isinstance(train_data, str):
             train_data = TabularDataset(file_path=train_data)
@@ -536,7 +535,6 @@ class TabularPredictorV2(TabularPredictor):
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
-            force_forkserver()
 
         if dist_ip_addrs is None:
             dist_ip_addrs = []
