@@ -406,7 +406,11 @@ class HyperbandScheduler(FIFOScheduler):
             # in schedule_next before
             cls.resource_manager._request(task.resources)
         # reporter and terminator
-        reporter = DistStatusReporter(remote=task.resources.node)
+        if 'reporter' in kwargs: 
+            # MOHyperbandScheduler provides a custom reporter
+            reporter = kwargs['reporter']
+        else:
+            reporter = DistStatusReporter(remote=task.resources.node)
         task.args['reporter'] = reporter
 
         # Register task

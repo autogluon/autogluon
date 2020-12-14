@@ -107,35 +107,39 @@ class MODistStatusReporter(DistStatusReporter):
     >>> def train_func(config, reporter):
     ...     reporter(accuracy=1, f_score=1, training_iters=4)
     """
-    def __init__(self, objectives, weights, scalarization_options, remote=None):
+    def __init__(self, objectives, weights, scalarization_opts, remote=None):
         super().__init__(remote)
         self.objectives = objectives
         self.weights = weights
-        self.scalarization_options = scalarization_options
+        self.scalarization_options = scalarization_opts
     
     def __call__(self, **kwargs):
         """Report updated training status.
         Pass in `done=True` when the training job is completed.
 
         Args:
-            kwargs: Latest training result status. Reporter requires access to all objectives of interest.
+            kwargs: Latest training result status. Reporter requires access to
+            all objectives of interest.
 
         Example
         _______
         >>> reporter(accuracy=1, f_score=1, training_iters=4)
         """
         try:
-            objective_vector = np.array([kwargs[k] for k in self.objectives])
+            v = np.array([kwargs[k] for k in self.objectives])
         except KeyError:
-            raise KeyError("Reporter requires accesss to all objective values. Please ensure you return all required values.")
+            raise KeyError("Reporter requires accesss to all objective values.\
+                Please ensure you return all required values.")
 
         if self.scalarization_options["algorithm"] == "random_weights":
-            scalarization = max([w @ objective_vector for w in self.weights])
+            scalarization = max([w @ v for w in self.weights])
         elif self.scalarization_options["algorithm"] == "parego":
             rho = self.scalarization_options["rho"]
-            scalarization = max([max(w * objective_vector) + rho * (w @ objective_vector) for w in self.weights])
+            scalarization = [max(w * v) + rho * (w @ v) for w in self.weights]
+            scalarization = max(scalarization)
         else:
-            raise ValueError("Specified scalarization algorithm is unknown. Valid algorithms are 'random_weights' and 'parego'.")
+            raise ValueError("Specified scalarization algorithm is unknown. \
+                Valid algorithms are 'random_weights' and 'parego'.")
         kwargs["_SCALARIZATION"] = scalarization
 
         super().__call__(**kwargs)
