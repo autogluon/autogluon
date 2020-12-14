@@ -143,3 +143,10 @@ def test_log_loss(gt, probs):
     ag_loss = log_loss(gt, probs)
     expected = np.log(probs[np.arange(probs.shape[0]), gt]).mean()
     np.testing.assert_allclose(ag_loss, expected)
+
+
+def test_log_loss_single_binary_class():
+    gt = np.array([1, 1, 1])
+    probs = np.array([0.1, 0.1, 0.1])
+    ag_loss = log_loss(gt, probs)
+    np.testing.assert_allclose(ag_loss, np.log(probs).mean())

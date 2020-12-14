@@ -363,7 +363,7 @@ recall = make_scorer('recall',
                      sklearn.metrics.recall_score)
 
 
-def customized_log_loss(y_true, y_pred):
+def customized_log_loss(y_true, y_pred, eps=1e-15):
     """
 
     Parameters
@@ -374,6 +374,9 @@ def customized_log_loss(y_true, y_pred):
     y_pred : array-like of float
         The predictions. shape = (n_samples, n_classes) or (n_samples,)
 
+    eps : float
+        The epsilon
+
     Returns
     -------
     loss
@@ -381,12 +384,15 @@ def customized_log_loss(y_true, y_pred):
     """
     assert y_true.ndim == 1
     if y_pred.ndim == 1:
-        return sklearn.metrics.log_loss(y_true, y_pred)
+        # First clip the y_pred which is also used in sklearn
+        y_pred = np.clip(y_pred, eps, 1 - eps)
+        return (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
     else:
         assert y_pred.ndim == 2, 'Only ndim=2 is supported'
         labels = np.arange(y_pred.shape[1], dtype=np.int32)
         return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred,
-                                        labels=labels)
+                                        labels=labels,
+                                        eps=eps)
 
 
 # Score function for probabilistic classification
