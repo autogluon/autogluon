@@ -260,6 +260,8 @@ predictor_model6.leaderboard(dev_df)
 
 After performing these comparisons, we have the following takeaways:
 
-    - The multimodal text neural network structure used in TextPrediction is a good for dealing with tabular data with text and numerical/categorical features.
-    - K-fold bagging / stacking and weighted ensemble are helpful
-    - We need a larger backbone. This aligns with the observation in recent papers, e.g., [Scaling Laws for Autoregressive Generative Modeling](https://arxiv.org/abs/2010.14701).
+- The multimodal text neural network structure used in TextPrediction is a good for dealing with tabular data with text and numerical/categorical features.
+
+- K-fold bagging / stacking and weighted ensemble are helpful
+
+- We need a larger backbone. This aligns with the observation in recent papers, e.g., [Scaling Laws for Autoregressive Generative Modeling](https://arxiv.org/abs/2010.14701).

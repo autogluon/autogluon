@@ -83,16 +83,21 @@ class TextPredictionV1Model(AbstractModel):
                 label_col_id += 1
         else:
             self._label_column_name = 'label'
-        concat_feature_df = pd.concat([X_train, X_val])
-        concat_feature_df.reset_index(drop=True, inplace=True)
+        if X_val is not None:
+            concat_feature_df = pd.concat([X_train, X_val])
+            concat_feature_df.reset_index(drop=True, inplace=True)
+            concat_label_df = pd.DataFrame({self._label_column_name: pd.concat([y_train, y_val])})
+            concat_label_df.reset_index(drop=True, inplace=True)
+        else:
+            concat_feature_df = X_train
+            concat_label_df = pd.DataFrame({self._label_column_name: y_train})
         feature_column_properties = get_column_properties(
             df=concat_feature_df,
             metadata=None,
             label_columns=None,
             provided_column_properties=None
         )
-        concat_label_df = pd.DataFrame({self._label_column_name: pd.concat([y_train, y_val])})
-        concat_label_df.reset_index(drop=True, inplace=True)
+
         label_column_property = get_column_properties(
             df=concat_label_df,
             metadata=None,
@@ -195,7 +200,10 @@ class TextPredictionV1Model(AbstractModel):
             mx.random.seed(seed)
 
         X_train = self.preprocess(X_train)
-        X_val = self.preprocess(X_val)
+        if X_val is not None:
+            X_val = self.preprocess(X_val)
+        else:
+            X_val = None
         column_properties = self._build_model(X_train=X_train,
                                               y_train=y_train,
                                               X_val=X_val,
@@ -219,13 +227,16 @@ class TextPredictionV1Model(AbstractModel):
         train_data = TabularDataset(X_train,
                                     column_properties=column_properties,
                                     label_columns=self._label_column_name)
-        tuning_data = TabularDataset(X_val,
-                                     column_properties=column_properties,
-                                     label_columns=self._label_column_name)
         logger.info('Train Dataset:')
         logger.info(train_data)
-        logger.info('Tuning Dataset:')
-        logger.info(tuning_data)
+        if X_val is not None:
+            tuning_data = TabularDataset(X_val,
+                                         column_properties=column_properties,
+                                         label_columns=self._label_column_name)
+            logger.info('Tuning Dataset:')
+            logger.info(tuning_data)
+        else:
+            tuning_data = None
         self.model.train(train_data=train_data,
                          tuning_data=tuning_data,
                          resource=resource,
