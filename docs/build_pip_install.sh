@@ -1,5 +1,5 @@
 #!/bin/bash
-
+python3 -m pip uninstall scipy
 python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
 python3 -m pip install --force-reinstall ipython==7.16
 

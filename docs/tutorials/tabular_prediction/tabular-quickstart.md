@@ -83,7 +83,7 @@ For tabular problems, `fit()` returns a `Predictor` object. For classification, 
 
 ```{.python .input}
 pred_probs = predictor.predict_proba(test_data_nolab)
-positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1][0]  # which label is considered 'positive' class
+positive_class = predictor.positive_class  # which label is considered 'positive' class
 print(f"Predicted probabilities of class '{positive_class}':", pred_probs)
 ```
 

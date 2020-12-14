@@ -21,8 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Consider having CatBoost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
-# TODO: v0.1 rename to CatBoostModel and rename model name default to CatBoost (instead of Catboost)
-class CatboostModel(AbstractModel):
+class CatBoostModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._category_features = None
@@ -35,7 +34,7 @@ class CatboostModel(AbstractModel):
         # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
         self._set_default_param_value('allow_writing_files', False)  # Disables creation of catboost logging files during training by default
         if self.problem_type != SOFTCLASS:  # TODO: remove this after catboost 0.24
-            self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
+            self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric.needs_pred, self.problem_type))
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
@@ -63,7 +62,7 @@ class CatboostModel(AbstractModel):
             try_import_catboostdev()  # Need to first import catboost then catboost_dev not vice-versa.
             from catboost_dev import CatBoostClassifier, CatBoostRegressor, Pool
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
-            self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
+            self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric.needs_pred, self.problem_type))
             self.params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
             self.params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
             self._set_default_param_value('early_stopping_rounds', 50)  # Speeds up training with custom (non-C++) losses

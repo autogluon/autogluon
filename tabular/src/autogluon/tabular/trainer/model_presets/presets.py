@@ -7,7 +7,7 @@ from collections import defaultdict
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
 from autogluon.core.metrics import soft_log_loss, mean_squared_error
-from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS,\
+from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS,\
     REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from ...models.abstract.abstract_model import AbstractModel
 from ...models.fastainn.tabular_nn_fastai import NNFastAiTabularModel
@@ -16,10 +16,12 @@ from ...models.lr.lr_model import LinearModel
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
-from ...models.catboost.catboost_model import CatboostModel
+from ...models.catboost.catboost_model import CatBoostModel
 from ...models.xgboost.xgboost_model import XGBoostModel
 from ...models.xt.xt_model import XTModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
+from ...models.fasttext.fasttext_model import FastTextModel
+from ...models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     NN=50,
     FASTAI=45,
     LR=40,
+    FASTTEXT=0,
     TRANSF=0,
     custom=0,
 )
@@ -62,12 +65,13 @@ MODEL_TYPES = dict(
     XT=XTModel,
     KNN=KNNModel,
     GBM=LGBModel,
-    CAT=CatboostModel,
+    CAT=CatBoostModel,
     XGB=XGBoostModel,
     NN=TabularNeuralNetModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
+    FASTTEXT=FastTextModel,
 )
 
 DEFAULT_MODEL_NAMES = {
@@ -75,36 +79,21 @@ DEFAULT_MODEL_NAMES = {
     XTModel: 'ExtraTrees',
     KNNModel: 'KNeighbors',
     LGBModel: 'LightGBM',
-    CatboostModel: 'Catboost',
+    CatBoostModel: 'CatBoost',
     XGBoostModel: 'XGBoost',
-    TabularNeuralNetModel: 'NeuralNet',
+    TabularNeuralNetModel: 'NeuralNetMXNet',
     LinearModel: 'LinearModel',
-    NNFastAiTabularModel: 'FastAINeuralNet',
+    NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
+    FastTextModel: 'FastText',
 }
-
-
-def _dd_classifier():
-    return 'Classifier'
-
-
-def _dd_regressor():
-    return 'Regressor'
-
-
-DEFAULT_MODEL_TYPE_SUFFIX = dict(
-    classifier=defaultdict(_dd_classifier),
-    regressor=defaultdict(_dd_regressor),
-)
-DEFAULT_MODEL_TYPE_SUFFIX['classifier'].update({LinearModel: ''})
-DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 
 
 # DONE: Add levels, including 'default'
 # DONE: Add lists
 # DONE: Add custom which can append to lists
 # DONE: Add special optional AG args for things like name prefix, name suffix, name, etc.
-# TODO: Move creation of stack ensemble internally into this function? Requires passing base models in as well.
+# DONE: Move creation of stack ensemble internally into this function? Requires passing base models in as well.
 # DONE: Add special optional AG args for training order
 # TODO: Add special optional AG args for base models
 # TODO: Consider making hyperparameters arg in fit() accept lists, concatenate hyperparameter sets together.
@@ -117,7 +106,8 @@ DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
 def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False,
-                      level='default', extra_ag_args_fit=None, extra_ag_args=None, name_suffix='', default_priorities=None, invalid_model_names: list = None):
+                      level: int = 0, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, extra_ag_args_fit=None, extra_ag_args=None, extra_ag_args_ensemble=None,
+                      name_suffix: str = None, default_priorities=None, invalid_model_names: list = None):
     if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS]:
         raise NotImplementedError
     if default_priorities is None:
@@ -136,14 +126,39 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
             model = copy.deepcopy(model)
             if AG_ARGS not in model:
                 model[AG_ARGS] = dict()
-            if extra_ag_args is not None:
-                model[AG_ARGS].update(extra_ag_args.copy())
+            if AG_ARGS_ENSEMBLE not in model:
+                model[AG_ARGS_ENSEMBLE] = dict()
             if 'model_type' not in model[AG_ARGS]:
                 model[AG_ARGS]['model_type'] = model_type
+            model_type_real = model[AG_ARGS]['model_type']
+            if not inspect.isclass(model_type_real):
+                model_type_real = MODEL_TYPES[model_type_real]
+            default_ag_args = model_type_real._get_default_ag_args()
+            if extra_ag_args is not None:
+                model_extra_ag_args = extra_ag_args.copy()
+                model_extra_ag_args.update(model[AG_ARGS])
+                model[AG_ARGS] = model_extra_ag_args
+            if extra_ag_args_ensemble is not None:
+                model_extra_ag_args_ensemble = extra_ag_args_ensemble.copy()
+                model_extra_ag_args_ensemble.update(model[AG_ARGS_ENSEMBLE])
+                model[AG_ARGS_ENSEMBLE] = model_extra_ag_args_ensemble
+            if extra_ag_args_fit is not None:
+                if AG_ARGS_FIT not in model:
+                    model[AG_ARGS_FIT] = dict()
+                model_extra_ag_args_fit = extra_ag_args_fit.copy()
+                model_extra_ag_args_fit.update(model[AG_ARGS_FIT])
+                model[AG_ARGS_FIT] = model_extra_ag_args_fit
+            if default_ag_args is not None:
+                default_ag_args.update(model[AG_ARGS])
+                model[AG_ARGS] = default_ag_args
             model_priority = model[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             # Check if model is valid
             if hyperparameter_tune and model[AG_ARGS].get('disable_in_hpo', False):
                 continue  # Not valid
+            elif not model[AG_ARGS].get('valid_stacker', True) and level > 0:
+                continue  # Not valid as a stacker model
+            elif not model[AG_ARGS].get('valid_base', True) and level == 0:
+                continue  # Not valid as a base model
             priority_dict[model_priority].append(model)
     model_priority_list = [model for priority in sorted(priority_dict.keys(), reverse=True) for model in priority_dict[priority]]
     model_names_set = set()
@@ -162,26 +177,37 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
         if name_orig is None:
             name_main = model[AG_ARGS].get('name_main', DEFAULT_MODEL_NAMES.get(model_type, model_type.__name__))
             name_prefix = model[AG_ARGS].get('name_prefix', '')
-            name_type_suffix = model[AG_ARGS].get('name_type_suffix', None)
-            if name_type_suffix is None:
-                suffix_key = 'classifier' if problem_type in (PROBLEM_TYPES_CLASSIFICATION+[SOFTCLASS]) else 'regressor'
-                name_type_suffix = DEFAULT_MODEL_TYPE_SUFFIX[suffix_key][model_type]
             name_suff = model[AG_ARGS].get('name_suffix', '')
-            name_orig = name_prefix + name_main + name_type_suffix + name_suff
-        name_orig = name_orig + name_suffix
+            name_orig = name_prefix + name_main + name_suff
+        if name_suffix is not None:
+            name_orig = name_orig + name_suffix
         name = name_orig
+        name_stacker = None
         num_increment = 2
-        while name in model_names_set:  # Ensure name is unique
-            name = f'{name_orig}_{num_increment}'
-            num_increment += 1
-        model_names_set.add(name)
+        if ensemble_kwargs is None:
+            while name in model_names_set:  # Ensure name is unique
+                name = f'{name_orig}_{num_increment}'
+                num_increment += 1
+            model_names_set.add(name)
+        else:
+            name_stacker = f'{name}_BAG_L{level}'
+            while name_stacker in model_names_set:  # Ensure name is unique
+                name = f'{name_orig}_{num_increment}'
+                name_stacker = f'{name}_BAG_L{level}'
+                num_increment += 1
+            model_names_set.add(name_stacker)
         model_params = copy.deepcopy(model)
         model_params.pop(AG_ARGS)
-        if extra_ag_args_fit is not None:
-            if AG_ARGS_FIT not in model_params:
-                model_params[AG_ARGS_FIT] = {}
-            model_params[AG_ARGS_FIT].update(extra_ag_args_fit.copy())  # TODO: Consider case of overwriting user specified extra args.
+        model_params.pop(AG_ARGS_ENSEMBLE)
         model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=model_params)
+
+        if ensemble_kwargs is not None:
+            ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
+            extra_ensemble_hyperparameters = copy.deepcopy(model[AG_ARGS_ENSEMBLE])
+            ensemble_kwargs_model['hyperparameters'] = ensemble_kwargs_model.get('hyperparameters', {})
+            ensemble_kwargs_model['hyperparameters'].update(extra_ensemble_hyperparameters)
+            model_init = ensemble_type(path=path, name=name_stacker, model_base=model_init, num_classes=num_classes, **ensemble_kwargs_model)
+
         models.append(model_init)
 
     return models
@@ -243,8 +269,8 @@ def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperpa
         rf_models = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=mean_squared_error,
                                       hyperparameters=hyperparameters_rf, hyperparameter_tune=hyperparameter_tune,
                                       extra_ag_args=extra_ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
-    models_cat = [model for model in models if isinstance(model, CatboostModel)]
-    models_noncat = [model for model in models if not isinstance(model, CatboostModel)]
+    models_cat = [model for model in models if isinstance(model, CatBoostModel)]
+    models_noncat = [model for model in models if not isinstance(model, CatBoostModel)]
     models = models_noncat + rf_models + models_cat
     if len(models) == 0:
         raise ValueError("At least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN','RF'], "

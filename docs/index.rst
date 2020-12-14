@@ -11,11 +11,11 @@ AutoGluon: AutoML for Text, Image, and Tabular Data
 .. note::
 
    Example using AutoGluon to train and deploy high-performance model on a tabular dataset:
-   
+
    >>> from autogluon.tabular import TabularPrediction as task
    >>> predictor = task.fit(train_data=task.Dataset(file_path=TRAIN_DATA.csv), label=COLUMN_NAME)
    >>> predictions = predictor.predict(task.Dataset(file_path=TEST_DATA.csv))
-   
+
    AutoGluon can be applied just as easily for prediction tasks with image or text data.
 
 
@@ -43,11 +43,11 @@ Tutorials
       How to predict variables in tabular datasets.
 
    .. card::
-      :title: Image Classification
-      :link: tutorials/image_classification/index.html
+      :title: Image Prediction
+      :link: tutorials/image_prediction/index.html
 
       How to classify images into various categories.
-    
+
    .. card::
       :title: Object Detection
       :link: tutorials/object_detection/index.html
@@ -89,14 +89,14 @@ Advanced Topics
    :hidden:
 
    tutorials/tabular_prediction/index
-   tutorials/image_classification/index
+   tutorials/image_prediction/index
    tutorials/object_detection/index
    tutorials/text_prediction/index
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index
-   api/autogluon.core
    api/autogluon.task
+   api/autogluon.core
    api/autogluon.core.space
    api/autogluon.core.scheduler
    api/autogluon.core.searcher

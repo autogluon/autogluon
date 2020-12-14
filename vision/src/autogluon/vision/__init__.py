@@ -1,3 +1,2 @@
-from .image_classification import *
+from .image_prediction import *
 from .object_detection import *
-

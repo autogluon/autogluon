@@ -1,15 +1,23 @@
 import copy
 import logging
+import math
+from typing import Union
 
+import os
+import numpy as np
 import pandas as pd
+from PIL import Image
+
+import networkx as nx
 
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from autogluon.core.task.base import BasePredictor
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
-from ...utils import REGRESSION
+from ...utils import BINARY, MULTICLASS, REGRESSION, get_pred_from_proba
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
+from ...data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.utils.utils import setup_outputdir
 
 __all__ = ['TabularPredictor']
@@ -92,6 +100,7 @@ class TabularPredictor(BasePredictor):
         self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
         self.class_labels_internal_map = self._learner.label_cleaner.inv_map
 
+    # TODO: v0.1 as_pandas=True by default to avoid user confusion and errors with mismatching indices?
     def predict(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
 
@@ -115,6 +124,7 @@ class TabularPredictor(BasePredictor):
         dataset = self.__get_dataset(dataset)
         return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas)
 
+    # TODO: v0.1 as_pandas=True by default to avoid user confusion on class names and errors with mismatching indices?
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
             If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
@@ -346,7 +356,7 @@ class TabularPredictor(BasePredictor):
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
             'num_bagging_folds': self._trainer.k_fold,
-            'stack_ensemble_levels': self._trainer.stack_ensemble_levels,
+            'max_stack_level': self._trainer.get_max_level(),
             'feature_prune': self._trainer.feature_prune,
             'hyperparameter_tune': hpo_used,
             'hyperparameters_userspecified': self._trainer.hyperparameters,
@@ -378,10 +388,10 @@ class TabularPredictor(BasePredictor):
                 num_fold_str = f" (with {results['num_bagging_folds']} folds)"
             print("Bagging used: %s %s" % (bagging_used, num_fold_str))
             num_stack_str = ""
-            stacking_used = results['stack_ensemble_levels'] > 0
+            stacking_used = results['max_stack_level'] > 1  # TODO: v0.1 increment by 1 when refactoring level names
             if stacking_used:
-                num_stack_str = f" (with {results['stack_ensemble_levels']} levels)"
-            print("Stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
+                num_stack_str = f" (with {results['max_stack_level']} levels)"
+            print("Multi-layer stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
             hpo_str = ""
             if hpo_used and verbosity <= 2:
                 hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"
@@ -500,9 +510,6 @@ class TabularPredictor(BasePredictor):
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         return self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models, use_orig_features=return_original_features)
 
-    # TODO: Add support for DataFrame input and support for DataFrame output
-    #  Add support for retaining DataFrame/Series indices in output
-    #  Add as_pandas parameter
     def transform_labels(self, labels, inverse=False, proba=False):
         """
         Transforms dataset labels to the internal label representation.
@@ -520,7 +527,7 @@ class TabularPredictor(BasePredictor):
             When `True`, the input labels are treated as being in the internal representation and the original representation is outputted.
         proba : boolean, default = False
             When `True`, the input labels are treated as probabilities and the output will be the internal representation of probabilities.
-                In this case, it is expected that `labels` be a `numpy.ndarray`.
+                In this case, it is expected that `labels` be a `pandas.DataFrame` or `numpy.ndarray`.
                 If the `problem_type` is multiclass:
                     The input column order must be equal to `predictor.class_labels`.
                     The output column order will be equal to `predictor.class_labels_internal`.
@@ -530,32 +537,33 @@ class TabularPredictor(BasePredictor):
 
         Returns
         -------
-        Pandas `pandas.Series` of labels if `proba=False` or Numpy `numpy.ndarray` of label probabilities if `proba=True`
+        Pandas `pandas.Series` of labels if `proba=False` or Pandas `pandas.DataFrame` of label probabilities if `proba=True`
 
         """
         if inverse:
             if proba:
-                labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels)
+                labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels, as_pandas=True)
             else:
                 labels_transformed = self._learner.label_cleaner.inverse_transform(y=labels)
         else:
             if proba:
-                labels_transformed = self._learner.label_cleaner.transform_proba(y=labels)
+                labels_transformed = self._learner.label_cleaner.transform_proba(y=labels, as_pandas=True)
             else:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    # TODO: Consider adding time_limit option to early stop the feature importance process
     # TODO: Add option to specify list of features within features list, to check importances of groups of features. Make tuple to specify new feature name associated with group.
-    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, silent=False, **kwargs):
+    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, silent=False):
         """
-        Calculates feature importance scores for the given model.
+        Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
         A feature score of 0.01 would indicate that the predictive performance dropped by 0.01 when the feature was randomly shuffled.
         The higher the score a feature has, the more important it is to the model's performance.
         If a feature has a negative score, this means that the feature is likely harmful to the final model, and a model trained with the feature removed would be expected to achieve a better predictive performance.
         Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
         To estimate how long `feature_importance(model, dataset, features)` will take, it is roughly the time taken by `predict_proba(dataset, model)` multiplied by the number of features.
+
+        Note: For highly accurate importance and p_value estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
 
         Parameters
         ----------
@@ -593,34 +601,69 @@ class TabularPredictor(BasePredictor):
             If `subsample_size=None` or `dataset` contains fewer than `subsample_size` rows, all rows will be used during computation.
             Larger values increase the accuracy of the feature importance scores.
             Runtime linearly scales with `subsample_size`.
+        time_limit : float, default = None
+            Time in seconds to limit the calculation of feature importance.
+            If None, feature importance will calculate without early stopping.
+            A minimum of 1 full shuffle set will always be evaluated. If a shuffle set evaluation takes longer than `time_limit`, the method will take the length of a shuffle set evaluation to return regardless of the `time_limit`.
+        num_shuffle_sets : int, default = None
+            The number of different permutation shuffles of the data that are evaluated.
+            Larger values will increase the quality of the importance evaluation.
+            It is generally recommended to increase `subsample_size` before increasing `num_shuffle_sets`.
+            Defaults to 3 if `time_limit` is None or 10 if `time_limit` is specified.
+            Runtime linearly scales with `num_shuffle_sets`.
+        include_confidence_band: bool, default = True
+            If True, will include output columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time (99% confidence interval).
+            Increasing `subsample_size` and `num_shuffle_sets` will tighten the band.
         silent : bool, default = False
-            Whether to suppress logging output
+            Whether to suppress logging output.
 
         Returns
         -------
-        Pandas `pandas.Series` of feature importance scores.
-
+        Pandas `pandas.DataFrame` of feature importance scores with 6 columns:
+            index: The feature name.
+            'importance': The estimated feature importance score.
+            'stddev': The standard deviation of the feature importance score. If NaN, then not enough num_shuffle_sets were used to calculate a variance.
+            'p_value': P-value for a statistical t-test of the null hypothesis: importance = 0, vs the (one-sided) alternative: importance > 0.
+                Features with low p-value appear confidently useful to the predictor, while the other features may be useless to the predictor (or even harmful to include in its training data).
+                A p-value of 0.01 indicates that there is a 1% chance that the feature is useless or harmful, and a 99% chance that the feature is useful.
+                A p-value of 0.99 indicates that there is a 99% chance that the feature is useless or harmful, and a 1% chance that the feature is useful.
+            'n': The number of shuffles performed to estimate importance score (corresponds to sample-size used to determine confidence interval for true score).
+            'p99_high': Upper end of 99% confidence interval for true feature importance score.
+            'p99_low': Lower end of 99% confidence interval for true feature importance score.
         """
-        allowed_kwarg_names = {'raw'}
-        for kwarg_name in kwargs.keys():
-            if kwarg_name not in allowed_kwarg_names:
-                raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
-        if 'raw' in kwargs.keys():
-            logger.log(30, 'Warning: `raw` is a deprecated parameter. Use `feature_stage` instead. Starting from AutoGluon 0.1.0, specifying `raw` as a parameter will cause an exception.')
-            logger.log(30, 'Overriding `feature_stage` value with `raw` value.')
-            raw = kwargs['raw']
-            if raw is True:
-                feature_stage = 'transformed'
-            elif raw is False:
-                feature_stage = 'transformed_model'
-            else:
-                raise ValueError(f'`raw` must be one of [True, False], but was {raw}.')
-
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
-        return self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage, subsample_size=subsample_size, silent=silent)
+        if num_shuffle_sets is None:
+            num_shuffle_sets = 10 if time_limit else 3
+
+        fi_df = self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage,
+                                                    subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
+
+        if include_confidence_band:
+            import scipy.stats
+            num_features = len(fi_df)
+            confidence_threshold = 0.99
+            p99_low_dict = dict()
+            p99_high_dict = dict()
+            for i in range(num_features):
+                fi = fi_df.iloc[i]
+                mean = fi['importance']
+                stddev = fi['stddev']
+                n = fi['n']
+                if stddev == np.nan or n == np.nan or mean == np.nan or n == 1:
+                    p99_high = np.nan
+                    p99_low = np.nan
+                else:
+                    t_val_99 = scipy.stats.t.ppf(1 - (1 - confidence_threshold) / 2, n-1)
+                    p99_high = mean + t_val_99 * stddev / math.sqrt(n)
+                    p99_low = mean - t_val_99 * stddev / math.sqrt(n)
+                p99_high_dict[fi.name] = p99_high
+                p99_low_dict[fi.name] = p99_low
+            fi_df['p99_high'] = pd.Series(p99_high_dict)
+            fi_df['p99_low'] = pd.Series(p99_low_dict)
+        return fi_df
 
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """
@@ -815,6 +858,115 @@ class TabularPredictor(BasePredictor):
         models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=base_models, name_suffix=name_suffix, time_limit=time_limits)
 
         return models
+
+    # TODO: v0.1 This can cause very strange issues related to index mismatches with original training data on extreme edge cases (multiclass where autogluon duplicated rows in data due to rare classes and eval_metric was log_loss)
+    #  This is a very rare case but needs to be fixed by v0.1 release
+    #  It might be good enough to do an inner join on training data, but it needs to be tested
+    def get_oof_pred(self, model: str = None, transformed=False) -> pd.Series:
+        """
+        Note: This is advanced functionality not intended for normal usage.
+
+        Returns the out-of-fold (OOF) predictions for every row in the training data.
+
+        For more information, refer to `get_oof_pred_proba()` documentation.
+
+        Parameters
+        ----------
+        model : str (optional)
+            Refer to `get_oof_pred_proba()` documentation.
+        transformed : bool, default = False
+            Refer to `get_oof_pred_proba()` documentation.
+
+        Returns
+        -------
+        :class:`pd.Series` object of the out-of-fold training predictions of the model.
+        """
+        y_pred_proba_oof_transformed = self.get_oof_pred_proba(model=model, transformed=True)
+        y_index = y_pred_proba_oof_transformed.index
+        y_pred_oof_transformed = get_pred_from_proba(y_pred_proba=y_pred_proba_oof_transformed.to_numpy(), problem_type=self._trainer.problem_type)
+        y_pred_oof_transformed = pd.Series(data=y_pred_oof_transformed, index=y_index, name=self.label_column)
+        if transformed:
+            return y_pred_oof_transformed
+        else:
+            return self.transform_labels(labels=y_pred_oof_transformed, inverse=True, proba=False)
+
+    # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
+    # TODO: v0.1 add tutorial related to this method, as it is very powerful.
+    # TODO: v0.1 This can cause very strange issues related to index mismatches with original training data on extreme edge cases (multiclass where autogluon duplicated rows in data due to rare classes and eval_metric was logloss)
+    #  This is a very rare case but needs to be fixed by v0.1 release
+    #  It might be good enough to do an inner join on training data, but it needs to be tested
+    def get_oof_pred_proba(self, model: str = None, transformed=False, as_multiclass=False) -> Union[pd.DataFrame, pd.Series]:
+        """
+        Note: This is advanced functionality not intended for normal usage.
+
+        Returns the out-of-fold (OOF) predicted class probabilities for every row in the training data.
+        OOF prediction probabilities may provide unbiased estimates of generalization accuracy (reflecting how predictions will behave on new data)
+        Predictions for each row are only made using models that were fit to a subset of data where this row was held-out.
+
+        Warning: This method will raise an exception if called on a model that is not a bagged ensemble. Only bagged models (such a stacker models) can produce OOF predictions.
+            This also means that refit_full models and distilled models will raise an exception.
+        Warning: If intending to join the output of this method with the original training data, be aware that a rare edge-case issue exists:
+            Multiclass problems with rare classes combined with the use of the 'log_loss' eval_metric may have forced AutoGluon to duplicate rows in the training data to satisfy minimum class counts in the data.
+            If this has occurred, then the indices and row counts of the returned pandas Series in this method may not align with the training data.
+            In this case, consider fetching the processed training data using `predictor.load_data_internal()` instead of using the original training data.
+            A more benign version of this issue occurs when 'log_loss' wasn't specified as the eval_metric but rare classes were dropped by AutoGluon.
+            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via `predictor.predict`.
+
+        Parameters
+        ----------
+        model : str (optional)
+            The name of the model to get out-of-fold predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+        transformed : bool, default = False
+            Whether the output values should be of the original label representation (False) or the internal label representation (True).
+            The internal representation for binary and multiclass classification are integers numbering the k possible classes from 0 to k-1, while the original representation is identical to the label classes provided during fit.
+            Generally, most users will want the original representation and keep `transformed=False`.
+        as_multiclass : bool, default = False
+            Whether to return binary classification probabilities as if they were for multiclass classification.
+                Output will contain two columns, and if `transformed=False`, the column names will correspond to the binary class labels.
+                The columns will be the same order as `predictor.class_labels`.
+            Only impacts output for binary classification problems.
+
+        Returns
+        -------
+        :class:`pd.Series` or :class:`pd.DataFrame` object of the out-of-fold training prediction probabilities of the model.
+        """
+        if not self._trainer.bagged_mode:
+            raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
+        if model is None:
+            model = self.get_model_best()
+        y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
+        if self.problem_type == MULTICLASS:
+            y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
+        else:
+            y_pred_proba_oof_transformed.columns = [self.label_column]
+            y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label_column]
+            if as_multiclass and self.problem_type == BINARY:
+                y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba_oof_transformed, as_pandas=True)
+                if not transformed:
+                    y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels)
+        if transformed:
+            return y_pred_proba_oof_transformed
+        else:
+            return self.transform_labels(labels=y_pred_proba_oof_transformed, inverse=True, proba=True)
+
+    # TODO: v0.1 Properly error/return None if label_cleaner hasn't been fit yet. (After API refactor)
+    # TODO: v0.1 Add positive_class parameter to task.fit
+    @property
+    def positive_class(self):
+        """
+        Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
+        In binary classification, `predictor.predict_proba()` returns the estimated probability that each row belongs to the positive class.
+        Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
+
+        Returns
+        -------
+        The positive class name in binary classification or None if the problem is not binary classification.
+        """
+        if self.problem_type != BINARY:
+            logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
+            return None
+        return self._learner.label_cleaner.cat_mappings_dependent_var[1]
 
     @classmethod
     def load(cls, output_directory, verbosity=2):
@@ -1086,6 +1238,72 @@ class TabularPredictor(BasePredictor):
         return self._learner.distill(X=train_data, X_val=tuning_data, time_limits=time_limits, hyperparameters=hyperparameters, holdout_frac=holdout_frac,
                                      verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
                                      augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
+
+    def plot_ensemble_model(self, prune_unused_nodes=True):
+        """
+            Output the visualized stack ensemble architecture of a model trained by `fit()`. 
+            The plot is stored to a file, `ensemble_model.png` in folder `Predictor.output_directory` 
+
+            This function requires `graphviz` and `pygraphviz` to be installed because this visualization depends on those package.
+            Unless this function will raise `ImportError` without being able to generate the visual of the ensemble model.
+
+            To install the required package, run the below commands (for Ubuntu linux):
+
+            $ sudo apt-get install graphviz
+            $ pip install graphviz
+
+            For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/documentation.html for PyGraphviz.
+
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        The file name with the full path to the saved graphic
+        """
+        try:
+            import pygraphviz
+        except:
+            raise ImportError('Visualizing ensemble network architecture requires pygraphviz library')
+            
+        G = self._trainer.model_graph.copy()
+
+        if prune_unused_nodes == True:
+            nodes_without_outedge = [node for node,degree in dict(G.degree()).items() if degree < 1]
+        else:
+            nodes_without_outedge = []
+
+        nodes_no_val_score = [node for node in G if G.nodes[node]['val_score'] == None]
+        
+        G.remove_nodes_from(nodes_without_outedge)
+        G.remove_nodes_from(nodes_no_val_score)
+
+        root_node = [n for n,d in G.out_degree() if d == 0]
+        best_model_node = self.get_model_best()
+
+        A = nx.nx_agraph.to_agraph(G)
+        
+        A.graph_attr.update(rankdir='BT')
+        A.node_attr.update(fontsize=10)
+        A.node_attr.update(shape='rectangle')
+
+        for node in A.iternodes():
+            node.attr['label'] = f"{node.name}\nVal score: {float(node.attr['val_score']):.4f}"
+
+            if node.name == best_model_node:
+                node.attr['style'] = 'filled'
+                node.attr['fillcolor'] = '#ff9900'
+                node.attr['shape'] = 'box3d'
+            elif nx.has_path(G, node.name, best_model_node):
+                node.attr['style'] = 'filled'
+                node.attr['fillcolor'] = '#ffcc00'
+
+        model_image_fname = os.path.join(self.output_directory, 'ensemble_model.png')
+
+        A.draw(model_image_fname, format='png', prog='dot')
+
+        return model_image_fname
 
     @staticmethod
     def _summarize(key, msg, results):

@@ -529,11 +529,15 @@ def train_function(args, reporter, train_data, tuning_data,
             else:
                 report_items.append(('reward', performance_score))
             report_items.append(('exp_dir', exp_dir))
+            if find_better:
+                best_report_items = report_items
             reporter(**dict(report_items))
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
                 break
-
+    best_report_items_dict = dict(best_report_items)
+    best_report_items_dict['report_idx'] = report_idx + 1
+    reporter(**best_report_items_dict)
 
 @use_np
 class BertForTextPredictionBasic:

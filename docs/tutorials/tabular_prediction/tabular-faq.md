@@ -14,7 +14,7 @@ Yes! The only functionality that may not work is `hyperparameter_tune=True` with
 
 ### What machine is best for running TabularPrediction?
 
-As an open-source library, AutoGluon can be run on any machine including your laptop. Currently the TabularPrediction module does not benefit much from GPUs, so CPU machines are fine (in contrast, TextPrediction/ImageClassification/ObjectDetection do greatly benefit from GPUs). Most TabularPrediction issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for TabularPrediction: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
+As an open-source library, AutoGluon can be run on any machine including your laptop. Currently the TabularPrediction module does not benefit much from GPUs, so CPU machines are fine (in contrast, TextPrediction/ImagePrediction/ObjectDetection do greatly benefit from GPUs). Most TabularPrediction issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for TabularPrediction: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
 
 
 ### How to resolve memory issues?
@@ -64,20 +64,21 @@ This should become obvious if you specify the `as_pandas` argument like this:
 predictor.predict_proba(test_data, as_pandas=True)
 ```
 
-Alternatively, you can see which class AutoGluon treats as the positive class in binary classification via:
-
-```
-positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1][0]
-```
-
-Or for multiclass classification:
+For multiclass classification:
 
 ```
 predictor.class_labels
 ```
 
-is a list of classes whose order corresponds to columns of `predict_proba()` output when it is a Numpy array.
+is a list of classes whose order corresponds to columns of `predict_proba()` output when it is a Numpy array. For binary classification, this is the order of classes when `predict_proba(as_multiclass=True)` is called.
 
+You can see which class AutoGluon treats as the positive class in binary classification via:
+
+```
+predictor.positive_class
+```
+
+The positive class can also be retrieved via `predictor.class_labels[-1]`. The output of `predict_proba()` for binary classification is the probability of the positive class.
 
 ### How can I use AutoGluon for interpretability?
 

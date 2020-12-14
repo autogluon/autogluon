@@ -29,7 +29,7 @@ performance = predictor.evaluate(test_data)
 ```
 ## News
 
-**Announcement for previous users:** The AutoGluon codebase has been modularized into [namespace packages](https://packaging.python.org/guides/packaging-namespace-packages/), which means you now only need those dependencies relevant to your prediction task of interest! For example, you can now work with tabular data without having to [install](https://auto.gluon.ai/dev/install.html) dependencies required for AutoGluon's computer vision tasks (and vice versa). Unfortunately this improvement required a minor API change (eg. instead of `from autogluon import TabularPrediction`, you should now do: `from autogluon.tabular import TabularPrediction`), for all versions newer than v0.0.14. Documentation/tutorials under the old API may still be viewed [for version 0.0.14](https://auto.gluon.ai/0.0.14/index.html) which is the last released version under the old API.
+**Announcement for previous users:** The AutoGluon codebase has been modularized into [namespace packages](https://packaging.python.org/guides/packaging-namespace-packages/), which means you now only need those dependencies relevant to your prediction task of interest! For example, you can now work with tabular data without having to [install](https://auto.gluon.ai/dev/install.html) dependencies required for AutoGluon's computer vision tasks (and vice versa). Unfortunately this improvement required a minor API change (eg. instead of `from autogluon import TabularPrediction`, you should now do: `from autogluon.tabular import TabularPrediction`), for all versions newer than v0.0.15. Documentation/tutorials under the old API may still be viewed [for version 0.0.15](https://auto.gluon.ai/0.0.15/index.html) which is the last released version under the old API.
 
 
 ## Resources
@@ -39,8 +39,8 @@ See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [docume
 - [Learning with tabular data](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html)
   - [Tips to maximize accuracy](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html#maximizing-predictive-performance) (if **benchmarking**, make sure to run `fit()` with argument `presets='best_quality'`).  
 
-- [Learning with text data](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html) 
-- [Learning with image data](https://auto.gluon.ai/stable/tutorials/image_classification/beginner.html)
+- [Learning with text data](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html)
+- [Learning with image data](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html)
 - More advanced topics such as [Neural Architecture Search](https://auto.gluon.ai/stable/tutorials/nas/index.html)
 
 ### Scientific Publications
@@ -84,6 +84,7 @@ AutoGluon also provides state-of-the-art tools for neural hyperparameter and arc
 - [General introduction into HNAS](https://www.youtube.com/watch?v=pB1LmZWK_N8&feature=youtu.be)
 - [Introduction into HNAS with AutoGluon](https://www.youtube.com/watch?v=GJVwUyVWZas)
 - [Example notebook](https://github.com/zhanghang1989/HPO2NAS-Tutorial-CVPR-ECCV2020/blob/master/mlp.ipynb)
+- [Example scripts for efficient multi-fidelity HNAS of PyTorch neural network models](https://github.com/awslabs/autogluon/tree/master/examples/hnas/)
 
 Also have a look at our paper ["Model-based Asynchronous Hyperparameter and Neural Architecture Search"](https://arxiv.org/abs/2003.10865) arXiv preprint arXiv:2003.10865 (2020).
 

@@ -333,7 +333,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 cumulative_loss += loss.sum()
             train_loss = cumulative_loss/float(train_dataset.num_examples)  # training loss this epoch
             if val_dataset is not None:
-                val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+                val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric.needs_pred)
             if (val_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
                 if val_dataset is not None:
                     if not np.isnan(val_metric):
@@ -379,7 +379,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if val_dataset is None:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:  # evaluate one final time:
-            final_val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+            final_val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric.needs_pred)
             if np.isnan(final_val_metric):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
@@ -557,10 +557,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             raise ValueError("Unknown optimizer specified: %s" % params['optimizer'])
         return optimizer
 
-    @staticmethod
-    def convert_df_dtype_to_str(df):
-        return df.astype(str)
-
     def _get_feature_arraycol_map(self, max_category_levels):
         """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
         feature_preserving_transforms = set(['continuous','skewed', 'ordinal', 'language'])  # these transforms do not alter dimensionality of feature
@@ -628,13 +624,13 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if onehot_features:
             onehot_transformer = Pipeline(steps=[
                 # TODO: Consider avoiding converting to string for improved memory efficiency
-                ('to_str', FunctionTransformer(self.convert_df_dtype_to_str)),
+                ('to_str', FunctionTransformer(convert_df_dtype_to_str)),
                 ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
                 ('onehot', OneHotMergeRaresHandleUnknownEncoder(max_levels=max_category_levels, sparse=False))])  # test-time unknown values will be encoded as all zeros vector
             transformers.append( ('onehot', onehot_transformer, onehot_features) )
         if embed_features:  # Ordinal transformer applied to convert to-be-embedded categorical features to integer levels
             ordinal_transformer = Pipeline(steps=[
-                ('to_str', FunctionTransformer(self.convert_df_dtype_to_str)),
+                ('to_str', FunctionTransformer(convert_df_dtype_to_str)),
                 ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
                 ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=max_category_levels))])  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
             transformers.append( ('ordinal', ordinal_transformer, embed_features) )
@@ -674,8 +670,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         return model
 
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
-        time_start = time.time()
         """ Performs HPO and sets self.params to best hyperparameter values """
+        time_start = time.time()
         self.verbosity = kwargs.get('verbosity', 2)
         logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
         self._set_default_searchspace()  # changes non-specified default hyperparams from fixed values to search-spaces.
@@ -740,6 +736,10 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
         if remove_fit and requires_save:
             self.optimizer = None
+
+
+def convert_df_dtype_to_str(df):
+    return df.astype(str)
 
 
 """ General TODOs:

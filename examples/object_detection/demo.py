@@ -1,5 +1,5 @@
 import autogluon.core as ag
-from autogluon.vision.object_detection import ObjectDetection as task
+from autogluon.vision.object_detection import ObjectDetector as task
 import os
 
 root = './'
@@ -25,7 +25,7 @@ dataset_test = task.Dataset(data_root, index_file_name='test', classes=('motorbi
 test_map = detector.evaluate(dataset_test)
 print("mAP on test dataset: {}".format(test_map[1][1]))
 
-# visualization 
+# visualization
 image = '000467.jpg'
 image_path = os.path.join(data_root, 'JPEGImages', image)
 print(image_path)

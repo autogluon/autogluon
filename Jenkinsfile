@@ -303,15 +303,15 @@ stage("Build Tutorials") {
       }
     }
   },
-  'image_classification': {
+  'image_prediction': {
     node('linux-gpu') {
       ws('workspace/autogluon-tutorial-image-classification') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_tutorial_image_classification -f docs/build_contrib.yml
-        conda activate autogluon_tutorial_image_classification
+        conda env update -n autogluon_tutorial_image_prediction -f docs/build_contrib.yml
+        conda activate autogluon_tutorial_image_prediction
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
@@ -320,15 +320,15 @@ stage("Build Tutorials") {
         git clean -fx
         bash docs/build_pip_install.sh
 
-        # only build for docs/image_classification
+        # only build for docs/image_prediction
         shopt -s extglob
-        rm -rf ./docs/tutorials/!(image_classification)
+        rm -rf ./docs/tutorials/!(image_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         cat docs/_build/rst/_static/d2l.js
         cat docs/_build/rst/conf.py
         tree -L 2 docs/_build/rst
         """
-        stash includes: 'docs/_build/rst/tutorials/image_classification/*', name: 'image_classification'
+        stash includes: 'docs/_build/rst/tutorials/image_prediction/*', name: 'image_prediction'
       }
     }
   },
@@ -507,7 +507,7 @@ stage("Build Docs") {
         escaped_context_root = site.replaceAll('\\/', '\\\\/')
 
         unstash 'course'
-        unstash 'image_classification'
+        unstash 'image_prediction'
         unstash 'nas'
         unstash 'object_detection'
         unstash 'tabular'

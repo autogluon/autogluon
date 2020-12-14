@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, **kwargs):
+    def __init__(self, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, **kwargs):
         super().__init__(**kwargs)
         if base_model_names is None:
             base_model_names = []
@@ -33,13 +33,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.base_models_dict: Dict[str, AbstractModel] = base_models_dict  # String name -> Model objects
         self.base_model_paths_dict = base_model_paths_dict
         self.base_model_types_dict = base_model_types_dict
-        self.use_orig_features = use_orig_features
 
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
-            if self.params['max_models_per_type'] > 0:
-                self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=base_model_types_inner_dict, model_scores=base_model_performances_dict, max_models_per_type=self.params['max_models_per_type'])
-            if self.params['max_models'] > 0:
-                self.base_model_names = self.limit_models(models=self.base_model_names, model_scores=base_model_performances_dict, max_models=self.params['max_models'])
+            if self.params['max_base_models_per_type'] > 0:
+                self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=base_model_types_inner_dict, model_scores=base_model_performances_dict, max_base_models_per_type=self.params['max_base_models_per_type'])
+            if self.params['max_base_models'] > 0:
+                self.base_model_names = self.limit_models(models=self.base_model_names, model_scores=base_model_performances_dict, max_base_models=self.params['max_base_models'])
 
         for model_name, model in self.base_models_dict.items():
             if model_name not in self.base_model_names:
@@ -50,29 +49,25 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.stack_column_prefix_to_model_map = {stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)}
 
     @staticmethod
-    def limit_models_per_type(models, model_types, model_scores, max_models_per_type):
+    def limit_models_per_type(models, model_types, model_scores, max_base_models_per_type):
         model_type_groups = defaultdict(list)
         for model in models:
-            model_type = model_types[model]
-            model_type_groups[model_type].append((model, model_scores[model]))
-        for key in model_type_groups:
-            model_type_groups[key] = sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)
-        for key in model_type_groups:
-            model_type_groups[key] = model_type_groups[key][:max_models_per_type]
+            model_type_groups[model_types[model]].append((model, model_scores[model]))
         models_remain = []
         for key in model_type_groups:
-            models_remain += model_type_groups[key]
+            models_remain += sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)[:max_base_models_per_type]
         models_valid = [model for model, score in models_remain]
         return models_valid
 
-    def limit_models(self, models, model_scores, max_models):
+    def limit_models(self, models, model_scores, max_base_models):
         model_types = {model: '' for model in models}
-        return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_models_per_type=max_models)
+        return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models)
 
     def _set_default_params(self):
-        default_params = {'max_models': 25, 'max_models_per_type': 5}
+        default_params = {'use_orig_features': True, 'max_base_models': 25, 'max_base_models_per_type': 5}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+        super()._set_default_params()
 
     def preprocess(self, X, fit=False, compute_base_preds=True, infer=True, model_pred_proba_dict=None, **kwargs):
         if self.stack_column_prefix_lst:
@@ -94,11 +89,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                         y_pred_proba = base_model.predict_proba(X)
                     X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
                 X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
-                if self.use_orig_features:
+                if self.params['use_orig_features']:
                     X = pd.concat([X_stacker, X], axis=1)
                 else:
                     X = X_stacker
-            elif not self.use_orig_features:
+            elif not self.params['use_orig_features']:
                 X = X[self.stack_columns]
         X = super().preprocess(X, **kwargs)
         return X
@@ -183,11 +178,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             stacker.name = stacker.name + os.path.sep + str(i)
             stacker.set_contexts(self.path_root + stacker.name + os.path.sep)
 
-            if self.problem_type == MULTICLASS:
-                oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
-            else:
-                oof_pred_proba = np.zeros(shape=len(X))
-            oof_pred_model_repeats = np.zeros(shape=len(X))
+            oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
             oof_pred_proba[test_index] += y_pred_proba
             oof_pred_model_repeats[test_index] += 1
 
@@ -219,6 +210,16 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         # TODO: hpo_results likely not correct because no renames
         return stackers, stackers_performance, hpo_results
 
+    def _get_init_args(self):
+        init_args = dict(
+            base_model_names=self.base_model_names,
+            base_models_dict=self.base_models_dict,
+            base_model_paths_dict=self.base_model_paths_dict,
+            base_model_types_dict=self.base_model_types_dict,
+        )
+        init_args.update(super()._get_init_args())
+        return init_args
+
     def load_base_model(self, model_name):
         if model_name in self.base_models_dict.keys():
             model = self.base_models_dict[model_name]
@@ -233,7 +234,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         stacker_info = dict(
             num_base_models=len(self.base_model_names),
             base_model_names=self.base_model_names,
-            use_orig_features=self.use_orig_features,
         )
         children_info = info.pop('children_info')
         info['stacker_info'] = stacker_info

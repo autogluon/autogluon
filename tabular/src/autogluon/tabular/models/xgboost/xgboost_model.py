@@ -38,7 +38,7 @@ class XGBoostModel(AbstractModel):
     def get_eval_metric(self):
         eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
         if eval_metric is None:
-            eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)
+            eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric.needs_pred, problem_type=self.problem_type)
         return eval_metric
 
     def _preprocess(self, X, is_train=False, max_category_levels=None, **kwargs):
@@ -131,21 +131,3 @@ class XGBoostModel(AbstractModel):
             return y_pred_proba
         else:
             return y_pred_proba[:, 1]
-
-    def get_model_feature_importance(self):
-        original_feature_names: list = self._ohe_generator.get_original_feature_names()
-        feature_names = self._ohe_generator.get_feature_names()
-        importances = self.model.feature_importances_.tolist()
-
-        importance_dict = {}
-        for original_feature in original_feature_names:
-            importance_dict[original_feature] = 0
-            for feature, value in zip(feature_names, importances):
-                if feature in self._ohe_generator.othercols:
-                    importance_dict[feature] = value
-                else:
-                    feature = '_'.join(feature.split('_')[:-1])
-                    if feature == original_feature:
-                        importance_dict[feature] += value
-
-        return importance_dict

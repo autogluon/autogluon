@@ -1,303 +1,202 @@
+"""Object Detection task"""
+import copy
+import pickle
 import logging
 
-import mxnet as mx
-from mxnet import gluon
-import copy
+from autogluon.core.utils import verbosity2loglevel
+from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 
-from .dataset import get_dataset
-from .detector import Detector
-from .pipeline import train_object_detection
-from .utils import get_network
-from autogluon.core.task.base import BaseTask, compile_scheduler_options
-from autogluon.core.decorator import sample_config
-from autogluon.core.space import Categorical
-from autogluon.core.utils import get_cpu_count, get_gpu_count
-from autogluon.mxnet.utils import update_params
+__all__ = ['ObjectDetector']
 
-__all__ = ['ObjectDetection']
+class ObjectDetector(object):
+    """AutoGluon Predictor for for detecting objects in images
 
-logger = logging.getLogger(__name__)
+    Parameters
+    ----------
+    log_dir : str
+        The directory for saving logs, by default using `pwd`: the current working directory.
 
-
-class ObjectDetection(BaseTask):
-    """AutoGluon Task for detecting and locating objects in images
     """
+    # Dataset is a subclass of `pd.DataFrame`, with `image` and `bbox` columns.
+    Dataset = _ObjectDetection.Dataset
 
-    @staticmethod
-    def Dataset(*args, **kwargs):
-        """ Dataset of images in which to detect objects.
-        """
-        return get_dataset(*args, **kwargs)
+    def __init__(self, log_dir=None):
+        self._log_dir = log_dir
+        self._detector = None
+        self._fit_summary = {}
 
-    @staticmethod
-    def fit(dataset='voc',
-            net=Categorical('mobilenet1.0'),
-            meta_arch='yolo3',
-            lr=Categorical(5e-4, 1e-4),
-            loss=gluon.loss.SoftmaxCrossEntropyLoss(),
-            split_ratio=0.8,
-            batch_size=16,
-            epochs=50,
-            num_trials=None,
-            time_limits=None,
-            nthreads_per_trial=12,
-            num_workers=32,
-            ngpus_per_trial=1,
-            hybridize=True,
-            scheduler_options=None,
+    def fit(self,
+            train_data,
+            val_data=None,
+            holdout_frac=0.1,
+            random_state=None,
+            time_limit=12*60*60,
+            epochs=None,
+            num_trials=1,
+            hyperparameters=None,
             search_strategy='random',
-            search_options=None,
-            verbose=False,
-            transfer='coco',
-            resume='',
-            checkpoint='checkpoint/exp1.ag',
-            visualizer='none',
+            scheduler_options=None,
+            nthreads_per_trial=None,
+            ngpus_per_trial=None,
             dist_ip_addrs=None,
-            auto_search=True,
-            seed=223,
-            data_shape=416,
-            start_epoch=0,
-            lr_mode='step',
-            lr_decay=0.1,
-            lr_decay_period=0,
-            lr_decay_epoch='160,180',
-            warmup_lr=0.0,
-            warmup_epochs=2,
-            warmup_iters=1000,
-            warmup_factor=1. / 3.,
-            momentum=0.9,
-            wd=0.0005,
-            log_interval=100,
-            save_prefix='',
-            save_interval=10,
-            val_interval=1,
-            num_samples=-1,
-            no_random_shape=False,
-            no_wd=False,
-            mixup=False,
-            no_mixup_epochs=20,
-            label_smooth=False,
-            syncbn=False,
-            reuse_pred_weights=True,
-            **kwargs):
-
-        """
-        Fit object detection models.
+            verbosity=3):
+        """Automatic fit process for object detection.
 
         Parameters
         ----------
-        dataset : str or :class:`autogluon.task.ObjectDectection.Dataset`
-            Training dataset containing images and corresponding object bounding boxes.
-        net : str, :class:`autogluon.space.AutoGluonObject`
-            Which existing neural network base models to consider as candidates.
-        meta_arch : str
-            Meta architecture of the model. Currently support YoloV3 (Default) and FasterRCNN.
-            YoloV3 is faster, while FasterRCNN is more accurate.
-        lr : float or :class:`autogluon.space`
-            The learning rate to use in each update of the neural network weights during training.
-        loss : mxnet.gluon.loss
-            Loss function used during training of the neural network weights.
-        split_ratio : float
-            Fraction of dataset to hold-out during training in order to tune hyperparameters (i.e. validation data).
-            The final returned model may be fit to all of the data (after hyperparameters have been selected).
-        batch_size : int
-            How many images to group in each mini-batch during gradient computations in training.
-        epochs : int
-            How many epochs to train the neural networks for at most.
-        num_trials : int
-            Maximal number of hyperparameter configurations to try out.
-        time_limits : int
-            Approximately how long should `fit()` should run for (wallclock time in seconds).
-            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion).
-        nthreads_per_trial : int
-            How many CPUs to use in each trial (ie. single training run of a model).
-        num_workers : int
-            How many CPUs to use for data loading during training of a model.
-        ngpus_per_trial : int
-            How many GPUs to use in each trial (ie. single training run of a model). 
-        hybridize : bool
-            Whether or not the MXNet neural network should be hybridized (for increased efficiency).
-        scheduler_options : dict
-            Extra arguments passed to __init__ of scheduler, to configure the
-            orchestration of training jobs during hyperparameter-tuning.
-        search_strategy : str, default = None
-            Which hyperparameter search algorithm to use. Options include:
-            'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization),
-            'skopt' (SKopt Bayesian optimization), 'grid' (grid search),
-            'hyperband' (Hyperband scheduling with random search), 'bayesopt-hyperband'
-            (Hyperband scheduling with GP-BO search).
-            If unspecified, the default is 'random'.
-        search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs
-            hyperparameter optimization.
-        verbose : bool
-            Whether or not to print out intermediate information during training.
-        resume : str
-            Path to checkpoint file of existing model, from which model training
-            should resume.
-            If not empty, we also start the hyperparameter search from the state
-            loaded from checkpoint.
-        checkpoint : str or None
-            State of hyperparameter search is stored to this local file
-        visualizer : str
-            Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
-        dist_ip_addrs : list
-            List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        auto_search : bool
-            If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
-        seed : int
-            Random seed to set for reproducibility.
-        data_shape : int
-            Shape of the image data.
-        start_epoch : int
-            Which epoch we begin training from 
-            (eg. if we resume training of an existing model, then this
-            argument may be set to the number of epochs the model has already been trained for previously).
-        lr_mode : str
-            What sort of learning rate schedule should be followed during training.
-        lr_decay : float
-            How much learning rate should be decayed during training.
-        lr_decay_period : int
-            How often learning rate should be decayed during training.
-        warmup_lr : float
-            Learning rate to use during warm up period at the start of training.
-        warmup_epochs : int
-            How many initial epochs constitute the "warm up" period of model training.
-        warmup_iters : int
-            How many initial iterations constitute the "warm up" period of model training.
-            This is used by R-CNNs
-        warmup_factor : float
-            warmup factor of target lr. initial lr starts from target lr * warmup_factor
-        momentum : float or  :class:`autogluon.space`
-            Momentum to use in optimization of neural network weights during training.
-        wd : float or :class:`autogluon.space`
-            Weight decay to use in optimization of neural network weights during training.
-        log_interval : int
-            Log results every so many epochs during training.
-        save_prefix : str
-            Prefix to append to file name for saved model.
-        save_interval : int
-            Save a copy of model every so many epochs during training.
-        val_interval : int
-            Evaluate performance on held-out validation data every so many epochs during training.
-        no_random_shape : bool
-            Whether random shapes should not be used.
-        no_wd : bool
-            Whether weight decay should be turned off.
-        mixup : bool
-            Whether or not to utilize mixup data augmentation strategy.
-        no_mixup_epochs : int
-            If using mixup, we first train model for this many epochs without mixup data augmentation.
-        label_smooth : bool
-            Whether or not to utilize label smoothing.
-        syncbn : bool
-            Whether or not to utilize synchronized batch normalization.
-        
+        train_data : pd.DataFrame or str
+            Training data, can be a dataframe like image dataset.
+            If a string is provided, will search for k8 datasets.
+        val_data : pd.DataFrame or str, default = None
+            Training data, can be a dataframe like image dataset.
+            If a string is provided, will search for k8 datasets.
+            If `None`, the validation dataset will be randomly split from `train_data`.
+        holdout_frac : float, default = 0.1
+            The random split ratio for `val_data` if `val_data==None`.
+        random_state : numpy.random.state, default = None
+            The random_state for shuffling, only used if `val_data==None`.
+            Note that the `random_state` only affect the splitting process, not model training.
+        time_limit : int, default = 43200
+            Time limit in seconds, default is 12 hours. If `time_limit` is hit during `fit`, the
+            HPO process will interrupt and return the current best configuration.
+        epochs : int, default value based on network
+            The `epochs` for model training, if `None` is provided, then default `epochs` for model
+            will be used.
+        num_trials : int, default = 1
+            The number of HPO trials. If `None`, will run infinite trials until `time_limit` is met.
+        hyperparameters : dict, default = None
+            Extra hyperparameters for specific models.
+            Accepted args includes(not limited to):
+            batch_size : int
+                Mini batch size
+            learning_rate : float
+                Trainer learning rate for optimization process.
+            You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
+        search_strategy : str, default = 'random'
+            Searcher strategy for HPO, 'random' by default.
+            Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
+            ‘skopt’ (SKopt Bayesian optimization), ‘grid’ (grid search).
+        scheduler_options : dict, default = None
+            Extra options for HPO scheduler, please refer to `autogluon.core.Searcher` for details.
+        nthreads_per_trial : int, default = (# cpu cores)
+            Number of CPU threads for each trial, if `None`, will detect the # cores on current instance.
+        ngpus_per_trial : int, default = (# gpus)
+            Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
+        dist_ip_addrs : list, default = None
+            If not `None`, will spawn tasks on distributed nodes.
+        verbosity : int, default = 3
+            Controls how detailed of a summary to ouput.
+            Set <= 0 for no output printing, 1 to print just high-level summary,
+            2 to print summary and create plots, >= 3 to print all information produced during fit().
+        """
+        log_level = verbosity2loglevel(verbosity)
+        if self._detector is not None:
+            self._detector._logger.setLevel(log_level)
+            self._detector._logger.propagate = True
+            self._fit_summary = self._detector.fit(train_data, val_data, 1 - holdout_frac, random_state, resume=False)
+            return
+
+        # new HPO task
+        config={'log_dir': self._log_dir,
+                'num_trials': 99999 if num_trials is None else max(1, num_trials),
+                'time_limits': time_limit,
+                'search_strategy': search_strategy,
+                }
+        if nthreads_per_trial is not None:
+            config.update({'nthreads_per_trial': nthreads_per_trial})
+        if ngpus_per_trial is not None:
+            config.update({'ngpus_per_trial': ngpus_per_trial})
+        if dist_ip_addrs is not None:
+            config.update({'dist_ip_addrs': dist_ip_addrs})
+        if epochs is not None:
+            config.update({'epochs': epochs})
+        if isinstance(hyperparameters, dict):
+            # check if hyperparameters overwriting existing config
+            for k, v in hyperparameters.items():
+                if k in config:
+                    raise ValueError(f'Overwriting {k} = {config[k]} to {v} by hyperparameters is ambiguous.')
+            config.update(hyperparameters)
+        if scheduler_options is not None:
+            config.update(scheduler_options)
+        # verbosity
+        if log_level > logging.INFO:
+            logging.getLogger('gluoncv.auto.tasks.object_detection').propagate = False
+            for logger_name in ('SSDEstimator', 'CenterNetEstimator', 'YOLOv3Estimator', 'FasterRCNNEstimator'):
+                logging.getLogger(logger_name).setLevel(log_level)
+                logging.getLogger(logger_name).propagate = False
+        task = _ObjectDetection(config=config)
+        task._logger.setLevel(log_level)
+        task._logger.propagate = True
+        self._detector = task.fit(train_data, val_data, 1 - holdout_frac, random_state)
+        self._detector._logger.setLevel(log_level)
+        self._detector._logger.propagate = True
+        self._fit_summary = task.fit_summary()
+
+    def predict(self, x):
+        """Predict objects in image, return the confidences, bounding boxes of each predicted object.
+
+        Parameters
+        ----------
+        x : str, pd.DataFrame or ndarray
+            The input, can be str(filepath), pd.DataFrame with 'image' column, or raw ndarray input.
+
         Returns
         -------
-            :class:`autogluon.task.object_detection.Detector` object which can make predictions on new data and summarize what happened during `fit()`.
-        
-        Examples
-        --------
-        >>> from autogluon.vision.object_detection import ObjectDetection as task
-        >>> detector = task.fit(dataset = 'voc', net = 'mobilenet1.0',
-        >>>                     time_limits = 600, ngpus_per_trial = 1, num_trials = 1)
+
+        pd.DataFrame
+            The returned dataframe will contain (`pred_score`, `pred_bbox`, `pred_id`).
+            If more than one image in input, the returned dataframe will contain `images` column,
+            and all results are concatenated.
         """
-        if auto_search:
-            # The strategies can be injected here, for example: automatic suggest some hps
-            # based on the dataset statistics
-            pass
+        if self._detector is None:
+            raise RuntimeError('Detector is not initialized, try `fit` first.')
+        return self._detector.predict(x)
 
-        nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
-        if ngpus_per_trial > get_gpu_count():
-            logger.warning(
-                "The number of requested GPUs is greater than the number of available GPUs.")
-        ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
+    def evaluate(self, val_data):
+        """Evaluate model performance on validation data.
 
-        # If only time_limits is given, the scheduler starts trials until the
-        # time limit is reached
-        if num_trials is None and time_limits is None:
-            num_trials = 2
+        Parameters
+        ----------
+        val_data : pd.DataFrame or iterator
+            The validation data.
+        """
+        if self._detector is None:
+            raise RuntimeError('Detector not initialized, try `fit` first.')
+        return self._detector.evaluate(val_data)
 
-        train_object_detection.register_args(
-            meta_arch=meta_arch,
-            dataset=dataset,
-            net=net,
-            lr=lr,
-            loss=loss,
-            num_gpus=ngpus_per_trial,
-            batch_size=batch_size,
-            split_ratio=split_ratio,
-            epochs=epochs,
-            num_workers=nthreads_per_trial,
-            hybridize=hybridize,
-            verbose=verbose,
-            final_fit=False,
-            seed=seed,
-            data_shape=data_shape,
-            start_epoch=0,
-            transfer=transfer,
-            lr_mode=lr_mode,
-            lr_decay=lr_decay,
-            lr_decay_period=lr_decay_period,
-            lr_decay_epoch=lr_decay_epoch,
-            warmup_lr=warmup_lr,
-            warmup_epochs=warmup_epochs,
-            warmup_iters=warmup_iters,
-            warmup_factor=warmup_factor,
-            momentum=momentum,
-            wd=wd,
-            log_interval=log_interval,
-            save_prefix=save_prefix,
-            save_interval=save_interval,
-            val_interval=val_interval,
-            num_samples=num_samples,
-            no_random_shape=no_random_shape,
-            no_wd=no_wd,
-            mixup=mixup,
-            no_mixup_epochs=no_mixup_epochs,
-            label_smooth=label_smooth,
-            resume=resume,
-            syncbn=syncbn,
-            reuse_pred_weights=reuse_pred_weights)
+    def fit_summary(self):
+        """Return summary of last `fit` process.
 
-        # Backward compatibility:
-        grace_period = kwargs.get('grace_period')
-        if grace_period is not None:
-            if scheduler_options is None:
-                scheduler_options = {'grace_period': grace_period}
-            else:
-                assert 'grace_period' not in scheduler_options, \
-                    "grace_period appears both in scheduler_options and as direct argument"
-                scheduler_options = copy.copy(scheduler_options)
-                scheduler_options['grace_period'] = grace_period
-            logger.warning(
-                "grace_period is deprecated, use "
-                "scheduler_options={'grace_period': ...} instead")
-        scheduler_options = compile_scheduler_options(
-            scheduler_options=scheduler_options,
-            search_strategy=search_strategy,
-            search_options=search_options,
-            nthreads_per_trial=nthreads_per_trial,
-            ngpus_per_trial=ngpus_per_trial,
-            checkpoint=checkpoint,
-            num_trials=num_trials,
-            time_out=time_limits,
-            resume=(len(resume) > 0),
-            visualizer=visualizer,
-            time_attr='epoch',
-            reward_attr='map_reward',
-            dist_ip_addrs=dist_ip_addrs,
-            epochs=epochs)
-        results = BaseTask.run_fit(
-            train_object_detection, search_strategy, scheduler_options)
-        logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
-        args = sample_config(train_object_detection.args, results['best_config'])
-        logger.info('The best config: {}'.format(results['best_config']))
+        Returns
+        -------
+        dict
+            The summary of last `fit` process. Major keys are ('train_map', 'val_map', 'total_time',...)
 
-        ngpus = get_gpu_count()
-        ctx = [mx.gpu(i) for i in range(ngpus)] if ngpus > 0 else [mx.cpu()]
-        model = get_network(args.meta_arch, args.net, dataset.init().get_classes(), transfer, ctx,
-                            syncbn=args.syncbn)
-        update_params(model, results.pop('model_params'))
-        return Detector(model, results, checkpoint, args)
+        """
+        return copy.copy(self._fit_summary)
+
+    def save(self, file_name):
+        """Dump predictor to disk.
+
+        Parameters
+        ----------
+        file_name : str
+            The file name of saved copy.
+
+        """
+        with open(file_name, 'wb') as fid:
+            pickle.dump(self, fid)
+
+    @classmethod
+    def load(cls, file_name):
+        """Load previously saved predictor.
+
+        Parameters
+        ----------
+        file_name : str
+            The file name for saved pickle file.
+
+        """
+        with open(file_name, 'rb') as fid:
+            obj = pickle.load(fid)
+        return obj

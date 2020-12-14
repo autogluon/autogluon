@@ -2,7 +2,7 @@ import math
 import autogluon.core as ag
 from autogluon.mxnet.optimizer import SGD
 from autogluon.extra.model_zoo import EfficientNet
-from autogluon.vision import ImageClassification as task
+from autogluon.vision import ImagePredictor as task
 
 @ag.obj(
     width_coefficient=ag.Categorical(1.1, 1.2),
