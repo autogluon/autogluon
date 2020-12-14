@@ -2,7 +2,7 @@
 
 :label:`sec_tabularprediction_text_multimodal`
 
-In this tutorial, we will introduce how to use AutoGluon to deal with multimodal data that involves text other other features, e.g., categorical features. These types of data are prevalent in real world applications. For example, when we try to analyze the sentiment of users' tweets, we can not only use the raw text in the tweets but also other features such as the topic of the tweet and the user profile. In the following, we will investigate different ways that you may combine the neural network model in AutoGluon Text, which is based on state-of-the-art pretrained language models and the ensemble techniques in AutoGluon Tabular to improve the final performance on multimodal datasets. For more details about what's the inner-working of the AutoGluon Text neural network, you may refer to :ref:`sec_textprediction_heterogeneous`.
+In this tutorial, we will introduce how to use AutoGluon to deal with multimodal data that involves text and other features, e.g., categorical features. These types of data are prevalent in real world applications. For example, when we try to analyze the sentiment of users' tweets, we can not only use the raw text in the tweets but also other features such as the topic of the tweet and the user profile. In the following, we will investigate different ways that you may combine the neural network model in AutoGluon Text, which is based on state-of-the-art pretrained language models and the ensemble techniques in AutoGluon Tabular to improve the final performance on multimodal datasets. For more details about what's the inner-working of the AutoGluon Text neural network, you may refer to :ref:`sec_textprediction_heterogeneous`.
 
 
 
