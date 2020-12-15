@@ -1,17 +1,15 @@
-"""Text Prediction Model based on BERT"""
-from typing import Union, Optional
+"""Text Prediction Model based on Pretrained Language Model. Version 1"""
+from typing import Optional
 import collections
 import logging
 import pandas as pd
 import os
-import json
 import random
 import numpy as np
-from autogluon.core.constants import BINARY, REGRESSION, AG_ARGS_FIT
 
 from ..abstract.abstract_model import AbstractModel
-from ...features.feature_metadata import FeatureMetadata, R_OBJECT, R_INT, R_FLOAT, R_CATEGORY,\
-    S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_TEXT
+from ...features.feature_metadata import R_OBJECT, R_INT, R_FLOAT, \
+    S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
 
 
 logger = logging.getLogger(__name__)
