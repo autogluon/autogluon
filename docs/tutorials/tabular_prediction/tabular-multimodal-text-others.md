@@ -278,7 +278,7 @@ predictor_model6.leaderboard(dev_df, silent=True)
 
 After performing these comparisons, we have the following takeaways:
 
-- The multimodal text neural network structure used in TextPrediction is a good for dealing with tabular data with text and numerical/categorical features.
+- The multimodal text neural network structure used in TextPrediction is a good for dealing with tabular data with text and categorical features.
 
 - K-fold bagging / stacking and weighted ensemble are helpful
 
