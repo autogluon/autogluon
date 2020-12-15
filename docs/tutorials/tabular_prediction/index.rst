@@ -25,10 +25,10 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       How to use AutoGluon for Kaggle competitions.
 
    .. card::
-      :title: Explore Models for Data Tables with Text and Other Features
+      :title: Explore Models for Data Tables with Text and Categorical Features
       :link: tabular-multimodal-text-others.html
 
-      Tutorial about how to use autogluon to solve tasks that contain both text and other types of features.
+      Tutorial about how to use autogluon to solve tasks that contain both text and categorical features.
 
    .. card::
       :title: FAQ

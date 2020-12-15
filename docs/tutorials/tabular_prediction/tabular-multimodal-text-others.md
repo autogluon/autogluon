@@ -1,8 +1,15 @@
-# Explore Models for Tabular Data with Text and Other Columns
+# Explore Models for Data Tables with Text and Categorical Features
 
 :label:`sec_tabularprediction_text_multimodal`
 
-In this tutorial, we will introduce how to use AutoGluon to deal with tabular data that involves text and other type of features, e.g., categorical features. These types of data are prevalent in real world applications. For example, when we try to analyze the sentiment of users' tweets, we can not only use the raw text in the tweets but also other features such as the topic of the tweet and the user profile. In the following, we will investigate different ways that you may combine the neural network model in AutoGluon Text, which is based on state-of-the-art pretrained language models and the ensemble techniques in AutoGluon Tabular to improve the final performance on multimodal datasets. For more details about what's the inner-working of the AutoGluon Text neural network, you may refer to :ref:`sec_textprediction_heterogeneous`.
+We will introduce how to use AutoGluon to deal with tabular data that involves text and categorical features.
+This type of data, i.e., data which contains text and other features, is prevalent in real world applications.
+For example, when building a sentiment analysis model of users' tweets, we can not only use the raw text in the 
+tweets but also other features such as the topic of the tweet and the user profile. In the following, 
+we will investigate different ways to ensemble the state-of-the-art (pretrained) language models in AutoGluon TextPrediction 
+with all of the other models used in AutoGluon TabularPrediction. 
+For more details about the inner-working of the neural network architecture used in AutoGluon TextPrediction, 
+you may refer to :ref:`sec_textprediction_heterogeneous`.
 
 
 
@@ -52,7 +59,8 @@ print('Number of dev samples:', len(dev_df))
 print('Number of test samples:', len(test_df))
 ```
 
-There are two features in the dataset: the users' review about the product and the product's type. Also, there are four classes and we have split the train and dev set based on stratified sampling.
+There are two features in the dataset: the users' review of the product and the product's type. 
+Also, there are four classes and we have split the train and dev set based on stratified sampling.
 
 
 ```{.python .input}
@@ -69,9 +77,11 @@ dev_df
 test_df
 ```
 
-## What can we get without mixing multiple data types?
+## What happens if we ignore all the non-text features?
 
-First of all, let's try to train models without mixing the multi-modal data. We will use the TextPrediction model in AutoGluon to train a predictor with text data only. This will internally use the ELECTRA model as the backbone.
+First of all, let's try to ignore all the non-text features. We will use the TextPrediction model 
+in AutoGluon to train a predictor with text data only. This will internally use the ELECTRA-small 
+model as the backbone. As we can see, the result is not very good.
 
 
 ```{.python .input}
@@ -92,8 +102,9 @@ print(predictor_text_only.evaluate(dev_df[['Product_Description', 'Sentiment']],
 
 ## Model 1:  Baseline with N-Gram + TF-IDF
 
-We first train the baseline model in AutoGluon without the pretrained language model. Internally, AutoGluon uses the n-gram and TF-IDF based features.
-
+The first baseline model is to directly call AutoGluno TabularPrediction to train a predictor.
+AutoGluon TabularPrediction uses the n-gram and TF-IDF based features for text columns and considers 
+text and categorical columns simultaneously.
 
 ```{.python .input}
 predictor_model1 = TabularPrediction.fit(train_df,
@@ -107,14 +118,19 @@ predictor_model1 = TabularPrediction.fit(train_df,
 
 
 ```{.python .input}
-predictor_model1.leaderboard(dev_df)
+predictor_model1.leaderboard(dev_df, silent=True)
 ```
 
-We can find that combining the product type feature is quite essential for good performance.
+We can find that using product type (a categorical column) is quite essential for good performance in this task. 
+The accuracy is much higher than the model trained with only text column. 
 
 ## Model 2: Extract Text Embedding and Use Tabular Predictor
 
-The AutoGluon-Text offers the `extract_embedding()` functionality so we can try to have a two-stage model. In the first stage, we use the text-only model to extract sentence embeddings and then use AutoGluon TabularPredictor to get the final model.
+Our second attempt in combining text and other features is to use the trained TextPrediction model to extract embeddings and 
+use TabularPrediction to build the predictor on top of the text embeddings. 
+The AutoGluon TextPrediction model offers the `extract_embedding()` functionality so we can try to 
+have the two-stage model. In the first stage, we use the text-only model to extract sentence embeddings. 
+In the second stage, we use AutoGluon TabularPrediction to get the final model.
 
 
 ```{.python .input}
@@ -143,8 +159,10 @@ predictor_model2 = TabularPrediction.fit(merged_train_data,
 
 
 ```{.python .input}
-predictor_model2.leaderboard(merged_dev_data)
+predictor_model2.leaderboard(merged_dev_data, silent=True)
 ```
+
+The performance is better than the first model.
 
 ## Model 3: Use the Neural Network in AutoGluon-Text in Tabular Weighted Ensemble
 
@@ -169,7 +187,7 @@ predictor_model3 = TabularPrediction.fit(train_df,
 
 
 ```{.python .input}
-predictor_model3.leaderboard(dev_df)
+predictor_model3.leaderboard(dev_df, silent=True)
 ```
 
 ## Model 4: K-Fold Bagging and Stack Ensemble
@@ -191,7 +209,7 @@ predictor_model4 = TabularPrediction.fit(train_df,
 
 
 ```{.python .input}
-predictor_model4.leaderboard(dev_df)
+predictor_model4.leaderboard(dev_df, silent=True)
 ```
 
 ## Model 5: Multimodal embedding + TabularPrediction
@@ -222,7 +240,7 @@ predictor_model5 = TabularPrediction.fit(train_df.join(pd.DataFrame(train_senten
 
 
 ```{.python .input}
-predictor_model5.leaderboard(dev_df.join(pd.DataFrame(dev_sentence_multimodal_embeddings)))
+predictor_model5.leaderboard(dev_df.join(pd.DataFrame(dev_sentence_multimodal_embeddings)), silent=True)
 ```
 
 ## Model 6: Use a larger backbone
@@ -253,7 +271,7 @@ predictor_model6 = TabularPrediction.fit(train_df,
 
 
 ```{.python .input}
-predictor_model6.leaderboard(dev_df)
+predictor_model6.leaderboard(dev_df, silent=True)
 ```
 
 ## Major Takeaways
