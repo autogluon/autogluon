@@ -9,7 +9,7 @@ tweets but also other features such as the topic of the tweet and the user profi
 we will investigate different ways to ensemble the state-of-the-art (pretrained) language models in AutoGluon TextPrediction 
 with all of the other models used in AutoGluon TabularPrediction. 
 For more details about the inner-working of the neural network architecture used in AutoGluon TextPrediction, 
-you may refer to :ref:`sec_textprediction_architecture`.
+you may refer to Section ":ref:`sec_textprediction_architecture`" in :ref:`sec_textprediction_heterogeneous`.
 
 
 
@@ -245,7 +245,8 @@ predictor_model5.leaderboard(dev_df.join(pd.DataFrame(dev_sentence_multimodal_em
 
 ## Model 6: Use a larger backbone
 
-Now, we will choose to use a larger backbone: ELECTRA-base. We will find that the performance gets improved after we change to use a larger backbone model.
+Now, we will choose to use a larger backbone: ELECTRA-base. We will find that the performance gets improved after we change to use a larger backbone model. 
+However, we should notice that the training time will be longer and the inference cost will be higher.
 
 
 ```{.python .input}
