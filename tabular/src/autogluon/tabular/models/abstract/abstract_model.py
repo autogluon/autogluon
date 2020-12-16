@@ -58,11 +58,6 @@ class AbstractModel:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
             logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
 
-        if stopping_metric is None:
-            self.stopping_metric = self.eval_metric
-        else:
-            self.stopping_metric = stopping_metric
-
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
             self.normalize_pred_probas = True
             logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
@@ -86,6 +81,15 @@ class AbstractModel:
             if AG_ARGS_FIT in hyperparameters:
                 ag_args_fit = hyperparameters.pop(AG_ARGS_FIT)
                 self.params_aux.update(ag_args_fit)
+
+        if stopping_metric is None:
+            self.stopping_metric = self.params_aux.get('stopping_metric', self._get_default_stopping_metric())
+        else:
+            if 'stopping_metric' in self.params_aux:
+                raise AssertionError('stopping_metric was specified in both hyperparameters AG_args_fit and model init. Please specify only once.')
+            self.stopping_metric = stopping_metric
+        self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, 'stopping_metric')
+
         self._set_default_params()
         self.nondefault_params = []
         if hyperparameters is not None:
@@ -678,6 +682,14 @@ class AbstractModel:
         Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
         """
         return {}
+
+    def _get_default_stopping_metric(self):
+        if self.eval_metric.name == 'roc_auc':
+            stopping_metric = 'log_loss'
+        else:
+            stopping_metric = self.eval_metric
+        stopping_metric = metrics.get_metric(stopping_metric, self.problem_type, 'stopping_metric')
+        return stopping_metric
 
 
 class AbstractNeuralNetworkModel(AbstractModel):

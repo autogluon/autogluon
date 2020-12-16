@@ -16,14 +16,13 @@ DEFAULT_DISTILL_PRIORITY = dict(
 )
 
 
-def get_preset_models_distillation(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None,
+def get_preset_models_distillation(path, problem_type, eval_metric, hyperparameters, num_classes=None,
                                    hyperparameter_tune=False, distill_level=0, name_suffix='_DSTL', invalid_model_names: list = None):
     if problem_type == MULTICLASS:
         models = get_preset_models_softclass(path=path, num_classes=num_classes, hyperparameters=hyperparameters,
                                              hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix, invalid_model_names=invalid_model_names)
     elif problem_type == BINARY:  # convert to regression in distillation
         eval_metric = mean_squared_error
-        stopping_metric = mean_squared_error
         # Constrain output-range of NN:
         nn_outputrange = {'y_range': (0.0,1.0), 'y_range_extend': 0.0}
         if 'NN' in hyperparameters:
@@ -61,7 +60,7 @@ def get_preset_models_distillation(path, problem_type, eval_metric, hyperparamet
             hyperparameters['default']['RF'] = rf_hyperparameters
 
     if problem_type == REGRESSION or problem_type == BINARY:
-        models = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=eval_metric, stopping_metric=stopping_metric,
+        models = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=eval_metric,
                                    hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix,
                                    default_priorities=DEFAULT_DISTILL_PRIORITY, invalid_model_names=invalid_model_names)
 

@@ -40,7 +40,7 @@ class AbstractTrainer:
     trainer_info_json_name = 'info.json'
     distill_stackname = 'distill'  # name of stack-level for distilled student models
 
-    def __init__(self, path: str, problem_type: str, scheduler_options=None, eval_metric=None, stopping_metric=None,
+    def __init__(self, path: str, problem_type: str, scheduler_options=None, eval_metric=None,
                  num_classes=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
                  save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2):
         self.path = path
@@ -54,21 +54,12 @@ class AbstractTrainer:
         else:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
-        # stopping_metric is used to early stop all models except for aux models.
-        if stopping_metric is not None:
-            self.stopping_metric = stopping_metric
-        elif self.eval_metric.name == 'roc_auc':
-            self.stopping_metric = log_loss
-        else:
-            self.stopping_metric = self.eval_metric
-
         self.eval_metric_expects_y_pred = scorer_expects_y_pred(scorer=self.eval_metric)
         logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
         if not self.eval_metric_expects_y_pred:
             logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "\tTo change this, specify the eval_metric argument of fit()")
-        logger.log(25, f"AutoGluon will early stop models using evaluation metric: '{self.stopping_metric.name}'")
         self.num_classes = num_classes
         self.feature_prune = False  # will be set to True if feature-pruning is turned on.
         self.low_memory = low_memory
@@ -1572,7 +1563,6 @@ class AbstractTrainer:
 
         problem_type = self.problem_type
         eval_metric = self.eval_metric.name
-        stopping_metric = self.stopping_metric.name
         time_train_start = self._time_train_start
         num_rows_train = self._num_rows_train
         num_cols_train = self._num_cols_train
@@ -1596,7 +1586,6 @@ class AbstractTrainer:
             'num_classes': num_classes,
             'problem_type': problem_type,
             'eval_metric': eval_metric,
-            'stopping_metric': stopping_metric,
             'best_model': best_model,
             'best_model_score_val': best_model_score_val,
             'best_model_stack_level': best_model_stack_level,
@@ -1957,7 +1946,7 @@ class AbstractTrainer:
             models_distill = self.get_models(hyperparameters=hyperparameters, name_suffix=student_suffix)
         else:
             models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type,
-                                                            eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
+                                                            eval_metric=self.eval_metric,
                                                             num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix, invalid_model_names=self.get_model_names())
             if self.problem_type != REGRESSION:
                 self._regress_preds_asprobas = True

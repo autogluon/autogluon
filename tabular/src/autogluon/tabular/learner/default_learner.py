@@ -73,7 +73,6 @@ class DefaultLearner(AbstractLearner):
             path=self.model_context,
             problem_type=self.label_cleaner.problem_type_transform,
             eval_metric=self.eval_metric,
-            stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
             feature_metadata=self.feature_generator.feature_metadata,
             low_memory=True,
@@ -89,8 +88,6 @@ class DefaultLearner(AbstractLearner):
         self.trainer_path = trainer.path
         if self.eval_metric is None:
             self.eval_metric = trainer.eval_metric
-        if self.stopping_metric is None:
-            self.stopping_metric = trainer.stopping_metric
 
         self.save()
         trainer.train(X, y, X_val, y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)

@@ -39,7 +39,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, id_columns: list = None, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, stopping_metric=None, cache_data=True, is_trainer_present=False, random_seed=0):
+                 problem_type=None, eval_metric=None, cache_data=True, is_trainer_present=False, random_seed=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.id_columns = id_columns
@@ -48,7 +48,6 @@ class AbstractLearner:
         self.threshold = label_count_threshold
         self.problem_type = problem_type
         self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
-        self.stopping_metric = get_metric(stopping_metric, self.problem_type, 'stopping_metric')
         self.cache_data = cache_data
         if not self.cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
@@ -59,7 +58,6 @@ class AbstractLearner:
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
-        self.feature_generators = [self.feature_generator]
 
         self.trainer: AbstractTrainer = None
         self.trainer_type = None
@@ -71,6 +69,10 @@ class AbstractLearner:
             self.version = __version__
         except:
             self.version = None
+
+    @property
+    def feature_generators(self):
+        return [self.feature_generator]
 
     @property
     def class_labels(self):
@@ -579,8 +581,3 @@ class AbstractLearner:
         }
 
         return learner_info
-
-    def register_metrics(self, eval_metric=None, stopping_metric=None):
-        # TODO: v0.1 stop edits from being valid after models have been fit
-        self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
-        self.stopping_metric = get_metric(stopping_metric, self.problem_type, 'stopping_metric')

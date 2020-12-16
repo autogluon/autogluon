@@ -214,13 +214,6 @@ class TabularPredictorV2(TabularPredictor):
         if (visualizer is not None) and (visualizer != 'none') and ('NN' in hyperparameters):
             hyperparameters['NN']['visualizer'] = visualizer
 
-        # TODO: v0.1 consider not allowing eval_metric and stopping_metric specification here
-        if eval_metric is None:
-            eval_metric = self._learner.eval_metric
-        if stopping_metric is None:
-            stopping_metric = self._learner.stopping_metric
-        self._learner.register_metrics(eval_metric=eval_metric, stopping_metric=stopping_metric)
-
         # All models use the same scheduler:
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,

@@ -88,3 +88,6 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         extra_ag_args = {'valid_base': False}
         default_ag_args.update(extra_ag_args)
         return default_ag_args
+
+    def _get_default_stopping_metric(self):
+        return self.eval_metric
