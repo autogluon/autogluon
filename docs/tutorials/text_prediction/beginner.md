@@ -165,7 +165,11 @@ print(score3)
 ```
 
 ## Extract Embeddings
-After you have trained a predictor, you can also use the predictor to extract embeddings. This can be useful for integrating with other AutoGluon modules like the task in AutoGluon-Tabular.
+:label:`sec_textprediction_extract_embedding`
+
+After you have trained a predictor, you can also use the predictor to extract embeddings that maps the input data to a real vector. 
+This can be useful for integrating with other AutoGluon modules like the TabularPrediction model. 
+We can just feed the embeddings to TabularPrediction. 
 
 
 ```{.python .input}

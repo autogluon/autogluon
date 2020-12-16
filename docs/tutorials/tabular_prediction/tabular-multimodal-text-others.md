@@ -9,7 +9,7 @@ tweets but also other features such as the topic of the tweet and the user profi
 we will investigate different ways to ensemble the state-of-the-art (pretrained) language models in AutoGluon TextPrediction 
 with all of the other models used in AutoGluon TabularPrediction. 
 For more details about the inner-working of the neural network architecture used in AutoGluon TextPrediction, 
-you may refer to :ref:`sec_textprediction_heterogeneous`.
+you may refer to :ref:`sec_textprediction_architecture`.
 
 
 
@@ -128,8 +128,8 @@ The accuracy is much higher than the model trained with only text column.
 
 Our second attempt in combining text and other features is to use the trained TextPrediction model to extract embeddings and 
 use TabularPrediction to build the predictor on top of the text embeddings. 
-The AutoGluon TextPrediction model offers the `extract_embedding()` functionality so we can try to 
-have the two-stage model. In the first stage, we use the text-only model to extract sentence embeddings. 
+The AutoGluon TextPrediction model offers the `extract_embedding()` functionality (For more details, go to :ref:`sec_textprediction_extract_embedding`), 
+so we are able to build a two-stage model. In the first stage, we use the text-only model to extract sentence embeddings. 
 In the second stage, we use AutoGluon TabularPrediction to get the final model.
 
 
