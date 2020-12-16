@@ -23,6 +23,7 @@ from ...trainer import AbstractTrainer
 logger = logging.getLogger()  # return root logger
 
 
+# TODO: v0.1 Add comments that models are serialized on disk after fit
 class TabularPredictorV2(TabularPredictor):
     """
     AutoGluon Task for predicting values in column of tabular dataset (classification or regression)
@@ -36,39 +37,29 @@ class TabularPredictorV2(TabularPredictor):
             label,
             problem_type=None,
             eval_metric=None,
-            feature_metadata_in=None,
-            feature_generator="automl",
             output_directory=None,
             verbosity=2,
             **kwargs
     ):
         self._validate_init_kwargs(kwargs)
         output_directory = setup_outputdir(output_directory)  # TODO: Rename to directory/path?
-        self.feature_metadata_in = feature_metadata_in  # TODO: Unused, FIXME: currently overwritten after .fit, split into two variables: one for pre and one for post processing.
         self.verbosity = verbosity  # TODO: Unused
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
 
-        # TODO: v0.1 Add presets for feature_generator: `feature_generator='special'`, ignore_text, etc.
-        if feature_generator is None:
-            feature_generator = IdentityFeatureGenerator()
-        elif feature_generator == "automl":
-            feature_generator = AutoMLPipelineFeatureGenerator()
-        if feature_metadata_in is not None:
-            if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
-                feature_generator.feature_metadata_in = copy.deepcopy(feature_metadata_in)
-            else:
-                raise AssertionError('`feature_metadata_in` already exists in `feature_generator`.')
-
-        self._learner: AbstractLearner = learner_type(path_context=output_directory, label=label, feature_generator=feature_generator,
+        self._learner: AbstractLearner = learner_type(path_context=output_directory, label=label, feature_generator=None,
                                                       eval_metric=eval_metric, problem_type=problem_type, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
 
     # TODO: Documentation, flesh out capabilities
-    def fit_feature_generator(self, data: pd.DataFrame) -> pd.DataFrame:
-        return self._learner.fit_transform_features(data)
+    # TODO: Rename feature_generator -> feature_pipeline for users?
+    # TODO: Return transformed data?
+    # TODO: kwargs?
+    def fit_feature_generator(self, data: pd.DataFrame, feature_generator='auto', feature_metadata=None):
+        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
+        self._learner.fit_transform_features(data)
 
     @unpack(set_presets)
     def fit(self,
@@ -76,17 +67,13 @@ class TabularPredictorV2(TabularPredictor):
             tuning_data=None,
             time_limits=None,
             presets=None,
-            eval_metric=None,
-            stopping_metric=None,
-            auto_stack=False,
-            hyperparameter_tune=False,
             hyperparameters=None,
-            holdout_frac=None,
-            num_bagging_folds=0,
-            num_bagging_sets=None,
-            stack_ensemble_levels=0,
-            num_trials=None,
-            search_strategy='random',
+            feature_generator="auto",
+            feature_metadata=None,
+            # verbosity=None,  # TODO: Add
+            hyperparameter_tune=False,  # TODO: Remove but add string default options to scheduler_kwargs? Rename to hyperparameter_tune_kwargs
+            num_trials=None,  # TODO: REMOVE
+            search_strategy='random',  # TODO: REMOVE
             **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
@@ -115,6 +102,12 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: v0.1 - HPO arguments to a generic hyperparameter_tune_kwargs parameter?
         # TODO: v0.1 - stack_ensemble_levels is silently ignored if num_bagging_folds < 2, ensure there is a warning printed
 
+        holdout_frac = kwargs.get('holdout_frac', None)
+        num_bagging_folds = kwargs.get('num_bagging_folds', 0)
+        num_bagging_sets = kwargs.get('num_bagging_sets', None)
+        stack_ensemble_levels = kwargs.get('stack_ensemble_levels', 0)
+        auto_stack = kwargs.get('auto_stack', False)
+
         feature_prune = kwargs.get('feature_prune', False)
         scheduler_options = kwargs.get('scheduler_options', None)
         search_options = kwargs.get('search_options', None)
@@ -124,6 +117,7 @@ class TabularPredictorV2(TabularPredictor):
         visualizer = kwargs.get('visualizer', None)
         unlabeled_data = kwargs.get('unlabeled_data', None)
 
+        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
         train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, unlabeled_data=unlabeled_data)
 
         if feature_prune:
@@ -345,6 +339,11 @@ class TabularPredictorV2(TabularPredictor):
     @staticmethod
     def _validate_fit_kwargs(kwargs):
         allowed_kwarg_names = {
+            'holdout_frac',
+            'num_bagging_folds',
+            'num_bagging_sets',
+            'stack_ensemble_levels',
+            'auto_stack',
             'AG_args',
             'AG_args_fit',
             'AG_args_ensemble',
@@ -430,3 +429,27 @@ class TabularPredictorV2(TabularPredictor):
         else:
             logger.log(20, 'No further advice found.')
         logger.log(20, '================================================================')
+
+    def _set_feature_generator(self, feature_generator='auto', feature_metadata=None):
+        if self._learner.feature_generator is not None:
+            if isinstance(feature_generator, str) and feature_generator == 'auto':
+                feature_generator = self._learner.feature_generator
+            else:
+                raise AssertionError('FeatureGenerator already exists!')
+        self._learner.feature_generator = self._get_default_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
+
+    # TODO: Move out of predictor?
+    def _get_default_feature_generator(self, feature_generator, feature_metadata=None):
+        if feature_generator is None:
+            feature_generator = IdentityFeatureGenerator()
+        elif isinstance(feature_generator, str):
+            if feature_generator == 'auto':
+                feature_generator = AutoMLPipelineFeatureGenerator()
+            else:
+                raise ValueError(f"Unknown feature_generator preset: '{feature_generator}', valid presets: {['auto']}")
+        if feature_metadata is not None:
+            if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
+                feature_generator.feature_metadata_in = copy.deepcopy(feature_metadata)
+            else:
+                raise AssertionError('`feature_metadata_in` already exists in `feature_generator`.')
+        return feature_generator

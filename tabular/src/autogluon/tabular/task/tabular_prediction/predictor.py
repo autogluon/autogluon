@@ -116,6 +116,10 @@ class TabularPredictor:
     def feature_metadata(self):
         return self._trainer.feature_metadata
 
+    @property
+    def feature_metadata_in(self):
+        return self._learner.feature_generator.feature_metadata_in
+
     # TODO: v0.1 rename to label
     @property
     def label_column(self):
