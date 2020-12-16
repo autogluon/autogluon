@@ -14,7 +14,7 @@ from tqdm.auto import tqdm
 from .reporter import DistStatusReporter, FakeReporter
 from .resource import DistributedResource
 from .scheduler import TaskScheduler
-from .. import Task
+from ..task.task import Task
 from ..decorator import _autogluon_method
 from ..searcher import BaseSearcher
 from ..searcher import searcher_factory

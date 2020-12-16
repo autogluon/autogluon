@@ -15,16 +15,16 @@ from .dataset import random_split_train_val, TabularDataset, infer_problem_type,
     get_column_properties
 from .models.basic_v1 import BertForTextPredictionBasic
 from autogluon.core.task.base import BaseTask
-from autogluon.core.scheduler import get_cpu_count, get_gpu_count
 from autogluon.core import space
 from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.loaders import load_pd
-from autogluon.core.utils.utils import default_holdout_frac
+from autogluon.core.utils.utils import get_cpu_count, get_gpu_count, default_holdout_frac
 from autogluon.core.utils.miscs import verbosity2loglevel
+
 
 __all__ = ['TextPrediction', 'ag_text_prediction_params']
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return root logger
 
 ag_text_prediction_params = Registry('ag_text_prediction_params')
 
@@ -44,7 +44,7 @@ def default() -> dict:
                     'model.backbone.name': 'google_electra_small',
                     'optimization.batch_size': 32,
                     'optimization.num_train_epochs': 4,
-                    'optimization.lr': space.Real(1E-5, 1E-4)
+                    'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5)
                 }
             },
         },
@@ -54,9 +54,30 @@ def default() -> dict:
             'search_options': None,        # Extra kwargs passed to searcher
             'scheduler_options': None,     # Extra kwargs passed to scheduler
             'time_limits': None,           # The total time limit
-            'num_trials': 4,               # The number of trials
-        }
+            'num_trials': 3,               # The number of trials
+        },
+        'seed': None,                      # The seed value
     }
+    return ret
+
+
+@ag_text_prediction_params.register()
+def default_no_hpo() -> dict:
+    """The default hyperparameters without HPO
+
+    It will have a version key and a list of candidate models.
+    Each model has its own search space inside.
+    """
+    ret = default()
+    ret['hpo_params']['num_trials'] = 1
+    return ret
+
+
+@ag_text_prediction_params.register()
+def default_electra_base_no_hpo() -> dict:
+    ret = default_no_hpo()
+    ret['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name']\
+        = 'google_electra_base'
     return ret
 
 
@@ -93,20 +114,23 @@ def merge_params(base_params, partial_params=None):
 
 
 def get_recommended_resource(nthreads_per_trial=None,
-                             ngpus_per_trial=None):
-    """Get the recommended resource.
+                             ngpus_per_trial=None) -> dict:
+    """Get the recommended resources.
+
+    Internally, we will try to use GPU whenever it's possible. That means, we will use
+    a single GPU for finetuning.
 
     Parameters
     ----------
     nthreads_per_trial
-        The number of threads per trial
+        The number of threads per trial provided by the user.
     ngpus_per_trial
-        The number of GPUs per trial
+        The number of GPUs per trial provided by the user.
 
     Returns
     -------
     resource
-        The resource
+        The recommended resource.
     """
     if nthreads_per_trial is None and ngpus_per_trial is None:
         nthreads_per_trial = get_cpu_count()
@@ -162,9 +186,9 @@ def infer_eval_stop_log_metrics(problem_type,
         if eval_metric is None:
             eval_metric = 'acc'
         if label_shape == 2:
-            log_metrics = ['f1', 'mcc', 'auc', 'acc', 'nll']
+            log_metrics = ['f1', 'mcc', 'roc_auc', 'acc', 'log_loss']
         else:
-            log_metrics = ['acc', 'nll']
+            log_metrics = ['acc', 'log_loss']
     elif problem_type == _C.REGRESSION:
         if stopping_metric is None:
             stopping_metric = 'mse'
@@ -308,7 +332,9 @@ class TextPrediction(BaseTask):
         else:
             base_params = ag_text_prediction_params.create('default')
             hyperparameters = merge_params(base_params, hyperparameters)
-        np.random.seed(seed)
+        if seed is not None:
+            hyperparameters['seed'] = seed
+        np.random.seed(hyperparameters['seed'])
         if not isinstance(train_data, pd.DataFrame):
             train_data = load_pd.load(train_data)
         # Inference the label
@@ -338,6 +364,7 @@ class TextPrediction(BaseTask):
                 holdout_frac = default_holdout_frac(len(train_data), True)
             train_data, tuning_data = random_split_train_val(train_data,
                                                              valid_ratio=holdout_frac)
+
         else:
             if not isinstance(tuning_data, pd.DataFrame):
                 tuning_data = load_pd.load(tuning_data)
@@ -349,6 +376,7 @@ class TextPrediction(BaseTask):
             label_columns=label_columns,
             provided_column_properties=None,
             categorical_default_handle_missing_value=True)
+
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)
@@ -458,7 +486,7 @@ class TextPrediction(BaseTask):
                     scheduler_options=scheduler_options,
                     num_trials=num_trials,
                     plot_results=plot_results,
-                    console_log=verbosity > 2,
+                    console_log=verbosity >= 2,
                     ignore_warning=verbosity <= 2)
         return model
 

@@ -65,6 +65,10 @@ stage("Unit Test") {
           python3 -m pip install --upgrade -e .
           cd ../tabular/
           python3 -m pip install --upgrade -e .
+          cd ../mxnet/
+          python3 -m pip install --upgrade -e .
+          cd ../text/
+          python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
         }

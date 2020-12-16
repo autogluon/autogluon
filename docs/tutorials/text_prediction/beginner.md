@@ -38,7 +38,7 @@ train_data.head(10)
 Above the data happen to be stored in a [Parquet](https://databricks.com/glossary/what-is-parquet) table format, but you can also directly `load()` data from a [CSV](https://en.wikipedia.org/wiki/Comma-separated_values) file instead. While here we load files from [AWS S3 cloud storage](https://docs.aws.amazon.com/AmazonS3/latest/dev/Welcome.html), these could instead be local files on your machine. After loading, `train_data` is simply a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), where each row represents a different training example (for machine learning to be appropriate, the rows should be independent and identically distributed).
 
 To ensure this tutorial runs quickly, we simply call `fit()` with a subset of 2000 training examples and limit its runtime to approximately 1 minute. 
-To achieve reasonable performance in your applications, you should set much longer `time_limits` (eg. 1 hour), or do not specify `time_limits` at all. 
+To achieve reasonable performance in your applications, you should set much longer `time_limits` (eg. 1 hour), or do not specify `time_limits` at all.
 
 
 ```{.python .input}
@@ -152,7 +152,7 @@ print(score1, score2, score3)
 ```
 
 ## Save and Load
-Finally we demonstrate how to easily save and load a trained TextPrediction model.
+Here, we demonstrate how to easily save and load a trained TextPrediction model.
 
 
 ```{.python .input}
@@ -162,6 +162,19 @@ predictor_sts_new = task.load('saved_dir')
 score3 = predictor_sts_new.predict({'sentence1': [sentences[0]],
                                     'sentence2': [sentences[3]]})
 print(score3)
+```
+
+## Extract Embeddings
+:label:`sec_textprediction_extract_embedding`
+
+After you have trained a predictor, you can also use the predictor to extract embeddings that maps the input data to a real vector. 
+This can be useful for integrating with other AutoGluon modules like the TabularPrediction model. 
+We can just feed the embeddings to TabularPrediction. 
+
+
+```{.python .input}
+embeddings = predictor_sts_new.extract_embedding(dev_data)
+print(embeddings)
 ```
 
 **Note:** `TextPrediction` depends on the [GluonNLP](https://gluon-nlp.mxnet.io/) package. 

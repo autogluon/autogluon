@@ -16,14 +16,14 @@ np.random.seed(123)
 ## Paraphrase Identification
 
 We consider a Paraphrase Identification task for illustration. Given a pair of sentences, the goal is to predict whether or not one sentence is a restatement of the other (a binary classification task). Here we train models on the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398) dataset.
-For quick demonstration, we will subsample the training data and only use 1000 samples.
+For quick demonstration, we will subsample the training data and only use 800 samples.
 
 ```{.python .input}
 from autogluon.core.utils.loaders import load_pd
 
 train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/train.parquet')
 dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/dev.parquet')
-rand_idx = np.random.permutation(np.arange(len(train_data)))[:1000]
+rand_idx = np.random.permutation(np.arange(len(train_data)))[:800]
 train_data = train_data.iloc[rand_idx]
 train_data.reset_index(inplace=True, drop=True)
 train_data.head(10)
@@ -67,7 +67,7 @@ hyperparameters = {
     'models': {
             'BertForTextPredictionBasic': {
                 'search_space': {
-                    'model.network.agg_net.num_layers': ag.space.Int(0, 3),
+                    'model.network.agg_net.mid_units': ag.space.Int(32, 128),
                     'model.network.agg_net.data_dropout': ag.space.Categorical(False, True),
                     'optimization.num_train_epochs': 4,
                     'optimization.warmup_portion': ag.space.Real(0.1, 0.2),
