@@ -6,6 +6,7 @@ from pandas.api.types import CategoricalDtype
 
 from .abstract import AbstractFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
+from .. import R_BOOL
 from ..feature_metadata import R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_TEXT, S_TEXT_AS_CATEGORY
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
         return dict(
-            valid_raw_types=[R_OBJECT, R_CATEGORY],
+            valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
             invalid_special_types=[S_DATETIME_AS_OBJECT]
         )
 
