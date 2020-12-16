@@ -107,6 +107,8 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular import FillMissing, Categorify, Normalize
         from fastai.core import defaults
 
+        # TODO add NaN imputation logic
+
         self.cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
         self.cont_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
 

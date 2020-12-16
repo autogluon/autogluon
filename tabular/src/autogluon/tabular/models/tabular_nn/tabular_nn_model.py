@@ -7,35 +7,33 @@
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
-import random, json, time, os, logging, warnings
+import json
+import logging
+import os
+import random
+import time
+import warnings
 from collections import OrderedDict
 
+import mxnet as mx
 import numpy as np
 import pandas as pd
-import mxnet as mx
-from mxnet import nd, autograd, gluon
 from gluoncv.utils import LRSequential, LRScheduler
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
+from mxnet import nd, autograd, gluon
 
 from autogluon.core import Space
-from autogluon.core.utils import try_import_mxboard
-from autogluon.core.metrics import log_loss, roc_auc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-
-
-from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
+from autogluon.core.metrics import log_loss, roc_auc
+from autogluon.core.utils import try_import_mxboard
 from .embednet import EmbedNet
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from .tabular_nn_dataset import TabularNNDataset
+from .tabular_nn_preprocessor import TabularNeuralNetPreprocessor
 from .tabular_nn_trial import tabular_nn_trial
 from ..abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
-from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-
+from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
@@ -82,7 +80,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self.features if it works with bagging
-        self.processor = None  # data processor
+        self.processor: TabularNeuralNetPreprocessor = None  # data processor
         self.summary_writer = None
         self.ctx = mx.cpu()
         self.batch_size = None
@@ -513,7 +511,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         logger.log(15, "AutoGluon Neural Network infers features are of the following types:")
         logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
-        self.processor = self._create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels)
+        if self.processor is not None:
+            Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
+        self.processor = TabularNeuralNetPreprocessor(self._types_of_features, self.unique_category_str, impute_strategy, max_category_levels)
         df = self.processor.fit_transform(df) # 2D numpy array
         self.feature_arraycol_map = self._get_feature_arraycol_map(max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
         num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])  # should match number of columns in processed array
@@ -562,7 +562,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         feature_preserving_transforms = set(['continuous','skewed', 'ordinal', 'language'])  # these transforms do not alter dimensionality of feature
         feature_arraycol_map = {}  # unordered version
         current_colindex = 0
-        for transformer in self.processor.transformers_:
+        for transformer in self.processor.transformers:
             transformer_name = transformer[0]
             transformed_features = transformer[2]
             if transformer_name in feature_preserving_transforms:
@@ -600,43 +600,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             else:
                 raise ValueError("unknown feature type encountered")
         return feature_type_map
-
-    def _create_preprocessor(self, impute_strategy, max_category_levels):
-        """ Defines data encoders used to preprocess different data types and creates instance variable which is sklearn ColumnTransformer object """
-        if self.processor is not None:
-            Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
-        continuous_features = self._types_of_features['continuous']
-        skewed_features = self._types_of_features['skewed']
-        onehot_features = self._types_of_features['onehot']
-        embed_features = self._types_of_features['embed']
-        language_features = self._types_of_features['language']
-        transformers = []  # order of various column transformers in this list is important!
-        if continuous_features:
-            continuous_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputer(strategy=impute_strategy)),
-                ('scaler', StandardScaler())])
-            transformers.append( ('continuous', continuous_transformer, continuous_features) )
-        if skewed_features:
-            power_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputer(strategy=impute_strategy)),
-                ('quantile', QuantileTransformer(output_distribution='normal')) ])  # Or output_distribution = 'uniform'
-            transformers.append( ('skewed', power_transformer, skewed_features) )
-        if onehot_features:
-            onehot_transformer = Pipeline(steps=[
-                # TODO: Consider avoiding converting to string for improved memory efficiency
-                ('to_str', FunctionTransformer(convert_df_dtype_to_str)),
-                ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
-                ('onehot', OneHotMergeRaresHandleUnknownEncoder(max_levels=max_category_levels, sparse=False))])  # test-time unknown values will be encoded as all zeros vector
-            transformers.append( ('onehot', onehot_transformer, onehot_features) )
-        if embed_features:  # Ordinal transformer applied to convert to-be-embedded categorical features to integer levels
-            ordinal_transformer = Pipeline(steps=[
-                ('to_str', FunctionTransformer(convert_df_dtype_to_str)),
-                ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
-                ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=max_category_levels))])  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
-            transformers.append( ('ordinal', ordinal_transformer, embed_features) )
-        if language_features:
-            raise NotImplementedError("language_features cannot be used at the moment")
-        return ColumnTransformer(transformers=transformers)  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
     def save(self, path: str = None, verbose=True) -> str:
         if self.model is not None:
@@ -738,8 +701,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             self.optimizer = None
 
 
-def convert_df_dtype_to_str(df):
-    return df.astype(str)
 
 
 """ General TODOs:
