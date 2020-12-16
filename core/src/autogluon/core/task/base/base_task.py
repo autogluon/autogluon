@@ -10,6 +10,7 @@ from ...utils import in_ipynb, try_import_mxnet
 __all__ = [
     'BaseTask',
     'compile_scheduler_options',
+    'compile_scheduler_options_v2',
     'create_scheduler']
 
 Results = collections.namedtuple('Results', 'model reward config time metadata')
@@ -97,9 +98,9 @@ searcher_for_hyperband_strategy = {
 
 
 def compile_scheduler_options(
-        scheduler_options, search_strategy, search_options, nthreads_per_trial,
-        ngpus_per_trial, checkpoint, num_trials, time_out, resume, visualizer,
-        time_attr, reward_attr, dist_ip_addrs, epochs=None):
+        scheduler_options, search_strategy, nthreads_per_trial,
+        ngpus_per_trial, num_trials, time_out, search_options=None, checkpoint=None, resume=False, visualizer=None,
+        time_attr=None, reward_attr=None, dist_ip_addrs=None, epochs=None):
     """
     Updates a copy of scheduler_options (scheduler-specific options, can be
     empty) with general options. The result can be passed to __init__ of the
@@ -133,6 +134,8 @@ def compile_scheduler_options(
         scheduler_options = dict()
     else:
         assert isinstance(scheduler_options, dict)
+    if dist_ip_addrs is None:
+        dist_ip_addrs = []
     assert isinstance(search_strategy, str)
     if search_options is None:
         search_options = dict()
@@ -141,7 +144,7 @@ def compile_scheduler_options(
     if time_attr is None:
         time_attr = 'epoch'
     if reward_attr is None:
-        reward_attr = 'accuracy'
+        reward_attr = 'validation_performance'
     scheduler_options = copy.copy(scheduler_options)
     scheduler_options.update({
         'resource': {
@@ -162,3 +165,97 @@ def compile_scheduler_options(
         if epochs is not None:
             scheduler_options['max_t'] = epochs
     return scheduler_options
+
+
+# TODO: Migrate TextPrediction to use this version, delete old version
+def compile_scheduler_options_v2(
+        scheduler_options, nthreads_per_trial,
+        ngpus_per_trial, num_trials, time_out, search_strategy=None, search_options=None, checkpoint=None, resume=False, visualizer=None,
+        time_attr=None, reward_attr=None, dist_ip_addrs=None, epochs=None):
+    """
+    Updates a copy of scheduler_options (scheduler-specific options, can be
+    empty) with general options. The result can be passed to __init__ of the
+    scheduler.
+
+    Special role of epochs for HyperbandScheduler: If the search_strategy
+    involves HyperbandScheduler and epochs is given, then this value is
+    copied to scheduler_options['max_t']. Pass epochs for applications
+    where the time_attr is epoch, and epochs is the maximum number of
+    epochs.
+
+    :param scheduler_options:
+    :param search_strategy:
+    :param search_options:
+    :param nthreads_per_trial:
+    :param ngpus_per_trial:
+    :param checkpoint:
+    :param num_trials:
+    :param time_out:
+    :param resume:
+    :param visualizer:
+    :param time_attr:
+    :param reward_attr:
+    :param dist_ip_addrs:
+    :param kwargs:
+    :param epochs: See above. Optional
+    :return: Copy of scheduler_options with updates
+
+    """
+    if scheduler_options is None:
+        scheduler_options = dict()
+    else:
+        assert isinstance(scheduler_options, dict)
+    if dist_ip_addrs is None:
+        dist_ip_addrs = []
+    if search_strategy is None:
+        search_strategy = 'random'
+    assert isinstance(search_strategy, str)
+    if search_options is None:
+        search_options = dict()
+    if visualizer is None:
+        visualizer = 'none'
+    if time_attr is None:
+        time_attr = 'epoch'
+    if reward_attr is None:
+        reward_attr = 'validation_performance'
+    _scheduler_options = {
+        'resource': {
+            'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
+        'searcher': search_strategy,
+        'search_options': search_options,
+        'checkpoint': checkpoint,
+        'resume': resume,
+        'num_trials': num_trials,
+        'time_out': time_out,
+        'reward_attr': reward_attr,
+        'time_attr': time_attr,
+        'visualizer': visualizer,
+        'dist_ip_addrs': dist_ip_addrs,
+    }
+    _scheduler_options.update(copy.copy(scheduler_options))
+
+    searcher = searcher_for_hyperband_strategy.get(_scheduler_options['searcher'])
+    if searcher is not None:
+        _scheduler_options['searcher'] = searcher
+        if epochs is not None:
+            _scheduler_options['max_t'] = epochs
+    required_options = [
+        'resource',
+        'searcher',
+        'search_options',
+        'checkpoint',
+        'resume',
+        'num_trials',
+        'time_out',
+        'reward_attr',
+        'time_attr',
+        'visualizer',
+        'dist_ip_addrs',
+    ]
+    missing_options = []
+    for option in required_options:
+        if option not in _scheduler_options:
+            missing_options.append(option)
+    if missing_options:
+        raise AssertionError(f'Missing required keys in scheduler_options: {missing_options}')
+    return _scheduler_options
