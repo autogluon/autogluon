@@ -182,6 +182,7 @@ predictor_model3 = TabularPrediction.fit(train_df,
                                       eval_metric='accuracy',
                                       stopping_metric='accuracy',
                                       hyperparameters=tabular_multimodel_hparam_v1,
+                                      ngpus_per_trial=1,
                                       output_directory='model3')
 ```
 
@@ -204,6 +205,7 @@ predictor_model4 = TabularPrediction.fit(train_df,
                                          hyperparameters=tabular_multimodel_hparam_v1,
                                          num_bagging_folds=5,
                                          stack_ensemble_levels=1,
+                                         ngpus_per_trial=1,
                                          output_directory='model4')
 ```
 
@@ -235,6 +237,7 @@ predictor_model5 = TabularPrediction.fit(train_df.join(pd.DataFrame(train_senten
                                          eval_metric='accuracy',
                                          stopping_metric='accuracy',
                                          hyperparameters='default',
+                                         ngpus_per_trial=1,
                                          output_directory='model5')
 ```
 
@@ -267,6 +270,7 @@ predictor_model6 = TabularPrediction.fit(train_df,
                                       eval_metric='accuracy',
                                       stopping_metric='accuracy',
                                       hyperparameters=tabular_multimodel_hparam_v2,
+                                      ngpus_per_trial=1,
                                       output_directory='model6')
 ```
 
