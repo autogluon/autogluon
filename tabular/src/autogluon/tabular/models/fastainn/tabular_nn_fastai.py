@@ -15,6 +15,7 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
+from autogluon.tabular.features import R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
 
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
@@ -106,15 +107,8 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular import FillMissing, Categorify, Normalize
         from fastai.core import defaults
 
-        self.cat_columns = X_train.select_dtypes([
-            'category', 'object', 'bool', 'bool_'
-        ]).columns.values.tolist()
-
-        self.cont_columns = X_train.select_dtypes([
-            'float', 'float_', 'float16', 'float32', 'float64',
-            'int', 'int_', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64',
-            'datetime'
-        ]).columns.values.tolist()
+        self.cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+        self.cont_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
 
         if self.problem_type == REGRESSION and self.y_scaler is not None:
             y_train_norm = pd.Series(self.y_scaler.fit_transform(y_train.values.reshape(-1, 1)).reshape(-1))

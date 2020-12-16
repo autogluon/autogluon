@@ -14,7 +14,7 @@ R_FLOAT = 'float'
 R_OBJECT = 'object'
 R_CATEGORY = 'category'
 R_DATETIME = 'datetime'
-# TODO: R_BOOL/R_BOOLEAN?
+R_BOOL = 'bool'  # TODO: R_BOOL/R_BOOLEAN?
 # TODO: R_FLOAT_SPARSE/R_INT_SPARSE/R_CATEGORY_SPARSE?
 
 # Special types: Meta information about the special meaning of a feature that is not present in the raw data.
