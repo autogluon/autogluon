@@ -103,11 +103,11 @@ class ObjectDetector(object):
                 'search_strategy': search_strategy,
                 }
         if nthreads_per_trial is not None:
-            config.update({'nthreads_per_trial': nthreads_per_trial})
+            config['nthreads_per_trial'] = nthreads_per_trial
         if ngpus_per_trial is not None:
-            config.update({'ngpus_per_trial': ngpus_per_trial})
+            config['ngpus_per_trial'] = ngpus_per_trial
         if dist_ip_addrs is not None:
-            config.update({'dist_ip_addrs': dist_ip_addrs})
+            config['dist_ip_addrs'] = dist_ip_addrs
         if isinstance(hyperparameters, dict):
             # check if hyperparameters overwriting existing config
             for k, v in hyperparameters.items():
