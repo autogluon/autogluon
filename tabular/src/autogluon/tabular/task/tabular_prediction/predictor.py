@@ -129,47 +129,6 @@ class TabularPredictor:
     def output_directory(self):
         return self._learner.path
 
-    # TODO: Documentation
-    # Enables extra fit calls after the original fit
-    def fit_extra(
-            self, hyperparameters, base_model_names=None, time_limits=None, stack_ensemble_levels=None, fit_new_weighted_ensemble=True, relative_stack=True,
-            # TODO: Add all arguments in
-            # hyperparameter_tune=False, verbosity=None, AG_args_fit=None, excluded_model_types=None, refit_full=None, feature_prune=None,
-            # num_trials=None, search_strategy='random', scheduler_options=None, searcher_options=None, nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None,
-            core_kwargs=None, aux_kwargs=None
-    ) -> list:
-        # TODO: unlabeled data?
-        # TODO: Allow disable aux (default to disabled)
-        # TODO: time_limits -> time_limit
-        time_start = time.time()
-
-        if stack_ensemble_levels is None:
-            hyperparameter_keys = list(hyperparameters.keys())
-            highest_level = 0
-            for key in hyperparameter_keys:
-                if isinstance(key, int):
-                    highest_level = max(key, highest_level)
-            stack_ensemble_levels = highest_level
-
-        # TODO: Add special error message if called and training/val data was not cached.
-        X_train, y_train, X_val, y_val = self._trainer.load_data()
-        fit_models = self._trainer.train_multi_levels(
-            X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, hyperparameters=hyperparameters, base_model_names=base_model_names, time_limit=time_limits, relative_stack=relative_stack, level_end=stack_ensemble_levels,
-            core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
-        )
-
-        if time_limits is not None:
-            time_limits = time_limits - (time.time() - time_start)
-
-        if fit_new_weighted_ensemble:
-            if time_limits is not None:
-                time_limit_weighted = max(time_limits, 60)
-            else:
-                time_limit_weighted = None
-            fit_models += self.fit_weighted_ensemble(time_limits=time_limit_weighted)
-
-        return fit_models
-
     # TODO: v0.1 as_pandas=True by default to avoid user confusion and errors with mismatching indices?
     def predict(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).

@@ -1,6 +1,7 @@
 import copy
 import logging
 import math
+import time
 
 import numpy as np
 import pandas as pd
@@ -77,6 +78,7 @@ class TabularPredictorV2(TabularPredictor):
 
         # TODO: Move documentation from TabularPrediction.fit to here
         # TODO: Move all scheduler/searcher specific arguments into hyperparameter_tune_kwargs
+        # TODO: Move num_cpu/num_gpu to AG_args_fit
 
         """
         self._validate_fit_kwargs(kwargs)
@@ -114,7 +116,7 @@ class TabularPredictorV2(TabularPredictor):
         ag_args = kwargs.get('AG_args', None)
         ag_args_fit = kwargs.get('AG_args_fit', None)
         ag_args_ensemble = kwargs.get('AG_args_ensemble', None)
-        excluded_model_types = kwargs.get('excluded_model_types', [])
+        excluded_model_types = kwargs.get('excluded_model_types', None)
 
         self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
         train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, unlabeled_data=unlabeled_data)
@@ -194,6 +196,48 @@ class TabularPredictorV2(TabularPredictor):
         if save_space:
             self.save_space()
         self.save()
+
+    # TODO: Documentation
+    # Enables extra fit calls after the original fit
+    def fit_extra(
+            self, hyperparameters, time_limits=None,
+            base_model_names=None, stack_ensemble_levels=None, fit_new_weighted_ensemble=True, relative_stack=True,  # kwargs
+            # TODO: Add all arguments in
+            # verbosity=None, AG_args_fit=None, excluded_model_types=None, refit_full=None, feature_prune=None,
+            # hyperparameter_tune_kwargs, num_cpus, num_gpus
+            core_kwargs=None, aux_kwargs=None
+    ) -> list:
+        # TODO: unlabeled data?
+        # TODO: Allow disable aux (default to disabled)
+        # TODO: time_limits -> time_limit
+        time_start = time.time()
+
+        if stack_ensemble_levels is None:
+            hyperparameter_keys = list(hyperparameters.keys())
+            highest_level = 0
+            for key in hyperparameter_keys:
+                if isinstance(key, int):
+                    highest_level = max(key, highest_level)
+            stack_ensemble_levels = highest_level
+
+        # TODO: Add special error message if called and training/val data was not cached.
+        X_train, y_train, X_val, y_val = self._trainer.load_data()
+        fit_models = self._trainer.train_multi_levels(
+            X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, hyperparameters=hyperparameters, base_model_names=base_model_names, time_limit=time_limits, relative_stack=relative_stack, level_end=stack_ensemble_levels,
+            core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
+        )
+
+        if time_limits is not None:
+            time_limits = time_limits - (time.time() - time_start)
+
+        if fit_new_weighted_ensemble:
+            if time_limits is not None:
+                time_limit_weighted = max(time_limits, 60)
+            else:
+                time_limit_weighted = None
+            fit_models += self.fit_weighted_ensemble(time_limits=time_limit_weighted)
+
+        return fit_models
 
     def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bagging_folds, stack_ensemble_levels):
         num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)
