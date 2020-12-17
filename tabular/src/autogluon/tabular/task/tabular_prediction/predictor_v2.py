@@ -47,7 +47,7 @@ class TabularPredictorV2(TabularPredictor):
         self.verbosity = verbosity
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
-        learner_kwargs = kwargs.pop('learner_kwargs', dict())
+        learner_kwargs = kwargs.pop('learner_kwargs', dict())  # TODO: id_columns -> ignored_columns
 
         self._learner: AbstractLearner = learner_type(path_context=output_directory, label=label, feature_generator=None,
                                                       eval_metric=eval_metric, problem_type=problem_type, **learner_kwargs)
@@ -91,14 +91,10 @@ class TabularPredictorV2(TabularPredictor):
 
         logger.setLevel(verbosity2loglevel(verbosity))
 
-        # TODO: Stopping metric -> Default to None for models, let model choose if None as if hyperparameter
         # AG_args_fit = {'num_gpus': -1} -> 'auto' by default
         # TODO: v0.1 - time_limits -> time_limit? -> +1
         # TODO: v0.1 - stack_ensemble_levels -> num_stack_levels / num_stack_layers? -> num_stack_levels
-        # TODO: v0.1 - id_columns -> ignored_columns? -> +1
         # TODO: v0.1 - num_cpus/num_gpus -> rename/rework -> num_threads, num_gpus in AG_args_fit -> HPO overrides
-        # TODO: v0.1 - visualizer -> consider reworking/removing -> AG_args_fit argument
-        # TODO: v0.1 - HPO arguments to a generic hyperparameter_tune_kwargs parameter?
         # TODO: v0.1 - stack_ensemble_levels is silently ignored if num_bagging_folds < 2, ensure there is a warning printed
 
         holdout_frac = kwargs.get('holdout_frac', None)
@@ -114,7 +110,7 @@ class TabularPredictorV2(TabularPredictor):
         set_best_to_refit_full = kwargs.get('set_best_to_refit_full', False)
 
         ag_args = kwargs.get('AG_args', None)
-        ag_args_fit = kwargs.get('AG_args_fit', None)
+        ag_args_fit = kwargs.get('AG_args_fit', dict())
         ag_args_ensemble = kwargs.get('AG_args_ensemble', None)
         excluded_model_types = kwargs.get('excluded_model_types', None)
 
@@ -151,13 +147,11 @@ class TabularPredictorV2(TabularPredictor):
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(len(train_data), hyperparameter_tune)
 
-        # TODO: visualizer to args_fit?
-        # TODO: Does not work with advanced model hyperparameters option
         if scheduler_options is not None:
             visualizer = scheduler_options[1]['visualizer']
-            # Add visualizer to NN hyperparameters:
-            if (visualizer is not None) and (visualizer != 'none') and ('NN' in hyperparameters):
-                hyperparameters['NN']['visualizer'] = visualizer
+            if (visualizer is not None) and (visualizer != 'none'):
+                if 'visualizer' not in ag_args_fit:
+                    ag_args_fit['visualizer'] = visualizer
 
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
                           hyperparameter_tune=hyperparameter_tune,

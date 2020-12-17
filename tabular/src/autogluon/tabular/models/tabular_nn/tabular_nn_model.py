@@ -251,7 +251,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             logging.debug("initialized")
         if setup_trainer:
             # Also setup mxboard to monitor training if visualizer has been specified:
-            visualizer = params.get('visualizer', 'none')
+            visualizer = self.params_aux.get('visualizer', 'none')
             if visualizer == 'tensorboard' or visualizer == 'mxboard':
                 try_import_mxboard()
                 from mxboard import SummaryWriter
