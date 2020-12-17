@@ -26,7 +26,6 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.metrics import log_loss, roc_auc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
-
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .embednet import EmbedNet
 from .hyperparameters.parameters import get_default_param
@@ -94,9 +93,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self._architecture_desc = None
         self.optimizer = None
         self.verbosity = None
-        if self.stopping_metric is not None and self.eval_metric == roc_auc and self.stopping_metric == log_loss:
-            self.stopping_metric = roc_auc  # NN is overconfident so early stopping with logloss can halt training too quick
-
         self.eval_metric_name = self.stopping_metric.name
 
     def _set_default_params(self):
@@ -745,6 +741,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
         if remove_fit and requires_save:
             self.optimizer = None
+
+    def _get_default_stopping_metric(self):
+        return self.eval_metric
 
 
 def convert_df_dtype_to_str(df):
