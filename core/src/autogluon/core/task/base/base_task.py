@@ -98,9 +98,9 @@ searcher_for_hyperband_strategy = {
 
 
 def compile_scheduler_options(
-        scheduler_options, search_strategy, nthreads_per_trial,
-        ngpus_per_trial, num_trials, time_out, search_options=None, checkpoint=None, resume=False, visualizer=None,
-        time_attr=None, reward_attr=None, dist_ip_addrs=None, epochs=None):
+        scheduler_options, search_strategy, search_options, nthreads_per_trial,
+        ngpus_per_trial, checkpoint, num_trials, time_out, resume, visualizer,
+        time_attr, reward_attr, dist_ip_addrs, epochs=None):
     """
     Updates a copy of scheduler_options (scheduler-specific options, can be
     empty) with general options. The result can be passed to __init__ of the
@@ -134,8 +134,6 @@ def compile_scheduler_options(
         scheduler_options = dict()
     else:
         assert isinstance(scheduler_options, dict)
-    if dist_ip_addrs is None:
-        dist_ip_addrs = []
     assert isinstance(search_strategy, str)
     if search_options is None:
         search_options = dict()
@@ -144,7 +142,7 @@ def compile_scheduler_options(
     if time_attr is None:
         time_attr = 'epoch'
     if reward_attr is None:
-        reward_attr = 'validation_performance'
+        reward_attr = 'accuracy'
     scheduler_options = copy.copy(scheduler_options)
     scheduler_options.update({
         'resource': {
