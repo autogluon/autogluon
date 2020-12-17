@@ -5,7 +5,6 @@ import random
 import sys
 import time
 from functools import partial
-from time import sleep
 
 import dill
 
@@ -14,7 +13,6 @@ from autogluon.core.scheduler.managers import TaskManagers
 from autogluon.core.scheduler.reporter import Communicator, LocalStatusReporter
 from autogluon.core.utils import CustomProcess, AutoGluonEarlyStop
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
-import threading
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +34,11 @@ class DistributedJobRunner(object):
 
         def _release_resource_callback(fut):
             logger.debug(f'Releasing Resources {self.task.task_id}')
-            with DistributedJobRunner.JOB_REGISTRATION_LOCK:
+            with self.JOB_REGISTRATION_LOCK:
                 self.managers.release_resources(self.task.resources)
 
-        with DistributedJobRunner.JOB_REGISTRATION_LOCK:
-            remote: Remote = self.task.resources.node
+        with self.JOB_REGISTRATION_LOCK:
+            remote = self.task.resources.node
             job = remote.submit(
                 partial(self._run_dist_job, self.task.task_id),
                 self.task.fn,
@@ -55,8 +53,8 @@ class DistributedJobRunner(object):
 
         return job
 
-    @staticmethod
-    def _run_dist_job(task_id, fn, args, gpu_ids):
+    @classmethod
+    def _run_dist_job(cls, task_id, fn, args, gpu_ids):
         """Remote function Executing the task
         """
         try:
@@ -89,7 +87,7 @@ class DistributedJobRunner(object):
 
             with make_temp_directory() as tempdir:
                 p = CustomProcess(
-                    target=partial(DistributedJobRunner._worker, tempdir, task_id, pickled_fn, pickled_args),
+                    target=partial(cls._worker, tempdir, task_id, pickled_fn, pickled_args),
                     args=(return_list, gpu_ids, cross_process_args)
                 )
                 p.start()
@@ -106,23 +104,23 @@ class DistributedJobRunner(object):
 
                 # Get processes outputs
                 if not is_fork_enabled():
-                    DistributedJobRunner.__print(tempdir, task_id, 'out')
-                    DistributedJobRunner.__print(tempdir, task_id, 'err')
+                    cls.__print(tempdir, task_id, 'out')
+                    cls.__print(tempdir, task_id, 'err')
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
         ret = return_list[0] if len(return_list) > 0 else None
         return ret
 
-    @staticmethod
-    def __print(tempdir, task_id, out):
+    @classmethod
+    def __print(cls, tempdir, task_id, out):
         with open(os.path.join(tempdir, f'{task_id}.{out}')) as f:
             out = f.read()
             file = sys.stderr if out is 'err' else sys.stdout
             if out:
                 print(f'(task:{task_id})\t{out}', file=file, end='')
 
-    @staticmethod
-    def _worker(tempdir, task_id, pickled_fn, pickled_args, return_list, gpu_ids, args):
+    @classmethod
+    def _worker(cls, tempdir, task_id, pickled_fn, pickled_args, return_list, gpu_ids, args):
         """Worker function in the client
         """
         with open(os.path.join(tempdir, f'{task_id}.out'), 'w') as std_out:
@@ -135,7 +133,7 @@ class DistributedJobRunner(object):
                 fn = pickled_fn if is_fork_enabled() else dill.loads(pickled_fn)
                 args = {**pickled_args, **args} if is_fork_enabled() else {**dill.loads(pickled_args), **args}
 
-                DistributedJobRunner.set_cuda_environment(gpu_ids)
+                cls.set_cuda_environment(gpu_ids)
 
                 # running
                 try:
@@ -147,8 +145,8 @@ class DistributedJobRunner(object):
                 sys.stdout.flush()
                 sys.stderr.flush()
 
-    @staticmethod
-    def set_cuda_environment(gpu_ids):
+    @classmethod
+    def set_cuda_environment(cls, gpu_ids):
         if len(gpu_ids) > 0:
             # handle GPU devices
             os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))

@@ -367,8 +367,8 @@ class FIFOScheduler(TaskScheduler):
             self.scheduled_tasks.append(task_dict)
 
     def _clean_task_internal(self, task_dict):
-        while task_dict['ReporterThread'].is_alive():
-            task_dict['ReporterThread'].join(timeout=60)
+        if task_dict['ReporterThread'].is_alive():
+            task_dict['ReporterThread'].join()
 
     def _add_checkpointing_to_job(self, job):
         def _save_checkpoint_callback(fut):
