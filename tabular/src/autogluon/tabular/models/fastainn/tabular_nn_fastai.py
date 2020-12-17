@@ -10,17 +10,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
 from autogluon.core.utils import try_import_fastai_v1
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
-from autogluon.tabular.features import R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
-
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
+from .metrics import get_objective_func_name, get_objective_func_to_monitor
+from .. import AbstractNeuralNetworkModel
 from ..abstract.model_trial import skip_hpo
-from ..abstract.abstract_model import AbstractModel
+from ..tabular_nn.tabular_nn_preprocessor import TabularNeuralNetPreprocessor
 from ...features.feature_metadata import R_OBJECT
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
@@ -51,7 +51,7 @@ def make_temp_directory():
 
 # TODO: Takes extremely long time prior to training start if many (10000) continuous features from ngrams, debug - explore TruncateSVD option to reduce input dimensionality
 # TODO: currently fastai automatically detect and use CUDA if available - add code to honor autogluon settings
-class NNFastAiTabularModel(AbstractModel):
+class NNFastAiTabularModel(AbstractNeuralNetworkModel):
     """ Class for fastai v1 neural network models that operate on tabular data.
 
         Hyperparameters:
@@ -92,25 +92,78 @@ class NNFastAiTabularModel(AbstractModel):
         self.cont_columns = []
         self.col_after_transformer = None
         self.y_scaler = None
+        self.processor = None
+        self.feature_columns = None
+        self.feature_arraycol_map = None
 
-    def fold_preprocess(self, X, fit=False):
-        if fit:
-            cols_to_use = self.cont_columns + self.cat_columns
-            self.col_after_transformer = [col for col in X.columns if col in cols_to_use]
-        X = pd.DataFrame(data=X, columns=self.col_after_transformer)
+    def process_train_data(self, X, params):
+        if self.processor is not None:
+            Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
         X = super().preprocess(X)
+        max_category_levels = params['proc.max_category_levels']
+        skew_threshold = params['proc.skew_threshold']
+        use_ngram_features = params['use_ngram_features']
+        impute_strategy = params['proc.impute_strategy']
+        embed_min_categories = params['proc.embed_min_categories']
+
+        self._types_of_features, X = self._get_types_of_features(
+            X, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features)
+
+        self.processor = TabularNeuralNetPreprocessor(self._types_of_features, self.unique_category_str,
+            impute_strategy, max_category_levels)
+
+        X = self.processor.fit_transform(X)
+
+        self.__register_feature_types(max_category_levels)
+
+        logger.log(15, f'Using {len(self.cat_columns)} categorical columns, {len(self.cont_columns)} continuous columns')
+
+        X = pd.DataFrame(X, columns=self.feature_columns)
         return X
 
-    def preprocess_train(self, X_train, y_train, X_val, y_val, **kwargs):
+    def __register_feature_types(self, max_category_levels):
+        # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
+        self.feature_arraycol_map = self.processor.get_feature_arraycol_map(max_category_levels)
+        self.feature_columns = []
+        self.cat_columns = []
+        self.cont_columns = []
+        for col, col_idxs in self.feature_arraycol_map.items():
+            if len(col_idxs) == 1:
+                self.feature_columns.append([col_idxs[0], col])
+                self.__append_feature_type(col, col)
+            else:
+                for i, col_id in enumerate(col_idxs):
+                    _col = f'{col}.{i}'
+                    self.feature_columns.append([col_id, _col])
+                    self.__append_feature_type(col, _col)
+        sorted(self.feature_columns, key=lambda x: x[0])
+        self.feature_columns = [x[1] for x in self.feature_columns]
+
+    def process_test_data(self, X, params):
+        X = pd.DataFrame(data=X, columns=self.col_after_transformer)
+        X = super().preprocess(X)
+        X = pd.DataFrame(self.processor.transform(X), columns=self.feature_columns)
+        return X
+
+    def __append_feature_type(self, col, col_to_add):
+        if self.__is_feature_is_in_any_of_types(col, ['embed']):
+            self.cat_columns.append(col_to_add)
+        elif self.__is_feature_is_in_any_of_types(col, ['continuous', 'skewed', 'onehot']):
+            self.cont_columns.append(col_to_add)
+
+    def __is_feature_is_in_any_of_types(self, feature, types):
+        for t in types:
+            if feature in self._types_of_features[t]:
+                return True
+        return False
+
+    def process_train(self, X_train, y_train, X_val, y_val, params, **kwargs):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
         from fastai.tabular import FillMissing, Categorify, Normalize
         from fastai.core import defaults
 
         # TODO add NaN imputation logic
-
-        self.cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
-        self.cont_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
 
         if self.problem_type == REGRESSION and self.y_scaler is not None:
             y_train_norm = pd.Series(self.y_scaler.fit_transform(y_train.values.reshape(-1, 1)).reshape(-1))
@@ -119,21 +172,11 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             y_train_norm = y_train
             y_val_norm = y_val
-        try:
-            X_train_stats = X_train.describe(include='all').T.reset_index()
-            cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_train_stats['unique'].isna())]['index'].values
-        except:
-            cat_cols_to_drop = []
-        cat_cols_to_keep = [col for col in X_train.columns.values if (col not in cat_cols_to_drop)]
-        cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
-        logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
-        self.cat_columns = cat_cols_to_use
-        self.cat_columns = [feature for feature in self.cat_columns if feature in list(X_train.columns)]
-        self.cont_columns = [feature for feature in self.cont_columns if feature in list(X_train.columns)]
-        logger.log(15, f'Using {len(self.cont_columns)} cont features')
-        X_train = self.fold_preprocess(X_train, fit=True)
+
+        X_train = self.process_train_data(X_train, params=params)
         if X_val is not None:
-            X_val = self.fold_preprocess(X_val)
+            X_val = self.process_test_data(X_val, params=params)
+
         df_train, train_idx, val_idx = self._generate_datasets(X_train, y_train_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
         procs = [FillMissing, Categorify, Normalize]
@@ -162,10 +205,10 @@ class NNFastAiTabularModel(AbstractModel):
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
-        data = self.preprocess_train(X_train, y_train, X_val, y_val)
+        data = self.process_train(X_train, y_train, X_val, y_val, params)
 
-        nn_metric, objective_func_name = self.__get_objective_func_name()
-        objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
+        nn_metric, objective_func_name = get_objective_func_name(self.problem_type, self.stopping_metric)
+        objective_func_name_to_monitor = get_objective_func_to_monitor(objective_func_name)
         objective_optim_mode = 'min' if objective_func_name in [
             'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'r2'  # Regression objectives
         ] else 'auto'
@@ -234,78 +277,6 @@ class NNFastAiTabularModel(AbstractModel):
             val_idx = np.arange(len(X_val)) + len(X_train)
         return df_train, train_idx, val_idx
 
-    def __get_objective_func_name(self):
-        from fastai.metrics import root_mean_squared_error, mean_squared_error, mean_absolute_error, accuracy, FBeta, AUROC, Precision, Recall, r2_score
-
-        metrics_map = {
-            # Regression
-            'root_mean_squared_error': root_mean_squared_error,
-            'mean_squared_error': mean_squared_error,
-            'mean_absolute_error': mean_absolute_error,
-            'r2': r2_score,
-            # Not supported: median_absolute_error
-
-            # Classification
-            'accuracy': accuracy,
-
-            'f1': FBeta(beta=1),
-            'f1_macro': FBeta(beta=1, average='macro'),
-            'f1_micro': FBeta(beta=1, average='micro'),
-            'f1_weighted': FBeta(beta=1, average='weighted'),  # this one has some issues
-
-            'roc_auc': AUROC(),
-
-            'precision': Precision(),
-            'precision_macro': Precision(average='macro'),
-            'precision_micro': Precision(average='micro'),
-            'precision_weighted': Precision(average='weighted'),
-
-            'recall': Recall(),
-            'recall_macro': Recall(average='macro'),
-            'recall_micro': Recall(average='micro'),
-            'recall_weighted': Recall(average='weighted'),
-            'log_loss': None,
-            # Not supported: pac_score
-        }
-
-        # Unsupported metrics will be replaced by defaults for a given problem type
-        objective_func_name = self.stopping_metric.name
-        if objective_func_name not in metrics_map.keys():
-            if self.problem_type == REGRESSION:
-                objective_func_name = 'mean_squared_error'
-            else:
-                objective_func_name = 'log_loss'
-            logger.warning(f'Metric {self.stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
-
-        if objective_func_name in metrics_map.keys():
-            nn_metric = metrics_map[objective_func_name]
-        else:
-            nn_metric = None
-        return nn_metric, objective_func_name
-
-    def __get_objective_func_to_monitor(self, objective_func_name):
-        monitor_obj_func = {
-            'roc_auc': 'auroc',
-
-            'f1': 'f_beta',
-            'f1_macro': 'f_beta',
-            'f1_micro': 'f_beta',
-            'f1_weighted': 'f_beta',
-
-            'precision_macro': 'precision',
-            'precision_micro': 'precision',
-            'precision_weighted': 'precision',
-
-            'recall_macro': 'recall',
-            'recall_micro': 'recall',
-            'recall_weighted': 'recall',
-            'log_loss': 'valid_loss',
-        }
-        objective_func_name_to_monitor = objective_func_name
-        if objective_func_name in monitor_obj_func:
-            objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
-        return objective_func_name_to_monitor
-
     def _predict_proba(self, X, **kwargs):
         from fastai.basic_data import DatasetType
         from fastai.tabular import TabularList
@@ -313,6 +284,8 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular import FillMissing, Categorify, Normalize
 
         X = self.preprocess(X, **kwargs)
+        X = self.process_test_data(X, params=self.params)
+
         procs = [FillMissing, Categorify, Normalize]
 
         single_row = len(X) == 1

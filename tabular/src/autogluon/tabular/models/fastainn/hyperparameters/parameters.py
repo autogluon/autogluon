@@ -33,6 +33,21 @@ def get_param_multiclass_baseline():
         # If > 0, then use LabelSmoothingCrossEntropy loss function for binary/multi-class classification;
         # otherwise use default loss function for this type of problem
         'smoothing': 0.0,
+
+        'proc.max_category_levels': 100,  # maximum number of allowed levels per categorical feature
+
+        # numerical features whose absolute skewness is greater than this receive special
+        # power-transform preprocessing. Choose big value to avoid using power-transforms
+        'proc.skew_threshold': 0.99,
+
+        'use_ngram_features': False,
+
+        # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
+        'proc.impute_strategy': 'median',
+
+        # apply embedding layer to categorical features with at least this many levels.
+        # Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
+        'proc.embed_min_categories': 4,
     }
     return params
 

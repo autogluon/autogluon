@@ -80,7 +80,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self.features if it works with bagging
-        self.processor: TabularNeuralNetPreprocessor = None  # data processor
+        self.processor = None  # data processor
         self.summary_writer = None
         self.ctx = mx.cpu()
         self.batch_size = None
@@ -515,7 +515,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
         self.processor = TabularNeuralNetPreprocessor(self._types_of_features, self.unique_category_str, impute_strategy, max_category_levels)
         df = self.processor.fit_transform(df) # 2D numpy array
-        self.feature_arraycol_map = self._get_feature_arraycol_map(max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
+        self.feature_arraycol_map = self.processor.get_feature_arraycol_map(max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
         num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])  # should match number of columns in processed array
         if num_array_cols != df.shape[1]:
             raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in df array does not match feature_arraycol_map.")
@@ -557,37 +557,10 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             raise ValueError("Unknown optimizer specified: %s" % params['optimizer'])
         return optimizer
 
-    def _get_feature_arraycol_map(self, max_category_levels):
-        """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
-        feature_preserving_transforms = set(['continuous','skewed', 'ordinal', 'language'])  # these transforms do not alter dimensionality of feature
-        feature_arraycol_map = {}  # unordered version
-        current_colindex = 0
-        for transformer in self.processor.transformers:
-            transformer_name = transformer[0]
-            transformed_features = transformer[2]
-            if transformer_name in feature_preserving_transforms:
-                for feature in transformed_features:
-                    if feature in feature_arraycol_map:
-                        raise ValueError("same feature is processed by two different column transformers: %s" % feature)
-                    feature_arraycol_map[feature] = [current_colindex]
-                    current_colindex += 1
-            elif transformer_name == 'onehot':
-                oh_encoder = [step for (name, step) in transformer[1].steps if name == 'onehot'][0]
-                for i in range(len(transformed_features)):
-                    feature = transformed_features[i]
-                    if feature in feature_arraycol_map:
-                        raise ValueError("same feature is processed by two different column transformers: %s" % feature)
-                    oh_dimensionality = min(len(oh_encoder.categories_[i]), max_category_levels+1)
-                    feature_arraycol_map[feature] = list(range(current_colindex, current_colindex+oh_dimensionality))
-                    current_colindex += oh_dimensionality
-            else:
-                raise ValueError("unknown transformer encountered: %s" % transformer_name)
-        return OrderedDict([(key, feature_arraycol_map[key]) for key in feature_arraycol_map])
-
     def _get_feature_type_map(self):
         """ Returns OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language') """
         if self.feature_arraycol_map is None:
-            raise ValueError("must first call _get_feature_arraycol_map() before _get_feature_type_map()")
+            raise ValueError("must first call processor.get_feature_arraycol_map() before _get_feature_type_map()")
         vector_features = self._types_of_features['continuous'] + self._types_of_features['skewed'] + self._types_of_features['onehot']
         feature_type_map = OrderedDict()
         for feature_name in self.feature_arraycol_map:

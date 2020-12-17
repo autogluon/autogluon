@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
@@ -53,6 +55,33 @@ class TabularNeuralNetPreprocessor(object):
         return ColumnTransformer(
             transformers=transformers)  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
+    def get_feature_arraycol_map(self, max_category_levels):
+        """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
+        feature_preserving_transforms = set(['continuous', 'skewed', 'ordinal', 'language'])  # these transforms do not alter dimensionality of feature
+        feature_arraycol_map = {}  # unordered version
+        current_colindex = 0
+        for transformer in self.processor.transformers_:
+            transformer_name = transformer[0]
+            transformed_features = transformer[2]
+            if transformer_name in feature_preserving_transforms:
+                for feature in transformed_features:
+                    if feature in feature_arraycol_map:
+                        raise ValueError("same feature is processed by two different column transformers: %s" % feature)
+                    feature_arraycol_map[feature] = [current_colindex]
+                    current_colindex += 1
+            elif transformer_name == 'onehot':
+                oh_encoder = [step for (name, step) in transformer[1].steps if name == 'onehot'][0]
+                for i in range(len(transformed_features)):
+                    feature = transformed_features[i]
+                    if feature in feature_arraycol_map:
+                        raise ValueError("same feature is processed by two different column transformers: %s" % feature)
+                    oh_dimensionality = min(len(oh_encoder.categories_[i]), max_category_levels+1)
+                    feature_arraycol_map[feature] = list(range(current_colindex, current_colindex+oh_dimensionality))
+                    current_colindex += oh_dimensionality
+            else:
+                raise ValueError("unknown transformer encountered: %s" % transformer_name)
+        return OrderedDict([(key, feature_arraycol_map[key]) for key in feature_arraycol_map])
+
     # ------- Delegation methods --------
 
     def fit_transform(self, df):
@@ -60,10 +89,6 @@ class TabularNeuralNetPreprocessor(object):
 
     def transform(self, df):
         return self.processor.transform(df)
-
-    @property
-    def transformers(self):
-        return self.processor.transformers_
 
 
 def convert_df_dtype_to_str(df):
