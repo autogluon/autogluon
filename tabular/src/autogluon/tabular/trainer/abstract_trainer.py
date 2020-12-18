@@ -862,7 +862,7 @@ class AbstractTrainer:
             model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: move this into model creation process?
 
         if isinstance(model, BaggedEnsembleModel):
-            model.fit(X=X_train, y=y_train, **model_fit_kwargs)
+            model.fit(X_train=X_train, y_train=y_train, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
@@ -1019,7 +1019,7 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             try:
                 if isinstance(model, BaggedEnsembleModel):
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X_train, y=y_train, k_fold=k_fold, scheduler_options=(self._scheduler_func, self._scheduler_options), verbosity=self.verbosity)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, k_fold=k_fold, scheduler_options=(self._scheduler_func, self._scheduler_options), verbosity=self.verbosity)
                 else:
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, scheduler_options=(self._scheduler_func, self._scheduler_options), verbosity=self.verbosity)
             except Exception as err:
