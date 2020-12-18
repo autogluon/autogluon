@@ -47,9 +47,9 @@ class DistributedJobRunner(object):
             )
             # Fast job submission from multiple threads causes lost jobs and hangs reporter thread.
             # Keep the values above 200ms combined
-            time.sleep(0.15)
+            time.sleep(0.3)
             job.add_done_callback(_release_resource_callback)
-            time.sleep(0.15 + random.random())
+            time.sleep(0.3 + random.random())
 
         return job
 
