@@ -78,6 +78,10 @@ class AbstractLearner:
     def class_labels(self):
         return self.label_cleaner.ordered_class_labels
 
+    @property
+    def is_fit(self):
+        return self.trainer_path is not None or self.trainer is not None
+
     def set_contexts(self, path_context):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
 
@@ -87,6 +91,8 @@ class AbstractLearner:
         return path_context, model_context, save_path
 
     def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):
+        if self.is_fit:
+            raise AssertionError('Learner is already fit.')
         self._validate_fit_input(X=X, X_val=X_val, **kwargs)
         return self._fit(X=X, X_val=X_val, **kwargs)
 

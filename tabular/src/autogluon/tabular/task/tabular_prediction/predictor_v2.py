@@ -24,7 +24,7 @@ from ...trainer import AbstractTrainer
 logger = logging.getLogger()  # return root logger
 
 
-# TODO: v0.1 Add comments that models are serialized on disk after fit
+# TODO: v0.1 Add logging comments that models are serialized on disk after fit
 class TabularPredictorV2(TabularPredictor):
     """
     AutoGluon Task for predicting values in column of tabular dataset (classification or regression)
@@ -45,6 +45,7 @@ class TabularPredictorV2(TabularPredictor):
         self._validate_init_kwargs(kwargs)
         output_directory = setup_outputdir(output_directory)  # TODO: Rename to directory/path?
         self.verbosity = verbosity
+        logger.setLevel(verbosity2loglevel(self.verbosity))
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())  # TODO: id_columns -> ignored_columns
@@ -66,7 +67,7 @@ class TabularPredictorV2(TabularPredictor):
     def fit(self,
             train_data,
             tuning_data=None,
-            time_limits=None,
+            time_limit=None,
             presets=None,
             hyperparameters=None,
             feature_generator="auto",
@@ -77,10 +78,13 @@ class TabularPredictorV2(TabularPredictor):
         Fit models to predict a column of data table based on the other columns.
 
         # TODO: Move documentation from TabularPrediction.fit to here
-        # TODO: Move all scheduler/searcher specific arguments into hyperparameter_tune_kwargs
         # TODO: Move num_cpu/num_gpu to AG_args_fit
+        # TODO: num_bag_folds or num_bagging_folds?
+        # TODO: num_stack_levels or num_stacking_levels?
 
         """
+        if self._learner.is_fit:
+            raise AssertionError('Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`.')
         self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
@@ -88,19 +92,12 @@ class TabularPredictorV2(TabularPredictor):
             verbosity = 0
         elif verbosity > 4:
             verbosity = 4
-
         logger.setLevel(verbosity2loglevel(verbosity))
-
-        # AG_args_fit = {'num_gpus': -1} -> 'auto' by default
-        # TODO: v0.1 - time_limits -> time_limit? -> +1
-        # TODO: v0.1 - stack_ensemble_levels -> num_stack_levels / num_stack_layers? -> num_stack_levels
-        # TODO: v0.1 - num_cpus/num_gpus -> rename/rework -> num_threads, num_gpus in AG_args_fit -> HPO overrides
-        # TODO: v0.1 - stack_ensemble_levels is silently ignored if num_bagging_folds < 2, ensure there is a warning printed
 
         holdout_frac = kwargs.get('holdout_frac', None)
         num_bagging_folds = kwargs.get('num_bagging_folds', None)
         num_bagging_sets = kwargs.get('num_bagging_sets', None)
-        stack_ensemble_levels = kwargs.get('stack_ensemble_levels', None)
+        num_stack_levels = kwargs.get('num_stack_levels', None)
         auto_stack = kwargs.get('auto_stack', False)
         num_cpus = kwargs.get('num_cpus', None)
         num_gpus = kwargs.get('num_gpus', None)
@@ -128,13 +125,13 @@ class TabularPredictorV2(TabularPredictor):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
         # Process kwargs to create trainer, schedulers, searchers:
-        num_bagging_folds, num_bagging_sets, stack_ensemble_levels = self._sanitize_stack_args(
-            num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-            time_limits=time_limits, auto_stack=auto_stack, num_train_rows=len(train_data),
+        num_bagging_folds, num_bagging_sets, num_stack_levels = self._sanitize_stack_args(
+            num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, num_stack_levels=num_stack_levels,
+            time_limit=time_limit, auto_stack=auto_stack, num_train_rows=len(train_data),
         )
 
         if hyperparameter_tune_kwargs is not None:
-            scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs, time_limits, hyperparameters, num_cpus, num_gpus, num_bagging_folds, stack_ensemble_levels)
+            scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bagging_folds, num_stack_levels)
         else:
             scheduler_options = None
 
@@ -155,9 +152,9 @@ class TabularPredictorV2(TabularPredictor):
 
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
                           hyperparameter_tune=hyperparameter_tune,
-                          holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
+                          holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=num_stack_levels,
                           hyperparameters=hyperparameters, ag_args=ag_args, ag_args_fit=ag_args_fit, ag_args_ensemble=ag_args_ensemble, excluded_model_types=excluded_model_types,
-                          time_limit=time_limits, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                          time_limit=time_limit, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
         self._set_post_fit_vars()
 
         keep_only_best = kwargs.get('keep_only_best', False)
@@ -194,8 +191,8 @@ class TabularPredictorV2(TabularPredictor):
     # TODO: Documentation
     # Enables extra fit calls after the original fit
     def fit_extra(
-            self, hyperparameters, time_limits=None,
-            base_model_names=None, stack_ensemble_levels=None, fit_new_weighted_ensemble=True, relative_stack=True,  # kwargs
+            self, hyperparameters, time_limit=None,
+            base_model_names=None, num_stack_levels=None, fit_new_weighted_ensemble=True, relative_stack=True,  # kwargs
             # TODO: Add all arguments in
             # verbosity=None, AG_args_fit=None, excluded_model_types=None, refit_full=None, feature_prune=None,
             # hyperparameter_tune_kwargs, num_cpus, num_gpus
@@ -203,41 +200,40 @@ class TabularPredictorV2(TabularPredictor):
     ) -> list:
         # TODO: unlabeled data?
         # TODO: Allow disable aux (default to disabled)
-        # TODO: time_limits -> time_limit
         time_start = time.time()
 
-        if stack_ensemble_levels is None:
+        if num_stack_levels is None:
             hyperparameter_keys = list(hyperparameters.keys())
             highest_level = 0
             for key in hyperparameter_keys:
                 if isinstance(key, int):
                     highest_level = max(key, highest_level)
-            stack_ensemble_levels = highest_level
+            num_stack_levels = highest_level
 
         # TODO: Add special error message if called and training/val data was not cached.
         X_train, y_train, X_val, y_val = self._trainer.load_data()
         fit_models = self._trainer.train_multi_levels(
-            X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, hyperparameters=hyperparameters, base_model_names=base_model_names, time_limit=time_limits, relative_stack=relative_stack, level_end=stack_ensemble_levels,
+            X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, hyperparameters=hyperparameters, base_model_names=base_model_names, time_limit=time_limit, relative_stack=relative_stack, level_end=num_stack_levels,
             core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
         )
 
-        if time_limits is not None:
-            time_limits = time_limits - (time.time() - time_start)
+        if time_limit is not None:
+            time_limit = time_limit - (time.time() - time_start)
 
         if fit_new_weighted_ensemble:
-            if time_limits is not None:
-                time_limit_weighted = max(time_limits, 60)
+            if time_limit is not None:
+                time_limit_weighted = max(time_limit, 60)
             else:
                 time_limit_weighted = None
             fit_models += self.fit_weighted_ensemble(time_limits=time_limit_weighted)
 
         return fit_models
 
-    def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bagging_folds, stack_ensemble_levels):
+    def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bagging_folds, num_stack_levels):
         num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)
         time_limits_hpo = time_limit
         if num_bagging_folds >= 2 and (time_limits_hpo is not None):
-            time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
+            time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + num_stack_levels))
         # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
         time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
 
@@ -271,7 +267,7 @@ class TabularPredictorV2(TabularPredictor):
             logger.log(30, 'Warning: dist_ip_addrs does not currently work. Distributed instances will not be utilized.')
 
         if scheduler_options['num_trials'] == 1:
-            logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, disabling HPO.')
+            logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, disabling HPO.')
             return None  # FIXME
 
         scheduler_cls = schedulers[scheduler_options['searcher'].lower()]
@@ -355,7 +351,7 @@ class TabularPredictorV2(TabularPredictor):
             'holdout_frac',
             'num_bagging_folds',
             'num_bagging_sets',
-            'stack_ensemble_levels',
+            'num_stack_levels',
             'auto_stack',
             'AG_args',
             'AG_args_fit',
@@ -462,29 +458,29 @@ class TabularPredictorV2(TabularPredictor):
                 raise AssertionError('`feature_metadata_in` already exists in `feature_generator`.')
         return feature_generator
 
-    def _sanitize_stack_args(self, num_bagging_folds, num_bagging_sets, stack_ensemble_levels, time_limits, auto_stack, num_train_rows):
+    def _sanitize_stack_args(self, num_bagging_folds, num_bagging_sets, num_stack_levels, time_limit, auto_stack, num_train_rows):
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
-            # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
+            # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bagging_folds is None:
                 num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
-            if stack_ensemble_levels is None:
-                stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+            if num_stack_levels is None:
+                num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
         if num_bagging_folds is None:
             num_bagging_folds = 0
-        if stack_ensemble_levels is None:
-            stack_ensemble_levels = 0
+        if num_stack_levels is None:
+            num_stack_levels = 0
         if not isinstance(num_bagging_folds, int):
             raise ValueError(f'num_bagging_folds must be an integer. (num_bagging_folds={num_bagging_folds})')
-        if not isinstance(stack_ensemble_levels, int):
-            raise ValueError(f'stack_ensemble_levels must be an integer. (stack_ensemble_levels={stack_ensemble_levels})')
+        if not isinstance(num_stack_levels, int):
+            raise ValueError(f'num_stack_levels must be an integer. (num_stack_levels={num_stack_levels})')
         if num_bagging_folds < 2 and num_bagging_folds != 0:
             raise ValueError(f'num_bagging_folds must be equal to 0 or >=2. (num_bagging_folds={num_bagging_folds})')
-        if stack_ensemble_levels != 0 and num_bagging_folds == 0:
-            raise ValueError(f'stack_ensemble_levels must be 0 if num_bagging_folds is 0. (stack_ensemble_levels={stack_ensemble_levels}, num_bagging_folds={num_bagging_folds})')
+        if num_stack_levels != 0 and num_bagging_folds == 0:
+            raise ValueError(f'num_stack_levels must be 0 if num_bagging_folds is 0. (num_stack_levels={num_stack_levels}, num_bagging_folds={num_bagging_folds})')
         if num_bagging_sets is None:
             if num_bagging_folds >= 2:
-                if time_limits is not None:
+                if time_limit is not None:
                     num_bagging_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
                 else:
                     num_bagging_sets = 1
@@ -492,4 +488,4 @@ class TabularPredictorV2(TabularPredictor):
                 num_bagging_sets = 1
         if not isinstance(num_bagging_sets, int):
             raise ValueError(f'num_bagging_sets must be an integer. (num_bagging_sets={num_bagging_sets})')
-        return num_bagging_folds, num_bagging_sets, stack_ensemble_levels
+        return num_bagging_folds, num_bagging_sets, num_stack_levels
