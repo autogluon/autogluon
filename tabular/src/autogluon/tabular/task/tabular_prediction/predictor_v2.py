@@ -1,6 +1,7 @@
 import copy
 import logging
 import math
+import pprint
 import time
 
 import numpy as np
@@ -81,39 +82,42 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: Move num_cpu/num_gpu to AG_args_fit
         # TODO: num_bag_folds or num_bagging_folds?
         # TODO: num_stack_levels or num_stacking_levels?
+        # TODO: AG_args -> ag_args?
 
         """
         if self._learner.is_fit:
             raise AssertionError('Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`.')
-        self._validate_fit_kwargs(kwargs)
+        kwargs_orig = kwargs.copy()
+        kwargs = self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
         self._set_logger_verbosity(verbosity)
 
-        holdout_frac = kwargs.get('holdout_frac', None)
-        num_bagging_folds = kwargs.get('num_bagging_folds', None)
-        num_bagging_sets = kwargs.get('num_bagging_sets', None)
-        num_stack_levels = kwargs.get('num_stack_levels', None)
-        auto_stack = kwargs.get('auto_stack', False)
-        num_cpus = kwargs.get('num_cpus', None)
-        num_gpus = kwargs.get('num_gpus', None)
-        unlabeled_data = kwargs.get('unlabeled_data', None)
-        save_bagged_folds = kwargs.get('save_bagged_folds', True)
-        refit_full = kwargs.get('refit_full', False)
-        set_best_to_refit_full = kwargs.get('set_best_to_refit_full', False)
+        if verbosity >= 3:
+            logger.log(20, '============ fit kwarg info ============')
+            logger.log(20, 'User Specified kwargs:')
+            logger.log(20, f'{pprint.pformat(kwargs_orig)}')
+            logger.log(20, 'Full kwargs:')
+            logger.log(20, f'{pprint.pformat(kwargs)}')
+            logger.log(20, '========================================')
 
-        ag_args = kwargs.get('AG_args', None)
-        ag_args_fit = kwargs.get('AG_args_fit', dict())
-        ag_args_ensemble = kwargs.get('AG_args_ensemble', None)
-        excluded_model_types = kwargs.get('excluded_model_types', None)
+        holdout_frac = kwargs['holdout_frac']
+        num_bagging_folds = kwargs['num_bagging_folds']
+        num_bagging_sets = kwargs['num_bagging_sets']
+        num_stack_levels = kwargs['num_stack_levels']
+        auto_stack = kwargs['auto_stack']
+        num_cpus = kwargs['num_cpus']
+        num_gpus = kwargs['num_gpus']
+        unlabeled_data = kwargs['unlabeled_data']
+        save_bagged_folds = kwargs['save_bagged_folds']
+
+        ag_args = kwargs['AG_args']
+        ag_args_fit = kwargs['AG_args_fit']
+        ag_args_ensemble = kwargs['AG_args_ensemble']
+        excluded_model_types = kwargs['excluded_model_types']
 
         self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
         train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, unlabeled_data=unlabeled_data)
-
-        if refit_full and not self._learner.cache_data:
-            raise ValueError('`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
-        if set_best_to_refit_full and not refit_full:
-            raise ValueError('`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
 
         if hyperparameters is None:
             hyperparameters = 'default'
@@ -143,6 +147,8 @@ class TabularPredictorV2(TabularPredictor):
         if scheduler_options is not None:
             visualizer = scheduler_options[1]['visualizer']
             if (visualizer is not None) and (visualizer != 'none'):
+                if ag_args_fit is None:
+                    ag_args_fit = dict()
                 if 'visualizer' not in ag_args_fit:
                     ag_args_fit['visualizer'] = visualizer
 
@@ -153,7 +159,15 @@ class TabularPredictorV2(TabularPredictor):
                           time_limit=time_limit, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
         self._set_post_fit_vars()
 
-        keep_only_best = kwargs.get('keep_only_best', False)
+        self._post_fit(
+            keep_only_best=kwargs['keep_only_best'],
+            refit_full=kwargs['refit_full'],
+            set_best_to_refit_full=kwargs['set_best_to_refit_full'],
+            save_space=kwargs['save_space'],
+        )
+        self.save()
+
+    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -179,10 +193,8 @@ class TabularPredictorV2(TabularPredictor):
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
-        save_space = kwargs.get('save_space', False)
         if save_space:
             self.save_space()
-        self.save()
 
     # TODO: Documentation
     # Enables extra fit calls after the original fit
@@ -350,32 +362,49 @@ class TabularPredictorV2(TabularPredictor):
         if invalid_keys:
             raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
 
-    @staticmethod
-    def _validate_fit_kwargs(kwargs):
-        allowed_kwarg_names = {
-            'holdout_frac',
-            'num_bagging_folds',
-            'num_bagging_sets',
-            'num_stack_levels',
-            'auto_stack',
-            'AG_args',
-            'AG_args_fit',
-            'AG_args_ensemble',
-            'excluded_model_types',
-            'set_best_to_refit_full',
-            'save_bagged_folds',
-            'keep_only_best',
-            'save_space',
-            'refit_full',
-            'num_cpus',
-            'num_gpus',
-            'unlabeled_data',
-            'verbosity',
-        }
+    def _validate_fit_kwargs(self, kwargs):
+        fit_kwargs_default = dict(
+            holdout_frac=None,
+            num_bagging_folds=None,
+            num_bagging_sets=None,
+            num_stack_levels=None,
+            auto_stack=False,
+            AG_args=None,
+            AG_args_fit=None,
+            AG_args_ensemble=None,
+            excluded_model_types=None,
+            set_best_to_refit_full=False,
+            save_bagged_folds=True,
+            keep_only_best=False,
+            save_space=False,
+            refit_full=False,
+            num_cpus=None,
+            num_gpus=None,
+            unlabeled_data=None,
+            verbosity=self.verbosity,
+        )
 
+        allowed_kwarg_names = list(fit_kwargs_default.keys())
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
+
+        kwargs_sanitized = fit_kwargs_default.copy()
+        kwargs_sanitized.update(kwargs)
+
+        # Deepcopy args to avoid altering outer context
+        deepcopy_args = ['AG_args', 'AG_args_fit', 'AG_args_ensemble', 'excluded_model_types']
+        for deepcopy_arg in deepcopy_args:
+            kwargs_sanitized[deepcopy_arg] = copy.deepcopy(kwargs_sanitized[deepcopy_arg])
+
+        refit_full = kwargs_sanitized['refit_full']
+        set_best_to_refit_full = kwargs_sanitized['set_best_to_refit_full']
+        if refit_full and not self._learner.cache_data:
+            raise ValueError('`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
+        if set_best_to_refit_full and not refit_full:
+            raise ValueError('`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
+
+        return kwargs_sanitized
 
     def _validate_fit_data(self, train_data, tuning_data=None, unlabeled_data=None):
         if isinstance(train_data, str):
