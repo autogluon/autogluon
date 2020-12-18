@@ -42,10 +42,10 @@ class TabularPredictorV2(TabularPredictor):
             verbosity=2,
             **kwargs
     ):
+        self.verbosity = verbosity
+        self._set_logger_verbosity(self.verbosity)
         self._validate_init_kwargs(kwargs)
         output_directory = setup_outputdir(output_directory)  # TODO: Rename to directory/path?
-        self.verbosity = verbosity
-        logger.setLevel(verbosity2loglevel(self.verbosity))
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())  # TODO: id_columns -> ignored_columns
@@ -58,7 +58,7 @@ class TabularPredictorV2(TabularPredictor):
     # TODO: Documentation, flesh out capabilities
     # TODO: Rename feature_generator -> feature_pipeline for users?
     # TODO: Return transformed data?
-    # TODO: kwargs?
+    # TODO: feature_generator_kwargs?
     def fit_feature_generator(self, data: pd.DataFrame, feature_generator='auto', feature_metadata=None):
         self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
         self._learner.fit_transform_features(data)
@@ -88,11 +88,7 @@ class TabularPredictorV2(TabularPredictor):
         self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        if verbosity < 0:
-            verbosity = 0
-        elif verbosity > 4:
-            verbosity = 4
-        logger.setLevel(verbosity2loglevel(verbosity))
+        self._set_logger_verbosity(verbosity)
 
         holdout_frac = kwargs.get('holdout_frac', None)
         num_bagging_folds = kwargs.get('num_bagging_folds', None)
@@ -281,6 +277,15 @@ class TabularPredictorV2(TabularPredictor):
         if self._learner.trainer_path is not None:
             self._learner.persist_trainer(low_memory=True)
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
+
+    def _set_logger_verbosity(self, verbosity=None):
+        if verbosity is None:
+            verbosity = self.verbosity
+        if verbosity < 0:
+            verbosity = 0
+        elif verbosity > 4:
+            verbosity = 4
+        logger.setLevel(verbosity2loglevel(verbosity))
 
     # TODO: Update and correct the logging message on loading directions
     def save(self):
