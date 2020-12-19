@@ -73,7 +73,6 @@ class TabularPredictorV2(TabularPredictor):
             hyperparameters=None,
             feature_generator="auto",
             feature_metadata=None,
-            hyperparameter_tune_kwargs=None,
             **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
@@ -82,7 +81,7 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: Move num_cpu/num_gpu to AG_args_fit
         # TODO: num_bag_folds or num_bagging_folds?
         # TODO: num_stack_levels or num_stacking_levels?
-        # TODO: AG_args -> ag_args?
+        # TODO: AG_args -> ag_args? ag_args -> extra_ag_args?
 
         """
         if self._learner.is_fit:
@@ -106,6 +105,7 @@ class TabularPredictorV2(TabularPredictor):
         num_bagging_sets = kwargs['num_bagging_sets']
         num_stack_levels = kwargs['num_stack_levels']
         auto_stack = kwargs['auto_stack']
+        hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
         num_cpus = kwargs['num_cpus']
         num_gpus = kwargs['num_gpus']
         unlabeled_data = kwargs['unlabeled_data']
@@ -369,6 +369,7 @@ class TabularPredictorV2(TabularPredictor):
             num_bagging_sets=None,
             num_stack_levels=None,
             auto_stack=False,
+            hyperparameter_tune_kwargs=None,
             AG_args=None,
             AG_args_fit=None,
             AG_args_ensemble=None,
