@@ -2,7 +2,7 @@ from gluonts.dataset.repository.datasets import dataset_recipes
 from ..task.forecasting.dataset_v2 import TimeSeriesDataset
 import pandas as pd
 
-__all__ = ['gluonts_builtin_datasets', 'rebuild_tabular', 'create_time_series_dataset']
+__all__ = ['gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset']
 
 
 def gluonts_builtin_datasets():
@@ -75,7 +75,7 @@ def train_test_split(df, prediction_length):
     return train_ds, test_ds
 
 
-def create_time_series_dataset(data, index_column="index", target_column="target", time_column="date"):
+def time_series_dataset(data, index_column="index", target_column="target", time_column="date"):
     rebuilt_data = rebuild_tabular(data,
                                    index_column=index_column,
                                    target_column=target_column,

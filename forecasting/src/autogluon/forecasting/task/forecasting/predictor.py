@@ -38,8 +38,8 @@ class ForecastingPredictor(BasePredictor):
         """Returns the list of model names trained in this `predictor` object."""
         return self._trainer.get_model_names_all()
 
-    def predict(self, data, model=None, for_score=False):
-        predict_targets = self._learner.predict(data, model=model, for_score=for_score)
+    def predict(self, data, model=None, for_score=False, **kwargs):
+        predict_targets = self._learner.predict(data, model=model, for_score=for_score, **kwargs)
         return predict_targets
 
     def evaluate(self, data, **kwargs):

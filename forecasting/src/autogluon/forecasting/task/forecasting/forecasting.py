@@ -42,15 +42,13 @@ class Forecasting(BaseTask):
                                      index_column=index_column,
                                      target_column=target_column,
                                      time_column=time_column)
-        if hyperparameter_tune:
-            if val_data is None:
-                train_full = train_data.copy()
-                train_data, val_data = train_test_split(train_data, prediction_length)
-            else:
-                val_data = rebuild_tabular(val_data,
-                                           index_column=index_column,
-                                           target_column=target_column,
-                                           time_column=time_column)
+        if val_data is None:
+            train_data, val_data = train_test_split(train_data, prediction_length)
+        else:
+            val_data = rebuild_tabular(val_data,
+                                       index_column=index_column,
+                                       target_column=target_column,
+                                       time_column=time_column)
         train_data = TimeSeriesDataset(train_data, index_column=index_column)
         freq = train_data.get_freq()
         if val_data is not None:

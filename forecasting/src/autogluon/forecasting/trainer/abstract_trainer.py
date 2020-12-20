@@ -135,7 +135,7 @@ class AbstractTrainer:
             model = self._train_single(train_data, model)
             fit_end_time = time.time()
             if val_data is not None:
-                score = model.score(val_data)
+                score = -model.score(val_data)
             else:
                 score = None
             pred_end_time = time.time()
@@ -222,15 +222,15 @@ class AbstractTrainer:
 
         return df_sorted
 
-    def predict(self, data, model=None, for_score=True):
+    def predict(self, data, model=None, for_score=True, **kwargs):
         if model is not None:
-            return self._predict_model(data, model, for_score)
+            return self._predict_model(data, model, for_score, **kwargs)
         elif self.model_best is not None:
-            return self._predict_model(data, self.model_best, for_score)
+            return self._predict_model(data, self.model_best, for_score, **kwargs)
         else:
             model = self.get_model_best()
             self.model_best = model
-            return self._predict_model(data, model, for_score)
+            return self._predict_model(data, model, for_score, **kwargs)
 
     def score(self, data, model=None, quantiles=None):
         if self.eval_metric is not None and self.eval_metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
@@ -247,14 +247,14 @@ class AbstractTrainer:
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[self.eval_metric]
 
-    def _predict_model(self, data, model, for_score=True):
+    def _predict_model(self, data, model, for_score=True, **kwargs):
         if isinstance(model, str):
             model = self.load_model(model)
         if for_score:
-            forecasts, tss = model.predict_for_scoring(data)
+            forecasts, tss = model.predict_for_scoring(data, **kwargs)
             return forecasts, tss
         else:
-            return model.predict(data)
+            return model.predict(data, **kwargs)
 
     @classmethod
     def load_info(cls, path, reset_paths=False, load_model_if_required=True):

@@ -5,6 +5,7 @@ import os
 from ...abstract.abstract_model import AbstractModel
 from gluonts.evaluation import Evaluator
 from gluonts.evaluation.backtest import make_evaluation_predictions
+import json
 from tqdm import tqdm
 
 
@@ -82,9 +83,18 @@ class AbstractGluonTSModel(AbstractModel):
     def fit(self, train_data, time_limit=None):
         pass
 
-    def predict(self, data):
-        predicted_targets = self.model.predict(data)
-        return predicted_targets
+    def predict(self, data, quantiles=None):
+        if quantiles is None:
+            quantiles = [0.5]
+        status = [0 < quantiles[i] < 1 for i in range(len(quantiles))]
+        if not all(status):
+            raise ValueError("Invalid quantile value.")
+        result_dict = {}
+        predicted_targets = list(self.model.predict(data))
+        for quantile in quantiles:
+            result_dict[quantile] = [ts_predict.quantile(str(quantile)) for ts_predict in predicted_targets]
+
+        return result_dict
 
     def predict_for_scoring(self, data, num_samples=100):
         forecast_it, ts_it = make_evaluation_predictions(dataset=data,
