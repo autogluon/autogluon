@@ -81,7 +81,7 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: Move num_cpu/num_gpu to AG_args_fit
         # TODO: num_bag_folds or num_bagging_folds?
         # TODO: num_stack_levels or num_stacking_levels?
-        # TODO: AG_args -> ag_args? ag_args -> extra_ag_args?
+        # TODO: AG_args -> ag_args?
 
         """
         if self._learner.is_fit:
@@ -153,7 +153,7 @@ class TabularPredictorV2(TabularPredictor):
                     ag_args_fit['visualizer'] = visualizer
 
         # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
-        core_kwargs = {'extra_ag_args': ag_args, 'extra_ag_args_ensemble': ag_args_ensemble, 'extra_ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
+        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
                           hyperparameter_tune=hyperparameter_tune,
                           holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=num_stack_levels,

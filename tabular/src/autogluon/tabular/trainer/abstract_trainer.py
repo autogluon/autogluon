@@ -306,7 +306,7 @@ class AbstractTrainer:
 
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=0, base_model_names: List[str] = None, stack_name='core', save_bagged_folds: bool = None,
-                             extra_ag_args=None, extra_ag_args_fit=None, extra_ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, **kwargs) -> List[str]:
+                             ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 0, then the models will use base model predictions as additional features.
@@ -342,11 +342,11 @@ class AbstractTrainer:
                     'save_bagged_folds': save_bagged_folds,
                     'random_state': level + self.random_seed,
                 }
-                models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, extra_ag_args=extra_ag_args, extra_ag_args_fit=extra_ag_args_fit,
-                                         ensemble_type=ensemble_type, ensemble_kwargs=ensemble_kwargs, extra_ag_args_ensemble=extra_ag_args_ensemble,
+                models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, ag_args=ag_args, ag_args_fit=ag_args_fit,
+                                         ensemble_type=ensemble_type, ensemble_kwargs=ensemble_kwargs, ag_args_ensemble=ag_args_ensemble,
                                          hyperparameter_preprocess_func=self._process_hyperparameters, hyperparameter_preprocess_kwargs=hyperparameter_preprocess_kwargs)
         elif isinstance(models, dict):
-            models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, extra_ag_args=extra_ag_args, extra_ag_args_fit=extra_ag_args_fit,
+            models = self.get_models(models, hyperparameter_tune=kwargs.get('hyperparameter_tune', False), level=level, name_suffix=name_suffix, ag_args=ag_args, ag_args_fit=ag_args_fit,
                                      hyperparameter_preprocess_func=self._process_hyperparameters, hyperparameter_preprocess_kwargs=hyperparameter_preprocess_kwargs)
         X_train_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
@@ -835,7 +835,7 @@ class AbstractTrainer:
                 save_bagged_folds=save_bagged_folds,
                 random_state=level + self.random_seed,
             ),
-            extra_ag_args={'name_bag_suffix': ''},
+            ag_args={'name_bag_suffix': ''},
             name_suffix=name_suffix,
             level=level,
         )

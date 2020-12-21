@@ -102,18 +102,18 @@ DEFAULT_MODEL_NAMES = {
 # DONE: Add special optional AG args for things like name prefix, name suffix, name, etc.
 # DONE: Move creation of stack ensemble internally into this function? Requires passing base models in as well.
 # DONE: Add special optional AG args for training order
-# TODO: Add special optional AG args for base models
+# DONE: Add special optional AG args for base models
 # TODO: Consider making hyperparameters arg in fit() accept lists, concatenate hyperparameter sets together.
 # TODO: Consider adding special optional AG args for #cores,#gpus,num_early_stopping_iterations,etc.
 # DONE: Consider adding special optional AG args for max train time, max memory size, etc.
 # TODO: Consider adding special optional AG args for use_original_features,features_to_use,etc.
 # TODO: Consider adding optional AG args to dynamically disable models such as valid_num_classes_range, valid_row_count_range, valid_feature_count_range, etc.
 # TODO: Args such as max_repeats, num_folds
-# TODO: Add banned_model_types arg
+# DONE: Add banned_model_types arg
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
 def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, feature_metadata=None, num_classes=None, hyperparameter_tune=False,
-                      level: int = 0, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, extra_ag_args_fit=None, extra_ag_args=None, extra_ag_args_ensemble=None,
+                      level: int = 0, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, ag_args_fit=None, ag_args=None, ag_args_ensemble=None,
                       name_suffix: str = None, default_priorities=None, invalid_model_names: list = None, hyperparameter_preprocess_func=None, hyperparameter_preprocess_kwargs=None):
     if hyperparameter_preprocess_func is not None:
         if hyperparameter_preprocess_kwargs is None:
@@ -143,18 +143,18 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
             if not inspect.isclass(model_type_real):
                 model_type_real = MODEL_TYPES[model_type_real]
             default_ag_args = model_type_real._get_default_ag_args()
-            if extra_ag_args is not None:
-                model_extra_ag_args = extra_ag_args.copy()
+            if ag_args is not None:
+                model_extra_ag_args = ag_args.copy()
                 model_extra_ag_args.update(model[AG_ARGS])
                 model[AG_ARGS] = model_extra_ag_args
-            if extra_ag_args_ensemble is not None:
-                model_extra_ag_args_ensemble = extra_ag_args_ensemble.copy()
+            if ag_args_ensemble is not None:
+                model_extra_ag_args_ensemble = ag_args_ensemble.copy()
                 model_extra_ag_args_ensemble.update(model.get(AG_ARGS_ENSEMBLE, dict()))
                 model[AG_ARGS_ENSEMBLE] = model_extra_ag_args_ensemble
-            if extra_ag_args_fit is not None:
+            if ag_args_fit is not None:
                 if AG_ARGS_FIT not in model:
                     model[AG_ARGS_FIT] = dict()
-                model_extra_ag_args_fit = extra_ag_args_fit.copy()
+                model_extra_ag_args_fit = ag_args_fit.copy()
                 model_extra_ag_args_fit.update(model[AG_ARGS_FIT])
                 model[AG_ARGS_FIT] = model_extra_ag_args_fit
             if default_ag_args is not None:
@@ -239,7 +239,7 @@ def get_preset_stacker_model(path, problem_type, eval_metric, num_classes=None,
 
 
 # TODO: v0.1 cleanup and avoid hardcoded logic with model names
-def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_classes=None, hyperparameter_tune=False, name_suffix='', extra_ag_args=None, invalid_model_names: list = None):
+def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_classes=None, hyperparameter_tune=False, name_suffix='', ag_args=None, invalid_model_names: list = None):
     model_types_standard = ['GBM', 'NN', 'CAT']
     hyperparameters = copy.deepcopy(hyperparameters)
     hyperparameters_standard = copy.deepcopy(hyperparameters)
@@ -254,7 +254,7 @@ def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_cla
         # TODO: add support for per-stack level hyperparameters
     models = get_preset_models(path=path, problem_type=SOFTCLASS, feature_metadata=feature_metadata, eval_metric=soft_log_loss, stopping_metric=soft_log_loss,
                                hyperparameters=hyperparameters_standard, num_classes=num_classes, hyperparameter_tune=hyperparameter_tune,
-                               extra_ag_args=extra_ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
+                               ag_args=ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
     if invalid_model_names is None:
         invalid_model_names = []
     invalid_model_names = invalid_model_names + [model.name for model in models]
@@ -280,7 +280,7 @@ def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_cla
             hyperparameters_rf['default']['RF'] = rf_params
         rf_models = get_preset_models(path=path, problem_type=REGRESSION, feature_metadata=feature_metadata, eval_metric=mean_squared_error,
                                       hyperparameters=hyperparameters_rf, hyperparameter_tune=hyperparameter_tune,
-                                      extra_ag_args=extra_ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
+                                      ag_args=ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
     models_cat = [model for model in models if isinstance(model, CatBoostModel)]
     models_noncat = [model for model in models if not isinstance(model, CatBoostModel)]
     models = models_noncat + rf_models + models_cat
