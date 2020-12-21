@@ -92,7 +92,7 @@ DEFAULT_MODEL_NAMES = {
     TabTransformerModel: 'Transformer',
     TextPredictionV1Model: 'TextNeuralNetV1',
     FastTextModel: 'FastText',
-    GreedyWeightedEnsembleModel: 'GreedyEnsemble',
+    GreedyWeightedEnsembleModel: 'WeightedEnsemble',
 }
 
 
@@ -195,10 +195,11 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
                 num_increment += 1
             model_names_set.add(name)
         else:
-            name_stacker = f'{name}_BAG_L{level}'
+            name_bag_suffix = model[AG_ARGS].get('name_bag_suffix', '_BAG')
+            name_stacker = f'{name}{name_bag_suffix}_L{level}'
             while name_stacker in model_names_set:  # Ensure name is unique
                 name = f'{name_orig}_{num_increment}'
-                name_stacker = f'{name}_BAG_L{level}'
+                name_stacker = f'{name}{name_bag_suffix}_L{level}'
                 num_increment += 1
             model_names_set.add(name_stacker)
         model_params = copy.deepcopy(model)

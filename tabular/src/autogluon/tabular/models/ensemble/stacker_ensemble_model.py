@@ -179,4 +179,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
                 self.feature_metadata = stacker_feature_metadata
             else:
-                self.feature_metadata = self.feature_metadata.join_metadata(stacker_feature_metadata)
+                existing_stack_features = self.feature_metadata.get_features(required_special_types=[S_STACK])
+                if set(stacker_feature_metadata.get_features()) != set(existing_stack_features):
+                    self.feature_metadata = self.feature_metadata.join_metadata(stacker_feature_metadata)

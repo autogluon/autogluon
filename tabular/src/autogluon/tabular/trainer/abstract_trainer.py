@@ -813,19 +813,9 @@ class AbstractTrainer:
         if len(base_model_names) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return []
-        if name_suffix is None:
-            name_suffix = ''
 
         if child_hyperparameters is None:
             child_hyperparameters = {}
-
-        invalid_model_names = set(self.get_model_names())
-        # Ensure name is unique
-        model_stack_name = f'WeightedEnsemble{name_suffix}_L{level}'
-        num_increment = 2
-        while model_stack_name in invalid_model_names:  # Ensure name is unique
-            model_stack_name = f'WeightedEnsemble{name_suffix}_{num_increment}_L{level}'
-            num_increment += 1
 
         weighted_ensemble_model = self.get_models(
             stopping_metric=self.eval_metric,
@@ -845,10 +835,11 @@ class AbstractTrainer:
                 save_bagged_folds=save_bagged_folds,
                 random_state=level + self.random_seed,
             ),
+            extra_ag_args={'name_bag_suffix': ''},
+            name_suffix=name_suffix,
             level=level,
         )
         weighted_ensemble_model = weighted_ensemble_model[0]
-        weighted_ensemble_model.rename(model_stack_name)
         models = self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
