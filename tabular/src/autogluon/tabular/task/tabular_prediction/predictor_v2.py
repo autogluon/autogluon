@@ -152,10 +152,12 @@ class TabularPredictorV2(TabularPredictor):
                 if 'visualizer' not in ag_args_fit:
                     ag_args_fit['visualizer'] = visualizer
 
+        # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
+        core_kwargs = {'extra_ag_args': ag_args, 'extra_ag_args_ensemble': ag_args_ensemble, 'extra_ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
                           hyperparameter_tune=hyperparameter_tune,
                           holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, ag_args=ag_args, ag_args_fit=ag_args_fit, ag_args_ensemble=ag_args_ensemble, excluded_model_types=excluded_model_types,
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs,
                           time_limit=time_limit, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
         self._set_post_fit_vars()
 

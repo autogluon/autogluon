@@ -700,10 +700,11 @@ class TabularPrediction(BaseTask):
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold, cache_data=cache_data, random_seed=random_seed)
+        core_kwargs = {'extra_ag_args': ag_args, 'extra_ag_args_ensemble': ag_args_ensemble, 'extra_ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, ag_args=ag_args, ag_args_fit=ag_args_fit, ag_args_ensemble=ag_args_ensemble, excluded_model_types=excluded_model_types,
+                    hyperparameters=hyperparameters, core_kwargs=core_kwargs,
                     time_limit=time_limits_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
