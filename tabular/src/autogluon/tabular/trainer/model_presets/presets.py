@@ -23,6 +23,7 @@ from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 from ...models.fasttext.fasttext_model import FastTextModel
 from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 from ...models.ensemble.stacker_ensemble_model import StackerEnsembleModel
+from ...models.ensemble.greedy_weighted_ensemble_model import GreedyWeightedEnsembleModel
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ MODEL_TYPES = dict(
     TRANSF=TabTransformerModel,
     TEXT_NN_V1=TextPredictionV1Model,
     FASTTEXT=FastTextModel,
+    GREEDY=GreedyWeightedEnsembleModel,
 )
 
 DEFAULT_MODEL_NAMES = {
@@ -90,6 +92,7 @@ DEFAULT_MODEL_NAMES = {
     TabTransformerModel: 'Transformer',
     TextPredictionV1Model: 'TextNeuralNetV1',
     FastTextModel: 'FastText',
+    GreedyWeightedEnsembleModel: 'GreedyEnsemble',
 }
 
 
@@ -207,6 +210,8 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
             ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
             extra_ensemble_hyperparameters = copy.deepcopy(model.get(AG_ARGS_ENSEMBLE, dict()))
             ensemble_kwargs_model['hyperparameters'] = ensemble_kwargs_model.get('hyperparameters', {})
+            if ensemble_kwargs_model['hyperparameters'] is None:
+                ensemble_kwargs_model['hyperparameters'] = {}
             ensemble_kwargs_model['hyperparameters'].update(extra_ensemble_hyperparameters)
             model_init = ensemble_type(path=path, name=name_stacker, model_base=model_init, num_classes=num_classes, **ensemble_kwargs_model)
 

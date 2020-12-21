@@ -816,11 +816,8 @@ class AbstractTrainer:
         if name_suffix is None:
             name_suffix = ''
 
-        # TODO: Remove extra_params, currently a hack
-        if child_hyperparameters is not None:
-            extra_params = {'_tmp_greedy_hyperparameters': child_hyperparameters}
-        else:
-            extra_params = {}
+        if child_hyperparameters is None:
+            child_hyperparameters = {}
 
         invalid_model_names = set(self.get_model_names())
         # Ensure name is unique
@@ -830,28 +827,40 @@ class AbstractTrainer:
             model_stack_name = f'WeightedEnsemble{name_suffix}_{num_increment}_L{level}'
             num_increment += 1
 
-        weighted_ensemble_model = WeightedEnsembleModel(
-            path=self.path,
-            name=model_stack_name,
-            base_model_names=base_model_names,
-            base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=base_model_names),
-            base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=base_model_names),
-            base_model_types_inner_dict=self.get_models_attribute_dict(attribute='type_inner', models=base_model_names),
-            base_model_performances_dict=self.get_models_attribute_dict(attribute='val_score', models=base_model_names),
-            hyperparameters=hyperparameters, eval_metric=self.eval_metric, stopping_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed,
-            **extra_params
+        weighted_ensemble_model = self.get_models(
+            stopping_metric=self.eval_metric,
+            hyperparameters={
+                'default': {
+                    'GREEDY': [child_hyperparameters],
+                }
+            },
+            ensemble_type=WeightedEnsembleModel,
+            ensemble_kwargs=dict(
+                base_model_names=base_model_names,
+                base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=base_model_names),
+                base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=base_model_names),
+                base_model_types_inner_dict=self.get_models_attribute_dict(attribute='type_inner', models=base_model_names),
+                base_model_performances_dict=self.get_models_attribute_dict(attribute='val_score', models=base_model_names),
+                hyperparameters=hyperparameters,
+                save_bagged_folds=save_bagged_folds,
+                random_state=level + self.random_seed,
+            ),
+            level=level,
         )
-        self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
-        if check_if_best and weighted_ensemble_model.name in self.get_model_names():
-            if self.model_best is None:
-                self.model_best = weighted_ensemble_model.name
-            else:
-                best_score = self.get_model_attribute(self.model_best, 'val_score')
-                cur_score = self.get_model_attribute(weighted_ensemble_model.name, 'val_score')
-                if cur_score > best_score:
-                    # new best model
-                    self.model_best = weighted_ensemble_model.name
-        return [weighted_ensemble_model.name]
+        weighted_ensemble_model = weighted_ensemble_model[0]
+        weighted_ensemble_model.rename(model_stack_name)
+        models = self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
+        for weighted_ensemble_model_name in models:
+            if check_if_best and weighted_ensemble_model_name in self.get_model_names():
+                if self.model_best is None:
+                    self.model_best = weighted_ensemble_model_name
+                else:
+                    best_score = self.get_model_attribute(self.model_best, 'val_score')
+                    cur_score = self.get_model_attribute(weighted_ensemble_model_name, 'val_score')
+                    if cur_score > best_score:
+                        # new best model
+                        self.model_best = weighted_ensemble_model_name
+        return models
 
     def _train_single(self, X_train, y_train, model: AbstractModel, X_val=None, y_val=None, **model_fit_kwargs) -> AbstractModel:
         """
