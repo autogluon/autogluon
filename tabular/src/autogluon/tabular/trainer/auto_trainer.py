@@ -16,8 +16,9 @@ class AutoTrainer(AbstractTrainer):
         eval_metric = kwargs.pop('eval_metric', self.eval_metric)
         num_classes = kwargs.pop('num_classes', self.num_classes)
         invalid_model_names = kwargs.pop('invalid_model_names', self.get_model_names())
+        feature_metadata = kwargs.pop('feature_metadata', self.feature_metadata)
         return get_preset_models(path=path, problem_type=problem_type, eval_metric=eval_metric,
-                                 num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names, **kwargs)
+                                 num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names, feature_metadata=feature_metadata, **kwargs)
 
     # TODO: rename to .fit for 0.1
     def train(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, hyperparameter_tune=False, feature_prune=False, holdout_frac=0.1, stack_ensemble_levels=0, hyperparameters=None, ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, time_limit=None, **kwargs):

@@ -109,7 +109,7 @@ DEFAULT_MODEL_NAMES = {
 # TODO: Add banned_model_types arg
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
-def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False,
+def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, feature_metadata=None, num_classes=None, hyperparameter_tune=False,
                       level: int = 0, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, extra_ag_args_fit=None, extra_ag_args=None, extra_ag_args_ensemble=None,
                       name_suffix: str = None, default_priorities=None, invalid_model_names: list = None):
     if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS]:
@@ -130,8 +130,6 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
             model = copy.deepcopy(model)
             if AG_ARGS not in model:
                 model[AG_ARGS] = dict()
-            if AG_ARGS_ENSEMBLE not in model:
-                model[AG_ARGS_ENSEMBLE] = dict()
             if 'model_type' not in model[AG_ARGS]:
                 model[AG_ARGS]['model_type'] = model_type
             model_type_real = model[AG_ARGS]['model_type']
@@ -144,7 +142,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
                 model[AG_ARGS] = model_extra_ag_args
             if extra_ag_args_ensemble is not None:
                 model_extra_ag_args_ensemble = extra_ag_args_ensemble.copy()
-                model_extra_ag_args_ensemble.update(model[AG_ARGS_ENSEMBLE])
+                model_extra_ag_args_ensemble.update(model.get(AG_ARGS_ENSEMBLE, dict()))
                 model[AG_ARGS_ENSEMBLE] = model_extra_ag_args_ensemble
             if extra_ag_args_fit is not None:
                 if AG_ARGS_FIT not in model:
@@ -201,13 +199,13 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
                 num_increment += 1
             model_names_set.add(name_stacker)
         model_params = copy.deepcopy(model)
-        model_params.pop(AG_ARGS)
-        model_params.pop(AG_ARGS_ENSEMBLE)
-        model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=model_params)
+        model_params.pop(AG_ARGS, None)
+        model_params.pop(AG_ARGS_ENSEMBLE, None)
+        model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=model_params, feature_metadata=feature_metadata)
 
         if ensemble_kwargs is not None:
             ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
-            extra_ensemble_hyperparameters = copy.deepcopy(model[AG_ARGS_ENSEMBLE])
+            extra_ensemble_hyperparameters = copy.deepcopy(model.get(AG_ARGS_ENSEMBLE, dict()))
             ensemble_kwargs_model['hyperparameters'] = ensemble_kwargs_model.get('hyperparameters', {})
             ensemble_kwargs_model['hyperparameters'].update(extra_ensemble_hyperparameters)
             model_init = ensemble_type(path=path, name=name_stacker, model_base=model_init, num_classes=num_classes, **ensemble_kwargs_model)

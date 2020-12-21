@@ -20,6 +20,7 @@ class WeightedEnsembleModel(StackerEnsembleModel):
             model_base = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False)
         super().__init__(model_base=model_base, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, **kwargs)
         if model_base_is_none:
+            self.feature_metadata = None
             self.model_base = GreedyWeightedEnsembleModel(path='', name='greedy_ensemble', num_classes=self.num_classes, base_model_names=self.stack_column_prefix_lst, problem_type=self.problem_type, eval_metric=self.eval_metric, stopping_metric=self.stopping_metric, hyperparameters=child_hyperparameters)
             self._child_type = type(self.model_base)
         self.low_memory = False

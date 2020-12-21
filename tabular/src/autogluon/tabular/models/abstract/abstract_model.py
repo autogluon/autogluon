@@ -64,6 +64,8 @@ class AbstractModel:
         else:
             self.normalize_pred_probas = False
 
+        if feature_metadata is not None:
+            feature_metadata = copy.deepcopy(feature_metadata)
         self.feature_metadata = feature_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
         self.features = features
         self.debug = debug

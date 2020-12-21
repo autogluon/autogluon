@@ -858,9 +858,6 @@ class AbstractTrainer:
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        if model.feature_metadata is None:
-            model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: move this into model creation process?
-
         if isinstance(model, BaggedEnsembleModel):
             model.fit(X_train=X_train, y_train=y_train, **model_fit_kwargs)
         else:
@@ -1001,8 +998,6 @@ class AbstractTrainer:
             k_fold = self.k_fold
         if n_repeats is None:
             n_repeats = self.n_repeats
-        if (n_repeat_start == 0) and (k_fold_start == 0):
-            model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: Don't set feature_metadata here
         if feature_prune:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to feature_prune, value = {n_repeat_start}')
