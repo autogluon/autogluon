@@ -21,14 +21,9 @@ class AutoTrainer(AbstractTrainer):
                                  num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names, feature_metadata=feature_metadata, **kwargs)
 
     # TODO: rename to .fit for 0.1
-    def train(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, hyperparameter_tune=False, feature_prune=False, holdout_frac=0.1, stack_ensemble_levels=0, hyperparameters=None, ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, time_limit=None, **kwargs):
+    def train(self, X_train, y_train, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, hyperparameter_tune=False, feature_prune=False, holdout_frac=0.1, stack_ensemble_levels=0, ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, time_limit=None, **kwargs):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.train()`. Argument: {key}')
-
-        if hyperparameters is None:
-            hyperparameters = {}
-        # TODO: v0.1 self.hyperparmeters is not consistent in repeated calls (re-uses ag_args_fit but not ag_args or ag_args_ensemble)
-        self.hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
 
         if self.bagged_mode:
             if (y_val is not None) and (X_val is not None):
@@ -42,7 +37,7 @@ class AutoTrainer(AbstractTrainer):
             if (y_val is None) or (X_val is None):
                 X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_seed)
 
-        core_kwargs = {'extra_ag_args': ag_args, 'extra_ag_args_ensemble': ag_args_ensemble}
-        self._train_multi_and_ensemble(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=self.hyperparameters,
+        core_kwargs = {'extra_ag_args': ag_args, 'extra_ag_args_ensemble': ag_args_ensemble, 'extra_ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
+        self._train_multi_and_ensemble(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters,
                                        hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                                        stack_ensemble_levels=stack_ensemble_levels, time_limit=time_limit, core_kwargs=core_kwargs)

@@ -388,7 +388,6 @@ class TabularPredictor:
             'max_stack_level': self._trainer.get_max_level(),
             'feature_prune': self._trainer.feature_prune,
             'hyperparameter_tune': hpo_used,
-            'hyperparameters_userspecified': self._trainer.hyperparameters,
         }
         if self.problem_type != REGRESSION:
             results['num_classes'] = self._trainer.num_classes

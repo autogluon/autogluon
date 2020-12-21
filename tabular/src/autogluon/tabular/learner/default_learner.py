@@ -90,7 +90,7 @@ class DefaultLearner(AbstractLearner):
             self.eval_metric = trainer.eval_metric
 
         self.save()
-        trainer.train(X, y, X_val, y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
+        trainer.train(X, y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end

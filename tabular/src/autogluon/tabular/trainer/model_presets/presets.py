@@ -114,7 +114,11 @@ DEFAULT_MODEL_NAMES = {
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
 def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, feature_metadata=None, num_classes=None, hyperparameter_tune=False,
                       level: int = 0, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, extra_ag_args_fit=None, extra_ag_args=None, extra_ag_args_ensemble=None,
-                      name_suffix: str = None, default_priorities=None, invalid_model_names: list = None):
+                      name_suffix: str = None, default_priorities=None, invalid_model_names: list = None, hyperparameter_preprocess_func=None, hyperparameter_preprocess_kwargs=None):
+    if hyperparameter_preprocess_func is not None:
+        if hyperparameter_preprocess_kwargs is None:
+            hyperparameter_preprocess_kwargs = dict()
+        hyperparameters = hyperparameter_preprocess_func(hyperparameters, **hyperparameter_preprocess_kwargs)
     if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS]:
         raise NotImplementedError
     if default_priorities is None:
@@ -235,7 +239,7 @@ def get_preset_stacker_model(path, problem_type, eval_metric, num_classes=None,
 
 
 # TODO: v0.1 cleanup and avoid hardcoded logic with model names
-def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperparameter_tune=False, name_suffix='', extra_ag_args=None, invalid_model_names: list = None):
+def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_classes=None, hyperparameter_tune=False, name_suffix='', extra_ag_args=None, invalid_model_names: list = None):
     model_types_standard = ['GBM', 'NN', 'CAT']
     hyperparameters = copy.deepcopy(hyperparameters)
     hyperparameters_standard = copy.deepcopy(hyperparameters)
@@ -248,7 +252,7 @@ def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperpa
         hyperparameters_standard = {key: hyperparameters_standard[key] for key in hyperparameters_standard if key in model_types_standard}
         hyperparameters_rf = {key: hyperparameters_rf[key] for key in hyperparameters_rf if key == 'RF'}
         # TODO: add support for per-stack level hyperparameters
-    models = get_preset_models(path=path, problem_type=SOFTCLASS, eval_metric=soft_log_loss, stopping_metric=soft_log_loss,
+    models = get_preset_models(path=path, problem_type=SOFTCLASS, feature_metadata=feature_metadata, eval_metric=soft_log_loss, stopping_metric=soft_log_loss,
                                hyperparameters=hyperparameters_standard, num_classes=num_classes, hyperparameter_tune=hyperparameter_tune,
                                extra_ag_args=extra_ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
     if invalid_model_names is None:
@@ -274,7 +278,7 @@ def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperpa
             hyperparameters_rf['RF'] = rf_params
         elif 'default' in hyperparameters_rf and 'RF' in hyperparameters_rf['default']:
             hyperparameters_rf['default']['RF'] = rf_params
-        rf_models = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=mean_squared_error,
+        rf_models = get_preset_models(path=path, problem_type=REGRESSION, feature_metadata=feature_metadata, eval_metric=mean_squared_error,
                                       hyperparameters=hyperparameters_rf, hyperparameter_tune=hyperparameter_tune,
                                       extra_ag_args=extra_ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
     models_cat = [model for model in models if isinstance(model, CatBoostModel)]
