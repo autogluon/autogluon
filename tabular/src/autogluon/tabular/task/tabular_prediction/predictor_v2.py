@@ -204,7 +204,7 @@ class TabularPredictorV2(TabularPredictor):
             self, hyperparameters, time_limit=None,
             base_model_names=None, num_stack_levels=None, fit_new_weighted_ensemble=True, relative_stack=True,  # kwargs
             # TODO: Add all arguments in
-            # verbosity=None, AG_args_fit=None, excluded_model_types=None, refit_full=None, feature_prune=None,
+            # verbosity=None, refit_full=None,
             # hyperparameter_tune_kwargs, num_cpus, num_gpus
             core_kwargs=None, aux_kwargs=None
     ) -> list:
@@ -365,24 +365,41 @@ class TabularPredictorV2(TabularPredictor):
             raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
 
     def _validate_fit_kwargs(self, kwargs):
+
+        # TODO:
+        #  Valid core_kwargs values:
+        #  ag_args, ag_args_fit, ag_args_ensemble, save_bagged_folds, stack_name, ensemble_type, name_suffix, time_limit
+        #  Valid aux_kwargs values:
+        #  name_suffix, time_limit, stack_name
+
         fit_kwargs_default = dict(
+            # data split / ensemble architecture kwargs
             holdout_frac=None,
             num_bagging_folds=None,
             num_bagging_sets=None,
             num_stack_levels=None,
             auto_stack=False,
+
             hyperparameter_tune_kwargs=None,
+
+            # core_kwargs
             AG_args=None,
             AG_args_fit=None,
             AG_args_ensemble=None,
             excluded_model_types=None,
-            set_best_to_refit_full=False,
             save_bagged_folds=True,
+
+            # post_fit_kwargs
+            set_best_to_refit_full=False,
             keep_only_best=False,
             save_space=False,
             refit_full=False,
+
+            # move into AG_args_fit?
             num_cpus=None,
             num_gpus=None,
+
+            # other
             unlabeled_data=None,
             verbosity=self.verbosity,
         )
