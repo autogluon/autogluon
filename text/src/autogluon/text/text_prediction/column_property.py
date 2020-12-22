@@ -275,7 +275,7 @@ class TextColumnProperty(ColumnProperty):
 
     def parse(self, column_data: pd.Series):
         super().parse(column_data)
-        lengths = column_data.apply(len)
+        lengths = column_data.apply(lambda x: len(x) if x else 0)
         self._min_length = lengths.min()
         self._avg_length = lengths.mean()
         self._max_length = lengths.max()
