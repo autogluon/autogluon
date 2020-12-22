@@ -195,3 +195,19 @@ def test_mixed_column_type():
                           plot_results=False)
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
     verify_predictor_save_load(predictor3, dev_data)
+
+
+def test_empty_text_item():
+    train_data = load_pd.load(
+        'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')
+    rng_state = np.random.RandomState(123)
+    train_perm = rng_state.permutation(len(train_data))
+    train_data = train_data.iloc[train_perm[:100]]
+    train_data.iat[0, 0] = None
+    train_data.iat[10, 0] = None
+    predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
+                         label='score', num_trials=1,
+                         ngpus_per_trial=0,
+                         verbosity=4,
+                         output_directory='./sts_empty_text_item',
+                         plot_results=False)
