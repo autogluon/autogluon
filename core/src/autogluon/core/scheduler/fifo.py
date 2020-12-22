@@ -345,7 +345,7 @@ class FIFOScheduler(TaskScheduler):
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
-        job = cls._start_distributed_job(task, cls.managers.resource_manager)
+        job = cls.jobs.start_distributed_job(task, cls.managers.resource_manager)
         # reporter thread
         rp = threading.Thread(
             target=self._run_reporter,

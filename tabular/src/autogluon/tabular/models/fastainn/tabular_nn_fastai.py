@@ -1,8 +1,5 @@
-import contextlib
 import copy
 import logging
-import shutil
-import tempfile
 import time
 from functools import partial
 from pathlib import Path
@@ -11,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.utils import try_import_fastai_v1
+from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
@@ -38,15 +36,6 @@ from ...features.feature_metadata import R_OBJECT
 LABEL = '__label__'
 
 logger = logging.getLogger(__name__)
-
-
-@contextlib.contextmanager
-def make_temp_directory():
-    temp_dir = tempfile.mkdtemp()
-    try:
-        yield temp_dir
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 # TODO: Takes extremely long time prior to training start if many (10000) continuous features from ngrams, debug - explore TruncateSVD option to reduce input dimensionality
