@@ -291,5 +291,5 @@ class TaskScheduler(object):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(\n' + \
-            str(self.resource_manager) +')\n'
+            str(self.managers.resource_manager) +')\n'
         return reprstr

@@ -123,10 +123,10 @@ class RLScheduler(FIFOScheduler):
         super().__init__(
             train_fn=train_fn, **filter_by_key(kwargs, _ARGUMENT_KEYS))
         # reserve controller computation resource on master node
-        master_node = self.remote_manager.get_master_node()
+        master_node = self.managers.remote_manager.get_master_node()
         controller_resource = kwargs['controller_resource']
         self.controller_resource = DistributedResource(**controller_resource)
-        assert self.resource_manager.reserve_resource(
+        assert self.managers.resource_manager.reserve_resource(
             master_node, self.controller_resource),\
             "Not Enough Resource on Master Node for Training Controller"
         if controller_resource['num_gpus'] > 0:
@@ -323,7 +323,7 @@ class RLScheduler(FIFOScheduler):
         for p1, p2 in zip(task_jobs, reporter_threads):
             p1.result()
             p2.join()
-        with self.LOCK:
+        with self.managers.lock:
             for task in tasks:
                 self.finished_tasks.append({'TASK_ID': task.task_id,
                                            'Config': task.args['config']})
@@ -343,9 +343,9 @@ class RLScheduler(FIFOScheduler):
             task (:class:`autogluon.scheduler.Task`): a new training task
         """
         cls = RLScheduler
-        cls.resource_manager._request(task.resources)
+        cls.managers.request_resources(task.resources)
         # main process
-        job = cls._start_distributed_job(task, cls.resource_manager)
+        job = cls._start_distributed_job(task, cls.managers.resource_manager)
         return job
 
     def join_tasks(self):
