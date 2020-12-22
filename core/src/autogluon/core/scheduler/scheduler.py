@@ -14,6 +14,7 @@ from warnings import warn
 import multiprocessing as mp
 from collections import OrderedDict
 
+from .managers import TaskManagers
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from .. import Task
@@ -49,44 +50,24 @@ class ClassProperty(object):
 class TaskScheduler(object):
     """Base Distributed Task Scheduler
     """
-    LOCK = mp.Lock()
-    _resource_manager = None
-    _remote_manager = None
-
-    @ClassProperty
-    def resource_manager(cls):
-        if cls._resource_manager is None:
-            cls._resource_manager = DistributedResourceManager()
-        return cls._resource_manager
-
-    @ClassProperty
-    def remote_manager(cls):
-        if cls._remote_manager is None:
-            cls._remote_manager = RemoteManager()
-        return cls._remote_manager
+    managers = TaskManagers()
 
     def __init__(self, dist_ip_addrs=None):
-        if dist_ip_addrs is None:
-            dist_ip_addrs=[]
         cls = TaskScheduler
-        remotes = cls.remote_manager.add_remote_nodes(dist_ip_addrs)
-        cls.resource_manager.add_remote(cls.remote_manager.get_remotes())
+        cls.managers.register_dist_ip_addrs(dist_ip_addrs)
         self.scheduled_tasks = []
         self.finished_tasks = []
 
     def add_remote(self, ip_addrs):
         """Add remote nodes to the scheduler computation resource.
         """
-        ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
-        with self.LOCK:
-            remotes = TaskScheduler.remote_manager.add_remote_nodes(ip_addrs)
-            TaskScheduler.resource_manager.add_remote(remotes)
+        self.managers.add_remote(ip_addrs)
 
     @classmethod
     def upload_files(cls, files, **kwargs):
         """Upload files to remote machines, so that they are accessible by import or load.
         """
-        cls.remote_manager.upload_files(files, **kwargs)
+        cls.managers.upload_files(files, **kwargs)
 
     def _dict_from_task(self, task):
         if isinstance(task, Task):
@@ -120,19 +101,19 @@ class TaskScheduler(object):
         # adding the task
         cls = TaskScheduler
         if not task.resources.is_ready:
-            cls.resource_manager._request(task.resources)
-        job = cls._start_distributed_job(task, cls.resource_manager)
+            cls.managers.request_resources(task.resources)
+        job = cls._start_distributed_job(task, cls.managers.resource_manager)
         new_dict = self._dict_from_task(task)
         new_dict['Job'] = job
-        with self.LOCK:
+        with self.managers.lock:
             self.scheduled_tasks.append(new_dict)
 
     def run_job(self, task):
         """Run a training task to the scheduler (Sync).
         """
         cls = TaskScheduler
-        cls.resource_manager._request(task.resources)
-        job = cls._start_distributed_job(task, cls.resource_manager)
+        cls.managers.request_resources(task.resources)
+        job = cls._start_distributed_job(task, cls.managers.resource_manager)
         return job.result()
 
     @staticmethod
@@ -240,7 +221,7 @@ class TaskScheduler(object):
         pass
 
     def _cleaning_tasks(self):
-        with self.LOCK:
+        with self.managers.lock:
             new_scheduled_tasks = []
             for task_dict in self.scheduled_tasks:
                 if task_dict['Job'].done():
