@@ -26,7 +26,7 @@ class DistributedJobRunner(object):
         """Async Execute the job in remote and release the resources
         """
         logger.debug('\nScheduling {}'.format(task))
-        job = task.resources.node.submit(cls._run_dist_job, task.fn, task.args, task.resources.gpu_ids)
+        job = task.resources.node.submit(cls._run_dist_job, task.task_id, task.fn, task.args, task.resources.gpu_ids)
 
         def _release_resource_callback(fut):
             logger.debug('Start Releasing Resource')
@@ -36,22 +36,33 @@ class DistributedJobRunner(object):
         return job
 
     @classmethod
-    def _worker(cls, pickled_fn, pickled_args, return_list, gpu_ids, args):
+    def _worker(cls, tempdir, task_id, pickled_fn, pickled_args, return_list, gpu_ids, args):
         """Worker function in the client
         """
 
-        # Only fork mode allows passing non-picklable objects
-        fn = pickled_fn if is_fork_enabled() else dill.loads(pickled_fn)
-        args = {**pickled_args, **args} if is_fork_enabled() else {**dill.loads(pickled_args), **args}
+        with open(os.path.join(tempdir, f'{task_id}.out'), 'w') as std_out:
+            with open(os.path.join(tempdir, f'{task_id}.err'), 'w') as err_out:
 
-        DistributedJobRunner.set_cuda_environment(gpu_ids)
+                # redirect stdout/strerr into a file so the main process can read it after the job is completed
+                if not is_fork_enabled():
+                    sys.stdout = std_out
+                    sys.stderr = err_out
 
-        # running
-        try:
-            ret = fn(**args)
-        except AutoGluonEarlyStop:
-            ret = None
-        return_list.append(ret)
+                # Only fork mode allows passing non-picklable objects
+                fn = pickled_fn if is_fork_enabled() else dill.loads(pickled_fn)
+                args = {**pickled_args, **args} if is_fork_enabled() else {**dill.loads(pickled_args), **args}
+
+                DistributedJobRunner.set_cuda_environment(gpu_ids)
+
+                # running
+                try:
+                    ret = fn(**args)
+                except AutoGluonEarlyStop:
+                    ret = None
+                return_list.append(ret)
+
+                sys.stdout.flush()
+                sys.stderr.flush()
 
     @classmethod
     def set_cuda_environment(cls, gpu_ids):
@@ -62,21 +73,9 @@ class DistributedJobRunner(object):
         else:
             os.environ['CUDA_VISIBLE_DEVICES'] = "-1"
 
-    @classmethod
-    def _wrap(cls, tempdir, task):
-        return partial(cls._wrapper, tempdir, task)
 
     @classmethod
-    def _wrapper(cls, tempdir, task, *args, **kwargs):
-        with open(os.path.join(tempdir, SYS_STD_OUT_FILE), 'w') as std_out:
-            with open(os.path.join(tempdir, SYS_ERR_OUT_FILE), 'w') as err_out:
-                sys.stdout = std_out
-                sys.stderr = err_out
-                task(*args, **kwargs)
-
-
-    @classmethod
-    def _run_dist_job(cls, fn, args, gpu_ids):
+    def _run_dist_job(cls, task_id, fn, args, gpu_ids):
         """Remote function Executing the task
         """
         if '_default_config' in args['args']:
@@ -109,7 +108,7 @@ class DistributedJobRunner(object):
 
             with make_temp_directory() as tempdir:
                 p = CustomProcess(
-                    target=cls._wrap(tempdir, partial(cls._worker, pickled_fn, pickled_args)),
+                    target=partial(cls._worker, tempdir, task_id, pickled_fn, pickled_args),
                     args=(return_list, gpu_ids, cross_process_args)
                 )
                 p.start()
@@ -117,10 +116,9 @@ class DistributedJobRunner(object):
                     cp = Communicator.Create(p, local_reporter, dist_reporter)
                 p.join()
                 # Get processes outputs
-                with open(os.path.join(tempdir, SYS_STD_OUT_FILE)) as f:
-                    print(f.read(), file=sys.stdout, end='')
-                with open(os.path.join(tempdir, SYS_ERR_OUT_FILE)) as f:
-                    print(f.read(), file=sys.stderr, end='')
+                if not is_fork_enabled():
+                    cls.__print(tempdir, task_id, 'out')
+                    cls.__print(tempdir, task_id, 'err')
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
         ret = return_list[0] if len(return_list) > 0 else None
