@@ -203,11 +203,11 @@ def test_empty_text_item():
     rng_state = np.random.RandomState(123)
     train_perm = rng_state.permutation(len(train_data))
     train_data = train_data.iloc[train_perm[:100]]
-    train_data['sentence1', 0] = None
-    train_data['sentence1', 10] = None
+    train_data.iat[0, 0] = None
+    train_data.iat[10, 0] = None
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                         label='label', num_trials=1,
+                         label='score', num_trials=1,
                          ngpus_per_trial=0,
                          verbosity=4,
-                         output_directory='./sst_empty_text_item',
+                         output_directory='./sts_empty_text_item',
                          plot_results=False)
