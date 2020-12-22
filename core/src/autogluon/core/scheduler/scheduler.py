@@ -82,7 +82,7 @@ class TaskScheduler(object):
         cls = TaskScheduler
         if not task.resources.is_ready:
             cls.managers.request_resources(task.resources)
-        job = cls.jobs.start_distributed_job(task, cls.managers.resource_manager)
+        job = cls.jobs.start_distributed_job(task, cls.managers)
         new_dict = self._dict_from_task(task)
         new_dict['Job'] = job
         with self.managers.lock:
@@ -93,7 +93,7 @@ class TaskScheduler(object):
         """
         cls = TaskScheduler
         cls.managers.request_resources(task.resources)
-        job = cls.jobs.start_distributed_job(task, cls.managers.resource_manager)
+        job = cls.jobs.start_distributed_job(task, cls.managers)
         return job.result()
 
     def _clean_task_internal(self, task_dict):

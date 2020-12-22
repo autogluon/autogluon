@@ -345,7 +345,7 @@ class RLScheduler(FIFOScheduler):
         cls = RLScheduler
         cls.managers.request_resources(task.resources)
         # main process
-        job = cls.jobs.start_distributed_job(task, cls.managers.resource_manager)
+        job = cls.jobs.start_distributed_job(task, cls.managers)
         return job
 
     def join_tasks(self):

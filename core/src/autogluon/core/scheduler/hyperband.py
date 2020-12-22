@@ -459,7 +459,7 @@ class HyperbandScheduler(FIFOScheduler):
                 task.args['config'], milestone=self.max_t)
 
         # main process
-        job = cls.jobs.start_distributed_job(task, cls.managers.resource_manager)
+        job = cls.jobs.start_distributed_job(task, cls.managers)
         # reporter thread
         rp = threading.Thread(
             target=self._run_reporter,

@@ -6,6 +6,7 @@ from functools import partial
 
 import dill
 
+from autogluon.core.scheduler.managers import TaskManagers
 from autogluon.core.scheduler.reporter import Communicator, LocalStatusReporter
 from autogluon.core.utils import CustomProcess, AutoGluonEarlyStop
 from autogluon.core.utils.files import make_temp_directory
@@ -22,7 +23,7 @@ SYS_STD_OUT_FILE = 'sys_std.out'
 class DistributedJobRunner(object):
 
     @classmethod
-    def start_distributed_job(cls, task, resource_manager):
+    def start_distributed_job(cls, task, manager: TaskManagers):
         """Async Execute the job in remote and release the resources
         """
         logger.debug('\nScheduling {}'.format(task))
@@ -30,7 +31,7 @@ class DistributedJobRunner(object):
 
         def _release_resource_callback(fut):
             logger.debug('Start Releasing Resource')
-            resource_manager._release(task.resources)
+            manager.release_resources(task.resources)
 
         job.add_done_callback(_release_resource_callback)
         return job
