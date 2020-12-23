@@ -165,7 +165,7 @@ class TabularPrediction(BaseTask):
                 ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2']
             For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
 
-            You can also pass your own evaluation function here as long as it follows formatting of the functions defined in `autogluon/utils/tabular/metrics/`.
+            You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
         stopping_metric : function or str, default = None
             Metric which iteratively-trained models use to early stop to avoid overfitting.
             `stopping_metric` is not used by weighted ensembles, instead weighted ensembles maximize `eval_metric`.
