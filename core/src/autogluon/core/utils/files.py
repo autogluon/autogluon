@@ -1,3 +1,4 @@
+import contextlib
 import os
 from pathlib import Path
 import requests
@@ -7,6 +8,7 @@ import hashlib
 import zipfile
 import logging
 from .tqdm import tqdm
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -132,27 +134,36 @@ def raise_num_file(nofile_atleast=4096):
     if res is None:
         return (None,)*2
     # what is current ulimit -n setting?
-    soft,ohard = res.getrlimit(res.RLIMIT_NOFILE)
+    soft, ohard = res.getrlimit(res.RLIMIT_NOFILE)
     hard = ohard
     # increase limit (soft and even hard) if needed
     if soft < nofile_atleast:
         soft = nofile_atleast
 
-        if hard<soft:
+        if hard < soft:
             hard = soft
 
         #logger.warning('setting soft & hard ulimit -n {} {}'.format(soft,hard))
         try:
-            res.setrlimit(res.RLIMIT_NOFILE,(soft,hard))
-        except (ValueError,res.error):
+            res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
+        except (ValueError, res.error):
             try:
                hard = soft
-               logger.warning('trouble with max limit, retrying with soft,hard {},{}'.format(soft,hard))
-               res.setrlimit(res.RLIMIT_NOFILE,(soft,hard))
+               logger.warning('trouble with max limit,  retrying with soft, hard {}, {}'.format(soft, hard))
+               res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
             except Exception:
                logger.warning('failed to set ulimit')
-               soft,hard = res.getrlimit(res.RLIMIT_NOFILE)
+               soft, hard = res.getrlimit(res.RLIMIT_NOFILE)
 
-    return soft,hard
+    return soft, hard
 
 raise_num_file()
+
+
+@contextlib.contextmanager
+def make_temp_directory():
+    temp_dir = tempfile.mkdtemp()
+    try:
+        yield temp_dir
+    finally:
+        shutil.rmtree(temp_dir)
