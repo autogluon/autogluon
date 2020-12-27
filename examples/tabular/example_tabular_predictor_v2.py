@@ -26,8 +26,7 @@ predictor1.leaderboard(test_data)
 ##################################
 
 predictor2 = TabularPredictorV2(label, eval_metric=eval_metric)
-predictor2.fit_feature_generator(train_data)  # Can also fit the feature generator prior to calling fit
-predictor2.fit(train_data, hyperparameters=hyperparameters, num_bagging_folds=2)
+predictor2.fit(train_data, hyperparameters=hyperparameters, num_bag_folds=2)
 predictor2.leaderboard(test_data)
 
 ####################################

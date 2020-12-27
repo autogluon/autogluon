@@ -33,36 +33,30 @@ class TabularPredictorV2(TabularPredictor):
     Dataset = TabularDataset
     predictor_file_name = 'predictor.pkl'
 
+    # TODO: v0.1 add pip freeze + python version output after fit + log file, validate that same pip freeze on load as cached
+    # TODO: v0.1 predictor.clone()
     # TODO: v0.1 add documentation to init
     def __init__(
             self,
             label,
             problem_type=None,
             eval_metric=None,
-            output_directory=None,
+            path=None,
             verbosity=2,
             **kwargs
     ):
         self.verbosity = verbosity
         self._set_logger_verbosity(self.verbosity)
         self._validate_init_kwargs(kwargs)
-        output_directory = setup_outputdir(output_directory)  # TODO: Rename to directory/path?
+        path = setup_outputdir(path)
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
-        learner_kwargs = kwargs.pop('learner_kwargs', dict())  # TODO: id_columns -> ignored_columns
+        learner_kwargs = kwargs.pop('learner_kwargs', dict())  # TODO: id_columns -> ignored_columns +1
 
-        self._learner: AbstractLearner = learner_type(path_context=output_directory, label=label, feature_generator=None,
+        self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None,
                                                       eval_metric=eval_metric, problem_type=problem_type, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
-
-    # TODO: Documentation, flesh out capabilities
-    # TODO: Rename feature_generator -> feature_pipeline for users?
-    # TODO: Return transformed data?
-    # TODO: feature_generator_kwargs?
-    def fit_feature_generator(self, data: pd.DataFrame, feature_generator='auto', feature_metadata=None):
-        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
-        self._learner.fit_transform_features(data)
 
     @unpack(set_presets)
     def fit(self,
@@ -71,7 +65,7 @@ class TabularPredictorV2(TabularPredictor):
             time_limit=None,
             presets=None,
             hyperparameters=None,
-            feature_generator="auto",
+            feature_generator="auto",  # TODO: kwargs?
             feature_metadata=None,
             **kwargs):
         """
@@ -79,9 +73,7 @@ class TabularPredictorV2(TabularPredictor):
 
         # TODO: Move documentation from TabularPrediction.fit to here
         # TODO: Move num_cpu/num_gpu to AG_args_fit
-        # TODO: num_bag_folds or num_bagging_folds?
-        # TODO: num_stack_levels or num_stacking_levels?
-        # TODO: AG_args -> ag_args?
+        # TODO: AG_args -> ag_args? +1 -> Will change after replacing original TabularPredictor to avoid extra API breaks.
 
         """
         if self._learner.is_fit:
@@ -101,8 +93,8 @@ class TabularPredictorV2(TabularPredictor):
             logger.log(20, '========================================')
 
         holdout_frac = kwargs['holdout_frac']
-        num_bagging_folds = kwargs['num_bagging_folds']
-        num_bagging_sets = kwargs['num_bagging_sets']
+        num_bag_folds = kwargs['num_bag_folds']
+        num_bag_sets = kwargs['num_bag_sets']
         num_stack_levels = kwargs['num_stack_levels']
         auto_stack = kwargs['auto_stack']
         hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
@@ -125,13 +117,13 @@ class TabularPredictorV2(TabularPredictor):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
         # Process kwargs to create trainer, schedulers, searchers:
-        num_bagging_folds, num_bagging_sets, num_stack_levels = self._sanitize_stack_args(
-            num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, num_stack_levels=num_stack_levels,
+        num_bag_folds, num_bag_sets, num_stack_levels = self._sanitize_stack_args(
+            num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
             time_limit=time_limit, auto_stack=auto_stack, num_train_rows=len(train_data),
         )
 
         if hyperparameter_tune_kwargs is not None:
-            scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bagging_folds, num_stack_levels)
+            scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels)
         else:
             scheduler_options = None
 
@@ -156,7 +148,7 @@ class TabularPredictorV2(TabularPredictor):
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
                           hyperparameter_tune=hyperparameter_tune,
-                          holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=num_stack_levels,
+                          holdout_frac=holdout_frac, num_bagging_folds=num_bag_folds, num_bagging_sets=num_bag_sets, stack_ensemble_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs,
                           time_limit=time_limit, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
         self._set_post_fit_vars()
@@ -239,11 +231,12 @@ class TabularPredictorV2(TabularPredictor):
 
         return fit_models
 
-    def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bagging_folds, num_stack_levels):
+    # TODO: Move to generic, migrate all tasks to same kwargs logic
+    def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels):
         num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)
         time_limits_hpo = time_limit
-        if num_bagging_folds >= 2 and (time_limits_hpo is not None):
-            time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + num_stack_levels))
+        if num_bag_folds >= 2 and (time_limits_hpo is not None):
+            time_limits_hpo = time_limits_hpo / (1 + num_bag_folds * (1 + num_stack_levels))
         # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
         time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
 
@@ -370,32 +363,36 @@ class TabularPredictorV2(TabularPredictor):
         #  Valid core_kwargs values:
         #  ag_args, ag_args_fit, ag_args_ensemble, save_bagged_folds, stack_name, ensemble_type, name_suffix, time_limit
         #  Valid aux_kwargs values:
-        #  name_suffix, time_limit, stack_name
+        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
 
+        # TODO: Remove features from models option for fit_extra
+        # TODO: Constructor?
         fit_kwargs_default = dict(
-            # data split / ensemble architecture kwargs
-            holdout_frac=None,
-            num_bagging_folds=None,
-            num_bagging_sets=None,
+            # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
+            holdout_frac=None,  # TODO: Potentially error if num_bag_folds is also specified
+            num_bag_folds=None,
+            num_bag_sets=None,
             num_stack_levels=None,
             auto_stack=False,
 
             hyperparameter_tune_kwargs=None,
 
-            # core_kwargs
+            # core_kwargs -> +1 nest
             AG_args=None,
             AG_args_fit=None,
             AG_args_ensemble=None,
             excluded_model_types=None,
-            save_bagged_folds=True,
+            save_bagged_folds=True,  # TODO: Move to AG_args_ensemble
 
-            # post_fit_kwargs
+            # aux_kwargs -> +1 nest
+
+            # post_fit_kwargs -> +1 nest
             set_best_to_refit_full=False,
             keep_only_best=False,
             save_space=False,
             refit_full=False,
 
-            # move into AG_args_fit?
+            # move into AG_args_fit? +1
             num_cpus=None,
             num_gpus=None,
 
@@ -449,6 +446,73 @@ class TabularPredictorV2(TabularPredictor):
                                  "Unlabeled data must have not the label column specified in it.\n")
         return train_data, tuning_data, unlabeled_data
 
+    def _set_feature_generator(self, feature_generator='auto', feature_metadata=None):
+        if self._learner.feature_generator is not None:
+            if isinstance(feature_generator, str) and feature_generator == 'auto':
+                feature_generator = self._learner.feature_generator
+            else:
+                raise AssertionError('FeatureGenerator already exists!')
+        self._learner.feature_generator = self._get_default_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
+
+    # TODO: Move out of predictor?
+    def _get_default_feature_generator(self, feature_generator, feature_metadata=None):
+        if feature_generator is None:
+            feature_generator = IdentityFeatureGenerator()
+        elif isinstance(feature_generator, str):
+            if feature_generator == 'auto':
+                feature_generator = AutoMLPipelineFeatureGenerator()
+            else:
+                raise ValueError(f"Unknown feature_generator preset: '{feature_generator}', valid presets: {['auto']}")
+        if feature_metadata is not None:
+            if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
+                feature_generator.feature_metadata_in = copy.deepcopy(feature_metadata)
+            else:
+                raise AssertionError('`feature_metadata_in` already exists in `feature_generator`.')
+        return feature_generator
+
+    def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack, num_train_rows):
+        if auto_stack:
+            # TODO: What about datasets that are 100k+? At a certain point should we not bag?
+            # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
+            if num_bag_folds is None:
+                num_bag_folds = min(10, max(5, math.floor(num_train_rows / 100)))
+            if num_stack_levels is None:
+                num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+        if num_bag_folds is None:
+            num_bag_folds = 0
+        if num_stack_levels is None:
+            num_stack_levels = 0
+        if not isinstance(num_bag_folds, int):
+            raise ValueError(f'num_bag_folds must be an integer. (num_bag_folds={num_bag_folds})')
+        if not isinstance(num_stack_levels, int):
+            raise ValueError(f'num_stack_levels must be an integer. (num_stack_levels={num_stack_levels})')
+        if num_bag_folds < 2 and num_bag_folds != 0:
+            raise ValueError(f'num_bag_folds must be equal to 0 or >=2. (num_bag_folds={num_bag_folds})')
+        if num_stack_levels != 0 and num_bag_folds == 0:
+            raise ValueError(f'num_stack_levels must be 0 if num_bag_folds is 0. (num_stack_levels={num_stack_levels}, num_bag_folds={num_bag_folds})')
+        if num_bag_sets is None:
+            if num_bag_folds >= 2:
+                if time_limit is not None:
+                    num_bag_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
+                else:
+                    num_bag_sets = 1
+            else:
+                num_bag_sets = 1
+        if not isinstance(num_bag_sets, int):
+            raise ValueError(f'num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})')
+        return num_bag_folds, num_bag_sets, num_stack_levels
+
+
+# Location to store WIP functionality that will be later added to TabularPredictorV2
+class _TabularPredictorExperimental(TabularPredictorV2):
+    # TODO: Documentation, flesh out capabilities
+    # TODO: Rename feature_generator -> feature_pipeline for users?
+    # TODO: Return transformed data?
+    # TODO: feature_generator_kwargs?
+    def fit_feature_generator(self, data: pd.DataFrame, feature_generator='auto', feature_metadata=None):
+        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
+        self._learner.fit_transform_features(data)
+
     # TODO: rename to `advice`
     # TODO: Add documentation
     def _advice(self):
@@ -487,59 +551,3 @@ class TabularPredictorV2(TabularPredictor):
         else:
             logger.log(20, 'No further advice found.')
         logger.log(20, '================================================================')
-
-    def _set_feature_generator(self, feature_generator='auto', feature_metadata=None):
-        if self._learner.feature_generator is not None:
-            if isinstance(feature_generator, str) and feature_generator == 'auto':
-                feature_generator = self._learner.feature_generator
-            else:
-                raise AssertionError('FeatureGenerator already exists!')
-        self._learner.feature_generator = self._get_default_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
-
-    # TODO: Move out of predictor?
-    def _get_default_feature_generator(self, feature_generator, feature_metadata=None):
-        if feature_generator is None:
-            feature_generator = IdentityFeatureGenerator()
-        elif isinstance(feature_generator, str):
-            if feature_generator == 'auto':
-                feature_generator = AutoMLPipelineFeatureGenerator()
-            else:
-                raise ValueError(f"Unknown feature_generator preset: '{feature_generator}', valid presets: {['auto']}")
-        if feature_metadata is not None:
-            if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
-                feature_generator.feature_metadata_in = copy.deepcopy(feature_metadata)
-            else:
-                raise AssertionError('`feature_metadata_in` already exists in `feature_generator`.')
-        return feature_generator
-
-    def _sanitize_stack_args(self, num_bagging_folds, num_bagging_sets, num_stack_levels, time_limit, auto_stack, num_train_rows):
-        if auto_stack:
-            # TODO: What about datasets that are 100k+? At a certain point should we not bag?
-            # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
-            if num_bagging_folds is None:
-                num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
-            if num_stack_levels is None:
-                num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
-        if num_bagging_folds is None:
-            num_bagging_folds = 0
-        if num_stack_levels is None:
-            num_stack_levels = 0
-        if not isinstance(num_bagging_folds, int):
-            raise ValueError(f'num_bagging_folds must be an integer. (num_bagging_folds={num_bagging_folds})')
-        if not isinstance(num_stack_levels, int):
-            raise ValueError(f'num_stack_levels must be an integer. (num_stack_levels={num_stack_levels})')
-        if num_bagging_folds < 2 and num_bagging_folds != 0:
-            raise ValueError(f'num_bagging_folds must be equal to 0 or >=2. (num_bagging_folds={num_bagging_folds})')
-        if num_stack_levels != 0 and num_bagging_folds == 0:
-            raise ValueError(f'num_stack_levels must be 0 if num_bagging_folds is 0. (num_stack_levels={num_stack_levels}, num_bagging_folds={num_bagging_folds})')
-        if num_bagging_sets is None:
-            if num_bagging_folds >= 2:
-                if time_limit is not None:
-                    num_bagging_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
-                else:
-                    num_bagging_sets = 1
-            else:
-                num_bagging_sets = 1
-        if not isinstance(num_bagging_sets, int):
-            raise ValueError(f'num_bagging_sets must be an integer. (num_bagging_sets={num_bagging_sets})')
-        return num_bagging_folds, num_bagging_sets, num_stack_levels

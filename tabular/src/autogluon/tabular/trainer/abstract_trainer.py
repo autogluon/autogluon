@@ -821,7 +821,7 @@ class AbstractTrainer:
             stopping_metric=self.eval_metric,
             hyperparameters={
                 'default': {
-                    'GREEDY': [child_hyperparameters],
+                    'ENS_GREEDY': [child_hyperparameters],
                 }
             },
             ensemble_type=WeightedEnsembleModel,

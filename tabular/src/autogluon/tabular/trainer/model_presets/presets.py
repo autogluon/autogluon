@@ -76,7 +76,7 @@ MODEL_TYPES = dict(
     TRANSF=TabTransformerModel,
     TEXT_NN_V1=TextPredictionV1Model,
     FASTTEXT=FastTextModel,
-    GREEDY=GreedyWeightedEnsembleModel,
+    ENS_GREEDY=GreedyWeightedEnsembleModel,
 )
 
 DEFAULT_MODEL_NAMES = {
