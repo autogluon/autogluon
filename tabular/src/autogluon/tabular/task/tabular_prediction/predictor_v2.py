@@ -126,23 +126,12 @@ class TabularPredictorV2(TabularPredictor):
             scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels)
         else:
             scheduler_options = None
-
-        if scheduler_options is not None:
-            hyperparameter_tune = True
+        hyperparameter_tune = scheduler_options is not None
+        if hyperparameter_tune:
             logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
-        else:
-            hyperparameter_tune = False
 
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(len(train_data), hyperparameter_tune)
-
-        if scheduler_options is not None:
-            visualizer = scheduler_options[1]['visualizer']
-            if (visualizer is not None) and (visualizer != 'none'):
-                if ag_args_fit is None:
-                    ag_args_fit = dict()
-                if 'visualizer' not in ag_args_fit:
-                    ag_args_fit['visualizer'] = visualizer
 
         # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
@@ -194,15 +183,41 @@ class TabularPredictorV2(TabularPredictor):
     # Enables extra fit calls after the original fit
     def fit_extra(
             self, hyperparameters, time_limit=None,
-            base_model_names=None, num_stack_levels=None, fit_new_weighted_ensemble=True, relative_stack=True,  # kwargs
-            # TODO: Add all arguments in
-            # verbosity=None, refit_full=None,
-            # hyperparameter_tune_kwargs, num_cpus, num_gpus
-            core_kwargs=None, aux_kwargs=None
-    ) -> list:
-        # TODO: unlabeled data?
+            base_model_names=None, fit_new_weighted_ensemble=True, relative_stack=True,  # kwargs
+            # core_kwargs=None,
+            aux_kwargs=None, **kwargs
+    ):
         # TODO: Allow disable aux (default to disabled)
         time_start = time.time()
+
+        kwargs_orig = kwargs.copy()
+        kwargs = self._validate_fit_extra_kwargs(kwargs)
+
+        verbosity = kwargs.get('verbosity', self.verbosity)
+        self._set_logger_verbosity(verbosity)
+
+        if verbosity >= 3:
+            logger.log(20, '============ fit kwarg info ============')
+            logger.log(20, 'User Specified kwargs:')
+            logger.log(20, f'{pprint.pformat(kwargs_orig)}')
+            logger.log(20, 'Full kwargs:')
+            logger.log(20, f'{pprint.pformat(kwargs)}')
+            logger.log(20, '========================================')
+
+        # TODO: num_bag_sets
+        num_stack_levels = kwargs['num_stack_levels']
+        hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
+        num_cpus = kwargs['num_cpus']
+        num_gpus = kwargs['num_gpus']
+        # save_bagged_folds = kwargs['save_bagged_folds']  # TODO: Enable
+
+        ag_args = kwargs['AG_args']
+        ag_args_fit = kwargs['AG_args_fit']
+        ag_args_ensemble = kwargs['AG_args_ensemble']
+        excluded_model_types = kwargs['excluded_model_types']
+
+        if isinstance(hyperparameters, str):
+            hyperparameters = get_hyperparameter_config(hyperparameters)
 
         if num_stack_levels is None:
             hyperparameter_keys = list(hyperparameters.keys())
@@ -211,6 +226,18 @@ class TabularPredictorV2(TabularPredictor):
                 if isinstance(key, int):
                     highest_level = max(key, highest_level)
             num_stack_levels = highest_level
+
+        if hyperparameter_tune_kwargs is not None:
+            scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, self._trainer.k_fold, num_stack_levels)
+        else:
+            scheduler_options = None
+        hyperparameter_tune = scheduler_options is not None
+        if hyperparameter_tune:
+            raise ValueError('Hyperparameter Tuning is not allowed in `fit_extra`.')  # FIXME: Change this
+            # logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
+
+        # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
+        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
 
         # TODO: Add special error message if called and training/val data was not cached.
         X_train, y_train, X_val, y_val = self._trainer.load_data()
@@ -229,7 +256,13 @@ class TabularPredictorV2(TabularPredictor):
                 time_limit_weighted = None
             fit_models += self.fit_weighted_ensemble(time_limits=time_limit_weighted)
 
-        return fit_models
+        self._post_fit(
+            keep_only_best=kwargs['keep_only_best'],
+            refit_full=kwargs['refit_full'],
+            set_best_to_refit_full=kwargs['set_best_to_refit_full'],
+            save_space=kwargs['save_space'],
+        )
+        self.save()
 
     # TODO: Move to generic, migrate all tasks to same kwargs logic
     def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels):
@@ -371,9 +404,24 @@ class TabularPredictorV2(TabularPredictor):
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             holdout_frac=None,  # TODO: Potentially error if num_bag_folds is also specified
             num_bag_folds=None,
+            auto_stack=False,
+
+            # other
+            unlabeled_data=None,
+        )
+
+        kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
+
+        kwargs_sanitized = fit_kwargs_default.copy()
+        kwargs_sanitized.update(kwargs)
+
+        return kwargs_sanitized
+
+    def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None):
+        fit_extra_kwargs_default = dict(
+            # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             num_bag_sets=None,
             num_stack_levels=None,
-            auto_stack=False,
 
             hyperparameter_tune_kwargs=None,
 
@@ -397,16 +445,17 @@ class TabularPredictorV2(TabularPredictor):
             num_gpus=None,
 
             # other
-            unlabeled_data=None,
             verbosity=self.verbosity,
         )
 
-        allowed_kwarg_names = list(fit_kwargs_default.keys())
+        allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
+        if extra_valid_keys is not None:
+            allowed_kwarg_names += extra_valid_keys
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
 
-        kwargs_sanitized = fit_kwargs_default.copy()
+        kwargs_sanitized = fit_extra_kwargs_default.copy()
         kwargs_sanitized.update(kwargs)
 
         # Deepcopy args to avoid altering outer context
