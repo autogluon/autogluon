@@ -425,8 +425,6 @@ class TabularPredictor:
                 hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"
             print("Hyperparameter-tuning used: %s %s" % (hpo_used, hpo_str))
             # TODO: uncomment once feature_prune is functional:  self._summarize('feature_prune', 'feature-selection used', results)
-            print("User-specified hyperparameters:")
-            print(results['hyperparameters_userspecified'])
             print("Feature Metadata (Processed):")
             print("(raw dtype, special dtypes):")
             print(self.feature_metadata)
