@@ -81,13 +81,8 @@ class AbstractTrainer:
         self.reset_paths = False
 
         self.hpo_results = {}  # Stores summary of HPO process
-        # Scheduler attributes:
-        if scheduler_options is not None:
-            self._scheduler_func = scheduler_options[0]  # unpack tuple
-            self._scheduler_options = scheduler_options[1]
-        else:
-            self._scheduler_func = None
-            self._scheduler_options = None
+        # Scheduler attributes
+        self._scheduler_options = scheduler_options
 
         self._time_limit = None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.
         self._time_train_start = None  # Internal timestamp of the time training started for a given fit call. Used in logging statements.
@@ -1005,7 +1000,7 @@ class AbstractTrainer:
                 raise ValueError(f'k_fold_start must be 0 to feature_prune, value = {k_fold_start}')
             self._autotune(X_train=X_train, X_holdout=X_val, y_train=y_train, y_holdout=y_val, model_base=model)  # TODO: Update to use CV instead of holdout
         if hyperparameter_tune:
-            if self._scheduler_func is None or self._scheduler_options is None:
+            if self._scheduler_options is None:
                 raise ValueError('scheduler_options cannot be None when hyperparameter_tune = True')
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
@@ -1014,9 +1009,9 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             try:
                 if isinstance(model, BaggedEnsembleModel):
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, k_fold=k_fold, scheduler_options=(self._scheduler_func, self._scheduler_options), verbosity=self.verbosity)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, k_fold=k_fold, scheduler_options=self._scheduler_options, verbosity=self.verbosity)
                 else:
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, scheduler_options=(self._scheduler_func, self._scheduler_options), verbosity=self.verbosity)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, scheduler_options=self._scheduler_options, verbosity=self.verbosity)
             except Exception as err:
                 logger.exception(f'Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.')
                 logger.warning(err)
@@ -1045,8 +1040,8 @@ class AbstractTrainer:
                 ))
             if self._scheduler_options is not None:
                 model_fit_kwargs.update({
-                    'num_cpus': self._scheduler_options['resource']['num_cpus'],
-                    'num_gpus': self._scheduler_options['resource']['num_gpus'],
+                    'num_cpus': self._scheduler_options[1]['resource']['num_cpus'],
+                    'num_gpus': self._scheduler_options[1]['resource']['num_gpus'],
                 })  # Additional configurations for model.fit
             model_names_trained = self._train_and_save(X_train, y_train, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
         self.save()
