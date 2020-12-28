@@ -112,7 +112,7 @@ DEFAULT_MODEL_NAMES = {
 # DONE: Add banned_model_types arg
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
-def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, feature_metadata=None, num_classes=None, hyperparameter_tune=False,
+def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, feature_metadata=None, num_classes=None, hyperparameter_tune_kwargs=None,
                       level: int = 0, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, ag_args_fit=None, ag_args=None, ag_args_ensemble=None,
                       name_suffix: str = None, default_priorities=None, invalid_model_names: list = None, hyperparameter_preprocess_func=None, hyperparameter_preprocess_kwargs=None):
     if hyperparameter_preprocess_func is not None:
@@ -162,7 +162,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
                 model[AG_ARGS] = default_ag_args
             model_priority = model[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             # Check if model is valid
-            if hyperparameter_tune and model[AG_ARGS].get('disable_in_hpo', False):
+            if hyperparameter_tune_kwargs and model[AG_ARGS].get('disable_in_hpo', False):
                 continue  # Not valid
             elif not model[AG_ARGS].get('valid_stacker', True) and level > 0:
                 continue  # Not valid as a stacker model
@@ -225,21 +225,8 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
     return models
 
 
-def get_preset_stacker_model(path, problem_type, eval_metric, num_classes=None,
-                             hyperparameters={'NN': {}, 'GBM': {}}, hyperparameter_tune=False):
-    # TODO: Expand options to RF and NN
-    if problem_type == REGRESSION:
-        model = RFModel(path=path, name='LinearRegression', model=LinearRegression(),
-                        problem_type=problem_type, eval_metric=eval_metric)
-    else:
-        model = RFModel(path=path, name='LogisticRegression', model=LogisticRegression(
-            solver='liblinear', multi_class='auto', max_iter=500,  # n_jobs=-1  # TODO: HP set to hide warnings, but we should find optimal HP for this
-        ), problem_type=problem_type, eval_metric=eval_metric)
-    return model
-
-
 # TODO: v0.1 cleanup and avoid hardcoded logic with model names
-def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_classes=None, hyperparameter_tune=False, name_suffix='', ag_args=None, invalid_model_names: list = None):
+def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_classes=None, hyperparameter_tune_kwargs=None, name_suffix='', ag_args=None, invalid_model_names: list = None):
     model_types_standard = ['GBM', 'NN', 'CAT']
     hyperparameters = copy.deepcopy(hyperparameters)
     hyperparameters_standard = copy.deepcopy(hyperparameters)
@@ -253,7 +240,7 @@ def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_cla
         hyperparameters_rf = {key: hyperparameters_rf[key] for key in hyperparameters_rf if key == 'RF'}
         # TODO: add support for per-stack level hyperparameters
     models = get_preset_models(path=path, problem_type=SOFTCLASS, feature_metadata=feature_metadata, eval_metric=soft_log_loss, stopping_metric=soft_log_loss,
-                               hyperparameters=hyperparameters_standard, num_classes=num_classes, hyperparameter_tune=hyperparameter_tune,
+                               hyperparameters=hyperparameters_standard, num_classes=num_classes, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                                ag_args=ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
     if invalid_model_names is None:
         invalid_model_names = []
@@ -279,7 +266,7 @@ def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_cla
         elif 'default' in hyperparameters_rf and 'RF' in hyperparameters_rf['default']:
             hyperparameters_rf['default']['RF'] = rf_params
         rf_models = get_preset_models(path=path, problem_type=REGRESSION, feature_metadata=feature_metadata, eval_metric=mean_squared_error,
-                                      hyperparameters=hyperparameters_rf, hyperparameter_tune=hyperparameter_tune,
+                                      hyperparameters=hyperparameters_rf, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                                       ag_args=ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
     models_cat = [model for model in models if isinstance(model, CatBoostModel)]
     models_noncat = [model for model in models if not isinstance(model, CatBoostModel)]

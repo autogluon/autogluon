@@ -133,10 +133,18 @@ class TabularPredictorV2(TabularPredictor):
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(len(train_data), hyperparameter_tune)
 
+        if ag_args_fit is None:
+            ag_args_fit = dict()
+        # TODO: v0.1: Update to be 'auto' or None by default to give full control to individual models.
+        if 'num_cpus' not in ag_args_fit and num_cpus is not None:
+            ag_args_fit['num_cpus'] = num_cpus
+        if 'num_gpus' not in ag_args_fit and num_gpus is not None:
+            ag_args_fit['num_gpus'] = num_gpus
+
         # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
-        self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
-                          hyperparameter_tune=hyperparameter_tune,
+        self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
+                          hyperparameter_tune_kwargs=scheduler_options,
                           holdout_frac=holdout_frac, num_bagging_folds=num_bag_folds, num_bagging_sets=num_bag_sets, stack_ensemble_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs,
                           time_limit=time_limit, save_bagged_folds=save_bagged_folds, verbosity=verbosity)

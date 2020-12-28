@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import psutil
 
-from autogluon.core.utils import shuffle_df_rows
+from autogluon.core.utils import get_cpu_count
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
@@ -139,11 +139,10 @@ class AbstractModel:
             max_time_limit_ratio=1.0,  # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3, time_limit would be changed to 3.
             max_time_limit=None,  # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
             min_time_limit=0,  # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
-            # num_cpu=None,
-            # num_gpu=None,
+            # num_cpus=None,
+            # num_gpus=None,
             # ignore_hpo=False,
             # max_early_stopping_rounds=None,
-            # use_orig_features=True,  # TODO: Only for stackers
             # TODO: add option for only top-k ngrams
             ignored_type_group_special=None,  # List, drops any features in `self.feature_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
             ignored_type_group_raw=None,  # List, drops any features in `self.feature_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
@@ -274,6 +273,15 @@ class AbstractModel:
         elif time_limit is not None:
             time_limit = max(time_limit, min_time_limit)
         kwargs['time_limit'] = time_limit
+        kwargs = self._preprocess_fit_resources(kwargs)
+        return kwargs
+
+    def _preprocess_fit_resources(self, kwargs):
+        default_num_cpus, default_num_gpus = self._get_default_resources()
+        num_cpus = self.params_aux.get('num_cpus', default_num_cpus)
+        num_gpus = self.params_aux.get('num_gpus', default_num_gpus)
+        kwargs['num_cpus'] = kwargs.get('num_cpus', num_cpus)
+        kwargs['num_gpus'] = kwargs.get('num_gpus', num_gpus)
         return kwargs
 
     def fit(self, **kwargs):
@@ -505,8 +513,6 @@ class AbstractModel:
         scheduler_func, scheduler_options = scheduler_options  # Unpack tuple
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
-        params_copy['num_threads'] = scheduler_options['resource'].get('num_cpus', None)
-        params_copy['num_gpus'] = scheduler_options['resource'].get('num_gpus', None)
         dataset_train_filename = 'dataset_train.p'
         train_path = directory + dataset_train_filename
         save_pkl.save(path=train_path, object=(X_train, y_train))
@@ -676,6 +682,11 @@ class AbstractModel:
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
+
+    def _get_default_resources(self):
+        num_cpus = get_cpu_count()
+        num_gpus = 0
+        return num_cpus, num_gpus
 
     # TODO: v0.1 Add reference link to all valid keys and their usage or keep full docs here and reference elsewhere?
     @classmethod

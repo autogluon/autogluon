@@ -598,6 +598,10 @@ class BaggedEnsembleModel(AbstractModel):
         oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
         return oof_pred_proba, oof_pred_model_repeats
 
+    def _preprocess_fit_resources(self, kwargs):
+        """Pass along to child models to avoid altering up-front"""
+        return kwargs
+
     # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
     def hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options=None, preprocess_kwargs=None, **kwargs):
         if len(self.models) != 0:

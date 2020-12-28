@@ -33,13 +33,12 @@ class DefaultLearner(AbstractLearner):
         self._time_limit = None
 
     # TODO: v0.1 Document trainer_fit_kwargs
-    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, holdout_frac=0.1,
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac=0.1,
              num_bagging_folds=0, num_bagging_sets=1, time_limit=None, save_bagged_folds=True, verbosity=2, **trainer_fit_kwargs):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
                 X_unlabeled (DataFrame): data used for pretraining a model. This is same data format as X, without label-column. This data is used for semi-supervised learning.
-                scheduler_options (tuple: (search_strategy, dict): Options for scheduler
                 holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_val != None, ignored if kfolds != 0)
                 num_bagging_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
                 num_bagging_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
@@ -78,7 +77,6 @@ class DefaultLearner(AbstractLearner):
             low_memory=True,
             k_fold=num_bagging_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bagging_sets,  # TODO: Consider moving to fit call
-            scheduler_options=scheduler_options,
             save_data=self.cache_data,
             save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
