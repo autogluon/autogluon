@@ -69,10 +69,7 @@ class RFModel(AbstractModel):
         n_estimators_final = hyperparams['n_estimators']
 
         n_estimators_minimum = min(40, n_estimators_final)
-        if n_estimators_minimum < 40:
-            n_estimators_test = max(1, math.floor(n_estimators_minimum/5))
-        else:
-            n_estimators_test = 8
+        n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
 
         X_train = self.preprocess(X_train)
         n_estimator_increments = [n_estimators_final]
@@ -113,8 +110,9 @@ class RFModel(AbstractModel):
             self.model = self.model.fit(X_train, y_train)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
-
-                model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
+                model_size_bytes = 0
+                for estimator in self.model.estimators_:  # Uses far less memory than pickling the entire forest at once
+                    model_size_bytes += sys.getsizeof(pickle.dumps(estimator))
                 expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / self.model.n_estimators)
                 available_mem = psutil.virtual_memory().available
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
