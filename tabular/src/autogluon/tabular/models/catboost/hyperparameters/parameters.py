@@ -17,7 +17,7 @@ def get_param_baseline(problem_type, num_classes=None):
 def get_param_binary_baseline():
     params = {
         'iterations': DEFAULT_ITERATIONS,
-        'learning_rate': 0.1,
+        'learning_rate': 0.05,
     }
     return params
 
@@ -25,7 +25,7 @@ def get_param_binary_baseline():
 def get_param_multiclass_baseline(num_classes):
     params = {
         'iterations': DEFAULT_ITERATIONS,
-        'learning_rate': 0.1,
+        'learning_rate': 0.05,
     }
     return params
 
@@ -33,6 +33,6 @@ def get_param_multiclass_baseline(num_classes):
 def get_param_regression_baseline():
     params = {
         'iterations': DEFAULT_ITERATIONS,
-        'learning_rate': 0.1,
+        'learning_rate': 0.05,
     }
     return params

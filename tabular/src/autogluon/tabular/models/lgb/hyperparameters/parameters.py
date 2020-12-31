@@ -55,6 +55,7 @@ def get_param_binary_baseline():
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
+        'learning_rate': 0.05,
         'objective': 'binary',
         'verbose': -1,
         'boosting_type': 'gbdt',
@@ -67,6 +68,7 @@ def get_param_multiclass_baseline(num_classes):
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
+        'learning_rate': 0.05,
         'objective': 'multiclass',
         'num_classes': num_classes,
         'verbose': -1,
@@ -80,6 +82,7 @@ def get_param_regression_baseline():
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
+        'learning_rate': 0.05,
         'objective': 'regression',
         'verbose': -1,
         'boosting_type': 'gbdt',
