@@ -53,13 +53,13 @@ requirements = [
     'scikit-learn>=0.22.0,<0.24',
     'networkx>=2.3,<3.0',
     'gluoncv==0.9.0',  # TODO: v0.1 consider using only minimum required code from gluoncv and drop dependency
-    'torch<2.0',  # TODO: v0.1 make optional
-    'fastai<2.0',  # TODO: v0.1 make optional
+    'torch>=1.0,<2.0',  # TODO: v0.1 make optional
+    'fastai>=1.0,<2.0',  # TODO: v0.1 make optional
     f'autogluon.core=={version}',
 ]
 
 test_requirements = [
-    'pytest'
+    'pytest',
 ]
 
 if __name__ == '__main__':
