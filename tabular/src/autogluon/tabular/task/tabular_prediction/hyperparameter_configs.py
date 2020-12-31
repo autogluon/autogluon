@@ -13,6 +13,7 @@ hyperparameter_config_dict = dict(
         ],
         'CAT': {},
         'XGB': {},
+        'FASTAI': {},
         'RF': [
             {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
             {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
@@ -38,6 +39,7 @@ hyperparameter_config_dict = dict(
         ],
         'CAT': {},
         'XGB': {},
+        'FASTAI': {},
         'RF': [
             {'criterion': 'gini', 'max_depth': 15, 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
             {'criterion': 'entropy', 'max_depth': 15, 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
@@ -59,6 +61,7 @@ hyperparameter_config_dict = dict(
         ],
         'CAT': {},
         'XGB': {},
+        'FASTAI': {},
     },
     # Results in extremely quick to train models. Only use this when prototyping, as the model accuracy will be severely reduced.
     toy={

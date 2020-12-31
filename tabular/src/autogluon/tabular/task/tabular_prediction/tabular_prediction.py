@@ -219,6 +219,7 @@ class TabularPrediction(BaseTask):
                     ],
                     'CAT': {},
                     'XGB': {},
+                    'FASTAI': {},
                     'RF': [
                         {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
                         {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
@@ -245,6 +246,8 @@ class TabularPrediction(BaseTask):
                      See also the CatBoost docs: https://catboost.ai/docs/concepts/parameter-tuning.html
                 XGB: `autogluon.tabular.models.xgboost.hyperparameters.parameters`
                      See also the XGBoost docs: https://xgboost.readthedocs.io/en/latest/parameter.html
+                FASTAI: `autogluon.tabular.models.fastainn.hyperparameters.parameters`
+                     See also the FastAI docs: https://docs.fast.ai/tabular.models.html
                 RF: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
                 XT: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
