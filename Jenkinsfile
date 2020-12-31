@@ -27,6 +27,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
+
           cd core/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
@@ -60,6 +63,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.tabular
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
+
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
 
           cd core/
           python3 -m pip install --upgrade -e .
@@ -101,6 +107,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
+
           cd core/
           python3 -m pip install --upgrade -e .
           cd ../extra/
@@ -139,6 +148,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
+
           cd core/
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
@@ -176,6 +188,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.tabular
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
+
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
 
           cd core/
           python3 -m pip install --upgrade -e .
@@ -217,6 +232,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
+
           cd core/
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
@@ -256,6 +274,9 @@ stage("Unit Test") {
           pip uninstall -y autogluon.tabular
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
+
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
 
           cd core/
           python3 -m pip install --upgrade -e .
