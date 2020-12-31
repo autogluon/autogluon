@@ -12,14 +12,13 @@ python3 -m pip uninstall -y autogluon.tabular
 python3 -m pip uninstall -y autogluon.core
 python3 -m pip uninstall -y autogluon-contrib-nlp
 
-# Python 3.7 bug workaround: https://github.com/python/typing/issues/573
-python3 -m pip uninstall -y typing
-
 cd core/
 python3 -m pip install --upgrade -e .
 cd ..
 
 cd tabular/
+# Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+python3 -m pip uninstall -y typing
 python3 -m pip install --upgrade -e .
 cd ..
 
