@@ -6,19 +6,18 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
+from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
 from autogluon.core.utils import try_import_fastai_v1
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
 from autogluon.tabular.features import R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
 
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
-from ..abstract.model_trial import skip_hpo
 from ..abstract.abstract_model import AbstractModel
+from ..abstract.model_trial import skip_hpo
 from ...features.feature_metadata import R_OBJECT
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
@@ -76,9 +75,12 @@ class NNFastAiTabularModel(AbstractModel):
     unique_category_str = '!missing!'
 
     def __init__(self, **kwargs):
+        from fastai.tabular import FillMissing, Categorify, Normalize
         super().__init__(**kwargs)
         self.cat_columns = []
         self.cont_columns = []
+        self.columns_fills = {}
+        self.procs = [FillMissing, Categorify, Normalize]
         self.col_after_transformer = None
         self.y_scaler = None
 
@@ -93,7 +95,6 @@ class NNFastAiTabularModel(AbstractModel):
     def preprocess_train(self, X_train, y_train, X_val, y_val, **kwargs):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
-        from fastai.tabular import FillMissing, Categorify, Normalize
         from fastai.core import defaults
 
         self.cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
@@ -117,21 +118,38 @@ class NNFastAiTabularModel(AbstractModel):
         self.cat_columns = cat_cols_to_use
         self.cat_columns = [feature for feature in self.cat_columns if feature in list(X_train.columns)]
         self.cont_columns = [feature for feature in self.cont_columns if feature in list(X_train.columns)]
+
+        for c in self.cat_columns:
+            self.columns_fills[c] = '__missing__'
+        for c in self.cont_columns:
+            self.columns_fills[c] = X_train[c].mean()
+
+        X_train = self.fill_missing(X_train)
+
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
         X_train = self.fold_preprocess(X_train, fit=True)
         if X_val is not None:
+            X_val = self.fill_missing(X_val)
             X_val = self.fold_preprocess(X_val)
         df_train, train_idx, val_idx = self._generate_datasets(X_train, y_train_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
-        procs = [FillMissing, Categorify, Normalize]
 
         # additional workers are helping only when fork is enabled; in other mp modes, communication overhead reduces performance
         num_workers = defaults.cpus if is_fork_enabled() else 0
-        data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs)
+
+        # Copy cat_columns and cont_columns because TabularList is mutating the list
+        data = (TabularList.from_df(df_train, path=self.path,
+                                    cat_names=self.cat_columns.copy(), cont_names=self.cont_columns.copy(), procs=self.procs)
                 .split_by_idxs(train_idx, val_idx)
                 .label_from_df(cols=LABEL, label_cls=label_class)
                 .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32, num_workers=num_workers))
         return data
+
+    def fill_missing(self, df):
+        df = df[self.cat_columns + self.cont_columns]
+        for c in self.cat_columns + self.cont_columns:
+            df[c] = df[c].fillna(self.columns_fills[c])
+        return df
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
         try_import_fastai_v1()
@@ -299,15 +317,17 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.utils.mod_display import progress_disabled_ctx
         from fastai.tabular import FillMissing, Categorify, Normalize
 
+        X = self.fill_missing(X)
         X = self.preprocess(X, **kwargs)
-        procs = [FillMissing, Categorify, Normalize]
 
         single_row = len(X) == 1
         # fastai has issues predicting on a single row, duplicating the row as a workaround
         if single_row:
             X = pd.concat([X, X]).reset_index(drop=True)
 
-        self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs))
+        # Copy cat_columns and cont_columns because TabularList is mutating the list
+        self.model.data.add_test(TabularList.from_df(
+            X, cat_names=self.cat_columns.copy(), cont_names=self.cont_columns.copy(), procs=self.procs))
         with progress_disabled_ctx(self.model) as model:
             preds, _ = model.get_preds(ds_type=DatasetType.Test)
         if single_row:
