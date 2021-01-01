@@ -22,6 +22,7 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionT
 
 from autogluon.core import Space
 from autogluon.core.utils import try_import_mxboard
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.metrics import log_loss, roc_auc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
@@ -197,9 +198,12 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             self.ctx = mx.cpu()
         self.get_net(train_dataset, params=params)
 
-        if time_limit:
+        if time_limit is not None:
             time_elapsed = time.time() - start_time
+            time_limit_orig = time_limit
             time_limit = time_limit - time_elapsed
+            if time_limit <= time_limit_orig * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
+                raise TimeLimitExceeded
 
         self.train_net(train_dataset=train_dataset, params=params, val_dataset=val_dataset, initialize=True, setup_trainer=True, time_limit=time_limit, reporter=reporter)
         self.params_post_fit = params
@@ -315,6 +319,10 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             logger.log(15, "untrained Neural Net saved to file")
             return
 
+        start_fit_time = time.time()
+        if time_limit is not None:
+            time_limit = time_limit - (start_fit_time - start_time)
+
         # Training Loop:
         for e in range(num_epochs):
             if e == 0:  # special actions during first epoch:
@@ -363,11 +371,12 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                     reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
             if e - val_improve_epoch > epochs_wo_improve:
                 break  # early-stop if validation-score hasn't strictly improved in `epochs_wo_improve` consecutive epochs
-            if time_limit:
-                time_elapsed = time.time() - start_time
+            if time_limit is not None:
+                time_elapsed = time.time() - start_fit_time
+                time_epoch_average = time_elapsed / (e+1)
                 time_left = time_limit - time_elapsed
-                if time_left <= 0:
-                    logger.log(20, "\tRan out of time, stopping training early.")
+                if time_left < time_epoch_average:
+                    logger.log(20, f"\tRan out of time, stopping training early. (Stopping on epoch {e})")
                     break
 
         if val_dataset is not None:
