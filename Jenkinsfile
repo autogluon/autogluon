@@ -64,6 +64,8 @@ stage("Unit Test") {
           cd core/
           python3 -m pip install --upgrade -e .
           cd ../tabular/
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
@@ -180,6 +182,8 @@ stage("Unit Test") {
           cd core/
           python3 -m pip install --upgrade -e .
           cd ../tabular/
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
@@ -260,6 +264,8 @@ stage("Unit Test") {
           cd core/
           python3 -m pip install --upgrade -e .
           cd ../tabular/
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          pip uninstall -y typing
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
