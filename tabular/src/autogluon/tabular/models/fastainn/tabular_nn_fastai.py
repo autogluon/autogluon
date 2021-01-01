@@ -33,7 +33,7 @@ from ...features.feature_metadata import R_OBJECT
 # MacOS issue: torchvision==0.7.0 + torch==1.6.0 can cause segfaults; use torch==1.2.0 torchvision==0.4.0
 
 LABEL = '__label__'
-MISSING = '__missing__'
+MISSING = '__!#ag_internal_missing#!__'
 
 logger = logging.getLogger(__name__)
 
