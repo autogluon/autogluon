@@ -1,7 +1,9 @@
 import logging
 
 import numpy as np
+import math
 import psutil
+import time
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 
 from autogluon.core.constants import REGRESSION
@@ -54,10 +56,17 @@ class KNNModel(AbstractModel):
         spaces = {}
         return spaces
 
-    def _fit(self, X_train, y_train, **kwargs):
+    def _fit(self, X_train, y_train, time_limit=None, **kwargs):
+        time_start = time.time()
         X_train = self.preprocess(X_train)
-        self._validate_fit_memory_usage(X_train=X_train)
-        self.model = self._model_type(**self.params).fit(X_train, y_train)
+        self._validate_fit_memory_usage(X_train=X_train)  # TODO: Can incorporate this into samples, can fit on portion of data to satisfy memory instead of raising exception immediately
+
+        num_rows_max = len(X_train)
+        # FIXME: v0.1 Must store final num rows for refit_full or else will use everything! Worst case refit_full could train far longer than the original model.
+        if time_limit is None or num_rows_max <= 10000:
+            self.model = self._model_type(**self.params).fit(X_train, y_train)
+        else:
+            self.model = self._fit_with_samples(X_train=X_train, y_train=y_train, time_limit=time_limit - (time.time() - time_start))
 
     def _validate_fit_memory_usage(self, X_train):
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
@@ -70,6 +79,66 @@ class KNNModel(AbstractModel):
                 logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory...')
             if model_memory_ratio > (0.20 * max_memory_usage_ratio):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
+
+    # TODO: Consider making this fully generic and available to all models
+    def _fit_with_samples(self, X_train, y_train, time_limit):
+        """
+        Fit model with samples of the data repeatedly, gradually increasing the amount of data until time_limit is reached or all data is used.
+
+        X_train and y_train must already be preprocessed
+        """
+        time_start = time.time()
+
+        sample_growth_factor = 2  # Growth factor of each sample in terms of row count
+        sample_time_growth_factor = 8  # Assume next sample will take 8x longer than previous (Somewhat safe but there are datasets where it is even >8x.
+
+        num_rows_samples = []
+        num_rows_max = len(X_train)
+        num_rows_cur = 10000
+        while True:
+            num_rows_cur = min(num_rows_cur, num_rows_max)
+            num_rows_samples.append(num_rows_cur)
+            if num_rows_cur == num_rows_max:
+                break
+            num_rows_cur *= sample_growth_factor
+            num_rows_cur = math.ceil(num_rows_cur)
+            if num_rows_cur * 1.5 >= num_rows_max:
+                num_rows_cur = num_rows_max
+
+        def sample_func(chunk, frac):
+            # Guarantee at least 1 sample (otherwise log_loss would crash or model would return different column counts in pred_proba)
+            n = max(math.ceil(len(chunk) * frac), 1)
+            return chunk.sample(n=n, replace=False, random_state=0)
+
+        if self.problem_type != REGRESSION:
+            y_train_df = y_train.to_frame(name='label').reset_index(drop=True)
+        else:
+            y_train_df = None
+
+        time_start_sample_loop = time.time()
+        time_limit_left = time_limit - (time_start_sample_loop - time_start)
+        for samples in num_rows_samples:
+            if samples != num_rows_max:
+                if self.problem_type == REGRESSION:
+                    idx = np.random.choice(num_rows_max, size=samples, replace=False)
+                else:
+                    idx = y_train_df.groupby('label', group_keys=False).apply(sample_func, frac=samples/num_rows_max).index
+                X_train_samp = X_train[idx, :]
+                y_train_samp = y_train.iloc[idx]
+            else:
+                X_train_samp = X_train
+                y_train_samp = y_train
+            self.model = self._model_type(**self.params).fit(X_train_samp, y_train_samp)
+            time_limit_left_prior = time_limit_left
+            time_fit_end_sample = time.time()
+            time_limit_left = time_limit - (time_fit_end_sample - time_start)
+            time_fit_sample = time_limit_left_prior - time_limit_left
+            time_required_for_next = time_fit_sample * sample_time_growth_factor
+            logger.log(15, f'\t{round(time_fit_sample, 2)}s \t= Train Time (Using {samples} of {num_rows_max} samples) ({round(time_limit_left, 2)}s remaining time)')
+            if time_required_for_next > time_limit_left and samples != num_rows_samples[-1]:
+                logger.log(20, f'\tNot enough time to train model on all training rows. Fit {samples}/{num_rows_max} rows. (Next model expected to take {round(time_required_for_next, 2)}s to train.)')
+                break
+        return self.model
 
     # TODO: Add HPO
     def hyperparameter_tune(self, **kwargs):
