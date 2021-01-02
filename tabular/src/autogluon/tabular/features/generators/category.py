@@ -111,7 +111,8 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                     if len(category_list) > 1:
                         if self.cat_order == 'original':
                             original_cat_order = list(X_category[column].cat.categories)
-                            category_list = [cat for cat in original_cat_order if cat in category_list]
+                            set_category_list = set(category_list)
+                            category_list = [cat for cat in original_cat_order if cat in set_category_list]
                         elif self.cat_order == 'alphanumeric':
                             category_list.sort()
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))  # TODO: Remove columns if all NaN after this?
