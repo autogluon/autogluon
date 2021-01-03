@@ -117,7 +117,7 @@ class KNNModel(AbstractModel):
 
         time_start_sample_loop = time.time()
         time_limit_left = time_limit - (time_start_sample_loop - time_start)
-        for samples in num_rows_samples:
+        for i, samples in enumerate(num_rows_samples):
             if samples != num_rows_max:
                 if self.problem_type == REGRESSION:
                     idx = np.random.choice(num_rows_max, size=samples, replace=False)
@@ -134,9 +134,9 @@ class KNNModel(AbstractModel):
             time_limit_left = time_limit - (time_fit_end_sample - time_start)
             time_fit_sample = time_limit_left_prior - time_limit_left
             time_required_for_next = time_fit_sample * sample_time_growth_factor
-            logger.log(15, f'\t{round(time_fit_sample, 2)}s \t= Train Time (Using {samples} of {num_rows_max} samples) ({round(time_limit_left, 2)}s remaining time)')
-            if time_required_for_next > time_limit_left and samples != num_rows_samples[-1]:
-                logger.log(20, f'\tNot enough time to train model on all training rows. Fit {samples}/{num_rows_max} rows. (Next model expected to take {round(time_required_for_next, 2)}s to train.)')
+            logger.log(15, f'\t{round(time_fit_sample, 2)}s \t= Train Time (Using {samples}/{num_rows_max} rows) ({round(time_limit_left, 2)}s remaining time)')
+            if time_required_for_next > time_limit_left and i != len(num_rows_samples) - 1:
+                logger.log(20, f'\tNot enough time to train KNN model on all training rows. Fit {samples}/{num_rows_max} rows. (Training KNN model on {num_rows_samples[i+1]} rows is expected to take {round(time_required_for_next, 2)}s)')
                 break
         return self.model
 
