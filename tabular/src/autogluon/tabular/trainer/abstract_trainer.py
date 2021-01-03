@@ -999,6 +999,10 @@ class AbstractTrainer:
             elif k_fold_start != 0:
                 raise ValueError(f'k_fold_start must be 0 to feature_prune, value = {k_fold_start}')
             self._autotune(X_train=X_train, X_holdout=X_val, y_train=y_train, y_holdout=y_val, model_base=model)  # TODO: Update to use CV instead of holdout
+        model_fit_kwargs = dict(
+            time_limit=time_limit,
+            verbosity=self.verbosity,
+        )
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
@@ -1007,9 +1011,9 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             try:
                 if isinstance(model, BaggedEnsembleModel):
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, verbosity=self.verbosity)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
                 else:
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, scheduler_options=hyperparameter_tune_kwargs, verbosity=self.verbosity)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
             except Exception as err:
                 logger.exception(f'Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.')
                 logger.warning(err)
@@ -1024,10 +1028,6 @@ class AbstractTrainer:
                     self._add_model(model=model_hpo, stack_name=stack_name, level=level)
                     model_names_trained.append(model_hpo.name)
         else:
-            model_fit_kwargs = dict(
-                time_limit=time_limit,
-                verbosity=self.verbosity,
-            )
             if isinstance(model, BaggedEnsembleModel):
                 model_fit_kwargs.update(dict(
                     k_fold=k_fold,
@@ -1102,14 +1102,20 @@ class AbstractTrainer:
         )
         fit_args.update(kwargs)
 
+        if hyperparameter_tune_kwargs:
+            time_split = True
+        else:
+            time_split = False
         if k_fold == 0:
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune, time_limit=time_limit, **fit_args)
+            time_ratio = 0.9 if hyperparameter_tune_kwargs else 1
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune, time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
         else:
             k_fold_start = 0
             if hyperparameter_tune_kwargs or feature_prune:
                 time_start = time.time()
+                time_ratio = (1 - (1 / k_fold)) * 0.9
                 models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune,
-                                                k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
+                                                k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
                 k_fold_start = 1
                 if time_limit is not None:
                     time_limit = time_limit - (time.time() - time_start)
@@ -1122,7 +1128,7 @@ class AbstractTrainer:
     # TODO: Robert dataset, LightGBM is super good but RF and KNN take all the time away from it on 1h despite being much worse
     # TODO: Add time_limit_per_model
     # TODO: Rename for v0.1
-    def _train_multi_fold(self, X_train, y_train, models: List[AbstractModel], time_limit=None, **kwargs) -> List[str]:
+    def _train_multi_fold(self, X_train, y_train, models: List[AbstractModel], time_limit=None, time_split=False, time_ratio=1, **kwargs) -> List[str]:
         """
         Trains and saves a list of models sequentially.
         This method should only be called in self._train_multi_initial
@@ -1130,17 +1136,26 @@ class AbstractTrainer:
         """
         models_valid = []
         time_start = time.time()
+        if time_limit is not None:
+            time_limit = time_limit * time_ratio
+        if time_limit is not None and len(models) > 0:
+            time_limit_model_split = time_limit / len(models)
+        else:
+            time_limit_model_split = time_limit
         for i, model in enumerate(models):
             if isinstance(model, str):
                 model = self.load_model(model)
             elif self.low_memory:
                 model = copy.deepcopy(model)
             # TODO: Only update scores when finished, only update model as part of final models if finished!
-            if time_limit is None:
-                time_left = None
+            if time_split:
+                time_left = time_limit_model_split
             else:
-                time_start_model = time.time()
-                time_left = time_limit - (time_start_model - time_start)
+                if time_limit is None:
+                    time_left = None
+                else:
+                    time_start_model = time.time()
+                    time_left = time_limit - (time_start_model - time_start)
             model_name_trained_lst = self._train_single_full(X_train, y_train, model, time_limit=time_left, **kwargs)
 
             if self.low_memory:

@@ -502,7 +502,13 @@ class AbstractModel:
         )
         return init_args
 
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
+        scheduler_options = copy.deepcopy(scheduler_options)
+        if 'time_out' not in scheduler_options[1]:
+            scheduler_options[1]['time_out'] = time_limit
+        return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
+
+    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)

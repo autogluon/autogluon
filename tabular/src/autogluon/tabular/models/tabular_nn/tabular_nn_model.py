@@ -674,7 +674,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             model.summary_writer = None
         return model
 
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         """ Performs HPO and sets self.params to best hyperparameter values """
         time_start = time.time()
         self.verbosity = kwargs.get('verbosity', 2)

@@ -143,7 +143,7 @@ class RFModel(AbstractModel):
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
     def get_model_feature_importance(self):

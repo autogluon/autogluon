@@ -369,7 +369,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
     def _get_default_auxiliary_params(self) -> dict:

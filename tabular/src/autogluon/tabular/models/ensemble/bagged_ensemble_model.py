@@ -603,7 +603,7 @@ class BaggedEnsembleModel(AbstractModel):
         return kwargs
 
     # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
-    def hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options=None, preprocess_kwargs=None, **kwargs):
+    def _hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options=None, preprocess_kwargs=None, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 

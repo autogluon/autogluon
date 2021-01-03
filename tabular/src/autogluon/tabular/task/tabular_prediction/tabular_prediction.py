@@ -661,6 +661,8 @@ class TabularPrediction(BaseTask):
             time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
         # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
         time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+        if time_limits is not None:
+            time_limits_hpo = None
 
         if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):
             hyperparameter_tune = False
@@ -703,6 +705,8 @@ class TabularPrediction(BaseTask):
             reward_attr='validation_performance',
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
+        if time_limits_hpo is None:
+            scheduler_options.pop('time_out', None)
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         if not hyperparameter_tune:
             scheduler_options = None

@@ -280,6 +280,8 @@ class TabularPredictorV2(TabularPredictor):
             time_limits_hpo = time_limits_hpo / (1 + num_bag_folds * (1 + num_stack_levels))
         # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
         time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+        if time_limit is not None:
+            time_limits_hpo = None
 
         if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, str):
             preset_dict = {
@@ -315,6 +317,8 @@ class TabularPredictorV2(TabularPredictor):
             return None  # FIXME
 
         scheduler_cls = schedulers[scheduler_options['searcher'].lower()]
+        if scheduler_options['time_out'] is None:
+            scheduler_options.pop('time_out', None)
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         return scheduler_options
 
