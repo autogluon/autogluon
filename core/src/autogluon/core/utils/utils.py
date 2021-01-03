@@ -178,6 +178,16 @@ def augment_rare_classes(X, label, threshold):
         logger.debug("augment_rare_classes did not need to duplicate any data from rare classes")
         return X
 
+    missing_classes = []
+    for clss, n_clss in class_counts_invalid.iteritems():
+        if n_clss == 0:
+            missing_classes.append(clss)
+    if missing_classes:
+        logger.warning(f'WARNING: Classes were found that have 0 training examples, and may lead to downstream issues. '
+                       f'Consider either providing data for these classes or removing them from the class categories. '
+                       f'These classes will be ignored: {missing_classes}')
+        class_counts_invalid = class_counts_invalid[~class_counts_invalid.index.isin(set(missing_classes))]
+
     aug_df = None
     for clss, n_clss in class_counts_invalid.iteritems():
         n_toadd = threshold - n_clss
@@ -197,6 +207,7 @@ def augment_rare_classes(X, label, threshold):
     X = X.append(aug_df)
     class_counts = X[label].value_counts()
     class_counts_invalid = class_counts[class_counts < threshold]
+    class_counts_invalid = class_counts_invalid[~class_counts_invalid.index.isin(set(missing_classes))]
     if len(class_counts_invalid) > 0:
         raise RuntimeError("augment_rare_classes failed to produce enough data from rare classes")
     logger.log(15, "Replicated some data from rare classes in training set because eval_metric requires all classes")
