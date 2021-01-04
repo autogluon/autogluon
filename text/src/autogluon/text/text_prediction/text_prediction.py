@@ -232,6 +232,7 @@ class TextPrediction(BaseTask):
             hyperparameters=None,
             plot_results=None,
             seed=None,
+            visualizer=None,
             verbosity=2):
         """Fit models to make predictions based on text inputs.
 
@@ -292,7 +293,9 @@ class TextPrediction(BaseTask):
         plot_results : bool, default = None
             Whether or not to plot intermediate training results during `fit()`.
         seed : int, default = None
-            Seed value for random state used inside `fit()`. 
+            Seed value for random state used inside `fit()`.
+        visualizer : str, default = None
+            How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', None].
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed
             during fit().

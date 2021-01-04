@@ -232,11 +232,12 @@ def _classification_regression_predict(net, dataloader, problem_type,
 def calculate_metric(scorer, ground_truth, predictions, problem_type):
     if problem_type == _C.CLASSIFICATION:
         if scorer.name == 'roc_auc':
-            return scorer(ground_truth, predictions[:, 1])
+            return scorer._sign * scorer(ground_truth, predictions[:, 1])
         else:
-            return scorer(ground_truth, predictions)
+            return scorer._sign * scorer(ground_truth, predictions)
     else:
-        return scorer(ground_truth, predictions)
+        return scorer._sign * scorer(ground_truth, predictions)
+
 
 @use_np
 def train_function(args, reporter, train_data, tuning_data,
@@ -249,6 +250,7 @@ def train_function(args, reporter, train_data, tuning_data,
     if isinstance(log_metrics, str):
         log_metrics = [log_metrics]
     log_metric_scorers = [get_metric(ele) for ele in log_metrics]
+    greater_is_better = log_metric_scorers[0].greater_is_better
     stopping_metric_scorer = get_metric(stopping_metric)
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['OMP_NUM_THREADS'] = '1'
@@ -417,7 +419,9 @@ def train_function(args, reporter, train_data, tuning_data,
                                          problem_types[0])
             valid_time_spent = time.time() - valid_start_tick
             # Metrics have ensured that greater --> better
-            if best_performance_score is None or dev_score >= best_performance_score:
+            if best_performance_score is None or \
+                    (greater_is_better and dev_score >= best_performance_score) or \
+                    (not greater_is_better and dev_score <= best_performance_score):
                 find_better = True
                 no_better_rounds = 0
                 best_performance_score = dev_score
@@ -443,8 +447,7 @@ def train_function(args, reporter, train_data, tuning_data,
             if time_limits is not None and total_time_spent > time_limits:
                 break
             report_idx += 1
-            report_items.append((stopping_metric_scorer.reward_attr,
-                                 dev_score))
+            report_items.append((stopping_metric_scorer.name, dev_score))
             report_items.append(('exp_dir', exp_dir))
             if find_better:
                 best_report_items = report_items
