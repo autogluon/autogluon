@@ -33,6 +33,7 @@ from ...features.feature_metadata import R_OBJECT
 # MacOS issue: torchvision==0.7.0 + torch==1.6.0 can cause segfaults; use torch==1.2.0 torchvision==0.4.0
 
 LABEL = '__label__'
+MISSING = '__!#ag_internal_missing#!__'
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +72,8 @@ class NNFastAiTabularModel(AbstractModel):
             See: https://docs.fast.ai/layers.html#LabelSmoothingCrossEntropy
     """
 
+
     model_internals_file_name = 'model-internals.pkl'
-    unique_category_str = '!missing!'
 
     def __init__(self, **kwargs):
         from fastai.tabular import FillMissing, Categorify, Normalize
@@ -120,7 +121,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.cont_columns = [feature for feature in self.cont_columns if feature in list(X_train.columns)]
 
         for c in self.cat_columns:
-            self.columns_fills[c] = '__missing__'
+            self.columns_fills[c] = MISSING
         for c in self.cont_columns:
             self.columns_fills[c] = X_train[c].mean()
 
@@ -146,8 +147,10 @@ class NNFastAiTabularModel(AbstractModel):
         return data
 
     def fill_missing(self, df):
-        df = df[self.cat_columns + self.cont_columns]
+        df = df[self.cat_columns + self.cont_columns].copy()
         for c in self.cat_columns + self.cont_columns:
+            if c in self.cat_columns:
+                df[c] = df[c].cat.add_categories(MISSING)
             df[c] = df[c].fillna(self.columns_fills[c])
         return df
 
@@ -315,7 +318,6 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.basic_data import DatasetType
         from fastai.tabular import TabularList
         from fastai.utils.mod_display import progress_disabled_ctx
-        from fastai.tabular import FillMissing, Categorify, Normalize
 
         X = self.fill_missing(X)
         X = self.preprocess(X, **kwargs)
