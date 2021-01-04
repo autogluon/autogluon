@@ -9,7 +9,7 @@ from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_mod
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
 from autogluon.core.utils.utils import setup_outputdir
-
+from ...utils.dataset_utils import time_series_dataset
 __all__ = ['ForecastingPredictor']
 
 logger = logging.getLogger()  # return root logger
@@ -17,7 +17,7 @@ logger = logging.getLogger()  # return root logger
 
 class ForecastingPredictor(BasePredictor):
 
-    def __init__(self, learner):
+    def __init__(self, learner, index_column="index", target_column="target", time_column="date"):
         """ Creates TabularPredictor object.
             You should not construct a TabularPredictor yourself, it is only intended to be produced during fit().
 
@@ -29,6 +29,9 @@ class ForecastingPredictor(BasePredictor):
             To access any learner method `func()` from this Predictor, use: `predictor._learner.func()`.
             To access any trainer method `func()` from this `Predictor`, use: `predictor._trainer.func()`.
         """
+        self.index_column = index_column
+        self.target_column = target_column
+        self.time_column = time_column
         self._learner: Learner = learner  # Learner object
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
         self.output_directory = self._learner.path
@@ -38,12 +41,21 @@ class ForecastingPredictor(BasePredictor):
         """Returns the list of model names trained in this `predictor` object."""
         return self._trainer.get_model_names_all()
 
+    def preprocessing(self, data):
+        processed_data = time_series_dataset(data,
+                                             index_column=self.index_column,
+                                             target_column=self.target_column,
+                                             time_column=self.time_column)
+        return processed_data
+
     def predict(self, data, model=None, for_score=False, **kwargs):
-        predict_targets = self._learner.predict(data, model=model, for_score=for_score, **kwargs)
+        processed_data = self.preprocessing(data)
+        predict_targets = self._learner.predict(processed_data, model=model, for_score=for_score, **kwargs)
         return predict_targets
 
     def evaluate(self, data, **kwargs):
-        perf = self._learner.score(data, **kwargs)
+        processed_data = self.preprocessing(data)
+        perf = self._learner.score(processed_data, **kwargs)
         return perf
 
     def evaluate_predictions(self, forecasts, tss, **kwargs):

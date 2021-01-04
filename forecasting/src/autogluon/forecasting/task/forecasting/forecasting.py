@@ -1,5 +1,6 @@
 from autogluon.core.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
-from .dataset_v2 import TimeSeriesDataset
+from .dataset import TimeSeriesDataset
+from autogluon.tabular.task.tabular_prediction.dataset import TabularDataset
 from ...utils.dataset_utils import rebuild_tabular, train_test_split
 from ...learner.abstract_learner import AbstractLearner
 from ...learner import DefaultLearner as Learner
@@ -11,7 +12,7 @@ __all__ = ['Forecasting']
 
 class Forecasting(BaseTask):
 
-    Dataset = TimeSeriesDataset
+    Dataset = TabularDataset
     Predictor = ForecastingPredictor
 
     @staticmethod
@@ -79,7 +80,10 @@ class Forecasting(BaseTask):
                     hyperparameter_tune=hyperparameter_tune,)
 
         # TODO: refit full
-        predictor = ForecastingPredictor(learner)
+        predictor = ForecastingPredictor(learner,
+                                         index_column=index_column,
+                                         target_column=target_column,
+                                         time_column=time_column)
         return predictor
 
 

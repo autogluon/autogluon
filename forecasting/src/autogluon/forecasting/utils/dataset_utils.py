@@ -1,8 +1,8 @@
 from gluonts.dataset.repository.datasets import dataset_recipes
-from ..task.forecasting.dataset_v2 import TimeSeriesDataset
+from ..task.forecasting.dataset import TimeSeriesDataset
 import pandas as pd
 
-__all__ = ['gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset']
+__all__ = ['gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset', 'train_test_split']
 
 
 def gluonts_builtin_datasets():
@@ -45,6 +45,7 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
     if index_column is None:
         X = X[[time_column, target_column]]
         X["index_column"] = ["time_series" for i in range(X.shape[0])]
+        index_column = "index_column"
     time_list = sorted(list(set(X[time_column])))
     freq = pd.infer_freq(time_list)
     if freq is None:
@@ -56,7 +57,8 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
         each time series, and use dataframe.pivot() to convert it to one column, where the column name is the
         time, each row is the corresponding target value for each time series.
         """
-        data_dic = {index_column: list(set(df[index_column]))}
+        df = df.sort_values(by=index_column)
+        data_dic = {index_column: sorted(list(set(df[index_column])))}
 
         for time in time_list:
             tmp = df[df[time_column] == time][[index_column, time_column, target_column]]
@@ -75,9 +77,11 @@ def train_test_split(df, prediction_length):
     return train_ds, test_ds
 
 
-def time_series_dataset(data, index_column="index", target_column="target", time_column="date"):
+def time_series_dataset(data, index_column=None, target_column="target", time_column="date"):
     rebuilt_data = rebuild_tabular(data,
                                    index_column=index_column,
                                    target_column=target_column,
                                    time_column=time_column)
+    if index_column is None:
+        index_column = "index_column"
     return TimeSeriesDataset(rebuilt_data, index_column=index_column)
