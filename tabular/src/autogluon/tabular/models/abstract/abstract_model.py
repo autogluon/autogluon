@@ -219,38 +219,37 @@ class AbstractModel:
         If preprocessing code will produce the same output regardless of which child model processes the input data, then it should live here to avoid redundant repeated processing for each child.
         This means this method cannot be used for data normalization. Refer to `_preprocess` instead.
         """
-        if self.features is not None:
-            # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
-            if list(X.columns) != self.features:
-                return X[self.features]
-        else:
-            self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
-            # TODO: Consider changing how this works or where it is done
-            if self.feature_metadata is None:
-                feature_metadata = FeatureMetadata.from_df(X)
-            else:
-                feature_metadata = self.feature_metadata
-            get_features_kwargs = self.params_aux.get('get_features_kwargs', None)
-            if get_features_kwargs is not None:
-                valid_features = feature_metadata.get_features(**get_features_kwargs)
-            else:
-                ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', None)
-                ignored_type_group_special = self.params_aux.get('ignored_type_group_special', None)
-                valid_features = feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
-            get_features_kwargs_extra = self.params_aux.get('get_features_kwargs_extra', None)
-            if get_features_kwargs_extra is not None:
-                valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
-                valid_features = [feature for feature in valid_features if feature in valid_features_extra]
-            dropped_features = [feature for feature in self.features if feature not in valid_features]
-            logger.log(10, f'\tDropped {len(dropped_features)} of {len(self.features)} features.')
-            self.features = [feature for feature in self.features if feature in valid_features]
-            if self.feature_metadata is not None:
-                self.feature_metadata = self.feature_metadata.keep_features(self.features)
-            if not self.features:
-                raise NoValidFeatures
-            if list(X.columns) != self.features:
-                X = X[self.features]
+        if self.features is None:
+            self._preprocess_set_features(X=X)
+        # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
+        if list(X.columns) != self.features:
+            X = X[self.features]
         return X
+
+    def _preprocess_set_features(self, X: pd.DataFrame):
+        self.features = list(X.columns)
+        # TODO: Consider changing how this works or where it is done
+        if self.feature_metadata is None:
+            feature_metadata = FeatureMetadata.from_df(X)
+        else:
+            feature_metadata = self.feature_metadata
+        get_features_kwargs = self.params_aux.get('get_features_kwargs', None)
+        if get_features_kwargs is not None:
+            valid_features = feature_metadata.get_features(**get_features_kwargs)
+        else:
+            ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', None)
+            ignored_type_group_special = self.params_aux.get('ignored_type_group_special', None)
+            valid_features = feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+        get_features_kwargs_extra = self.params_aux.get('get_features_kwargs_extra', None)
+        if get_features_kwargs_extra is not None:
+            valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
+            valid_features = [feature for feature in valid_features if feature in valid_features_extra]
+        dropped_features = [feature for feature in self.features if feature not in valid_features]
+        logger.log(10, f'\tDropped {len(dropped_features)} of {len(self.features)} features.')
+        self.features = [feature for feature in self.features if feature in valid_features]
+        self.feature_metadata = feature_metadata.keep_features(self.features)
+        if not self.features:
+            raise NoValidFeatures
 
     def _preprocess_fit_args(self, **kwargs):
         time_limit = kwargs.get('time_limit', None)
