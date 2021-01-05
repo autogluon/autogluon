@@ -257,12 +257,14 @@ from autogluon.text.text_prediction.text_prediction import ag_text_prediction_pa
 from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
 import copy
 
-text_nn_params = ag_text_prediction_params.create('default_no_hpo')
-text_nn_params['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] = 'google_electra_base'
+text_nn_params = ag_text_prediction_params.create('default_electra_base_no_hpo')
 text_nn_params['AG_args'] = {'valid_stacker': False}
 
-tabular_multimodel_hparam_v2 = copy.deepcopy(tabular_multimodel_hparam_v1)
-tabular_multimodel_hparam_v2['TEXT_NN_V1'] = text_nn_params
+tabular_multimodel_hparam_v2 = {
+    'GBM': [{}, {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}}],
+    'CAT': {},
+    'TEXT_NN_V1': {'AG_args': {'valid_stacker': False}},
+}
 
 predictor_model6 = TabularPrediction.fit(train_df,
                                       label=label_column,

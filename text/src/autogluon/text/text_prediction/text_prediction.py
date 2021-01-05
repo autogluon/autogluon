@@ -41,9 +41,9 @@ def default() -> dict:
         'models': {
             'BertForTextPredictionBasic': {
                 'search_space': {
-                    'model.backbone.name': 'google_electra_base',
+                    'model.backbone.name': 'google_electra_small',
                     'optimization.batch_size': 32,
-                    'optimization.per_device_batch_size': 8,
+                    'optimization.per_device_batch_size': 16,
                     'optimization.num_train_epochs': 4,
                     'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5),
                     'optimization.layerwise_lr_decay': space.Real(0.8, 1.0, default=0.8)
@@ -86,6 +86,10 @@ def default_electra_small() -> dict:
 def default_electra_base_no_hpo() -> dict:
     """The default search space that uses ELECTRA Base as the backbone"""
     cfg = default_no_hpo()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+        = 'google_electra_base'
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 8
     return cfg
 
 
