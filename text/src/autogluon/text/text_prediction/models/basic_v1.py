@@ -416,7 +416,7 @@ def train_function(args, reporter, train_data, tuning_data,
             dev_score = calculate_metric(stopping_metric_scorer, gt_dev_labels, dev_predictions,
                                          problem_types[0])
             valid_time_spent = time.time() - valid_start_tick
-            # Metrics have ensured that greater --> better
+
             if best_performance_score is None or \
                     (greater_is_better and dev_score >= best_performance_score) or \
                     (not greater_is_better and dev_score <= best_performance_score):
