@@ -16,8 +16,13 @@ class EfficientNetB1(EfficientNet):
                          depth_coefficient=depth_coefficient,
                          input_size=input_size)
 
-results = task.fit('imagenet', net=EfficientNetB1(), search_strategy='grid',
-                   optimizer=SGD(learning_rate=1e-1, momentum=0.9, wd=1e-4),
-                   batch_size=32)
+classifier = ImagePredictor()
+classifier.fit('imagenet',
+               hyperparameters={
+                   'net':EfficientNetB1(),
+                   'search_strategy': 'grid',
+                   'optimizer': SGD(learning_rate=1e-1, momentum=0.9, wd=1e-4),
+                   'batch_size': 32
+                   })
 
-print(results)
+print(classifier.fit_summary())

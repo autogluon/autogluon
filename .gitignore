@@ -120,7 +120,6 @@ train/*
 
 tutorials/checkpoint/*
 tutorials/train/*
-examples/image_classification/*/
 examples/image_classification/*.csv
 tests/unittests/*.zip
 
