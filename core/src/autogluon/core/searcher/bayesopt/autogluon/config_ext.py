@@ -77,6 +77,43 @@ class ExtendedConfiguration(object):
     def from_dict(self, config_dct: dict) -> CS.Configuration:
         # Note: Here, the key for resource is resource_attr_key, not
         # resource_attr_name
-        return CS.Configuration(
-            self.hp_ranges_ext if self.resource_attr_key in config_dct \
-                else self.hp_ranges, values=config_dct)
+        hp_ranges = self.hp_ranges_ext if self.resource_attr_key in config_dct \
+            else self.hp_ranges
+        return CS.Configuration(hp_ranges.config_space, values=config_dct)
+
+    def split(self, config_ext: CS.Configuration, as_dict: bool=False) -> \
+            (Union[CS.Configuration, dict], int):
+        """
+        :param config_ext: Extended config
+        :param as_dict: Return as dict?
+        :return: (config, resource_value)
+        """
+        x_res = copy.copy(config_ext.get_dictionary())
+        resource_value = int(x_res[self.resource_attr_name])
+        del x_res[self.resource_attr_name]
+        if not as_dict:
+            x_res = CS.Configuration(self.hp_ranges.config_space, values=x_res)
+        return x_res, resource_value
+
+    def get_resource(self, config_ext: CS.Configuration) -> int:
+        return config_ext.get_dictionary()[self.resource_attr_name]
+
+    def config_to_tuple(self, config: Union[CS.Configuration, dict]) -> tuple:
+        """
+        :param config: Can be extended or not
+        :return: Tuple representation (ignoring resource attribute for extended
+            config)
+        """
+        if isinstance(config, CS.Configuration):
+            config = config.get_dictionary()
+        else:
+            assert isinstance(config, dict)
+        return tuple(config[k] for k in self.keys_sorted)
+
+    def tuple_to_config(self, config_tpl: tuple, as_dict: bool = False) -> \
+            Union[CS.Configuration, dict]:
+        config = dict(zip(self.keys_sorted, config_tpl))
+        if not as_dict:
+            config = CS.Configuration(self.hp_ranges.config_space,
+                                      values=config)
+        return config
