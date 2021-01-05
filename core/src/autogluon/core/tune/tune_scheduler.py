@@ -37,10 +37,18 @@ class RayTuneScheduler(object):
         config = EasyDict(config)
         return fn(config, reporter=cls.reporter_fn, **kwargs)
 
-    def run_job(self, **kwargs):
+    def run(self, **kwargs):
         result = tune.run(
             partial(self.train_fn_wrapper, self.task_fn.f),
             config=self.wrap_space(self.task_fn.kwvars),
             **self.tune_args
         )
+        best_trial = result.get_best_trial("accuracy", "max", "last")
+        print("Best trial config: {}".format(best_trial.config))
+        print("Best trial final validation accuracy: {}".format(best_trial.last_result["accuracy"]))
+
         return result
+
+    def join_jobs(self, timeout=None):
+        # Keep for compatibility
+        pass
