@@ -41,10 +41,12 @@ def default() -> dict:
         'models': {
             'BertForTextPredictionBasic': {
                 'search_space': {
-                    'model.backbone.name': 'google_electra_small',
+                    'model.backbone.name': 'google_electra_base',
                     'optimization.batch_size': 32,
+                    'optimization.per_device_batch_size': 8,
                     'optimization.num_train_epochs': 4,
-                    'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5)
+                    'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5),
+                    'optimization.layerwise_lr_decay': space.Real(0.8, 1.0, default=0.8)
                 }
             },
         },
@@ -78,6 +80,7 @@ def default_electra_base_no_hpo() -> dict:
     ret = default_no_hpo()
     ret['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name']\
         = 'google_electra_base'
+    ret['models']['BertForTextPredictionBasic']['search_space']['optimization.batch_size'] = 8
     return ret
 
 
@@ -470,7 +473,7 @@ class TextPrediction(BaseTask):
             scheduler_options['grace_period'] = scheduler_options.get(
                 'grace_period', 10)
             scheduler_options['max_t'] = scheduler_options.get(
-                'max_t', 50)
+                'max_t', 10)
 
         if recommended_resource['num_gpus'] == 0:
             warnings.warn('Recommend to use GPU to run the TextPrediction task!')
