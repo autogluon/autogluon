@@ -65,23 +65,28 @@ def default() -> dict:
 
 @ag_text_prediction_params.register()
 def default_no_hpo() -> dict:
-    """The default hyperparameters without HPO
+    """The default hyperparameters without HPO"""
+    cfg = default()
+    cfg['hpo_params']['num_trials'] = 1
+    return cfg
 
-    It will have a version key and a list of candidate models.
-    Each model has its own search space inside.
-    """
-    ret = default()
-    ret['hpo_params']['num_trials'] = 1
-    return ret
+
+@ag_text_prediction_params.register()
+def default_electra_small() -> dict:
+    """The default search space that uses ELECTRA Small as the backbone."""
+    cfg = default()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+        = 'google_electra_small'
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 16
+    return cfg
 
 
 @ag_text_prediction_params.register()
 def default_electra_base_no_hpo() -> dict:
-    ret = default_no_hpo()
-    ret['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name']\
-        = 'google_electra_base'
-    ret['models']['BertForTextPredictionBasic']['search_space']['optimization.per_device_batch_size'] = 8
-    return ret
+    """The default search space that uses ELECTRA Base as the backbone"""
+    cfg = default_no_hpo()
+    return cfg
 
 
 def merge_params(base_params, partial_params=None):
