@@ -263,7 +263,7 @@ text_nn_params['AG_args'] = {'valid_stacker': False}
 tabular_multimodel_hparam_v2 = {
     'GBM': [{}, {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}}],
     'CAT': {},
-    'TEXT_NN_V1': {'AG_args': {'valid_stacker': False}},
+    'TEXT_NN_V1': text_nn_params,
 }
 
 predictor_model6 = TabularPrediction.fit(train_df,
