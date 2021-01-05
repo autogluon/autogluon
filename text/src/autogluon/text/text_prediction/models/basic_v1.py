@@ -230,11 +230,9 @@ def _classification_regression_predict(net, dataloader, problem_type,
 
 
 def calculate_metric(scorer, ground_truth, predictions, problem_type):
-    if problem_type == _C.CLASSIFICATION:
-        if scorer.name == 'roc_auc':
-            return scorer._sign * scorer(ground_truth, predictions[:, 1])
-        else:
-            return scorer._sign * scorer(ground_truth, predictions)
+    if problem_type == _C.CLASSIFICATION and scorer.name == 'roc_auc':
+        # For ROC_AUC, we need to feed in the probability of positive class to the scorer.
+        return scorer._sign * scorer(ground_truth, predictions[:, 1])
     else:
         return scorer._sign * scorer(ground_truth, predictions)
 
@@ -606,7 +604,7 @@ class BertForTextPredictionBasic:
             resume=False,
             visualizer=scheduler_options.get('visualizer'),
             time_attr='report_idx',
-            reward_attr=stopping_metric_scorer.reward_attr,
+            reward_attr=stopping_metric_scorer.name,
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_data=train_data,
