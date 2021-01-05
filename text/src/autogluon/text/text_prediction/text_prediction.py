@@ -80,7 +80,7 @@ def default_electra_base_no_hpo() -> dict:
     ret = default_no_hpo()
     ret['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name']\
         = 'google_electra_base'
-    ret['models']['BertForTextPredictionBasic']['search_space']['optimization.batch_size'] = 8
+    ret['models']['BertForTextPredictionBasic']['search_space']['optimization.per_device_batch_size'] = 8
     return ret
 
 
