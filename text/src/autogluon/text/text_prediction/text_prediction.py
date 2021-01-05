@@ -43,8 +43,10 @@ def default() -> dict:
                 'search_space': {
                     'model.backbone.name': 'google_electra_small',
                     'optimization.batch_size': 32,
+                    'optimization.per_device_batch_size': 16,
                     'optimization.num_train_epochs': 4,
-                    'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5)
+                    'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5),
+                    'optimization.layerwise_lr_decay': space.Real(0.8, 1.0, default=0.8)
                 }
             },
         },
@@ -63,22 +65,32 @@ def default() -> dict:
 
 @ag_text_prediction_params.register()
 def default_no_hpo() -> dict:
-    """The default hyperparameters without HPO
+    """The default hyperparameters without HPO"""
+    cfg = default()
+    cfg['hpo_params']['num_trials'] = 1
+    return cfg
 
-    It will have a version key and a list of candidate models.
-    Each model has its own search space inside.
-    """
-    ret = default()
-    ret['hpo_params']['num_trials'] = 1
-    return ret
+
+@ag_text_prediction_params.register()
+def default_electra_small() -> dict:
+    """The default search space that uses ELECTRA Small as the backbone."""
+    cfg = default()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+        = 'google_electra_small'
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 16
+    return cfg
 
 
 @ag_text_prediction_params.register()
 def default_electra_base_no_hpo() -> dict:
-    ret = default_no_hpo()
-    ret['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name']\
+    """The default search space that uses ELECTRA Base as the backbone"""
+    cfg = default_no_hpo()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
         = 'google_electra_base'
-    return ret
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 8
+    return cfg
 
 
 def merge_params(base_params, partial_params=None):
@@ -232,6 +244,7 @@ class TextPrediction(BaseTask):
             hyperparameters=None,
             plot_results=None,
             seed=None,
+            visualizer=None,
             verbosity=2):
         """Fit models to make predictions based on text inputs.
 
@@ -292,7 +305,9 @@ class TextPrediction(BaseTask):
         plot_results : bool, default = None
             Whether or not to plot intermediate training results during `fit()`.
         seed : int, default = None
-            Seed value for random state used inside `fit()`. 
+            Seed value for random state used inside `fit()`.
+        visualizer : str, default = None
+            How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', None].
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed
             during fit().
@@ -467,7 +482,7 @@ class TextPrediction(BaseTask):
             scheduler_options['grace_period'] = scheduler_options.get(
                 'grace_period', 10)
             scheduler_options['max_t'] = scheduler_options.get(
-                'max_t', 50)
+                'max_t', 10)
 
         if recommended_resource['num_gpus'] == 0:
             warnings.warn('Recommend to use GPU to run the TextPrediction task!')
