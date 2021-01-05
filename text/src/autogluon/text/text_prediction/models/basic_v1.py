@@ -587,8 +587,6 @@ class BertForTextPredictionBasic:
         os.makedirs(self._output_directory, exist_ok=True)
         search_space_reg = args(search_space=space.Dict(**self.search_space))
         # Scheduler and searcher for HPO
-        if search_strategy.endswith('hyperband') and time_limits is None:
-            time_limits = 5 * 60 * 60  # 5 hours
         if scheduler_options is None:
             scheduler_options = dict()
         stopping_metric_scorer = get_metric(self._stopping_metric)

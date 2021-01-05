@@ -475,6 +475,7 @@ class FIFOScheduler(TaskScheduler):
 
     def _add_training_result(self, task_id, reported_result, config=None):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
+            print(reported_result)
             if 'loss' in reported_result:
                 self.mxboard.add_scalar(
                     tag='loss',
