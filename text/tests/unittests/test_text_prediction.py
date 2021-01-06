@@ -46,7 +46,7 @@ def test_sst():
     dev_data = dev_data.iloc[valid_perm[:10]]
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='label', num_trials=1,
-                         ngpus_per_trial=0,
+                         ngpus_per_trial=1,
                          verbosity=4,
                          output_directory='./sst',
                          plot_results=False)
@@ -129,7 +129,7 @@ def test_no_job_finished_raise():
         # Setting a very small time limits to trigger the bug
         predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                              label='label', num_trials=1,
-                             ngpus_per_trial=0,
+                             ngpus_per_trial=1,
                              verbosity=4,
                              time_limits=10,
                              output_directory='./sst_raise',
@@ -207,7 +207,7 @@ def test_empty_text_item():
     train_data.iat[10, 0] = None
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='score', num_trials=1,
-                         ngpus_per_trial=0,
+                         ngpus_per_trial=1,
                          verbosity=4,
                          output_directory='./sts_empty_text_item',
                          plot_results=False)
