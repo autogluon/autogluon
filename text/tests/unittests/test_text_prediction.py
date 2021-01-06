@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
@@ -53,6 +54,40 @@ def test_sst():
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
     verify_predictor_save_load(predictor, dev_data, verify_proba=True)
 
+
+def test_cpu_only_raise():
+    train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
+                              'glue/sst/train.parquet')
+    dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
+                            'glue/sst/dev.parquet')
+    rng_state = np.random.RandomState(123)
+    train_perm = rng_state.permutation(len(train_data))
+    valid_perm = rng_state.permutation(len(dev_data))
+    train_data = train_data.iloc[train_perm[:100]]
+    dev_data = dev_data.iloc[valid_perm[:10]]
+    with pytest.raises(RuntimeError):
+        predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
+                             label='label', num_trials=1,
+                             ngpus_per_trial=0,
+                             verbosity=4,
+                             output_directory='./sst',
+                             plot_results=False)
+    os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'] = '1'
+    predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
+                         label='label', num_trials=1,
+                         ngpus_per_trial=0,
+                         verbosity=4,
+                         output_directory='./sst',
+                         plot_results=False)
+
+    os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'] = '0'
+    with pytest.raises(RuntimeError):
+        predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
+                             label='label', num_trials=1,
+                             ngpus_per_trial=0,
+                             verbosity=4,
+                             output_directory='./sst',
+                             plot_results=False)
 
 def test_mrpc():
     train_data = load_pd.load(

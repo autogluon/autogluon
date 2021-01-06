@@ -1,6 +1,7 @@
 import logging
 import copy
 import warnings
+import os
 from packaging import version
 
 import numpy as np
@@ -486,9 +487,22 @@ class TextPrediction(BaseTask):
                 'max_t', 50)
 
         if recommended_resource['num_gpus'] == 0:
-            raise RuntimeError('Only CPU is detected and we will not proceed to run TextPrediction.'
-                               ' GPU is required to run the model! You may set '
-                               '`ngpus_per_trial` to enable GPU.')
+            if 'AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU' in os.environ:
+                use_warning = os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU']
+            else:
+                use_warning = False
+            if use_warning:
+                warnings.warn('No GPU is detected in the machine and we will recommend you to '
+                              'use TextPrediction on a GPU-enabled instance. Currently, '
+                              'training on CPU is slow.')
+            else:
+                raise RuntimeError('No GPU is detected in the machine and we will '
+                                   'not proceed to run TexPrediction because they will train '
+                                   'too slowly with only CPU. You may try to set `ngpus_per_trial` '
+                                   'to a number larger than 0 when calling `.fit()`. '
+                                   'Also, you can set the environment variable '
+                                   '"AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU=1" to force the model to '
+                                   'use CPU for training.')
         model = model_candidates[0]
         if plot_results is None:
             if in_ipynb():
