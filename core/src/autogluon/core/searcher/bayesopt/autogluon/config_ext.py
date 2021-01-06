@@ -56,6 +56,14 @@ class ExtendedConfiguration(object):
     def remap_resource(
             self, config_ext: CS.Configuration, resource: int,
             as_dict: bool=False) -> Union[CS.Configuration, dict]:
+        """
+        Re-assigns resource value for extended config.
+
+        :param config_ext: Extended config
+        :param resource: New resource value
+        :param as_dict: Return as dict?
+        :return:
+        """
         x_dct = copy.copy(config_ext.get_dictionary())
         x_dct[self.resource_attr_name] = resource
         if as_dict:
@@ -67,6 +75,13 @@ class ExtendedConfiguration(object):
     def remove_resource(
             self, config_ext: CS.Configuration,
             as_dict: bool=False) -> Union[CS.Configuration, dict]:
+        """
+        Strips away resource attribute and returns normal config
+
+        :param config_ext: Extended config
+        :param as_dict: Return as dict?
+        :return: config_ext without resource attribute
+        """
         x_dct = copy.copy(config_ext.get_dictionary())
         del x_dct[self.resource_attr_name]
         if as_dict:
@@ -75,6 +90,13 @@ class ExtendedConfiguration(object):
             return CS.Configuration(self.hp_ranges.config_space, values=x_dct)
 
     def from_dict(self, config_dct: dict) -> CS.Configuration:
+        """
+        Converts dict into CS.Configuration config (extended or normal, depending
+        on whether the dict contains a resource attribute).
+
+        :param config_dct:
+        :return:
+        """
         # Note: Here, the key for resource is resource_attr_key, not
         # resource_attr_name
         hp_ranges = self.hp_ranges_ext if self.resource_attr_key in config_dct \
@@ -84,8 +106,10 @@ class ExtendedConfiguration(object):
     def split(self, config_ext: CS.Configuration, as_dict: bool=False) -> \
             (Union[CS.Configuration, dict], int):
         """
+        Split extended config into normal config and resource value.
+
         :param config_ext: Extended config
-        :param as_dict: Return as dict?
+        :param as_dict: Return config as dict?
         :return: (config, resource_value)
         """
         x_res = copy.copy(config_ext.get_dictionary())
@@ -96,24 +120,8 @@ class ExtendedConfiguration(object):
         return x_res, resource_value
 
     def get_resource(self, config_ext: CS.Configuration) -> int:
-        return config_ext.get_dictionary()[self.resource_attr_name]
-
-    def config_to_tuple(self, config: Union[CS.Configuration, dict]) -> tuple:
         """
-        :param config: Can be extended or not
-        :return: Tuple representation (ignoring resource attribute for extended
-            config)
+        :param config_ext: Extended config
+        :return: Value of resource attribute
         """
-        if isinstance(config, CS.Configuration):
-            config = config.get_dictionary()
-        else:
-            assert isinstance(config, dict)
-        return tuple(config[k] for k in self.keys_sorted)
-
-    def tuple_to_config(self, config_tpl: tuple, as_dict: bool = False) -> \
-            Union[CS.Configuration, dict]:
-        config = dict(zip(self.keys_sorted, config_tpl))
-        if not as_dict:
-            config = CS.Configuration(self.hp_ranges.config_space,
-                                      values=config)
-        return config
+        return int(config_ext.get_dictionary()[self.resource_attr_name])
