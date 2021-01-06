@@ -475,7 +475,6 @@ class FIFOScheduler(TaskScheduler):
 
     def _add_training_result(self, task_id, reported_result, config=None):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
-            print(reported_result)
             if 'loss' in reported_result:
                 self.mxboard.add_scalar(
                     tag='loss',
@@ -483,7 +482,7 @@ class FIFOScheduler(TaskScheduler):
                         f'task {task_id} valid_loss',
                         reported_result['loss']
                     ),
-                    global_step=reported_result[self._reward_attr]
+                    global_step=reported_result[self._time_attr]
                 )
             self.mxboard.add_scalar(
                 tag=self._reward_attr,
@@ -491,7 +490,7 @@ class FIFOScheduler(TaskScheduler):
                     f'task {task_id} {self._reward_attr}',
                     reported_result[self._reward_attr]
                 ),
-                global_step=reported_result[self._reward_attr]
+                global_step=reported_result[self._time_attr]
             )
         with self._fifo_lock:
             # Note: We store all of reported_result in training_history[task_id],
