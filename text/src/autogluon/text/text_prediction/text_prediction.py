@@ -488,7 +488,7 @@ class TextPrediction(BaseTask):
 
         if recommended_resource['num_gpus'] == 0:
             if 'AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU' in os.environ:
-                use_warning = os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU']
+                use_warning = bool(os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'])
             else:
                 use_warning = False
             if use_warning:
