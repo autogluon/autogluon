@@ -102,7 +102,8 @@ class GPFIFOSearcher(object):
             initial_scoring: Optional[str] = None,
             profiler: Optional[GPMXNetSimpleProfiler] = None,
             first_is_default: bool = True,
-            debug_log: Optional[DebugLogPrinter] = None):
+            debug_log: Optional[DebugLogPrinter] = None,
+            cost_metric_name: Optional[str] = None):
         """
         Note that the SurrogateModel is created on demand (by the state
         transformer) in get_config, along with components needed for the BO
@@ -173,6 +174,10 @@ class GPFIFOSearcher(object):
         if debug_log is not None:
             assert isinstance(hp_ranges, HyperparameterRanges_CS), \
                 "If debug_log is given, must have hp_ranges of HyperparameterRanges_CS type"
+        if cost_metric_name is not None:
+            self.cost_metric_name = cost_metric_name
+        else:
+            self.cost_metric_name = 'elapsed_time'
         # Sums up profiling records across all get_config calls
         self._profile_record = dict()
         if debug_log is not None:
@@ -185,7 +190,7 @@ class GPFIFOSearcher(object):
             deb_msg += ("- first_is_default = {}".format(first_is_default))
             logger.info(deb_msg)
 
-    def update(self, config: Candidate, reward: float):
+    def update(self, config: Candidate, reward: float, **kwargs):
         """
         Registers new datapoint at config, with reward reward.
         Note that in general, config should previously have been registered as
@@ -196,9 +201,11 @@ class GPFIFOSearcher(object):
         :param reward:
         """
         crit_val = self.map_reward(reward)
+        metrics = dictionarize_objective(crit_val)
+        if 'elapsed_time' in kwargs:
+            metrics[self.cost_metric_name] = kwargs['elapsed_time']
         self.state_transformer.label_candidate(CandidateEvaluation(
-            candidate=copy.deepcopy(config),
-            metrics=dictionarize_objective(crit_val)))
+            candidate=copy.deepcopy(config), metrics=metrics))
         if self.debug_log is not None:
             config_id = self.debug_log.config_id(config)
             msg = "Update for config_id {}: reward = {}, crit_val = {}".format(

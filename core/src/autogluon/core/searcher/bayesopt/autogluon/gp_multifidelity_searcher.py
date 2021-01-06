@@ -54,7 +54,8 @@ class GPMultiFidelitySearcher(object):
             initial_scoring: Optional[str] = None,
             profiler: Optional[GPMXNetSimpleProfiler] = None,
             first_is_default: bool = True,
-            debug_log: Optional[DebugLogPrinter] = None):
+            debug_log: Optional[DebugLogPrinter] = None,
+            cost_metric_name: Optional[str] = None):
         """
         Note that the GPMXNetModel is created on demand (by the state
         transformer) in get_config, along with components needed for the BO
@@ -124,7 +125,7 @@ class GPMultiFidelitySearcher(object):
             hp_ranges, resource_attr_key, resource_attr_range)
         if debug_log is not None:
             # Configure DebugLogPrinter
-            debug_log.configspace_ext = self.configspace_ext
+            debug_log.set_configspace_ext(self.configspace_ext)
         self.debug_log = debug_log
         # Create state transformer
         # Initial state is empty (note that the state is mutable)
@@ -147,6 +148,10 @@ class GPMultiFidelitySearcher(object):
         self.profiler = profiler
         self.do_profile = (profiler is not None)
         self.first_is_default = first_is_default
+        if cost_metric_name is not None:
+            self.cost_metric_name = cost_metric_name
+        else:
+            self.cost_metric_name = 'elapsed_time'
         # Sums up profiling records across all get_config calls
         self._profile_record = dict()
         if debug_log is not None:
@@ -159,7 +164,8 @@ class GPMultiFidelitySearcher(object):
             deb_msg += ("- first_is_default = {}".format(first_is_default))
             logger.info(deb_msg)
 
-    def update(self, config: CS.Configuration, reward: float, resource: int):
+    def update(self, config: CS.Configuration, reward: float, resource: int,
+               **kwargs):
         """
         Registers new datapoint at config, with reward and resource.
         Note that in general, config should previously have been registered as
@@ -172,8 +178,11 @@ class GPMultiFidelitySearcher(object):
         """
         config_ext = self.configspace_ext.get(config, resource)
         crit_val = self.map_reward(reward)
+        metrics = dictionarize_objective(crit_val)
+        if 'elapsed_time' in kwargs:
+            metrics[self.cost_metric_name] = kwargs['elapsed_time']
         self.state_transformer.label_candidate(CandidateEvaluation(
-            candidate=config_ext, metrics=dictionarize_objective(crit_val)))
+            candidate=config_ext, metrics=metrics))
         if self.debug_log is not None:
             config_id = self.debug_log.config_id(config_ext)
             msg = "Update for config_id {}: reward = {}, crit_val = {}".format(
@@ -291,6 +300,10 @@ class GPMultiFidelitySearcher(object):
             # BO should only search over configs at resource level
             # target_resource
             self._fix_resource_attribute(target_resource)
+            if self.debug_log is not None:
+                self.debug_log.append_extra(
+                    "Score values computed at target_resource = {}".format(
+                        target_resource))
             # Create BO algorithm
             initial_candidates_scorer = create_initial_candidates_scorer(
                 self.initial_scoring, model, self.acquisition_class,
@@ -319,11 +332,10 @@ class GPMultiFidelitySearcher(object):
                  "before. Maybe there are no free configurations left? "
                  "The blacklist size is {}".format(len(blacklisted_candidates)))
             next_config = _config[0]
-            if self.do_profile:
-                self.profiler.stop('total_nextcand')
             # Remove resource attribute
             config = self.configspace_ext.remove_resource(next_config)
             if self.do_profile:
+                self.profiler.stop('total_nextcand')
                 self.profiler.stop('total_all')
 
         if self.debug_log is not None:

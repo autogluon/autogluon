@@ -56,9 +56,9 @@ class OneDimensionalWarping(Block):
 
         :param x: input data of size (n,1)
         """
-        warping = self._warping()
-        warping_a = anp.take(warping, [0], axis = 0)
-        warping_b = anp.take(warping, [1], axis = 0)
+        warping = anp.reshape(self._warping(), (-1,))
+        warping_a = warping[0]
+        warping_b = warping[1]
 
         return 1. - anp.power(1. - anp.power(
             self._rescale(x), warping_a), warping_b)
@@ -132,7 +132,7 @@ class Warping(Block):
         """
         warped_X = []
         for col_index, transformation in enumerate(self.transformations):
-            x = anp.take(X, [col_index], axis=1)
+            x = X[:, col_index:(col_index+1)]
             warped_X.append(transformation(x))
 
         return anp.concatenate(warped_X, axis=1)
