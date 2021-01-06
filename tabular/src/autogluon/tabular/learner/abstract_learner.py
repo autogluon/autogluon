@@ -170,30 +170,26 @@ class AbstractLearner:
     def score(self, X: DataFrame, y=None, model=None):
         if y is None:
             X, y = self.extract_label(X)
-        X = self.transform_features(X)
-        y = self.label_cleaner.transform(y)
-        trainer = self.load_trainer()
-        if self.problem_type == MULTICLASS:
-            y = y.fillna(-1)
-            if (not trainer.eval_metric_expects_y_pred) and (-1 in y.unique()):
-                # log_loss / pac_score
-                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
-        return trainer.score(X=X, y=y, model=model)
+        self._validate_class_labels(y)
+        if self.eval_metric.needs_pred:
+            y_pred = self.predict(X=X, model=model)
+            return self.eval_metric(y, y_pred)
+        else:
+            y_pred_proba = self.predict_proba(X=X, model=model)
+            return self.eval_metric(y, y_pred_proba)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
         leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
         if y is None:
             X, y = self.extract_label(X)
-        X = self.transform_features(X)
-        y = self.label_cleaner.transform(y)
-        trainer = self.load_trainer()
-        if self.problem_type == MULTICLASS:
-            y = y.fillna(-1)
-            if (not trainer.eval_metric_expects_y_pred) and (-1 in y.unique()):
-                # log_loss / pac_score
-                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
+        self._validate_class_labels(y)
 
+        X = self.transform_features(X)
+        y_internal = self.label_cleaner.transform(y)
+        y_internal = y_internal.fillna(-1)
+
+        trainer = self.load_trainer()
         scores = {}
         all_trained_models = trainer.get_model_names()
         all_trained_models_can_infer = trainer.get_model_names(can_infer=True)
@@ -203,7 +199,7 @@ class AbstractLearner:
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())
             ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric)
-            ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
+            ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None)
             oracle_weights = ensemble_selection.weights_
             oracle_pred_time_start = time.time()
             oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
@@ -213,10 +209,9 @@ class AbstractLearner:
             pred_time_test_marginal['oracle_ensemble'] = oracle_pred_time
             all_trained_models.append('oracle_ensemble')
 
-        for model_name, pred_proba in model_pred_proba_dict.items():
-            if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
-                pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)  # FIXME: I think this doesn't work correctly, must use original y as well!
-            if trainer.eval_metric_expects_y_pred:
+        for model_name, pred_proba_internal in model_pred_proba_dict.items():
+            pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba_internal)
+            if self.eval_metric.needs_pred:
                 pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
                 scores[model_name] = self.eval_metric(y, pred)
             else:
@@ -277,6 +272,18 @@ class AbstractLearner:
         df_merged = df_merged[df_columns_new]
 
         return df_merged
+
+    def _validate_class_labels(self, y):
+        if self.problem_type == MULTICLASS and not self.eval_metric.needs_pred:
+            y_unique = np.unique(y)
+            valid_class_set = set(self.class_labels)
+            unknown_classes = []
+            for cls in y_unique:
+                if cls not in valid_class_set:
+                    unknown_classes.append(cls)
+            if unknown_classes:
+                # log_loss / pac_score
+                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
 
     def _remove_missing_labels(self, y_true, y_pred):
         """Removes missing labels and produces warning if any are found."""
