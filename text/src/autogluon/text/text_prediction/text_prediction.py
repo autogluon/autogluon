@@ -1,6 +1,7 @@
 import logging
 import copy
 import warnings
+import os
 from packaging import version
 
 import numpy as np
@@ -46,7 +47,7 @@ def default() -> dict:
                     'optimization.per_device_batch_size': 16,
                     'optimization.num_train_epochs': 4,
                     'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5),
-                    'optimization.layerwise_lr_decay': space.Real(0.8, 1.0, default=0.8)
+                    'optimization.layerwise_lr_decay': 0.8
                 }
             },
         },
@@ -475,6 +476,7 @@ class TextPrediction(BaseTask):
             scheduler_options = hyperparameters['hpo_params']['scheduler_options']
             if scheduler_options is None:
                 scheduler_options = dict()
+        scheduler_options['visualizer'] = visualizer
         if search_strategy.endswith('hyperband'):
             # Specific defaults for hyperband scheduling
             scheduler_options['reduction_factor'] = scheduler_options.get(
@@ -482,10 +484,25 @@ class TextPrediction(BaseTask):
             scheduler_options['grace_period'] = scheduler_options.get(
                 'grace_period', 10)
             scheduler_options['max_t'] = scheduler_options.get(
-                'max_t', 10)
+                'max_t', 50)
 
         if recommended_resource['num_gpus'] == 0:
-            warnings.warn('Recommend to use GPU to run the TextPrediction task!')
+            if 'AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU' in os.environ:
+                use_warning = int(os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'])
+            else:
+                use_warning = False
+            if use_warning:
+                warnings.warn('No GPU is detected in the machine and we will recommend you to '
+                              'use TextPrediction on a GPU-enabled instance. Currently, '
+                              'training on CPU is slow.')
+            else:
+                raise RuntimeError('No GPU is detected in the machine and we will '
+                                   'not proceed to run TexPrediction because they will train '
+                                   'too slowly with only CPU. You may try to set `ngpus_per_trial` '
+                                   'to a number larger than 0 when calling `.fit()`. '
+                                   'Also, you can set the environment variable '
+                                   '"AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU=1" to force the model to '
+                                   'use CPU for training.')
         model = model_candidates[0]
         if plot_results is None:
             if in_ipynb():
