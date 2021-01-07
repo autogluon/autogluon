@@ -176,6 +176,7 @@ class AbstractLearner:
             return self.eval_metric(y, y_pred)
         else:
             y_pred_proba = self.predict_proba(X=X, model=model)
+            y = self.label_cleaner.transform(y)
             return self.eval_metric(y, y_pred_proba)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
@@ -199,23 +200,23 @@ class AbstractLearner:
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())
             ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric)
-            ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None)
+            ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None)  # TODO: Only fit non-nan
             oracle_weights = ensemble_selection.weights_
             oracle_pred_time_start = time.time()
             oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
             oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
             oracle_pred_time = time.time() - oracle_pred_time_start
-            model_pred_proba_dict['oracle_ensemble'] = oracle_pred_proba_ensemble
-            pred_time_test_marginal['oracle_ensemble'] = oracle_pred_time
-            all_trained_models.append('oracle_ensemble')
+            model_pred_proba_dict['OracleEnsemble'] = oracle_pred_proba_ensemble
+            pred_time_test_marginal['OracleEnsemble'] = oracle_pred_time
+            all_trained_models.append('OracleEnsemble')
 
-        for model_name, pred_proba_internal in model_pred_proba_dict.items():
-            pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba_internal)
+        for model_name, y_pred_proba_internal in model_pred_proba_dict.items():
             if self.eval_metric.needs_pred:
-                pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
-                scores[model_name] = self.eval_metric(y, pred)
+                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+                scores[model_name] = self.eval_metric(y, y_pred)
             else:
-                scores[model_name] = self.eval_metric(y, pred_proba)
+                y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
+                scores[model_name] = self.eval_metric(y_internal, y_pred_proba)
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
@@ -273,7 +274,10 @@ class AbstractLearner:
 
         return df_merged
 
-    def _validate_class_labels(self, y):
+    def _validate_class_labels(self, y: Series):
+        null_count = y.isnull().sum()
+        if null_count:
+            raise ValueError(f'Labels cannot contain missing (nan) values. Found {null_count} missing label values.')
         if self.problem_type == MULTICLASS and not self.eval_metric.needs_pred:
             y_unique = np.unique(y)
             valid_class_set = set(self.class_labels)
@@ -284,22 +288,6 @@ class AbstractLearner:
             if unknown_classes:
                 # log_loss / pac_score
                 raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
-
-    def _remove_missing_labels(self, y_true, y_pred):
-        """Removes missing labels and produces warning if any are found."""
-        if self.problem_type == REGRESSION:
-            non_missing_boolean_mask = [y is not None and not pd.isnull(y) for y in y_true]
-        else:
-            non_missing_boolean_mask = [y is not None and not pd.isnull(y) and y != '' for y in y_true]
-
-        n_missing = len(non_missing_boolean_mask) - sum(non_missing_boolean_mask)
-        if n_missing > 0:
-            y_true = y_true[non_missing_boolean_mask]
-            y_pred = y_pred[non_missing_boolean_mask]
-            warnings.warn(f"There are {n_missing} (out of {len(y_true)}) evaluation datapoints for which the label is missing. "
-                          f"AutoGluon removed these points from the evaluation, which thus may not be entirely representative. "
-                          f"You should carefully study why there are missing labels in your evaluation data.")
-        return y_true, y_pred
 
     # TODO: Refactor to be less brittle.
     # TODO: Instead take y_pred_proba as input, convert to y_pred when necessary. Treat y_pred_proba as y_pred for regression.
@@ -319,8 +307,9 @@ class AbstractLearner:
         assert isinstance(y_true, (np.ndarray, pd.Series))
         assert isinstance(y_pred, (np.ndarray, pd.Series))  # TODO: Enable DataFrame for y_pred_proba
 
-        # TODO: Consider removing _remove_missing_labels, this creates an inconsistency between how .score, .score_debug, and .evaluate compute scores.
-        y_true, y_pred = self._remove_missing_labels(y_true, y_pred)
+        self._validate_class_labels(y_true)
+        if not self.eval_metric.needs_pred:
+            y_true = self.label_cleaner.transform(y_true)  # Get labels in numeric order
         performance = self.eval_metric(y_true, y_pred)
 
         metric = self.eval_metric.name
