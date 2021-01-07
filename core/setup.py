@@ -61,6 +61,7 @@ requirements = [
     'scikit-learn>=0.22.0,<0.24',  # TODO v0.1: Upgrade
     'autograd>=1.3',
     'dill==0.3.3',  # TODO v0.1: Loosen version restriction?
+    'ray[tune]',
 ]
 
 test_requirements = [
