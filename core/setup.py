@@ -60,6 +60,7 @@ requirements = [
     'scikit-learn>=0.22.0,<0.24',
     'autograd>=1.3',
     'dill==0.3.3',
+    'ray[tune]',
 ]
 
 test_requirements = [
