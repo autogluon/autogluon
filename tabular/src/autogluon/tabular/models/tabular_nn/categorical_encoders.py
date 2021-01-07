@@ -166,7 +166,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
         """
         if not (hasattr(X, 'iloc') and getattr(X, 'ndim', 0) == 2):
             # if not a dataframe, do normal check_array validation
-            X_temp = check_array(X, dtype=None)
+            X_temp = check_array(X, dtype=None, force_all_finite=False)
             if (not hasattr(X, 'dtype')
                     and np.issubdtype(X_temp.dtype, np.str_)):
                 X = check_array(X, dtype=np.object)

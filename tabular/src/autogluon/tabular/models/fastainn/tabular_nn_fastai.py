@@ -72,34 +72,28 @@ class NNFastAiTabularModel(AbstractModel):
             See: https://docs.fast.ai/layers.html#LabelSmoothingCrossEntropy
     """
 
-
     model_internals_file_name = 'model-internals.pkl'
 
     def __init__(self, **kwargs):
-        from fastai.tabular import FillMissing, Categorify, Normalize
         super().__init__(**kwargs)
-        self.cat_columns = []
-        self.cont_columns = []
-        self.columns_fills = {}
-        self.procs = [FillMissing, Categorify, Normalize]
-        self.col_after_transformer = None
+        self.cat_columns = None
+        self.cont_columns = None
+        self.columns_fills = None
+        self.procs = None
         self.y_scaler = None
+        self._inner_features = None
 
-    def fold_preprocess(self, X, fit=False):
-        if fit:
-            cols_to_use = self.cont_columns + self.cat_columns
-            self.col_after_transformer = [col for col in X.columns if col in cols_to_use]
-        X = pd.DataFrame(data=X, columns=self.col_after_transformer)
-        X = super().preprocess(X)
-        return X
-
-    def preprocess_train(self, X_train, y_train, X_val, y_val, **kwargs):
+    def _preprocess_train(self, X_train, y_train, X_val, y_val, **kwargs):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
         from fastai.core import defaults
 
-        self.cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
-        self.cont_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
+        X_train = self.preprocess(X_train, fit=True)
+        if X_val is not None:
+            X_val = self.preprocess(X_val)
+
+        from fastai.tabular import FillMissing, Categorify, Normalize
+        self.procs = [FillMissing, Categorify, Normalize]
 
         if self.problem_type == REGRESSION and self.y_scaler is not None:
             y_train_norm = pd.Series(self.y_scaler.fit_transform(y_train.values.reshape(-1, 1)).reshape(-1))
@@ -108,30 +102,8 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             y_train_norm = y_train
             y_val_norm = y_val
-        try:
-            X_train_stats = X_train.describe(include='all').T.reset_index()
-            cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_train_stats['unique'].isna())]['index'].values
-        except:
-            cat_cols_to_drop = []
-        cat_cols_to_keep = [col for col in X_train.columns.values if (col not in cat_cols_to_drop)]
-        cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
-        logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
-        self.cat_columns = cat_cols_to_use
-        self.cat_columns = [feature for feature in self.cat_columns if feature in list(X_train.columns)]
-        self.cont_columns = [feature for feature in self.cont_columns if feature in list(X_train.columns)]
-
-        for c in self.cat_columns:
-            self.columns_fills[c] = MISSING
-        for c in self.cont_columns:
-            self.columns_fills[c] = X_train[c].mean()
-
-        X_train = self.fill_missing(X_train)
 
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
-        X_train = self.fold_preprocess(X_train, fit=True)
-        if X_val is not None:
-            X_val = self.fill_missing(X_val)
-            X_val = self.fold_preprocess(X_val)
         df_train, train_idx, val_idx = self._generate_datasets(X_train, y_train_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
 
@@ -146,11 +118,37 @@ class NNFastAiTabularModel(AbstractModel):
                 .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32, num_workers=num_workers))
         return data
 
-    def fill_missing(self, df):
-        df = df[self.cat_columns + self.cont_columns].copy()
-        for c in self.cat_columns + self.cont_columns:
-            if c in self.cat_columns:
-                df[c] = df[c].cat.add_categories(MISSING)
+    def _preprocess(self, X: pd.DataFrame, fit=False, **kwargs):
+        X = super()._preprocess(X=X, **kwargs)
+        if fit:
+            self.cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+            self.cont_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
+            try:
+                X_train_stats = X.describe(include='all').T.reset_index()
+                cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_train_stats['unique'].isna())]['index'].values
+            except:
+                cat_cols_to_drop = []
+            cat_cols_to_keep = [col for col in X.columns.values if (col not in cat_cols_to_drop)]
+            cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
+            logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
+            self.cat_columns = cat_cols_to_use
+            self.cat_columns = [feature for feature in self.cat_columns if feature in list(X.columns)]
+            self.cont_columns = [feature for feature in self.cont_columns if feature in list(X.columns)]
+
+            self.columns_fills = {}
+            for c in self.cat_columns:
+                self.columns_fills[c] = MISSING
+            for c in self.cont_columns:
+                self.columns_fills[c] = X[c].mean()
+            self._inner_features = self.cat_columns + self.cont_columns
+        return self._fill_missing(X)
+
+    def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df[self._inner_features].copy()
+        for c in self.cat_columns:
+            df[c] = df[c].cat.add_categories(MISSING)
+            df[c] = df[c].fillna(self.columns_fills[c])
+        for c in self.cont_columns:
             df[c] = df[c].fillna(self.columns_fills[c])
         return df
 
@@ -170,7 +168,7 @@ class NNFastAiTabularModel(AbstractModel):
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
-        data = self.preprocess_train(X_train, y_train, X_val, y_val)
+        data = self._preprocess_train(X_train, y_train, X_val, y_val)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
@@ -319,7 +317,6 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular import TabularList
         from fastai.utils.mod_display import progress_disabled_ctx
 
-        X = self.fill_missing(X)
         X = self.preprocess(X, **kwargs)
 
         single_row = len(X) == 1
