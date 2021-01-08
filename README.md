@@ -21,7 +21,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # python3 -m pip install --upgrade "mxnet<2.0.0"
 # python3 -m pip install --pre autogluon
 
-from autogluon.tabular import TabularPrediction as task
+from autogluon.task.tabular_prediction import TabularPrediction as task
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 predictor = task.fit(train_data=train_data, label='class')
