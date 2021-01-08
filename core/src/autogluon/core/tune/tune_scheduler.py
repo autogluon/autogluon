@@ -66,6 +66,7 @@ class RayTuneScheduler(object):
         results_history_callback = ResultsHistoryCallback(self.training_history)
         result = tune.run(
             partial(self.train_fn_wrapper, self.task_fn.f),
+            name='AG',
             callbacks=[results_history_callback],
             config=self.wrap_space(self.task_fn.kwvars),
             **self.tune_args
@@ -75,6 +76,22 @@ class RayTuneScheduler(object):
         print("Best trial final validation accuracy: {}".format(best_trial.last_result["accuracy"]))
 
         return result
+
+    def restore(self, **kwargs):
+        results_history_callback = ResultsHistoryCallback(self.training_history)
+        result = tune.run(
+            partial(self.train_fn_wrapper, self.task_fn.f),
+            name='AG',
+            callbacks=[results_history_callback],
+            config=self.wrap_space(self.task_fn.kwvars),
+            **kwargs
+        )
+        best_trial = result.get_best_trial("accuracy", "max", "last")
+        print("Best trial config: {}".format(best_trial.config))
+        print("Best trial final validation accuracy: {}".format(best_trial.last_result["accuracy"]))
+
+        return result
+
 
     def join_jobs(self, timeout=None):
         # Keep for compatibility
@@ -105,7 +122,7 @@ class RayTuneScheduler(object):
         plt.title("Performance vs Training-Time in each HPO Trial")
         for task_id, task_res in self.training_history.items():
             rewards = [x[self.reward_attr] for x in task_res]
-            x = list(range(len(task_res)))
+            x = [x[self.time_attr] for x in task_res]
             plt.plot(x, rewards, label=f'task {task_id}')
         if use_legend:
             plt.legend(loc='best')
