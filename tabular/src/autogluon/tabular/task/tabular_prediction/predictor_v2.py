@@ -9,7 +9,7 @@ import pandas as pd
 
 from autogluon.core.task.base import compile_scheduler_options_v2
 from autogluon.core.task.base.base_task import schedulers
-from autogluon.core.utils import verbosity2loglevel
+from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
@@ -18,7 +18,7 @@ from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
-from ...features import AutoMLPipelineFeatureGenerator, IdentityFeatureGenerator
+from .feature_generator_presets import get_default_feature_generator
 from ...learner import AbstractLearner, DefaultLearner
 from ...trainer import AbstractTrainer
 
@@ -46,7 +46,7 @@ class TabularPredictorV2(TabularPredictor):
             **kwargs
     ):
         self.verbosity = verbosity
-        self._set_logger_verbosity(self.verbosity)
+        set_logger_verbosity(self.verbosity, logger=logger)
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
 
@@ -65,7 +65,6 @@ class TabularPredictorV2(TabularPredictor):
             time_limit=None,
             presets=None,
             hyperparameters=None,
-            feature_generator="auto",  # TODO: kwargs?
             feature_metadata=None,
             **kwargs):
         """
@@ -74,6 +73,7 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: Move documentation from TabularPrediction.fit to here
         # TODO: Move num_cpu/num_gpu to AG_args_fit
         # TODO: AG_args -> ag_args? +1 -> Will change after replacing original TabularPredictor to avoid extra API breaks.
+        # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 
         """
         if self._learner.is_fit:
@@ -82,7 +82,7 @@ class TabularPredictorV2(TabularPredictor):
         kwargs = self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        self._set_logger_verbosity(verbosity)
+        set_logger_verbosity(verbosity, logger=logger)
 
         if verbosity >= 3:
             logger.log(20, '============ fit kwarg info ============')
@@ -100,6 +100,7 @@ class TabularPredictorV2(TabularPredictor):
         hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
         num_cpus = kwargs['num_cpus']
         num_gpus = kwargs['num_gpus']
+        feature_generator = kwargs['feature_generator']
         unlabeled_data = kwargs['unlabeled_data']
         save_bagged_folds = kwargs['save_bagged_folds']
 
@@ -202,7 +203,7 @@ class TabularPredictorV2(TabularPredictor):
         kwargs = self._validate_fit_extra_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        self._set_logger_verbosity(verbosity)
+        set_logger_verbosity(verbosity, logger=logger)
 
         if verbosity >= 3:
             logger.log(20, '============ fit kwarg info ============')
@@ -310,7 +311,7 @@ class TabularPredictorV2(TabularPredictor):
         assert scheduler_options['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
         # TODO: Fix or remove in v0.1
         if scheduler_options.get('dist_ip_addrs', None):
-            logger.log(30, 'Warning: dist_ip_addrs does not currently work. Distributed instances will not be utilized.')
+            logger.log(30, 'Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
 
         if scheduler_options['num_trials'] == 1:
             logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, disabling HPO.')
@@ -330,15 +331,6 @@ class TabularPredictorV2(TabularPredictor):
             self._learner.persist_trainer(low_memory=True)
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
-    def _set_logger_verbosity(self, verbosity=None):
-        if verbosity is None:
-            verbosity = self.verbosity
-        if verbosity < 0:
-            verbosity = 0
-        elif verbosity > 4:
-            verbosity = 4
-        logger.setLevel(verbosity2loglevel(verbosity))
-
     # TODO: Update and correct the logging message on loading directions
     def save(self):
         tmp_learner = self._learner
@@ -352,7 +344,7 @@ class TabularPredictorV2(TabularPredictor):
 
     @classmethod
     def load(cls, directory, verbosity=2):
-        logger.setLevel(verbosity2loglevel(verbosity))  # Reset logging after load (may be in new Python session)
+        set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
         if directory is None:
             raise ValueError("output_directory cannot be None in load()")
 
@@ -415,10 +407,11 @@ class TabularPredictorV2(TabularPredictor):
         fit_kwargs_default = dict(
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             holdout_frac=None,  # TODO: Potentially error if num_bag_folds is also specified
-            num_bag_folds=None,
+            num_bag_folds=None,  # TODO: Potentially move to fit_extra, raise exception if value too large / invalid in fit_extra.
             auto_stack=False,
 
             # other
+            feature_generator="auto",
             unlabeled_data=None,
         )
 
@@ -513,23 +506,7 @@ class TabularPredictorV2(TabularPredictor):
                 feature_generator = self._learner.feature_generator
             else:
                 raise AssertionError('FeatureGenerator already exists!')
-        self._learner.feature_generator = self._get_default_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
-
-    # TODO: Move out of predictor?
-    def _get_default_feature_generator(self, feature_generator, feature_metadata=None):
-        if feature_generator is None:
-            feature_generator = IdentityFeatureGenerator()
-        elif isinstance(feature_generator, str):
-            if feature_generator == 'auto':
-                feature_generator = AutoMLPipelineFeatureGenerator()
-            else:
-                raise ValueError(f"Unknown feature_generator preset: '{feature_generator}', valid presets: {['auto']}")
-        if feature_metadata is not None:
-            if feature_generator.feature_metadata_in is None and not feature_generator.is_fit():
-                feature_generator.feature_metadata_in = copy.deepcopy(feature_metadata)
-            else:
-                raise AssertionError('`feature_metadata_in` already exists in `feature_generator`.')
-        return feature_generator
+        self._learner.feature_generator = get_default_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
 
     def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack, num_train_rows):
         if auto_stack:

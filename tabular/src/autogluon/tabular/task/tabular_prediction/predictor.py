@@ -125,6 +125,7 @@ class TabularPredictor:
     def label_column(self):
         return self._learner.label
 
+    # TODO: v0.1 rename to path
     @property
     def output_directory(self):
         return self._learner.path

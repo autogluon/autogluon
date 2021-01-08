@@ -1,7 +1,11 @@
+import logging
 import os
 import warnings
 
-__all__ = ['in_ipynb', 'warning_filter', 'verbosity2loglevel']
+__all__ = ['in_ipynb', 'warning_filter', 'verbosity2loglevel', 'set_logger_verbosity']
+
+_logger = logging.getLogger()  # return root logger
+
 
 def in_ipynb():
     if 'AG_DOCS' in os.environ and os.environ['AG_DOCS']:
@@ -15,6 +19,7 @@ def in_ipynb():
     except NameError:
         return False
 
+
 class warning_filter(object):
     def __enter__(self):
         warnings.filterwarnings("ignore", category=UserWarning)
@@ -26,6 +31,7 @@ class warning_filter(object):
         warnings.filterwarnings("default", category=UserWarning)
         warnings.filterwarnings("default", category=FutureWarning)
         warnings.filterwarnings("default", category=DeprecationWarning)
+
 
 def verbosity2loglevel(verbosity):
     """ Translates verbosity to logging level. Suppresses warnings if verbosity = 0. """
@@ -43,3 +49,13 @@ def verbosity2loglevel(verbosity):
         log_level = 10 # print everything (ie. debug mode)
     
     return log_level
+
+
+def set_logger_verbosity(verbosity: int, logger=None):
+    if logger is None:
+        logger = _logger
+    if verbosity < 0:
+        verbosity = 0
+    elif verbosity > 4:
+        verbosity = 4
+    logger.setLevel(verbosity2loglevel(verbosity))
