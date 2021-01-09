@@ -120,7 +120,7 @@ class _autogluon_method(object):
         return repr(self.f)
 
 
-def args(default=None, **kwvars):
+def args(default=None, checkpoint_dir=None, **kwvars):
     """Decorator for a Python training script that registers its arguments as hyperparameters. 
        Each hyperparameter takes fixed value or is a searchable space, and the arguments may either be:
        built-in Python objects (e.g. floats, strings, lists, etc.), AutoGluon objects (see :func:`autogluon.obj`), 
@@ -207,7 +207,7 @@ def func(**kwvars):
                         kwargs[k] = kwspaces[k].sample(**sub_config)
                     elif k in config:
                         kwargs[k] = config[k]
-                        
+
                 return self.func(*self.args, **kwargs)
 
         @functools.wraps(func)

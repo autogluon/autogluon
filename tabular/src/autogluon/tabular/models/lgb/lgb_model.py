@@ -24,6 +24,7 @@ from .lgb_utils import construct_dataset
 from ..abstract.abstract_model import AbstractModel
 from ..utils import fixedvals_from_searchspaces
 from ...features.feature_metadata import R_OBJECT
+import pathlib
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
@@ -327,7 +328,9 @@ class LGBModel(AbstractModel):
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
             dataset_val_pkl_filename=dataset_val_pkl_filename,
-            directory=directory,
+            # using absolute path - child jobs can have different working directory
+            # this allow to load datasets consistently
+            directory=str(pathlib.Path().absolute() / directory) + '/',
             model=self,
             time_start=time_start,
             time_limit=scheduler_options['time_out']
