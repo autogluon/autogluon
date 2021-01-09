@@ -6,14 +6,13 @@ Via a simple `fit()` call, AutoGluon can produce highly-accurate models to predi
 To start, import autogluon.tabular and TabularPrediction module as your task:
 
 ```{.python .input}
-import autogluon.core as ag
-from autogluon.tabular import TabularPrediction as task
+from autogluon.tabular import TabularDataset, TabularPredictorV2
 ```
 
 Load training data from a [CSV file](https://en.wikipedia.org/wiki/Comma-separated_values) into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
 
 ```{.python .input}
-train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 subsample_size = 500  # subsample subset of data for faster demo, try setting this to much larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
@@ -32,23 +31,23 @@ print("Summary of class variable: \n", train_data[label_column].describe())
 Now use AutoGluon to train multiple models:
 
 ```{.python .input}
-dir = 'agModels-predictClass'  # specifies folder where to store trained models
-predictor = task.fit(train_data=train_data, label=label_column, output_directory=dir)
+save_path = 'agModels-predictClass'  # specifies folder to store trained models
+predictor = TabularPredictorV2(label=label_column, path=save_path).fit(train_data)
 ```
 
 Next, load separate test data to demonstrate how to make predictions on new examples at inference time:
 
 ```{.python .input}
-test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 y_test = test_data[label_column]  # values to predict
-test_data_nolab = test_data.drop(labels=[label_column],axis=1)  # delete label column to prove we're not cheating
+test_data_nolab = test_data.drop(labels=[label_column], axis=1)  # delete label column to prove we're not cheating
 print(test_data_nolab.head())
 ```
 
 We use our trained models to make predictions on the new data and then evaluate performance:
 
 ```{.python .input}
-predictor = task.load(dir)  # unnecessary, just demonstrates how to load previously-trained predictor from file
+predictor = TabularPredictorV2.load(save_path)  # unnecessary, just demonstrates how to load previously-trained predictor from file
 
 y_pred = predictor.predict(test_data_nolab)
 print("Predictions:  ", y_pred)
@@ -59,8 +58,8 @@ Now you're ready to try AutoGluon on your own tabular datasets!
 As long as they're stored in a popular format like CSV, you should be able to achieve strong predictive performance with just 2 lines of code:
 
 ```
-from autogluon.tabular import TabularPrediction as task
-predictor = task.fit(train_data=task.Dataset(file_path=<file-name>), label_column=<variable-name>)
+from autogluon.tabular import TabularPredictorV2
+predictor = TabularPredictorV2(label=<variable-name>).fit(train_data=<file-name>)
 ```
 
 **Note:** This simple call to `fit()` is intended for your first prototype model. In a subsequent section, we'll demonstrate how to maximize predictive performance by additionally specifying two `fit()` arguments: `presets` and `eval_metric`.
@@ -84,7 +83,7 @@ For tabular problems, `fit()` returns a `Predictor` object. For classification, 
 ```{.python .input}
 pred_probs = predictor.predict_proba(test_data_nolab)
 positive_class = predictor.positive_class  # which label is considered 'positive' class
-print(f"Predicted probabilities of class '{positive_class}':", pred_probs)
+print(f"Predicted probabilities of class '{positive_class}': ", pred_probs)
 ```
 
 Besides inference, this object can also summarize what happened during fit.
@@ -110,7 +109,7 @@ predictor.leaderboard(test_data, silent=True)
 
 When we call `predict()`, AutoGluon automatically predicts with the model that displayed the best performance on validation data (i.e. the weighted-ensemble). We can instead specify which model to use for predictions like this:
 ```
-predictor.predict(test_data, model='NeuralNetClassifier')
+predictor.predict(test_data, model='LightGBM')
 ```
 
 Above the scores of predictive performance were based on a default evaluation metric (accuracy for binary classification). Performance in certain applications may be measured by different metrics than the ones AutoGluon optimizes for by default. If you know the metric that counts in your application, you should specify it as demonstrated in the next section.
@@ -121,17 +120,16 @@ Above the scores of predictive performance were based on a default evaluation me
 To get the best predictive accuracy with AutoGluon, you should generally use it like this:
 
 ```{.python .input}
-time_limits = 60 # for quick demonstration only, you should set this to longest time you are willing to wait (in seconds)
-metric = 'roc_auc' # specify your evaluation metric here
-predictor = task.fit(train_data=train_data, label=label_column, time_limits=time_limits,
-                     eval_metric=metric, presets='best_quality')
+time_limit = 60  # for quick demonstration only, you should set this to longest time you are willing to wait (in seconds)
+metric = 'roc_auc'  # specify your evaluation metric here
+predictor = TabularPredictorV2(label=label_column, eval_metric=metric).fit(train_data, time_limit=time_limit, presets='best_quality')
 ```
 
 This command implements the following strategy to maximize accuracy:
 
 - Specify the argument `presets='best_quality'`, which allows AutoGluon to automatically construct powerful model ensembles based on [stacking/bagging](https://arxiv.org/abs/2003.06505), and will greatly improve the resulting predictions if granted sufficient training time. The default value of `presets` is `'medium_quality_faster_train'`, which produces *less* accurate models but facilitates faster prototyping. With `presets`, you can flexibly prioritize predictive accuracy vs. training/inference speed. For example, if you care less about predictive performance and want to quickly deploy a basic model, consider using: `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`.
 
-- Provide the `eval_metric` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression).  You can also define your own custom metric function, see examples in the folder: `autogluon/utils/tabular/metrics/`
+- Provide the `eval_metric` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression).  You can also define your own custom metric function, see examples in the folder: `autogluon/core/metrics/`
 
 - Include all your data in `train_data` and do not provide `tuning_data` (AutoGluon will split the data more intelligently to fit its needs).
 
@@ -139,7 +137,7 @@ This command implements the following strategy to maximize accuracy:
 
 - Do not specify `hyperparameters` argument (allow AutoGluon to adaptively select which models/hyperparameters to use).
 
-- Set `time_limits` to the longest amount of time (in seconds) that you are willing to wait. AutoGluon's predictive performance improves the longer `fit()` is allowed to run.
+- Set `time_limit` to the longest amount of time (in seconds) that you are willing to wait. AutoGluon's predictive performance improves the longer `fit()` is allowed to run.
 
 
 ## Regression (predicting numeric table columns):
@@ -154,7 +152,7 @@ print("Summary of age variable: \n", train_data[age_column].describe())
 We again call `fit()`, imposing a time-limit this time (in seconds), and also demonstrate a shorthand method to evaluate the resulting model on the test data (which contain labels):
 
 ```{.python .input}
-predictor_age = task.fit(train_data=train_data, output_directory="agModels-predictAge", label=age_column, time_limits=60)
+predictor_age = TabularPredictorV2(label=age_column, path="agModels-predictAge").fit(train_data, time_limit=60)
 performance = predictor_age.evaluate(test_data)
 ```
 

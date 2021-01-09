@@ -43,7 +43,7 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
         return [[train_index, test_index] for train_index, test_index in kf.split(X)]
 
 
-def setup_outputdir(output_directory):
+def setup_outputdir(output_directory, warn_if_exist=True):
     if output_directory is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
@@ -57,7 +57,7 @@ def setup_outputdir(output_directory):
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f"No output_directory specified. Models will be saved in: {output_directory}")
-    else:
+    elif warn_if_exist:
         try:
             os.makedirs(output_directory, exist_ok=False)
         except FileExistsError as e:

@@ -1020,7 +1020,7 @@ class TabularPredictor:
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
 
-        output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
+        output_directory = setup_outputdir(output_directory, warn_if_exist=False)  # replace ~ with absolute path if it exists
         learner = Learner.load(output_directory)
         try:
             from ...version import __version__

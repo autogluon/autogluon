@@ -7,8 +7,7 @@ import tempfile
 
 import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.tabular import TabularPrediction as task
-from autogluon.tabular.task.tabular_prediction.predictor_v2 import TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictorV2
 
 
 def pytest_addoption(parser):
@@ -94,8 +93,8 @@ class DatasetLoaderHelper:
             ag.unzip(zip_name, directory_prefix)
             os.remove(zip_name)
 
-        train_data = task.Dataset(file_path=train_file_path)
-        test_data = task.Dataset(file_path=test_file_path)
+        train_data = TabularDataset(file_path=train_file_path)
+        test_data = TabularDataset(file_path=test_file_path)
         return train_data, test_data
 
 
