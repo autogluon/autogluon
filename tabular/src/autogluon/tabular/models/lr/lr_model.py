@@ -140,7 +140,7 @@ class LinearModel(AbstractModel):
         self.model = model.fit(X_train, y_train)
 
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
     def _select_features_handle_text_include(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):

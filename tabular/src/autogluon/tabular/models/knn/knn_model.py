@@ -141,7 +141,7 @@ class KNNModel(AbstractModel):
         return self.model
 
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
 

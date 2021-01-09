@@ -1,5 +1,6 @@
 import copy
 import logging
+import time
 import math
 from typing import Union
 
@@ -12,7 +13,6 @@ import networkx as nx
 
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
-from autogluon.core.task.base import BasePredictor
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
 from ...utils import BINARY, MULTICLASS, REGRESSION, get_pred_from_proba
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
@@ -25,7 +25,7 @@ __all__ = ['TabularPredictor']
 logger = logging.getLogger()  # return root logger
 
 
-class TabularPredictor(BasePredictor):
+class TabularPredictor:
     """ Object returned by `fit()` in Tabular Prediction tasks.
         Use for making predictions on new data and viewing information about models trained during `fit()`.
 
@@ -91,14 +91,44 @@ class TabularPredictor(BasePredictor):
         self._learner: Learner = learner  # Learner object
         self._learner.persist_trainer(low_memory=True)
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
-        self.output_directory = self._learner.path
-        self.problem_type = self._learner.problem_type
-        self.eval_metric = self._learner.eval_metric
-        self.label_column = self._learner.label
-        self.feature_metadata = self._trainer.feature_metadata
-        self.class_labels = self._learner.class_labels
-        self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
-        self.class_labels_internal_map = self._learner.label_cleaner.inv_map
+
+    @property
+    def class_labels(self):
+        return self._learner.class_labels
+
+    @property
+    def class_labels_internal(self):
+        return self._learner.label_cleaner.ordered_class_labels_transformed
+
+    @property
+    def class_labels_internal_map(self):
+        return self._learner.label_cleaner.inv_map
+
+    @property
+    def eval_metric(self):
+        return self._learner.eval_metric
+
+    @property
+    def problem_type(self):
+        return self._learner.problem_type
+
+    @property
+    def feature_metadata(self):
+        return self._trainer.feature_metadata
+
+    @property
+    def feature_metadata_in(self):
+        return self._learner.feature_generator.feature_metadata_in
+
+    # TODO: v0.1 rename to label
+    @property
+    def label_column(self):
+        return self._learner.label
+
+    # TODO: v0.1 rename to path
+    @property
+    def output_directory(self):
+        return self._learner.path
 
     # TODO: v0.1 as_pandas=True by default to avoid user confusion and errors with mismatching indices?
     def predict(self, dataset, model=None, as_pandas=False):
@@ -359,7 +389,6 @@ class TabularPredictor(BasePredictor):
             'max_stack_level': self._trainer.get_max_level(),
             'feature_prune': self._trainer.feature_prune,
             'hyperparameter_tune': hpo_used,
-            'hyperparameters_userspecified': self._trainer.hyperparameters,
         }
         if self.problem_type != REGRESSION:
             results['num_classes'] = self._trainer.num_classes
@@ -397,8 +426,6 @@ class TabularPredictor(BasePredictor):
                 hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"
             print("Hyperparameter-tuning used: %s %s" % (hpo_used, hpo_str))
             # TODO: uncomment once feature_prune is functional:  self._summarize('feature_prune', 'feature-selection used', results)
-            print("User-specified hyperparameters:")
-            print(results['hyperparameters_userspecified'])
             print("Feature Metadata (Processed):")
             print("(raw dtype, special dtypes):")
             print(self.feature_metadata)
@@ -1149,9 +1176,10 @@ class TabularPredictor(BasePredictor):
                 models_to_keep = self._trainer.get_model_best()
         self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete, allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk, dry_run=dry_run)
 
-    def get_model_names(self):
+    # TODO: v0.1 add documentation for arguments
+    def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
         """Returns the list of model names trained in this `predictor` object."""
-        return self._trainer.get_model_names()
+        return self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
 
     def get_model_names_persisted(self):
         """Returns the list of model names which are persisted in memory."""

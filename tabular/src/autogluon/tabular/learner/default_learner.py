@@ -33,13 +33,12 @@ class DefaultLearner(AbstractLearner):
         self._time_limit = None
 
     # TODO: v0.1 Document trainer_fit_kwargs
-    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, holdout_frac=0.1,
-             num_bagging_folds=0, num_bagging_sets=1, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2, **trainer_fit_kwargs):
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac=0.1,
+             num_bagging_folds=0, num_bagging_sets=1, time_limit=None, save_bagged_folds=True, verbosity=2, **trainer_fit_kwargs):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
                 X_unlabeled (DataFrame): data used for pretraining a model. This is same data format as X, without label-column. This data is used for semi-supervised learning.
-                scheduler_options (tuple: (search_strategy, dict): Options for scheduler
                 holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_val != None, ignored if kfolds != 0)
                 num_bagging_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
                 num_bagging_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
@@ -51,7 +50,7 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, f'Beginning AutoGluon training ... Time limit = {time_limit}s')
         else:
             logger.log(20, 'Beginning AutoGluon training ...')
-        logger.log(20, f'AutoGluon will save models to {self.path}')
+        logger.log(20, f'AutoGluon will save models to "{self.path}"')
         logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
         logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
@@ -73,14 +72,12 @@ class DefaultLearner(AbstractLearner):
             path=self.model_context,
             problem_type=self.label_cleaner.problem_type_transform,
             eval_metric=self.eval_metric,
-            stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
             feature_metadata=self.feature_generator.feature_metadata,
             low_memory=True,
             k_fold=num_bagging_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bagging_sets,  # TODO: Consider moving to fit call
-            scheduler_options=scheduler_options,
-            save_data=save_data,
+            save_data=self.cache_data,
             save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
             verbosity=verbosity
@@ -89,11 +86,9 @@ class DefaultLearner(AbstractLearner):
         self.trainer_path = trainer.path
         if self.eval_metric is None:
             self.eval_metric = trainer.eval_metric
-        if self.stopping_metric is None:
-            self.stopping_metric = trainer.stopping_metric
 
         self.save()
-        trainer.train(X, y, X_val, y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
+        trainer.train(X, y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end
@@ -119,11 +114,8 @@ class DefaultLearner(AbstractLearner):
             self.problem_type = self.infer_problem_type(X[self.label])
 
         if X_val is not None and self.label in X_val.columns:
-            # TODO: This is not an ideal solution, instead check if bagging and X_val exists with label, then merge them prior to entering general data processing.
-            #  This solution should handle virtually all cases correctly, only downside is it might cut more classes than it needs to.
-            self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=1, num_bagging_folds=num_bagging_folds)
-        else:
-            self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
+            holdout_frac = 1
+        self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
 
         if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
             X = augment_rare_classes(X, self.label, self.threshold)
@@ -153,12 +145,6 @@ class DefaultLearner(AbstractLearner):
         else:
             y_val = None
 
-        if self.id_columns:
-            logger.log(20, f'Dropping ID columns: {self.id_columns}')
-            X = X.drop(self.id_columns, axis=1, errors='ignore')
-            if X_val is not None:
-                X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
-
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         logger.log(20, f'Using Feature Generators to preprocess the data ...')
         if X_val is not None:
@@ -170,7 +156,7 @@ class DefaultLearner(AbstractLearner):
                 X_super = self.feature_generator.transform(X_super)
                 self.feature_generator.print_feature_metadata_info()
             else:
-                X_super = self.feature_generator.fit_transform(X_super)
+                X_super = self.fit_transform_features(X_super)
             X = X_super.head(len(X)).set_index(X.index)
 
             X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)
@@ -185,13 +171,12 @@ class DefaultLearner(AbstractLearner):
                 X_super = self.feature_generator.transform(X_super)
                 self.feature_generator.print_feature_metadata_info()
             else:
-                X_super = self.feature_generator.fit_transform(X_super)
+                X_super = self.fit_transform_features(X_super)
 
             X = X_super.head(len(X)).set_index(X.index)
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
-
 
         return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bagging_folds
 

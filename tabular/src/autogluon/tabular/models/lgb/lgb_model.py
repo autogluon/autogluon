@@ -276,7 +276,7 @@ class LGBModel(AbstractModel):
     # FIXME: Requires major refactor + refactor lgb_trial.py
     #  model names are not aligned with what is communicated to trainer!
     # FIXME: Likely tabular_nn_trial.py and abstract trial also need to be refactored heavily + hyperparameter functions
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         time_start = time.time()
         logger.log(15, "Beginning hyperparameter tuning for Gradient Boosting Model...")
         self._set_default_searchspace()

@@ -193,5 +193,5 @@ class FastTextModel(AbstractModel):
         return self._model_size_estimate
 
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)

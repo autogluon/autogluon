@@ -661,6 +661,8 @@ class TabularPrediction(BaseTask):
             time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
         # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
         time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+        if time_limits is not None:
+            time_limits_hpo = None
 
         if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):
             hyperparameter_tune = False
@@ -675,6 +677,17 @@ class TabularPrediction(BaseTask):
 
         eval_metric = get_metric(eval_metric, problem_type, 'eval_metric')
         stopping_metric = get_metric(stopping_metric, problem_type, 'stopping_metric')
+        if stopping_metric is not None:
+            if ag_args_fit is None:
+                ag_args_fit = dict()
+            ag_args_fit['stopping_metric'] = stopping_metric
+
+        if ag_args_fit is None:
+            ag_args_fit = dict()
+        if 'num_cpus' not in ag_args_fit and nthreads_per_trial is not None:
+            ag_args_fit['num_cpus'] = nthreads_per_trial
+        if 'num_gpus' not in ag_args_fit and ngpus_per_trial is not None:
+            ag_args_fit['num_gpus'] = ngpus_per_trial
 
         # All models use the same scheduler:
         scheduler_options = compile_scheduler_options(
@@ -692,15 +705,21 @@ class TabularPrediction(BaseTask):
             reward_attr='validation_performance',
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
+        if time_limits_hpo is None:
+            scheduler_options.pop('time_out', None)
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
-        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
+        if not hyperparameter_tune:
+            scheduler_options = None
+
+        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
-                          label_count_threshold=label_count_threshold, random_seed=random_seed)
-        learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data, scheduler_options=scheduler_options,
-                    hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+                          label_count_threshold=label_count_threshold, cache_data=cache_data, random_seed=random_seed)
+        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
+        learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
+                    hyperparameter_tune_kwargs=scheduler_options, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, ag_args=ag_args, ag_args_fit=ag_args_fit, ag_args_ensemble=ag_args_ensemble, excluded_model_types=excluded_model_types,
-                    time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    hyperparameters=hyperparameters, core_kwargs=core_kwargs,
+                    time_limit=time_limits_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
 

@@ -460,7 +460,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
     # TODO: Consider HPO for pretraining with unlabeled data. (Potential future work)
     # TODO: Does not work correctly when cuda is enabled.
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         from .utils import tt_trial
         import torch
 
