@@ -7,6 +7,8 @@ from pandas import DataFrame, Series
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
+from ..utils import get_pred_from_proba
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,7 +57,7 @@ class LabelCleaner:
     def transform_proba(self, y: Union[DataFrame, Series, np.ndarray], as_pandas=False):
         return y
 
-    def inverse_transform_proba(self, y, as_pandas=False):
+    def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
         return y
 
     @staticmethod
@@ -113,7 +115,7 @@ class LabelCleanerMulticlass(LabelCleaner):
         else:
             return y
 
-    def inverse_transform_proba(self, y, as_pandas=False):
+    def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
         y_index = None
         if isinstance(y, DataFrame):
             y_index = y.index
@@ -123,7 +125,13 @@ class LabelCleanerMulticlass(LabelCleaner):
             y_transformed[:, self.label_index_to_keep] = y
         else:
             y_transformed = y
-        if as_pandas:
+        if as_pred:
+            y_transformed = get_pred_from_proba(y_pred_proba=y_transformed, problem_type=self.problem_type_transform)
+            y_transformed = self._convert_to_valid_series(y_transformed)
+            y_transformed = y_transformed.map(self.cat_mappings_dependent_var_uncleaned)
+            if y_index is not None:
+                y_transformed.index = y_index
+        if as_pandas and not as_pred:
             y_transformed = DataFrame(data=y_transformed, index=y_index, columns=self.ordered_class_labels, dtype=np.float32)
         return y_transformed
 
@@ -177,6 +185,22 @@ class LabelCleanerBinary(LabelCleaner):
         self.ordered_class_labels_transformed = [0, 1]
         self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]\
 
+    def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
+        if not as_pred:
+            return y
+        y_index = None
+        if isinstance(y, Series):
+            y_index = y.index
+            y = y.to_numpy()
+        if as_pred:
+            y = get_pred_from_proba(y_pred_proba=y, problem_type=self.problem_type_transform)
+            y = self._convert_to_valid_series(y)
+            y = y.map(self.cat_mappings_dependent_var)
+            y = y.to_numpy()
+        if as_pandas:
+            y = Series(data=y, index=y_index)
+        return y
+
     def _transform(self, y: Series) -> Series:
         y = y.map(self.inv_map)
         return y
@@ -196,9 +220,9 @@ class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
         y = self.label_cleaner_binary.transform(y)
         return y
 
-    def inverse_transform_proba(self, y, as_pandas=False):
+    def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
         y = self.convert_binary_proba_to_multiclass_proba(y=y, as_pandas=as_pandas)
-        return super().inverse_transform_proba(y, as_pandas=as_pandas)
+        return super().inverse_transform_proba(y, as_pandas=as_pandas, as_pred=as_pred)
 
     @staticmethod
     def convert_binary_proba_to_multiclass_proba(y, as_pandas=False):
