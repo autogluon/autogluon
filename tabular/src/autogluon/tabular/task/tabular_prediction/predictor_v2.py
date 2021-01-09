@@ -158,6 +158,7 @@ class TabularPredictorV2(TabularPredictor):
             save_space=kwargs['save_space'],
         )
         self.save()
+        return self
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False):
         if refit_full is True:
@@ -272,6 +273,7 @@ class TabularPredictorV2(TabularPredictor):
             save_space=kwargs['save_space'],
         )
         self.save()
+        return self
 
     # TODO: Move to generic, migrate all tasks to same kwargs logic
     def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels):
