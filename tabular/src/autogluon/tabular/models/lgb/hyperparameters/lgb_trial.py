@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # FIXME: Hyperband does not work with LightGBM
 # FIXME: If stopping metric != eval_metric, score will be wrong!
 @args()
-def lgb_trial(args, reporter):
+def lgb_trial(args, reporter, checkpoint_dir=None):
     """ Training script for hyperparameter evaluation of Gradient Boosting model """
     try:
         model, args, util_args = model_trial.prepare_inputs(args=args)
