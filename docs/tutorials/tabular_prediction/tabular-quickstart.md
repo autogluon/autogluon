@@ -40,7 +40,7 @@ Next, load separate test data to demonstrate how to make predictions on new exam
 ```{.python .input}
 test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 y_test = test_data[label_column]  # values to predict
-test_data_nolab = test_data.drop(labels=[label_column], axis=1)  # delete label column to prove we're not cheating
+test_data_nolab = test_data.drop(columns=[label_column])  # delete label column to prove we're not cheating
 print(test_data_nolab.head())
 ```
 

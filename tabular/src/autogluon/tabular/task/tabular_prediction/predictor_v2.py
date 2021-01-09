@@ -58,6 +58,10 @@ class TabularPredictorV2(TabularPredictor):
         self._learner_type = type(self._learner)
         self._trainer = None
 
+    @property
+    def path(self):
+        return self._learner.path
+
     @unpack(set_presets)
     def fit(self,
             train_data,
@@ -73,6 +77,7 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: Move documentation from TabularPrediction.fit to here
         # TODO: Move num_cpu/num_gpu to ag_args_fit
         # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
+        # TODO: Remove all `time_limits` in project, replace with `time_limit`
 
         """
         if self._learner.is_fit:
