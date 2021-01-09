@@ -171,9 +171,9 @@ Another option is to directly include the neural network in AutoGluon-Text as on
 
 ```{.python .input}
 tabular_multimodel_hparam_v1 = {
-    'GBM': [{}, {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}}],
+    'GBM': [{}, {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}}],
     'CAT': {},
-    'TEXT_NN_V1': {'AG_args': {'valid_stacker': False}},
+    'TEXT_NN_V1': {},
 }
 
 predictor_model3 = TabularPrediction.fit(train_df,
@@ -258,10 +258,9 @@ from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get
 import copy
 
 text_nn_params = ag_text_prediction_params.create('default_electra_base_no_hpo')
-text_nn_params['AG_args'] = {'valid_stacker': False}
 
 tabular_multimodel_hparam_v2 = {
-    'GBM': [{}, {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}}],
+    'GBM': [{}, {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}}],
     'CAT': {},
     'TEXT_NN_V1': text_nn_params,
 }

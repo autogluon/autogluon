@@ -8,6 +8,7 @@ import tempfile
 import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular import TabularPrediction as task
+from autogluon.tabular.task.tabular_prediction.predictor_v2 import TabularPredictorV2
 
 
 def pytest_addoption(parser):
@@ -55,8 +56,8 @@ class DatasetLoaderHelper:
         },
         # Regression with multiple text field and categorical
         sts={
-            'url': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue_sts.zip',
-            'name': 'glue_sts',
+            'url': 'https://autogluon-text.s3-us-west-2.amazonaws.com/glue_sts.zip',
+            'name': 'SemanticTextualSimilarity',
             'problem_type': REGRESSION,
             'label_column': 'score',
         }
@@ -105,10 +106,11 @@ class FitHelper:
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label_column = dataset_info['label_column']
         savedir = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
-        fit_args['label'] = label_column
-        fit_args['output_directory'] = savedir
-        predictor = FitHelper.fit_dataset(train_data=train_data, fit_args=fit_args,
-                                          sample_size=sample_size)
+        init_args = dict(
+            label=label_column,
+            path=savedir,
+        )
+        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
@@ -131,10 +133,10 @@ class FitHelper:
         return predictor
 
     @staticmethod
-    def fit_dataset(train_data, fit_args, sample_size=None):
+    def fit_dataset(train_data, init_args, fit_args, sample_size=None):
         if sample_size is not None and sample_size < len(train_data):
             train_data = train_data.sample(n=sample_size, random_state=0)
-        return task.fit(train_data=train_data, **fit_args)
+        return TabularPredictorV2(**init_args).fit(train_data, **fit_args)
 
 
 @pytest.fixture

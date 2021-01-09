@@ -71,8 +71,7 @@ class TabularPredictorV2(TabularPredictor):
         Fit models to predict a column of data table based on the other columns.
 
         # TODO: Move documentation from TabularPrediction.fit to here
-        # TODO: Move num_cpu/num_gpu to AG_args_fit
-        # TODO: AG_args -> ag_args? +1 -> Will change after replacing original TabularPredictor to avoid extra API breaks.
+        # TODO: Move num_cpu/num_gpu to ag_args_fit
         # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 
         """
@@ -104,9 +103,9 @@ class TabularPredictorV2(TabularPredictor):
         unlabeled_data = kwargs['unlabeled_data']
         save_bagged_folds = kwargs['save_bagged_folds']
 
-        ag_args = kwargs['AG_args']
-        ag_args_fit = kwargs['AG_args_fit']
-        ag_args_ensemble = kwargs['AG_args_ensemble']
+        ag_args = kwargs['ag_args']
+        ag_args_fit = kwargs['ag_args_fit']
+        ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
 
         self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
@@ -221,9 +220,9 @@ class TabularPredictorV2(TabularPredictor):
         num_gpus = kwargs['num_gpus']
         # save_bagged_folds = kwargs['save_bagged_folds']  # TODO: Enable
 
-        ag_args = kwargs['AG_args']
-        ag_args_fit = kwargs['AG_args_fit']
-        ag_args_ensemble = kwargs['AG_args_ensemble']
+        ag_args = kwargs['ag_args']
+        ag_args_fit = kwargs['ag_args_fit']
+        ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
 
         if isinstance(hyperparameters, str):
@@ -433,11 +432,11 @@ class TabularPredictorV2(TabularPredictor):
             hyperparameter_tune_kwargs=None,
 
             # core_kwargs -> +1 nest
-            AG_args=None,
-            AG_args_fit=None,
-            AG_args_ensemble=None,
+            ag_args=None,
+            ag_args_fit=None,
+            ag_args_ensemble=None,
             excluded_model_types=None,
-            save_bagged_folds=True,  # TODO: Move to AG_args_ensemble
+            save_bagged_folds=True,  # TODO: Move to ag_args_ensemble
 
             # aux_kwargs -> +1 nest
 
@@ -447,7 +446,7 @@ class TabularPredictorV2(TabularPredictor):
             save_space=False,
             refit_full=False,
 
-            # move into AG_args_fit? +1
+            # move into ag_args_fit? +1
             num_cpus=None,
             num_gpus=None,
 
@@ -466,7 +465,7 @@ class TabularPredictorV2(TabularPredictor):
         kwargs_sanitized.update(kwargs)
 
         # Deepcopy args to avoid altering outer context
-        deepcopy_args = ['AG_args', 'AG_args_fit', 'AG_args_ensemble', 'excluded_model_types']
+        deepcopy_args = ['ag_args', 'ag_args_fit', 'ag_args_ensemble', 'excluded_model_types']
         for deepcopy_arg in deepcopy_args:
             kwargs_sanitized[deepcopy_arg] = copy.deepcopy(kwargs_sanitized[deepcopy_arg])
 

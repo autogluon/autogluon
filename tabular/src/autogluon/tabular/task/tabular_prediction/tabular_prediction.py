@@ -216,24 +216,24 @@ class TabularPrediction(BaseTask):
                     'NN': {},
                     'GBM': [
                         {},
-                        {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
+                        {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
                     ],
                     'CAT': {},
                     'XGB': {},
                     'FASTAI': {},
                     'RF': [
-                        {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                        {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
                     ],
                     'XT': [
-                        {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                        {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
                     ],
                     'KNN': [
-                        {'weights': 'uniform', 'AG_args': {'name_suffix': 'Unif'}},
-                        {'weights': 'distance', 'AG_args': {'name_suffix': 'Dist'}},
+                        {'weights': 'uniform', 'ag_args': {'name_suffix': 'Unif'}},
+                        {'weights': 'distance', 'ag_args': {'name_suffix': 'Dist'}},
                     ],
                     'custom': ['GBM']
                 }
@@ -260,8 +260,8 @@ class TabularPrediction(BaseTask):
                     Note: 'penalty' parameter can be used for regression to specify regularization method: 'L1' and 'L2' values are supported.
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
-                        Example: `hyperparameters = {'RF': {..., 'AG_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
-                    AG_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
+                        Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
+                    ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
                             name_main: (str) The main name of the model. Example: 'RandomForest'.
@@ -273,7 +273,7 @@ class TabularPrediction(BaseTask):
                             valid_stacker: (bool) If False, the model will not be trained as a level 1 or higher stacker model.
                             valid_base: (bool) If False, the model will not be trained as a level 0 (base) model.
                         Reference the default hyperparameters for example usage of these options.
-                    AG_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
+                    ag_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
                         Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limits` argument given during `fit()` but is not the same.
                         Valid keys:
                             max_memory_usage_ratio: (float, default=1.0) The ratio of memory usage relative to the default to allow before early stopping or killing the model. Values greater than 1.0 will be increasingly prone to out-of-memory errors.
@@ -282,7 +282,7 @@ class TabularPrediction(BaseTask):
                             min_time_limit: (float, default=0) Allow this model to train for at least this long (in sec), regardless of the time limit it would otherwise be granted.
                                 If `min_time_limit >= max_time_limit`, time_limit will be set to min_time_limit.
                                 If `min_time_limit=None`, time_limit will be set to None and the model will have no training time restriction.
-                    AG_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled. Only models in stack levels >=1 are impacted by these parameters.
+                    ag_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled. Only models in stack levels >=1 are impacted by these parameters.
                         Valid keys:
                             use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
                             max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
@@ -321,21 +321,21 @@ class TabularPrediction(BaseTask):
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
 
         Kwargs can include additional arguments for advanced users:
-            AG_args : dict, default={}
+            ag_args : dict, default={}
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
-                See the `AG_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
-                Identical to specifying `AG_args` parameter for all models in `hyperparameters`.
-                If a key in `AG_args` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
-            AG_args_fit : dict, default={}
+                See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Identical to specifying `ag_args` parameter for all models in `hyperparameters`.
+                If a key in `ag_args` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            ag_args_fit : dict, default={}
                 Keyword arguments to pass to all models.
-                See the `AG_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
-                Identical to specifying `AG_args_fit` parameter for all models in `hyperparameters`.
-                If a key in `AG_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
-            AG_args_ensemble : dict, default={}
+                See the `ag_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Identical to specifying `ag_args_fit` parameter for all models in `hyperparameters`.
+                If a key in `ag_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            ag_args_ensemble : dict, default={}
                 Keyword arguments to pass to all models.
-                See the `AG_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
-                Identical to specifying `AG_args_ensemble` parameter for all models in `hyperparameters`.
-                If a key in `AG_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+                See the `ag_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Identical to specifying `ag_args_ensemble` parameter for all models in `hyperparameters`.
+                If a key in `ag_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
             excluded_model_types : list, default = []
                 Banned subset of model types to avoid training during `fit()`, even if present in `hyperparameters`.
                 Valid values: ['RF', 'XT', 'KNN', 'GBM', 'CAT', 'NN', 'LR', 'custom']. Reference `hyperparameters` documentation for what models correspond to each value.
@@ -504,9 +504,9 @@ class TabularPrediction(BaseTask):
         allowed_kwarg_names = {
             'feature_generator',
             'trainer_type',
-            'AG_args',
-            'AG_args_fit',
-            'AG_args_ensemble',
+            'ag_args',
+            'ag_args_fit',
+            'ag_args_ensemble',
             'excluded_model_types',
             'label_count_threshold',
             'id_columns',
@@ -614,9 +614,9 @@ class TabularPrediction(BaseTask):
                                        AutoMLPipelineFeatureGenerator(**_feature_generator_kwargs))
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
-        ag_args = kwargs.get('AG_args', None)
-        ag_args_fit = kwargs.get('AG_args_fit', None)
-        ag_args_ensemble = kwargs.get('AG_args_ensemble', None)
+        ag_args = kwargs.get('ag_args', None)
+        ag_args_fit = kwargs.get('ag_args_fit', None)
+        ag_args_ensemble = kwargs.get('ag_args_ensemble', None)
         excluded_model_types = kwargs.get('excluded_model_types', [])
         random_seed = kwargs.get('random_seed', 0)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)

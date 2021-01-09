@@ -1469,10 +1469,10 @@ class AbstractTrainer:
                 custom_info['child_model_type'] = bagged_info.get('child_model_type', None)
                 custom_info['child_hyperparameters'] = bagged_info.get('child_hyperparameters', None)
                 custom_info['child_hyperparameters_fit'] = bagged_info.get('child_hyperparameters_fit', None)
-                custom_info['child_AG_args_fit'] = bagged_info.get('child_AG_args_fit', None)
+                custom_info['child_ag_args_fit'] = bagged_info.get('child_ag_args_fit', None)
                 custom_model_info[model_name] = custom_info
 
-            model_info_keys = ['num_features', 'model_type', 'hyperparameters', 'hyperparameters_fit', 'AG_args_fit', 'features']
+            model_info_keys = ['num_features', 'model_type', 'hyperparameters', 'hyperparameters_fit', 'ag_args_fit', 'features']
             model_info_sum_keys = []
             for key in model_info_keys:
                 model_info_dict[key] = [model_info[model_name][key] for model_name in model_names]
@@ -1480,7 +1480,7 @@ class AbstractTrainer:
                     key_dict = {model_name: model_info[model_name][key] for model_name in model_names}
                     model_info_dict[key + '_full'] = [self.get_model_attribute_full(model=model_name, attribute=key_dict) for model_name in model_names]
 
-            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_AG_args_fit']
+            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_ag_args_fit']
             model_info_full_keys = {'memory_size': [('memory_size_w_ancestors', sum)], 'memory_size_min': [('memory_size_min_w_ancestors', max)], 'num_models': [('num_models_w_ancestors', sum)]}
             for key in model_info_keys:
                 model_info_dict[key] = [custom_model_info[model_name][key] for model_name in model_names]

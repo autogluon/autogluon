@@ -248,7 +248,7 @@ def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_cla
     # Swap RF criterion for MSE:
     rf_models = []
     if len(hyperparameters_rf) > 0:
-        rf_newparams = {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE'}}
+        rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
         if 'RF' in hyperparameters_rf:
             rf_params = hyperparameters_rf['RF']
         elif 'default' in hyperparameters_rf and 'RF' in hyperparameters_rf['default']:

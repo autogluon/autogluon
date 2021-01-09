@@ -311,7 +311,7 @@ class TabularPredictor:
                         This is most commonly set for hyperparameters that indicate model training iterations or epochs, as early stopping can find a different value from what 'hyperparameters' indicated.
                         In these cases, the provided hyperparameter in 'hyperparameters' is used as a maximum for the model, but the model is still able to early stop at a smaller value during training to achieve a better validation score or to satisfy time constraints.
                         For example, if a NN model was given `epochs=500` as a hyperparameter, but found during training that `epochs=60` resulted in optimal validation score, it would use `epoch=60` and `hyperparameters_fit={'epoch': 60}` would be set.
-                    'AG_args_fit': Special AutoGluon arguments that influence model fit.
+                    'ag_args_fit': Special AutoGluon arguments that influence model fit.
                         See the documentation of the `hyperparameters` argument in `TabularPrediction.fit()` for more information.
                     'features': List of feature names used by the model.
 
@@ -319,7 +319,7 @@ class TabularPredictor:
 
                     'child_hyperparameters_fit': Equivalent to 'hyperparameters_fit', but for the model's children.
 
-                    'child_AG_args_fit': Equivalent to 'AG_args_fit', but for the model's children.
+                    'child_ag_args_fit': Equivalent to 'ag_args_fit', but for the model's children.
 
                     'ancestors': The model's ancestors. Ancestor models are the models which are required to make predictions during the construction of the model's input features.
                         If A is an ancestor of B, then B is a descendant of A.
