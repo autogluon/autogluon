@@ -20,7 +20,7 @@ hyperparams = {'NN': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': ag
 
 predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir,
                      hyperparameter_tune=True, hyperparameters=hyperparams,
-                     num_trials=5, time_limits=1*60, num_bagging_folds=0, stack_ensemble_levels=0)  # since tuning_data = None, automatically determines train/validation split
+                     num_trials=5, time_limit=60, num_bagging_folds=0, stack_ensemble_levels=0)  # since tuning_data = None, automatically determines train/validation split
 
 results = predictor.fit_summary()  # display detailed summary of fit() process
 print(results)

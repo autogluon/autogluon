@@ -20,7 +20,8 @@ class AutoTrainer(AbstractTrainer):
         return get_preset_models(path=path, problem_type=problem_type, eval_metric=eval_metric,
                                  num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names, feature_metadata=feature_metadata, **kwargs)
 
-    # TODO: rename to .fit for 0.1
+    # TODO: v0.1 rename to .fit
+    # TODO: v0.1 rename stack_ensemble_levels -> num_stack_levels
     def train(self, X_train, y_train, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, hyperparameter_tune_kwargs=None, feature_prune=False, holdout_frac=0.1, stack_ensemble_levels=0, core_kwargs: dict = None, time_limit=None, **kwargs):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.train()`. Argument: {key}')

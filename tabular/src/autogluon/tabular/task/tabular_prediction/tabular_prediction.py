@@ -60,7 +60,7 @@ class TabularPrediction(BaseTask):
     def fit(train_data,
             label,
             tuning_data=None,
-            time_limits=None,
+            time_limit=None,
             output_directory=None,
             presets=None,
             problem_type=None,
@@ -93,7 +93,7 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
-        time_limits : int, default = None
+        time_limit : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` or `auto_stack` is specified.
         output_directory : str, default = None
@@ -116,7 +116,7 @@ class TabularPrediction(BaseTask):
 
             In-depth Preset Info:
                 best_quality={'auto_stack': True}
-                    Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limits value.
+                    Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
                 best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True}
@@ -274,7 +274,7 @@ class TabularPrediction(BaseTask):
                             valid_base: (bool) If False, the model will not be trained as a level 0 (base) model.
                         Reference the default hyperparameters for example usage of these options.
                     ag_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
-                        Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limits` argument given during `fit()` but is not the same.
+                        Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limit` argument given during `fit()` but is not the same.
                         Valid keys:
                             max_memory_usage_ratio: (float, default=1.0) The ratio of memory usage relative to the default to allow before early stopping or killing the model. Values greater than 1.0 will be increasingly prone to out-of-memory errors.
                             max_time_limit_ratio: (float, default=1.0) The ratio of the provided time_limit to use during model `fit()`. If `time_limit=10` and `max_time_limit_ratio=0.3`, time_limit would be changed to 3. Does not alter max_time_limit or min_time_limit values.
@@ -302,7 +302,7 @@ class TabularPrediction(BaseTask):
             To further improve predictions, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets.
         num_bagging_sets : int, default = None
             Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
-            Defaults to 1 if time_limits is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
+            Defaults to 1 if time_limit is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
             Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
         stack_ensemble_levels : int, default = None
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
@@ -310,7 +310,7 @@ class TabularPrediction(BaseTask):
             To prevent overfitting, `num_bagging_folds >= 2` must also be set or else a ValueError will be raised.
         num_trials : int, default = None
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
-            If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
+            If both `time_limit` and `num_trials` are specified, `time_limit` takes precedent.
         search_strategy : str, default = 'random'
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune=True`).
             Options include: 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search).
@@ -395,7 +395,7 @@ class TabularPrediction(BaseTask):
                     Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
                     If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
                         Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
-                The time taken by this process is not enforced by `time_limits`.
+                The time taken by this process is not enforced by `time_limit`.
                 `cache_data` must be set to `True` to enable this functionality.
             set_best_to_refit_full : bool, default = False
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
@@ -490,8 +490,8 @@ class TabularPrediction(BaseTask):
         To maximize predictive performance, use the following:
 
         >>> eval_metric = 'roc_auc'  # set this to the metric you ultimately care about
-        >>> time_limits = 360  # set as long as you are willing to wait (in sec)
-        >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limits=time_limits)
+        >>> time_limit = 360  # set as long as you are willing to wait (in sec)
+        >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limit=time_limit)
         """
         assert search_strategy != 'bayesopt_hyperband', \
             "search_strategy == 'bayesopt_hyperband' not yet supported"
@@ -499,6 +499,10 @@ class TabularPrediction(BaseTask):
             verbosity = 0
         elif verbosity > 4:
             verbosity = 4
+
+        if 'time_limits' in kwargs:
+            logger.warning('WARNING: Using deprecated argument `time_limits`. Use `time_limit` instead! This will cause an exception in future releases.')
+            time_limit = kwargs.pop('time_limits')
 
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
@@ -531,7 +535,6 @@ class TabularPrediction(BaseTask):
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
 
-        # TODO: v0.1 - time_limits -> time_limit?
         # TODO: v0.1 - stack_ensemble_levels -> num_stack_levels / num_stack_layers?
         # TODO: v0.1 - id_columns -> ignored_columns?
         # TODO: v0.1 - nthreads_per_trial/ngpus_per_trial -> rename/rework
@@ -623,7 +626,7 @@ class TabularPrediction(BaseTask):
         num_train_rows = len(train_data)
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
-            # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
+            # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bagging_folds is None:
                 num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
             if stack_ensemble_levels is None:
@@ -642,7 +645,7 @@ class TabularPrediction(BaseTask):
             raise ValueError(f'stack_ensemble_levels must be 0 if num_bagging_folds is 0. (stack_ensemble_levels={stack_ensemble_levels}, num_bagging_folds={num_bagging_folds})')
         if num_bagging_sets is None:
             if num_bagging_folds >= 2:
-                if time_limits is not None:
+                if time_limit is not None:
                     num_bagging_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
                 else:
                     num_bagging_sets = 1
@@ -655,19 +658,19 @@ class TabularPrediction(BaseTask):
         # Ensure there exist sufficient labels for stratified splits across all bags
         label_count_threshold = max(label_count_threshold, num_bagging_folds)
 
-        time_limits_orig = copy.deepcopy(time_limits)
-        time_limits_hpo = copy.deepcopy(time_limits)
+        time_limit_orig = copy.deepcopy(time_limit)
+        time_limit_hpo = copy.deepcopy(time_limit)
 
-        if num_bagging_folds >= 2 and (time_limits_hpo is not None):
-            time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
+        if num_bagging_folds >= 2 and (time_limit_hpo is not None):
+            time_limit_hpo = time_limit_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
         # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
-        time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
-        if time_limits is not None:
-            time_limits_hpo = None
+        time_limit_hpo, num_trials = setup_trial_limits(time_limit_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+        if time_limit is not None:
+            time_limit_hpo = None
 
         if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):
             hyperparameter_tune = False
-            logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
+            logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, setting to False.')
 
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(num_train_rows, hyperparameter_tune)
@@ -699,14 +702,14 @@ class TabularPrediction(BaseTask):
             ngpus_per_trial=ngpus_per_trial,
             checkpoint=None,
             num_trials=num_trials,
-            time_out=time_limits_hpo,
+            time_out=time_limit_hpo,
             resume=False,
             visualizer=visualizer,
             time_attr='epoch',
             reward_attr='validation_performance',
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
-        if time_limits_hpo is None:
+        if time_limit_hpo is None:
             scheduler_options.pop('time_out', None)
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         if not hyperparameter_tune:
@@ -720,7 +723,7 @@ class TabularPrediction(BaseTask):
                     hyperparameter_tune_kwargs=scheduler_options, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                    time_limit=time_limits_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    time_limit=time_limit_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
 

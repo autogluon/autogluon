@@ -39,7 +39,7 @@ print(train_data.head())
 
 # Fit model ensemble:
 predictor = task.fit(train_data=train_data, label=label_column, problem_type='multiclass', output_directory=savedir,
-                     cache_data=True, auto_stack=True, time_limits=time_limit)
+                     cache_data=True, auto_stack=True, time_limit=time_limit)
 
 # Distill ensemble-predictor into single model:
 time_limit = 60  # None
@@ -48,7 +48,7 @@ time_limit = 60  # None
 aug_data = task.Dataset(file_path=train_file_path)
 aug_data = aug_data.head(subsample_size)  # subsample for faster demo
 
-distilled_model_names = predictor.distill(time_limit=time_limit, augment_args={'num_augmented_samples': 100})  # default distillation (time_limits & augment_args are also optional, here set to suboptimal values to ensure quick runtime)
+distilled_model_names = predictor.distill(time_limit=time_limit, augment_args={'num_augmented_samples': 100})  # default distillation (time_limit & augment_args are also optional, here set to suboptimal values to ensure quick runtime)
 
 # Other variants demonstrating different usage options:
 predictor.distill(time_limit=time_limit, teacher_preds='soft', augment_method='spunge', augment_args={'size_factor': 1}, verbosity=3, models_name_suffix='spunge')

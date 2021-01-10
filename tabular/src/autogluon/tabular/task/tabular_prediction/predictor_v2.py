@@ -75,7 +75,7 @@ class TabularPredictorV2(TabularPredictor):
         Fit models to predict a column of data table based on the other columns.
 
         # TODO: Move documentation from TabularPrediction.fit to here
-        # TODO: Move num_cpu/num_gpu to ag_args_fit
+        # TODO: Move num_cpus/num_gpus to ag_args_fit
         # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
         # TODO: Remove all `time_limits` in project, replace with `time_limit`
 
@@ -268,7 +268,7 @@ class TabularPredictorV2(TabularPredictor):
                 time_limit_weighted = max(time_limit, 60)
             else:
                 time_limit_weighted = None
-            fit_models += self.fit_weighted_ensemble(time_limits=time_limit_weighted)
+            fit_models += self.fit_weighted_ensemble(time_limit=time_limit_weighted)
 
         self._post_fit(
             keep_only_best=kwargs['keep_only_best'],

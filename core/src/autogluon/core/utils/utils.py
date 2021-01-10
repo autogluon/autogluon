@@ -86,9 +86,9 @@ def setup_trial_limits(time_limit, num_trials, hyperparameters):
         if time_limit is None:
             time_limit = 10 * 60  # run for 10min by default
         time_limit /= float(len(hyperparameters))  # each model type gets half the available time
-        num_trials = 1000  # run up to 1000 trials (or as you can within the given time_limits)
+        num_trials = 1000  # run up to 1000 trials (or as you can within the given time_limit)
     elif time_limit is None:
-        time_limit = int(1e6)  # user only specified num_trials, so run all of them regardless of time-limits
+        time_limit = int(1e6)  # user only specified num_trials, so run all of them regardless of time_limit
     else:
         time_limit /= float(len(hyperparameters))  # each model type gets half the available time
 

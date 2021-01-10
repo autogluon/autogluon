@@ -3,7 +3,7 @@
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API.
 
-This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune`, `hyperparameters`, `stack_ensemble_levels`, `num_bagging_folds`, `num_bagging_sets`, etc.
+This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune_kwargs`, `hyperparameters`, `num_stack_levels`, `num_bag_folds`, `num_bag_sets`, etc.
 
 Using the same census data table as in the :ref:`sec_tabularquick` tutorial, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
 
@@ -94,7 +94,7 @@ In the above example, the predictive performance may be poor because we specifie
 
 ## Model ensembling with stacking/bagging
 
-Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two other methods to boost predictive performance are [bagging and stack-ensembling](https://arxiv.org/abs/2003.06505).  You'll often see performance improve if you specify `num_bagging_folds` = 5-10, `stack_ensemble_levels` = 1-3 in the call to `fit()`, but this will increase training times and memory/disk usage.
+Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two other methods to boost predictive performance are [bagging and stack-ensembling](https://arxiv.org/abs/2003.06505).  You'll often see performance improve if you specify `num_bag_folds` = 5-10, `num_stack_levels` = 1-3 in the call to `fit()`, but this will increase training times and memory/disk usage.
 
 ```{.python .input}
 predictor = TabularPredictorV2(label=label_column, eval_metric=metric).fit(train_data,

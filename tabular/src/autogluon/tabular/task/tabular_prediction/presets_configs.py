@@ -14,7 +14,7 @@ def unpack(g):
 
 # Dictionary of preset fit() parameter configurations.
 preset_dict = dict(
-    # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limits value.
+    # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
     # Recommended for applications that benefit from the best possible model accuracy.
     best_quality={'auto_stack': True},
 

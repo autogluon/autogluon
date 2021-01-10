@@ -820,7 +820,7 @@ class TabularPredictor:
     # TODO: Move code logic to learner/trainer
     # TODO: Add task.fit arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
-    def fit_weighted_ensemble(self, base_models: list = None, name_suffix='_custom', expand_pareto_frontier=False, time_limits=None):
+    def fit_weighted_ensemble(self, base_models: list = None, name_suffix='_custom', expand_pareto_frontier=False, time_limit=None):
         """
         Fits new weighted ensemble models to combine predictions of previously-trained models.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -841,8 +841,8 @@ class TabularPredictor:
             These weighted ensemble models will attempt to expand the pareto frontier.
             This will create many different weighted ensembles which have different accuracy/memory/inference-speed trade-offs.
             This is particularly useful when inference speed is an important consideration.
-        time_limits : int, default = None
-            Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limits` value is applied to each model.
+        time_limit : int, default = None
+            Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limit` value is applied to each model.
             If None, the ensemble models train without time restriction.
 
         Returns
@@ -878,11 +878,11 @@ class TabularPredictor:
                 models_to_check_now = models_to_check[:i+1]
                 max_base_model_level = max([trainer.get_model_level(base_model) for base_model in models_to_check_now])
                 weighted_ensemble_level = max_base_model_level + 1
-                models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=models_to_check_now, name_suffix=name_suffix + '_pareto' + str(i), time_limit=time_limits)
+                models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=models_to_check_now, name_suffix=name_suffix + '_pareto' + str(i), time_limit=time_limit)
 
         max_base_model_level = max([trainer.get_model_level(base_model) for base_model in base_models])
         weighted_ensemble_level = max_base_model_level + 1
-        models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=base_models, name_suffix=name_suffix, time_limit=time_limits)
+        models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=base_models, name_suffix=name_suffix, time_limit=time_limit)
 
         return models
 
@@ -1235,7 +1235,7 @@ class TabularPredictor:
                 'num_augmented_samples': int, number of augmented datapoints used during distillation. Overrides 'size_factor', 'max_size' if specified.
                 'max_size': float, the maximum number of augmented datapoints to add (ignored if 'num_augmented_samples' specified).
                 'size_factor': float, if n = training data sample-size, we add int(n * size_factor) augmented datapoints, up to 'max_size'.
-                Larger values in `augment_args` will slow down the runtime of distill(), and may produce worse results if provided time_limits are too small.
+                Larger values in `augment_args` will slow down the runtime of distill(), and may produce worse results if provided time_limit are too small.
                 You can also pass in kwargs for the `spunge_augment`, `munge_augment` functions in `autogluon/utils/tabular/ml/augmentation/distill_utils.py`.
         models_name_suffix : str, default = None
             Optional suffix that can be appended at the end of all distilled student models' names.
