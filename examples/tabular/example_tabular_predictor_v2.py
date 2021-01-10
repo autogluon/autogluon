@@ -25,8 +25,7 @@ predictor1.leaderboard(test_data)
 # Fitting with the new Predictor #
 ##################################
 
-predictor2 = TabularPredictorV2(label, eval_metric=eval_metric)
-predictor2.fit(train_data, hyperparameters=hyperparameters, num_bag_folds=2)
+predictor2 = TabularPredictorV2(label, eval_metric=eval_metric).fit(train_data, hyperparameters=hyperparameters, num_bag_folds=2)
 predictor2.leaderboard(test_data)
 
 ####################################

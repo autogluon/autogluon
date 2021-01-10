@@ -353,7 +353,7 @@ class TabularPredictor:
 
             Parameters
             ----------
-            verbosity : int, default = 3
+            verbosity : int, default = 3
                 Controls how detailed of a summary to ouput.
                 Set <= 0 for no output printing, 1 to print just high-level summary,
                 2 to print summary and create plots, >= 3 to print all information produced during fit().
@@ -1251,14 +1251,14 @@ class TabularPredictor:
 
         Examples
         --------
-        >>> from autogluon.tabular import TabularPrediction as task
-        >>> train_data = task.Dataset('train.csv')
-        >>> predictor = task.fit(train_data=train_data, label='class', auto_stack=True, cache_data=True)  # predictor is in bagged mode and `cache_data=True`.
+        >>> from autogluon.tabular import TabularDataset, TabularPredictorV2
+        >>> train_data = TabularDataset('train.csv')
+        >>> predictor = TabularPredictorV2(label='class').fit(train_data, auto_stack=True)
         >>> distilled_model_names = predictor.distill()
-        >>> test_data = task.Dataset('test.csv')
+        >>> test_data = TabularDataset('test.csv')
         >>> ldr = predictor.leaderboard(test_data)
-        >>> model_todeploy = distilled_model_names[0]
-        >>> predictor.predict(test_data, model=model_todeploy)
+        >>> model_to_deploy = distilled_model_names[0]
+        >>> predictor.predict(test_data, model=model_to_deploy)
 
         """
         if isinstance(hyperparameters, str):

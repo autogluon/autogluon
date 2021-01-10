@@ -86,7 +86,7 @@ print('"Sentence":', sentence2, '"Predicted Class-Probabilities":', probs[1])
 
 ## Sentence Similarity
 
-Next, let's use AutoGluon to train a model for evaluating how semantically similar two sentences are. 
+Next, let's use AutoGluon to train a model for evaluating how semantically similar two sentences are. 
 We use the [Semantic Textual Similarity Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark) dataset for illustration.
 
 

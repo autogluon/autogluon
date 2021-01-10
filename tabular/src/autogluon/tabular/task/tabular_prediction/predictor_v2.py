@@ -78,6 +78,8 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: Move num_cpus/num_gpus to ag_args_fit
         # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
         # TODO: Remove all `time_limits` in project, replace with `time_limit`
+        # TODO: Add logging for which presets were used
+        # TODO: TabularDataset 'file_path' make so it does not have to be named. Same with 'df'.
 
         """
         if self._learner.is_fit:

@@ -105,7 +105,7 @@ def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10
         Args:
             num_augmented_samples: number of additional augmented data points to return
             perturb_prob: probability of perturbing each feature during augmentation. Set near 0 to ensure augmented sample distribution remains closer to real data.
-            s: We noise numeric features by their std-dev divided by this factor (inverse of continuous_feature_noise). Set large to ensure augmented sample distribution remains closer to real data.
+            s: We noise numeric features by their std-dev divided by this factor (inverse of continuous_feature_noise). Set large to ensure augmented sample distribution remains closer to real data.
     """
     nn_dummy = TabularNeuralNetModel(path='nn_dummy', name='nn_dummy', problem_type=REGRESSION, eval_metric=mean_squared_error,
                                      hyperparameters={'num_dataloading_workers': 0, 'proc.embed_min_categories': np.inf},

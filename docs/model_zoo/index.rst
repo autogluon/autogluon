@@ -19,7 +19,7 @@ EfficientNet
 ------------
 
 The following pretrained EfficientNet [1]_ models are provided for image classification.
-The accuracy achieved by each model on a popular image classification benchmark is indicated, along with the image crop-size used by each model.
+The accuracy achieved by each model on a popular image classification benchmark is indicated, along with the image crop-size used by each model.
 
 .. [1] Tan, Mingxing, and Quoc V. Le. \
        "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks.

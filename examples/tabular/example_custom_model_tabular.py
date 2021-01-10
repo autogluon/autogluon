@@ -1,7 +1,6 @@
 """ Example script for defining and using custom models in AutoGluon Tabular """
-import time
 
-from autogluon.tabular import TabularPrediction as task
+from autogluon.tabular import TabularDataset, TabularPredictorV2
 from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
 from autogluon.tabular.data.label_cleaner import LabelCleaner
 from autogluon.tabular.models import AbstractModel
@@ -59,18 +58,18 @@ class AdvancedNaiveBayesModel(AbstractModel):
 # Loading Data #
 ################
 
-train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')  # can be local CSV file as well, returns Pandas DataFrame
-test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')  # another Pandas DataFrame
-label_column = 'class'  # specifies which column do we want to predict
+train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')  # can be local CSV file as well, returns Pandas DataFrame
+test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')  # another Pandas DataFrame
+label = 'class'  # specifies which column do we want to predict
 train_data = train_data.head(1000)  # subsample for faster demo
 
-#############################################
-# Training custom model outside of task.fit #
-#############################################
+#####################################################
+# Training custom model outside of TabularPredictor #
+#####################################################
 
 # Separate features and labels
-X_train = train_data.drop(columns=[label_column])
-y_train = train_data[label_column]
+X_train = train_data.drop(columns=[label])
+y_train = train_data[label]
 
 problem_type = infer_problem_type(y=y_train)  # Infer problem type (or else specify directly)
 naive_bayes_model = NaiveBayesModel(path='AutogluonModels/', name='CustomNaiveBayes', problem_type=problem_type)
@@ -88,8 +87,8 @@ naive_bayes_model.fit(X_train=X_train, y_train=y_train_clean)  # Fit custom mode
 # naive_bayes_model = NaiveBayesModel.load(path=load_path)
 
 # Prepare test data
-X_test = test_data.drop(columns=[label_column])
-y_test = test_data[label_column]
+X_test = test_data.drop(columns=[label])
+y_test = test_data[label]
 y_test_clean = label_cleaner.transform(y_test)
 
 y_pred = naive_bayes_model.predict(X_test)
@@ -100,19 +99,17 @@ print(y_pred_orig)
 score = naive_bayes_model.score(X_test, y_test_clean)
 print(f'test score ({naive_bayes_model.eval_metric.name}) = {score}')
 
-########################################
-# Training custom model using task.fit #
-########################################
+################################################
+# Training custom model using TabularPredictor #
+################################################
 
 custom_hyperparameters = {NaiveBayesModel: {}}
 # custom_hyperparameters = {NaiveBayesModel: [{}, {'var_smoothing': 0.00001}, {'var_smoothing': 0.000002}]}  # Train 3 NaiveBayes models with different hyperparameters
-predictor = task.fit(train_data=train_data, label=label_column, hyperparameters=custom_hyperparameters)  # Train a single default NaiveBayesModel
+predictor = TabularPredictorV2(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train a single default NaiveBayesModel
 predictor.leaderboard(test_data)
 
 y_pred = predictor.predict(test_data)
 print(y_pred)
-
-time.sleep(1)  # Ensure we don't use the same train directory
 
 ###############################################################
 # Training custom model alongside other models using task.fit #
@@ -120,8 +117,8 @@ time.sleep(1)  # Ensure we don't use the same train directory
 
 # Now we add the custom model to be trained alongside the default models:
 custom_hyperparameters.update(get_hyperparameter_config('default'))
-predictor = task.fit(train_data=train_data, label=label_column, hyperparameters=custom_hyperparameters)  # Train the default models plus a single default NaiveBayesModel
-# predictor = task.fit(train_data=train_data, label=label_column, auto_stack=True, hyperparameters=custom_hyperparameters)  # We can even use the custom model in a multi-layer stack ensemble
+predictor = TabularPredictorV2(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train the default models plus a single default NaiveBayesModel
+# predictor = TabularPredictorV2(label=label).fit(train_data, hyperparameters=custom_hyperparameters, auto_stack=True)  # We can even use the custom model in a multi-layer stack ensemble
 predictor.leaderboard(test_data)
 
 y_pred = predictor.predict(test_data)
