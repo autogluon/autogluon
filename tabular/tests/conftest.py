@@ -56,7 +56,7 @@ class DatasetLoaderHelper:
         # Regression with multiple text field and categorical
         sts={
             'url': 'https://autogluon-text.s3.amazonaws.com/glue_sts.zip',
-            'name': 'SemanticTextualSimilarity',
+            'name': 'glue_sts',
             'problem_type': REGRESSION,
             'label_column': 'score',
         }
