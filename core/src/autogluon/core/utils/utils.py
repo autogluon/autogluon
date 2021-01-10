@@ -80,22 +80,22 @@ def setup_compute(nthreads_per_trial, ngpus_per_trial):
     return nthreads_per_trial, ngpus_per_trial
 
 
-def setup_trial_limits(time_limits, num_trials, hyperparameters):
+def setup_trial_limits(time_limit, num_trials, hyperparameters):
     """ Adjust default time limits / num_trials """
     if num_trials is None:
-        if time_limits is None:
-            time_limits = 10 * 60  # run for 10min by default
-        time_limits /= float(len(hyperparameters))  # each model type gets half the available time
+        if time_limit is None:
+            time_limit = 10 * 60  # run for 10min by default
+        time_limit /= float(len(hyperparameters))  # each model type gets half the available time
         num_trials = 1000  # run up to 1000 trials (or as you can within the given time_limits)
-    elif time_limits is None:
-        time_limits = int(1e6)  # user only specified num_trials, so run all of them regardless of time-limits
+    elif time_limit is None:
+        time_limit = int(1e6)  # user only specified num_trials, so run all of them regardless of time-limits
     else:
-        time_limits /= float(len(hyperparameters))  # each model type gets half the available time
+        time_limit /= float(len(hyperparameters))  # each model type gets half the available time
 
-    if time_limits <= 10:  # threshold = 10sec, ie. too little time to run >1 trial.
+    if time_limit <= 10:  # threshold = 10sec, ie. too little time to run >1 trial.
         num_trials = 1
-    time_limits *= 0.9  # reduce slightly to account for extra time overhead
-    return time_limits, num_trials
+    time_limit *= 0.9  # reduce slightly to account for extra time overhead
+    return time_limit, num_trials
 
 
 def get_leaderboard_pareto_frontier(leaderboard: DataFrame, score_col='score_val', inference_time_col='pred_time_val_full') -> DataFrame:

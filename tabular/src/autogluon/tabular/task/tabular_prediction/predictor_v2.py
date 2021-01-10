@@ -282,13 +282,13 @@ class TabularPredictorV2(TabularPredictor):
     # TODO: Move to generic, migrate all tasks to same kwargs logic
     def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels):
         num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)
-        time_limits_hpo = time_limit
-        if num_bag_folds >= 2 and (time_limits_hpo is not None):
-            time_limits_hpo = time_limits_hpo / (1 + num_bag_folds * (1 + num_stack_levels))
+        time_limit_hpo = time_limit
+        if num_bag_folds >= 2 and (time_limit_hpo is not None):
+            time_limit_hpo = time_limit_hpo / (1 + num_bag_folds * (1 + num_stack_levels))
         # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
-        time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+        time_limit_hpo, num_trials = setup_trial_limits(time_limit_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
         if time_limit is not None:
-            time_limits_hpo = None
+            time_limit_hpo = None
 
         if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, str):
             preset_dict = {
@@ -309,7 +309,7 @@ class TabularPredictorV2(TabularPredictor):
             nthreads_per_trial=num_cpus,
             ngpus_per_trial=num_gpus,
             num_trials=num_trials,
-            time_out=time_limits_hpo,
+            time_out=time_limit_hpo,
         )
         if scheduler_options is None:
             return None

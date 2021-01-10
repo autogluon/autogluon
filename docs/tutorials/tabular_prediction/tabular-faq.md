@@ -9,7 +9,7 @@ See ["Maximizing predictive performance" in the Quick Start Tutorial](tabular-qu
 
 ### Can I run TabularPrediction on Mac/Windows?
 
-Yes! The only functionality that may not work is `hyperparameter_tune=True` with the NN model (this should be resolved in the next MXNet update).
+Yes! The only functionality that may not work is hyperparameter tuning with the NN model (this should be resolved in the next MXNet update).
 
 
 ### What machine is best for running TabularPrediction?
@@ -29,7 +29,7 @@ See ["If you encounter disk space issues" in the In Depth Tutorial](tabular-inde
 
 ### How can I reduce the time required for training?
 
-Specify the `time_limits` argument in `fit()` to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in `fit()`, and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
+Specify the `time_limit` argument in `fit()` to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in `fit()`, and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
 
 Since many of the strategies to reduce memory usage also reduce training times, also check out: ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-memory-issues).
 

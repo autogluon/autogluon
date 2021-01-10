@@ -1185,7 +1185,7 @@ class TabularPredictor:
         """Returns the list of model names which are persisted in memory."""
         return list(self._learner.load_trainer().models.keys())
 
-    def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limits=None, hyperparameters=None, holdout_frac=None,
+    def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limit=None, hyperparameters=None, holdout_frac=None,
                 teacher_preds='soft', augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}, models_name_suffix=None, verbosity=None):
         """
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
@@ -1206,7 +1206,7 @@ class TabularPredictor:
             unless bagging/stacking was previously used in which case a new training/validation split is performed.
         augmentation_data : :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
             An optional extra dataset of unlabeled rows that can be used for augmenting the dataset used to fit student models during distillation (ignored if None).
-        time_limits : int, default = None
+        time_limit : int, default = None
             Approximately how long (in seconds) the distillation process should run for.
             If None, no time-constraint will be enforced allowing the distilled models to fully train.
         hyperparameters : dict or str, default = None
@@ -1263,7 +1263,7 @@ class TabularPredictor:
         """
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
-        return self._learner.distill(X=train_data, X_val=tuning_data, time_limits=time_limits, hyperparameters=hyperparameters, holdout_frac=holdout_frac,
+        return self._learner.distill(X=train_data, X_val=tuning_data, time_limit=time_limit, hyperparameters=hyperparameters, holdout_frac=holdout_frac,
                                      verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
                                      augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
 

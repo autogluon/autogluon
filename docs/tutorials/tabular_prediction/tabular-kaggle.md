@@ -39,13 +39,12 @@ This means you'll need to run the above steps with `[COMPETITION]` replaced by `
 ```
 import pandas as pd
 import numpy as np
-from autogluon.tabular import TabularPrediction as task
-from autogluon.tabular.metrics import roc_auc
+from autogluon.tabular import TabularPredictorV2
 
 directory = '~/IEEEfraud/'  # directory where you have downloaded the data CSV files from the competition
 label_column = 'isFraud'  # name of target variable to predict in this competition
 eval_metric = 'roc_auc'  # Optional: specify that competition evaluation metric is AUC
-output_directory = directory + 'AutoGluonModels/'  # where to store trained models
+save_path = directory + 'AutoGluonModels/'  # where to store trained models
 
 train_identity = pd.read_csv(directory+'train_identity.csv')
 train_transaction = pd.read_csv(directory+'train_transaction.csv')
@@ -54,15 +53,14 @@ train_transaction = pd.read_csv(directory+'train_transaction.csv')
 Since the training data for this competition is comprised of multiple CSV files, we just first join them into a single large table (with rows = examples, columns = features) before applying AutoGluon:
 
 ```
-train = pd.merge(train_transaction, train_identity, on='TransactionID', how='left')
-train_data = task.Dataset(df = train) # convert to AutoGluon dataset
-del train_identity, train_transaction, train # free unused memory
+train_data = pd.merge(train_transaction, train_identity, on='TransactionID', how='left')
 ```
 
 Note that a left-join on the `TransactionID` key happened to be most appropriate for this Kaggle competition, but for others involving multiple training data files, you will likely need to use a different join strategy (always consider this very carefully). Now that all our training data resides within a single table, we can apply AutoGluon. Below, we specify the `presets` argument to maximize AutoGluon's predictive accuracy which usually requires that you run `fit()` with longer time limits (3600s below should likely be increased in your run):
 ```
-predictor = task.fit(train_data=train_data, label=label_column, output_directory=output_directory,
-                     eval_metric=eval_metric, presets='best_quality', verbosity=3, time_limits=3600)
+predictor = TabularPredictorV2(label=label_column, eval_metric=eval_metric, path=save_path, verbosity=3).fit(
+    train_data, presets='best_quality', time_limit=3600
+)
 
 results = predictor.fit_summary()
 ```
@@ -72,9 +70,7 @@ Now, we use the trained AutoGluon Predictor to make predictions on the competiti
 ```
 test_identity = pd.read_csv(directory+'test_identity.csv')
 test_transaction = pd.read_csv(directory+'test_transaction.csv')
-test = pd.merge(test_transaction, test_identity, on='TransactionID', how='left')  # same join applied to training files
-test_data = task.Dataset(df = test)  # convert to AutoGluon dataset
-del test_identity, test_transaction, test  # free unused memory
+test_data = pd.merge(test_transaction, test_identity, on='TransactionID', how='left')  # same join applied to training files
 
 y_predproba = predictor.predict_proba(test_data)
 print(y_predproba[:5]) # some example predicted fraud-probabilities
@@ -111,7 +107,7 @@ We have now completed steps (4)-(6) from the top of this tutorial. To submit you
 
 `kaggle competitions submit -c ieee-fraud-detection -f sample_submission.csv -m "my first submission"`
 
-You can now play with different `fit()` arguments and feature-engineering techniques to try and maximize the rank of your submissions in the Kaggle Leaderboard!
+You can now play with different `fit()` arguments and feature-engineering techniques to try and maximize the rank of your submissions in the Kaggle Leaderboard!
 
 
 **Tips to maximize predictive performance:**
@@ -120,7 +116,7 @@ You can now play with different `fit()` arguments and feature-engineering techni
 
    - If the training examples are time-based and the competition test examples come from future data, we recommend you reserve the most recently-collected training examples as a separate validation dataset passed to `fit()`. Otherwise, you do not need to specify a validation set yourself and AutoGluon will automatically partition the competition training data into its own training/validation sets.
 
-   - Beyond simply specifying `presets = 'best_quality'`, you may play with more advanced `fit()` arguments such as: `num_bagging_folds`, `stack_ensemble_levels`, `num_bagging_sets`, `hyperparameter_tune`, `hyperparameters`, `refit_full`. However we recommend spending most of your time on [feature-engineering](https://www.coursera.org/lecture/competitive-data-science/overview-1Nh5Q) and just specifying `presets = 'best_quality'` inside the call to `fit()`.
+   - Beyond simply specifying `presets = 'best_quality'`, you may play with more advanced `fit()` arguments such as: `num_bag_folds`, `num_stack_levels`, `num_bag_sets`, `hyperparameter_tune_kwargs`, `hyperparameters`, `refit_full`. However we recommend spending most of your time on [feature-engineering](https://www.coursera.org/lecture/competitive-data-science/overview-1Nh5Q) and just specifying `presets = 'best_quality'` inside the call to `fit()`.
 
 
 **Troubleshooting:**

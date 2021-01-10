@@ -122,8 +122,7 @@ Often stacking/bagging will produce superior accuracy than hyperparameter-tuning
 Even if you've started a new Python session since last calling `fit()`, you can still load a previously trained predictor from disk:
 
 ```{.python .input}
-predictor = TabularPredictorV2.load(save_path)
-assert predictor.path == save_path  # `predictor.path` is another way to get the relative path needed to later load predictor.
+predictor = TabularPredictorV2.load(save_path)  # `predictor.path` is another way to get the relative path needed to later load predictor.
 ```
 
 Above `save_path` is the same folder previously passed to `TabularPredictorV2`, in which all the trained models have been saved. You can train easily models on one machine and deploy them on another. Simply copy the `save_path` folder to the new machine and specify its new path in `TabularPredictorV2.load()`.
@@ -276,7 +275,7 @@ This adds the refit-full models to the leaderboard and we can opt to use any of 
 While computationally-favorable, single individual models will usually have lower accuracy than weighted/stacked/bagged ensembles. [Model Distillation](https://arxiv.org/abs/2006.14284) offers one way to retain the computational benefits of a single model, while enjoying some of the accuracy-boost that comes with ensembling. The idea is to train the individual model (which we can call the student) to mimic the predictions of the full stack ensemble (the teacher). Like `refit_full()`, the `distill()` function will produce additional models we can opt to use for prediction.
 
 ```{.python .input}
-student_models = predictor.distill(time_limits=30)  # specify much longer time limit in real applications
+student_models = predictor.distill(time_limit=30)  # specify much longer time limit in real applications
 print(student_models)
 preds_student = predictor.predict(test_data_nolabel, model=student_models[0])
 print(f"predictions from {student_models[0]}:", preds_student)

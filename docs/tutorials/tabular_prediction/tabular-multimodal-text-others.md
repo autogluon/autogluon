@@ -22,7 +22,7 @@ import pandas as pd
 import pprint
 import random
 from autogluon.text import TextPrediction
-from autogluon.tabular import TabularPrediction
+from autogluon.tabular import TabularPredictorV2
 import mxnet as mx
 
 np.random.seed(123)
@@ -45,14 +45,14 @@ In the following, we will use the product sentiment analysis dataset from this [
 
 ```{.python .input}
 feature_columns = ['Product_Description', 'Product_Type']
-label_column = 'Sentiment'
+label = 'Sentiment'
 
 train_df = pd.read_csv('product_sentiment_machine_hack/train.csv')
 dev_df = pd.read_csv('product_sentiment_machine_hack/dev.csv')
 test_df = pd.read_csv('product_sentiment_machine_hack/test.csv')
 
-train_df = train_df[feature_columns + [label_column]]
-dev_df = dev_df[feature_columns + [label_column]]
+train_df = train_df[feature_columns + [label]]
+dev_df = dev_df[feature_columns + [label]]
 test_df = test_df[feature_columns]
 print('Number of training samples:', len(train_df))
 print('Number of dev samples:', len(dev_df))
@@ -86,7 +86,7 @@ model as the backbone. As we can see, the result is not very good.
 
 ```{.python .input}
 predictor_text_only = TextPrediction.fit(train_df[['Product_Description', 'Sentiment']],
-                                         label=label_column,
+                                         label=label,
                                          time_limits=None,
                                          ngpus_per_trial=1,
                                          hyperparameters='default_no_hpo',
@@ -102,18 +102,12 @@ print(predictor_text_only.evaluate(dev_df[['Product_Description', 'Sentiment']],
 
 ## Model 1:  Baseline with N-Gram + TF-IDF
 
-The first baseline model is to directly call AutoGluno TabularPrediction to train a predictor.
+The first baseline model is to directly call AutoGluon TabularPrediction to train a predictor.
 AutoGluon TabularPrediction uses the n-gram and TF-IDF based features for text columns and considers 
 text and categorical columns simultaneously.
 
 ```{.python .input}
-predictor_model1 = TabularPrediction.fit(train_df,
-                                         label=label_column,
-                                         time_limits=None,
-                                         eval_metric='accuracy',
-                                         stopping_metric='accuracy',
-                                         hyperparameters='default',
-                                         output_directory='model1')
+predictor_model1 = TabularPredictorV2(label=label, eval_metric='accuracy', path='model1').fit(train_df)
 ```
 
 
@@ -148,13 +142,7 @@ print(merged_train_data)
 
 
 ```{.python .input}
-predictor_model2 = TabularPrediction.fit(merged_train_data,
-                                         label=label_column,
-                                         time_limits=None,
-                                         eval_metric='accuracy',
-                                         stopping_metric='accuracy',
-                                         hyperparameters='default',
-                                         output_directory='model2')
+predictor_model2 = TabularPredictorV2(label=label, eval_metric='accuracy', path='model2').fit(merged_train_data)
 ```
 
 
@@ -176,14 +164,9 @@ tabular_multimodel_hparam_v1 = {
     'TEXT_NN_V1': {},
 }
 
-predictor_model3 = TabularPrediction.fit(train_df,
-                                      label=label_column,
-                                      time_limits=None,
-                                      eval_metric='accuracy',
-                                      stopping_metric='accuracy',
-                                      hyperparameters=tabular_multimodel_hparam_v1,
-                                      ngpus_per_trial=1,
-                                      output_directory='model3')
+predictor_model3 = TabularPredictorV2(label=label, eval_metric='accuracy', path='model3').fit(
+    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_gpus=1
+)
 ```
 
 
@@ -197,16 +180,9 @@ A more advanced strategy is to use 5-fold bagging and call stack ensembling. Thi
 
 
 ```{.python .input}
-predictor_model4 = TabularPrediction.fit(train_df,
-                                         label=label_column,
-                                         time_limits=None,
-                                         eval_metric='accuracy',
-                                         stopping_metric='accuracy',
-                                         hyperparameters=tabular_multimodel_hparam_v1,
-                                         num_bagging_folds=5,
-                                         stack_ensemble_levels=1,
-                                         ngpus_per_trial=1,
-                                         output_directory='model4')
+predictor_model4 = TabularPredictorV2(label=label, eval_metric='accuracy', path='model4').fit(
+    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_gpus=1, num_bag_folds=5, num_stack_levels=1
+)
 ```
 
 
@@ -221,7 +197,7 @@ Also, since the neural network in text prediction can directly handle multi-moda
 
 ```{.python .input}
 predictor_text_multimodal = TextPrediction.fit(train_df,
-                                               label=label_column,
+                                               label=label,
                                                time_limits=None,
                                                eval_metric='accuracy',
                                                stopping_metric='accuracy',
@@ -231,14 +207,7 @@ predictor_text_multimodal = TextPrediction.fit(train_df,
 train_sentence_multimodal_embeddings = predictor_text_multimodal.extract_embedding(train_df)
 dev_sentence_multimodal_embeddings = predictor_text_multimodal.extract_embedding(dev_df)
 
-predictor_model5 = TabularPrediction.fit(train_df.join(pd.DataFrame(train_sentence_multimodal_embeddings)),
-                                         label=label_column,
-                                         time_limits=None,
-                                         eval_metric='accuracy',
-                                         stopping_metric='accuracy',
-                                         hyperparameters='default',
-                                         ngpus_per_trial=1,
-                                         output_directory='model5')
+predictor_model5 = TabularPredictorV2(label=label, eval_metric='accuracy', path='model5').fit(train_df)
 ```
 
 
@@ -265,14 +234,9 @@ tabular_multimodel_hparam_v2 = {
     'TEXT_NN_V1': text_nn_params,
 }
 
-predictor_model6 = TabularPrediction.fit(train_df,
-                                      label=label_column,
-                                      time_limits=None,
-                                      eval_metric='accuracy',
-                                      stopping_metric='accuracy',
-                                      hyperparameters=tabular_multimodel_hparam_v2,
-                                      ngpus_per_trial=1,
-                                      output_directory='model6')
+predictor_model6 = TabularPredictorV2(label=label, eval_metric='accuracy', path='model6').fit(
+    train_df, hyperparameters=tabular_multimodel_hparam_v2, num_gpus=1
+)
 ```
 
 

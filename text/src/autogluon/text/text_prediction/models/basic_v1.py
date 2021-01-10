@@ -770,7 +770,7 @@ class BertForTextPredictionBasic:
 
         Parameters
         ----------
-        test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
+        test_data : `pandas.DataFrame`, `autogluon.tabular.TabularDataset`, or str
             The test data to get predictions for. Can be DataFrame/Dataset or a file that can
             be loaded into DataFrame/Dataset.
 
@@ -792,7 +792,7 @@ class BertForTextPredictionBasic:
 
         Parameters
         ----------
-        test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
+        test_data : `pandas.DataFrame`, `autogluon.tabular.TabularDataset`, or str
             The test data to get predictions for. Can be DataFrame/Dataset or a file that can be loaded into DataFrame/Dataset.
         get_original_labels : bool, default = True
             Whether or not predictions should be formatted in terms of the original labels.
