@@ -6,7 +6,7 @@ Via a simple `fit()` call, AutoGluon can produce highly-accurate models to predi
 To start, import autogluon.tabular and TabularPrediction module as your task:
 
 ```{.python .input}
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 ```
 
 Load training data from a [CSV file](https://en.wikipedia.org/wiki/Comma-separated_values) into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
@@ -32,7 +32,7 @@ Now use AutoGluon to train multiple models:
 
 ```{.python .input}
 save_path = 'agModels-predictClass'  # specifies folder to store trained models
-predictor = TabularPredictorV2(label=label_column, path=save_path).fit(train_data)
+predictor = TabularPredictor(label=label_column, path=save_path).fit(train_data)
 ```
 
 Next, load separate test data to demonstrate how to make predictions on new examples at inference time:
@@ -47,7 +47,7 @@ print(test_data_nolab.head())
 We use our trained models to make predictions on the new data and then evaluate performance:
 
 ```{.python .input}
-predictor = TabularPredictorV2.load(save_path)  # unnecessary, just demonstrates how to load previously-trained predictor from file
+predictor = TabularPredictor.load(save_path)  # unnecessary, just demonstrates how to load previously-trained predictor from file
 
 y_pred = predictor.predict(test_data_nolab)
 print("Predictions:  ", y_pred)
@@ -58,8 +58,8 @@ Now you're ready to try AutoGluon on your own tabular datasets!
 As long as they're stored in a popular format like CSV, you should be able to achieve strong predictive performance with just 2 lines of code:
 
 ```
-from autogluon.tabular import TabularPredictorV2
-predictor = TabularPredictorV2(label=<variable-name>).fit(train_data=<file-name>)
+from autogluon.tabular import TabularPredictor
+predictor = TabularPredictor(label=<variable-name>).fit(train_data=<file-name>)
 ```
 
 **Note:** This simple call to `fit()` is intended for your first prototype model. In a subsequent section, we'll demonstrate how to maximize predictive performance by additionally specifying two `fit()` arguments: `presets` and `eval_metric`.
@@ -122,7 +122,7 @@ To get the best predictive accuracy with AutoGluon, you should generally use it 
 ```{.python .input}
 time_limit = 60  # for quick demonstration only, you should set this to longest time you are willing to wait (in seconds)
 metric = 'roc_auc'  # specify your evaluation metric here
-predictor = TabularPredictorV2(label=label_column, eval_metric=metric).fit(train_data, time_limit=time_limit, presets='best_quality')
+predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, time_limit=time_limit, presets='best_quality')
 ```
 
 This command implements the following strategy to maximize accuracy:
@@ -152,7 +152,7 @@ print("Summary of age variable: \n", train_data[age_column].describe())
 We again call `fit()`, imposing a time-limit this time (in seconds), and also demonstrate a shorthand method to evaluate the resulting model on the test data (which contain labels):
 
 ```{.python .input}
-predictor_age = TabularPredictorV2(label=age_column, path="agModels-predictAge").fit(train_data, time_limit=60)
+predictor_age = TabularPredictor(label=age_column, path="agModels-predictAge").fit(train_data, time_limit=60)
 performance = predictor_age.evaluate(test_data)
 ```
 

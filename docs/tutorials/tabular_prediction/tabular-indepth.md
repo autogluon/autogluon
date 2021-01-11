@@ -8,7 +8,7 @@ This tutorial describes how you can exert greater control when using AutoGluon's
 Using the same census data table as in the :ref:`sec_tabularquick` tutorial, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
 
 ```{.python .input}
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 
 import numpy as np
 
@@ -69,7 +69,7 @@ hyperparameter_tune_kwargs = {  # specify to enable HPO
     'searcher': search_strategy,
 }
 
-predictor = TabularPredictorV2(label=label_column, eval_metric=metric).fit(
+predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(
     train_data, tuning_data=val_data, time_limit=time_limit,
     hyperparameters=hyperparameters, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
 )
@@ -97,7 +97,7 @@ In the above example, the predictive performance may be poor because we specifie
 Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two other methods to boost predictive performance are [bagging and stack-ensembling](https://arxiv.org/abs/2003.06505).  You'll often see performance improve if you specify `num_bag_folds` = 5-10, `num_stack_levels` = 1-3 in the call to `fit()`, but this will increase training times and memory/disk usage.
 
 ```{.python .input}
-predictor = TabularPredictorV2(label=label_column, eval_metric=metric).fit(train_data,
+predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data,
     num_bag_folds=5, num_bag_sets=1, num_stack_levels=1,
     hyperparameters = {'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
 )
@@ -108,7 +108,7 @@ You should not provide `tuning_data` when stacking/bagging, and instead provide 
 ```{.python .input}
 save_path = 'agModels-predictOccupation'  # folder where to store trained models
 
-predictor = TabularPredictorV2(label=label_column, eval_metric=metric, path=save_path).fit(
+predictor = TabularPredictor(label=label_column, eval_metric=metric, path=save_path).fit(
     train_data, auto_stack=True,
     time_limit=30, hyperparameters={'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
 )
@@ -122,10 +122,10 @@ Often stacking/bagging will produce superior accuracy than hyperparameter-tuning
 Even if you've started a new Python session since last calling `fit()`, you can still load a previously trained predictor from disk:
 
 ```{.python .input}
-predictor = TabularPredictorV2.load(save_path)  # `predictor.path` is another way to get the relative path needed to later load predictor.
+predictor = TabularPredictor.load(save_path)  # `predictor.path` is another way to get the relative path needed to later load predictor.
 ```
 
-Above `save_path` is the same folder previously passed to `TabularPredictorV2`, in which all the trained models have been saved. You can train easily models on one machine and deploy them on another. Simply copy the `save_path` folder to the new machine and specify its new path in `TabularPredictorV2.load()`.
+Above `save_path` is the same folder previously passed to `TabularPredictor`, in which all the trained models have been saved. You can train easily models on one machine and deploy them on another. Simply copy the `save_path` folder to the new machine and specify its new path in `TabularPredictor.load()`.
 
 We can make a prediction on an individual example rather than a full dataset:
 
@@ -290,13 +290,13 @@ One option is to specify more lightweight `presets`:
 
 ```{.python .input}
 presets = ['good_quality_faster_inference_only_refit', 'optimize_for_deployment']
-predictor_light = TabularPredictorV2(label=label_column, eval_metric=metric).fit(train_data, presets=presets, time_limit=30)
+predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, presets=presets, time_limit=30)
 ```
 
 Another option is to specify more lightweight hyperparameters:
 
 ```{.python .input}
-predictor_light = TabularPredictorV2(label=label_column, eval_metric=metric).fit(train_data, hyperparameters='very_light', time_limit=30)
+predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, hyperparameters='very_light', time_limit=30)
 ```
 
 Here you can set `hyperparameters` to either 'light', 'very_light', or 'toy' to obtain progressively smaller (but less accurate) models and predictors. Advanced users may instead try manually specifying particular models' hyperparameters in order to make them faster/smaller.
@@ -305,7 +305,7 @@ Finally, you may also exclude specific unwieldy models from being trained at all
 
 ```{.python .input}
 excluded_model_types = ['KNN', 'NN', 'custom']
-predictor_light = TabularPredictorV2(label=label_column, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
+predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
 ```
 
 

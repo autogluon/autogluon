@@ -95,12 +95,12 @@ The Tabular Dataset API works with pandas Dataframes, which supports chunking da
 Here's an example of one such chunk-based inference:
 
 ```{.python .input}
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 import pandas as pd
 import requests
 
 train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-predictor = TabularPredictorV2(label='class').fit(train_data.sample(n=100, random_state=0), hyperparameters={'GBM': {}})
+predictor = TabularPredictor(label='class').fit(train_data.sample(n=100, random_state=0), hyperparameters={'GBM': {}})
 
 # Get the test dataset, if you are working with local data then omit the next two lines
 r = requests.get('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv', allow_redirects=True)

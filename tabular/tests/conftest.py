@@ -6,7 +6,7 @@ import pytest
 
 import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 
 
 def pytest_addoption(parser):
@@ -134,7 +134,7 @@ class FitHelper:
     def fit_dataset(train_data, init_args, fit_args, sample_size=None):
         if sample_size is not None and sample_size < len(train_data):
             train_data = train_data.sample(n=sample_size, random_state=0)
-        return TabularPredictorV2(**init_args).fit(train_data, **fit_args)
+        return TabularPredictor(**init_args).fit(train_data, **fit_args)
 
 
 @pytest.fixture

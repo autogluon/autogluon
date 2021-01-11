@@ -2,7 +2,7 @@
 
 # NOTE: To distill CatBoost models in multiclass classification, you need to first run:  pip install catboost-dev
 
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 
 subsample_size = 500
 time_limit = 60
@@ -18,7 +18,7 @@ test_data = TabularDataset(file_path=test_file_path)
 test_data = test_data.head(subsample_size)  # subsample for faster run
 
 # Fit model ensemble:
-predictor = TabularPredictorV2(label).fit(train_data, auto_stack=True, time_limit=time_limit)
+predictor = TabularPredictor(label).fit(train_data, auto_stack=True, time_limit=time_limit)
 
 # Distill ensemble-predictor into single model:
 

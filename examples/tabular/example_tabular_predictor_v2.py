@@ -1,6 +1,6 @@
 
 from autogluon.tabular import TabularPrediction as task
-from autogluon.tabular.task.tabular_prediction.predictor_v2 import TabularPredictorV2
+from autogluon.tabular import TabularPredictor
 
 
 ################
@@ -25,7 +25,7 @@ predictor1.leaderboard(test_data)
 # Fitting with the new Predictor #
 ##################################
 
-predictor2 = TabularPredictorV2(label, eval_metric=eval_metric).fit(train_data, hyperparameters=hyperparameters, num_bag_folds=2)
+predictor2 = TabularPredictor(label, eval_metric=eval_metric).fit(train_data, hyperparameters=hyperparameters, num_bag_folds=2)
 predictor2.leaderboard(test_data)
 
 ####################################

@@ -4,7 +4,7 @@
 """
 
 import autogluon.core as ag
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 
 
 # Training time:
@@ -20,7 +20,7 @@ hyperparameters = {
     'XGB': {'n_estimators': 1000, 'learning_rate': ag.Real(0.01, 0.1, log=True)}
 }
 
-predictor = TabularPredictorV2(label=label, path=save_path).fit(
+predictor = TabularPredictor(label=label, path=save_path).fit(
     train_data, hyperparameters=hyperparameters, hyperparameter_tune_kwargs='auto', time_limit=60
 )
 

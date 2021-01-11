@@ -29,7 +29,7 @@ import pandas as pd
 import pytest
 
 import autogluon.core as ag
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 from autogluon.tabular.utils import BINARY, MULTICLASS, REGRESSION
 
 
@@ -82,7 +82,7 @@ def test_advanced_functionality():
     directory = directory_prefix + 'advanced/' + dataset['name'] + "/"
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    predictor = TabularPredictorV2(label=label, path=savedir).fit(train_data)
+    predictor = TabularPredictor(label=label, path=savedir).fit(train_data)
     leaderboard = predictor.leaderboard(dataset=test_data)
     leaderboard_extra = predictor.leaderboard(dataset=test_data, extra_info=True)
     assert set(predictor.get_model_names()) == set(leaderboard['model'])
@@ -119,7 +119,7 @@ def test_advanced_functionality():
 
     predictor.persist_models(models='all', max_memory=None)
     predictor.save()  # Save predictor while models are persisted: Intended functionality is that they won't be persisted when loaded.
-    predictor_loaded = TabularPredictorV2.load(predictor.output_directory)  # Assert that predictor loading works
+    predictor_loaded = TabularPredictor.load(predictor.output_directory)  # Assert that predictor loading works
     leaderboard_loaded = predictor_loaded.leaderboard(dataset=test_data)
     assert len(leaderboard) == len(leaderboard_loaded)
     assert predictor_loaded.get_model_names_persisted() == []  # Assert that models were not still persisted after loading predictor
@@ -189,7 +189,7 @@ def run_tabular_benchmark_toy(fit_args):
     directory = directory_prefix + dataset['name'] + "/"
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    predictor = TabularPredictorV2(label=dataset['label_column'], path=savedir).fit(train_data, **fit_args)
+    predictor = TabularPredictor(label=dataset['label_column'], path=savedir).fit(train_data, **fit_args)
     print(predictor.feature_metadata)
     print(predictor.feature_metadata.type_map_raw)
     print(predictor.feature_metadata.type_group_map_special)
@@ -271,11 +271,11 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 if subsample_size < len(train_data):
                     # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
                     train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
-            predictor = TabularPredictorV2(label=label_column, path=savedir).fit(train_data, **fit_args)
+            predictor = TabularPredictor(label=label_column, path=savedir).fit(train_data, **fit_args)
             results = predictor.fit_summary(verbosity=4)
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
-            predictor = TabularPredictorV2.load(savedir)  # Test loading previously-trained predictor from file
+            predictor = TabularPredictor.load(savedir)  # Test loading previously-trained predictor from file
             y_pred = predictor.predict(test_data)
             perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
             if dataset['problem_type'] != REGRESSION:

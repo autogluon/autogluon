@@ -1,6 +1,6 @@
 """ Example script for predicting columns of tables, demonstrating simple use-case """
 
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 
 
 # Training time:
@@ -10,9 +10,9 @@ print(train_data.head())
 label = 'class'  # specifies which column do we want to predict
 save_path = 'ag_models/'  # where to save trained models
 
-predictor = TabularPredictorV2(label=label, path=save_path).fit(train_data)
+predictor = TabularPredictor(label=label, path=save_path).fit(train_data)
 # NOTE: Default settings above are intended to ensure reasonable runtime at the cost of accuracy. To maximize predictive accuracy, do this instead:
-# predictor = TabularPredictorV2(label=label_column, eval_metric=YOUR_METRIC_NAME, path=save_path).fit(train_data, presets='best_quality')
+# predictor = TabularPredictor(label=label_column, eval_metric=YOUR_METRIC_NAME, path=save_path).fit(train_data, presets='best_quality')
 results = predictor.fit_summary()
 
 # Inference time:
@@ -21,6 +21,6 @@ y_test = test_data[label]
 test_data = test_data.drop(labels=[label], axis=1)  # delete labels from test data since we wouldn't have them in practice
 print(test_data.head())
 
-predictor = TabularPredictorV2.load(save_path)  # Unnecessary, we reload predictor just to demonstrate how to load previously-trained predictor from file
+predictor = TabularPredictor.load(save_path)  # Unnecessary, we reload predictor just to demonstrate how to load previously-trained predictor from file
 y_pred = predictor.predict(test_data)
 perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)

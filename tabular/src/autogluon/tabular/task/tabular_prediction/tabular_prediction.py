@@ -12,7 +12,7 @@ from autogluon.core.metrics import get_metric
 
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
-from .predictor import TabularPredictor
+from .predictor_legacy import TabularPredictorV1
 from .presets_configs import set_presets, unpack
 from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 from ...features import AutoMLPipelineFeatureGenerator
@@ -31,10 +31,10 @@ class TabularPrediction(BaseTask):
     """
 
     Dataset = TabularDataset
-    Predictor = TabularPredictor
+    Predictor = TabularPredictorV1
 
     @staticmethod
-    def load(output_directory, verbosity=2) -> TabularPredictor:
+    def load(output_directory, verbosity=2) -> TabularPredictorV1:
         """
         Load a predictor object previously produced by `fit()` from file and returns this object.
         It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
@@ -53,7 +53,7 @@ class TabularPrediction(BaseTask):
         -------
         :class:`autogluon.task.tabular_prediction.TabularPredictor` object that can be used to make predictions.
         """
-        return TabularPredictor.load(output_directory=output_directory, verbosity=verbosity)
+        return TabularPredictorV1.load(output_directory=output_directory, verbosity=verbosity)
 
     @staticmethod
     @unpack(set_presets)
@@ -725,7 +725,7 @@ class TabularPrediction(BaseTask):
                     hyperparameters=hyperparameters, core_kwargs=core_kwargs,
                     time_limit=time_limit_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
-        predictor = TabularPredictor(learner=learner)
+        predictor = TabularPredictorV1(learner=learner)
 
         keep_only_best = kwargs.get('keep_only_best', False)
         if refit_full is True:

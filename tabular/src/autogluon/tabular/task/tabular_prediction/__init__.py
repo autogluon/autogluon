@@ -1,4 +1,4 @@
 from .tabular_prediction import *
 from .dataset import *
-from .predictor import *
-from .predictor_v2 import TabularPredictorV2
+from .predictor_legacy import *
+from .predictor import TabularPredictor

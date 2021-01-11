@@ -1,6 +1,6 @@
 """ Example script for defining and using custom models in AutoGluon Tabular """
 
-from autogluon.tabular import TabularDataset, TabularPredictorV2
+from autogluon.tabular import TabularDataset, TabularPredictor
 from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
 from autogluon.tabular.data.label_cleaner import LabelCleaner
 from autogluon.tabular.models import AbstractModel
@@ -105,7 +105,7 @@ print(f'test score ({naive_bayes_model.eval_metric.name}) = {score}')
 
 custom_hyperparameters = {NaiveBayesModel: {}}
 # custom_hyperparameters = {NaiveBayesModel: [{}, {'var_smoothing': 0.00001}, {'var_smoothing': 0.000002}]}  # Train 3 NaiveBayes models with different hyperparameters
-predictor = TabularPredictorV2(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train a single default NaiveBayesModel
+predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train a single default NaiveBayesModel
 predictor.leaderboard(test_data)
 
 y_pred = predictor.predict(test_data)
@@ -117,8 +117,8 @@ print(y_pred)
 
 # Now we add the custom model to be trained alongside the default models:
 custom_hyperparameters.update(get_hyperparameter_config('default'))
-predictor = TabularPredictorV2(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train the default models plus a single default NaiveBayesModel
-# predictor = TabularPredictorV2(label=label).fit(train_data, hyperparameters=custom_hyperparameters, auto_stack=True)  # We can even use the custom model in a multi-layer stack ensemble
+predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train the default models plus a single default NaiveBayesModel
+# predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters, auto_stack=True)  # We can even use the custom model in a multi-layer stack ensemble
 predictor.leaderboard(test_data)
 
 y_pred = predictor.predict(test_data)
