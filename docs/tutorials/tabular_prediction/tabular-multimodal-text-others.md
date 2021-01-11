@@ -7,7 +7,7 @@ This type of data, i.e., data which contains text and other features, is prevale
 For example, when building a sentiment analysis model of users' tweets, we can not only use the raw text in the 
 tweets but also other features such as the topic of the tweet and the user profile. In the following, 
 we will investigate different ways to ensemble the state-of-the-art (pretrained) language models in AutoGluon TextPrediction 
-with all of the other models used in AutoGluon TabularPrediction. 
+with all the other models used in AutoGluon TabularPrediction. 
 For more details about the inner-working of the neural network architecture used in AutoGluon TextPrediction, 
 you may refer to Section ":ref:`sec_textprediction_architecture`" in :ref:`sec_textprediction_heterogeneous`.
 
@@ -17,7 +17,6 @@ you may refer to Section ":ref:`sec_textprediction_architecture`" in :ref:`sec_t
 %matplotlib inline
 import matplotlib.pyplot as plt
 import numpy as np
-import autogluon
 import pandas as pd
 import pprint
 import random
