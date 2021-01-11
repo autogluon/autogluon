@@ -3,7 +3,6 @@ import os
 import shutil
 import uuid
 import pytest
-import tempfile
 
 import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -104,10 +103,10 @@ class FitHelper:
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label_column = dataset_info['label_column']
-        savedir = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
+        save_path = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
         init_args = dict(
             label=label_column,
-            path=savedir,
+            path=save_path,
         )
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
         if sample_size is not None and sample_size < len(test_data):
@@ -126,9 +125,9 @@ class FitHelper:
             predictor.predict_proba(test_data, model=refit_model_name)
         predictor.info()
         predictor.leaderboard(test_data, extra_info=True)
-        assert os.path.realpath(savedir) == os.path.realpath(predictor.output_directory)
+        assert os.path.realpath(save_path) == os.path.realpath(predictor.output_directory)
         if delete_directory:
-            shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
+            shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
 
     @staticmethod
