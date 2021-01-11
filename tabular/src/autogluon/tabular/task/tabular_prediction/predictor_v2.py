@@ -80,6 +80,7 @@ class TabularPredictorV2(TabularPredictor):
         # TODO: Remove all `time_limits` in project, replace with `time_limit`
         # TODO: Add logging for which presets were used
         # TODO: TabularDataset 'file_path' make so it does not have to be named. Same with 'df'.
+        # TODO: Resolve raw text feature usage in default feature generator
 
         """
         if self._learner.is_fit:
@@ -115,13 +116,28 @@ class TabularPredictorV2(TabularPredictor):
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
 
-        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
         train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, unlabeled_data=unlabeled_data)
 
         if hyperparameters is None:
             hyperparameters = 'default'
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
+
+        ###################################
+        # FIXME: v0.1 This section is a hack
+        feature_generator_init_kwargs = dict()
+        if 'TEXT_NN_V1' in hyperparameters:
+            feature_generator_init_kwargs['enable_raw_text_features'] = True
+        else:
+            for key in hyperparameters:
+                if isinstance(key, int) or key == 'default':
+                    print(hyperparameters[key])
+                    if 'TEXT_NN_V1' in hyperparameters[key]:
+                        feature_generator_init_kwargs['enable_raw_text_features'] = True
+                        break
+        ###################################
+
+        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata, init_kwargs=feature_generator_init_kwargs)
 
         # Process kwargs to create trainer, schedulers, searchers:
         num_bag_folds, num_bag_sets, num_stack_levels = self._sanitize_stack_args(
@@ -508,13 +524,13 @@ class TabularPredictorV2(TabularPredictor):
                                  "Unlabeled data must have not the label column specified in it.\n")
         return train_data, tuning_data, unlabeled_data
 
-    def _set_feature_generator(self, feature_generator='auto', feature_metadata=None):
+    def _set_feature_generator(self, feature_generator='auto', feature_metadata=None, init_kwargs=None):
         if self._learner.feature_generator is not None:
             if isinstance(feature_generator, str) and feature_generator == 'auto':
                 feature_generator = self._learner.feature_generator
             else:
                 raise AssertionError('FeatureGenerator already exists!')
-        self._learner.feature_generator = get_default_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
+        self._learner.feature_generator = get_default_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata, init_kwargs=init_kwargs)
 
     def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack, num_train_rows):
         if auto_stack:
