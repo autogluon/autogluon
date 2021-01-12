@@ -118,13 +118,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         super()._fit(X_train=X_train, y_train=y_train, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
 
     def set_contexts(self, path_context):
-        path_root_orig = os.path.realpath(self.path_root)
+        path_root_orig = self.path_root
         super().set_contexts(path_context=path_context)
         for model, model_path in self.base_model_paths_dict.items():
-            model_path = os.path.realpath(model_path)
-            prefix = os.path.commonprefix([path_root_orig, model_path])
-            model_local_path = model_path[len(prefix):]
-            self.base_model_paths_dict[model] = os.path.join(self.path_root, model_local_path)
+            model_local_path = model_path.split(path_root_orig, 1)[1]
+            self.base_model_paths_dict[model] = self.path_root + model_local_path
 
     def set_stack_columns(self, stack_column_prefix_lst):
         if self.problem_type == MULTICLASS:
