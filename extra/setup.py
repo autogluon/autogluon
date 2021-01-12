@@ -49,7 +49,7 @@ requirements = [
     'gluoncv>=0.9.1,<1.0',
     'scipy>=1.3.3,<1.5.0',
     'graphviz<0.9.0,>=0.8.1',
-    'bokeh',
+    'bokeh<=2.2.2',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',
     f'autogluon.core=={version}'
