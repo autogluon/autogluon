@@ -135,7 +135,7 @@ def test_no_text_column_raise():
         ('😉😉😉', 'wink')] * 30
 
     df = pd.DataFrame(data, columns=['data', 'label'])
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(AssertionError):
         predictor = task.fit(df, label='label',
                              verbosity=4)
 

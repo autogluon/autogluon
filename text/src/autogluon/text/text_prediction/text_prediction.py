@@ -419,11 +419,11 @@ class TextPrediction(BaseTask):
                 has_text_column = True
                 break
         if not has_text_column:
-            raise NotImplementedError('No Text Column is found! This is currently not supported by '
-                                      'the TextPrediction task. You may try to use '
-                                      'TabularPrediction.fit().\n' \
-                                      'The inferred column properties of the training data is {}'
-                                      .format(train_data))
+            raise AssertionError('No Text Column is found! This is currently not supported by '
+                                 'the TextPrediction task. You may try to use '
+                                 'TabularPrediction.fit().\n' \
+                                 'The inferred column properties of the training data is {}'
+                                 .format(train_data))
         problem_types = []
         label_shapes = []
         for label_col_name in label_columns:
