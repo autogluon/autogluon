@@ -105,6 +105,9 @@ def construct_custom_catboost_metric(metric, is_higher_better, needs_pred_proba,
         return 'Logloss'
     if (metric.name == 'roc_auc') and (problem_type == BINARY) and needs_pred_proba:
         return 'AUC'
+    if (metric.name == 'roc_auc_ovo_macro') and (problem_type == MULTICLASS) and needs_pred_proba:
+        logger.warning(f'Metric {metric.name} is not supported by this model - using AUC:type=Mu instead')
+        return 'AUC:type=Mu'
     if (metric.name == 'f1') and (problem_type == BINARY) and not needs_pred_proba:
         return 'F1'
     if (metric.name == 'balanced_accuracy') and (problem_type == BINARY) and not needs_pred_proba:
