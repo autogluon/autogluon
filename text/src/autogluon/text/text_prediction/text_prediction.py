@@ -392,7 +392,13 @@ class TextPrediction(BaseTask):
             label_columns=label_columns,
             provided_column_properties=None,
             categorical_default_handle_missing_value=True)
-
+        has_text_column = False
+        for ele in column_properties:
+            if ele.type == _C.TEXT:
+                has_text_column = True
+        if not has_text_column:
+            raise ValueError("No text column is found in the dataset. "
+                             "We will skip the text prediction model.")
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)
