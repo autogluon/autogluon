@@ -56,6 +56,7 @@ class Forecasting(BaseTask):
             val_data = TimeSeriesDataset(val_data, index_column=index_column)
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         random_seed = kwargs.get('random_seed', 0)
+        quantiles = kwargs.get("quantiles", ["0.5"])
         scheduler_options = {"searcher": search_strategy,
                              "resource": {"num_cpus": 1, "num_gpus": 0},
                              "num_trials": num_trials,
@@ -77,7 +78,8 @@ class Forecasting(BaseTask):
                     val_data=val_data,
                     scheduler_options=scheduler_options,
                     hyperparameters=hyperparameters,
-                    hyperparameter_tune=hyperparameter_tune,)
+                    hyperparameter_tune=hyperparameter_tune,
+                    quantiles=quantiles)
 
         # TODO: refit full
         predictor = ForecastingPredictor(learner,

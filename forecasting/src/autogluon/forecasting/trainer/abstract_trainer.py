@@ -22,11 +22,12 @@ class AbstractTrainer:
     trainer_info_json_name = 'info.json'
 
     def __init__(self, path: str, freq, prediction_length, scheduler_options=None, eval_metric=None,
-                 save_data=False):
+                 save_data=False, **kwargs):
         self.path = path
         self.freq = freq
         self.prediction_length = prediction_length
         self.save_data = save_data
+        self.quantiles = kwargs.get("quantiles", ["0.5"])
 
         self.model_info = {}
         self.models = {}

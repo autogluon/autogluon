@@ -1,25 +1,38 @@
-from gluonts.evaluation.backtest import make_evaluation_predictions
 import autogluon.core.utils.savers.save_pkl as save_pkl
 import autogluon.core.utils.loaders.load_pkl as load_pkl
-import os
 from ...abstract.abstract_model import AbstractModel
-from gluonts.evaluation import Evaluator
 from gluonts.evaluation.backtest import make_evaluation_predictions
-import json
+from gluonts.model.forecast import SampleForecast, QuantileForecast, DistributionForecast
+from pathlib import Path
 import pandas as pd
+import numpy as np
+import copy
+import os
+import time
+from gluonts.evaluation import Evaluator
+from ..abstract_gluonts.model_trial import model_trial
 from tqdm import tqdm
+from autogluon.core.scheduler.fifo import FIFOScheduler
+from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core.task.base.base_predictor import BasePredictor
+from gluonts.model.predictor import Predictor
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractGluonTSModel(AbstractModel):
 
     model_file_name = "model.pkl"
+    gluonts_model_path = "gluon_ts"
 
     def __init__(self, path: str, freq: str, prediction_length: int, name: str, eval_metric: str = None,
-                 hyperparameters=None, model=None):
+                 hyperparameters=None, model=None, **kwargs):
         """
         Create a new model
         Args:
             path(str): directory where to store all the model
+            freq(str): frequency
             name(str): name of subdirectory inside path where model will be saved.
             eval_metric(str): objective function the model intends to optimize, will use mean_wQuantileLoss by default
             hyperparameters: various hyperparameters that will be used by model (can be search spaces instead of fixed values).
@@ -40,6 +53,9 @@ class AbstractGluonTSModel(AbstractModel):
         self.set_default_parameters()
         self.params["freq"] = freq
         self.params["prediction_length"] = prediction_length
+
+        self.best_configs = self.params.copy()
+
         self.nondefault_parameters = []
         if hyperparameters is not None:
             self.params.update(hyperparameters)
@@ -49,6 +65,7 @@ class AbstractGluonTSModel(AbstractModel):
         self.val_score = None
         self.fit_time = None
         self.predict_time = None
+        self.quantiles = kwargs.get("quantiles", ["0.5"])
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
@@ -61,10 +78,17 @@ class AbstractGluonTSModel(AbstractModel):
         return path
 
     def save(self, path: str = None,):
+        # save self
         if path is None:
             path = self.path
         file_path = path + self.model_file_name
         save_pkl.save(path=file_path, object=self)
+
+        # save gluonts model
+        weight_path = path + self.gluonts_model_path
+        os.makedirs(weight_path, exist_ok=True)
+        self.model.serialize(Path(weight_path))
+        self.model = None
         return path
 
     @classmethod
@@ -73,23 +97,46 @@ class AbstractGluonTSModel(AbstractModel):
         model = load_pkl.load(path=file_path,)
         if reset_path:
             model.set_context(path)
+        weight_path = path + cls.gluonts_model_path
+        model.model = Predictor.deserialize(Path(weight_path))
         return model
 
     def set_default_parameters(self):
-        pass
+        self.params = {}
 
     def create_model(self):
         pass
 
     def fit(self, train_data, time_limit=None):
-        pass
+        if time_limit is None or time_limit > 0:
+            self.create_model()
+            self.model = self.model.train(train_data)
+        else:
+            raise TimeLimitExceeded
 
     def predict(self, data, quantiles=None):
         if quantiles is None:
-            quantiles = [0.5]
+            quantiles = self.quantiles
         result_dict = {}
         predicted_targets = list(self.model.predict(data))
-        status = [0 < quantiles[i] < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
+        if isinstance(predicted_targets[0], QuantileForecast):
+            status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
+        elif isinstance(predicted_targets[0], SampleForecast):
+            transformed_targets = []
+            for forecast in predicted_targets:
+                tmp = []
+                for quantile in quantiles:
+                    tmp.append(forecast.quantile(quantile))
+                transformed_targets.append(QuantileForecast(forecast_arrays=np.array(tmp),
+                                                            start_date=forecast.start_date,
+                                                            freq=forecast.freq,
+                                                            forecast_keys=self.quantiles,
+                                                            item_id=forecast.item_id))
+            predicted_targets = copy.deepcopy(transformed_targets)
+            status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
+        else:
+            raise TypeError("DistributionForecast is not yet supported.")
+
         if not all(status):
             raise ValueError("Invalid quantile value.")
         index = data.get_index()
@@ -109,9 +156,6 @@ class AbstractGluonTSModel(AbstractModel):
                                                          predictor=self.model,
                                                          num_samples=num_samples)
         return list(tqdm(forecast_it, total=len(data))), list(tqdm(ts_it, total=len(data)))
-
-    def hyperparameter_tune(self, train_data, val_data, scheduler_options, **kwargs):
-        pass
 
     def score(self, data, metric=None, num_samples=100):
         """
@@ -133,4 +177,71 @@ class AbstractGluonTSModel(AbstractModel):
         num_series = len(tss)
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[metric]
+
+    def hyperparameter_tune(self, train_data, val_data, scheduler_options, **kwargs):
+        time_start = time.time()
+        params_copy = self.params.copy()
+
+        directory = self.path
+
+        dataset_train_filename = 'dataset_train.p'
+        train_path = directory + dataset_train_filename
+        save_pkl.save(path=train_path, object=train_data)
+
+        dataset_val_filename = 'dataset_val.p'
+        val_path = directory + dataset_val_filename
+        save_pkl.save(path=val_path, object=val_data)
+        scheduler_func, scheduler_options = scheduler_options
+
+        util_args = dict(
+            train_data_path=dataset_train_filename,
+            val_data_path=dataset_val_filename,
+            directory=directory,
+            model=self,
+            time_start=time_start,
+            time_limit=scheduler_options["time_out"]
+        )
+
+        model_trial.register_args(util_args=util_args, **params_copy)
+        scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_options)
+        scheduler.run()
+        scheduler.join_jobs()
+        self.best_configs.update(scheduler.get_best_config())
+        return self._get_hpo_results(scheduler, scheduler_options, time_start)
+
+    def _get_hpo_results(self, scheduler, scheduler_options, time_start):
+        # Store results / models from this HPO run:
+        best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
+        hpo_results = {
+            'best_reward': scheduler.get_best_reward(),
+            'best_config': best_hp,
+            'total_time': time.time() - time_start,
+            'metadata': scheduler.metadata,
+            'training_history': scheduler.training_history,
+            'config_history': scheduler.config_history,
+            'reward_attr': scheduler._reward_attr,
+            'args': model_trial.args
+        }
+
+        hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model
+        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+            raise NotImplementedError("need to fetch model files from remote Workers")
+            # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
+            # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
+
+        hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
+        hpo_model_performances = {}
+        for trial in sorted(hpo_results['trial_info'].keys()):
+            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
+            file_id = "trial_" + str(trial)  # unique identifier to files from this trial
+            trial_model_name = self.name + os.path.sep + file_id
+            trial_model_path = self.path_root + trial_model_name + os.path.sep
+            hpo_models[trial_model_name] = trial_model_path
+            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
+
+        logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
+        logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
+        logger.log(15, str(best_hp))
+        return hpo_models, hpo_model_performances, hpo_results
+
 

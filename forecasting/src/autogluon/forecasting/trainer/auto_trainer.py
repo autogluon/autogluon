@@ -17,7 +17,8 @@ class AutoTrainer(AbstractTrainer):
                                  eval_metric=eval_metric,
                                  hyperparameters=hyperparameters,
                                  freq=self.freq,
-                                 prediction_length=self.prediction_length)
+                                 prediction_length=self.prediction_length,
+                                 quantiles=self.quantiles)
 
     # TODO: rename to .fit for 0.1
     def train(self, train_data, val_data=None, hyperparameter_tune=False, hyperparameters=None):

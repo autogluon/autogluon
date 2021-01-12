@@ -50,7 +50,7 @@ class AbstractLearner:
                          **kwargs)
 
     def _fit(self, train_data, freq, prediction_length, val_data=None, scheduler_options=None, hyperparameter_tune=False,
-             hyperparameters=None):
+             hyperparameters=None, **kwargs):
         raise NotImplementedError
 
     def predict(self, data, model=None, for_score=False, **kwargs):
