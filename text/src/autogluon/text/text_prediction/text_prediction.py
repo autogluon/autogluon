@@ -393,7 +393,7 @@ class TextPrediction(BaseTask):
             provided_column_properties=None,
             categorical_default_handle_missing_value=True)
         has_text_column = False
-        for ele in column_properties:
+        for ele in column_properties.values():
             if ele.type == _C.TEXT:
                 has_text_column = True
         if not has_text_column:
