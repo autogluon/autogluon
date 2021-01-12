@@ -266,14 +266,15 @@ class TextPredictionV1Model(AbstractModel):
     def save(self, path: str = None, verbose=True) -> str:
         if path is None:
             path = self.path
-        model_path = os.path.join(path, self.model_file_name)
         text_nn_path = os.path.join(path, self.nn_model_name)
-        logger.log(15, f'Save Model Hyperparams to {model_path}.')
-        logger.log(15, f'Save Model Text NN weights to {text_nn_path}')
+        model_path = text_nn_path + os.sep + self.model_file_name
+        logger.log(15, f'Save Model Text NN weights and model hyperparameters'
+                       f' to {text_nn_path}. '
+                       f'The model hyper-parameters are saved as {model_path}')
         model = self.model
         self.model = None
         # save this AbstractModel object without NN weights
-        super().save(path=model_path, verbose=verbose)
+        super().save(path=text_nn_path + os.sep, verbose=verbose)
         model.save(text_nn_path)
         self.model = model
         return path
@@ -300,7 +301,8 @@ class TextPredictionV1Model(AbstractModel):
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
         logger.log(15, f'Load from {path}.')
-        obj = super().load(os.path.join(path, cls.model_file_name))
-        nn_model = BertForTextPredictionBasic.load(os.path.join(path, cls.nn_model_name))
+        text_nn_path = os.path.join(path, cls.nn_model_name)
+        obj = super().load(os.path.realpath(text_nn_path) + os.sep)
+        nn_model = BertForTextPredictionBasic.load(text_nn_path)
         obj.model = nn_model
         return obj
