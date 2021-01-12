@@ -151,6 +151,13 @@ class CatBoostModel(AbstractModel):
 
         params = self.params.copy()
         num_features = len(self.features)
+
+        # FIXME: v0.1 add default as CPU and GPU only if explicitly specified in ag_args_fit.
+        #  Fix num_gpus > 0 and time_limit is not None : Currently crashes.
+        if num_gpus != 0:
+            logger.warning('WARNING: Attempted to run CatBoost with GPU. CatBoost GPU implementation is not yet implemented, using CPU instead.')
+            num_gpus = 0
+
         if num_gpus != 0:
             if 'task_type' not in params:
                 params['task_type'] = 'GPU'
