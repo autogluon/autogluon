@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import random
 import numpy as np
+from autogluon.core.utils.utils import default_holdout_frac
 
 from ..abstract.abstract_model import AbstractModel
 from ...features.feature_metadata import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
@@ -185,7 +186,7 @@ class TextPredictionV1Model(AbstractModel):
         """
         try:
             import mxnet as mx
-            from autogluon.text.text_prediction.dataset import TabularDataset
+            from autogluon.text.text_prediction.dataset import TabularDataset, random_split_train_val
             from autogluon.text.text_prediction.text_prediction import get_recommended_resource
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
@@ -209,8 +210,6 @@ class TextPredictionV1Model(AbstractModel):
         X_train = self.preprocess(X_train, fit=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
-        else:
-            X_val = None
         column_properties = self._build_model(X_train=X_train,
                                               y_train=y_train,
                                               X_val=X_val,
@@ -233,20 +232,18 @@ class TextPredictionV1Model(AbstractModel):
             scheduler_options['max_t'] = scheduler_options.get(
                 'max_t', 50)
         if X_val is None:
-            X_train, X_val = 
+            holdout_frac = default_holdout_frac(len(X_train), True)
+            X_train, X_val = random_split_train_val(X_train, valid_ratio=holdout_frac)
         train_data = TabularDataset(X_train,
                                     column_properties=column_properties,
                                     label_columns=self._label_column_name)
         logger.info('Train Dataset:')
         logger.info(train_data)
-        if X_val is not None:
-            tuning_data = TabularDataset(X_val,
-                                         column_properties=column_properties,
-                                         label_columns=self._label_column_name)
-            logger.info('Tuning Dataset:')
-            logger.info(tuning_data)
-        else:
-            tuning_data = None
+        tuning_data = TabularDataset(X_val,
+                                     column_properties=column_properties,
+                                     label_columns=self._label_column_name)
+        logger.info('Tuning Dataset:')
+        logger.info(tuning_data)
         self.model.train(train_data=train_data,
                          tuning_data=tuning_data,
                          resource=resource,
