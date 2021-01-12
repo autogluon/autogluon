@@ -397,8 +397,9 @@ class TextPrediction(BaseTask):
             if ele.type == _C.TEXT:
                 has_text_column = True
         if not has_text_column:
-            raise ValueError("No text column is found in the dataset. "
-                             "We will skip the text prediction model.")
+            raise NotImplementedError("No text column is found in the dataset. "
+                                      "This is not supported by TextPrediction. "
+                                      "We will skip the model.")
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)
