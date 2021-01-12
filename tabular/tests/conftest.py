@@ -1,8 +1,9 @@
 import copy
 import os
 import shutil
-
+import uuid
 import pytest
+import tempfile
 
 import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -103,13 +104,11 @@ class FitHelper:
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label_column = dataset_info['label_column']
-        directory = directory_prefix + dataset_name + "/"
-        savedir = directory + 'AutogluonOutput/'
-
-        shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
+        savedir = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
         fit_args['label'] = label_column
         fit_args['output_directory'] = savedir
-        predictor = FitHelper.fit_dataset(train_data=train_data, fit_args=fit_args, sample_size=sample_size)
+        predictor = FitHelper.fit_dataset(train_data=train_data, fit_args=fit_args,
+                                          sample_size=sample_size)
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
