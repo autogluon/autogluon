@@ -256,19 +256,16 @@ class TextPredictionV1Model(AbstractModel):
                          ignore_warning=verbosity < 2)
 
     def save(self, path: str = None, verbose=True) -> str:
-        if path is None:
-            path = self.path
-        text_nn_path = os.path.join(path, self.nn_model_name)
-        model_path = text_nn_path + os.sep + self.model_file_name
-        logger.log(15, f'Save Model Text NN weights and model hyperparameters'
-                       f' to {text_nn_path}. '
-                       f'The model hyper-parameters are saved as {model_path}')
         model = self.model
         self.model = None
         # save this AbstractModel object without NN weights
-        super().save(path=text_nn_path + os.sep, verbose=verbose)
-        model.save(text_nn_path)
+        path = super().save(path=path, verbose=verbose)
         self.model = model
+
+        text_nn_path = os.path.join(path, self.nn_model_name)
+        model.save(text_nn_path)
+        logger.log(15, f"\tSaved Text NN weights and model hyperparameters to '{text_nn_path}'.")
+
         return path
 
     def get_memory_size(self) -> int:
@@ -292,9 +289,6 @@ class TextPredictionV1Model(AbstractModel):
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
-        logger.log(15, f'Load from {path}.')
-        text_nn_path = os.path.join(path, cls.nn_model_name)
-        obj = super().load(os.path.realpath(text_nn_path) + os.sep)
-        nn_model = BertForTextPredictionBasic.load(text_nn_path)
-        obj.model = nn_model
-        return obj
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model.model = BertForTextPredictionBasic.load(os.path.join(path, cls.nn_model_name))
+        return model
