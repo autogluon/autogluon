@@ -393,13 +393,16 @@ class TextPrediction(BaseTask):
             provided_column_properties=None,
             categorical_default_handle_missing_value=True)
         has_text_column = False
-        for ele in column_properties.values():
-            if ele.type == _C.TEXT:
+        for k, v in column_properties.items():
+            if v.type == _C.TEXT:
                 has_text_column = True
+                break
         if not has_text_column:
-            raise NotImplementedError("No text column is found in the dataset. "
-                                      "This is not supported by TextPrediction. "
-                                      "We will skip the model.")
+            raise AssertionError('No Text Column is found! This is currently not supported by '
+                                 'the TextPrediction task. You may try to use '
+                                 'TabularPrediction.fit().\n' \
+                                 'The inferred column properties of the training data is {}'
+                                 .format(train_data))
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)
@@ -413,17 +416,7 @@ class TextPrediction(BaseTask):
         logger.info(tuning_data)
         logger.debug('Hyperparameters:')
         logger.debug(hyperparameters)
-        has_text_column = False
-        for k, v in column_properties.items():
-            if v.type == _C.TEXT:
-                has_text_column = True
-                break
-        if not has_text_column:
-            raise AssertionError('No Text Column is found! This is currently not supported by '
-                                 'the TextPrediction task. You may try to use '
-                                 'TabularPrediction.fit().\n' \
-                                 'The inferred column properties of the training data is {}'
-                                 .format(train_data))
+
         problem_types = []
         label_shapes = []
         for label_col_name in label_columns:
