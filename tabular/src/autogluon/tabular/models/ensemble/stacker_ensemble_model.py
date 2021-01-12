@@ -124,7 +124,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             model_path = os.path.realpath(model_path)
             prefix = os.path.commonprefix([path_root_orig, model_path])
             model_local_path = model_path[len(prefix):]
-            self.base_model_paths_dict[model] = self.path_root + model_local_path
+            self.base_model_paths_dict[model] = os.path.join(self.path_root, model_local_path)
 
     def set_stack_columns(self, stack_column_prefix_lst):
         if self.problem_type == MULTICLASS:
