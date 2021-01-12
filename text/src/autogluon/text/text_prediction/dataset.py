@@ -93,7 +93,7 @@ def is_categorical_column(data: pd.Series,
         Whether the column is a categorical column
     parsed_allow_missing
     """
-    if data.dtype == pd.CategoricalDtype:
+    if data.dtype.name == 'category':
         return True, default_allow_missing
     threshold = min(int(len(data) * ratio), threshold)
     sample_set = set()
