@@ -132,3 +132,4 @@ text/src/autogluon/text/version.py
 vision/src/autogluon/vision/version.py
 
 AutogluonModels
+VERSION.minor

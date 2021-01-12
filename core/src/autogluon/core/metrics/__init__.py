@@ -354,6 +354,14 @@ roc_auc = make_scorer('roc_auc',
                       greater_is_better=True,
                       needs_threshold=True)
 
+roc_auc_ovo_macro = make_scorer('roc_auc_ovo_macro',
+                                sklearn.metrics.roc_auc_score,
+                                multi_class='ovo',
+                                average='macro',
+                                greater_is_better=True,
+                                needs_proba=True,
+                                needs_threshold=False)
+
 average_precision = make_scorer('average_precision',
                                 sklearn.metrics.average_precision_score,
                                 needs_threshold=True)
@@ -426,7 +434,7 @@ for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_er
         REGRESSION_METRICS[alias] = scorer
 
 CLASSIFICATION_METRICS = dict()
-for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, average_precision, log_loss, pac_score]:
+for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, roc_auc_ovo_macro, average_precision, log_loss, pac_score]:
     CLASSIFICATION_METRICS[scorer.name] = scorer
     for alias in scorer.alias:
         CLASSIFICATION_METRICS[alias] = scorer
