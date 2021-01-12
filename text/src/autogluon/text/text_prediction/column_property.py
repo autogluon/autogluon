@@ -174,7 +174,7 @@ class CategoricalColumnProperty(ColumnProperty):
 
     def parse(self, column_data: pd.Series):
         super().parse(column_data=column_data)
-        if column_data.dtype
+
         if self._allow_missing is None:
             if self.num_missing_sample > 0:
                 self._allow_missing = True

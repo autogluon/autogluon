@@ -67,13 +67,8 @@ class TextPredictionV1Model(AbstractModel):
     def _preprocess(self, X: pd.DataFrame, fit=False, **kwargs):
         if fit:
             self._numeric_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT])
-            self._cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_CATEGORY])
         if self._numeric_columns:
             X[self._numeric_columns] = X[self._numeric_columns].fillna(-1)  # FIXME v0.1: Make this more sophisticated, such as mean.
-        if self._cat_columns:
-            X[self._cat_columns] = X[self._cat_columns].astype('object')  # FIXME v0.1: Avoid this unnecessary conversion.
-            # FIXME v0.1: This will crash if NaNs are present at test time.
-            # X[self._cat_columns] = X[self._cat_columns].fillna(0)  # FIXME v0.1: Make this more sophisticated. This is not correct.
         return X
 
     def _build_model(self, X_train, y_train, X_val, y_val, hyperparameters):
@@ -143,9 +138,7 @@ class TextPredictionV1Model(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
             get_features_kwargs=dict(
-                valid_raw_types=[R_INT, R_FLOAT,
-                                 # R_CATEGORY,  # FIXME: Add R_CATEGORY features
-                                 R_OBJECT],
+                valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
                 invalid_special_types=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
             ),
         )
@@ -239,6 +232,8 @@ class TextPredictionV1Model(AbstractModel):
                 'grace_period', 10)
             scheduler_options['max_t'] = scheduler_options.get(
                 'max_t', 50)
+        if X_val is None:
+            X_train, X_val = 
         train_data = TabularDataset(X_train,
                                     column_properties=column_properties,
                                     label_columns=self._label_column_name)
