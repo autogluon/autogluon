@@ -136,7 +136,9 @@ def test_confusion_matrix_with_empty_inputs():
                             [0.2, 0.1, 0.7],
                             [0.3, 0.4, 0.3],
                             [0.01, 0.9, 0.09]]
-                           )])
+                           ),
+                          ([0, 1, 0, 1],
+                           [0.1, 0.2, 0.3, 0.4])])
 def test_log_loss(gt, probs):
     gt = np.array(gt, dtype=np.int64)
     probs = np.array(probs, dtype=np.float32)
