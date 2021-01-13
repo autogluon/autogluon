@@ -240,7 +240,7 @@ def normalize_df(df, convert_text_to_numerical=True, remove_none=True):
     else:
         new_df = df.copy()
         for col_name in conversion_cols:
-            new_df[:, col_name] = conversion_cols[col_name]
+            new_df[col_name] = conversion_cols[col_name]
         return new_df
 
 
