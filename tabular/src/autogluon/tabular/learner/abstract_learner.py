@@ -519,7 +519,7 @@ class AbstractLearner:
         else:
             return []
 
-    def distill(self, X=None, y=None, X_val=None, y_val=None, time_limits=None, hyperparameters=None, holdout_frac=None,
+    def distill(self, X=None, y=None, X_val=None, y_val=None, time_limit=None, hyperparameters=None, holdout_frac=None,
                 verbosity=None, models_name_suffix=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
         """ See abstract_trainer.distill() for details. """
@@ -547,7 +547,7 @@ class AbstractLearner:
             augmentation_data = self.transform_features(augmentation_data)
 
         trainer = self.load_trainer()
-        distilled_model_names = trainer.distill(X_train=X, y_train=y, X_val=X_val, y_val=y_val, time_limits=time_limits, hyperparameters=hyperparameters,
+        distilled_model_names = trainer.distill(X_train=X, y_train=y, X_val=X_val, y_val=y_val, time_limit=time_limit, hyperparameters=hyperparameters,
                                                 holdout_frac=holdout_frac, verbosity=verbosity, teacher_preds=teacher_preds, models_name_suffix=models_name_suffix,
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)

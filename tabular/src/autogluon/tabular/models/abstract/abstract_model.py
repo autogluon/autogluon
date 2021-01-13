@@ -88,7 +88,7 @@ class AbstractModel:
             self.stopping_metric = self.params_aux.get('stopping_metric', self._get_default_stopping_metric())
         else:
             if 'stopping_metric' in self.params_aux:
-                raise AssertionError('stopping_metric was specified in both hyperparameters AG_args_fit and model init. Please specify only once.')
+                raise AssertionError('stopping_metric was specified in both hyperparameters ag_args_fit and model init. Please specify only once.')
             self.stopping_metric = stopping_metric
         self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, 'stopping_metric')
 

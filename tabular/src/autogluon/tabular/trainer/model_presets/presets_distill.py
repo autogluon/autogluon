@@ -41,7 +41,7 @@ def get_preset_models_distillation(path, problem_type, eval_metric, feature_meta
         elif 'default' in hyperparameters and 'NN' in hyperparameters['default']:
             hyperparameters['default']['NN'] = nn_hyperparameters
         # Swap RF criterion for MSE:
-        rf_newparams = {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE'}}
+        rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
         if 'RF' in hyperparameters:
             rf_hyperparameters = hyperparameters['RF']
         elif 'default' in hyperparameters and 'RF' in hyperparameters['default']:

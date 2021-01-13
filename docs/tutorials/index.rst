@@ -16,7 +16,7 @@ Image Prediction
       :title: Customized Search and HPO
       :link: image_prediction/hpo.html
 
-      Hyperparameter tuning to improve image classification accuracy.
+      Hyperparameter tuning to improve image classification accuracy.
 
    .. card::
       :title: Use Your Own Dataset

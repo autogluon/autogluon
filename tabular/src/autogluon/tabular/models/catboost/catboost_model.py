@@ -216,7 +216,7 @@ class CatBoostModel(AbstractModel):
 
             params_final = params.copy()
 
-            # TODO: This only handles memory with time_limits specified, but not with time_limits=None, handle when time_limits=None
+            # TODO: This only handles memory with time_limit specified, but not with time_limit=None, handle when time_limit=None
             available_mem = psutil.virtual_memory().available
             if self.problem_type == SOFTCLASS:  # TODO: remove this once catboost-dev is no longer necessary and SOFTCLASS objectives can be pickled.
                 model_size_bytes = 1  # skip memory check

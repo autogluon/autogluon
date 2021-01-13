@@ -560,7 +560,7 @@ class BaggedEnsembleModel(AbstractModel):
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
             child_hyperparameters=self._get_model_base().params,
             child_hyperparameters_fit = self._get_compressed_params_trained(),
-            child_AG_args_fit = self._get_model_base().params_aux,
+            child_ag_args_fit = self._get_model_base().params_aux,
         )
         info['bagged_info'] = bagged_info
         info['children_info'] = children_info

@@ -29,9 +29,8 @@ import pandas as pd
 import pytest
 
 import autogluon.core as ag
-from autogluon.tabular import TabularPrediction as task
+from autogluon.tabular import TabularDataset, TabularPredictor
 from autogluon.tabular.utils import BINARY, MULTICLASS, REGRESSION
-from autogluon.tabular.task.tabular_prediction.predictor import TabularPredictor
 
 
 def test_tabular():
@@ -39,10 +38,10 @@ def test_tabular():
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 0 # random seed
     subsample_size = None
-    hyperparameter_tune = False
+    hyperparameter_tune_kwargs = None
     verbosity = 2 # how much output to print
     hyperparameters = None
-    time_limits = None
+    time_limit = None
     fast_benchmark = True # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
@@ -51,16 +50,15 @@ def test_tabular():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        time_limits = 60
+        time_limit = 60
 
-    fit_args = {
-        'hyperparameter_tune': hyperparameter_tune,
-        'verbosity': verbosity,
-    }
+    fit_args = {'verbosity': verbosity}
+    if hyperparameter_tune_kwargs is not None:
+        fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
     if hyperparameters is not None:
         fit_args['hyperparameters'] = hyperparameters
-    if time_limits is not None:
-        fit_args['time_limits'] = time_limits
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
     run_tabular_benchmark_toy(fit_args=fit_args)
@@ -84,7 +82,7 @@ def test_advanced_functionality():
     directory = directory_prefix + 'advanced/' + dataset['name'] + "/"
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    predictor = task.fit(train_data=train_data, label=label, output_directory=savedir)
+    predictor = TabularPredictor(label=label, path=savedir).fit(train_data)
     leaderboard = predictor.leaderboard(dataset=test_data)
     leaderboard_extra = predictor.leaderboard(dataset=test_data, extra_info=True)
     assert set(predictor.get_model_names()) == set(leaderboard['model'])
@@ -121,7 +119,7 @@ def test_advanced_functionality():
 
     predictor.persist_models(models='all', max_memory=None)
     predictor.save()  # Save predictor while models are persisted: Intended functionality is that they won't be persisted when loaded.
-    predictor_loaded = TabularPredictor.load(output_directory=predictor.output_directory)  # Assert that predictor loading works
+    predictor_loaded = TabularPredictor.load(predictor.path)  # Assert that predictor loading works
     leaderboard_loaded = predictor_loaded.leaderboard(dataset=test_data)
     assert len(leaderboard) == len(leaderboard_loaded)
     assert predictor_loaded.get_model_names_persisted() == []  # Assert that models were not still persisted after loading predictor
@@ -164,8 +162,8 @@ def load_data(directory_prefix, train_file, test_file, name, url=None):
         ag.unzip(zip_name, directory_prefix)
         os.remove(zip_name)
 
-    train_data = task.Dataset(file_path=train_file_path)
-    test_data = task.Dataset(file_path=test_file_path)
+    train_data = TabularDataset(file_path=train_file_path)
+    test_data = TabularDataset(file_path=test_file_path)
     return train_data, test_data
 
 
@@ -191,7 +189,7 @@ def run_tabular_benchmark_toy(fit_args):
     directory = directory_prefix + dataset['name'] + "/"
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    predictor = task.fit(train_data=train_data, label=dataset['label_column'], output_directory=savedir, **fit_args)
+    predictor = TabularPredictor(label=dataset['label_column'], path=savedir).fit(train_data, **fit_args)
     print(predictor.feature_metadata)
     print(predictor.feature_metadata.type_map_raw)
     print(predictor.feature_metadata.type_group_map_special)
@@ -273,11 +271,11 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 if subsample_size < len(train_data):
                     # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
                     train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
-            predictor: TabularPredictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, **fit_args)
+            predictor = TabularPredictor(label=label_column, path=savedir).fit(train_data, **fit_args)
             results = predictor.fit_summary(verbosity=4)
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
-            predictor = task.load(savedir)  # Test loading previously-trained predictor from file
+            predictor = TabularPredictor.load(savedir)  # Test loading previously-trained predictor from file
             y_pred = predictor.predict(test_data)
             perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
             if dataset['problem_type'] != REGRESSION:
@@ -340,7 +338,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 with pytest.raises(AssertionError):
                     predictor.get_oof_pred_proba()
             if run_distill:
-                predictor.distill(time_limits=60, augment_args={'size_factor':0.5})
+                predictor.distill(time_limit=60, augment_args={'size_factor':0.5})
 
     # Summarize:
     avg_perf = np.mean(performance_vals)
@@ -375,13 +373,12 @@ def test_tabularHPObagstack():
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 10000 # random seed
     subsample_size = None
-    hyperparameter_tune = True
-    stack_ensemble_levels = 2
-    num_bagging_folds = 2
+    hyperparameter_tune_kwargs = {'searcher': 'random'}
+    num_stack_levels = 2
+    num_bag_folds = 2
     verbosity = 2 # how much output to print
     hyperparameters = None
-    time_limits = None
-    num_trials = None
+    time_limit = None
     fast_benchmark = True # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
@@ -393,22 +390,21 @@ def test_tabularHPObagstack():
         nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001,0.01), 'lr_scheduler': ag.Categorical(None, 'cosine','step')}
         gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01,0.1)}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
-        time_limits = 150
-        num_trials = 3
+        time_limit = 150
+        hyperparameter_tune_kwargs['num_trials'] = 3
 
     fit_args = {
-        'num_bagging_folds': num_bagging_folds,
-        'stack_ensemble_levels': stack_ensemble_levels,
-        'hyperparameter_tune': hyperparameter_tune,
+        'num_bag_folds': num_bag_folds,
+        'num_stack_levels': num_stack_levels,
         'verbosity': verbosity,
     }
+    if hyperparameter_tune_kwargs is not None:
+        fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
     if hyperparameters is not None:
         fit_args['hyperparameters'] = hyperparameters
-    if time_limits is not None:
-        fit_args['time_limits'] = time_limits
-        fit_args['num_bagging_sets'] = 2
-    if num_trials is not None:
-        fit_args['num_trials'] = num_trials
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
+        fit_args['num_bag_sets'] = 2
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)
@@ -419,11 +415,10 @@ def test_tabularHPO():
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 99 # random seed
     subsample_size = None
-    hyperparameter_tune = True
+    hyperparameter_tune_kwargs = {'searcher': 'random'}
     verbosity = 2 # how much output to print
     hyperparameters = None
-    time_limits = None
-    num_trials = None
+    time_limit = None
     fast_benchmark = True # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
@@ -435,19 +430,16 @@ def test_tabularHPO():
         nn_options = {'num_epochs': 2}
         gbm_options = {'num_boost_round': 20}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
-        time_limits = 60
-        num_trials = 5
+        time_limit = 60
+        hyperparameter_tune_kwargs['num_trials'] = 5
 
-    fit_args = {
-        'hyperparameter_tune': hyperparameter_tune,
-        'verbosity': verbosity,
-    }
+    fit_args = {'verbosity': verbosity,}
+    if hyperparameter_tune_kwargs is not None:
+        fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
     if hyperparameters is not None:
         fit_args['hyperparameters'] = hyperparameters
-    if time_limits is not None:
-        fit_args['time_limits'] = time_limits
-    if num_trials is not None:
-        fit_args['num_trials'] = num_trials
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)
@@ -455,15 +447,15 @@ def test_tabularHPO():
 
 def test_tabular_bag():
     ############ Benchmark options you can set: ########################
-    num_bagging_folds = 3
-    stack_ensemble_levels = 0
+    num_bag_folds = 3
+    num_stack_levels = 0
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 123 # random seed
     subsample_size = None
-    hyperparameter_tune = False
+    hyperparameter_tune_kwargs = None
     verbosity = 2 # how much output to print
     hyperparameters = None
-    time_limits = None
+    time_limit = None
     fast_benchmark = True # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
@@ -475,19 +467,20 @@ def test_tabular_bag():
         nn_options = {'num_epochs': 1}
         gbm_options = {'num_boost_round': 30}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
-        time_limits = 60
+        time_limit = 60
 
     fit_args = {
-        'num_bagging_folds': num_bagging_folds,
-        'stack_ensemble_levels': stack_ensemble_levels,
-        'hyperparameter_tune': hyperparameter_tune,
+        'num_bag_folds': num_bag_folds,
+        'num_stack_levels': num_stack_levels,
         'verbosity': verbosity,
     }
+    if hyperparameter_tune_kwargs is not None:
+        fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
     if hyperparameters is not None:
         fit_args['hyperparameters'] = hyperparameters
-    if time_limits is not None:
-        fit_args['time_limits'] = time_limits
-        fit_args['num_bagging_sets'] = 2
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
+        fit_args['num_bag_sets'] = 2
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)
@@ -496,15 +489,15 @@ def test_tabular_bag():
 @pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")
 def test_tabular_stack1():
     ############ Benchmark options you can set: ########################
-    stack_ensemble_levels = 1
-    num_bagging_folds = 0
+    num_stack_levels = 1
+    num_bag_folds = 0
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 32 # random seed
     subsample_size = None
-    hyperparameter_tune = False
+    hyperparameter_tune_kwargs = None
     verbosity = 2 # how much output to print
     hyperparameters = None
-    time_limits = None
+    time_limit = None
     fast_benchmark = True # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
@@ -516,18 +509,19 @@ def test_tabular_stack1():
         nn_options = {'num_epochs': 3}
         gbm_options = {'num_boost_round': 30}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
-        time_limits = 60
+        time_limit = 60
 
     fit_args = {
-        'num_bagging_folds': num_bagging_folds,
-        'stack_ensemble_levels': stack_ensemble_levels,
-        'hyperparameter_tune': hyperparameter_tune,
+        'num_bag_folds': num_bag_folds,
+        'num_stack_levels': num_stack_levels,
         'verbosity': verbosity,
     }
+    if hyperparameter_tune_kwargs is not None:
+        fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
     if hyperparameters is not None:
         fit_args['hyperparameters'] = hyperparameters
-    if time_limits is not None:
-        fit_args['time_limits'] = time_limits
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val = seed_val, fit_args=fit_args)
@@ -536,15 +530,15 @@ def test_tabular_stack1():
 @pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")
 def test_tabular_stack2():
     ############ Benchmark options you can set: ########################
-    stack_ensemble_levels = 2
-    num_bagging_folds = 0
+    num_stack_levels = 2
+    num_bag_folds = 0
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 66 # random seed
     subsample_size = None
-    hyperparameter_tune = False
+    hyperparameter_tune_kwargs = None
     verbosity = 2 # how much output to print
     hyperparameters = None
-    time_limits = None
+    time_limit = None
     fast_benchmark = True # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
@@ -556,18 +550,19 @@ def test_tabular_stack2():
         nn_options = {'num_epochs': 3}
         gbm_options = {'num_boost_round': 30}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
-        time_limits = 60
+        time_limit = 60
 
     fit_args = {
-        'num_bagging_folds': num_bagging_folds,
-        'stack_ensemble_levels': stack_ensemble_levels,
-        'hyperparameter_tune': hyperparameter_tune,
+        'num_bag_folds': num_bag_folds,
+        'num_stack_levels': num_stack_levels,
         'verbosity': verbosity,
     }
+    if hyperparameter_tune_kwargs is not None:
+        fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
     if hyperparameters is not None:
         fit_args['hyperparameters'] = hyperparameters
-    if time_limits is not None:
-        fit_args['time_limits'] = time_limits
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)
@@ -576,15 +571,15 @@ def test_tabular_stack2():
 @pytest.mark.slow
 def test_tabular_bagstack():
     ############ Benchmark options you can set: ########################
-    stack_ensemble_levels = 2
-    num_bagging_folds = 3
+    num_stack_levels = 2
+    num_bag_folds = 3
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 53 # random seed
     subsample_size = None
-    hyperparameter_tune = False
+    hyperparameter_tune_kwargs = None
     verbosity = 2 # how much output to print
     hyperparameters = None
-    time_limits = None
+    time_limit = None
     fast_benchmark = True # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
@@ -596,19 +591,20 @@ def test_tabular_bagstack():
         nn_options = {'num_epochs': 2}
         gbm_options = {'num_boost_round': 40}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options, 'custom': ['GBM']}
-        time_limits = 60
+        time_limit = 60
 
     fit_args = {
-        'num_bagging_folds': num_bagging_folds,
-        'stack_ensemble_levels': stack_ensemble_levels,
-        'hyperparameter_tune': hyperparameter_tune,
+        'num_bag_folds': num_bag_folds,
+        'num_stack_levels': num_stack_levels,
         'verbosity': verbosity,
     }
+    if hyperparameter_tune_kwargs is not None:
+        fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
     if hyperparameters is not None:
         fit_args['hyperparameters'] = hyperparameters
-    if time_limits is not None:
-        fit_args['time_limits'] = time_limits
-        fit_args['num_bagging_sets'] = 2
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
+        fit_args['num_bag_sets'] = 2
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args, run_distill=True)

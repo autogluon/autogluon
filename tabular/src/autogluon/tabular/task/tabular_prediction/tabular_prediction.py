@@ -12,7 +12,7 @@ from autogluon.core.metrics import get_metric
 
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
-from .predictor import TabularPredictor
+from .predictor_legacy import TabularPredictorV1
 from .presets_configs import set_presets, unpack
 from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 from ...features import AutoMLPipelineFeatureGenerator
@@ -31,10 +31,10 @@ class TabularPrediction(BaseTask):
     """
 
     Dataset = TabularDataset
-    Predictor = TabularPredictor
+    Predictor = TabularPredictorV1
 
     @staticmethod
-    def load(output_directory, verbosity=2) -> TabularPredictor:
+    def load(output_directory, verbosity=2) -> TabularPredictorV1:
         """
         Load a predictor object previously produced by `fit()` from file and returns this object.
         It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
@@ -53,14 +53,14 @@ class TabularPrediction(BaseTask):
         -------
         :class:`autogluon.task.tabular_prediction.TabularPredictor` object that can be used to make predictions.
         """
-        return TabularPredictor.load(output_directory=output_directory, verbosity=verbosity)
+        return TabularPredictorV1.load(output_directory=output_directory, verbosity=verbosity)
 
     @staticmethod
     @unpack(set_presets)
     def fit(train_data,
             label,
             tuning_data=None,
-            time_limits=None,
+            time_limit=None,
             output_directory=None,
             presets=None,
             problem_type=None,
@@ -93,7 +93,7 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
-        time_limits : int, default = None
+        time_limit : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` or `auto_stack` is specified.
         output_directory : str, default = None
@@ -116,7 +116,7 @@ class TabularPrediction(BaseTask):
 
             In-depth Preset Info:
                 best_quality={'auto_stack': True}
-                    Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limits value.
+                    Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
                 best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True}
@@ -216,24 +216,24 @@ class TabularPrediction(BaseTask):
                     'NN': {},
                     'GBM': [
                         {},
-                        {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
+                        {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
                     ],
                     'CAT': {},
                     'XGB': {},
                     'FASTAI': {},
                     'RF': [
-                        {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                        {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
                     ],
                     'XT': [
-                        {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                        {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
                     ],
                     'KNN': [
-                        {'weights': 'uniform', 'AG_args': {'name_suffix': 'Unif'}},
-                        {'weights': 'distance', 'AG_args': {'name_suffix': 'Dist'}},
+                        {'weights': 'uniform', 'ag_args': {'name_suffix': 'Unif'}},
+                        {'weights': 'distance', 'ag_args': {'name_suffix': 'Dist'}},
                     ],
                     'custom': ['GBM']
                 }
@@ -260,8 +260,8 @@ class TabularPrediction(BaseTask):
                     Note: 'penalty' parameter can be used for regression to specify regularization method: 'L1' and 'L2' values are supported.
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
-                        Example: `hyperparameters = {'RF': {..., 'AG_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
-                    AG_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
+                        Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
+                    ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
                             name_main: (str) The main name of the model. Example: 'RandomForest'.
@@ -273,8 +273,8 @@ class TabularPrediction(BaseTask):
                             valid_stacker: (bool) If False, the model will not be trained as a level 1 or higher stacker model.
                             valid_base: (bool) If False, the model will not be trained as a level 0 (base) model.
                         Reference the default hyperparameters for example usage of these options.
-                    AG_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
-                        Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limits` argument given during `fit()` but is not the same.
+                    ag_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
+                        Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limit` argument given during `fit()` but is not the same.
                         Valid keys:
                             max_memory_usage_ratio: (float, default=1.0) The ratio of memory usage relative to the default to allow before early stopping or killing the model. Values greater than 1.0 will be increasingly prone to out-of-memory errors.
                             max_time_limit_ratio: (float, default=1.0) The ratio of the provided time_limit to use during model `fit()`. If `time_limit=10` and `max_time_limit_ratio=0.3`, time_limit would be changed to 3. Does not alter max_time_limit or min_time_limit values.
@@ -282,7 +282,7 @@ class TabularPrediction(BaseTask):
                             min_time_limit: (float, default=0) Allow this model to train for at least this long (in sec), regardless of the time limit it would otherwise be granted.
                                 If `min_time_limit >= max_time_limit`, time_limit will be set to min_time_limit.
                                 If `min_time_limit=None`, time_limit will be set to None and the model will have no training time restriction.
-                    AG_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled. Only models in stack levels >=1 are impacted by these parameters.
+                    ag_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled. Only models in stack levels >=1 are impacted by these parameters.
                         Valid keys:
                             use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
                             max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
@@ -302,7 +302,7 @@ class TabularPrediction(BaseTask):
             To further improve predictions, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets.
         num_bagging_sets : int, default = None
             Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
-            Defaults to 1 if time_limits is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
+            Defaults to 1 if time_limit is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
             Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
         stack_ensemble_levels : int, default = None
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
@@ -310,7 +310,7 @@ class TabularPrediction(BaseTask):
             To prevent overfitting, `num_bagging_folds >= 2` must also be set or else a ValueError will be raised.
         num_trials : int, default = None
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
-            If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
+            If both `time_limit` and `num_trials` are specified, `time_limit` takes precedent.
         search_strategy : str, default = 'random'
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune=True`).
             Options include: 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search).
@@ -321,21 +321,21 @@ class TabularPrediction(BaseTask):
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
 
         Kwargs can include additional arguments for advanced users:
-            AG_args : dict, default={}
+            ag_args : dict, default={}
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
-                See the `AG_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
-                Identical to specifying `AG_args` parameter for all models in `hyperparameters`.
-                If a key in `AG_args` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
-            AG_args_fit : dict, default={}
+                See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Identical to specifying `ag_args` parameter for all models in `hyperparameters`.
+                If a key in `ag_args` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            ag_args_fit : dict, default={}
                 Keyword arguments to pass to all models.
-                See the `AG_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
-                Identical to specifying `AG_args_fit` parameter for all models in `hyperparameters`.
-                If a key in `AG_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
-            AG_args_ensemble : dict, default={}
+                See the `ag_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Identical to specifying `ag_args_fit` parameter for all models in `hyperparameters`.
+                If a key in `ag_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            ag_args_ensemble : dict, default={}
                 Keyword arguments to pass to all models.
-                See the `AG_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
-                Identical to specifying `AG_args_ensemble` parameter for all models in `hyperparameters`.
-                If a key in `AG_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+                See the `ag_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Identical to specifying `ag_args_ensemble` parameter for all models in `hyperparameters`.
+                If a key in `ag_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
             excluded_model_types : list, default = []
                 Banned subset of model types to avoid training during `fit()`, even if present in `hyperparameters`.
                 Valid values: ['RF', 'XT', 'KNN', 'GBM', 'CAT', 'NN', 'LR', 'custom']. Reference `hyperparameters` documentation for what models correspond to each value.
@@ -395,7 +395,7 @@ class TabularPrediction(BaseTask):
                     Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
                     If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
                         Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
-                The time taken by this process is not enforced by `time_limits`.
+                The time taken by this process is not enforced by `time_limit`.
                 `cache_data` must be set to `True` to enable this functionality.
             set_best_to_refit_full : bool, default = False
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
@@ -490,8 +490,8 @@ class TabularPrediction(BaseTask):
         To maximize predictive performance, use the following:
 
         >>> eval_metric = 'roc_auc'  # set this to the metric you ultimately care about
-        >>> time_limits = 360  # set as long as you are willing to wait (in sec)
-        >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limits=time_limits)
+        >>> time_limit = 360  # set as long as you are willing to wait (in sec)
+        >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limit=time_limit)
         """
         assert search_strategy != 'bayesopt_hyperband', \
             "search_strategy == 'bayesopt_hyperband' not yet supported"
@@ -500,13 +500,17 @@ class TabularPrediction(BaseTask):
         elif verbosity > 4:
             verbosity = 4
 
+        if 'time_limits' in kwargs:
+            logger.warning('WARNING: Using deprecated argument `time_limits`. Use `time_limit` instead! This will cause an exception in future releases.')
+            time_limit = kwargs.pop('time_limits')
+
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
             'feature_generator',
             'trainer_type',
-            'AG_args',
-            'AG_args_fit',
-            'AG_args_ensemble',
+            'ag_args',
+            'ag_args_fit',
+            'ag_args_ensemble',
             'excluded_model_types',
             'label_count_threshold',
             'id_columns',
@@ -531,7 +535,6 @@ class TabularPrediction(BaseTask):
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
 
-        # TODO: v0.1 - time_limits -> time_limit?
         # TODO: v0.1 - stack_ensemble_levels -> num_stack_levels / num_stack_layers?
         # TODO: v0.1 - id_columns -> ignored_columns?
         # TODO: v0.1 - nthreads_per_trial/ngpus_per_trial -> rename/rework
@@ -614,16 +617,16 @@ class TabularPrediction(BaseTask):
                                        AutoMLPipelineFeatureGenerator(**_feature_generator_kwargs))
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
-        ag_args = kwargs.get('AG_args', None)
-        ag_args_fit = kwargs.get('AG_args_fit', None)
-        ag_args_ensemble = kwargs.get('AG_args_ensemble', None)
+        ag_args = kwargs.get('ag_args', None)
+        ag_args_fit = kwargs.get('ag_args_fit', None)
+        ag_args_ensemble = kwargs.get('ag_args_ensemble', None)
         excluded_model_types = kwargs.get('excluded_model_types', [])
         random_seed = kwargs.get('random_seed', 0)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         num_train_rows = len(train_data)
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
-            # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
+            # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bagging_folds is None:
                 num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
             if stack_ensemble_levels is None:
@@ -642,7 +645,7 @@ class TabularPrediction(BaseTask):
             raise ValueError(f'stack_ensemble_levels must be 0 if num_bagging_folds is 0. (stack_ensemble_levels={stack_ensemble_levels}, num_bagging_folds={num_bagging_folds})')
         if num_bagging_sets is None:
             if num_bagging_folds >= 2:
-                if time_limits is not None:
+                if time_limit is not None:
                     num_bagging_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
                 else:
                     num_bagging_sets = 1
@@ -655,19 +658,19 @@ class TabularPrediction(BaseTask):
         # Ensure there exist sufficient labels for stratified splits across all bags
         label_count_threshold = max(label_count_threshold, num_bagging_folds)
 
-        time_limits_orig = copy.deepcopy(time_limits)
-        time_limits_hpo = copy.deepcopy(time_limits)
+        time_limit_orig = copy.deepcopy(time_limit)
+        time_limit_hpo = copy.deepcopy(time_limit)
 
-        if num_bagging_folds >= 2 and (time_limits_hpo is not None):
-            time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
+        if num_bagging_folds >= 2 and (time_limit_hpo is not None):
+            time_limit_hpo = time_limit_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
         # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
-        time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
-        if time_limits is not None:
-            time_limits_hpo = None
+        time_limit_hpo, num_trials = setup_trial_limits(time_limit_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+        if time_limit is not None:
+            time_limit_hpo = None
 
         if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):
             hyperparameter_tune = False
-            logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
+            logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, setting to False.')
 
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(num_train_rows, hyperparameter_tune)
@@ -699,14 +702,14 @@ class TabularPrediction(BaseTask):
             ngpus_per_trial=ngpus_per_trial,
             checkpoint=None,
             num_trials=num_trials,
-            time_out=time_limits_hpo,
+            time_out=time_limit_hpo,
             resume=False,
             visualizer=visualizer,
             time_attr='epoch',
             reward_attr='validation_performance',
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
-        if time_limits_hpo is None:
+        if time_limit_hpo is None:
             scheduler_options.pop('time_out', None)
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         if not hyperparameter_tune:
@@ -720,9 +723,9 @@ class TabularPrediction(BaseTask):
                     hyperparameter_tune_kwargs=scheduler_options, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                    time_limit=time_limits_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    time_limit=time_limit_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
-        predictor = TabularPredictor(learner=learner)
+        predictor = TabularPredictorV1(learner=learner)
 
         keep_only_best = kwargs.get('keep_only_best', False)
         if refit_full is True:

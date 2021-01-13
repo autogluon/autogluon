@@ -1,12 +1,9 @@
-from autogluon.tabular.models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 
-
+# FIXME: v0.1 Add refit_full support to text model
 def test_text_prediction_v1_sts(fit_helper):
     fit_args = dict(
-        hyperparameters={TextPredictionV1Model: {}},
+        hyperparameters={'TEXT_NN_V1': {}},
+        num_gpus=1,
     )
     dataset_name = 'sts'
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name,
-                                        fit_args=fit_args,
-                                        sample_size=100,
-                                        refit_full=True)
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, sample_size=100)

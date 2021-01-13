@@ -7,7 +7,7 @@ This type of data, i.e., data which contains text and other features, is prevale
 For example, when building a sentiment analysis model of users' tweets, we can not only use the raw text in the 
 tweets but also other features such as the topic of the tweet and the user profile. In the following, 
 we will investigate different ways to ensemble the state-of-the-art (pretrained) language models in AutoGluon TextPrediction 
-with all of the other models used in AutoGluon TabularPrediction. 
+with all the other models used in AutoGluon's TabularPredictor. 
 For more details about the inner-working of the neural network architecture used in AutoGluon TextPrediction, 
 you may refer to Section ":ref:`sec_textprediction_architecture`" in :ref:`sec_textprediction_heterogeneous`.
 
@@ -17,12 +17,11 @@ you may refer to Section ":ref:`sec_textprediction_architecture`" in :ref:`sec_t
 %matplotlib inline
 import matplotlib.pyplot as plt
 import numpy as np
-import autogluon
 import pandas as pd
 import pprint
 import random
 from autogluon.text import TextPrediction
-from autogluon.tabular import TabularPrediction
+from autogluon.tabular import TabularPredictor
 import mxnet as mx
 
 np.random.seed(123)
@@ -45,14 +44,14 @@ In the following, we will use the product sentiment analysis dataset from this [
 
 ```{.python .input}
 feature_columns = ['Product_Description', 'Product_Type']
-label_column = 'Sentiment'
+label = 'Sentiment'
 
 train_df = pd.read_csv('product_sentiment_machine_hack/train.csv')
 dev_df = pd.read_csv('product_sentiment_machine_hack/dev.csv')
 test_df = pd.read_csv('product_sentiment_machine_hack/test.csv')
 
-train_df = train_df[feature_columns + [label_column]]
-dev_df = dev_df[feature_columns + [label_column]]
+train_df = train_df[feature_columns + [label]]
+dev_df = dev_df[feature_columns + [label]]
 test_df = test_df[feature_columns]
 print('Number of training samples:', len(train_df))
 print('Number of dev samples:', len(dev_df))
@@ -86,7 +85,7 @@ model as the backbone. As we can see, the result is not very good.
 
 ```{.python .input}
 predictor_text_only = TextPrediction.fit(train_df[['Product_Description', 'Sentiment']],
-                                         label=label_column,
+                                         label=label,
                                          time_limits=None,
                                          ngpus_per_trial=1,
                                          hyperparameters='default_no_hpo',
@@ -102,18 +101,12 @@ print(predictor_text_only.evaluate(dev_df[['Product_Description', 'Sentiment']],
 
 ## Model 1:  Baseline with N-Gram + TF-IDF
 
-The first baseline model is to directly call AutoGluno TabularPrediction to train a predictor.
-AutoGluon TabularPrediction uses the n-gram and TF-IDF based features for text columns and considers 
+The first baseline model is to directly call AutoGluon's TabularPredictor to train a predictor.
+TabularPredictor uses the n-gram and TF-IDF based features for text columns and considers 
 text and categorical columns simultaneously.
 
 ```{.python .input}
-predictor_model1 = TabularPrediction.fit(train_df,
-                                         label=label_column,
-                                         time_limits=None,
-                                         eval_metric='accuracy',
-                                         stopping_metric='accuracy',
-                                         hyperparameters='default',
-                                         output_directory='model1')
+predictor_model1 = TabularPredictor(label=label, eval_metric='accuracy', path='model1').fit(train_df)
 ```
 
 
@@ -127,10 +120,10 @@ The accuracy is much higher than the model trained with only text column.
 ## Model 2: Extract Text Embedding and Use Tabular Predictor
 
 Our second attempt in combining text and other features is to use the trained TextPrediction model to extract embeddings and 
-use TabularPrediction to build the predictor on top of the text embeddings. 
+use TabularPredictor to build the predictor on top of the text embeddings. 
 The AutoGluon TextPrediction model offers the `extract_embedding()` functionality (For more details, go to :ref:`sec_textprediction_extract_embedding`), 
 so we are able to build a two-stage model. In the first stage, we use the text-only model to extract sentence embeddings. 
-In the second stage, we use AutoGluon TabularPrediction to get the final model.
+In the second stage, we use TabularPredictor to get the final model.
 
 
 ```{.python .input}
@@ -148,13 +141,7 @@ print(merged_train_data)
 
 
 ```{.python .input}
-predictor_model2 = TabularPrediction.fit(merged_train_data,
-                                         label=label_column,
-                                         time_limits=None,
-                                         eval_metric='accuracy',
-                                         stopping_metric='accuracy',
-                                         hyperparameters='default',
-                                         output_directory='model2')
+predictor_model2 = TabularPredictor(label=label, eval_metric='accuracy', path='model2').fit(merged_train_data)
 ```
 
 
@@ -171,19 +158,14 @@ Another option is to directly include the neural network in AutoGluon-Text as on
 
 ```{.python .input}
 tabular_multimodel_hparam_v1 = {
-    'GBM': [{}, {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}}],
+    'GBM': [{}, {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}}],
     'CAT': {},
-    'TEXT_NN_V1': {'AG_args': {'valid_stacker': False}},
+    'TEXT_NN_V1': {},
 }
 
-predictor_model3 = TabularPrediction.fit(train_df,
-                                      label=label_column,
-                                      time_limits=None,
-                                      eval_metric='accuracy',
-                                      stopping_metric='accuracy',
-                                      hyperparameters=tabular_multimodel_hparam_v1,
-                                      ngpus_per_trial=1,
-                                      output_directory='model3')
+predictor_model3 = TabularPredictor(label=label, eval_metric='accuracy', path='model3').fit(
+    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_gpus=1
+)
 ```
 
 
@@ -197,16 +179,9 @@ A more advanced strategy is to use 5-fold bagging and call stack ensembling. Thi
 
 
 ```{.python .input}
-predictor_model4 = TabularPrediction.fit(train_df,
-                                         label=label_column,
-                                         time_limits=None,
-                                         eval_metric='accuracy',
-                                         stopping_metric='accuracy',
-                                         hyperparameters=tabular_multimodel_hparam_v1,
-                                         num_bagging_folds=5,
-                                         stack_ensemble_levels=1,
-                                         ngpus_per_trial=1,
-                                         output_directory='model4')
+predictor_model4 = TabularPredictor(label=label, eval_metric='accuracy', path='model4').fit(
+    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_gpus=1, num_bag_folds=5, num_stack_levels=1
+)
 ```
 
 
@@ -214,14 +189,14 @@ predictor_model4 = TabularPrediction.fit(train_df,
 predictor_model4.leaderboard(dev_df, silent=True)
 ```
 
-## Model 5: Multimodal embedding + TabularPrediction
+## Model 5: Multimodal embedding + TabularPredictor
 
 Also, since the neural network in text prediction can directly handle multi-modal data, we can fit a model with TextPrediction first and then use that as an embedding extractor. This can be viewed as an improved version of Model-2.
 
 
 ```{.python .input}
 predictor_text_multimodal = TextPrediction.fit(train_df,
-                                               label=label_column,
+                                               label=label,
                                                time_limits=None,
                                                eval_metric='accuracy',
                                                stopping_metric='accuracy',
@@ -231,14 +206,7 @@ predictor_text_multimodal = TextPrediction.fit(train_df,
 train_sentence_multimodal_embeddings = predictor_text_multimodal.extract_embedding(train_df)
 dev_sentence_multimodal_embeddings = predictor_text_multimodal.extract_embedding(dev_df)
 
-predictor_model5 = TabularPrediction.fit(train_df.join(pd.DataFrame(train_sentence_multimodal_embeddings)),
-                                         label=label_column,
-                                         time_limits=None,
-                                         eval_metric='accuracy',
-                                         stopping_metric='accuracy',
-                                         hyperparameters='default',
-                                         ngpus_per_trial=1,
-                                         output_directory='model5')
+predictor_model5 = TabularPredictor(label=label, eval_metric='accuracy', path='model5').fit(train_df)
 ```
 
 
@@ -258,22 +226,16 @@ from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get
 import copy
 
 text_nn_params = ag_text_prediction_params.create('default_electra_base_no_hpo')
-text_nn_params['AG_args'] = {'valid_stacker': False}
 
 tabular_multimodel_hparam_v2 = {
-    'GBM': [{}, {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}}],
+    'GBM': [{}, {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}}],
     'CAT': {},
     'TEXT_NN_V1': text_nn_params,
 }
 
-predictor_model6 = TabularPrediction.fit(train_df,
-                                      label=label_column,
-                                      time_limits=None,
-                                      eval_metric='accuracy',
-                                      stopping_metric='accuracy',
-                                      hyperparameters=tabular_multimodel_hparam_v2,
-                                      ngpus_per_trial=1,
-                                      output_directory='model6')
+predictor_model6 = TabularPredictor(label=label, eval_metric='accuracy', path='model6').fit(
+    train_df, hyperparameters=tabular_multimodel_hparam_v2, num_gpus=1
+)
 ```
 
 

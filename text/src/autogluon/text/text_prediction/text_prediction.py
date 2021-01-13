@@ -411,7 +411,7 @@ class TextPrediction(BaseTask):
         if not has_text_column:
             raise AssertionError('No Text Column is found! This is currently not supported by '
                                  'the TextPrediction task. You may try to use '
-                                 'TabularPrediction.fit().\n' \
+                                 'autogluon.tabular.TabularPredictor.\n'
                                  'The inferred column properties of the training data is {}'
                                  .format(train_data))
         train_data = TabularDataset(train_data,

@@ -241,7 +241,7 @@ class List(NestedSpace):
         return reprstr
 
 class Dict(NestedSpace):
-    """Nested search space for dictionary containing multiple hyperparameters.
+    """Nested search space for dictionary containing multiple hyperparameters.
 
     Examples
     --------

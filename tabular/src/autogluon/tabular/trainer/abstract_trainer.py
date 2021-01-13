@@ -1469,10 +1469,10 @@ class AbstractTrainer:
                 custom_info['child_model_type'] = bagged_info.get('child_model_type', None)
                 custom_info['child_hyperparameters'] = bagged_info.get('child_hyperparameters', None)
                 custom_info['child_hyperparameters_fit'] = bagged_info.get('child_hyperparameters_fit', None)
-                custom_info['child_AG_args_fit'] = bagged_info.get('child_AG_args_fit', None)
+                custom_info['child_ag_args_fit'] = bagged_info.get('child_ag_args_fit', None)
                 custom_model_info[model_name] = custom_info
 
-            model_info_keys = ['num_features', 'model_type', 'hyperparameters', 'hyperparameters_fit', 'AG_args_fit', 'features']
+            model_info_keys = ['num_features', 'model_type', 'hyperparameters', 'hyperparameters_fit', 'ag_args_fit', 'features']
             model_info_sum_keys = []
             for key in model_info_keys:
                 model_info_dict[key] = [model_info[model_name][key] for model_name in model_names]
@@ -1480,7 +1480,7 @@ class AbstractTrainer:
                     key_dict = {model_name: model_info[model_name][key] for model_name in model_names}
                     model_info_dict[key + '_full'] = [self.get_model_attribute_full(model=model_name, attribute=key_dict) for model_name in model_names]
 
-            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_AG_args_fit']
+            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_ag_args_fit']
             model_info_full_keys = {'memory_size': [('memory_size_w_ancestors', sum)], 'memory_size_min': [('memory_size_min_w_ancestors', max)], 'num_models': [('num_models_w_ancestors', sum)]}
             for key in model_info_keys:
                 model_info_dict[key] = [custom_model_info[model_name][key] for model_name in model_names]
@@ -1810,16 +1810,16 @@ class AbstractTrainer:
         return val_score
 
     def distill(self, X_train=None, y_train=None, X_val=None, y_val=None, X_unlabeled=None,
-                time_limits=None, hyperparameters=None, holdout_frac=None, verbosity=None,
+                time_limit=None, hyperparameters=None, holdout_frac=None, verbosity=None,
                 models_name_suffix=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
         """ Various distillation algorithms.
             Args:
                 X_train, y_train: pd.DataFrame and pd.Series of training data.
-                    If None, original training data used during TabularPrediction.fit() will be loaded.
+                    If None, original training data used during predictor.fit() will be loaded.
                     This data is split into train/validation if X_val, y_val are None.
                 X_val, y_val: pd.DataFrame and pd.Series of validation data.
-                time_limits, hyperparameters, holdout_frac: defined as in TabularPrediction.fit()
+                time_limit, hyperparameters, holdout_frac: defined as in predictor.fit()
                 teacher_preds (None or str): If None, we only train with original labels (no data augmentation, overrides augment_method)
                     If 'hard', labels are hard teacher predictions given by: teacher.predict()
                     If 'soft', labels are soft teacher predictions given by: teacher.predict_proba()
@@ -1944,9 +1944,9 @@ class AbstractTrainer:
         distilled_model_names = []
         for model in models_distill:
             time_left = None
-            if time_limits is not None:
+            if time_limit is not None:
                 time_start_model = time.time()
-                time_left = time_limits - (time_start_model - time_train_start)
+                time_left = time_limit - (time_start_model - time_train_start)
 
             logger.log(15, f"Distilling student {str(model.name)} with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)}...")
             models = self._train_single_full(X_train=X_train, y_train=y_train, model=model, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,

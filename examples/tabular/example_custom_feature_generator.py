@@ -4,7 +4,7 @@ FeatureGenerators act to clean and prepare the data to maximize predictive accur
 FeatureGenerators are stateful data preprocessors which take input data (pandas DataFrame) and output transformed data (pandas DataFrame).
 FeatureGenerators are first fit on training data through the .fit_transform() function, and then transform new data through the .transform() function.
 These generators can do anything from filling NaN values (FillNaFeatureGenerator), dropping duplicate features (DropDuplicatesFeatureGenerator), generating ngram features from text (TextNgramFeatureGenerator), and much more.
-In AutoGluon's TabularPrediction task, the input data is transformed via a FeatureGenerator before entering a machine learning model. Some models use this transformed input directly and others perform further transformations before making predictions.
+In AutoGluon's TabularPredictor, the input data is transformed via a FeatureGenerator before entering a machine learning model. Some models use this transformed input directly and others perform further transformations before making predictions.
 
 This example is intended for advanced users that have a strong understanding of feature engineering and data preparation.
 Most users can get strong performance without specifying custom feature generators due to the generic and powerful default feature generator used by AutoGluon.
@@ -19,20 +19,20 @@ An advanced user may wish to create a custom feature generator to:
 # Loading Data #
 ################
 
-from autogluon.tabular import TabularPrediction as task
+from autogluon.tabular import TabularDataset, TabularPredictor
 
-train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')  # can be local CSV file as well, returns Pandas DataFrame
-test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv')  # another Pandas DataFrame
-label_column = 'class'  # specifies which column do we want to predict
+train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')  # can be local CSV file as well, returns Pandas DataFrame
+test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv')  # another Pandas DataFrame
+label = 'class'  # specifies which column do we want to predict
 sample_train_data = train_data.head(100)  # subsample for faster demo
 
 # Separate features and labels
 # Make sure to not include your label/target column when sending input to the feature generators, or else the label will be transformed as well.
-X = sample_train_data.drop(columns=[label_column])
-y = sample_train_data[label_column]
+X = sample_train_data.drop(columns=[label])
+y = sample_train_data[label]
 
-X_test = test_data.drop(columns=[label_column])
-y_test = test_data[label_column]
+X_test = test_data.drop(columns=[label])
+y_test = test_data[label]
 
 print(X)
 
@@ -130,7 +130,7 @@ X_test_transform = bulk_feature_generator.transform(X=X_test)  # Can now transfo
 print(X_test_transform.head(5))
 
 # PipelineFeatureGenerator is an implementation of BulkFeatureGenerator which automatically handles very common necessary stages without requiring them to be defined by the user.
-# It is recommended that users who wish to create custom feature generators as input to task.fit() should base their generators off of PipelineFeatureGenerator as a best practice.
+# It is recommended that users who wish to create custom feature generators as input to predictor.fit() should base their generators off of PipelineFeatureGenerator as a best practice.
 # The following results in the exact same final functionality as bulk_feature_generator, plus many additional edge case handling functionality:
 pipeline_feature_generator = PipelineFeatureGenerator(
     generators=[
@@ -164,16 +164,16 @@ print(X_transform.head(5))
 X_test_transform = auto_ml_pipeline_feature_generator.transform(X=X_test)
 print(X_test_transform.head(5))
 
-#####################################################
-# Specifying custom feature generator to task.fit() #
-#####################################################
+###########################################################
+# Specifying custom feature generator to TabularPredictor #
+###########################################################
 
 example_models = {'GBM': {}, 'CAT': {}}
 example_models_2 = {'RF': {}, 'KNN': {}}
 
 # Because auto_ml_pipeline_feature_generator is already fit, it doesn't need to be fit again in predictor. Instead, train_data is just transformed by auto_ml_pipeline_feature_generator.transform(train_data).
 # This allows the feature transformation to be completely independent of the training data, we could have used a completely different data source to fit the generator.
-predictor = task.fit(train_data=train_data, label='class', hyperparameters=example_models, feature_generator=auto_ml_pipeline_feature_generator)
+predictor = TabularPredictor(label='class').fit(train_data, hyperparameters=example_models, feature_generator=auto_ml_pipeline_feature_generator)
 X_test_transform_2 = predictor.transform_features(X_test)  # This is the same as calling auto_ml_pipeline_feature_generator.transform(X_test)
 assert(X_test_transform.equals(X_test_transform_2))
 # The feature metadata of the feature generator is also preserved. All downstream models will get this feature metadata information to make decisions on how they use the data.
@@ -181,9 +181,9 @@ assert(predictor.feature_metadata.to_dict() == auto_ml_pipeline_feature_generato
 predictor.leaderboard(test_data)
 
 # We can train multiple predictors with the same pre-fit feature generator. This can save a lot of time during experimentation if the fitting of the generator is expensive.
-predictor_2 = task.fit(train_data=train_data, label='class', hyperparameters=example_models_2, feature_generator=auto_ml_pipeline_feature_generator)
+predictor_2 = TabularPredictor(label='class').fit(train_data, hyperparameters=example_models_2, feature_generator=auto_ml_pipeline_feature_generator)
 predictor_2.leaderboard(test_data)
 
 # We can even specify our custom generator too (although it needs to do a bit more to actually improve the scores, in most situations just use AutoMLPipelineFeatureGenerator)
-predictor_3 = task.fit(train_data=train_data, label='class', hyperparameters=example_models, feature_generator=plus_three_feature_generator)
+predictor_3 = TabularPredictor(label='class').fit(train_data, hyperparameters=example_models, feature_generator=plus_three_feature_generator)
 predictor_3.leaderboard(test_data)

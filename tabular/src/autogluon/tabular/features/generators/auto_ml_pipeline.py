@@ -49,19 +49,19 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 
     Examples
     --------
-    >>> from autogluon.tabular import TabularPrediction as task
+    >>> from autogluon.tabular import TabularDataset
     >>> from autogluon.tabular.features.generators import AutoMLPipelineFeatureGenerator
     >>>
     >>> feature_generator = AutoMLPipelineFeatureGenerator()
     >>>
     >>> label_column = 'class'
-    >>> train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+    >>> train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
     >>> X_train = train_data.drop(labels=[label_column], axis=1)
     >>> y_train = train_data[label_column]
     >>>
     >>> X_train_transformed = feature_generator.fit_transform(X=X_train, y=y_train)
     >>>
-    >>> test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+    >>> test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
     >>>
     >>> X_test_transformed = feature_generator.transform(test_data)
     """
