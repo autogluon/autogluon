@@ -73,9 +73,9 @@ def default_no_hpo() -> dict:
 
 
 @ag_text_prediction_params.register()
-def default_electra_small() -> dict:
+def default_electra_small_no_hpo() -> dict:
     """The default search space that uses ELECTRA Small as the backbone."""
-    cfg = default()
+    cfg = default_no_hpo()
     cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
         = 'google_electra_small'
     cfg['models']['BertForTextPredictionBasic']['search_space'][
@@ -91,6 +91,17 @@ def default_electra_base_no_hpo() -> dict:
         = 'google_electra_base'
     cfg['models']['BertForTextPredictionBasic']['search_space'][
         'optimization.per_device_batch_size'] = 8
+    return cfg
+
+
+@ag_text_prediction_params.register()
+def default_electra_large_no_hpo() -> dict:
+    """The default search space that uses ELECTRA Base as the backbone"""
+    cfg = default_no_hpo()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+        = 'google_electra_large'
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 4
     return cfg
 
 
