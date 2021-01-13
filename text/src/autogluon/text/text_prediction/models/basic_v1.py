@@ -249,7 +249,7 @@ def train_function(args, reporter, train_data, tuning_data,
         log_metrics = [log_metrics]
     log_metric_scorers = [get_metric(ele) for ele in log_metrics]
     stopping_metric_scorer = get_metric(stopping_metric)
-    greater_is_better = stopping_metric.greater_is_better
+    greater_is_better = stopping_metric_scorer.greater_is_better
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['OMP_NUM_THREADS'] = '1'
     os.environ['MKL_DYNAMIC'] = 'FALSE'
