@@ -238,13 +238,10 @@ def normalize_df(df, convert_text_to_numerical=True, remove_none=True):
     if len(conversion_cols) == 0:
         return df
     else:
-        series_l = dict()
-        for col_name in df.columns:
-            if col_name in conversion_cols:
-                series_l[col_name] = conversion_cols[col_name]
-            else:
-                series_l[col_name] = df[col_name]
-        return pd.DataFrame(series_l)
+        new_df = df.copy()
+        for col_name in conversion_cols:
+            new_df[col_name] = conversion_cols[col_name]
+        return new_df
 
 
 def infer_problem_type(column_properties, label_col_name):
