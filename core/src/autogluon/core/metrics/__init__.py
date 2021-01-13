@@ -29,21 +29,6 @@ class Scorer(object, metaclass=ABCMeta):
         self.alias.add(alias)
 
     @property
-    def reward_attr(self) -> str:
-        """Get the reward attribute that matches the scorer.
-
-        Returns
-        -------
-        reward_attr
-        """
-        if self._sign == 1:
-            return self.name
-        elif self._sign == -1:
-            return f'- {self.name}'
-        else:
-            raise NotImplementedError('Only supports sign = -1 or 1.')
-
-    @property
     def greater_is_better(self) -> bool:
         """Return whether the score is greater the better.
 
