@@ -1,5 +1,6 @@
 """ Example: distilling AutoGluon's ensemble-predictor into a single model for binary classification. """
 
+# NOTE: Distillation can be done in a similar manner for multiclass classification and regression problems.
 # NOTE: To distill CatBoost models in multiclass classification, you need to first run:  pip install catboost-dev
 
 from autogluon.tabular import TabularDataset, TabularPredictor
