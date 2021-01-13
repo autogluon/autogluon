@@ -240,7 +240,7 @@ def normalize_df(df, convert_text_to_numerical=True, remove_none=True):
     else:
         new_df = df.copy()
         for col_name in conversion_cols:
-            new_df[col_name] = conversion_cols[col_name]
+            new_df[:, col_name] = conversion_cols[col_name]
         return new_df
 
 
@@ -318,9 +318,9 @@ class TabularDataset:
             categorical_default_handle_missing_value=categorical_default_handle_missing_value)
         for col_name, prop in column_properties.items():
             if prop.type == _C.TEXT:
-                df[col_name] = df[col_name].fillna('').apply(str)
+                df[:, col_name] = df[col_name].fillna('').apply(str)
             elif prop.type == _C.NUMERICAL:
-                df[col_name] = df[col_name].fillna(-1).apply(np.array)
+                df[:, col_name] = df[col_name].fillna(-1).apply(np.array)
         self._table = df
         self._column_properties = column_properties
 
