@@ -100,7 +100,6 @@ class CategoricalColumnProperty(ColumnProperty):
             The possible categories
         allow_missing
             Whether the categorical column is allowed to contain missing values
-        min_
         """
         super().__init__()
         self._allow_missing = allow_missing
