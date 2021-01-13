@@ -319,11 +319,6 @@ class TabularDataset:
             label_columns=label_columns,
             provided_column_properties=column_properties,
             categorical_default_handle_missing_value=categorical_default_handle_missing_value)
-        # Additional normalization
-        # FIXME 0.1 Use a better strategy
-        for col in column_properties:
-            if col.type == _C.NUMERICAL:
-                df[col] = df[col].fillna(-1)
         self._table = df
         self._column_properties = column_properties
 
