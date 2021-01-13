@@ -232,6 +232,7 @@ class TextPredictionV1Model(AbstractModel):
             scheduler_options['max_t'] = scheduler_options.get(
                 'max_t', 50)
         if X_val is None:
+            # FIXME: v0.1 Update TextPrediction to use all training data in refit_full
             holdout_frac = default_holdout_frac(len(X_train), True)
             X_train, X_val = random_split_train_val(X_train, valid_ratio=holdout_frac)
         train_data = TabularDataset(X_train,
