@@ -91,8 +91,7 @@ class CategoricalColumnProperty(ColumnProperty):
 
     def __init__(self,
                  categories: Optional[List[Union[int, bool, str]]] = None,
-                 allow_missing: Optional[bool] = None,
-                 min_count: Optional[int] = 100):
+                 allow_missing: Optional[bool] = None):
         """
 
         Parameters
@@ -101,6 +100,7 @@ class CategoricalColumnProperty(ColumnProperty):
             The possible categories
         allow_missing
             Whether the categorical column is allowed to contain missing values
+        min_
         """
         super().__init__()
         self._allow_missing = allow_missing
