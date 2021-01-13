@@ -304,6 +304,7 @@ class TabularDataset:
                 columns = [columns]
             df = df[columns]
         df = normalize_df(df)
+        print(df['list_price_value'])
         if column_metadata is None:
             column_metadata = dict()
         elif isinstance(column_metadata, str):
