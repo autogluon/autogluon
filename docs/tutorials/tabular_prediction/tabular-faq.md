@@ -7,14 +7,14 @@
 See ["Maximizing predictive performance" in the Quick Start Tutorial](tabular-quickstart.html#maximizing-predictive-performance).
 
 
-### Can I run TabularPrediction on Mac/Windows?
+### Can I run AutoGluon Tabular on Mac/Windows?
 
 Yes! The only functionality that may not work is hyperparameter tuning with the NN model (this should be resolved in the next MXNet update).
 
 
-### What machine is best for running TabularPrediction?
+### What machine is best for running AutoGluon Tabular?
 
-As an open-source library, AutoGluon can be run on any machine including your laptop. Currently the TabularPrediction module does not benefit much from GPUs, so CPU machines are fine (in contrast, TextPrediction/ImagePrediction/ObjectDetection do greatly benefit from GPUs). Most TabularPrediction issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for TabularPrediction: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
+As an open-source library, AutoGluon can be run on any machine including your laptop. Currently the Tabular module does not benefit much from GPUs, so CPU machines are fine (in contrast, TextPrediction/ImagePrediction/ObjectDetection do greatly benefit from GPUs). Most Tabular issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for Tabular: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
 
 
 ### How to resolve memory issues?
@@ -39,7 +39,7 @@ Since many of the strategies to reduce memory usage also reduce training times, 
 See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.html#accelerating-inference).
 
 
-### How does TabularPrediction work internally?
+### How does AutoGluon Tabular work internally?
 
 Details are provided in the following paper:
 

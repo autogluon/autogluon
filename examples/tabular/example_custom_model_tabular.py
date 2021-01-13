@@ -111,9 +111,9 @@ predictor.leaderboard(test_data)
 y_pred = predictor.predict(test_data)
 print(y_pred)
 
-###############################################################
-# Training custom model alongside other models using task.fit #
-###############################################################
+#######################################################################
+# Training custom model alongside other models using TabularPredictor #
+#######################################################################
 
 # Now we add the custom model to be trained alongside the default models:
 custom_hyperparameters.update(get_hyperparameter_config('default'))

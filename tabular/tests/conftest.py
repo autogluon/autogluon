@@ -125,7 +125,7 @@ class FitHelper:
             predictor.predict_proba(test_data, model=refit_model_name)
         predictor.info()
         predictor.leaderboard(test_data, extra_info=True)
-        assert os.path.realpath(save_path) == os.path.realpath(predictor.output_directory)
+        assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
         if delete_directory:
             shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor

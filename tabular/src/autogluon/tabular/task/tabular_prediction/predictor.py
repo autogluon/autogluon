@@ -84,7 +84,7 @@ class TabularPredictor(TabularPredictorV1):
 
         """
         if self._learner.is_fit:
-            raise AssertionError('Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`.')
+            raise AssertionError('Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new `Predictor`.')
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_kwargs(kwargs)
 

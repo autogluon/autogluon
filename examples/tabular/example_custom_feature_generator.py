@@ -4,7 +4,7 @@ FeatureGenerators act to clean and prepare the data to maximize predictive accur
 FeatureGenerators are stateful data preprocessors which take input data (pandas DataFrame) and output transformed data (pandas DataFrame).
 FeatureGenerators are first fit on training data through the .fit_transform() function, and then transform new data through the .transform() function.
 These generators can do anything from filling NaN values (FillNaFeatureGenerator), dropping duplicate features (DropDuplicatesFeatureGenerator), generating ngram features from text (TextNgramFeatureGenerator), and much more.
-In AutoGluon's TabularPrediction task, the input data is transformed via a FeatureGenerator before entering a machine learning model. Some models use this transformed input directly and others perform further transformations before making predictions.
+In AutoGluon's TabularPredictor, the input data is transformed via a FeatureGenerator before entering a machine learning model. Some models use this transformed input directly and others perform further transformations before making predictions.
 
 This example is intended for advanced users that have a strong understanding of feature engineering and data preparation.
 Most users can get strong performance without specifying custom feature generators due to the generic and powerful default feature generator used by AutoGluon.

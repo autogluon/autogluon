@@ -7,7 +7,7 @@ This tutorial presents two examples to demonstrate how `TextPrediction` can be u
 - [Sentiment Analysis](https://en.wikipedia.org/wiki/Sentiment_analysis)
 - [Sentence Similarity](https://arxiv.org/abs/1910.03940)
 
-The general usage is similar to AutoGluon's `TabularPrediction` module. We treat NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict. 
+The general usage is similar to AutoGluon's `TabularPredictor`. We treat NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict. 
 Here, the labels can be discrete categories (classification) or numerical values (regression).
 `TextPrediction` fits neural networks to your data via transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
 [ALBERT](https://arxiv.org/pdf/1909.11942.pdf), and [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB).
@@ -168,8 +168,8 @@ print(score3)
 :label:`sec_textprediction_extract_embedding`
 
 After you have trained a predictor, you can also use the predictor to extract embeddings that maps the input data to a real vector. 
-This can be useful for integrating with other AutoGluon modules like the TabularPrediction model. 
-We can just feed the embeddings to TabularPrediction. 
+This can be useful for integrating with other AutoGluon modules like TabularPredictor. 
+We can just feed the embeddings to TabularPredictor. 
 
 
 ```{.python .input}

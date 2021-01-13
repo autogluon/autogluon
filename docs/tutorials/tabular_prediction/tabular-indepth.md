@@ -5,7 +5,7 @@
 
 This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune_kwargs`, `hyperparameters`, `num_stack_levels`, `num_bag_folds`, `num_bag_sets`, etc.
 
-Using the same census data table as in the :ref:`sec_tabularquick` tutorial, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
+Using the same census data table as in the :ref:`sec_tabularquick` tutorial, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon's TabularPredictor and TabularDataset, and loading the data.
 
 ```{.python .input}
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -64,7 +64,7 @@ time_limit = 2*60  # train various models for ~2 min
 num_trials = 5  # try at most 3 different hyperparameter configurations for each type of model
 search_strategy = 'skopt'  # to tune hyperparameters using SKopt Bayesian optimization routine
 
-hyperparameter_tune_kwargs = {  # specify to enable HPO
+hyperparameter_tune_kwargs = {  # HPO is not performed unless hyperparameter_tune_kwargs is specified
     'num_trials': num_trials,
     'searcher': search_strategy,
 }

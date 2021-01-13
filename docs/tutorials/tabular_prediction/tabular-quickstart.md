@@ -3,7 +3,7 @@
 
 Via a simple `fit()` call, AutoGluon can produce highly-accurate models to predict the values in one column of a data table based on the rest of the columns' values. Use AutoGluon with tabular data for both classification and regression problems. This tutorial demonstrates how to use AutoGluon to produce a classification model that predicts whether or not a person's income exceeds $50,000.
 
-To start, import autogluon.tabular and TabularPrediction module as your task:
+To start, import AutoGluon's TabularPredictor and TabularDataset classes:
 
 ```{.python .input}
 from autogluon.tabular import TabularDataset, TabularPredictor

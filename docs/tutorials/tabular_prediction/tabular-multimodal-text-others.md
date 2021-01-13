@@ -7,7 +7,7 @@ This type of data, i.e., data which contains text and other features, is prevale
 For example, when building a sentiment analysis model of users' tweets, we can not only use the raw text in the 
 tweets but also other features such as the topic of the tweet and the user profile. In the following, 
 we will investigate different ways to ensemble the state-of-the-art (pretrained) language models in AutoGluon TextPrediction 
-with all the other models used in AutoGluon TabularPrediction. 
+with all the other models used in AutoGluon's TabularPredictor. 
 For more details about the inner-working of the neural network architecture used in AutoGluon TextPrediction, 
 you may refer to Section ":ref:`sec_textprediction_architecture`" in :ref:`sec_textprediction_heterogeneous`.
 
@@ -101,8 +101,8 @@ print(predictor_text_only.evaluate(dev_df[['Product_Description', 'Sentiment']],
 
 ## Model 1:  Baseline with N-Gram + TF-IDF
 
-The first baseline model is to directly call AutoGluon TabularPrediction to train a predictor.
-AutoGluon TabularPrediction uses the n-gram and TF-IDF based features for text columns and considers 
+The first baseline model is to directly call AutoGluon's TabularPredictor to train a predictor.
+TabularPredictor uses the n-gram and TF-IDF based features for text columns and considers 
 text and categorical columns simultaneously.
 
 ```{.python .input}
@@ -120,10 +120,10 @@ The accuracy is much higher than the model trained with only text column.
 ## Model 2: Extract Text Embedding and Use Tabular Predictor
 
 Our second attempt in combining text and other features is to use the trained TextPrediction model to extract embeddings and 
-use TabularPrediction to build the predictor on top of the text embeddings. 
+use TabularPredictor to build the predictor on top of the text embeddings. 
 The AutoGluon TextPrediction model offers the `extract_embedding()` functionality (For more details, go to :ref:`sec_textprediction_extract_embedding`), 
 so we are able to build a two-stage model. In the first stage, we use the text-only model to extract sentence embeddings. 
-In the second stage, we use AutoGluon TabularPrediction to get the final model.
+In the second stage, we use TabularPredictor to get the final model.
 
 
 ```{.python .input}
@@ -189,7 +189,7 @@ predictor_model4 = TabularPredictor(label=label, eval_metric='accuracy', path='m
 predictor_model4.leaderboard(dev_df, silent=True)
 ```
 
-## Model 5: Multimodal embedding + TabularPrediction
+## Model 5: Multimodal embedding + TabularPredictor
 
 Also, since the neural network in text prediction can directly handle multi-modal data, we can fit a model with TextPrediction first and then use that as an embedding extractor. This can be viewed as an improved version of Model-2.
 

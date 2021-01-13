@@ -119,7 +119,7 @@ def test_advanced_functionality():
 
     predictor.persist_models(models='all', max_memory=None)
     predictor.save()  # Save predictor while models are persisted: Intended functionality is that they won't be persisted when loaded.
-    predictor_loaded = TabularPredictor.load(predictor.output_directory)  # Assert that predictor loading works
+    predictor_loaded = TabularPredictor.load(predictor.path)  # Assert that predictor loading works
     leaderboard_loaded = predictor_loaded.leaderboard(dataset=test_data)
     assert len(leaderboard) == len(leaderboard_loaded)
     assert predictor_loaded.get_model_names_persisted() == []  # Assert that models were not still persisted after loading predictor
