@@ -131,7 +131,6 @@ def process_text_entity_features(
     text_token_ids = OrderedDict()
     text_token_offsets = OrderedDict()
     for col_name in text_columns:
-        print(f'data[{col_name}]={data[col_name]}')
         token_ids, token_offsets = tokenizer.encode_with_offsets(data[col_name], int)
         token_ids = np.array(token_ids)
         token_offsets = np.array(token_offsets)
