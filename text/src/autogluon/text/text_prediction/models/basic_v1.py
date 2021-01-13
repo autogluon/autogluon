@@ -593,8 +593,7 @@ class BertForTextPredictionBasic:
         if scheduler_options is None:
             scheduler_options = dict()
         stopping_metric_scorer = get_metric(self._stopping_metric)
-        stopping_negative_sign = stopping_metric_scorer._sign < 0
-        if stopping_negative_sign < 0:
+        if stopping_metric_scorer._sign < 0:
             reward_attr = '-{}'.format(stopping_metric_scorer.name)
         else:
             reward_attr = stopping_metric_scorer.name
