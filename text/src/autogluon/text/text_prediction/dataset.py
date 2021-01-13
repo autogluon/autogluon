@@ -304,7 +304,6 @@ class TabularDataset:
                 columns = [columns]
             df = df[columns]
         df = normalize_df(df)
-        print(df['list_price_value'])
         if column_metadata is None:
             column_metadata = dict()
         elif isinstance(column_metadata, str):
@@ -317,6 +316,11 @@ class TabularDataset:
             label_columns=label_columns,
             provided_column_properties=column_properties,
             categorical_default_handle_missing_value=categorical_default_handle_missing_value)
+        for col_name, prop in column_properties.items():
+            if prop.type == _C.TEXT:
+                df[col_name] = df[col_name].fillna('')
+            elif prop.type == _C.NUMERICAL:
+                df[col_name] = df[col_name].fillna(-1)
         self._table = df
         self._column_properties = column_properties
 
