@@ -223,7 +223,7 @@ class NumericalColumnProperty(ColumnProperty):
 
     def transform(self, ele):
         if ele is None:
-            return np.full(shape=self.shape, fill_value=np.nan, dtype=np.float32)
+            return np.full(shape=self.shape, fill_value=-1, dtype=np.float32)
         else:
             return np.array(ele, dtype=np.float32)
 
@@ -262,6 +262,12 @@ class TextColumnProperty(ColumnProperty):
         self._max_length = None
         self._avg_length = None
 
+    def transform(self, ele):
+        if ele is None:
+            return ''
+        else:
+            return str(ele)
+
     @property
     def min_length(self):
         return self._min_length
@@ -276,7 +282,7 @@ class TextColumnProperty(ColumnProperty):
 
     def parse(self, column_data: pd.Series):
         super().parse(column_data)
-        lengths = column_data.apply(lambda x: len(x) if x else 0)
+        lengths = column_data.apply(lambda x: len(str(x)) if x else 0)
         self._min_length = lengths.min()
         self._avg_length = lengths.mean()
         self._max_length = lengths.max()
