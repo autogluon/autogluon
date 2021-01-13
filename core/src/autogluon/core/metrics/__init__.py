@@ -29,21 +29,6 @@ class Scorer(object, metaclass=ABCMeta):
         self.alias.add(alias)
 
     @property
-    def reward_attr(self) -> str:
-        """Get the reward attribute that matches the scorer.
-
-        Returns
-        -------
-        reward_attr
-        """
-        if self._sign == 1:
-            return self.name
-        elif self._sign == -1:
-            return f'- {self.name}'
-        else:
-            raise NotImplementedError('Only supports sign = -1 or 1.')
-
-    @property
     def greater_is_better(self) -> bool:
         """Return whether the score is greater the better.
 
@@ -394,7 +379,7 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
     if y_pred.ndim == 1:
         # First clip the y_pred which is also used in sklearn
         y_pred = np.clip(y_pred, eps, 1 - eps)
-        return (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
+        return - (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
     else:
         assert y_pred.ndim == 2, 'Only ndim=2 is supported'
         labels = np.arange(y_pred.shape[1], dtype=np.int32)

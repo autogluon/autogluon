@@ -56,7 +56,7 @@ requirements = [
 
 text_requirements = [
     'pyarrow<=1.0.0',
-    'autogluon-contrib-nlp'
+    'autogluon-contrib-nlp==0.0.1b20210112'
 ]
 
 test_requirements = [

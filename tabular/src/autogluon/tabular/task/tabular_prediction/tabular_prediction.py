@@ -14,6 +14,7 @@ from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
+from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 from ...features import AutoMLPipelineFeatureGenerator
 from ...learner import DefaultLearner as Learner
 from ...trainer import AutoTrainer
@@ -607,7 +608,7 @@ class TabularPrediction(BaseTask):
         if _feature_generator_kwargs:
             if 'feature_generator' in kwargs:
                 logger.log(30, "WARNING: `feature_generator` was specified and will override any presets that alter feature generation (such as 'ignore_text')")
-        if 'TEXT_NN_V1' in hyperparameters:
+        if 'TEXT_NN_V1' in hyperparameters or TextPredictionV1Model in hyperparameters:
             _feature_generator_kwargs['enable_raw_text_features'] = True
         feature_generator = kwargs.get('feature_generator',
                                        AutoMLPipelineFeatureGenerator(**_feature_generator_kwargs))

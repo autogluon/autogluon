@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import sklearn
 from autogluon.core.metrics import confusion_matrix, log_loss
 
 
@@ -136,7 +137,7 @@ def test_confusion_matrix_with_empty_inputs():
                             [0.2, 0.1, 0.7],
                             [0.3, 0.4, 0.3],
                             [0.01, 0.9, 0.09]]
-                           )])
+                           ),])
 def test_log_loss(gt, probs):
     gt = np.array(gt, dtype=np.int64)
     probs = np.array(probs, dtype=np.float32)
@@ -148,5 +149,23 @@ def test_log_loss(gt, probs):
 def test_log_loss_single_binary_class():
     gt = np.array([1, 1, 1])
     probs = np.array([0.1, 0.2, 0.3])
-    np.testing.assert_allclose(log_loss(gt, probs), -np.log(probs).mean())
-    np.testing.assert_allclose(log_loss(1 - gt, probs), -np.log(1 - probs).mean())
+    np.testing.assert_allclose(log_loss(gt, probs), np.log(probs).mean())
+    np.testing.assert_allclose(log_loss(1 - gt, probs), np.log(1 - probs).mean())
+
+
+@pytest.mark.parametrize('gt,probs',
+                         [([0, 2, 1, 1],
+                           [[0.1, 0.2, 0.7],
+                            [0.2, 0.1, 0.7],
+                            [0.3, 0.4, 0.3],
+                            [0.01, 0.9, 0.09]]),
+                          ([0, 1, 0, 1],
+                           [0.1, 0.2, 0.3, 0.4]),])
+def test_log_loss_with_sklearn(gt, probs):
+    gt = np.array(gt, dtype=np.int64)
+    probs = np.array(probs, dtype=np.float32)
+    ag_loss = log_loss(gt, probs)
+    sklearn_log_loss = sklearn.metrics.log_loss(gt, probs)
+    # In AutoGluon, the metrics will always return score that is higher the better.
+    # Thus, the true value should be the negation of the real log_loss
+    np.testing.assert_allclose(ag_loss, -sklearn_log_loss)

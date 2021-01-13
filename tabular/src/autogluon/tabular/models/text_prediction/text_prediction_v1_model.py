@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import random
 import numpy as np
+from autogluon.core.utils.utils import default_holdout_frac
 
 from ..abstract.abstract_model import AbstractModel
 from ...features.feature_metadata import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
@@ -63,18 +64,6 @@ class TextPredictionV1Model(AbstractModel):
         self._label_column_name = None
         self._numeric_columns = None
         self._cat_columns = None
-
-    def _preprocess(self, X: pd.DataFrame, fit=False, **kwargs):
-        if fit:
-            self._numeric_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT])
-            self._cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_CATEGORY])
-        if self._numeric_columns:
-            X[self._numeric_columns] = X[self._numeric_columns].fillna(-1)  # FIXME v0.1: Make this more sophisticated, such as mean.
-        if self._cat_columns:
-            X[self._cat_columns] = X[self._cat_columns].astype('object')  # FIXME v0.1: Avoid this unnecessary conversion.
-            # FIXME v0.1: This will crash if NaNs are present at test time.
-            # X[self._cat_columns] = X[self._cat_columns].fillna(0)  # FIXME v0.1: Make this more sophisticated. This is not correct.
-        return X
 
     def _build_model(self, X_train, y_train, X_val, y_val, hyperparameters):
         try:
@@ -143,9 +132,7 @@ class TextPredictionV1Model(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
             get_features_kwargs=dict(
-                valid_raw_types=[R_INT, R_FLOAT,
-                                 # R_CATEGORY,  # FIXME: Add R_CATEGORY features
-                                 R_OBJECT],
+                valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
                 invalid_special_types=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
             ),
         )
@@ -192,7 +179,7 @@ class TextPredictionV1Model(AbstractModel):
         """
         try:
             import mxnet as mx
-            from autogluon.text.text_prediction.dataset import TabularDataset
+            from autogluon.text.text_prediction.dataset import TabularDataset, random_split_train_val
             from autogluon.text.text_prediction.text_prediction import get_recommended_resource
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
@@ -216,8 +203,6 @@ class TextPredictionV1Model(AbstractModel):
         X_train = self.preprocess(X_train, fit=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
-        else:
-            X_val = None
         column_properties = self._build_model(X_train=X_train,
                                               y_train=y_train,
                                               X_val=X_val,
@@ -239,19 +224,20 @@ class TextPredictionV1Model(AbstractModel):
                 'grace_period', 10)
             scheduler_options['max_t'] = scheduler_options.get(
                 'max_t', 50)
+        if X_val is None:
+            # FIXME: v0.1 Update TextPrediction to use all training data in refit_full
+            holdout_frac = default_holdout_frac(len(X_train), True)
+            X_train, X_val = random_split_train_val(X_train, valid_ratio=holdout_frac)
         train_data = TabularDataset(X_train,
                                     column_properties=column_properties,
                                     label_columns=self._label_column_name)
         logger.info('Train Dataset:')
         logger.info(train_data)
-        if X_val is not None:
-            tuning_data = TabularDataset(X_val,
-                                         column_properties=column_properties,
-                                         label_columns=self._label_column_name)
-            logger.info('Tuning Dataset:')
-            logger.info(tuning_data)
-        else:
-            tuning_data = None
+        tuning_data = TabularDataset(X_val,
+                                     column_properties=column_properties,
+                                     label_columns=self._label_column_name)
+        logger.info('Tuning Dataset:')
+        logger.info(tuning_data)
         self.model.train(train_data=train_data,
                          tuning_data=tuning_data,
                          resource=resource,
@@ -264,18 +250,16 @@ class TextPredictionV1Model(AbstractModel):
                          ignore_warning=verbosity < 2)
 
     def save(self, path: str = None, verbose=True) -> str:
-        if path is None:
-            path = self.path
-        model_path = os.path.join(path, self.model_file_name)
-        text_nn_path = os.path.join(path, self.nn_model_name)
-        logger.log(15, f'Save Model Hyperparams to {model_path}.')
-        logger.log(15, f'Save Model Text NN weights to {text_nn_path}')
         model = self.model
         self.model = None
         # save this AbstractModel object without NN weights
-        super().save(path=model_path, verbose=verbose)
-        model.save(text_nn_path)
+        path = super().save(path=path, verbose=verbose)
         self.model = model
+
+        text_nn_path = os.path.join(path, self.nn_model_name)
+        model.save(text_nn_path)
+        logger.log(15, f"\tSaved Text NN weights and model hyperparameters to '{text_nn_path}'.")
+
         return path
 
     def get_memory_size(self) -> int:
@@ -299,8 +283,6 @@ class TextPredictionV1Model(AbstractModel):
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
-        logger.log(15, f'Load from {path}.')
-        obj = super().load(os.path.join(path, cls.model_file_name))
-        nn_model = BertForTextPredictionBasic.load(os.path.join(path, cls.nn_model_name))
-        obj.model = nn_model
-        return obj
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model.model = BertForTextPredictionBasic.load(os.path.join(path, cls.nn_model_name))
+        return model

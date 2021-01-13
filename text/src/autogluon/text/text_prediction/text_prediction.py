@@ -73,9 +73,9 @@ def default_no_hpo() -> dict:
 
 
 @ag_text_prediction_params.register()
-def default_electra_small() -> dict:
+def default_electra_small_no_hpo() -> dict:
     """The default search space that uses ELECTRA Small as the backbone."""
-    cfg = default()
+    cfg = default_no_hpo()
     cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
         = 'google_electra_small'
     cfg['models']['BertForTextPredictionBasic']['search_space'][
@@ -91,6 +91,17 @@ def default_electra_base_no_hpo() -> dict:
         = 'google_electra_base'
     cfg['models']['BertForTextPredictionBasic']['search_space'][
         'optimization.per_device_batch_size'] = 8
+    return cfg
+
+
+@ag_text_prediction_params.register()
+def default_electra_large_no_hpo() -> dict:
+    """The default search space that uses ELECTRA Base as the backbone"""
+    cfg = default_no_hpo()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+        = 'google_electra_large'
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 4
     return cfg
 
 
@@ -392,7 +403,17 @@ class TextPrediction(BaseTask):
             label_columns=label_columns,
             provided_column_properties=None,
             categorical_default_handle_missing_value=True)
-
+        has_text_column = False
+        for k, v in column_properties.items():
+            if v.type == _C.TEXT:
+                has_text_column = True
+                break
+        if not has_text_column:
+            raise AssertionError('No Text Column is found! This is currently not supported by '
+                                 'the TextPrediction task. You may try to use '
+                                 'TabularPrediction.fit().\n' \
+                                 'The inferred column properties of the training data is {}'
+                                 .format(train_data))
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)
@@ -406,17 +427,7 @@ class TextPrediction(BaseTask):
         logger.info(tuning_data)
         logger.debug('Hyperparameters:')
         logger.debug(hyperparameters)
-        has_text_column = False
-        for k, v in column_properties.items():
-            if v.type == _C.TEXT:
-                has_text_column = True
-                break
-        if not has_text_column:
-            raise NotImplementedError('No Text Column is found! This is currently not supported by '
-                                      'the TextPrediction task. You may try to use '
-                                      'TabularPrediction.fit().\n' \
-                                      'The inferred column properties of the training data is {}'
-                                      .format(train_data))
+
         problem_types = []
         label_shapes = []
         for label_col_name in label_columns:

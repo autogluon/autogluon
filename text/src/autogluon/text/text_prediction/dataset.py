@@ -93,6 +93,8 @@ def is_categorical_column(data: pd.Series,
         Whether the column is a categorical column
     parsed_allow_missing
     """
+    if data.dtype.name == 'category':
+        return True, default_allow_missing
     threshold = min(int(len(data) * ratio), threshold)
     sample_set = set()
     element = data[data.first_valid_index()]
@@ -236,13 +238,10 @@ def normalize_df(df, convert_text_to_numerical=True, remove_none=True):
     if len(conversion_cols) == 0:
         return df
     else:
-        series_l = dict()
-        for col_name in df.columns:
-            if col_name in conversion_cols:
-                series_l[col_name] = conversion_cols[col_name]
-            else:
-                series_l[col_name] = df[col_name]
-        return pd.DataFrame(series_l)
+        new_df = df.copy()
+        for col_name in conversion_cols:
+            new_df[col_name] = conversion_cols[col_name]
+        return new_df
 
 
 def infer_problem_type(column_properties, label_col_name):
@@ -317,6 +316,11 @@ class TabularDataset:
             label_columns=label_columns,
             provided_column_properties=column_properties,
             categorical_default_handle_missing_value=categorical_default_handle_missing_value)
+        for col_name, prop in column_properties.items():
+            if prop.type == _C.TEXT:
+                df[col_name] = df[col_name].fillna('').apply(str)
+            elif prop.type == _C.NUMERICAL:
+                df[col_name] = df[col_name].fillna(-1).apply(np.array)
         self._table = df
         self._column_properties = column_properties
 
