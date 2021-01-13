@@ -386,7 +386,7 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
     if y_pred.ndim == 1:
         # First clip the y_pred which is also used in sklearn
         y_pred = np.clip(y_pred, eps, 1 - eps)
-        return (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
+        return - (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
     else:
         assert y_pred.ndim == 2, 'Only ndim=2 is supported'
         labels = np.arange(y_pred.shape[1], dtype=np.int32)
