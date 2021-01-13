@@ -65,13 +65,6 @@ class TextPredictionV1Model(AbstractModel):
         self._numeric_columns = None
         self._cat_columns = None
 
-    def _preprocess(self, X: pd.DataFrame, fit=False, **kwargs):
-        if fit:
-            self._numeric_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT])
-        if self._numeric_columns:
-            X[self._numeric_columns] = X[self._numeric_columns].fillna(-1)  # FIXME v0.1: Make this more sophisticated, such as mean.
-        return X
-
     def _build_model(self, X_train, y_train, X_val, y_val, hyperparameters):
         try:
             from autogluon.text.text_prediction.text_prediction \
