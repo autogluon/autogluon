@@ -446,9 +446,10 @@ def train_function(args, reporter, train_data, tuning_data,
                 break
             report_idx += 1
             if stopping_metric_scorer._sign < 0:
-                report_items.append(('-{}'.format(stopping_metric_scorer.name), -dev_score))
+                report_items.append(('reward_attr', -dev_score))
             else:
-                report_items.append((stopping_metric_scorer.name, dev_score))
+                report_items.append(('reward_attr', dev_score))
+            report_items.append(('eval_metric', stopping_metric_scorer.name))
             report_items.append(('exp_dir', exp_dir))
             if find_better:
                 best_report_items = report_items
@@ -592,11 +593,6 @@ class BertForTextPredictionBasic:
         # Scheduler and searcher for HPO
         if scheduler_options is None:
             scheduler_options = dict()
-        stopping_metric_scorer = get_metric(self._stopping_metric)
-        if stopping_metric_scorer._sign < 0:
-            reward_attr = '-{}'.format(stopping_metric_scorer.name)
-        else:
-            reward_attr = stopping_metric_scorer.name
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,
@@ -609,7 +605,7 @@ class BertForTextPredictionBasic:
             resume=False,
             visualizer=scheduler_options.get('visualizer'),
             time_attr='report_idx',
-            reward_attr=reward_attr,
+            reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_data=train_data,
