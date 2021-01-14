@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import multiprocessing as mp
@@ -6,18 +7,17 @@ import pickle
 import threading
 import time
 from collections import OrderedDict
-import numpy as np
-import copy
 
+import numpy as np
 from tqdm.auto import tqdm
 
 from .reporter import DistStatusReporter, FakeReporter
 from .resource import DistributedResource
 from .scheduler import TaskScheduler
-from ..task.task import Task
 from ..decorator import _autogluon_method
 from ..searcher import BaseSearcher
 from ..searcher import searcher_factory
+from ..task.task import Task
 from ..utils import save, load, mkdir, try_import_mxboard
 from ..utils.default_arguments import check_and_merge_defaults, \
     Float, Integer, String, Boolean, assert_no_invalid_options
@@ -524,13 +524,17 @@ class FIFOScheduler(TaskScheduler):
         if filename is None and not plot:
             logger.warning('Please either provide filename or allow plot in get_training_curves')
         import matplotlib.pyplot as plt
-        plt.ylabel(self._reward_attr)
+
+        eval_metric = self.__get_training_history_metric('eval_metric')
+        sign_mult = int(self.__get_training_history_metric('greater_is_better')) * 2 - 1
+
+        plt.ylabel(eval_metric)
         plt.xlabel(self._time_attr)
         plt.title("Performance vs Training-Time in each HPO Trial")
         with self._fifo_lock:
             for task_id, task_res in self.training_history.items():
-                rewards = [x[self._reward_attr] for x in task_res]
-                x = list(range(len(task_res)))
+                rewards = [x[self._reward_attr] * sign_mult for x in task_res]
+                x = [x[self._time_attr] for x in task_res]
                 plt.plot(x, rewards, label=f'task {task_id}')
         if use_legend:
             plt.legend(loc='best')
@@ -539,6 +543,12 @@ class FIFOScheduler(TaskScheduler):
             plt.savefig(filename)
         if plot:
             plt.show()
+
+    def __get_training_history_metric(self, metric):
+        for _, task_res in self.training_history.items():
+            if task_res and metric in task_res[0]:
+                return task_res[0][metric]
+        return None
 
     def state_dict(self, destination=None):
         """
