@@ -7,25 +7,28 @@
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
-import random, json, time, os, logging, warnings
+import json
+import logging
+import os
+import random
+import time
+import warnings
 from collections import OrderedDict
 
+import mxnet as mx
 import numpy as np
 import pandas as pd
-import mxnet as mx
-from mxnet import nd, autograd, gluon
 from gluoncv.utils import LRSequential, LRScheduler
+from mxnet import nd, autograd, gluon
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
 from autogluon.core import Space
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.utils import try_import_mxboard
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.core.metrics import log_loss, roc_auc
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .embednet import EmbedNet
 from .hyperparameters.parameters import get_default_param
@@ -34,8 +37,7 @@ from .tabular_nn_dataset import TabularNNDataset
 from .tabular_nn_trial import tabular_nn_trial
 from ..abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
-from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-
+from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
@@ -364,7 +366,11 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 # TODO: Ensure reporter/scheduler properly handle None/nan values after refactor
                 if val_dataset is not None and (not np.isnan(val_metric)):  # TODO: This might work without the if statement
                     # epoch must be number of epochs done (starting at 1)
-                    reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
+                    reporter(epoch=e + 1,
+                             validation_performance=val_metric,  # Higher val_metric = better
+                             train_loss=float(train_loss.asscalar()),
+                             eval_metric=self.eval_metric.name,
+                             greater_is_better=self.eval_metric.greater_is_better)
             if e - val_improve_epoch > epochs_wo_improve:
                 break  # early-stop if validation-score hasn't strictly improved in `epochs_wo_improve` consecutive epochs
             if time_limit is not None:
