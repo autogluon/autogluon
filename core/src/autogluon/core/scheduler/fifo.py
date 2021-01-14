@@ -526,7 +526,7 @@ class FIFOScheduler(TaskScheduler):
         import matplotlib.pyplot as plt
 
         eval_metric = self.__get_training_history_metric('eval_metric')
-        sign_mult = int(self.__get_training_history_metric('greater_is_better')) * 2 - 1
+        sign_mult = int(self.__get_training_history_metric('greater_is_better', default=True)) * 2 - 1
 
         plt.ylabel(eval_metric)
         plt.xlabel(self._time_attr)
@@ -544,11 +544,11 @@ class FIFOScheduler(TaskScheduler):
         if plot:
             plt.show()
 
-    def __get_training_history_metric(self, metric):
+    def __get_training_history_metric(self, metric, default=None):
         for _, task_res in self.training_history.items():
             if task_res and metric in task_res[0]:
                 return task_res[0][metric]
-        return None
+        return default
 
     def state_dict(self, destination=None):
         """
