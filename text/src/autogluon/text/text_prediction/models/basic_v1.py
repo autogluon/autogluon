@@ -9,7 +9,6 @@ import json
 import functools
 import tqdm
 import mxnet as mx
-import uuid
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
