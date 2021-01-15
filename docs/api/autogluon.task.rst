@@ -57,7 +57,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 .. autoclass:: TabularPredictor
    :members:
-   :no-inherited-members:
+   :inherited-members:
 
     .. rubric:: Methods
 
