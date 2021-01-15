@@ -41,8 +41,8 @@ class RayTuneScheduler(object):
 
     def __init__(self, task_fn, reward_attr, time_attr='epoch', **tune_args):
         self.task_fn = task_fn
-        self.tune_args = tune_args['tune_args'] if 'tune_args' in tune_args else tune_args
-        self.tune_args['metric'] = reward_attr
+
+        self.tune_args = self._repackage_tune_kwargs(tune_args, reward_attr)
         self.training_history = None
         self.config_history = None
         self._reward_attr = reward_attr
@@ -59,6 +59,29 @@ class RayTuneScheduler(object):
             },
             'resources_per_trial': self.resource}
 
+    def _repackage_tune_kwargs(self, tune_args, reward_attr):
+        """
+        Re-package autogluon-required parameters into tune format
+        """
+        tune_args = tune_args.copy()
+        resources = tune_args.pop('resource', None)
+        if resources:
+            if 'resources_per_trial' in tune_args:
+                logger.warning("'resources_per_trial' is overridden with 'resource' option, consider removing it and using only 'resource' option")
+            if 'num_cpus' in resources:
+                resources['cpu'] = resources.pop('num_cpus')
+            if 'num_gpus' in resources:
+                resources['gpu'] = resources.pop('num_gpus')
+            tune_args['resources_per_trial'] = resources
+        if 'time_out' in tune_args:
+            if 'time_budget_s' in tune_args:
+                logger.warning("'time_budget_s' is overridden with 'time_out' option, consider removing it and using only 'time_out' option")
+
+            tune_args['time_budget_s'] = tune_args.pop('time_out')
+
+        tune_args['metric'] = reward_attr
+        return tune_args
+
     def train_fn_wrapper(self, fn, config, reporter=None, **kwargs):
         config = EasyDict(config)
         config['task_id'] = tune.session.get_session().trial_name
@@ -74,7 +97,7 @@ class RayTuneScheduler(object):
             partial(self.train_fn_wrapper, self.task_fn.f),
             name='AG',
             callbacks=[results_history_callback],
-            config=self.wrap_space(self.task_fn.kwvars),
+            config=self._wrap_space(self.task_fn.kwvars),
             **self.tune_args
         )
         self.result = result
@@ -85,13 +108,25 @@ class RayTuneScheduler(object):
             partial(self.train_fn_wrapper, self.task_fn.f),
             name='AG',
             callbacks=[results_history_callback],
-            config=self.wrap_space(self.task_fn.kwvars),
+            config=self._wrap_space(self.task_fn.kwvars),
             **kwargs
         )
         self.result = result
 
     @classmethod
-    def wrap_space(cls, space):
+    def _wrap_space(cls, space):
+        """
+        Wraps autogluon hyperparameter space into tune format
+        Parameters
+        ----------
+        space:
+            autogluon hyperparameter spaces
+
+        Returns
+        -------
+        RayTune hyperparameter spaces
+
+        """
         if isinstance(space, Real):
             fn = tune.loguniform if space.log else tune.uniform
             return fn(space.lower, space.upper)
@@ -100,22 +135,24 @@ class RayTuneScheduler(object):
         elif isinstance(space, Categorical):
             return tune.choice(space)
         elif type(space) in [List, list]:
-            return [cls.wrap_space(s) for s in space]
+            return [cls._wrap_space(s) for s in space]
         elif type(space) in [Dict, dict]:
-            return {k: cls.wrap_space(v) for k, v in space.items()}
+            return {k: cls._wrap_space(v) for k, v in space.items()}
         else:
             return space
 
     def get_best_config(self):
+        # Required by autogluon
         best_trial = self.result.get_best_trial(self._reward_attr, self.tune_args['mode'], "last")
         return best_trial.config
 
     def get_best_reward(self):
+        # Required by autogluon
         best_trial = self.result.get_best_trial(self._reward_attr, self.tune_args['mode'], "last")
         return best_trial.last_result[self._reward_attr]
 
     def join_jobs(self, timeout=None):
-        # Keep for compatibility
+        # Required by autogluon
         pass
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
