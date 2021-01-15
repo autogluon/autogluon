@@ -35,7 +35,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 .. autosummary::
    :nosignatures:
 
-   TabularPrediction
+   TabularPredictor
 
 .. automodule:: autogluon.vision
 .. autosummary::
@@ -51,18 +51,17 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
    TextPrediction
 
 
-:hidden:`TabularPrediction`
+:hidden:`TabularPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.tabular
 
-.. autoclass:: TabularPrediction
-   :members: fit, load, Predictor, Dataset
+.. autoclass:: TabularPredictor
+   :members:
    :no-inherited-members:
-   :exclude-members: run_fit
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TabularPrediction
+    .. autoautosummary:: TabularPredictor
         :methods:
 
 
@@ -111,28 +110,10 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-Additional Tabular Prediction APIs
+Additional Tabular APIs
 ----------------------------------
 
-.. automodule:: autogluon.tabular.tabular_prediction
-
-:hidden:`TabularPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.tabular
-
-.. autoclass:: TabularPredictor
-   :members:
-   :no-inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: TabularPredictor
-        :methods:
-
-    .. rubric:: Attributes
-
-    .. autoautosummary:: TabularPredictor
-        :attributes:
 
 :hidden:`TabularDataset`
 ~~~~~~~~~~~~~~~~~~~~~~~~
