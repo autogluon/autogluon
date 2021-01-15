@@ -37,6 +37,7 @@ class AutoTrainer(AbstractTrainer):
         else:
             if (y_val is None) or (X_val is None):
                 X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_seed)
+                logger.log(20, f'Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X_train)}, Val Rows: {len(X_val)}')
 
         self._train_multi_and_ensemble(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters,
                                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune,

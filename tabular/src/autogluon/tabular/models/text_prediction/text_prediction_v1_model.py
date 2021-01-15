@@ -6,6 +6,9 @@ import pandas as pd
 import os
 import random
 import numpy as np
+
+from autogluon.core.utils import get_cpu_count, get_gpu_count
+from autogluon.core.utils.exceptions import NoGPUError
 from autogluon.core.utils.utils import default_holdout_frac
 
 from ..abstract.abstract_model import AbstractModel
@@ -62,8 +65,21 @@ class TextPredictionV1Model(AbstractModel):
         """
         super().__init__(**kwargs)
         self._label_column_name = None
-        self._numeric_columns = None
-        self._cat_columns = None
+        self._feature_generator = None
+
+    def _preprocess(self, X, fit=False, **kwargs):
+        from ...features.feature_metadata import R_CATEGORY
+        if fit:
+            from ...features.generators import BulkFeatureGenerator, CategoryFeatureGenerator, IdentityFeatureGenerator
+            # TODO: This feature generator improves scores for TextPrediction when rare categories are present. This should be fixed in TextPrediction.
+            self._feature_generator = BulkFeatureGenerator(generators=[
+                [
+                    CategoryFeatureGenerator(features_in=self.feature_metadata.get_features(valid_raw_types=[R_CATEGORY]), minimum_cat_count=1),
+                    IdentityFeatureGenerator(features_in=self.feature_metadata.get_features(invalid_raw_types=[R_CATEGORY])),
+                ],
+            ])
+            self._feature_generator.fit(X)
+        return self._feature_generator.transform(X)
 
     def _build_model(self, X_train, y_train, X_val, y_val, hyperparameters):
         try:
@@ -193,6 +209,9 @@ class TextPredictionV1Model(AbstractModel):
         resource = get_recommended_resource(nthreads_per_trial=num_cpus,
                                             ngpus_per_trial=num_gpus)
 
+        if resource['num_gpus'] == 0:
+            raise NoGPUError(f'\tNo GPUs available to train {self.name}. Resources: {resource}')
+
         # Set seed
         seed = self.params.get('seed')
         if seed is not None:
@@ -262,6 +281,18 @@ class TextPredictionV1Model(AbstractModel):
 
         return path
 
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        try:
+            from autogluon.text.text_prediction.dataset import TabularDataset
+            from autogluon.text.text_prediction.models.basic_v1 import BertForTextPredictionBasic
+        except ImportError:
+            raise ImportError(AG_TEXT_IMPORT_ERROR)
+
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model.model = BertForTextPredictionBasic.load(os.path.join(path, cls.nn_model_name))
+        return model
+
     def get_memory_size(self) -> int:
         """Return the memory size by calculating the total number of parameters.
 
@@ -275,14 +306,7 @@ class TextPredictionV1Model(AbstractModel):
             total_size += np.dtype(v.dtype).itemsize * np.prod(v.shape)
         return total_size
 
-    @classmethod
-    def load(cls, path: str, reset_paths=True, verbose=True):
-        try:
-            from autogluon.text.text_prediction.dataset import TabularDataset
-            from autogluon.text.text_prediction.models.basic_v1 import BertForTextPredictionBasic
-        except ImportError:
-            raise ImportError(AG_TEXT_IMPORT_ERROR)
-
-        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        model.model = BertForTextPredictionBasic.load(os.path.join(path, cls.nn_model_name))
-        return model
+    def _get_default_resources(self):
+        num_cpus = get_cpu_count()
+        num_gpus = get_gpu_count()
+        return num_cpus, num_gpus

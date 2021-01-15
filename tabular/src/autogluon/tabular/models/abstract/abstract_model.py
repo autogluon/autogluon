@@ -10,7 +10,6 @@ from typing import Union
 
 import numpy as np
 import pandas as pd
-import psutil
 
 from autogluon.core.utils import get_cpu_count
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
@@ -278,10 +277,15 @@ class AbstractModel:
 
     def _preprocess_fit_resources(self, kwargs):
         default_num_cpus, default_num_gpus = self._get_default_resources()
-        num_cpus = self.params_aux.get('num_cpus', default_num_cpus)
-        num_gpus = self.params_aux.get('num_gpus', default_num_gpus)
+        num_cpus = self.params_aux.get('num_cpus', 'auto')
+        num_gpus = self.params_aux.get('num_gpus', 'auto')
         kwargs['num_cpus'] = kwargs.get('num_cpus', num_cpus)
         kwargs['num_gpus'] = kwargs.get('num_gpus', num_gpus)
+        if kwargs['num_cpus'] == 'auto':
+            kwargs['num_cpus'] = default_num_cpus
+        if kwargs['num_gpus'] == 'auto':
+            kwargs['num_gpus'] = default_num_gpus
+        logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
         return kwargs
 
     def fit(self, **kwargs):
