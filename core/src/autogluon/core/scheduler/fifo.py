@@ -525,7 +525,7 @@ class FIFOScheduler(TaskScheduler):
             logger.warning('Please either provide filename or allow plot in get_training_curves')
         import matplotlib.pyplot as plt
 
-        eval_metric = self.__get_training_history_metric('eval_metric')
+        eval_metric = self.__get_training_history_metric('eval_metric', default='validation_performance')
         sign_mult = int(self.__get_training_history_metric('greater_is_better', default=True)) * 2 - 1
 
         plt.ylabel(eval_metric)
