@@ -42,7 +42,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     maximum_num_cat : int, default None
         The maximum amount of categories that can be considered non-rare.
         Sorted by occurrence count, up to the N highest count categories will be kept if maximum_num_cat=N. All others will be considered rare categories.
-    fill_nan : str, default None
+    fillna : str, default None
         The method used to handle missing values. Only valid if stateful_categories=True.
         Missing values include the values that were originally NaN and values converted to NaN from other parameters such as minimum_cat_count.
         Valid values:
@@ -51,7 +51,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
     """
-    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = None, maximum_num_cat: int = None, fill_nan: str = None, **kwargs):
+    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = None, maximum_num_cat: int = None, fillna: str = None, **kwargs):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
         if minimum_cat_count is not None and minimum_cat_count < 1:
@@ -62,22 +62,22 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         self._minimum_cat_count = minimum_cat_count
         self._maximum_num_cat = maximum_num_cat
         self.category_map = None
-        if fill_nan is not None:
-            if fill_nan not in ['mode']:
-                raise ValueError(f"fill_nan={fill_nan} is not a valid value. Valid values: {[None, 'mode']}")
-        self._fill_nan = fill_nan
-        self._fill_nan_flag = self._fill_nan is not None
-        self._fill_nan_map = None
+        if fillna is not None:
+            if fillna not in ['mode']:
+                raise ValueError(f"fillna={fillna} is not a valid value. Valid values: {[None, 'mode']}")
+        self._fillna = fillna
+        self._fillna_flag = self._fillna is not None
+        self._fillna_map = None
 
         if minimize_memory:
             self._post_generators = [CategoryMemoryMinimizeFeatureGenerator(inplace=True)] + self._post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         if self._stateful_categories:
-            X_out, self.category_map, self._fill_nan_map = self._generate_category_map(X=X)
-            if self._fill_nan_map is not None:
-                for column in self._fill_nan_map:
-                    X_out[column] = X_out[column].fillna(self._fill_nan_map[column])
+            X_out, self.category_map, self._fillna_map = self._generate_category_map(X=X)
+            if self._fillna_map is not None:
+                for column in self._fillna_map:
+                    X_out[column] = X_out[column].fillna(self._fillna_map[column])
         else:
             X_out = self._transform(X)
         feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
@@ -103,9 +103,9 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                 X_category = copy.deepcopy(X_category)  # TODO: Add inplace version / parameter
                 for column in self.category_map:
                     X_category[column].cat.set_categories(self.category_map[column], inplace=True)
-                if self._fill_nan_map is not None:
-                    for column in self._fill_nan_map:
-                        X_category[column].fillna(self._fill_nan_map[column], inplace=True)
+                if self._fillna_map is not None:
+                    for column in self._fillna_map:
+                        X_category[column].fillna(self._fillna_map[column], inplace=True)
         else:
             X_category = DataFrame(index=X.index)
         return X_category
@@ -138,11 +138,11 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
                     X_category[column] = X_category[column].cat.reorder_categories(category_list)
                 category_map[column] = copy.deepcopy(X_category[column].cat.categories)
-                if self._fill_nan_flag:
-                    if self._fill_nan == 'mode':
+                if self._fillna_flag:
+                    if self._fillna == 'mode':
                         if len(rank) > 0:
                             fill_nan_map[column] = list(rank.index)[-1]
-            if not self._fill_nan_flag:
+            if not self._fillna_flag:
                 fill_nan_map = None
             return X_category, category_map, fill_nan_map
         else:
@@ -154,10 +154,10 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             for feature in features:
                 if feature in self.category_map:
                     self.category_map.pop(feature)
-        if self._fill_nan_map:
+        if self._fillna_map:
             for feature in features:
-                if feature in self._fill_nan_map:
-                    self._fill_nan_map.pop(feature)
+                if feature in self._fillna_map:
+                    self._fillna_map.pop(feature)
 
     def _more_tags(self):
         return {'feature_interactions': False}

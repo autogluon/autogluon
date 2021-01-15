@@ -13,7 +13,7 @@ def test_category_feature_generator(generator_helper, data_helper):
     generator_2 = CategoryFeatureGenerator(maximum_num_cat=2)
     generator_3 = CategoryFeatureGenerator(minimum_cat_count=3)
     generator_4 = CategoryFeatureGenerator(cat_order='count')
-    generator_5 = CategoryFeatureGenerator(fill_nan='mode')
+    generator_5 = CategoryFeatureGenerator(fillna='mode')
     generator_6 = CategoryFeatureGenerator(minimize_memory=False)
 
     expected_feature_metadata_in_full = {
