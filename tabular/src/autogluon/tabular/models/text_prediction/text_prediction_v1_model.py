@@ -77,7 +77,7 @@ class TextPredictionV1Model(AbstractModel):
                     CategoryFeatureGenerator(features_in=self.feature_metadata.get_features(valid_raw_types=[R_CATEGORY]), minimum_cat_count=1),
                     IdentityFeatureGenerator(features_in=self.feature_metadata.get_features(invalid_raw_types=[R_CATEGORY])),
                 ],
-            ])
+            ], verbosity=0)
             self._feature_generator.fit(X)
         return self._feature_generator.transform(X)
 
