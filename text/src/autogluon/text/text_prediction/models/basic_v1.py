@@ -238,7 +238,7 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
 
 
 @use_np
-def train_function(args, reporter, train_data, tuning_data,
+def train_function(args, reporter, train_df_path, tuning_df_path,
                    time_limits, base_config, problem_types,
                    column_properties, label_columns, label_shapes,
                    log_metrics, stopping_metric, console_log,
@@ -247,6 +247,9 @@ def train_function(args, reporter, train_data, tuning_data,
     # Get the log metric scorers
     if isinstance(log_metrics, str):
         log_metrics = [log_metrics]
+    # Load the training and tuning data from the parquet file
+    train_data = pd.read_parquet(train_df_path)
+    tuning_data = pd.read_parquet(tuning_df_path)
     log_metric_scorers = [get_metric(ele) for ele in log_metrics]
     stopping_metric_scorer = get_metric(stopping_metric)
     greater_is_better = stopping_metric_scorer.greater_is_better
@@ -290,14 +293,14 @@ def train_function(args, reporter, train_data, tuning_data,
                                                 max_length=cfg.model.preprocess.max_length,
                                                 merge_text=cfg.model.preprocess.merge_text)
     logger.info('Process training set...')
-    processed_train = preprocessor.process_train(train_data.table)
+    processed_train = preprocessor.process_train(train_data)
     logger.info('Done!')
     logger.info('Process dev set...')
-    processed_dev = preprocessor.process_test(tuning_data.table)
+    processed_dev = preprocessor.process_test(tuning_data)
     logger.info('Done!')
     label = label_columns[0]
     # Get the ground-truth dev labels
-    gt_dev_labels = np.array(tuning_data.table[label].apply(column_properties[label].transform))
+    gt_dev_labels = np.array(tuning_data[label].apply(column_properties[label].transform))
     ctx_l = get_mxnet_available_ctx()
     base_batch_size = cfg.optimization.per_device_batch_size
     num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
@@ -607,10 +610,16 @@ class BertForTextPredictionBasic:
             time_attr='report_idx',
             reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
+        # Create a temporary cache file and then ask the inner function to load the
+        # temporary cache.
+        train_df_path = os.path.join(self._output_directory, 'cache_train_dataframe.pq')
+        tuning_df_path = os.path.join(self._output_directory, 'cache_tuning_dataframe.pq')
+        train_data.table.to_parquet(train_df_path)
+        tuning_data.table.to_parquet(tuning_df_path)
         train_fn = search_space_reg(functools.partial(train_function,
-                                                      train_data=train_data,
+                                                      train_df_path=train_df_path,
                                                       time_limits=time_limits,
-                                                      tuning_data=tuning_data,
+                                                      tuning_df_path=tuning_df_path,
                                                       base_config=self.base_config,
                                                       problem_types=self.problem_types,
                                                       column_properties=self._column_properties,
