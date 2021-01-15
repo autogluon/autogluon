@@ -11,7 +11,7 @@ from collections import defaultdict
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures
+from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
 from autogluon.core.utils import shuffle_df_rows, default_holdout_frac
 from autogluon.core.metrics import log_loss, scorer_expects_y_pred
 
@@ -916,6 +916,9 @@ class AbstractTrainer:
             del model
         except NoValidFeatures:
             logger.warning(f'\tNo valid features to train {model.name}... Skipping this model.')
+            del model
+        except NoGPUError:
+            logger.warning(f'\tNo GPUs available to train {model.name}... Skipping this model.')
             del model
         except Exception as err:
             logger.exception(f'\tWarning: Exception caused {model.name} to fail during training... Skipping this model.')

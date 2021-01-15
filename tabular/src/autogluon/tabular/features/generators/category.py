@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Add hashing trick if minimize_memory=True to avoid storing full original mapping
-# TODO: Retroactively prune mappings if feature was removed downstream
-# TODO: Have a concept of a 1:1 mapping, so you can safely remove features from features_in and features_out
-#  Have a method remove_features() where each generator implements custom logic, default is just to only remove from features_out, but Category could remove from features_in + inner generators + category_map.
+# TODO: fill_nan add additional options: group_rares, possibly percentile based
 class CategoryFeatureGenerator(AbstractFeatureGenerator):
     """
     CategoryFeatureGenerator is used to convert object types to category types, as well as remove rare categories and optimize memory usage.
@@ -44,13 +42,19 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     maximum_num_cat : int, default None
         The maximum amount of categories that can be considered non-rare.
         Sorted by occurrence count, up to the N highest count categories will be kept if maximum_num_cat=N. All others will be considered rare categories.
+    fillna : str, default None
+        The method used to handle missing values. Only valid if stateful_categories=True.
+        Missing values include the values that were originally NaN and values converted to NaN from other parameters such as minimum_cat_count.
+        Valid values:
+            None : Keep missing values as is. They will appear as NaN and have no category assigned to them.
+            'mode' : Set missing values to the most frequent category in their feature.
     **kwargs :
         Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
     """
-    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = None, maximum_num_cat: int = None, **kwargs):
+    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = None, maximum_num_cat: int = None, fillna: str = None, **kwargs):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
-        if minimum_cat_count is not None and minimum_cat_count <= 1:
+        if minimum_cat_count is not None and minimum_cat_count < 1:
             minimum_cat_count = None
         if cat_order not in ['original', 'alphanumeric', 'count']:
             raise ValueError(f"cat_order must be one of {['original', 'alphanumeric', 'count']}, but was: {cat_order}")
@@ -58,13 +62,22 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         self._minimum_cat_count = minimum_cat_count
         self._maximum_num_cat = maximum_num_cat
         self.category_map = None
+        if fillna is not None:
+            if fillna not in ['mode']:
+                raise ValueError(f"fillna={fillna} is not a valid value. Valid values: {[None, 'mode']}")
+        self._fillna = fillna
+        self._fillna_flag = self._fillna is not None
+        self._fillna_map = None
 
         if minimize_memory:
             self._post_generators = [CategoryMemoryMinimizeFeatureGenerator(inplace=True)] + self._post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         if self._stateful_categories:
-            X_out, self.category_map = self._generate_category_map(X=X)
+            X_out, self.category_map, self._fillna_map = self._generate_category_map(X=X)
+            if self._fillna_map is not None:
+                for column in self._fillna_map:
+                    X_out[column] = X_out[column].fillna(self._fillna_map[column])
         else:
             X_out = self._transform(X)
         feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
@@ -90,24 +103,26 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                 X_category = copy.deepcopy(X_category)  # TODO: Add inplace version / parameter
                 for column in self.category_map:
                     X_category[column].cat.set_categories(self.category_map[column], inplace=True)
+                if self._fillna_map is not None:
+                    for column in self._fillna_map:
+                        X_category[column].fillna(self._fillna_map[column], inplace=True)
         else:
             X_category = DataFrame(index=X.index)
         return X_category
 
     def _generate_category_map(self, X: DataFrame) -> (DataFrame, dict):
         if self.features_in:
+            fill_nan_map = dict()
             category_map = dict()
             X_category = X.astype('category')
             for column in X_category:
+                rank = X_category[column].value_counts().sort_values(ascending=True)
+                if self._minimum_cat_count is not None:
+                    rank = rank[rank >= self._minimum_cat_count]
+                if self._maximum_num_cat is not None:
+                    rank = rank[-self._maximum_num_cat:]
                 if self.cat_order == 'count' or self._minimum_cat_count is not None or self._maximum_num_cat is not None:
-                    rank = X_category[column].value_counts().sort_values(ascending=True)
-                    if self._minimum_cat_count is not None:
-                        rank = rank[rank >= self._minimum_cat_count]
-                    if self._maximum_num_cat is not None:
-                        rank = rank[-self._maximum_num_cat:]
-                    rank = rank.reset_index()
-
-                    category_list = list(rank['index'].values)  # category_list in 'count' order
+                    category_list = list(rank.index)  # category_list in 'count' order
                     if len(category_list) > 1:
                         if self.cat_order == 'original':
                             original_cat_order = list(X_category[column].cat.categories)
@@ -123,9 +138,15 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
                     X_category[column] = X_category[column].cat.reorder_categories(category_list)
                 category_map[column] = copy.deepcopy(X_category[column].cat.categories)
-            return X_category, category_map
+                if self._fillna_flag:
+                    if self._fillna == 'mode':
+                        if len(rank) > 0:
+                            fill_nan_map[column] = list(rank.index)[-1]
+            if not self._fillna_flag:
+                fill_nan_map = None
+            return X_category, category_map, fill_nan_map
         else:
-            return DataFrame(index=X.index), None
+            return DataFrame(index=X.index), None, None
 
     def _remove_features_in(self, features: list):
         super()._remove_features_in(features)
@@ -133,6 +154,10 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             for feature in features:
                 if feature in self.category_map:
                     self.category_map.pop(feature)
+        if self._fillna_map:
+            for feature in features:
+                if feature in self._fillna_map:
+                    self._fillna_map.pop(feature)
 
     def _more_tags(self):
         return {'feature_interactions': False}

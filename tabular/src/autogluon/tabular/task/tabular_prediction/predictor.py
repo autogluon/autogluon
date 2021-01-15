@@ -131,7 +131,6 @@ class TabularPredictor(TabularPredictorV1):
         else:
             for key in hyperparameters:
                 if isinstance(key, int) or key == 'default':
-                    print(hyperparameters[key])
                     if 'TEXT_NN_V1' in hyperparameters[key]:
                         feature_generator_init_kwargs['enable_raw_text_features'] = True
                         break
@@ -159,9 +158,9 @@ class TabularPredictor(TabularPredictorV1):
         if ag_args_fit is None:
             ag_args_fit = dict()
         # TODO: v0.1: Update to be 'auto' or None by default to give full control to individual models.
-        if 'num_cpus' not in ag_args_fit and num_cpus is not None:
+        if 'num_cpus' not in ag_args_fit and num_cpus != 'auto':
             ag_args_fit['num_cpus'] = num_cpus
-        if 'num_gpus' not in ag_args_fit and num_gpus is not None:
+        if 'num_gpus' not in ag_args_fit and num_gpus != 'auto':
             ag_args_fit['num_gpus'] = num_gpus
 
         # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
@@ -267,6 +266,12 @@ class TabularPredictor(TabularPredictorV1):
         if hyperparameter_tune:
             raise ValueError('Hyperparameter Tuning is not allowed in `fit_extra`.')  # FIXME: Change this
             # logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
+        if ag_args_fit is None:
+            ag_args_fit = dict()
+        if 'num_cpus' not in ag_args_fit and num_cpus != 'auto':
+            ag_args_fit['num_cpus'] = num_cpus
+        if 'num_gpus' not in ag_args_fit and num_gpus != 'auto':
+            ag_args_fit['num_gpus'] = num_gpus
 
         # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
@@ -299,7 +304,7 @@ class TabularPredictor(TabularPredictorV1):
 
     # TODO: Move to generic, migrate all tasks to same kwargs logic
     def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels):
-        num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)
+        num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)  # TODO: use 'auto' downstream
         time_limit_hpo = time_limit
         if num_bag_folds >= 2 and (time_limit_hpo is not None):
             time_limit_hpo = time_limit_hpo / (1 + num_bag_folds * (1 + num_stack_levels))
@@ -470,8 +475,8 @@ class TabularPredictor(TabularPredictorV1):
             refit_full=False,
 
             # move into ag_args_fit? +1
-            num_cpus=None,
-            num_gpus=None,
+            num_cpus='auto',
+            num_gpus='auto',
 
             # other
             verbosity=self.verbosity,

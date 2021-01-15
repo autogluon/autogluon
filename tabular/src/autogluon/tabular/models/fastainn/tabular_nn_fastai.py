@@ -154,9 +154,11 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
         try_import_fastai_v1()
+        import torch
         from fastai.layers import LabelSmoothingCrossEntropy
         from fastai.tabular import tabular_learner
         from fastai.utils.mod_display import progress_disabled_ctx
+        from fastai.core import defaults
         from .callbacks import EarlyStoppingCallbackWithTimeLimit, SaveModelCallback
 
         start_time = time.time()
@@ -166,6 +168,11 @@ class NNFastAiTabularModel(AbstractModel):
         self.y_scaler = params.get('y_scaler', None)
         if self.y_scaler is not None:
             self.y_scaler = copy.deepcopy(self.y_scaler)
+
+        if 'num_gpus' in kwargs:
+            if kwargs['num_gpus'] == 0:
+                # FIXME: This doesn't appear to change anything in terms of train/inference speed
+                defaults.device = torch.device('cpu')
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
         data = self._preprocess_train(X_train, y_train, X_val, y_val)
