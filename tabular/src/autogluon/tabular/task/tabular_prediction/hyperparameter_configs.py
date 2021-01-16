@@ -69,7 +69,34 @@ hyperparameter_config_dict = dict(
         'GBM': {'num_boost_round': 10},
         'CAT': {'iterations': 10},
         'XGB': {'n_estimators': 10},
-    }
+    },
+    # Default AutoGluon hyperparameters intended to maximize accuracy in multimodal tabular + text datasets. Requires GPU.
+    multimodal={
+        'NN': {},
+        'GBM': [
+            {},
+            {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+        ],
+        'CAT': {},
+        'XGB': {},
+        # 'FASTAI': {},  # FIXME: FASTAI is extremely slow if trained alongside TextNN due to forkserver.
+        'RF': [
+            {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+        ],
+        'XT': [
+            {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+        ],
+        'KNN': [
+            {'weights': 'uniform', 'ag_args': {'name_suffix': 'Unif'}},
+            {'weights': 'distance', 'ag_args': {'name_suffix': 'Dist'}},
+        ],
+        'TEXT_NN_V1': ['ELECTRA_BASE'],
+        'custom': ['GBM'],
+    },
 )
 
 

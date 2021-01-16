@@ -433,6 +433,7 @@ class AbstractFeatureGenerator:
         This should not be overwritten by implementations of AbstractFeatureGenerator.
         """
         for generator in generators:
+            generator.verbosity = min(self.verbosity, generator.verbosity)
             generator.set_log_prefix(log_prefix=self.log_prefix + '\t', prepend=True)
             X = generator.fit_transform(X=X, y=y, feature_metadata_in=feature_metadata, **kwargs)
             feature_metadata = generator.feature_metadata
