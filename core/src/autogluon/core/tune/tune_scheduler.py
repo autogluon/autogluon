@@ -1,5 +1,6 @@
 import logging
 from collections import OrderedDict
+from copy import deepcopy
 from functools import partial
 
 from ray import tune
@@ -42,7 +43,10 @@ class RayTuneScheduler(object):
     def __init__(self, task_fn, reward_attr, time_attr='epoch', **tune_args):
         self.task_fn = task_fn
 
+        # print(tune_args)  # FIXME: ALEX - WIP:
         self.tune_args = self._repackage_tune_kwargs(tune_args, reward_attr)
+        # print(self.tune_args)  # FIXME: ALEX - WIP:
+
         self.training_history = None
         self.config_history = None
         self._reward_attr = reward_attr
@@ -63,7 +67,7 @@ class RayTuneScheduler(object):
         """
         Re-package autogluon-required parameters into tune format
         """
-        tune_args = tune_args.copy()
+        tune_args = deepcopy(tune_args)
         resources = tune_args.pop('resource', None)
         if resources:
             if 'resources_per_trial' in tune_args:
@@ -73,14 +77,29 @@ class RayTuneScheduler(object):
             if 'num_gpus' in resources:
                 resources['gpu'] = resources.pop('num_gpus')
             tune_args['resources_per_trial'] = resources
-        if 'time_out' in tune_args:
-            if 'time_budget_s' in tune_args:
-                logger.warning("'time_budget_s' is overridden with 'time_out' option, consider removing it and using only 'time_out' option")
 
-            tune_args['time_budget_s'] = tune_args.pop('time_out')
+        ag_to_tune_arg_mapping = {
+            'time_out': 'time_budget_s',
+            'num_trials': 'num_samples',
+        }
+
+        for ag_arg, tune_arg in ag_to_tune_arg_mapping.items():
+            self._replace_ag_arg_with_tune(tune_args, ag_arg, tune_arg)
 
         tune_args['metric'] = reward_attr
+
+        ignore_args = ['searcher', 'search_options', 'checkpoint', 'visualizer', 'dist_ip_addrs', 'resume']
+        tune_args = {k: v for k, v in tune_args.items() if k not in ignore_args}
+
+        tune_args
+
         return tune_args
+
+    def _replace_ag_arg_with_tune(self, tune_args, ag_arg, tune_arg):
+        if ag_arg in tune_args:
+            if tune_arg in tune_args:
+                logger.warning(f"'{tune_arg}' is overridden with '{ag_arg}' option, consider removing it and using only '{ag_arg}' option")
+            tune_args[tune_arg] = tune_args.pop(ag_arg)
 
     def train_fn_wrapper(self, fn, config, reporter=None, **kwargs):
         config = EasyDict(config)

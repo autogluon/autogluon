@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 import os
+import pathlib
 import math
 import pickle
 import time
@@ -59,7 +60,7 @@ def setup_outputdir(path, warn_if_exist=True):
     if path is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = f"AutogluonModels/ag-{timestamp}{os.path.sep}"
+        path = f"{pathlib.Path().absolute()}/AutogluonModels/ag-{timestamp}{os.path.sep}"
         for i in range(1, 1000):
             try:
                 os.makedirs(path, exist_ok=False)

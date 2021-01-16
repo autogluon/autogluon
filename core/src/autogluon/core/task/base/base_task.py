@@ -5,6 +5,7 @@ import time
 from abc import abstractmethod
 
 from ...scheduler import *
+from ...tune.tune_scheduler import RayTuneScheduler
 from ...utils import in_ipynb, try_import_mxnet
 from ...utils.utils import setup_compute
 
@@ -23,7 +24,9 @@ schedulers = {
     'hyperband': HyperbandScheduler,
     'rl': RLScheduler,
     'bayesopt': FIFOScheduler,
-    'bayesopt_hyperband': HyperbandScheduler}
+    'bayesopt_hyperband': HyperbandScheduler,
+    'raytune': RayTuneScheduler,
+}
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
