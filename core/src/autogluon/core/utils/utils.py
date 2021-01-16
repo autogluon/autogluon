@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 import os
+import pathlib
 from collections import defaultdict
 from datetime import datetime
 
@@ -47,7 +48,7 @@ def setup_outputdir(output_directory):
     if output_directory is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        output_directory = f"AutogluonModels/ag-{timestamp}{os.path.sep}"
+        output_directory = f"{pathlib.Path().absolute()}/AutogluonModels/ag-{timestamp}{os.path.sep}"
         for i in range(1, 1000):
             try:
                 os.makedirs(output_directory, exist_ok=False)

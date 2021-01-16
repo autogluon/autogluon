@@ -7,6 +7,7 @@
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
+import pathlib
 import random, json, time, os, logging, warnings
 from collections import OrderedDict
 
@@ -703,6 +704,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                     logger.log(15, str(hyperparam)+ ":   "+str(params_copy[hyperparam]))
 
         util_args = dict(
+            # using absolute path - child jobs can have different working directory
+            # this allow to load datasets consistently
+            directory=str(pathlib.Path().absolute()) + '/',
             train_path=train_path,
             val_path=val_path,
             model=self,

@@ -9,13 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 @args()
-def tabular_nn_trial(args, reporter):
+def tabular_nn_trial(args, reporter, checkpoint_dir=None):
     """ Training and evaluation function used during a single trial of HPO """
     try:
         model, args, util_args = model_trial.prepare_inputs(args=args)
+        print(util_args)
 
-        train_dataset = TabularNNDataset.load(util_args.train_path)
-        val_dataset = TabularNNDataset.load(util_args.val_path)
+        train_dataset = TabularNNDataset.load(util_args.directory + util_args.train_path)
+        val_dataset = TabularNNDataset.load(util_args.directory + util_args.val_path)
         y_val = val_dataset.get_labels()
 
         fit_model_args = dict(X_train=train_dataset, y_train=None, X_val=val_dataset)
