@@ -1269,18 +1269,18 @@ class TabularPredictorV1:
 
     def plot_ensemble_model(self, prune_unused_nodes=True):
         """
-            Output the visualized stack ensemble architecture of a model trained by `fit()`. 
-            The plot is stored to a file, `ensemble_model.png` in folder `Predictor.output_directory` 
+        Output the visualized stack ensemble architecture of a model trained by `fit()`.
+        The plot is stored to a file, `ensemble_model.png` in folder `predictor.path`
 
-            This function requires `graphviz` and `pygraphviz` to be installed because this visualization depends on those package.
-            Unless this function will raise `ImportError` without being able to generate the visual of the ensemble model.
+        This function requires `graphviz` and `pygraphviz` to be installed because this visualization depends on those package.
+        Unless this function will raise `ImportError` without being able to generate the visual of the ensemble model.
 
-            To install the required package, run the below commands (for Ubuntu linux):
+        To install the required package, run the below commands (for Ubuntu linux):
 
-            $ sudo apt-get install graphviz
-            $ pip install graphviz
+        $ sudo apt-get install graphviz
+        $ pip install graphviz
 
-            For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/documentation.html for PyGraphviz.
+        For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/documentation.html for PyGraphviz.
 
 
         Parameters
