@@ -262,11 +262,11 @@ class TextPrediction(BaseTask):
 
         Parameters
         ----------
-        train_data : :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`
+        train_data : :class:`autogluon.tabular.TabularDataset` or :class:`pd.DataFrame`
             Training dataset where rows = individual training examples, columns = features.
         label : str
             Name of the label column. It can be a stringBy default, we will search for a column named
-        tuning_data : :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
+        tuning_data : :class:`autogluon.tabular.TabularDataset` or :class:`pd.DataFrame`, default = None
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
             If `tuning_data = None`, `fit()` will automatically hold out random examples from `train_data` for validation.
         time_limits : int or str, default = None
