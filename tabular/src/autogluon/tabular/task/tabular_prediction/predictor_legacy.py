@@ -67,10 +67,10 @@ class TabularPredictorV1:
     Examples
     --------
     >>> from autogluon.tabular import TabularPrediction as task
-    >>> train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+    >>> train_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
     >>> predictor = task.fit(train_data=train_data, label='class')
     >>> results = predictor.fit_summary()
-    >>> test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+    >>> test_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
     >>> perf = predictor.evaluate(test_data)
 
     """
@@ -1344,9 +1344,9 @@ class TabularPredictorV1:
         if isinstance(dataset, TabularDataset):
             return dataset
         elif isinstance(dataset, pd.DataFrame):
-            return TabularDataset(df=dataset)
+            return TabularDataset(dataset)
         elif isinstance(dataset, str):
-            return TabularDataset(file_path=dataset)
+            return TabularDataset(dataset)
         elif isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                    To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")

@@ -12,7 +12,7 @@ from autogluon.tabular import TabularDataset, TabularPredictor
 
 import numpy as np
 
-train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 subsample_size = 500  # subsample subset of data for faster demo, try setting this to much larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
@@ -20,7 +20,7 @@ print(train_data.head())
 label_column = 'occupation'
 print("Summary of occupation column: \n", train_data['occupation'].describe())
 
-new_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+new_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 test_data = new_data[5000:].copy()  # this should be separate data in your applications
 y_test = test_data[label_column]
 test_data_nolabel = test_data.drop(columns=[label_column])  # delete label column

@@ -61,13 +61,13 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     >>> feature_generator = BulkFeatureGenerator(generators=generators, verbosity=3)
     >>>
     >>> label_column = 'class'
-    >>> train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+    >>> train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
     >>> X_train = train_data.drop(labels=[label_column], axis=1)
     >>> y_train = train_data[label_column]
     >>>
     >>> X_train_transformed = feature_generator.fit_transform(X=X_train, y=y_train)
     >>>
-    >>> test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+    >>> test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
     >>>
     >>> X_test_transformed = feature_generator.transform(test_data)
     """

@@ -12,7 +12,7 @@ from autogluon.tabular import TabularDataset, TabularPredictor
 Load training data from a [CSV file](https://en.wikipedia.org/wiki/Comma-separated_values) into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
 
 ```{.python .input}
-train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 subsample_size = 500  # subsample subset of data for faster demo, try setting this to much larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
@@ -38,7 +38,7 @@ predictor = TabularPredictor(label=label_column, path=save_path).fit(train_data)
 Next, load separate test data to demonstrate how to make predictions on new examples at inference time:
 
 ```{.python .input}
-test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 y_test = test_data[label_column]  # values to predict
 test_data_nolab = test_data.drop(columns=[label_column])  # delete label column to prove we're not cheating
 print(test_data_nolab.head())

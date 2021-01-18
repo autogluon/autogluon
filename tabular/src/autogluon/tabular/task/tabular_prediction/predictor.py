@@ -124,7 +124,6 @@ class TabularPredictor(TabularPredictorV1):
 
         # TODO: Move num_cpus/num_gpus to ag_args_fit
         # TODO: Add logging for which presets were used
-        # TODO: TabularDataset 'file_path' make so it does not have to be named. Same with 'df'.
         # TODO: Add generic documentation to hyperparameter_tune_kwargs
         # TODO: Remove all `time_limits` in project, replace with `time_limit`
 
@@ -479,10 +478,10 @@ class TabularPredictor(TabularPredictorV1):
         Examples
         --------
         >>> from autogluon.tabular import TabularDataset, TabularPredictor
-        >>> train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+        >>> train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
         >>> label = 'class'
         >>> predictor = TabularPredictor(label=label).fit(train_data)
-        >>> test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+        >>> test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
         >>> leaderboard = predictor.leaderboard(test_data)
         >>> y_test = test_data[label]
         >>> test_data = test_data.drop(labels=[label], axis=1)
@@ -954,11 +953,11 @@ class TabularPredictor(TabularPredictorV1):
 
     def _validate_fit_data(self, train_data, tuning_data=None, unlabeled_data=None):
         if isinstance(train_data, str):
-            train_data = TabularDataset(file_path=train_data)
+            train_data = TabularDataset(train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
-            tuning_data = TabularDataset(file_path=tuning_data)
+            tuning_data = TabularDataset(tuning_data)
         if unlabeled_data is not None and isinstance(unlabeled_data, str):
-            unlabeled_data = TabularDataset(file_path=unlabeled_data)
+            unlabeled_data = TabularDataset(unlabeled_data)
 
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")

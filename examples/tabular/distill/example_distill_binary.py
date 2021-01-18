@@ -12,10 +12,10 @@ label = 'class'  # specifies which column do we want to predict
 train_file_path = 'https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv'
 test_file_path = 'https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv'
 
-train_data = TabularDataset(file_path=train_file_path)
+train_data = TabularDataset(train_file_path)
 train_data = train_data.head(subsample_size)  # subsample for faster demo
 
-test_data = TabularDataset(file_path=test_file_path)
+test_data = TabularDataset(test_file_path)
 test_data = test_data.head(subsample_size)  # subsample for faster run
 
 # Fit model ensemble:
@@ -26,7 +26,7 @@ predictor = TabularPredictor(label).fit(train_data, auto_stack=True, time_limit=
 time_limit = 60  # set = None to fully train distilled models
 
 # aug_data below is optional, but this could be additional unlabeled data you may have. Here we use the training data for demonstration, but you should only use new data here:
-aug_data = TabularDataset(file_path=train_file_path)
+aug_data = TabularDataset(train_file_path)
 aug_data = aug_data.head(subsample_size)
 
 distilled_model_names = predictor.distill(time_limit=time_limit, augment_args={'num_augmented_samples': 100})  # default distillation (time_limit & augment_args are also optional, here set to suboptimal values to ensure quick runtime)

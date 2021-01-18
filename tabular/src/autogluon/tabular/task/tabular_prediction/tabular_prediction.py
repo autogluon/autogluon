@@ -477,10 +477,10 @@ class TabularPrediction(BaseTask):
         Examples
         --------
         >>> from autogluon.tabular import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+        >>> train_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
         >>> label_column = 'class'
         >>> predictor = task.fit(train_data=train_data, label=label_column)
-        >>> test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+        >>> test_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
         >>> y_test = test_data[label_column]
         >>> test_data = test_data.drop(labels=[label_column], axis=1)
         >>> y_pred = predictor.predict(test_data)
@@ -551,9 +551,9 @@ class TabularPrediction(BaseTask):
         unlabeled_data = kwargs.get('unlabeled_data', None)
 
         if isinstance(train_data, str):
-            train_data = TabularDataset(file_path=train_data)
+            train_data = TabularDataset(train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
-            tuning_data = TabularDataset(file_path=tuning_data)
+            tuning_data = TabularDataset(tuning_data)
 
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
