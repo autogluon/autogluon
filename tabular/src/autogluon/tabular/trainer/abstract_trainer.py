@@ -199,9 +199,8 @@ class AbstractTrainer:
 
         return path, model_paths
 
-    # TODO: Rename to .fit in v0.1
     # TODO: Consider having AbstractTrainer inherit from AbstractModel in v0.1
-    def train(self, X_train, y_train, hyperparameters: dict, X_val=None, y_val=None, **kwargs):
+    def fit(self, X_train, y_train, hyperparameters: dict, X_val=None, y_val=None, **kwargs):
         raise NotImplementedError
 
     # TODO: v0.1 add invalid_model_names argument
@@ -1200,7 +1199,7 @@ class AbstractTrainer:
                                                             k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, time_limit_total_level=time_limit_total_level, **kwargs)
         return model_names_trained
 
-    def _train_multi_and_ensemble(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, stack_ensemble_levels=0, time_limit=None, **kwargs) -> List[str]:
+    def _train_multi_and_ensemble(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, num_stack_levels=0, time_limit=None, **kwargs) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if self.save_data and not self.is_data_saved:
             self.save_X_train(X_train)
@@ -1216,7 +1215,7 @@ class AbstractTrainer:
             self._num_rows_train += len(X_val)
         self._num_cols_train = len(list(X_train.columns))
         model_names_fit = self.train_multi_levels(X_train, y_train, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
-                                                  X_unlabeled=X_unlabeled, level_start=0, level_end=stack_ensemble_levels, time_limit=time_limit, **kwargs)
+                                                  X_unlabeled=X_unlabeled, level_start=0, level_end=num_stack_levels, time_limit=time_limit, **kwargs)
         if len(self.get_model_names()) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
         return model_names_fit
@@ -1560,7 +1559,7 @@ class AbstractTrainer:
             best_model_score_val = None
             best_model_stack_level = None
         # fit_time = None
-        num_bagging_folds = self.k_fold
+        num_bag_folds = self.k_fold
         max_core_stack_level = self.get_max_level('core')
         max_stack_level = self.get_max_level()
 
@@ -1593,7 +1592,7 @@ class AbstractTrainer:
             'best_model_score_val': best_model_score_val,
             'best_model_stack_level': best_model_stack_level,
             'num_models_trained': num_models_trained,
-            'num_bagging_folds': num_bagging_folds,
+            'num_bag_folds': num_bag_folds,
             'max_stack_level': max_stack_level,
             'max_core_stack_level': max_core_stack_level,
         }

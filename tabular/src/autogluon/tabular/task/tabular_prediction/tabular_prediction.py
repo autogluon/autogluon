@@ -721,7 +721,7 @@ class TabularPrediction(BaseTask):
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                     hyperparameter_tune_kwargs=scheduler_options, feature_prune=feature_prune,
-                    holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
+                    holdout_frac=holdout_frac, num_bag_folds=num_bagging_folds, num_bag_sets=num_bagging_sets, num_stack_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, core_kwargs=core_kwargs,
                     time_limit=time_limit_orig, save_bag_folds=save_bag_folds, verbosity=verbosity)
 

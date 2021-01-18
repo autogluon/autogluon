@@ -389,7 +389,7 @@ class TabularPredictorV1:
             'model_paths': self._trainer.get_models_attribute_dict('path'),  # dict with key = model-name, value = path to model file
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
-            'num_bagging_folds': self._trainer.k_fold,
+            'num_bag_folds': self._trainer.k_fold,
             'max_stack_level': self._trainer.get_max_level(),
             'feature_prune': self._trainer.feature_prune,
             'hyperparameter_tune': hpo_used,
@@ -416,9 +416,9 @@ class TabularPredictorV1:
             print("Types of models trained:")
             print(unique_model_types)
             num_fold_str = ""
-            bagging_used = results['num_bagging_folds'] > 0
+            bagging_used = results['num_bag_folds'] > 0
             if bagging_used:
-                num_fold_str = f" (with {results['num_bagging_folds']} folds)"
+                num_fold_str = f" (with {results['num_bag_folds']} folds)"
             print("Bagging used: %s %s" % (bagging_used, num_fold_str))
             num_stack_str = ""
             stacking_used = results['max_stack_level'] > 1  # TODO: v0.1 increment by 1 when refactoring level names
@@ -747,7 +747,7 @@ class TabularPredictorV1:
             Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
             This process will typically result in a slight accuracy reduction and a large inference speedup.
             The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
-                The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
+                The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bag_folds`) and n is the number of finished repeats (`num_bag_sets`) in the bagged ensemble.
             The runtime is generally 10% or less of the original fit runtime.
                 The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
         For non-bagged models:

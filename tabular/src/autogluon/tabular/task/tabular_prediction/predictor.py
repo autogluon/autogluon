@@ -28,10 +28,12 @@ logger = logging.getLogger()  # return root logger
 # TODO: num_cpus/num_gpus -> ag_args_fit
 # TODO: num_bag_sets -> ag_args
 # TODO: save_bag_folds -> ag_args_ensemble
-
-# Extra TODOs (Stretch)
+# TODO: make core_kwargs a kwargs argument to predictor.fit,
 # TODO: HPO in fit_extra, HPO via ag_args, per model.
-# TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
+# TODO: Document predictor attributes
+
+# Extra TODOs (Stretch): Can occur post v0.1
+# TODO: add aux_kwargs to predictor.fit
 # TODO: add pip freeze + python version output after fit + log file, validate that same pip freeze on load as cached
 # TODO: predictor.clone()
 # TODO: Add logging comments that models are serialized on disk after fit
@@ -147,7 +149,7 @@ class TabularPredictor(TabularPredictorV1):
             This dataset should be in the same format as `train_data`.
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
             Note: final model returned may be fit on `tuning_data` as well as `train_data`. Do not provide your evaluation test data here!
-            In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
+            In particular, when `num_bag_folds` > 0 or `num_stack_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
         time_limit : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
@@ -489,7 +491,7 @@ class TabularPredictor(TabularPredictorV1):
         >>> test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
         >>> leaderboard = predictor.leaderboard(test_data)
         >>> y_test = test_data[label]
-        >>> test_data = test_data.drop(labels=[label], axis=1)
+        >>> test_data = test_data.drop(columns=[label])
         >>> y_pred = predictor.predict(test_data)
         >>> perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred)
 
@@ -592,7 +594,7 @@ class TabularPredictor(TabularPredictorV1):
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           hyperparameter_tune_kwargs=scheduler_options,
-                          holdout_frac=holdout_frac, num_bagging_folds=num_bag_folds, num_bagging_sets=num_bag_sets, stack_ensemble_levels=num_stack_levels,
+                          holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs,
                           time_limit=time_limit, save_bag_folds=save_bag_folds, verbosity=verbosity)
         self._set_post_fit_vars()
