@@ -24,6 +24,24 @@ from ...trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
 
+# TODO: Add generic documentation to hyperparameter_tune_kwargs
+# TODO: Move num_cpus/num_gpus to ag_args_fit
+# TODO: num_bag_sets -> ag_args
+# TODO: save_bagged_folds -> save_bag_folds -> ag_args_ensemble
+# TODO: id_columns -> ignored_columns
+
+# Extra TODOs (Stretch)
+# TODO: HPO in fit_extra, HPO via ag_args, per model.
+# TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
+# TODO: add pip freeze + python version output after fit + log file, validate that same pip freeze on load as cached
+# TODO: predictor.clone()
+# TODO: Add logging comments that models are serialized on disk after fit
+# TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
+# TODO: Resolve raw text feature usage in default feature generator
+
+# Done for Tabular
+# TODO: Remove all `time_limits` in project, replace with `time_limit`
+
 
 class TabularPredictor(TabularPredictorV1):
     """
@@ -82,8 +100,6 @@ class TabularPredictor(TabularPredictorV1):
     """
     predictor_file_name = 'predictor.pkl'
 
-    # TODO: v0.1 add pip freeze + python version output after fit + log file, validate that same pip freeze on load as cached
-    # TODO: v0.1 predictor.clone()
     def __init__(
             self,
             label,
@@ -120,17 +136,7 @@ class TabularPredictor(TabularPredictorV1):
             feature_metadata='infer',
             **kwargs):
         """
-        Fit models to predict a column of data table based on the other columns.
-
-        # TODO: Move num_cpus/num_gpus to ag_args_fit
-        # TODO: Add logging for which presets were used
-        # TODO: Add generic documentation to hyperparameter_tune_kwargs
-        # TODO: Remove all `time_limits` in project, replace with `time_limit`
-
-        # Extra TODOs (Stretch)
-        # TODO: Add logging comments that models are serialized on disk after fit
-        # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
-        # TODO: Resolve raw text feature usage in default feature generator
+        Fit models to predict a column of a data table (label) based on the other columns (features).
 
         Parameters
         ----------
@@ -567,7 +573,7 @@ class TabularPredictor(TabularPredictorV1):
         )
 
         if hyperparameter_tune_kwargs is not None:
-            scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels)
+            scheduler_options = self._init_scheduler_tabular(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels)
         else:
             scheduler_options = None
         hyperparameter_tune = scheduler_options is not None
@@ -579,13 +585,11 @@ class TabularPredictor(TabularPredictorV1):
 
         if ag_args_fit is None:
             ag_args_fit = dict()
-        # TODO: v0.1: Update to be 'auto' or None by default to give full control to individual models.
         if 'num_cpus' not in ag_args_fit and num_cpus != 'auto':
             ag_args_fit['num_cpus'] = num_cpus
         if 'num_gpus' not in ag_args_fit and num_gpus != 'auto':
             ag_args_fit['num_gpus'] = num_gpus
 
-        # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           hyperparameter_tune_kwargs=scheduler_options,
@@ -675,6 +679,7 @@ class TabularPredictor(TabularPredictorV1):
 
         # TODO: Allow disable aux (default to disabled)
         # TODO: num_bag_sets
+        # num_bag_sets = kwargs['num_bag_sets']
         num_stack_levels = kwargs['num_stack_levels']
         hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
         num_cpus = kwargs['num_cpus']
@@ -701,7 +706,7 @@ class TabularPredictor(TabularPredictorV1):
             num_stack_levels = highest_level
 
         if hyperparameter_tune_kwargs is not None:
-            scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, self._trainer.k_fold, num_stack_levels)
+            scheduler_options = self._init_scheduler_tabular(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, self._trainer.k_fold, num_stack_levels)
         else:
             scheduler_options = None
         hyperparameter_tune = scheduler_options is not None
@@ -745,8 +750,7 @@ class TabularPredictor(TabularPredictorV1):
         self.save()
         return self
 
-    # TODO: Move to generic, migrate all tasks to same kwargs logic
-    def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels):
+    def _init_scheduler_tabular(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels):
         num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)  # TODO: use 'auto' downstream
         time_limit_hpo = time_limit
         if num_bag_folds >= 2 and (time_limit_hpo is not None):
@@ -755,6 +759,26 @@ class TabularPredictor(TabularPredictorV1):
         time_limit_hpo, num_trials = setup_trial_limits(time_limit_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
         if time_limit is not None:
             time_limit_hpo = None
+        scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_limit=time_limit_hpo, num_trials=num_trials, num_cpus=num_cpus, num_gpus=num_gpus)
+        if scheduler_options is None:
+            return None
+
+        assert scheduler_options[1]['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
+        # TODO: Fix or remove in v0.1
+        if scheduler_options[1].get('dist_ip_addrs', None):
+            logger.log(30, 'Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
+
+        if scheduler_options[1]['num_trials'] == 1:
+            logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, disabling HPO.')
+            return None  # FIXME
+
+        return scheduler_options
+
+    # TODO: Move to generic, migrate all tasks to same kwargs logic
+    def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit=None, num_trials=None, num_cpus=None, num_gpus=None):
+        if num_trials is None:
+            num_trials = 1000
+        num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)  # TODO: use 'auto' downstream
 
         if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, str):
             preset_dict = {
@@ -775,19 +799,10 @@ class TabularPredictor(TabularPredictorV1):
             nthreads_per_trial=num_cpus,
             ngpus_per_trial=num_gpus,
             num_trials=num_trials,
-            time_out=time_limit_hpo,
+            time_out=time_limit,
         )
         if scheduler_options is None:
             return None
-
-        assert scheduler_options['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
-        # TODO: Fix or remove in v0.1
-        if scheduler_options.get('dist_ip_addrs', None):
-            logger.log(30, 'Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
-
-        if scheduler_options['num_trials'] == 1:
-            logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, disabling HPO.')
-            return None  # FIXME
 
         scheduler_cls = schedulers[scheduler_options['searcher'].lower()]
         if scheduler_options['time_out'] is None:

@@ -188,7 +188,7 @@ The `predictor` also remembers what metric predictions should be evaluated with,
 
 ```{.python .input}
 y_pred = predictor.predict(test_data_nolabel)
-predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
+perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
 ```
 
 However, you must be careful here as certain metrics require predicted probabilities rather than classes.
