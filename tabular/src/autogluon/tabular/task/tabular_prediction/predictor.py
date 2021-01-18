@@ -28,7 +28,6 @@ logger = logging.getLogger()  # return root logger
 # TODO: Move num_cpus/num_gpus to ag_args_fit
 # TODO: num_bag_sets -> ag_args
 # TODO: save_bagged_folds -> save_bag_folds -> ag_args_ensemble
-# TODO: id_columns -> ignored_columns
 
 # Extra TODOs (Stretch)
 # TODO: HPO in fit_extra, HPO via ag_args, per model.
@@ -86,7 +85,7 @@ class TabularPredictor(TabularPredictorV1):
         learner_kwargs : dict, default = None
             Kwargs to send to the learner. Options include:
 
-            id_columns : list, default = None
+            ignored_columns : list, default = None
                 Banned subset of column names that predictor may not use as predictive features (e.g. unique identifier to a row or user-ID).
                 These columns are ignored during `fit()`.
             label_count_threshold : int, default = 10
@@ -115,7 +114,7 @@ class TabularPredictor(TabularPredictorV1):
         path = setup_outputdir(path)
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
-        learner_kwargs = kwargs.pop('learner_kwargs', dict())  # TODO: id_columns -> ignored_columns +1
+        learner_kwargs = kwargs.pop('learner_kwargs', dict())
 
         self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None,
                                                       eval_metric=eval_metric, problem_type=problem_type, **learner_kwargs)

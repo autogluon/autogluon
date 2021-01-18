@@ -716,7 +716,7 @@ class TabularPrediction(BaseTask):
             scheduler_options = None
 
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric,
-                          id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
+                          ignored_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold, cache_data=cache_data, random_seed=random_seed)
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
