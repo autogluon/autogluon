@@ -25,9 +25,9 @@ from ...trainer import AbstractTrainer
 logger = logging.getLogger()  # return root logger
 
 # TODO: Add generic documentation to hyperparameter_tune_kwargs
-# TODO: Move num_cpus/num_gpus to ag_args_fit
+# TODO: num_cpus/num_gpus -> ag_args_fit
 # TODO: num_bag_sets -> ag_args
-# TODO: save_bagged_folds -> save_bag_folds -> ag_args_ensemble
+# TODO: save_bag_folds -> ag_args_ensemble
 
 # Extra TODOs (Stretch)
 # TODO: HPO in fit_extra, HPO via ag_args, per model.
@@ -173,11 +173,11 @@ class TabularPredictor(TabularPredictorV1):
                 best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True}
                     Identical to best_quality but additionally trains refit_full models that have slightly lower predictive accuracy but are over 10x faster during inference and require 10x less disk space.
 
-                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False}
+                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
                     High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False, 'hyperparameters': 'light'}
+                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False, 'hyperparameters': 'light'}
                     Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
                     Recommended for applications that require fast inference speed.
 
@@ -378,7 +378,7 @@ class TabularPredictor(TabularPredictorV1):
                 Reference `hyperparameters` documentation for what models correspond to each value.
                 Useful when a particular model type such as 'KNN' or 'custom' is not desired but altering the `hyperparameters` dictionary is difficult or time-consuming.
                     Example: To exclude both 'KNN' and 'custom' models, specify `excluded_model_types=['KNN', 'custom']`.
-            save_bagged_folds : bool, default = True
+            save_bag_folds : bool, default = True
                 If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction.
                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
                     This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
@@ -530,7 +530,7 @@ class TabularPredictor(TabularPredictorV1):
         num_gpus = kwargs['num_gpus']
         feature_generator = kwargs['feature_generator']
         unlabeled_data = kwargs['unlabeled_data']
-        save_bagged_folds = kwargs['save_bagged_folds']
+        save_bag_folds = kwargs['save_bag_folds']
 
         ag_args = kwargs['ag_args']
         ag_args_fit = kwargs['ag_args_fit']
@@ -594,7 +594,7 @@ class TabularPredictor(TabularPredictorV1):
                           hyperparameter_tune_kwargs=scheduler_options,
                           holdout_frac=holdout_frac, num_bagging_folds=num_bag_folds, num_bagging_sets=num_bag_sets, stack_ensemble_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                          time_limit=time_limit, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                          time_limit=time_limit, save_bag_folds=save_bag_folds, verbosity=verbosity)
         self._set_post_fit_vars()
 
         self._post_fit(
@@ -683,7 +683,7 @@ class TabularPredictor(TabularPredictorV1):
         hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
         num_cpus = kwargs['num_cpus']
         num_gpus = kwargs['num_gpus']
-        # save_bagged_folds = kwargs['save_bagged_folds']  # TODO: Enable
+        # save_bag_folds = kwargs['save_bag_folds']  # TODO: Enable
 
         ag_args = kwargs['ag_args']
         ag_args_fit = kwargs['ag_args_fit']
@@ -884,7 +884,7 @@ class TabularPredictor(TabularPredictorV1):
 
         # TODO:
         #  Valid core_kwargs values:
-        #  ag_args, ag_args_fit, ag_args_ensemble, save_bagged_folds, stack_name, ensemble_type, name_suffix, time_limit
+        #  ag_args, ag_args_fit, ag_args_ensemble, save_bag_folds, stack_name, ensemble_type, name_suffix, time_limit
         #  Valid aux_kwargs values:
         #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
 
@@ -923,7 +923,7 @@ class TabularPredictor(TabularPredictorV1):
             ag_args_fit=None,
             ag_args_ensemble=None,
             excluded_model_types=None,
-            save_bagged_folds=True,  # TODO: Move to ag_args_ensemble
+            save_bag_folds=True,  # TODO: Move to ag_args_ensemble
 
             # aux_kwargs -> +1 nest
 

@@ -262,7 +262,7 @@ class TabularPredictorV1:
             'stack_level': The stack level of the model.
                 A model with stack level N can take any set of models with stack level less than N as input, with stack level 0 models having no model inputs.
             'can_infer': If model is able to perform inference on new data. If False, then the model either was not saved, was deleted, or an ancestor of the model cannot infer.
-                `can_infer` is often False when `save_bagged_folds=False` was specified in initial `task.fit`.
+                `can_infer` is often False when `save_bag_folds=False` was specified in initial `task.fit`.
             'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth model fit has `fit_order=N`. The order corresponds to the first child model fit in the case of bagged ensembles.
 
         Parameters

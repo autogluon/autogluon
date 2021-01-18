@@ -42,7 +42,7 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, eval_metric=None,
                  num_classes=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
-                 save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2):
+                 save_data=False, save_bag_folds=True, random_seed=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
@@ -70,7 +70,7 @@ class AbstractTrainer:
         else:
             self.k_fold = 0
             self.n_repeats = 1
-        self.save_bagged_folds = save_bagged_folds
+        self.save_bag_folds = save_bag_folds
 
         self.model_best = None
 
@@ -298,7 +298,7 @@ class AbstractTrainer:
         return core_models, aux_models
 
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
-                             level=0, base_model_names: List[str] = None, stack_name='core', save_bagged_folds: bool = None,
+                             level=0, base_model_names: List[str] = None, stack_name='core', save_bag_folds: bool = None,
                              ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
@@ -309,8 +309,8 @@ class AbstractTrainer:
         """
         if base_model_names is None:
             base_model_names = []
-        if save_bagged_folds is None:
-            save_bagged_folds = self.save_bagged_folds
+        if save_bag_folds is None:
+            save_bag_folds = self.save_bag_folds
         if not self.bagged_mode and level != 0:
             raise ValueError('Stack Ensembling is not valid for non-bagged mode.')
 
@@ -332,7 +332,7 @@ class AbstractTrainer:
                     'base_model_names': base_model_names,
                     'base_model_paths_dict': base_model_paths,
                     'base_model_types_dict': base_model_types,
-                    'save_bagged_folds': save_bagged_folds,
+                    'save_bag_folds': save_bag_folds,
                     'random_state': level + self.random_seed,
                 }
                 models = self.get_models(models, hyperparameter_tune_kwargs=kwargs.get('hyperparameter_tune_kwargs', None), level=level, name_suffix=name_suffix, ag_args=ag_args, ag_args_fit=ag_args_fit,
@@ -611,7 +611,7 @@ class AbstractTrainer:
                     child_hyperparameters[AG_ARGS_FIT] = copy.deepcopy(model_child.params_aux)
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
                     models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, k_fold=0, n_repeats=1,
-                                                                     base_model_names=base_model_names, name_suffix=REFIT_FULL_SUFFIX, save_bagged_folds=True, check_if_best=False, child_hyperparameters=child_hyperparameters)
+                                                                     base_model_names=base_model_names, name_suffix=REFIT_FULL_SUFFIX, save_bag_folds=True, check_if_best=False, child_hyperparameters=child_hyperparameters)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
                     for model_weighted_ensemble in models_trained:
                         model_loaded = self.load_model(model_weighted_ensemble)
@@ -621,7 +621,7 @@ class AbstractTrainer:
                         self.save_model(model_loaded)
                 else:
                     models_trained = self.stack_new_level_core(X=X_full, y=y_full, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME,
-                                                               hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=0, n_repeats=1, save_bagged_folds=True, ensemble_type=stacker_type)
+                                                               hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=0, n_repeats=1, save_bag_folds=True, ensemble_type=stacker_type)
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
                 for model_trained in models_trained:
@@ -802,9 +802,9 @@ class AbstractTrainer:
             logger.log(30, f'No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.')
         return unpersisted_models
 
-    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix: str = None, save_bagged_folds=None, check_if_best=True, child_hyperparameters=None) -> List[str]:
-        if save_bagged_folds is None:
-            save_bagged_folds = self.save_bagged_folds
+    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None) -> List[str]:
+        if save_bag_folds is None:
+            save_bag_folds = self.save_bag_folds
         if len(base_model_names) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return []
@@ -827,7 +827,7 @@ class AbstractTrainer:
                 base_model_types_inner_dict=self.get_models_attribute_dict(attribute='type_inner', models=base_model_names),
                 base_model_performances_dict=self.get_models_attribute_dict(attribute='val_score', models=base_model_names),
                 hyperparameters=hyperparameters,
-                save_bagged_folds=save_bagged_folds,
+                save_bag_folds=save_bag_folds,
                 random_state=level + self.random_seed,
             ),
             ag_args={'name_bag_suffix': ''},

@@ -122,11 +122,11 @@ class TabularPrediction(BaseTask):
                 best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True}
                     Identical to best_quality but additionally trains refit_full models that have slightly lower predictive accuracy but are over 10x faster during inference and require 10x less disk space.
 
-                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False}
+                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
                     High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False, 'hyperparameters': 'light'}
+                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False, 'hyperparameters': 'light'}
                     Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
                     Recommended for applications that require fast inference speed.
 
@@ -347,7 +347,7 @@ class TabularPrediction(BaseTask):
             label_count_threshold : int, default = 10
                 For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
                 AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
-            save_bagged_folds : bool, default = True
+            save_bag_folds : bool, default = True
                 If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction after `fit()`.
                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
                     This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
@@ -515,7 +515,7 @@ class TabularPrediction(BaseTask):
             'label_count_threshold',
             'id_columns',
             'set_best_to_refit_full',
-            'save_bagged_folds',
+            'save_bag_folds',
             'keep_only_best',
             'save_space',
             'cache_data',
@@ -588,7 +588,7 @@ class TabularPrediction(BaseTask):
         if set_best_to_refit_full and not refit_full:
             raise ValueError('`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
 
-        save_bagged_folds = kwargs.get('save_bagged_folds', True)
+        save_bag_folds = kwargs.get('save_bag_folds', True)
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
@@ -723,7 +723,7 @@ class TabularPrediction(BaseTask):
                     hyperparameter_tune_kwargs=scheduler_options, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                    time_limit=time_limit_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    time_limit=time_limit_orig, save_bag_folds=save_bag_folds, verbosity=verbosity)
 
         predictor = TabularPredictorV1(learner=learner)
 
