@@ -119,7 +119,15 @@ Additional Tabular APIs
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularDataset
+   :no-members:
    :no-inherited-members:
+
+:hidden:`FeatureMetadata`
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: FeatureMetadata
+   :members:
+   :inherited-members:
 
 
 Additional Image Prediction APIs

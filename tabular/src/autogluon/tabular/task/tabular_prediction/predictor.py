@@ -123,22 +123,22 @@ class TabularPredictor(TabularPredictorV1):
         Fit models to predict a column of data table based on the other columns.
 
         # TODO: Move num_cpus/num_gpus to ag_args_fit
-        # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
-        # TODO: Remove all `time_limits` in project, replace with `time_limit`
         # TODO: Add logging for which presets were used
         # TODO: TabularDataset 'file_path' make so it does not have to be named. Same with 'df'.
-        # TODO: Resolve raw text feature usage in default feature generator
         # TODO: Add generic documentation to hyperparameter_tune_kwargs
+        # TODO: Remove all `time_limits` in project, replace with `time_limit`
+
+        # Extra TODOs (Stretch)
         # TODO: Add logging comments that models are serialized on disk after fit
-        # TODO: feature_metadata documentation
-        # TODO: fit_extra documentation
+        # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
+        # TODO: Resolve raw text feature usage in default feature generator
 
         Parameters
         ----------
-        train_data : str or :class:`autogluon.tabular.TabularDataset` or `pandas.DataFrame`
-            Table of the training data, which is similar to pandas DataFrame.
+        train_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            Table of the training data, which is similar to a pandas DataFrame.
             If str is passed, `train_data` will be loaded using the str value as the file path.
-        tuning_data : str or :class:`autogluon.tabular.TabularDataset` or `pandas.DataFrame`, default = None
+        tuning_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
             Another dataset containing validation data reserved for tuning processes such as early stopping and hyperparameter tuning.
             This dataset should be in the same format as `train_data`.
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
@@ -315,10 +315,11 @@ class TabularPredictor(TabularPredictorV1):
                             max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
                             max_base_models_per_type: (int, default=5) Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available, only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
 
-        feature_metadata : :class:`autogluon.tabular.features.FeatureMetadata` or str, default = 'infer'
+        feature_metadata : :class:`autogluon.tabular.FeatureMetadata` or str, default = 'infer'
+            The feature metadata used in various inner logic in feature preprocessing.
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
-            If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying feature_metadata.
-            # TODO: Explain more about FeatureMetadata and where it is used.
+            In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
+            If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -473,7 +474,7 @@ class TabularPredictor(TabularPredictorV1):
 
         Returns
         -------
-        :class:`autogluon.tabular.TabularPredictor` object. Returns self.
+        :class:`TabularPredictor` object. Returns self.
 
         Examples
         --------
@@ -632,15 +633,31 @@ class TabularPredictor(TabularPredictorV1):
         if save_space:
             self.save_space()
 
-    # TODO: Documentation
-    # Enables extra fit calls after the original fit
-    def fit_extra(
-            self, hyperparameters, time_limit=None,
-            base_model_names=None, fit_new_weighted_ensemble=True, relative_stack=True,  # kwargs
-            # core_kwargs=None,
-            aux_kwargs=None, **kwargs
-    ):
-        # TODO: Allow disable aux (default to disabled)
+    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
+        """
+        Fits additional models after the original :meth:`TabularPredictor.fit` call.
+        The original train_data and tuning_data will be used to train the models.
+
+        Parameters
+        ----------
+        hyperparameters : str or dict
+            Refer to argument documentation in :meth:`TabularPredictor.fit`.
+            If `base_model_names` is specified and hyperparameters is using the level-based key notation,
+            the key of the level which directly uses the base models should be 0. The level in the hyperparameters
+            dictionary is relative, not absolute.
+        time_limit : int, default = None
+            Refer to argument documentation in :meth:`TabularPredictor.fit`.
+        base_model_names : list, default = None
+            The names of the models to use as base models for this fit call.
+            Base models will provide their out-of-fold predictions as additional features to the models in `hyperparameters`.
+            If specified, all models trained will be stack ensembles.
+            If None, models will be trained as if they were specified in :meth:`TabularPredictor.fit`, without depending on existing models.
+            Only valid if bagging is enabled.
+        **kwargs :
+            Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
+            Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
+                [`holdout_frac`, `num_bag_folds`, `auto_stack`, `feature_generator`, `unlabeled_data`]
+        """
         time_start = time.time()
 
         kwargs_orig = kwargs.copy()
@@ -657,6 +674,7 @@ class TabularPredictor(TabularPredictorV1):
             logger.log(20, f'{pprint.pformat(kwargs)}')
             logger.log(20, '========================================')
 
+        # TODO: Allow disable aux (default to disabled)
         # TODO: num_bag_sets
         num_stack_levels = kwargs['num_stack_levels']
         hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
@@ -668,6 +686,9 @@ class TabularPredictor(TabularPredictorV1):
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
+
+        fit_new_weighted_ensemble = False  # TODO v0.1: Add as option
+        aux_kwargs = None  # TODO v0.1: Add as option
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -701,7 +722,8 @@ class TabularPredictor(TabularPredictorV1):
         # TODO: Add special error message if called and training/val data was not cached.
         X_train, y_train, X_val, y_val = self._trainer.load_data()
         fit_models = self._trainer.train_multi_levels(
-            X_train=X_train, y_train=y_train, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val, base_model_names=base_model_names, time_limit=time_limit, relative_stack=relative_stack, level_end=num_stack_levels,
+            X_train=X_train, y_train=y_train, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
+            base_model_names=base_model_names, time_limit=time_limit, relative_stack=True, level_end=num_stack_levels,
             core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
         )
 

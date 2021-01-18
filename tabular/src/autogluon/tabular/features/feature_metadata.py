@@ -3,6 +3,8 @@ import logging
 from typing import Dict, List, Tuple
 from collections import defaultdict
 
+import pandas as pd
+
 from .types import get_type_map_raw, get_type_group_map_special
 
 logger = logging.getLogger(__name__)
@@ -369,7 +371,19 @@ class FeatureMetadata:
             return output_str
 
     @classmethod
-    def from_df(cls, df):
+    def from_df(cls, df: pd.DataFrame):
+        """
+        Construct a feature metadata based on the inferred types of an input :class:`pd.DataFrame`.
+
+        Parameters
+        ----------
+        df : :class:`pd.DataFrame`
+            DataFrame used to infer feature metadata.
+
+        Returns
+        -------
+        :class:`FeatureMetadata` object.
+        """
         type_map_raw = get_type_map_raw(df)
         type_group_map_special = get_type_group_map_special(df)
         return cls(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
