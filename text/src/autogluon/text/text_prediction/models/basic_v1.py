@@ -682,7 +682,7 @@ class BertForTextPredictionBasic:
         net.hybridize()
         ctx_l = get_mxnet_available_ctx()
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
-                            ctx=ctx_l[0])
+                            ctx=ctx_l)
         self._net = net
         mx.npx.waitall()
 
