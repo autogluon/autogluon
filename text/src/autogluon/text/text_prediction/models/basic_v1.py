@@ -889,7 +889,7 @@ class BertForTextPredictionBasic:
                                     cfg=loaded_config.model.network)
         net.hybridize()
         ctx_l = get_mxnet_available_ctx()
-        net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=ctx_l[0])
+        net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=ctx_l)
         model = cls(column_properties=column_properties,
                     label_columns=label_columns,
                     feature_columns=feature_columns,
