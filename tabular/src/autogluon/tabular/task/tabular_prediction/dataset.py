@@ -18,8 +18,8 @@ class TabularDataset(pd.DataFrame):
     Parameters
     ----------
     data : :class:`pd.DataFrame` or str
-        Path to data file (csv or parquet) or loaded :class:`pd.DataFrame`.
-        If you already have your data in a :class:`pd.DataFrame`, you can directly provide it by specifying `data`.
+        If str, path to data file (CSV or Parquet format).
+        If you already have your data in a :class:`pd.DataFrame`, you can specify it here.
 
     Attributes
     ----------
@@ -34,7 +34,6 @@ class TabularDataset(pd.DataFrame):
     --------
     >>> from autogluon.tabular import TabularDataset
     >>> train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-    >>> test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
     >>> train_data.head(30)
     >>> train_data.columns
     """

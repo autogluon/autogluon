@@ -373,12 +373,12 @@ class FeatureMetadata:
     @classmethod
     def from_df(cls, df: pd.DataFrame):
         """
-        Construct a feature metadata based on the inferred types of an input :class:`pd.DataFrame`.
+        Construct FeatureMetadata based on the inferred feature types of an input :class:`pd.DataFrame`.
 
         Parameters
         ----------
         df : :class:`pd.DataFrame`
-            DataFrame used to infer feature metadata.
+            DataFrame used to infer FeatureMetadata.
 
         Returns
         -------

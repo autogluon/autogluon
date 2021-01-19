@@ -173,7 +173,7 @@ class AbstractLearner:
         if self.label in X:
             X = X.drop(columns=[self.label])
         if self.ignored_columns:
-            logger.log(20, f'Dropping ID columns: {self.ignored_columns}')
+            logger.log(20, f'Dropping user-specified ignored columns: {self.ignored_columns}')
             X = X.drop(columns=self.ignored_columns, errors='ignore')
         for feature_generator in self.feature_generators:
             X = feature_generator.fit_transform(X, y)
