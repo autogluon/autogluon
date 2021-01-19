@@ -27,7 +27,6 @@ logger = logging.getLogger()  # return root logger
 # TODO: Add generic documentation to hyperparameter_tune_kwargs
 # TODO: num_cpus/num_gpus -> ag_args_fit
 # TODO: num_bag_sets -> ag_args
-# TODO: save_bag_folds -> ag_args_ensemble
 # TODO: make core_kwargs a kwargs argument to predictor.fit,
 # TODO: HPO in fit_extra, HPO via ag_args, per model.
 # TODO: Document predictor attributes
@@ -164,7 +163,7 @@ class TabularPredictor(TabularPredictorV1):
             For precise definitions of the provided presets, see file: `autogluon/tabular/task/tabular_prediction/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'best_quality_with_high_quality_refit', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
+            Available Presets: ['best_quality', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
@@ -172,14 +171,11 @@ class TabularPredictor(TabularPredictorV1):
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
-                best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True}
-                    Identical to best_quality but additionally trains refit_full models that have slightly lower predictive accuracy but are over 10x faster during inference and require 10x less disk space.
-
-                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
+                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False}
                     High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False, 'hyperparameters': 'light'}
+                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False, 'hyperparameters': 'light'}
                     Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
                     Recommended for applications that require fast inference speed.
 
@@ -320,6 +316,12 @@ class TabularPredictor(TabularPredictorV1):
                             use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
                             max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
                             max_base_models_per_type: (int, default=5) Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available, only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
+                            save_bag_folds: (bool, default=True)
+                                If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction.
+                                If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
+                                    This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
+                                    Particularly useful if disk usage is a concern. By not saving the fold models, bagged models will use only very small amounts of disk space during training.
+                                    In many training runs, this will reduce peak disk usage by >10x.
 
         feature_metadata : :class:`autogluon.tabular.FeatureMetadata` or str, default = 'infer'
             The feature metadata used in various inner logic in feature preprocessing.
@@ -380,13 +382,6 @@ class TabularPredictor(TabularPredictorV1):
                 Reference `hyperparameters` documentation for what models correspond to each value.
                 Useful when a particular model type such as 'KNN' or 'custom' is not desired but altering the `hyperparameters` dictionary is difficult or time-consuming.
                     Example: To exclude both 'KNN' and 'custom' models, specify `excluded_model_types=['KNN', 'custom']`.
-            save_bag_folds : bool, default = True
-                If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction.
-                If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
-                    This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
-                    Particularly useful if disk usage is a concern. By not saving the fold models, bagged models will use only very small amounts of disk space during training.
-                    In many training runs, this will reduce peak disk usage by >10x.
-                This parameter has no effect if bagging is disabled.
             refit_full : bool or str, default = False
                 Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
                 This is equivalent to calling `predictor.refit_full(model=refit_full)` after fit.
@@ -532,7 +527,6 @@ class TabularPredictor(TabularPredictorV1):
         num_gpus = kwargs['num_gpus']
         feature_generator = kwargs['feature_generator']
         unlabeled_data = kwargs['unlabeled_data']
-        save_bag_folds = kwargs['save_bag_folds']
 
         ag_args = kwargs['ag_args']
         ag_args_fit = kwargs['ag_args_fit']
@@ -591,12 +585,17 @@ class TabularPredictor(TabularPredictorV1):
         if 'num_gpus' not in ag_args_fit and num_gpus != 'auto':
             ag_args_fit['num_gpus'] = num_gpus
 
+        if kwargs['_save_bag_folds'] is not None:
+            if ag_args_ensemble is None:
+                ag_args_ensemble = {}
+            ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
+
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           hyperparameter_tune_kwargs=scheduler_options,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                          time_limit=time_limit, save_bag_folds=save_bag_folds, verbosity=verbosity)
+                          time_limit=time_limit, verbosity=verbosity)
         self._set_post_fit_vars()
 
         self._post_fit(
@@ -886,7 +885,7 @@ class TabularPredictor(TabularPredictorV1):
 
         # TODO:
         #  Valid core_kwargs values:
-        #  ag_args, ag_args_fit, ag_args_ensemble, save_bag_folds, stack_name, ensemble_type, name_suffix, time_limit
+        #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
         #  Valid aux_kwargs values:
         #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
 
@@ -925,7 +924,6 @@ class TabularPredictor(TabularPredictorV1):
             ag_args_fit=None,
             ag_args_ensemble=None,
             excluded_model_types=None,
-            save_bag_folds=True,  # TODO: Move to ag_args_ensemble
 
             # aux_kwargs -> +1 nest
 
@@ -941,6 +939,9 @@ class TabularPredictor(TabularPredictorV1):
 
             # other
             verbosity=self.verbosity,
+
+            # private
+            _save_bag_folds=None,
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
@@ -948,7 +949,9 @@ class TabularPredictor(TabularPredictorV1):
             allowed_kwarg_names += extra_valid_keys
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
-                raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
+                public_kwarg_options = [kwarg for kwarg in allowed_kwarg_names if kwarg[0] != '_']
+                public_kwarg_options.sort()
+                raise ValueError(f"Unknown keyword argument specified: {kwarg_name}\nValid kwargs: {public_kwarg_options}")
 
         kwargs_sanitized = fit_extra_kwargs_default.copy()
         kwargs_sanitized.update(kwargs)

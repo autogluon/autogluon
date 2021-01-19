@@ -693,6 +693,11 @@ class TabularPrediction(BaseTask):
         if 'num_gpus' not in ag_args_fit and ngpus_per_trial is not None:
             ag_args_fit['num_gpus'] = ngpus_per_trial
 
+        if save_bag_folds is not None:
+            if ag_args_ensemble is None:
+                ag_args_ensemble = {}
+            ag_args_ensemble['save_bag_folds'] = save_bag_folds
+
         # All models use the same scheduler:
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
@@ -723,7 +728,7 @@ class TabularPrediction(BaseTask):
                     hyperparameter_tune_kwargs=scheduler_options, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bag_folds=num_bagging_folds, num_bag_sets=num_bagging_sets, num_stack_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                    time_limit=time_limit_orig, save_bag_folds=save_bag_folds, verbosity=verbosity)
+                    time_limit=time_limit_orig, verbosity=verbosity)
 
         predictor = TabularPredictorV1(learner=learner)
 

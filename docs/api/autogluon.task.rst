@@ -121,6 +121,7 @@ Additional Tabular APIs
 .. autoclass:: TabularDataset
    :no-members:
    :no-inherited-members:
+   :no-methods:
 
 :hidden:`FeatureMetadata`
 ~~~~~~~~~~~~~~~~~~~~~~~~

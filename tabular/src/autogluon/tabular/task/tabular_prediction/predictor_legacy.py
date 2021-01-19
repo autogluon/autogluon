@@ -939,7 +939,7 @@ class TabularPredictorV1:
             If this has occurred, then the indices and row counts of the returned :class:`pd.Series` in this method may not align with the training data.
             In this case, consider fetching the processed training data using `predictor.load_data_internal()` instead of using the original training data.
             A more benign version of this issue occurs when 'log_loss' wasn't specified as the eval_metric but rare classes were dropped by AutoGluon.
-            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via `predictor.predict`.
+            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via :meth:`TabularPredictor.predict_proba`.
 
         Parameters
         ----------
@@ -985,7 +985,7 @@ class TabularPredictorV1:
     def positive_class(self):
         """
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
-        In binary classification, `predictor.predict_proba()` returns the estimated probability that each row belongs to the positive class.
+        In binary classification, :class:`TabularPredictor.predict_proba()` returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
 
         Returns
@@ -1046,8 +1046,8 @@ class TabularPredictorV1:
         return cls(learner=learner)
 
     def save(self):
-        """ Save this predictor to file in directory specified by this Predictor's `output_directory`.
-            Note that `fit()` already saves the predictor object automatically
+        """ Save this predictor to file in directory specified by this Predictor's `path`.
+            Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
             (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
         self._learner.save()
@@ -1182,7 +1182,7 @@ class TabularPredictorV1:
         """Returns the list of model names trained in this `predictor` object."""
         return self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
 
-    def get_model_names_persisted(self):
+    def get_model_names_persisted(self) -> list:
         """Returns the list of model names which are persisted in memory."""
         return list(self._learner.load_trainer().models.keys())
 
@@ -1268,7 +1268,7 @@ class TabularPredictorV1:
                                      verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
                                      augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
 
-    def plot_ensemble_model(self, prune_unused_nodes=True):
+    def plot_ensemble_model(self, prune_unused_nodes=True) -> str:
         """
         Output the visualized stack ensemble architecture of a model trained by `fit()`.
         The plot is stored to a file, `ensemble_model.png` in folder `predictor.path`
