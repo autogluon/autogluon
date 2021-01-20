@@ -163,7 +163,8 @@ class TabularNNDataset:
 
            # need to use threadpool if forkserver is enabled, otherwise GIL will be locked
             # please note: this will make training slower
-           thread_pool=is_forkserver_enabled(),
+           # thread_pool=is_forkserver_enabled(),
+           thread_pool=True,
         )  # no need to shuffle test data
 
     def has_vector_features(self):

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 @args()
-def model_trial(args, reporter: LocalStatusReporter):
+def model_trial(args, reporter: LocalStatusReporter, checkpoint_dir=None):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
         
         Notes:
