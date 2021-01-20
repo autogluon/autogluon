@@ -1,4 +1,5 @@
 from ...models.gluonts_model.mqcnn.mqcnn_model import MQCNNModel
+from ...models.gluonts_model.sff.simple_feedforward_model import SimpleFeedForwardModel
 from ...models.abstract.abstract_model import AbstractModel
 import copy
 from collections import defaultdict
@@ -10,15 +11,18 @@ logger = logging.getLogger(__name__)
 
 
 MODEL_TYPES = dict(
-    MQCNN=MQCNNModel
+    MQCNN=MQCNNModel,
+    SFF=SimpleFeedForwardModel,
 )
 
 DEFAULT_MODEL_NAMES = {
-    MQCNNModel: "MQCNN"
+    MQCNNModel: "MQCNN",
+    SimpleFeedForwardModel: "SFF",
 }
 
 DEFAULT_MODEL_PRIORITY = dict(
-    MQCNN=50
+    MQCNN=50,
+    SFF=30,
 )
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0

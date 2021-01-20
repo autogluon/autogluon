@@ -78,17 +78,18 @@ class AbstractGluonTSModel(AbstractModel):
         return path
 
     def save(self, path: str = None,):
-        # save self
         if path is None:
             path = self.path
-        file_path = path + self.model_file_name
-        save_pkl.save(path=file_path, object=self)
-
         # save gluonts model
         weight_path = path + self.gluonts_model_path
         os.makedirs(weight_path, exist_ok=True)
         self.model.serialize(Path(weight_path))
         self.model = None
+        # save self
+        file_path = path + self.model_file_name
+        save_pkl.save(path=file_path, object=self)
+
+
         return path
 
     @classmethod
@@ -116,7 +117,9 @@ class AbstractGluonTSModel(AbstractModel):
 
     def predict(self, data, quantiles=None):
         if quantiles is None:
-            quantiles = self.quantiles
+            quantiles = [str(q) for q in self.quantiles]
+        else:
+            quantiles = [str(q) for q in quantiles]
         result_dict = {}
         predicted_targets = list(self.model.predict(data))
         if isinstance(predicted_targets[0], QuantileForecast):
@@ -130,7 +133,7 @@ class AbstractGluonTSModel(AbstractModel):
                 transformed_targets.append(QuantileForecast(forecast_arrays=np.array(tmp),
                                                             start_date=forecast.start_date,
                                                             freq=forecast.freq,
-                                                            forecast_keys=self.quantiles,
+                                                            forecast_keys=quantiles,
                                                             item_id=forecast.item_id))
             predicted_targets = copy.deepcopy(transformed_targets)
             status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
