@@ -4,25 +4,27 @@
 AutoGluon Tasks
 ===============
 
-.. admonition:: Example (image prediction task):
+.. admonition:: Example (Tabular Prediction Task):
 
-   Tell AutoGluon that task is image prediction:
+   Import TabularDataset and TabularPredictor:
 
-   >>> import autogluon.core as ag
-   >>> from autogluon.vision import ImagePredictor as Task
+   >>> from autogluon.tabular import TabularDataset, TabularPredictor
 
-   Load a toy image dataset:
+   Load a tabular dataset:
 
-   >>> train, val, test = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/fashion-mnist-demo.zip')
+   >>> train_data = TabularDataset("https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv")
 
-   Fit classification models:
+   Fit classification models predicting on the "class" column:
 
-   >>> mytask = Task()
-   >>> mytask.fit(train, epochs=2)
+   >>> predictor = TabularPredictor(label="class").fit(train_data)
+
+   Load test data:
+
+   >>> test_data = TabularDataset("https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv")
 
    Evaluate predictions on test data:
 
-   >>> test_acc = mytask.evaluate(test)
+   >>> test_acc = predictor.evaluate(test_data)
 
 
 
