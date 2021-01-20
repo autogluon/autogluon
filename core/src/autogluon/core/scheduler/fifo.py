@@ -241,18 +241,20 @@ class FIFOScheduler(TaskScheduler):
         # For training_history callback mechanism:
         self._training_history_callback_last_block = -1
         self._training_history_callback_last_len = len(self.training_history)
-
-        logger.info('Starting Experiments')
-        logger.info(f'Num of Finished Tasks is {self.num_finished_tasks}')
+        log_suffix = ''
+        if time_out is not None:
+            log_suffix = f' (time_out={round(time_out, 2)}s)'
+        elif num_trials is not None:
+            log_suffix = f' (num_trials={num_trials - self.num_finished_tasks})'
+        logger.info(f'Starting Hyperparameter Tuning ...{log_suffix}')
+        logger.log(15, f'Num of Finished Tasks is {self.num_finished_tasks}')
         if num_trials is not None:
-            logger.info(f'Num of Pending Tasks is {num_trials - self.num_finished_tasks}')
+            logger.log(15, f'Num of Pending Tasks is {num_trials - self.num_finished_tasks}')
             tbar = tqdm(range(self.num_finished_tasks, num_trials))
         else:
             # In this case, only stopping by time_out is used. We do not display
             # a progress bar then
             tbar = range(self.num_finished_tasks, 100000)
-        if time_out is not None:
-            logger.info(f'Time out (secs) is {time_out}')
         for _ in tbar:
             # Quick check if resources are available before we check the time limit
             # This is to prevent booking next job while we are waiting for a resource, which

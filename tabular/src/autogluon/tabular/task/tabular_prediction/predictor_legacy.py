@@ -1019,7 +1019,7 @@ class TabularPredictorV1:
         """
         logger.setLevel(verbosity2loglevel(verbosity))  # Reset logging after load (may be in new Python session)
         if output_directory is None:
-            raise ValueError("output_directory cannot be None in load()")
+            raise ValueError("path cannot be None in load()")
 
         output_directory = setup_outputdir(output_directory, warn_if_exist=False)  # replace ~ with absolute path if it exists
         learner = Learner.load(output_directory)

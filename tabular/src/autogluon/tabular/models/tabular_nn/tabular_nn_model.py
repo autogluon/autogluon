@@ -734,7 +734,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         scheduler.run()
         scheduler.join_jobs()
-        scheduler.get_training_curves(plot=False, use_legend=False)
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
 

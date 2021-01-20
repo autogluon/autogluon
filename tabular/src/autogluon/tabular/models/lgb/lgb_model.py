@@ -299,7 +299,9 @@ class LGBModel(AbstractModel):
         num_threads = scheduler_options['resource'].get('num_cpus', -1)
         params_copy['num_threads'] = num_threads
         # num_gpus = scheduler_options['resource']['num_gpus'] # TODO: unused
-
+        # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+        warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+        warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, y_train=y_train, params=params_copy, X_val=X_val, y_val=y_val)
         dataset_train_filename = "dataset_train.bin"
         train_file = self.path + dataset_train_filename

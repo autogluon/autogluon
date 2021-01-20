@@ -1012,6 +1012,7 @@ class AbstractTrainer:
             elif k_fold_start != 0:
                 raise ValueError(f'k_fold_start must be 0 to hyperparameter_tune, value = {k_fold_start}')
             # hpo_models (dict): keys = model_names, values = model_paths
+            logging.log(20, f'Hyperparameter tuning model: {model.name} ...')
             try:
                 if isinstance(model, BaggedEnsembleModel):
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)

@@ -7,8 +7,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from autogluon.core.task.base import compile_scheduler_options_v2
-from autogluon.core.task.base.base_task import schedulers
+from autogluon.core.scheduler.scheduler_constructor import init_scheduler
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
@@ -759,7 +758,7 @@ class TabularPredictor(TabularPredictorV1):
         time_limit_hpo, num_trials = setup_trial_limits(time_limit_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
         if time_limit is not None:
             time_limit_hpo = None
-        scheduler_options = self._init_scheduler(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_limit=time_limit_hpo, num_trials=num_trials, num_cpus=num_cpus, num_gpus=num_gpus)
+        scheduler_options = init_scheduler(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_limit=time_limit_hpo, num_trials=num_trials, num_cpus=num_cpus, num_gpus=num_gpus)
         if scheduler_options is None:
             return None
 
@@ -772,42 +771,6 @@ class TabularPredictor(TabularPredictorV1):
             logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, disabling HPO.')
             return None  # FIXME
 
-        return scheduler_options
-
-    # TODO: Move to generic, migrate all tasks to same kwargs logic
-    def _init_scheduler(self, hyperparameter_tune_kwargs, time_limit=None, num_trials=None, num_cpus=None, num_gpus=None):
-        if num_trials is None:
-            num_trials = 1000
-        num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)  # TODO: use 'auto' downstream
-
-        if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, str):
-            preset_dict = {
-                'auto': {'searcher': 'random'},
-                # 'grid': {'searcher': 'grid'},  # grid commented out as it isn't compatible with most default model search spaces
-                'random': {'searcher': 'random'},
-                'bayesopt': {'searcher': 'bayesopt'},
-                # 'skopt': {'searcher': 'skopt'},  # TODO: Remove skopt? Is it worthwhile to keep as an option?
-                # Don't include hyperband and bayesopt hyperband at present
-            }
-            if hyperparameter_tune_kwargs not in preset_dict:
-                raise ValueError(f'Invalid hyperparameter_tune_kwargs preset value "{hyperparameter_tune_kwargs}". Valid presets: {list(preset_dict.keys())}')
-            hyperparameter_tune_kwargs = preset_dict[hyperparameter_tune_kwargs]
-
-        # All models use the same scheduler:
-        scheduler_options = compile_scheduler_options_v2(
-            scheduler_options=hyperparameter_tune_kwargs,
-            nthreads_per_trial=num_cpus,
-            ngpus_per_trial=num_gpus,
-            num_trials=num_trials,
-            time_out=time_limit,
-        )
-        if scheduler_options is None:
-            return None
-
-        scheduler_cls = schedulers[scheduler_options['searcher'].lower()]
-        if scheduler_options['time_out'] is None:
-            scheduler_options.pop('time_out', None)
-        scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         return scheduler_options
 
     def _set_post_fit_vars(self, learner: AbstractLearner = None):
@@ -833,7 +796,7 @@ class TabularPredictor(TabularPredictorV1):
     def load(cls, path, verbosity=2):
         set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
         if path is None:
-            raise ValueError("output_directory cannot be None in load()")
+            raise ValueError("path cannot be None in load()")
 
         path = setup_outputdir(path, warn_if_exist=False)  # replace ~ with absolute path if it exists
         predictor: TabularPredictor = load_pkl.load(path=path + cls.predictor_file_name)
@@ -864,7 +827,7 @@ class TabularPredictor(TabularPredictorV1):
 
     @classmethod
     def from_learner(cls, learner: AbstractLearner):
-        predictor = cls(label=learner.label, output_directory=learner.path)
+        predictor = cls(label=learner.label, path=learner.path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor
 

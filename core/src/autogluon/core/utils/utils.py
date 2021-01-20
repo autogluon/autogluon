@@ -43,29 +43,29 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
         return [[train_index, test_index] for train_index, test_index in kf.split(X)]
 
 
-def setup_outputdir(output_directory, warn_if_exist=True):
-    if output_directory is None:
+def setup_outputdir(path, warn_if_exist=True):
+    if path is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        output_directory = f"AutogluonModels/ag-{timestamp}{os.path.sep}"
+        path = f"AutogluonModels/ag-{timestamp}{os.path.sep}"
         for i in range(1, 1000):
             try:
-                os.makedirs(output_directory, exist_ok=False)
+                os.makedirs(path, exist_ok=False)
                 break
             except FileExistsError as e:
-                output_directory = f"AutogluonModels/ag-{timestamp}-{i:03d}{os.path.sep}"
+                path = f"AutogluonModels/ag-{timestamp}-{i:03d}{os.path.sep}"
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
-        logger.log(25, f"No output_directory specified. Models will be saved in: {output_directory}")
+        logger.log(25, f'No path specified. Models will be saved in: "{path}"')
     elif warn_if_exist:
         try:
-            os.makedirs(output_directory, exist_ok=False)
+            os.makedirs(path, exist_ok=False)
         except FileExistsError as e:
-            logger.warning(f'Warning: output_directory already exists! This predictor may overwrite an existing predictor! output_directory="{output_directory}"')
-    output_directory = os.path.expanduser(output_directory)  # replace ~ with absolute path if it exists
-    if output_directory[-1] != os.path.sep:
-        output_directory = output_directory + os.path.sep
-    return output_directory
+            logger.warning(f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"')
+    path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
+    if path[-1] != os.path.sep:
+        path = path + os.path.sep
+    return path
 
 
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
