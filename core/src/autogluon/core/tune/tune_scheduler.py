@@ -24,10 +24,11 @@ class ResultsHistoryCallback(Callback):
         trial = str(trial)
         if trial in self.training_history:
             self.training_history[trial].append(result)
-            self.config_history[trial].append(result['config'])
         else:
             self.training_history[trial] = [result]
-            self.config_history[trial] = [result['config']]
+            config = deepcopy(result['config'])
+            config.pop('util_args')
+            self.config_history[trial] = config
 
 
 class TuneReporter:
@@ -163,7 +164,9 @@ class RayTuneScheduler(object):
     def get_best_config(self):
         # Required by autogluon
         best_trial = self.result.get_best_trial(self._reward_attr, self.tune_args['mode'], "last")
-        return best_trial.config
+        config = deepcopy(best_trial.config)
+        config.pop('util_args')
+        return config
 
     def get_best_reward(self):
         # Required by autogluon
