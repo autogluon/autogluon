@@ -7,6 +7,7 @@ import pickle
 import threading
 import time
 from collections import OrderedDict
+from time import sleep
 
 import numpy as np
 from tqdm.auto import tqdm
@@ -253,6 +254,13 @@ class FIFOScheduler(TaskScheduler):
         if time_out is not None:
             logger.info(f'Time out (secs) is {time_out}')
         for _ in tbar:
+            # Quick check if resources are available before we check the time limit
+            # This is to prevent booking next job while we are waiting for a resource, which
+            # results in going over the time limit
+            resources = DistributedResource(**self.resource)
+            while not FIFOScheduler.managers.check_availability(resources):
+                sleep(0.1)
+
             if (time_out and time.time() - start_time >= time_out) or \
                     (self.max_reward and self.get_best_reward() >= self.max_reward):
                 break
