@@ -604,7 +604,7 @@ class BertForTextPredictionBasic:
             ngpus_per_trial=resource['num_gpus'],
             checkpoint=os.path.join(self._output_directory, 'checkpoint.ag'),
             num_trials=num_trials,
-            time_out=scheduler_options.get('time_out'),
+            time_out=time_limits,
             resume=False,
             visualizer=scheduler_options.get('visualizer'),
             time_attr='report_idx',
