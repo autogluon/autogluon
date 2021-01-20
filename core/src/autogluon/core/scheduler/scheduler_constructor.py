@@ -38,10 +38,10 @@ def init_scheduler(
             'bayesopt': Performs HPO via bayesian optimization.
         For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
             The 'searcher' key is required when providing a dict.
-    time_out : str or int, default = None
+    time_out : float, default = None
         Same as hyperparameter_tune_kwargs['time_out']. Ignored if specified in hyperparameter_tune_kwargs.
         At least one of time_out or num_trials must be specified.
-    num_trials : str or int, default = None
+    num_trials : int, default = None
         Same as hyperparameter_tune_kwargs['time_out']. Ignored if specified in hyperparameter_tune_kwargs.
         At least one of time_out or num_trials must be specified.
     nthreads_per_trial : str or int, default = 'all'
