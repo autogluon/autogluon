@@ -164,7 +164,7 @@ tabular_multimodel_hparam_v1 = {
 }
 
 predictor_model3 = TabularPredictor(label=label, eval_metric='accuracy', path='model3').fit(
-    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_gpus=1
+    train_df, hyperparameters=tabular_multimodel_hparam_v1
 )
 ```
 
@@ -180,7 +180,7 @@ A more advanced strategy is to use 5-fold bagging and call stack ensembling. Thi
 
 ```{.python .input}
 predictor_model4 = TabularPredictor(label=label, eval_metric='accuracy', path='model4').fit(
-    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_gpus=1, num_bag_folds=5, num_stack_levels=1
+    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_bag_folds=5, num_stack_levels=1
 )
 ```
 
