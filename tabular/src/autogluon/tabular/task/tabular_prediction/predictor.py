@@ -361,6 +361,7 @@ class TabularPredictor(TabularPredictorV1):
                     'auto': Uses the 'random' preset.
                     'random': Performs HPO via random search.
                     'bayesopt': Performs HPO via bayesian optimization.
+                For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
             ag_args : dict, default = None
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
                 See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
