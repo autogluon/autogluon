@@ -2,10 +2,12 @@
 from typing import Optional
 import collections
 import logging
-import pandas as pd
+import time
 import os
 import random
+
 import numpy as np
+import pandas as pd
 
 from autogluon.core.utils import get_cpu_count, get_gpu_count
 from autogluon.core.utils.exceptions import NoGPUError
@@ -200,6 +202,8 @@ class TextPredictionV1Model(AbstractModel):
         except ImportError:
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
+        time_start = time.time()
+
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus', None)
@@ -250,13 +254,17 @@ class TextPredictionV1Model(AbstractModel):
         train_data = TabularDataset(X_train,
                                     column_properties=column_properties,
                                     label_columns=self._label_column_name)
-        logger.info('Train Dataset:')
-        logger.info(train_data)
+        logger.log(15, 'Train Dataset:')
+        logger.log(15, train_data)
         tuning_data = TabularDataset(X_val,
                                      column_properties=column_properties,
                                      label_columns=self._label_column_name)
-        logger.info('Tuning Dataset:')
-        logger.info(tuning_data)
+        logger.log(15, 'Tuning Dataset:')
+        logger.log(15, tuning_data)
+
+        if time_limit is not None:
+            time_limit = time_limit - (time.time() - time_start)
+
         self.model.train(train_data=train_data,
                          tuning_data=tuning_data,
                          resource=resource,
@@ -265,8 +273,9 @@ class TextPredictionV1Model(AbstractModel):
                          search_options=self.params['hpo_params']['search_options'],
                          scheduler_options=scheduler_options,
                          num_trials=self.params['hpo_params']['num_trials'],
-                         console_log=verbosity >= 2,
-                         ignore_warning=verbosity < 2)
+                         console_log=verbosity >= 3,
+                         ignore_warning=verbosity < 3,
+                         verbosity=verbosity-1)
 
     def save(self, path: str = None, verbose=True) -> str:
         model = self.model
