@@ -6,6 +6,7 @@ from abc import abstractmethod
 
 from ...scheduler import *
 from ...utils import in_ipynb, try_import_mxnet
+from ...utils.utils import setup_compute
 
 __all__ = [
     'BaseTask',
@@ -216,7 +217,7 @@ def compile_scheduler_options_v2(
         time_attr = 'epoch'
     if reward_attr is None:
         reward_attr = 'validation_performance'
-    _scheduler_options = {
+    scheduler_params = {
         'resource': {
             'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
         'searcher': search_strategy,
@@ -230,13 +231,18 @@ def compile_scheduler_options_v2(
         'visualizer': visualizer,
         'dist_ip_addrs': dist_ip_addrs,
     }
-    _scheduler_options.update(copy.copy(scheduler_options))
+    scheduler_params.update(copy.copy(scheduler_options))
 
-    searcher = searcher_for_hyperband_strategy.get(_scheduler_options['searcher'])
+    scheduler_params['resource']['num_cpus'], scheduler_params['resource']['num_gpus'] = setup_compute(
+        nthreads_per_trial=scheduler_params['resource']['num_cpus'],
+        ngpus_per_trial=scheduler_params['resource']['num_gpus'],
+    )  # TODO: use 'auto' downstream
+
+    searcher = searcher_for_hyperband_strategy.get(scheduler_params['searcher'])
     if searcher is not None:
-        _scheduler_options['searcher'] = searcher
+        scheduler_params['searcher'] = searcher
         if epochs is not None:
-            _scheduler_options['max_t'] = epochs
+            scheduler_params['max_t'] = epochs
     required_options = [
         'resource',
         'searcher',
@@ -252,8 +258,8 @@ def compile_scheduler_options_v2(
     ]
     missing_options = []
     for option in required_options:
-        if option not in _scheduler_options:
+        if option not in scheduler_params:
             missing_options.append(option)
     if missing_options:
         raise AssertionError(f'Missing required keys in scheduler_options: {missing_options}')
-    return _scheduler_options
+    return scheduler_params

@@ -362,6 +362,7 @@ class TabularPredictor(TabularPredictorV1):
                     'random': Performs HPO via random search.
                     'bayesopt': Performs HPO via bayesian optimization.
                 For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
+                    The 'searcher' key is required when providing a dict.
             ag_args : dict, default = None
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
                 See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
@@ -759,9 +760,9 @@ class TabularPredictor(TabularPredictorV1):
         time_limit_hpo, num_trials = setup_trial_limits(time_limit_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
         if time_limit is not None:
             time_limit_hpo = None
-        scheduler_options = init_scheduler(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_limit=time_limit_hpo, num_trials=num_trials, num_cpus=num_cpus, num_gpus=num_gpus)
-        if scheduler_options is None:
+        if hyperparameter_tune_kwargs is None:
             return None
+        scheduler_options = init_scheduler(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit_hpo, num_trials=num_trials, nthreads_per_trial=num_cpus, ngpus_per_trial=num_gpus)
 
         assert scheduler_options[1]['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
         # TODO: Fix or remove in v0.1
@@ -770,7 +771,11 @@ class TabularPredictor(TabularPredictorV1):
 
         if scheduler_options[1]['num_trials'] == 1:
             logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, disabling HPO.')
-            return None  # FIXME
+            return None
+        scheduler_ngpus = scheduler_options[1]['resource'].get('num_gpus', 0)
+        if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
+            scheduler_options[1]['resource']['num_gpus'] = 1
+            logger.warning("Warning: TabularPredictor currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
 
         return scheduler_options
 

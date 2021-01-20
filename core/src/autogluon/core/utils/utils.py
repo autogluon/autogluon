@@ -69,14 +69,17 @@ def setup_outputdir(path, warn_if_exist=True):
 
 
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
-    if nthreads_per_trial is None or nthreads_per_trial == 'auto':  # FIXME: Use 'auto' downstream
-        nthreads_per_trial = multiprocessing.cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
+    if nthreads_per_trial is None or nthreads_per_trial == 'all' or nthreads_per_trial == 'auto':  # FIXME: Use 'auto' downstream
+        nthreads_per_trial = get_cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
 
     if ngpus_per_trial is None or ngpus_per_trial == 'auto':  # FIXME: Use 'auto' downstream
         ngpus_per_trial = 0  # do not use GPU by default
-    elif ngpus_per_trial > 1:
-        ngpus_per_trial = 1
-        logger.debug("tabular_prediction currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
+    elif ngpus_per_trial == 'all':
+        ngpus_per_trial = get_gpu_count()
+    if not isinstance(nthreads_per_trial, int) and nthreads_per_trial != 'auto':
+        raise ValueError(f'nthreads_per_trial must be an integer or "auto": nthreads_per_trial = {nthreads_per_trial}')
+    if not isinstance(ngpus_per_trial, int) and ngpus_per_trial != 'auto':
+        raise ValueError(f'ngpus_per_trial must be an integer or "auto": ngpus_per_trial = {ngpus_per_trial}')
     return nthreads_per_trial, ngpus_per_trial
 
 
