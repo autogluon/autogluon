@@ -632,7 +632,7 @@ class BertForTextPredictionBasic:
               scheduler_options=None,
               num_trials=None,
               plot_results=False,
-              auto_turnoff_hpo=False,
+              turnoff_hpo=False,
               console_log=True,
               ignore_warning=True):
         """
@@ -737,15 +737,15 @@ class BertForTextPredictionBasic:
                 scheduler.get_training_curves(filename=plot_training_curves,
                                               plot=plot_results,
                                               use_legend=True)
-        self._results = dict()
-        self._results.update(best_reward=scheduler.get_best_reward(),
-                             best_config=scheduler.get_best_config(),
-                             total_time=time.time() - start_tick,
-                             metadata=scheduler.metadata,
-                             training_history=scheduler.training_history,
-                             config_history=scheduler.config_history,
-                             reward_attr=scheduler._reward_attr,
-                             config=cfg)
+            self._results = dict()
+            self._results.update(best_reward=scheduler.get_best_reward(),
+                                 best_config=scheduler.get_best_config(),
+                                 total_time=time.time() - start_tick,
+                                 metadata=scheduler.metadata,
+                                 training_history=scheduler.training_history,
+                                 config_history=scheduler.config_history,
+                                 reward_attr=scheduler._reward_attr,
+                                 config=cfg)
         # Consider to move this to a separate predictor
         self._config = cfg
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
