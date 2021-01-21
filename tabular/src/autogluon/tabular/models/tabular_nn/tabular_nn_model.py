@@ -688,12 +688,11 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self._set_default_searchspace()  # changes non-specified default hyperparams from fixed values to search-spaces.
         if self.feature_metadata is None:
             raise ValueError("Trainer class must set feature_metadata for this model")
-        scheduler_func = scheduler_options[0]
-        scheduler_options = scheduler_options[1]
-        if scheduler_func is None or scheduler_options is None:
-            raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
-        num_cpus = scheduler_options['resource']['num_cpus']
-        # num_gpus = scheduler_options['resource']['num_gpus']  # TODO: Currently unused
+        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
+        if scheduler_cls is None or scheduler_params is None:
+            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
+        num_cpus = scheduler_params['resource']['num_cpus']
+        # num_gpus = scheduler_params['resource']['num_gpus']  # TODO: Currently unused
 
         params_copy = self.params.copy()
 
@@ -718,11 +717,11 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             val_path=val_path,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_options['time_out']
+            time_limit=scheduler_params['time_out']
         )
         tabular_nn_trial.register_args(util_args=util_args, **params_copy)
-        scheduler = scheduler_func(tabular_nn_trial, **scheduler_options)
-        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+        scheduler = scheduler_cls(tabular_nn_trial, **scheduler_params)
+        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
             # TODO: Ensure proper working directory setup on remote machines
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading preprocessed data to remote workers...")
@@ -734,9 +733,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         scheduler.run()
         scheduler.join_jobs()
-        scheduler.get_training_curves(plot=False, use_legend=False)
 
-        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
 
     def get_info(self):
         info = super().get_info()

@@ -1,13 +1,11 @@
 import copy
 import logging
-import time
 import math
 from typing import Union
 
 import os
 import numpy as np
 import pandas as pd
-from PIL import Image
 
 import networkx as nx
 
@@ -26,67 +24,69 @@ logger = logging.getLogger()  # return root logger
 
 
 class TabularPredictorV1:
-    """ Object returned by `fit()` in Tabular Prediction tasks.
-        Use for making predictions on new data and viewing information about models trained during `fit()`.
+    """
+    Object returned by `fit()` in Tabular Prediction tasks.
+    Use for making predictions on new data and viewing information about models trained during `fit()`.
 
-        Attributes
-        ----------
-        output_directory : str
-            Path to directory where all models used by this Predictor are stored.
-        problem_type : str
-            What type of prediction problem this Predictor has been trained for.
-        eval_metric : function or str
-            What metric is used to evaluate predictive performance.
-        label_column : str
-            Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-        feature_metadata : :class:`autogluon.utils.tabular.features.feature_metadata.FeatureMetadata`
-            Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label_column`).
-            Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
-            Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
-                `feature_metadata.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
-                `feature_metadata.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
-        class_labels : list
-            For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
-            For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
-                `class_labels[0]` corresponds to internal label = 0 (negative class), `class_labels[1]` corresponds to internal label = 1 (positive class).
-                This is relevant for certain metrics such as F1 where True and False labels impact the metric score differently.
-            For other problem types, will equal None.
-            For example if `pred = predict_proba(x, as_multiclass=True)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
-        class_labels_internal : list
-            For multiclass problems, this list contains the internal class labels in sorted order of internal `predict_proba()` output.
-            For binary problems, this list contains the internal class labels in sorted order of internal `predict_proba(as_multiclass=True)` output.
-                The value will always be `class_labels_internal=[0, 1]` for binary problems, with 0 as the negative class, and 1 as the positive class.
-            For other problem types, will equal None.
-        class_labels_internal_map : dict
-            For binary and multiclass classification problems, this dictionary contains the mapping of the original labels to the internal labels.
-            For example, in binary classification, label values of 'True' and 'False' will be mapped to the internal representation `1` and `0`.
-                Therefore, class_labels_internal_map would equal {'True': 1, 'False': 0}
-            For other problem types, will equal None.
-            For multiclass, it is possible for not all of the label values to have a mapping.
-                This indicates that the internal models will never predict those missing labels, and training rows associated with the missing labels were dropped.
+    Attributes
+    ----------
+    output_directory : str
+        Path to directory where all models used by this Predictor are stored.
+    problem_type : str
+        What type of prediction problem this Predictor has been trained for.
+    eval_metric : function or str
+        What metric is used to evaluate predictive performance.
+    label_column : str
+        Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
+    feature_metadata : :class:`autogluon.tabular.FeatureMetadata`
+        Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label_column`).
+        Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
+        Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
+            `feature_metadata.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
+            `feature_metadata.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
+    class_labels : list
+        For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
+        For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
+            `class_labels[0]` corresponds to internal label = 0 (negative class), `class_labels[1]` corresponds to internal label = 1 (positive class).
+            This is relevant for certain metrics such as F1 where True and False labels impact the metric score differently.
+        For other problem types, will equal None.
+        For example if `pred = predict_proba(x, as_multiclass=True)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
+    class_labels_internal : list
+        For multiclass problems, this list contains the internal class labels in sorted order of internal `predict_proba()` output.
+        For binary problems, this list contains the internal class labels in sorted order of internal `predict_proba(as_multiclass=True)` output.
+            The value will always be `class_labels_internal=[0, 1]` for binary problems, with 0 as the negative class, and 1 as the positive class.
+        For other problem types, will equal None.
+    class_labels_internal_map : dict
+        For binary and multiclass classification problems, this dictionary contains the mapping of the original labels to the internal labels.
+        For example, in binary classification, label values of 'True' and 'False' will be mapped to the internal representation `1` and `0`.
+            Therefore, class_labels_internal_map would equal {'True': 1, 'False': 0}
+        For other problem types, will equal None.
+        For multiclass, it is possible for not all of the label values to have a mapping.
+            This indicates that the internal models will never predict those missing labels, and training rows associated with the missing labels were dropped.
 
-        Examples
-        --------
-        >>> from autogluon.tabular import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-        >>> predictor = task.fit(train_data=train_data, label='class')
-        >>> results = predictor.fit_summary()
-        >>> test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
-        >>> perf = predictor.evaluate(test_data)
+    Examples
+    --------
+    >>> from autogluon.tabular import TabularPrediction as task
+    >>> train_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+    >>> predictor = task.fit(train_data=train_data, label='class')
+    >>> results = predictor.fit_summary()
+    >>> test_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+    >>> perf = predictor.evaluate(test_data)
 
     """
 
     def __init__(self, learner):
-        """ Creates TabularPredictor object.
-            You should not construct a TabularPredictor yourself, it is only intended to be produced during fit().
+        """
+        Creates TabularPredictor object.
+        You should not construct a TabularPredictor yourself, it is only intended to be produced during fit().
 
-            Parameters
-            ----------
-            learner : `AbstractLearner` object
-                Object that implements the `AbstractLearner` APIs.
+        Parameters
+        ----------
+        learner : `AbstractLearner` object
+            Object that implements the `AbstractLearner` APIs.
 
-            To access any learner method `func()` from this Predictor, use: `predictor._learner.func()`.
-            To access any trainer method `func()` from this `Predictor`, use: `predictor._trainer.func()`.
+        To access any learner method `func()` from this Predictor, use: `predictor._learner.func()`.
+        To access any trainer method `func()` from this `Predictor`, use: `predictor._trainer.func()`.
         """
         self._learner: Learner = learner  # Learner object
         self._learner.persist_trainer(low_memory=True)
@@ -132,23 +132,24 @@ class TabularPredictorV1:
 
     # TODO: v0.1 as_pandas=True by default to avoid user confusion and errors with mismatching indices?
     def predict(self, dataset, model=None, as_pandas=False):
-        """ Use trained models to produce predicted labels (in classification) or response values (in regression).
+        """
+        Use trained models to produce predicted labels (in classification) or response values (in regression).
 
-            Parameters
-            ----------
-            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
-                The dataset to make predictions for. Should contain same column names as training Dataset and follow same format
-                (may contain extra columns that won't be used by Predictor, including the label-column itself).
-                If str is passed, `dataset` will be loaded using the str value as the file path.
-            model : str (optional)
-                The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
-                Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
-            as_pandas : bool (optional)
-                Whether to return the output as a pandas Series (True) or numpy array (False)
+        Parameters
+        ----------
+        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            The dataset to make predictions for. Should contain same column names as training Dataset and follow same format
+            (may contain extra columns that won't be used by Predictor, including the label-column itself).
+            If str is passed, `dataset` will be loaded using the str value as the file path.
+        model : str (optional)
+            The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+        as_pandas : bool (optional)
+            Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False)
 
-            Returns
-            -------
-            Array of predictions, one corresponding to each row in given dataset. Either numpy Ndarray or pandas Series depending on `as_pandas` argument.
+        Returns
+        -------
+        Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
 
         """
         dataset = self.__get_dataset(dataset)
@@ -156,54 +157,56 @@ class TabularPredictorV1:
 
     # TODO: v0.1 as_pandas=True by default to avoid user confusion on class names and errors with mismatching indices?
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
-        """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
-            If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
+        """
+        Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
+        If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
 
-            Parameters
-            ----------
-            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
-                The dataset to make predictions for. Should contain same column names as training Dataset and follow same format
-                (may contain extra columns that won't be used by Predictor, including the label-column itself).
-                If str is passed, `dataset` will be loaded using the str value as the file path.
-            model : str (optional)
-                The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
-                Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
-            as_pandas : bool (optional)
-                Whether to return the output as a pandas object (True) or numpy array (False).
-                Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
-                If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
-            as_multiclass : bool (optional)
-                Whether to return binary classification probabilities as if they were for multiclass classification.
-                    Output will contain two columns, and if `as_pandas=True`, the column names will correspond to the binary class labels.
-                    The columns will be the same order as `predictor.class_labels`.
-                Only impacts output for binary classification problems.
+        Parameters
+        ----------
+        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            The dataset to make predictions for. Should contain same column names as training Dataset and follow same format
+            (may contain extra columns that won't be used by Predictor, including the label-column itself).
+            If str is passed, `dataset` will be loaded using the str value as the file path.
+        model : str (optional)
+            The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+        as_pandas : bool (optional)
+            Whether to return the output as a pandas object (True) or numpy array (False).
+            Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
+            If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
+        as_multiclass : bool (optional)
+            Whether to return binary classification probabilities as if they were for multiclass classification.
+                Output will contain two columns, and if `as_pandas=True`, the column names will correspond to the binary class labels.
+                The columns will be the same order as `predictor.class_labels`.
+            Only impacts output for binary classification problems.
 
-            Returns
-            -------
-            Array of predicted class-probabilities, corresponding to each row in the given dataset.
-            May be a numpy ndarray or pandas Series/DataFrame depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
-            For binary classification problems, the output contains for each datapoint only the predicted probability of the positive class, unless you specify `as_multiclass=True`.
+        Returns
+        -------
+        Array of predicted class-probabilities, corresponding to each row in the given dataset.
+        May be a :class:`np.ndarray` or :class:`pd.Series` / :class:`pd.DataFrame` depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
+        For binary classification problems, the output contains for each datapoint only the predicted probability of the positive class, unless you specify `as_multiclass=True`.
         """
         dataset = self.__get_dataset(dataset)
         return self._learner.predict_proba(X=dataset, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
     def evaluate(self, dataset, silent=False):
-        """ Report the predictive performance evaluated for a given Dataset.
-            This is basically a shortcut for: `pred = predict(dataset); evaluate_predictions(dataset[label_column], preds, auxiliary_metrics=False)`
-            that automatically uses `predict_proba()` instead of `predict()` when appropriate.
+        """
+        Report the predictive performance evaluated for a given Dataset.
+        This is basically a shortcut for: `pred = predict(dataset); evaluate_predictions(dataset[label_column], preds, auxiliary_metrics=False)`
+        that automatically uses `predict_proba()` instead of `predict()` when appropriate.
 
-            Parameters
-            ----------
-            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
-                This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
-                If str is passed, `dataset` will be loaded using the str value as the file path.
+        Parameters
+        ----------
+        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
+            If str is passed, `dataset` will be loaded using the str value as the file path.
 
-            silent : bool (optional)
-                Should performance results be printed?
+        silent : bool (optional)
+            Should performance results be printed?
 
-            Returns
-            -------
-            Predictive performance value on the given dataset, based on the `eval_metric` used by this Predictor.
+        Returns
+        -------
+        Predictive performance value on the given dataset, based on the `eval_metric` used by this Predictor.
         """
         dataset = self.__get_dataset(dataset)
         perf = self._learner.score(dataset)
@@ -214,153 +217,154 @@ class TabularPredictorV1:
         return perf
 
     def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True):
-        """ Evaluate the provided predictions against ground truth labels.
-            Evaluation is based on the `eval_metric` previously specifed to `fit()`, or default metrics if none was specified.
+        """
+        Evaluate the provided predictions against ground truth labels.
+        Evaluation is based on the `eval_metric` previously specifed to `fit()`, or default metrics if none was specified.
 
-            Parameters
-            ----------
-            y_true : list or `numpy.array`
-                The ordered collection of ground-truth labels.
-            y_pred : list or `numpy.array`
-                The ordered collection of predictions.
-                Caution: For certain types of `eval_metric` (such as 'roc_auc'), `y_pred` must be predicted-probabilities rather than predicted labels.
-            silent : bool (optional)
-                Should performance results be printed?
-            auxiliary_metrics: bool (optional)
-                Should we compute other (`problem_type` specific) metrics in addition to the default metric?
-            detailed_report : bool (optional)
-                Should we computed more detailed versions of the `auxiliary_metrics`? (requires `auxiliary_metrics = True`)
+        Parameters
+        ----------
+        y_true : list or :class:`np.array`
+            The ordered collection of ground-truth labels.
+        y_pred : list or :class:`np.array`
+            The ordered collection of predictions.
+            Caution: For certain types of `eval_metric` (such as 'roc_auc'), `y_pred` must be predicted-probabilities rather than predicted labels.
+        silent : bool (optional)
+            Should performance results be printed?
+        auxiliary_metrics: bool (optional)
+            Should we compute other (`problem_type` specific) metrics in addition to the default metric?
+        detailed_report : bool (optional)
+            Should we computed more detailed versions of the `auxiliary_metrics`? (requires `auxiliary_metrics = True`)
 
-            Returns
-            -------
-            Scalar performance value if `auxiliary_metrics = False`.
-            If `auxiliary_metrics = True`, returns dict where keys = metrics, values = performance along each metric.
+        Returns
+        -------
+        Scalar performance value if `auxiliary_metrics = False`.
+        If `auxiliary_metrics = True`, returns dict where keys = metrics, values = performance along each metric.
         """
         return self._learner.evaluate(y_true=y_true, y_pred=y_pred, silent=silent,
                                       auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
     def leaderboard(self, dataset=None, extra_info=False, only_pareto_frontier=False, silent=False):
         """
-            Output summary of information about models produced during fit() as a pandas DataFrame.
-            Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
-            Output DataFrame columns include:
-                'model': The name of the model.
+        Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
+        Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
+        Output DataFrame columns include:
+            'model': The name of the model.
 
-                'score_val': The validation score of the model on the 'eval_metric'.
+            'score_val': The validation score of the model on the 'eval_metric'.
 
-                'pred_time_val': The inference time required to compute predictions on the validation data end-to-end.
-                    Equivalent to the sum of all 'pred_time_val_marginal' values for the model and all of its base models.
-                'fit_time': The fit time required to train the model end-to-end (Including base models if the model is a stack ensemble).
-                    Equivalent to the sum of all 'fit_time_marginal' values for the model and all of its base models.
-                'pred_time_val_marginal': The inference time required to compute predictions on the validation data (Ignoring inference times for base models).
+            'pred_time_val': The inference time required to compute predictions on the validation data end-to-end.
+                Equivalent to the sum of all 'pred_time_val_marginal' values for the model and all of its base models.
+            'fit_time': The fit time required to train the model end-to-end (Including base models if the model is a stack ensemble).
+                Equivalent to the sum of all 'fit_time_marginal' values for the model and all of its base models.
+            'pred_time_val_marginal': The inference time required to compute predictions on the validation data (Ignoring inference times for base models).
+                Note that this ignores the time required to load the model into memory when bagging is disabled.
+            'fit_time_marginal': The fit time required to train the model (Ignoring base models).
+            'stack_level': The stack level of the model.
+                A model with stack level N can take any set of models with stack level less than N as input, with stack level 0 models having no model inputs.
+            'can_infer': If model is able to perform inference on new data. If False, then the model either was not saved, was deleted, or an ancestor of the model cannot infer.
+                `can_infer` is often False when `save_bag_folds=False` was specified in initial `task.fit`.
+            'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth model fit has `fit_order=N`. The order corresponds to the first child model fit in the case of bagged ensembles.
+
+        Parameters
+        ----------
+        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+            This Dataset must also contain the label-column with the same column-name as specified during fit().
+            If specified, then the leaderboard returned will contain additional columns 'score_test', 'pred_time_test', and 'pred_time_test_marginal'.
+                'score_test': The score of the model on the 'eval_metric' for the dataset provided.
+                'pred_time_test': The true end-to-end wall-clock inference time of the model for the dataset provided.
+                    Equivalent to the sum of all 'pred_time_test_marginal' values for the model and all of its base models.
+                'pred_time_test_marginal': The inference time of the model for the dataset provided, minus the inference time for the model's base models, if it has any.
                     Note that this ignores the time required to load the model into memory when bagging is disabled.
-                'fit_time_marginal': The fit time required to train the model (Ignoring base models).
-                'stack_level': The stack level of the model.
-                    A model with stack level N can take any set of models with stack level less than N as input, with stack level 0 models having no model inputs.
-                'can_infer': If model is able to perform inference on new data. If False, then the model either was not saved, was deleted, or an ancestor of the model cannot infer.
-                    `can_infer` is often False when `save_bagged_folds=False` was specified in initial `task.fit`.
-                'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth model fit has `fit_order=N`. The order corresponds to the first child model fit in the case of bagged ensembles.
+            If str is passed, `dataset` will be loaded using the str value as the file path.
+        extra_info : bool, default = False
+            If `True`, will return extra columns with advanced info.
+            This requires additional computation as advanced info data is calculated on demand.
+            Additional output columns when `extra_info=True` include:
+                'num_features': Number of input features used by the model.
+                    Some models may ignore certain features in the preprocessed data.
+                'num_models': Number of models that actually make up this "model" object.
+                    For non-bagged models, this is 1. For bagged models, this is equal to the number of child models (models trained on bagged folds) the bagged ensemble contains.
+                'num_models_w_ancestors': Equivalent to the sum of 'num_models' values for the model and its' ancestors (see below).
+                'memory_size': The amount of memory in bytes the model requires when persisted in memory. This is not equivalent to the amount of memory the model may use during inference.
+                    For bagged models, this is the sum of the 'memory_size' of all child models.
+                'memory_size_w_ancestors': Equivalent to the sum of 'memory_size' values for the model and its' ancestors.
+                    This is the amount of memory required to avoid loading any models in-between inference calls to get predictions from this model.
+                    For online-inference, this is critical. It is important that the machine performing online inference has memory more than twice this value to avoid loading models for every call to inference by persisting models in memory.
+                'memory_size_min': The amount of memory in bytes the model minimally requires to perform inference.
+                    For non-bagged models, this is equivalent to 'memory_size'.
+                    For bagged models, this is equivalent to the largest child model's 'memory_size_min'.
+                    To minimize memory usage, child models can be loaded and un-persisted one by one to infer. This is the default behavior if a bagged model was not already persisted in memory prior to inference.
+                'memory_size_min_w_ancestors': Equivalent to the max of the 'memory_size_min' values for the model and its' ancestors.
+                    This is the minimum required memory to infer with the model by only loading one model at a time, as each of its ancestors will also have to be loaded into memory.
+                    For offline-inference where latency is not a concern, this should be used to determine the required memory for a machine if 'memory_size_w_ancestors' is too large.
+                'num_ancestors': Number of ancestor models for the given model.
 
-            Parameters
-            ----------
-            dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
-                This Dataset must also contain the label-column with the same column-name as specified during fit().
-                If specified, then the leaderboard returned will contain additional columns 'score_test', 'pred_time_test', and 'pred_time_test_marginal'.
-                    'score_test': The score of the model on the 'eval_metric' for the dataset provided.
-                    'pred_time_test': The true end-to-end wall-clock inference time of the model for the dataset provided.
-                        Equivalent to the sum of all 'pred_time_test_marginal' values for the model and all of its base models.
-                    'pred_time_test_marginal': The inference time of the model for the dataset provided, minus the inference time for the model's base models, if it has any.
-                        Note that this ignores the time required to load the model into memory when bagging is disabled.
-                If str is passed, `dataset` will be loaded using the str value as the file path.
-            extra_info : bool, default = False
-                If `True`, will return extra columns with advanced info.
-                This requires additional computation as advanced info data is calculated on demand.
-                Additional output columns when `extra_info=True` include:
-                    'num_features': Number of input features used by the model.
-                        Some models may ignore certain features in the preprocessed data.
-                    'num_models': Number of models that actually make up this "model" object.
-                        For non-bagged models, this is 1. For bagged models, this is equal to the number of child models (models trained on bagged folds) the bagged ensemble contains.
-                    'num_models_w_ancestors': Equivalent to the sum of 'num_models' values for the model and its' ancestors (see below).
-                    'memory_size': The amount of memory in bytes the model requires when persisted in memory. This is not equivalent to the amount of memory the model may use during inference.
-                        For bagged models, this is the sum of the 'memory_size' of all child models.
-                    'memory_size_w_ancestors': Equivalent to the sum of 'memory_size' values for the model and its' ancestors.
-                        This is the amount of memory required to avoid loading any models in-between inference calls to get predictions from this model.
-                        For online-inference, this is critical. It is important that the machine performing online inference has memory more than twice this value to avoid loading models for every call to inference by persisting models in memory.
-                    'memory_size_min': The amount of memory in bytes the model minimally requires to perform inference.
-                        For non-bagged models, this is equivalent to 'memory_size'.
-                        For bagged models, this is equivalent to the largest child model's 'memory_size_min'.
-                        To minimize memory usage, child models can be loaded and un-persisted one by one to infer. This is the default behavior if a bagged model was not already persisted in memory prior to inference.
-                    'memory_size_min_w_ancestors': Equivalent to the max of the 'memory_size_min' values for the model and its' ancestors.
-                        This is the minimum required memory to infer with the model by only loading one model at a time, as each of its ancestors will also have to be loaded into memory.
-                        For offline-inference where latency is not a concern, this should be used to determine the required memory for a machine if 'memory_size_w_ancestors' is too large.
-                    'num_ancestors': Number of ancestor models for the given model.
+                'num_descendants': Number of descendant models for the given model.
 
-                    'num_descendants': Number of descendant models for the given model.
+                'model_type': The type of the given model.
+                    If the model is an ensemble type, 'child_model_type' will indicate the inner model type. A stack ensemble of bagged LightGBM models would have 'StackerEnsembleModel' as its model type.
+                'child_model_type': The child model type. None if the model is not an ensemble. A stack ensemble of bagged LightGBM models would have 'LGBModel' as its child type.
+                    child models are models which are used as a group to generate a given bagged ensemble model's predictions. These are the models trained on each fold of a bagged ensemble.
+                    For 10-fold bagging, the bagged ensemble model would have 10 child models.
+                    For 10-fold bagging with 3 repeats, the bagged ensemble model would have 30 child models.
+                    Note that child models are distinct from ancestors and descendants.
+                'hyperparameters': The hyperparameter values specified for the model.
+                    All hyperparameters that do not appear in this dict remained at their default values.
+                'hyperparameters_fit': The hyperparameters set by the model during fit.
+                    This overrides the 'hyperparameters' value for a particular key if present in 'hyperparameters_fit' to determine the fit model's final hyperparameters.
+                    This is most commonly set for hyperparameters that indicate model training iterations or epochs, as early stopping can find a different value from what 'hyperparameters' indicated.
+                    In these cases, the provided hyperparameter in 'hyperparameters' is used as a maximum for the model, but the model is still able to early stop at a smaller value during training to achieve a better validation score or to satisfy time constraints.
+                    For example, if a NN model was given `epochs=500` as a hyperparameter, but found during training that `epochs=60` resulted in optimal validation score, it would use `epoch=60` and `hyperparameters_fit={'epoch': 60}` would be set.
+                'ag_args_fit': Special AutoGluon arguments that influence model fit.
+                    See the documentation of the `hyperparameters` argument in `TabularPrediction.fit()` for more information.
+                'features': List of feature names used by the model.
 
-                    'model_type': The type of the given model.
-                        If the model is an ensemble type, 'child_model_type' will indicate the inner model type. A stack ensemble of bagged LightGBM models would have 'StackerEnsembleModel' as its model type.
-                    'child_model_type': The child model type. None if the model is not an ensemble. A stack ensemble of bagged LightGBM models would have 'LGBModel' as its child type.
-                        child models are models which are used as a group to generate a given bagged ensemble model's predictions. These are the models trained on each fold of a bagged ensemble.
-                        For 10-fold bagging, the bagged ensemble model would have 10 child models.
-                        For 10-fold bagging with 3 repeats, the bagged ensemble model would have 30 child models.
-                        Note that child models are distinct from ancestors and descendants.
-                    'hyperparameters': The hyperparameter values specified for the model.
-                        All hyperparameters that do not appear in this dict remained at their default values.
-                    'hyperparameters_fit': The hyperparameters set by the model during fit.
-                        This overrides the 'hyperparameters' value for a particular key if present in 'hyperparameters_fit' to determine the fit model's final hyperparameters.
-                        This is most commonly set for hyperparameters that indicate model training iterations or epochs, as early stopping can find a different value from what 'hyperparameters' indicated.
-                        In these cases, the provided hyperparameter in 'hyperparameters' is used as a maximum for the model, but the model is still able to early stop at a smaller value during training to achieve a better validation score or to satisfy time constraints.
-                        For example, if a NN model was given `epochs=500` as a hyperparameter, but found during training that `epochs=60` resulted in optimal validation score, it would use `epoch=60` and `hyperparameters_fit={'epoch': 60}` would be set.
-                    'ag_args_fit': Special AutoGluon arguments that influence model fit.
-                        See the documentation of the `hyperparameters` argument in `TabularPrediction.fit()` for more information.
-                    'features': List of feature names used by the model.
+                'child_hyperparameters': Equivalent to 'hyperparameters', but for the model's children.
 
-                    'child_hyperparameters': Equivalent to 'hyperparameters', but for the model's children.
+                'child_hyperparameters_fit': Equivalent to 'hyperparameters_fit', but for the model's children.
 
-                    'child_hyperparameters_fit': Equivalent to 'hyperparameters_fit', but for the model's children.
+                'child_ag_args_fit': Equivalent to 'ag_args_fit', but for the model's children.
 
-                    'child_ag_args_fit': Equivalent to 'ag_args_fit', but for the model's children.
+                'ancestors': The model's ancestors. Ancestor models are the models which are required to make predictions during the construction of the model's input features.
+                    If A is an ancestor of B, then B is a descendant of A.
+                    If a model's ancestor is deleted, the model is no longer able to infer on new data, and its 'can_infer' value will be False.
+                    A model can only have ancestor models whose 'stack_level' are lower than itself.
+                    'stack_level'=0 models have no ancestors.
+                'descendants': The model's descendants. Descendant models are the models which require this model to make predictions during the construction of their input features.
+                    If A is a descendant of B, then B is an ancestor of A.
+                    If this model is deleted, then all descendant models will no longer be able to infer on new data, and their 'can_infer' values will be False.
+                    A model can only have descendant models whose 'stack_level' are higher than itself.
 
-                    'ancestors': The model's ancestors. Ancestor models are the models which are required to make predictions during the construction of the model's input features.
-                        If A is an ancestor of B, then B is a descendant of A.
-                        If a model's ancestor is deleted, the model is no longer able to infer on new data, and its 'can_infer' value will be False.
-                        A model can only have ancestor models whose 'stack_level' are lower than itself.
-                        'stack_level'=0 models have no ancestors.
-                    'descendants': The model's descendants. Descendant models are the models which require this model to make predictions during the construction of their input features.
-                        If A is a descendant of B, then B is an ancestor of A.
-                        If this model is deleted, then all descendant models will no longer be able to infer on new data, and their 'can_infer' values will be False.
-                        A model can only have descendant models whose 'stack_level' are higher than itself.
+        only_pareto_frontier : bool, default = False
+            If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
+            At minimum this will include the model with the highest score and the model with the lowest inference time.
+            This is useful when deciding which model to use during inference if inference time is a consideration.
+            Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
+        silent : bool, default = False
+            Should leaderboard DataFrame be printed?
 
-            only_pareto_frontier : bool, default = False
-                If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
-                At minimum this will include the model with the highest score and the model with the lowest inference time.
-                This is useful when deciding which model to use during inference if inference time is a consideration.
-                Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
-            silent : bool, default = False
-                Should leaderboard DataFrame be printed?
-
-            Returns
-            -------
-            Pandas `pandas.DataFrame` of model performance summary information.
+        Returns
+        -------
+        :class:`pd.DataFrame` of model performance summary information.
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         return self._learner.leaderboard(X=dataset, extra_info=extra_info, only_pareto_frontier=only_pareto_frontier, silent=silent)
 
     def fit_summary(self, verbosity=3):
         """
-            Output summary of information about models produced during `fit()`.
-            May create various generated summary plots and store them in folder: `Predictor.output_directory`.
+        Output summary of information about models produced during `fit()`.
+        May create various generated summary plots and store them in folder: `predictor.path`.
 
-            Parameters
-            ----------
-            verbosity : int, default = 3
-                Controls how detailed of a summary to ouput.
-                Set <= 0 for no output printing, 1 to print just high-level summary,
-                2 to print summary and create plots, >= 3 to print all information produced during fit().
+        Parameters
+        ----------
+        verbosity : int, default = 3
+            Controls how detailed of a summary to ouput.
+            Set <= 0 for no output printing, 1 to print just high-level summary,
+            2 to print summary and create plots, >= 3 to print all information produced during `fit()`.
 
-            Returns
-            -------
-            Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
+        Returns
+        -------
+        Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
         """
         hpo_used = len(self._trainer.hpo_results) > 0
         model_types = self._trainer.get_models_attribute_dict(attribute='type')
@@ -385,7 +389,7 @@ class TabularPredictorV1:
             'model_paths': self._trainer.get_models_attribute_dict('path'),  # dict with key = model-name, value = path to model file
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
-            'num_bagging_folds': self._trainer.k_fold,
+            'num_bag_folds': self._trainer.k_fold,
             'max_stack_level': self._trainer.get_max_level(),
             'feature_prune': self._trainer.feature_prune,
             'hyperparameter_tune': hpo_used,
@@ -412,9 +416,9 @@ class TabularPredictorV1:
             print("Types of models trained:")
             print(unique_model_types)
             num_fold_str = ""
-            bagging_used = results['num_bagging_folds'] > 0
+            bagging_used = results['num_bag_folds'] > 0
             if bagging_used:
-                num_fold_str = f" (with {results['num_bagging_folds']} folds)"
+                num_fold_str = f" (with {results['num_bag_folds']} folds)"
             print("Bagging used: %s %s" % (bagging_used, num_fold_str))
             num_stack_str = ""
             stacking_used = results['max_stack_level'] > 1  # TODO: v0.1 increment by 1 when refactoring level names
@@ -479,7 +483,7 @@ class TabularPredictorV1:
 
         Parameters
         ----------
-        dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
+        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
             The dataset to apply feature transformation to.
             This dataset does not require the label column.
             If str is passed, `dataset` will be loaded using the str value as the file path.
@@ -519,19 +523,17 @@ class TabularPredictorV1:
 
         Returns
         -------
-        Pandas `pandas.DataFrame` of the provided `dataset` after feature transformation has been applied.
+        :class:`pd.DataFrame` of the provided `dataset` after feature transformation has been applied.
         This output does not include the label column, and will remove it if present in the supplied `dataset`.
         If a transformed label column is desired, use `predictor.transform_labels`.
 
         Examples
         --------
-        >>> from autogluon.tabular import TabularPrediction as task
-        >>> train_data = task.Dataset('train.csv')
-        >>> predictor = task.fit(train_data=train_data, label='class', auto_stack=True, cache_data=True)  # predictor is in bagged mode and `cache_data=True`.
-        >>> model = 'weighted_ensemble_k0_l1'
-        >>> test_data = task.Dataset('test.csv')
-        >>> train_data_transformed = predictor.transform_features(model=model)  # Internal training DataFrame used as input to `model.fit()` during `predictor = task.fit(train_data=train_data, ...)`
-        >>> test_data_transformed = predictor.transform_features(dataset=test_data, model=model)  # Internal test DataFrame used as input to `model.predict_proba()` during `predictor.predict_proba(test_data, model=model)`
+        >>> from autogluon.tabular import TabularPredictor
+        >>> predictor = TabularPredictor(label='class').fit('train.csv', label='class', auto_stack=True)  # predictor is in bagged mode.
+        >>> model = 'WeightedEnsemble_L1'
+        >>> train_data_transformed = predictor.transform_features(model=model)  # Internal training DataFrame used as input to `model.fit()` for each model trained in predictor.fit()`
+        >>> test_data_transformed = predictor.transform_features('test.csv', model=model)  # Internal test DataFrame used as input to `model.predict_proba()` during `predictor.predict_proba(test_data, model=model)`
 
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
@@ -546,7 +548,7 @@ class TabularPredictorV1:
 
         Parameters
         ----------
-        labels : `numpy.ndarray` or `pandas.Series`
+        labels : :class:`np.ndarray` or :class:`pd.Series`
             Labels to transform.
             If `proba=False`, an example input would be the output of `predictor.predict(test_data)`.
             If `proba=True`, an example input would be the output of `predictor.predict_proba(test_data)`.
@@ -554,17 +556,17 @@ class TabularPredictorV1:
             When `True`, the input labels are treated as being in the internal representation and the original representation is outputted.
         proba : boolean, default = False
             When `True`, the input labels are treated as probabilities and the output will be the internal representation of probabilities.
-                In this case, it is expected that `labels` be a `pandas.DataFrame` or `numpy.ndarray`.
+                In this case, it is expected that `labels` be a :class:`pd.DataFrame` or :class:`np.ndarray`.
                 If the `problem_type` is multiclass:
                     The input column order must be equal to `predictor.class_labels`.
                     The output column order will be equal to `predictor.class_labels_internal`.
                     if `inverse=True`, the same logic applies, but with input and output columns interchanged.
             When `False`, the input labels are treated as actual labels and the output will be the internal representation of the labels.
-                In this case, it is expected that `labels` be a `pandas.Series` or `numpy.ndarray`.
+                In this case, it is expected that `labels` be a :class:`pd.Series` or :class:`np.ndarray`.
 
         Returns
         -------
-        Pandas `pandas.Series` of labels if `proba=False` or Pandas `pandas.DataFrame` of label probabilities if `proba=True`
+        :class:`pd.Series` of labels if `proba=False` or :class:`pd.DataFrame` of label probabilities if `proba=True`.
 
         """
         if inverse:
@@ -594,7 +596,7 @@ class TabularPredictorV1:
 
         Parameters
         ----------
-        dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
+        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
             This dataset must also contain the label-column with the same column-name as specified during `fit()`.
             If specified, then the dataset is used to calculate the feature importance scores.
             If str is passed, `dataset` will be loaded using the str value as the file path.
@@ -646,7 +648,7 @@ class TabularPredictorV1:
 
         Returns
         -------
-        Pandas `pandas.DataFrame` of feature importance scores with 6 columns:
+        :class:`pd.DataFrame` of feature importance scores with 6 columns:
             index: The feature name.
             'importance': The estimated feature importance score.
             'stddev': The standard deviation of the feature importance score. If NaN, then not enough num_shuffle_sets were used to calculate a variance.
@@ -745,7 +747,7 @@ class TabularPredictorV1:
             Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
             This process will typically result in a slight accuracy reduction and a large inference speedup.
             The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
-                The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
+                The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bag_folds`) and n is the number of finished repeats (`num_bag_sets`) in the bagged ensemble.
             The runtime is generally 10% or less of the original fit runtime.
                 The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
         For non-bagged models:
@@ -934,10 +936,10 @@ class TabularPredictorV1:
             This also means that refit_full models and distilled models will raise an exception.
         Warning: If intending to join the output of this method with the original training data, be aware that a rare edge-case issue exists:
             Multiclass problems with rare classes combined with the use of the 'log_loss' eval_metric may have forced AutoGluon to duplicate rows in the training data to satisfy minimum class counts in the data.
-            If this has occurred, then the indices and row counts of the returned pandas Series in this method may not align with the training data.
+            If this has occurred, then the indices and row counts of the returned :class:`pd.Series` in this method may not align with the training data.
             In this case, consider fetching the processed training data using `predictor.load_data_internal()` instead of using the original training data.
             A more benign version of this issue occurs when 'log_loss' wasn't specified as the eval_metric but rare classes were dropped by AutoGluon.
-            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via `predictor.predict`.
+            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via :meth:`TabularPredictor.predict_proba`.
 
         Parameters
         ----------
@@ -983,7 +985,7 @@ class TabularPredictorV1:
     def positive_class(self):
         """
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
-        In binary classification, `predictor.predict_proba()` returns the estimated probability that each row belongs to the positive class.
+        In binary classification, :class:`TabularPredictor.predict_proba()` returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
 
         Returns
@@ -1000,7 +1002,6 @@ class TabularPredictorV1:
         """
         Load a predictor object previously produced by `fit()` from file and returns this object.
         It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
-        Is functionally equivalent to :meth:`autogluon.task.tabular_prediction.TabularPrediction.load`.
 
         Parameters
         ----------
@@ -1018,7 +1019,7 @@ class TabularPredictorV1:
         """
         logger.setLevel(verbosity2loglevel(verbosity))  # Reset logging after load (may be in new Python session)
         if output_directory is None:
-            raise ValueError("output_directory cannot be None in load()")
+            raise ValueError("path cannot be None in load()")
 
         output_directory = setup_outputdir(output_directory, warn_if_exist=False)  # replace ~ with absolute path if it exists
         learner = Learner.load(output_directory)
@@ -1045,8 +1046,8 @@ class TabularPredictorV1:
         return cls(learner=learner)
 
     def save(self):
-        """ Save this predictor to file in directory specified by this Predictor's `output_directory`.
-            Note that `fit()` already saves the predictor object automatically
+        """ Save this predictor to file in directory specified by this Predictor's `path`.
+            Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
             (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
         self._learner.save()
@@ -1087,7 +1088,7 @@ class TabularPredictorV1:
 
         Returns
         -------
-        Tuple of (`pandas.DataFrame`, `pandas.Series`) corresponding to the internal data features and internal data labels, respectively.
+        Tuple of (:class:`pd.DataFrame`, :class:`pd.Series`) corresponding to the internal data features and internal data labels, respectively.
 
         """
         if dataset == 'train':
@@ -1181,7 +1182,7 @@ class TabularPredictorV1:
         """Returns the list of model names trained in this `predictor` object."""
         return self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
 
-    def get_model_names_persisted(self):
+    def get_model_names_persisted(self) -> list:
         """Returns the list of model names which are persisted in memory."""
         return list(self._learner.load_trainer().models.keys())
 
@@ -1197,25 +1198,25 @@ class TabularPredictorV1:
 
         Parameters
         ----------
-        train_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
-            Same as `train_data` argument of :meth:`autogluon.task.tabular_prediction.TabularPrediction.fit`.
+        train_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+            Same as `train_data` argument of `fit()`.
             If None, the same training data will be loaded from `fit()` call used to produce this Predictor.
-        tuning_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
-            Same as `tuning_data` argument of :meth:`autogluon.task.tabular_prediction.TabularPrediction.fit`.
+        tuning_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+            Same as `tuning_data` argument of `fit()`.
             If `tuning_data = None` and `train_data = None`: the same training/validation splits will be loaded from `fit()` call used to produce this Predictor,
             unless bagging/stacking was previously used in which case a new training/validation split is performed.
-        augmentation_data : :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
+        augmentation_data : :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
             An optional extra dataset of unlabeled rows that can be used for augmenting the dataset used to fit student models during distillation (ignored if None).
         time_limit : int, default = None
             Approximately how long (in seconds) the distillation process should run for.
             If None, no time-constraint will be enforced allowing the distilled models to fully train.
         hyperparameters : dict or str, default = None
             Specifies which models to use as students and what hyperparameter-values to use for them.
-            Same as `hyperparameters` argument of :meth:`autogluon.task.tabular_prediction.TabularPrediction.fit`.
+            Same as `hyperparameters` argument of `fit()`.
             If = None, then student models will use the same hyperparameters from `fit()` used to produce this Predictor.
             Note: distillation is currently only supported for ['GBM','NN','RF','CAT'] student models, other models and their hyperparameters are ignored here.
         holdout_frac : float
-            Same as `holdout_frac` argument of :meth:`autogluon.task.tabular_prediction.TabularPrediction.fit`.
+            Same as `holdout_frac` argument of :meth:`TabularPredictor.fit`.
         teacher_preds : str, default = 'soft'
             What form of teacher predictions to distill from (teacher refers to the most accurate AutoGluon ensemble-predictor).
             If None, we only train with original labels (no data augmentation).
@@ -1236,13 +1237,13 @@ class TabularPredictorV1:
                 'max_size': float, the maximum number of augmented datapoints to add (ignored if 'num_augmented_samples' specified).
                 'size_factor': float, if n = training data sample-size, we add int(n * size_factor) augmented datapoints, up to 'max_size'.
                 Larger values in `augment_args` will slow down the runtime of distill(), and may produce worse results if provided time_limit are too small.
-                You can also pass in kwargs for the `spunge_augment`, `munge_augment` functions in `autogluon/utils/tabular/ml/augmentation/distill_utils.py`.
+                You can also pass in kwargs for the `spunge_augment`, `munge_augment` functions in `autogluon.tabular.augmentation.distill_utils`.
         models_name_suffix : str, default = None
             Optional suffix that can be appended at the end of all distilled student models' names.
             Note: all distilled models will contain '_DSTL' substring in their name by default.
         verbosity : int, default = None
             Controls amount of printed output during distillation (4 = highest, 0 = lowest).
-            Same as `verbosity` argument of :meth:`autogluon.task.tabular_prediction.TabularPrediction.fit`.
+            Same as `verbosity` parameter of :class:`TabularPredictor`.
             If None, the same `verbosity` used in previous fit is employed again.
 
         Returns
@@ -1267,20 +1268,20 @@ class TabularPredictorV1:
                                      verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
                                      augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
 
-    def plot_ensemble_model(self, prune_unused_nodes=True):
+    def plot_ensemble_model(self, prune_unused_nodes=True) -> str:
         """
-            Output the visualized stack ensemble architecture of a model trained by `fit()`. 
-            The plot is stored to a file, `ensemble_model.png` in folder `Predictor.output_directory` 
+        Output the visualized stack ensemble architecture of a model trained by `fit()`.
+        The plot is stored to a file, `ensemble_model.png` in folder `predictor.path`
 
-            This function requires `graphviz` and `pygraphviz` to be installed because this visualization depends on those package.
-            Unless this function will raise `ImportError` without being able to generate the visual of the ensemble model.
+        This function requires `graphviz` and `pygraphviz` to be installed because this visualization depends on those package.
+        Unless this function will raise `ImportError` without being able to generate the visual of the ensemble model.
 
-            To install the required package, run the below commands (for Ubuntu linux):
+        To install the required package, run the below commands (for Ubuntu linux):
 
-            $ sudo apt-get install graphviz
-            $ pip install graphviz
+        $ sudo apt-get install graphviz
+        $ pip install graphviz
 
-            For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/documentation.html for PyGraphviz.
+        For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/documentation.html for PyGraphviz.
 
 
         Parameters
@@ -1343,9 +1344,9 @@ class TabularPredictorV1:
         if isinstance(dataset, TabularDataset):
             return dataset
         elif isinstance(dataset, pd.DataFrame):
-            return TabularDataset(df=dataset)
+            return TabularDataset(dataset)
         elif isinstance(dataset, str):
-            return TabularDataset(file_path=dataset)
+            return TabularDataset(dataset)
         elif isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                    To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")

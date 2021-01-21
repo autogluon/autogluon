@@ -293,13 +293,15 @@ class LGBModel(AbstractModel):
         directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3! Use tabular/utils/savers for datasets, add new function
         os.makedirs(directory, exist_ok=True)
-        scheduler_func, scheduler_options = scheduler_options  # Unpack tuple
-        if scheduler_func is None or scheduler_options is None:
-            raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
-        num_threads = scheduler_options['resource'].get('num_cpus', -1)
+        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
+        if scheduler_cls is None or scheduler_params is None:
+            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
+        num_threads = scheduler_params['resource'].get('num_cpus', -1)
         params_copy['num_threads'] = num_threads
         # num_gpus = scheduler_options['resource']['num_gpus'] # TODO: unused
-
+        # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+        warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+        warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, y_train=y_train, params=params_copy, X_val=X_val, y_val=y_val)
         dataset_train_filename = "dataset_train.bin"
         train_file = self.path + dataset_train_filename
@@ -330,11 +332,11 @@ class LGBModel(AbstractModel):
             directory=directory,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_options['time_out']
+            time_limit=scheduler_params['time_out']
         )
         lgb_trial.register_args(util_args=util_args, **params_copy)
-        scheduler = scheduler_func(lgb_trial, **scheduler_options)
-        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+        scheduler = scheduler_cls(lgb_trial, **scheduler_params)
+        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
             scheduler.upload_files([train_file, val_file, val_pkl_path])  # TODO: currently does not work.
@@ -345,7 +347,7 @@ class LGBModel(AbstractModel):
         scheduler.run()
         scheduler.join_jobs()
 
-        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:

@@ -9,7 +9,7 @@ from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 __all__ = ['ObjectDetector']
 
 class ObjectDetector(object):
-    """AutoGluon Predictor for for detecting objects in images
+    """AutoGluon Predictor for detecting objects in images
 
     Parameters
     ----------

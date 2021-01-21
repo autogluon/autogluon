@@ -122,11 +122,11 @@ class TabularPrediction(BaseTask):
                 best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True}
                     Identical to best_quality but additionally trains refit_full models that have slightly lower predictive accuracy but are over 10x faster during inference and require 10x less disk space.
 
-                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False}
+                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
                     High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False, 'hyperparameters': 'light'}
+                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False, 'hyperparameters': 'light'}
                     Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
                     Recommended for applications that require fast inference speed.
 
@@ -347,7 +347,7 @@ class TabularPrediction(BaseTask):
             label_count_threshold : int, default = 10
                 For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
                 AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
-            save_bagged_folds : bool, default = True
+            save_bag_folds : bool, default = True
                 If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction after `fit()`.
                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
                     This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
@@ -401,10 +401,10 @@ class TabularPrediction(BaseTask):
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
                 This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
                 Only valid if `refit_full` is set.
-            feature_generator : `autogluon.utils.tabular.features.generators.abstract.AbstractFeatureGenerator`, default = `autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator()`
+            feature_generator : :class:`autogluon.tabular.features.generators.abstract.AbstractFeatureGenerator`, default = :class:`autogluon.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
-                To control aspects of the default feature generation process, you can pass in an AutoMLPipelineFeatureGenerator object constructed using some of these kwargs:
+                To control aspects of the default feature generation process, you can pass in an :class:`AutoMLPipelineFeatureGenerator` object constructed using some of these kwargs:
                     enable_numeric_features : bool, default True
                         Whether to keep features of 'int' and 'float' raw types.
                         These features are passed without alteration to the models.
@@ -429,9 +429,9 @@ class TabularPrediction(BaseTask):
                     vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
                         Only used if `enable_text_ngram_features=True`.
-            trainer_type : `Trainer` class, default=`AutoTrainer`
-                A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
-                Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
+            trainer_type : :class:`AbstractTrainer` class, default=:class:`AutoTrainer`
+                A class inheriting from :class:`autogluon.tabular.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
+                Note: In order to use a custom :class:`AbstractTrainer` class, you must import the class file that defines it into the current Python session.
             random_seed : int, default = 0
                 Seed to use when generating data split indices such as kfold splits and train/validation splits.
                 Caution: This seed only enables reproducible data splits (and the ability to randomize splits in each run by changing seed values).
@@ -477,10 +477,10 @@ class TabularPrediction(BaseTask):
         Examples
         --------
         >>> from autogluon.tabular import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+        >>> train_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
         >>> label_column = 'class'
         >>> predictor = task.fit(train_data=train_data, label=label_column)
-        >>> test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+        >>> test_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
         >>> y_test = test_data[label_column]
         >>> test_data = test_data.drop(labels=[label_column], axis=1)
         >>> y_pred = predictor.predict(test_data)
@@ -515,7 +515,7 @@ class TabularPrediction(BaseTask):
             'label_count_threshold',
             'id_columns',
             'set_best_to_refit_full',
-            'save_bagged_folds',
+            'save_bag_folds',
             'keep_only_best',
             'save_space',
             'cache_data',
@@ -551,9 +551,9 @@ class TabularPrediction(BaseTask):
         unlabeled_data = kwargs.get('unlabeled_data', None)
 
         if isinstance(train_data, str):
-            train_data = TabularDataset(file_path=train_data)
+            train_data = TabularDataset(train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
-            tuning_data = TabularDataset(file_path=tuning_data)
+            tuning_data = TabularDataset(tuning_data)
 
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
@@ -588,7 +588,7 @@ class TabularPrediction(BaseTask):
         if set_best_to_refit_full and not refit_full:
             raise ValueError('`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
 
-        save_bagged_folds = kwargs.get('save_bagged_folds', True)
+        save_bag_folds = kwargs.get('save_bag_folds', True)
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
@@ -693,6 +693,11 @@ class TabularPrediction(BaseTask):
         if 'num_gpus' not in ag_args_fit and ngpus_per_trial is not None:
             ag_args_fit['num_gpus'] = ngpus_per_trial
 
+        if save_bag_folds is not None:
+            if ag_args_ensemble is None:
+                ag_args_ensemble = {}
+            ag_args_ensemble['save_bag_folds'] = save_bag_folds
+
         # All models use the same scheduler:
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
@@ -716,14 +721,14 @@ class TabularPrediction(BaseTask):
             scheduler_options = None
 
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric,
-                          id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
+                          ignored_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold, cache_data=cache_data, random_seed=random_seed)
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                     hyperparameter_tune_kwargs=scheduler_options, feature_prune=feature_prune,
-                    holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
+                    holdout_frac=holdout_frac, num_bag_folds=num_bagging_folds, num_bag_sets=num_bagging_sets, num_stack_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                    time_limit=time_limit_orig, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    time_limit=time_limit_orig, verbosity=verbosity)
 
         predictor = TabularPredictorV1(learner=learner)
 

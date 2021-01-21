@@ -120,7 +120,7 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
                              model: Optional[SurrogateModel]):
         # generate a random candidates among which to pick the ones to be
         # locally optimized
-        logger.info("BO Algorithm: Generating initial candidates.")
+        logger.log(15, "BayesOpt Algorithm: Generating initial candidates.")
         if self.profiler is not None:
             self.profiler.start('nextcand_genrandom')
         if self.sample_unique_candidates:
@@ -135,7 +135,7 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
         if self.profiler is not None:
             self.profiler.stop('nextcand_genrandom')
             self.profiler.start('nextcand_scoring')
-        logger.info("BO Algorithm: Scoring (and reordering) candidates.")
+        logger.log(15, "BayesOpt Algorithm: Scoring (and reordering) candidates.")
         if self.debug_log is not None:
             candidates_and_scores = _order_candidates(
                 initial_candidates, self.initial_candidates_scorer,
@@ -153,7 +153,7 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
             self.profiler.start('nextcand_localsearch')
         candidates_with_optimization = _lazily_locally_optimize(
             initial_candidates, self.local_optimizer, model=model)
-        logger.info("BO Algorithm: Selecting final set of candidates.")
+        logger.log(15, "BayesOpt Algorithm: Selecting final set of candidates.")
         if self.debug_log is not None and \
                 isinstance(self.local_optimizer, LBFGSOptimizeAcquisition):
             # We would like to get num_evaluations from the first run (usually

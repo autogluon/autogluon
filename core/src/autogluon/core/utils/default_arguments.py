@@ -80,18 +80,15 @@ def check_and_merge_defaults(
     """
     prefix = "" if dict_name is None else "{}: ".format(dict_name)
     for key in mandatory:
-        assert key in options, \
-            prefix + "Key '{}' is missing (but is mandatory)".format(key)
+        assert key in options, prefix + "Key '{}' is missing (but is mandatory)".format(key)
     log_msg = ""
-    result_options = {
-        k: v for k, v in options.items() if v is not None}
+    result_options = {k: v for k, v in options.items() if v is not None}
     for key, value in default_options.items():
         if key not in result_options:
-            log_msg += (prefix + "Key '{}': Imputing default value {}\n".format(
-                key, value))
+            log_msg += (prefix + "Key '{}': Imputing default value {}\n".format(key, value))
             result_options[key] = value
     if log_msg:
-        logger.info(log_msg)
+        logger.log(15, log_msg)
     # Check constraints
     if constraints:
         for key, value in result_options.items():
