@@ -361,7 +361,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 # TODO: Ensure reporter/scheduler properly handle None/nan values after refactor
                 if val_dataset is not None and (not np.isnan(val_metric)):  # TODO: This might work without the if statement
                     # epoch must be number of epochs done (starting at 1)
-                    reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
+                    with PicklableModel(self):
+                        reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
             if e - val_improve_epoch > epochs_wo_improve:
                 break  # early-stop if validation-score hasn't strictly improved in `epochs_wo_improve` consecutive epochs
             if time_limit:
@@ -640,16 +641,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         return ColumnTransformer(transformers=transformers)  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
     def save(self, path: str = None, verbose=True) -> str:
-        if self.model is not None:
-            self._architecture_desc = self.model.architecture_desc
-        temp_model = self.model
-        temp_sw = self.summary_writer
-        self.model = None
-        self.summary_writer = None
-        path_final = super().save(path=path, verbose=verbose)
-        self.model = temp_model
-        self.summary_writer = temp_sw
-        self._architecture_desc = None
+        with PicklableModel(self):
+            path_final = super().save(path=path, verbose=verbose)
 
         # Export model
         if self.model is not None:
@@ -740,6 +733,28 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
         if remove_fit and requires_save:
             self.optimizer = None
+
+
+class PicklableModel(object):
+    def __init__(self, model):
+        self.m = model
+        self.temp_model = None
+        self.temp_sw = None
+        self.temp_architecture_desc = None
+
+    def __enter__(self):
+        if self.m.model is not None:
+            self.m._architecture_desc = self.m.model.architecture_desc
+        self.temp_model = self.m.model
+        self.temp_sw = self.m.summary_writer
+        self.m.model = None
+        self.m.summary_writer = None
+        return self.m
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.m.model = self.temp_model
+        self.m.summary_writer = self.temp_sw
+        self.m._architecture_desc = None
 
 
 def convert_df_dtype_to_str(df):
