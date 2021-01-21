@@ -243,11 +243,48 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    column_properties, label_columns, label_shapes,
                    log_metrics, stopping_metric, console_log,
                    ignore_warning=False):
+    """
+
+    Parameters
+    ----------
+    args
+        The arguments
+    reporter
+        The reporter. If it is set to None, we will
+    train_df_path
+        Path of the training dataframe
+    tuning_df_path
+        Path of the tuning dataframe
+    time_limits
+        Time limits
+    time_start
+        The starting timestamp of the experiment
+    base_config
+        Base configuration
+    problem_types
+        Types of the problem. Each label can have one problem_type
+    column_properties
+        Column properties
+    label_columns
+        Label columns
+    label_shapes
+        Shapes of the labels
+    log_metrics
+        Metrics for logging
+    stopping_metric
+        The stopping metric
+    console_log
+        Whether to log it to console
+    ignore_warning
+        Whether to ignore warning
+
+    """
     if time_limits is not None:
         start_train_tick = time.time()
         time_left = time_limits - (start_train_tick - time_start)
         if time_left <= 0:
-            reporter.terminate()
+            if reporter is not None:
+                reporter.terminate()
             return
     import os
     # Get the log metric scorers
@@ -448,34 +485,34 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                          ' total_time={:.2f}min'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60))
-            report_items = [('iteration', update_idx + 1),
-                            ('report_idx', report_idx + 1),
-                            ('epoch', int(update_idx / updates_per_epoch))] +\
-                           [(metric.name, score)
-                            for score, metric in zip(log_scores, log_metric_scorers)] + \
-                           [('find_better', find_better),
-                            ('time_spent', int(time.time() - start_tick))]
-            total_time_spent = time.time() - start_tick
-
-            if stopping_metric_scorer._sign < 0:
-                report_items.append(('reward_attr', -dev_score))
-            else:
-                report_items.append(('reward_attr', dev_score))
-            report_items.append(('eval_metric', stopping_metric_scorer.name))
-            report_items.append(('exp_dir', exp_dir))
-            if find_better:
-                best_report_items = report_items
-            reporter(**dict(report_items))
-            report_idx += 1
+            if reporter is not None:
+                report_items = [('iteration', update_idx + 1),
+                                ('report_idx', report_idx + 1),
+                                ('epoch', int(update_idx / updates_per_epoch))] +\
+                               [(metric.name, score)
+                                for score, metric in zip(log_scores, log_metric_scorers)] + \
+                               [('find_better', find_better),
+                                ('time_spent', int(time.time() - start_tick))]
+                if stopping_metric_scorer._sign < 0:
+                    report_items.append(('reward_attr', -dev_score))
+                else:
+                    report_items.append(('reward_attr', dev_score))
+                report_items.append(('eval_metric', stopping_metric_scorer.name))
+                report_items.append(('exp_dir', exp_dir))
+                if find_better:
+                    best_report_items = report_items
+                reporter(**dict(report_items))
+                report_idx += 1
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
                 break
+            total_time_spent = time.time() - start_tick
             if time_limits is not None and total_time_spent > time_limits:
                 break
-
-    best_report_items_dict = dict(best_report_items)
-    best_report_items_dict['report_idx'] = report_idx + 1
-    reporter(**best_report_items_dict)
+    if reporter is not None:
+        best_report_items_dict = dict(best_report_items)
+        best_report_items_dict['report_idx'] = report_idx + 1
+        reporter(**best_report_items_dict)
 
 @use_np
 class BertForTextPredictionBasic:
@@ -595,11 +632,36 @@ class BertForTextPredictionBasic:
               scheduler_options=None,
               num_trials=None,
               plot_results=False,
+              auto_turnoff_hpo=False,
               console_log=True,
               ignore_warning=True):
-        force_forkserver()
+        """
+
+        Parameters
+        ----------
+        train_data
+            The training data
+        tuning_data
+            The tuning data
+        resource
+
+        time_limits
+        search_strategy
+        search_options
+        scheduler_options
+        num_trials
+        plot_results
+        auto_turnoff_hpo
+        console_log
+        ignore_warning
+
+        Returns
+        -------
+
+        """
         start_tick = time.time()
-        logging_config(folder=self._output_directory, name='main',
+        logging_config(folder=self._output_directory,
+                       name='main',
                        console=console_log,
                        logger=self._logger)
         assert len(self._label_columns) == 1
@@ -623,7 +685,7 @@ class BertForTextPredictionBasic:
             time_attr='report_idx',
             reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
-        # Create a temporary cache file and then ask the inner function to load the
+        # Create a temporary cache file. The internal train function will load the
         # temporary cache.
         train_df_path = os.path.join(self._output_directory, 'cache_train_dataframe.pq')
         tuning_df_path = os.path.join(self._output_directory, 'cache_tuning_dataframe.pq')
@@ -643,28 +705,38 @@ class BertForTextPredictionBasic:
                                                       stopping_metric=self._stopping_metric,
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
-        scheduler_cls = schedulers[search_strategy.lower()]
-        # Create scheduler, run HPO experiment
-        scheduler = scheduler_cls(train_fn, **scheduler_options)
-        scheduler.run()
-        scheduler.join_jobs()
-        if len(scheduler.config_history) == 0:
-            raise RuntimeError('No training job has been completed! '
-                               'There are two possibilities: '
-                               '1) The time_limits is too small, '
-                               'or 2) There are some internal errors in AutoGluon. '
-                               'For the first case, you can increase the time_limits or set it to '
-                               'None, e.g., setting "TextPrediction.fit(..., time_limits=None). To '
-                               'further investigate the root cause, you can also try to train with '
-                               '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
-        best_config = scheduler.get_best_config()
-        self._logger.info('Results=', scheduler.searcher._results)
-        self._logger.info('Best_config={}'.format(best_config))
-        best_task_id = scheduler.get_best_task_id()
-        best_model_saved_dir_path = os.path.join(self._output_directory,
-                                                 'task{}'.format(best_task_id))
-        best_cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
-        cfg = self.base_config.clone_merge(best_cfg_path)
+        if scheduler_options['num_trials'] == 1 and auto_turnoff_hpo:
+            train_fn()
+        else:
+            force_forkserver()
+            scheduler_cls = schedulers[search_strategy.lower()]
+            # Create scheduler, run HPO experiment
+            scheduler = scheduler_cls(train_fn, **scheduler_options)
+            scheduler.run()
+            scheduler.join_jobs()
+            if len(scheduler.config_history) == 0:
+                raise RuntimeError('No training job has been completed! '
+                                   'There are two possibilities: '
+                                   '1) The time_limits is too small, '
+                                   'or 2) There are some internal errors in AutoGluon. '
+                                   'For the first case, you can increase the time_limits or set it to '
+                                   'None, e.g., setting "TextPrediction.fit(..., time_limits=None). To '
+                                   'further investigate the root cause, you can also try to train with '
+                                   '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
+            best_config = scheduler.get_best_config()
+            self._logger.info('Results=', scheduler.searcher._results)
+            self._logger.info('Best_config={}'.format(best_config))
+            best_task_id = scheduler.get_best_task_id()
+            best_model_saved_dir_path = os.path.join(self._output_directory,
+                                                     'task{}'.format(best_task_id))
+            best_cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
+            cfg = self.base_config.clone_merge(best_cfg_path)
+            if plot_results:
+                plot_training_curves = os.path.join(self._output_directory,
+                                                    'plot_training_curves.png')
+                scheduler.get_training_curves(filename=plot_training_curves,
+                                              plot=plot_results,
+                                              use_legend=True)
         self._results = dict()
         self._results.update(best_reward=scheduler.get_best_reward(),
                              best_config=scheduler.get_best_config(),
@@ -674,10 +746,6 @@ class BertForTextPredictionBasic:
                              config_history=scheduler.config_history,
                              reward_attr=scheduler._reward_attr,
                              config=cfg)
-        if plot_results:
-            plot_training_curves = os.path.join(self._output_directory, 'plot_training_curves.png')
-            scheduler.get_training_curves(filename=plot_training_curves, plot=plot_results,
-                                          use_legend=True)
         # Consider to move this to a separate predictor
         self._config = cfg
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
