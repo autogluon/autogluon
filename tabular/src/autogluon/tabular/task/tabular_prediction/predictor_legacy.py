@@ -1205,7 +1205,7 @@ class TabularPredictorV1:
             Same as `tuning_data` argument of `fit()`.
             If `tuning_data = None` and `train_data = None`: the same training/validation splits will be loaded from `fit()` call used to produce this Predictor,
             unless bagging/stacking was previously used in which case a new training/validation split is performed.
-        augmentation_data : :class:`TabularDataset` or class:`pd.DataFrame`, default = None
+        augmentation_data : :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
             An optional extra dataset of unlabeled rows that can be used for augmenting the dataset used to fit student models during distillation (ignored if None).
         time_limit : int, default = None
             Approximately how long (in seconds) the distillation process should run for.
@@ -1216,7 +1216,7 @@ class TabularPredictorV1:
             If = None, then student models will use the same hyperparameters from `fit()` used to produce this Predictor.
             Note: distillation is currently only supported for ['GBM','NN','RF','CAT'] student models, other models and their hyperparameters are ignored here.
         holdout_frac : float
-            Same as `holdout_frac` argument of :meth:`autogluon.tabular.TabularPrediction.fit`.
+            Same as `holdout_frac` argument of :meth:`TabularPredictor.fit`.
         teacher_preds : str, default = 'soft'
             What form of teacher predictions to distill from (teacher refers to the most accurate AutoGluon ensemble-predictor).
             If None, we only train with original labels (no data augmentation).
@@ -1243,7 +1243,7 @@ class TabularPredictorV1:
             Note: all distilled models will contain '_DSTL' substring in their name by default.
         verbosity : int, default = None
             Controls amount of printed output during distillation (4 = highest, 0 = lowest).
-            Same as `verbosity` parameter of :class:`autogluon.tabular.TabularPredictor`.
+            Same as `verbosity` parameter of :class:`TabularPredictor`.
             If None, the same `verbosity` used in previous fit is employed again.
 
         Returns

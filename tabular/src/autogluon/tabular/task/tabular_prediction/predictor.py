@@ -432,10 +432,10 @@ class TabularPredictor(TabularPredictorV1):
                 How many GPUs to use during fit.
                 If 'auto', will use all available GPUs.
                 Set to 0 to disable usage of GPUs.
-            feature_generator : `autogluon.tabular.features.generators.AbstractFeatureGenerator`, default = `autogluon.tabular.features.generators.AutoMLPipelineFeatureGenerator()`
+            feature_generator : :class:`autogluon.tabular.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.tabular.features.generators.AutoMLPipelineFeatureGenerator`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
-                To control aspects of the default feature generation process, you can pass in an AutoMLPipelineFeatureGenerator object constructed using some of these kwargs:
+                To control aspects of the default feature generation process, you can pass in an :class:`AutoMLPipelineFeatureGenerator` object constructed using some of these kwargs:
                     enable_numeric_features : bool, default True
                         Whether to keep features of 'int' and 'float' raw types.
                         These features are passed without alteration to the models.
@@ -461,6 +461,7 @@ class TabularPredictor(TabularPredictorV1):
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
                         Only used if `enable_text_ngram_features=True`.
             unlabeled_data : pd.DataFrame, default = None
+                [Experimental Parameter]
                 Collection of data without labels that we can use to pretrain on. This is the same schema as train_data, except
                 without the labels. Currently, unlabeled_data is only used for pretraining a TabTransformer model.
                 If you do not specify 'TRANSF' with unlabeled_data, then no pretraining will occur and unlabeled_data will be ignored!

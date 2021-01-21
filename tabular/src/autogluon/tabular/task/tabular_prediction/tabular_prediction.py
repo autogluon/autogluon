@@ -401,10 +401,10 @@ class TabularPrediction(BaseTask):
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
                 This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
                 Only valid if `refit_full` is set.
-            feature_generator : `autogluon.utils.tabular.features.generators.abstract.AbstractFeatureGenerator`, default = `autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator()`
+            feature_generator : :class:`autogluon.tabular.features.generators.abstract.AbstractFeatureGenerator`, default = :class:`autogluon.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
-                To control aspects of the default feature generation process, you can pass in an AutoMLPipelineFeatureGenerator object constructed using some of these kwargs:
+                To control aspects of the default feature generation process, you can pass in an :class:`AutoMLPipelineFeatureGenerator` object constructed using some of these kwargs:
                     enable_numeric_features : bool, default True
                         Whether to keep features of 'int' and 'float' raw types.
                         These features are passed without alteration to the models.
@@ -429,9 +429,9 @@ class TabularPrediction(BaseTask):
                     vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
                         Only used if `enable_text_ngram_features=True`.
-            trainer_type : `Trainer` class, default=`AutoTrainer`
-                A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
-                Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
+            trainer_type : :class:`AbstractTrainer` class, default=:class:`AutoTrainer`
+                A class inheriting from :class:`autogluon.tabular.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
+                Note: In order to use a custom :class:`AbstractTrainer` class, you must import the class file that defines it into the current Python session.
             random_seed : int, default = 0
                 Seed to use when generating data split indices such as kfold splits and train/validation splits.
                 Caution: This seed only enables reproducible data splits (and the ability to randomize splits in each run by changing seed values).
