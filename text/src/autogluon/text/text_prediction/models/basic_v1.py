@@ -239,10 +239,16 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
 
 @use_np
 def train_function(args, reporter, train_df_path, tuning_df_path,
-                   time_limits, base_config, problem_types,
+                   time_limits, time_start, base_config, problem_types,
                    column_properties, label_columns, label_shapes,
                    log_metrics, stopping_metric, console_log,
                    ignore_warning=False):
+    if time_limits is not None:
+        start_train_tick = time.time()
+        time_left = time_limits - (start_train_tick - time_start)
+        if time_left <= 0:
+            reporter.terminate()
+            return
     import os
     # Get the log metric scorers
     if isinstance(log_metrics, str):
@@ -357,6 +363,11 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     no_better_rounds = 0
     report_idx = 0
     start_tick = time.time()
+    if time_limits is not None:
+        time_limits -= start_tick - time_start
+        if time_limits <= 0:
+            reporter.terminate()
+            return
     best_report_items = None
     for update_idx in tqdm.tqdm(range(max_update), disable=None):
         num_samples_per_update_l = [0 for _ in ctx_l]
@@ -445,9 +456,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                            [('find_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
             total_time_spent = time.time() - start_tick
-            if time_limits is not None and total_time_spent > time_limits:
-                break
-            report_idx += 1
+
             if stopping_metric_scorer._sign < 0:
                 report_items.append(('reward_attr', -dev_score))
             else:
@@ -457,9 +466,13 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             if find_better:
                 best_report_items = report_items
             reporter(**dict(report_items))
+            report_idx += 1
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
                 break
+            if time_limits is not None and total_time_spent > time_limits:
+                break
+
     best_report_items_dict = dict(best_report_items)
     best_report_items_dict['report_idx'] = report_idx + 1
     reporter(**best_report_items_dict)
@@ -619,6 +632,7 @@ class BertForTextPredictionBasic:
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_df_path=train_df_path,
                                                       time_limits=time_limits,
+                                                      time_start=start_tick,
                                                       tuning_df_path=tuning_df_path,
                                                       base_config=self.base_config,
                                                       problem_types=self.problem_types,
