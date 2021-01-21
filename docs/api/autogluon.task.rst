@@ -4,6 +4,11 @@
 AutoGluon Tasks
 ===============
 
+.. note::
+
+   TabularPredictor is replacing TabularPrediction in the upcoming v0.1 release. TabularPredictor has a very similar API to TabularPrediction, but certain arguments have been renamed. Please refer to the TabularPredictor documentation below for details, and refer to the updated tutorials which use TabularPredictor.
+
+
 .. admonition:: Example (Tabular Prediction Task):
 
    Import TabularDataset and TabularPredictor:
