@@ -49,3 +49,6 @@ class TaskManagers(object):
 
     def release_resources(self, resources):
         self.resource_manager._release(resources)
+
+    def check_availability(self, resources):
+        return self.resource_manager.check_availability(resources)
