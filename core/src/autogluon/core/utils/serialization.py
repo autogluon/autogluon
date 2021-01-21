@@ -3,6 +3,7 @@ import logging
 import difflib
 import inspect
 import os
+import pickle
 import io
 import struct
 import sys
