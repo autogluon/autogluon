@@ -19,7 +19,7 @@ AutoGluon Tasks
 
    >>> train_data = TabularDataset("https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv")
 
-   Fit classification models predicting on the "class" column:
+   Fit classification models predicting the "class" column:
 
    >>> predictor = TabularPredictor(label="class").fit(train_data)
 

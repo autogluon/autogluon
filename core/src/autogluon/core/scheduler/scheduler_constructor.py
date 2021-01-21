@@ -64,8 +64,10 @@ def init_scheduler(
 
     Returns
     -------
-    scheduler_options : Tuple of (scheduler_cls : class :class:`autogluon.core.scheduler.TaskScheduler`, scheduler_params : dict)
-        To construct the scheduler, call `scheduler_options[0](train_fn, **scheduler_options[1])`
+    scheduler_cls : class :class:`autogluon.core.scheduler.TaskScheduler`, scheduler_params : dict
+        scheduler_cls is the class of the scheduler that will be constructed.
+        scheduler_params is the key word parameter arguments to pass to the Scheeduler class constructor when initializing a Scheduler object.
+        To actually construct a Scheduler object, call `scheduler_cls(train_fn, **scheduler_params)`
         By default in scheduler_params: time_attr='epoch', reward_attr='validation_performance'
 
     Examples
@@ -87,9 +89,7 @@ def init_scheduler(
     >>>     epochs=10,
     >>> )
     >>>
-    >>> scheduler_options = init_scheduler('auto', num_trials=5)
-    >>>
-    >>> scheduler_cls, scheduler_params = scheduler_options  # unpack tuple
+    >>> scheduler_cls, scheduler_params = init_scheduler('auto', num_trials=5)
     >>>
     >>> train_fn.register_args(**hyperparameters)  # Register search space
     >>> scheduler = scheduler_cls(train_fn, **scheduler_params)
@@ -121,8 +121,7 @@ def init_scheduler(
     scheduler_cls = schedulers[scheduler_params['searcher'].lower()]
     if scheduler_params['time_out'] is None:
         scheduler_params.pop('time_out', None)
-    scheduler_options = (scheduler_cls, scheduler_params)  # wrap into tuple
-    return scheduler_options
+    return scheduler_cls, scheduler_params
 
 
 def get_hyperparameter_tune_kwargs_preset(preset: str):
