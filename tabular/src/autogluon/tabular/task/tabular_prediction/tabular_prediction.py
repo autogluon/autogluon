@@ -4,16 +4,16 @@ import math
 
 import numpy as np
 
+from autogluon.core.dataset import TabularDataset
 from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 from autogluon.core.metrics import get_metric
 
-from .dataset import TabularDataset
-from .hyperparameter_configs import get_hyperparameter_config
+from ...configs.hyperparameter_configs import get_hyperparameter_config
 from .predictor_legacy import TabularPredictorV1
-from .presets_configs import set_presets, unpack
+from ...configs.presets_configs import set_presets, unpack
 from ...models.text_prediction.text_prediction_v1_model import TextPredictionV1Model
 from ...features import AutoMLPipelineFeatureGenerator
 from ...learner import DefaultLearner as Learner
@@ -82,12 +82,12 @@ class TabularPrediction(BaseTask):
 
         Parameters
         ----------
-        train_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`
+        train_data : str or :class:`autogluon.tabular.TabularDataset` or `pandas.DataFrame`
             Table of the training data, which is similar to pandas DataFrame.
             If str is passed, `train_data` will be loaded using the str value as the file path.
         label : str
             Name of the column that contains the target variable to predict.
-        tuning_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
+        tuning_data : str or :class:`autogluon.tabular.TabularDataset` or `pandas.DataFrame`, default = None
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
@@ -108,7 +108,7 @@ class TabularPrediction(BaseTask):
             To get good quality with minimal disk usage, set `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`
             Any user-specified arguments in `fit()` will override the values used by presets.
             If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
-            For precise definitions of the provided presets, see file: `autogluon/tasks/tabular_prediction/presets_configs.py`.
+            For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
             Available Presets: ['best_quality', 'best_quality_with_high_quality_refit', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
@@ -190,7 +190,7 @@ class TabularPrediction(BaseTask):
                     'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
-                Reference `autogluon/task/tabular_prediction/hyperparameter_configs.py` for information on the hyperparameters associated with each preset.
+                Reference `autogluon/tabular/configs/hyperparameter_configs.py` for information on the hyperparameters associated with each preset.
             Keys are strings that indicate which model types to train.
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors), 'LR' (linear regression)
                 If certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.

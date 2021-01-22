@@ -1,8 +1,8 @@
+import inspect
 import logging
 
 from ..task.base import compile_scheduler_options_v2
 from ..task.base.base_task import schedulers
-from ..utils.utils import setup_compute
 
 logger = logging.getLogger()
 
@@ -17,15 +17,17 @@ _scheduler_presets = {
 }
 
 
-def init_scheduler(
+def scheduler_factory(
         hyperparameter_tune_kwargs,
         time_out: float = None,
         num_trials: int = None,
         nthreads_per_trial='all',
         ngpus_per_trial='all',
+        scheduler_cls='auto',
         **kwargs):
     """
     Constructs a scheduler via lazy initialization based on the input hyperparameter_tune_kwargs.
+    The output will contain the scheduler class and init arguments except for the `train_fn` argument, which must be specified downstream.
 
     Parameters
     ----------
@@ -38,6 +40,7 @@ def init_scheduler(
             'bayesopt': Performs HPO via bayesian optimization.
         For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
             The 'searcher' key is required when providing a dict.
+            Some schedulers may have different valid keys.
     time_out : float, default = None
         Same as hyperparameter_tune_kwargs['time_out']. Ignored if specified in hyperparameter_tune_kwargs.
         At least one of time_out or num_trials must be specified.
@@ -58,6 +61,9 @@ def init_scheduler(
             'all': Use all GPUs.
             'auto': Keep value as 'auto' in output, must be updated downstream.
         If None, use 0 GPUs.
+    scheduler_cls : str or cls, default = 'auto'
+        If 'auto', scheduler_cls will be automatically set to the best matching scheduler class corresponding to the chosen searcher.
+        It is recommended to always use 'auto' unless implementing custom schedulers.
     **kwargs :
         Kwargs to specify any other scheduler parameters.
         A kwarg will be ignored if also specified in hyperparameter_tune_kwargs.
@@ -74,7 +80,7 @@ def init_scheduler(
     --------
     >>> import numpy as np
     >>> import autogluon.core as ag
-    >>> from autogluon.core.scheduler.scheduler_constructor import init_scheduler
+    >>> from autogluon.core.scheduler.scheduler_factory import scheduler_factory
     >>>
     >>>
     >>> @ag.args()
@@ -89,7 +95,7 @@ def init_scheduler(
     >>>     epochs=10,
     >>> )
     >>>
-    >>> scheduler_cls, scheduler_params = init_scheduler('auto', num_trials=5)
+    >>> scheduler_cls, scheduler_params = scheduler_factory('auto', num_trials=5)
     >>>
     >>> train_fn.register_args(**hyperparameters)  # Register search space
     >>> scheduler = scheduler_cls(train_fn, **scheduler_params)
@@ -118,7 +124,10 @@ def init_scheduler(
         **kwargs,
     )
 
-    scheduler_cls = schedulers[scheduler_params['searcher'].lower()]
+    if isinstance(scheduler_cls, str) and scheduler_cls == 'auto':
+        scheduler_cls = schedulers[scheduler_params['searcher'].lower()]
+    if not inspect.isclass(scheduler_cls):
+        raise ValueError(f'scheduler_cls must be a class, but was instead: {scheduler_cls}')
     if scheduler_params['time_out'] is None:
         scheduler_params.pop('time_out', None)
     return scheduler_cls, scheduler_params

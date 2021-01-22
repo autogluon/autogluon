@@ -7,19 +7,19 @@ import time
 import numpy as np
 import pandas as pd
 
-from autogluon.core.scheduler.scheduler_constructor import init_scheduler
+from autogluon.core.dataset import TabularDataset
+from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 
-from .dataset import TabularDataset
-from .hyperparameter_configs import get_hyperparameter_config
-from .predictor_legacy import TabularPredictorV1
-from .presets_configs import set_presets, unpack
-from .feature_generator_presets import get_default_feature_generator
-from ...learner import AbstractLearner, DefaultLearner
-from ...trainer import AbstractTrainer
+from ..configs.hyperparameter_configs import get_hyperparameter_config
+from ..configs.presets_configs import set_presets, unpack
+from ..configs.feature_generator_presets import get_default_feature_generator
+from ..task.tabular_prediction.predictor_legacy import TabularPredictorV1
+from ..learner import AbstractLearner, DefaultLearner
+from ..trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
 
@@ -159,7 +159,7 @@ class TabularPredictor(TabularPredictorV1):
             To get good quality with minimal disk usage, set `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`
             Any user-specified arguments in `fit()` will override the values used by presets.
             If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
-            For precise definitions of the provided presets, see file: `autogluon/tabular/task/tabular_prediction/presets_configs.py`.
+            For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
             Available Presets: ['best_quality', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
@@ -205,7 +205,7 @@ class TabularPredictor(TabularPredictorV1):
                     'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
-                Reference `autogluon/tabular/task/tabular_prediction/hyperparameter_configs.py` for information on the hyperparameters associated with each preset.
+                Reference `autogluon/tabular/configs/hyperparameter_configs.py` for information on the hyperparameters associated with each preset.
             Keys are strings that indicate which model types to train.
                 Stable model options include:
                     'GBM' (LightGBM)
@@ -763,7 +763,7 @@ class TabularPredictor(TabularPredictorV1):
             time_limit_hpo = None
         if hyperparameter_tune_kwargs is None:
             return None
-        scheduler_options = init_scheduler(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit_hpo, num_trials=num_trials, nthreads_per_trial=num_cpus, ngpus_per_trial=num_gpus)
+        scheduler_options = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit_hpo, num_trials=num_trials, nthreads_per_trial=num_cpus, ngpus_per_trial=num_gpus)
 
         assert scheduler_options[1]['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
         # TODO: Fix or remove in v0.1
