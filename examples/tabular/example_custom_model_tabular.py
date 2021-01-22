@@ -1,7 +1,7 @@
 """ Example script for defining and using custom models in AutoGluon Tabular """
 
 from autogluon.tabular import TabularDataset, TabularPredictor
-from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
+from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 from autogluon.tabular.data.label_cleaner import LabelCleaner
 from autogluon.tabular.models import AbstractModel
 from autogluon.tabular.utils import infer_problem_type
