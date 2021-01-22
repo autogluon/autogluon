@@ -1,10 +1,10 @@
 
 import pandas as pd
 
-from autogluon.core.utils import warning_filter
+from .utils import warning_filter
 
 with warning_filter():
-    from autogluon.core.utils.loaders import load_pd
+    from .utils.loaders import load_pd
 
 __all__ = ['TabularDataset']
 
@@ -32,7 +32,7 @@ class TabularDataset(pd.DataFrame):
 
     Examples
     --------
-    >>> from autogluon.tabular import TabularDataset
+    >>> from autogluon.core.dataset import TabularDataset
     >>> train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
     >>> train_data.head(30)
     >>> train_data.columns

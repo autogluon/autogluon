@@ -7,6 +7,7 @@ import time
 import numpy as np
 import pandas as pd
 
+from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_constructor import init_scheduler
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
@@ -16,7 +17,6 @@ from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_tri
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import set_presets, unpack
 from ..configs.feature_generator_presets import get_default_feature_generator
-from ..task.tabular_prediction.dataset import TabularDataset
 from ..task.tabular_prediction.predictor_legacy import TabularPredictorV1
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer

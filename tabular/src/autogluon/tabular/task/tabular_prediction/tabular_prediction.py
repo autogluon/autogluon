@@ -4,13 +4,13 @@ import math
 
 import numpy as np
 
+from autogluon.core.dataset import TabularDataset
 from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import verbosity2loglevel
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 from autogluon.core.metrics import get_metric
 
-from .dataset import TabularDataset
 from ...configs.hyperparameter_configs import get_hyperparameter_config
 from .predictor_legacy import TabularPredictorV1
 from ...configs.presets_configs import set_presets, unpack
@@ -82,12 +82,12 @@ class TabularPrediction(BaseTask):
 
         Parameters
         ----------
-        train_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`
+        train_data : str or :class:`autogluon.tabular.TabularDataset` or `pandas.DataFrame`
             Table of the training data, which is similar to pandas DataFrame.
             If str is passed, `train_data` will be loaded using the str value as the file path.
         label : str
             Name of the column that contains the target variable to predict.
-        tuning_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
+        tuning_data : str or :class:`autogluon.tabular.TabularDataset` or `pandas.DataFrame`, default = None
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
