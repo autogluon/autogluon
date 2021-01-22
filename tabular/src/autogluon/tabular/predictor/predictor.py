@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.dataset import TabularDataset
-from autogluon.core.scheduler.scheduler_constructor import init_scheduler
+from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
@@ -763,7 +763,7 @@ class TabularPredictor(TabularPredictorV1):
             time_limit_hpo = None
         if hyperparameter_tune_kwargs is None:
             return None
-        scheduler_options = init_scheduler(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit_hpo, num_trials=num_trials, nthreads_per_trial=num_cpus, ngpus_per_trial=num_gpus)
+        scheduler_options = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit_hpo, num_trials=num_trials, nthreads_per_trial=num_cpus, ngpus_per_trial=num_gpus)
 
         assert scheduler_options[1]['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
         # TODO: Fix or remove in v0.1
