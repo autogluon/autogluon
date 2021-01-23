@@ -2,9 +2,10 @@
 import copy
 import pickle
 import logging
+import warnings
 
 import pandas as pd
-from autogluon.core.utils import verbosity2loglevel
+from autogluon.core.utils import verbosity2loglevel, get_gpu_free_memory
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 
@@ -164,6 +165,18 @@ class ImagePredictor(object):
         if num_gpus is not None:
             config['ngpus_per_trial'] = num_gpus
         if isinstance(hyperparameters, dict):
+            if 'batch_size' in hyperparameters:
+                bs = hyperparameters['batch_size']
+                if num_gpus is not None and num_gpus > 1 and bs > 64:
+                    # using gpus, check batch size vs. available gpu memory
+                    free_gpu_memory = get_gpu_free_memory()
+                    if not free_gpu_memory:
+                        warnings.warn('Unable to detect free GPU memory, we are unable to verify your batch_size setting.')
+                    elif len(free_gpu_memory) < num_gpus:
+                        warnings.warn(f'Detected GPU memory for {len(free_gpu_memory)} gpus but {num_gpus} is requested.')
+                    elif sum(free_gpu_memory[:num_gpus]) / bs < 128:
+                        warnings.warn(f'batch-size: {bs} is potentially larger than what your gpus can support ' +
+                                      f'free memory: {free_gpu_memory[:num_gpus]}')
             net = hyperparameters.pop('net', None)
             if net is not None:
                 config['custom_net'] = net

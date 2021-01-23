@@ -2,8 +2,9 @@
 import copy
 import pickle
 import logging
+import warnings
 
-from autogluon.core.utils import verbosity2loglevel
+from autogluon.core.utils import verbosity2loglevel, get_gpu_free_memory
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 
 __all__ = ['ObjectDetector']
@@ -106,6 +107,18 @@ class ObjectDetector(object):
         if num_gpus is not None:
             config['ngpus_per_trial'] = num_gpus
         if isinstance(hyperparameters, dict):
+            if 'batch_size' in hyperparameters:
+                bs = hyperparameters['batch_size']
+                if num_gpus is not None and num_gpus > 1 and bs > 64:
+                    # using gpus, check batch size vs. available gpu memory
+                    free_gpu_memory = get_gpu_free_memory()
+                    if not free_gpu_memory:
+                        warnings.warn('Unable to detect free GPU memory, we are unable to verify your batch_size setting.')
+                    elif len(free_gpu_memory) < num_gpus:
+                        warnings.warn(f'Detected GPU memory for {len(free_gpu_memory)} gpus but {num_gpus} is requested.')
+                    elif sum(free_gpu_memory[:num_gpus]) / bs < 1280:
+                        warnings.warn(f'batch-size: {bs} is potentially larger than what your gpus can support ' +
+                                      f'free memory: {free_gpu_memory[:num_gpus]}')
             # check if hyperparameters overwriting existing config
             for k, v in hyperparameters.items():
                 if k in config:
