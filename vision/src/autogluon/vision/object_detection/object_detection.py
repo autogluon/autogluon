@@ -97,9 +97,12 @@ class ObjectDetector(object):
             return
 
         # new HPO task
+        if time_limit is None and num_trials is None:
+            raise ValueError('`time_limit` and `num_trials` can not be `None` at the same time, '
+                             'otherwise the training will not be terminated gracefully.')
         config={'log_dir': self._log_dir,
                 'num_trials': 99999 if num_trials is None else max(1, num_trials),
-                'time_limits': time_limit,
+                'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
                 'search_strategy': search_strategy,
                 }
         if num_cpus is not None:
