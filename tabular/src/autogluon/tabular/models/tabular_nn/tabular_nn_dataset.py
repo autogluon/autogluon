@@ -162,8 +162,7 @@ class TabularNNDataset:
            num_workers=self.num_dataloading_workers if is_fork_enabled() else 0,
 
            # need to use threadpool if forkserver is enabled, otherwise GIL will be locked
-            # please note: this will make training slower
-           # thread_pool=is_forkserver_enabled(),
+           # please note: this will make training slower
            thread_pool=True,
         )  # no need to shuffle test data
 

@@ -1,4 +1,5 @@
 import logging
+import pickle
 from collections import OrderedDict
 from copy import deepcopy
 from functools import partial
@@ -27,7 +28,8 @@ class ResultsHistoryCallback(Callback):
         else:
             self.training_history[trial] = [result]
             config = deepcopy(result['config'])
-            config.pop('util_args')
+            if 'util_args' in config:
+                config.pop('util_args')
             self.config_history[trial] = config
 
 
@@ -165,7 +167,8 @@ class RayTuneScheduler(object):
         # Required by autogluon
         best_trial = self.result.get_best_trial(self._reward_attr, self.tune_args['mode'], "last")
         config = deepcopy(best_trial.config)
-        config.pop('util_args')
+        if 'util_args' in config:
+            config.pop('util_args')
         return config
 
     def get_best_reward(self):
@@ -176,6 +179,18 @@ class RayTuneScheduler(object):
     def join_jobs(self, timeout=None):
         # Required by autogluon
         pass
+
+    def get_best_task_id(self):
+        """Get the task id that results in the best configuration/best reward.
+
+        If there are duplicated configurations, we return the id of the first one.
+        """
+        best_config = self.get_best_config()
+        for task_id, config in self.config_history.items():
+            if pickle.dumps(best_config) == pickle.dumps(config):
+                return task_id
+        raise RuntimeError('The best config {} is not found in config history = {}. '
+                           'This should never happen!'.format(best_config, self.config_history))
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
         if filename is None and not plot:

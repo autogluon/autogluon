@@ -1,3 +1,5 @@
+import pathlib
+
 import numpy as np
 import os
 import math
@@ -21,8 +23,7 @@ from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_
 from autogluon.core import args, space
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
-from autogluon.core.metrics import get_metric, Scorer
-from autogluon.core.utils.multiprocessing_utils import force_forkserver
+from autogluon.core.metrics import get_metric
 
 from .. import constants as _C
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
@@ -242,7 +243,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    time_limits, time_start, base_config, problem_types,
                    column_properties, label_columns, label_shapes,
                    log_metrics, stopping_metric, console_log,
-                   ignore_warning=False):
+                   ignore_warning=False, checkpoint_dir=None):
     if time_limits is not None:
         start_train_tick = time.time()
         time_left = time_limits - (start_train_tick - time_start)
@@ -527,8 +528,7 @@ class BertForTextPredictionBasic:
         self._stopping_metric = stopping_metric
         self._log_metrics = log_metrics
         self._logger = logger
-        self._output_directory = output_directory
-
+        self._output_directory = str(pathlib.Path(output_directory).absolute())
         self._label_columns = label_columns
         self._feature_columns = feature_columns
         self._label_shapes = label_shapes
@@ -598,7 +598,7 @@ class BertForTextPredictionBasic:
               console_log=True,
               ignore_warning=True,
               verbosity=2):
-        force_forkserver()
+        # FIXME: force_forkserver()
         start_tick = time.time()
         logging_config(folder=self._output_directory, name='main',
                        console=console_log,
@@ -659,9 +659,8 @@ class BertForTextPredictionBasic:
                                'further investigate the root cause, you can also try to train with '
                                '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
         best_config = scheduler.get_best_config()
-        if verbosity >= 2:
-            self._logger.info('Results=', scheduler.searcher._results)
-            self._logger.info('Best_config={}'.format(best_config))
+        self._logger.info('Results=', scheduler.searcher._results)
+        self._logger.info('Best_config={}'.format(best_config))
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,
                                                  'task{}'.format(best_task_id))
