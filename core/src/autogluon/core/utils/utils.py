@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import subprocess
 import os
 from collections import defaultdict
 from datetime import datetime
@@ -220,3 +221,22 @@ def augment_rare_classes(X, label, threshold):
         raise RuntimeError("augment_rare_classes failed to produce enough data from rare classes")
     logger.log(15, "Replicated some data from rare classes in training set because eval_metric requires all classes")
     return X
+
+def get_gpu_free_memory():
+    """Grep gpu free memory from nvidia-smi tool.
+    This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
+    it as a suggestion, stay away with any rules bound to it.
+    E.g. for a 4-gpu machine, the result can be list of int
+    >>> print(get_gpu_free_memory)
+    >>> [13861, 13859, 13859, 13863]
+    """
+    _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
+
+    try:
+        COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
+        memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
+        memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+    except:
+        # could fail due to 
+        memory_free_values = []
+    return memory_free_values

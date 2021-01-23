@@ -35,9 +35,9 @@ class Classifier(BasePredictor):
     >>>                        test_path='data/test')
     >>> classifier = task.fit(dataset,
     >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-    >>>                       time_limits=time_limits,
-    >>>                       ngpus_per_trial=1,
-    >>>                       num_trials = 4)
+    >>>                       time_limit=time_limit,
+    >>>                       num_gpus=1,
+    >>>                       num_trials=4)
     >>> image = 'data/test/BabyShirt/BabyShirt_323.jpg'
     >>> ind, prob = classifier.predict(image)
     """

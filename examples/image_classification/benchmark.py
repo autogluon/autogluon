@@ -52,7 +52,7 @@ def main():
     train_dataset, val_dataset, test_dataset = ImagePredictor.Dataset.from_folders(dataset_dir)
     if isinstance(val_dataset, pd.DataFrame) and len(val_dataset) < 1:
         val_dataset = None
-    predictor = ImagePredictor(log_dir=output_directory)
+    predictor = ImagePredictor(path=output_directory)
     num_classes = target_hyperparams.pop('classes')
     assert num_classes == len(train_dataset.classes), f'num_class mismatch, {num_classes} vs {len(train_dataset.classes)}'
     # overwriting default by command line:

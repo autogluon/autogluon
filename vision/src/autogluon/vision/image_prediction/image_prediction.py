@@ -15,31 +15,44 @@ class ImagePredictor(object):
 
     Parameters
     ----------
-    log_dir : str
-        The directory for saving logs, by default using `pwd`: the current working directory.
+    problem_type : str, default = None
+        Type of prediction problem. Options: ('multiclass'). If problem_type = None, the prediction problem type is inferred
+         based on the provided dataset. Currently only multiclass(or single class vs. background) classification is supported.
+    eval_metric : str, default = None
+        Metric by which to evaluate the data with. Options: ('accuracy').
+        Currently only supports accuracy for multiclass classification.
+    path : str, default = None
+        The directory for saving logs or intermediate data. If unspecified, will create a sub-directory under
+        current working directory.
+    verbosity : int, default = 2
+        Verbosity levels range from 0 to 4 and control how much information is printed. 
+        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings). 
+        If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+        where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
     Dataset = _ImageClassification.Dataset
 
-    def __init__(self, log_dir=None):
-        self._log_dir = log_dir
+    def __init__(self, problem_type=None, eval_metric=None, path=None, verbosity=2):
+        self._problem_type = problem_type
+        self._eval_metric = eval_metric
+        self._log_dir = path
+        self._verbosity = verbosity
         self._classifier = None
         self._fit_summary = {}
 
     def fit(self,
             train_data,
-            val_data=None,
+            tuning_data=None,
             holdout_frac=0.1,
             random_state=None,
-            time_limit=12*60*60,
+            time_limit=None,
             num_trials=1,
             hyperparameters=None,
             search_strategy='random',
             scheduler_options=None,
-            nthreads_per_trial=None,
-            ngpus_per_trial=None,
-            dist_ip_addrs=None,
-            verbosity=3):
+            num_cpus=None,
+            num_gpus=None):
         """Automatic fit process for image prediction.
 
         Parameters
@@ -51,17 +64,19 @@ class ImagePredictor(object):
             For more details of how to construct a dataset for image predictor, check out:
             `http://preview.d2l.ai/d8/main/image_classification/getting_started.html`.
             If a string is provided, will search for k8 built-in datasets.
-        val_data : pd.DataFrame or str, default = None
-            Training data, can be a dataframe like image dataset.
+        tuning_data : pd.DataFrame or str, default = None
+            Another dataset containing validation data reserved for tuning processes,
+            can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
-            If `None`, the validation dataset will be randomly split from `train_data`.
+            If `None`, the validation dataset will be randomly split from `train_data` according to `holdout_frac`.
         holdout_frac : float, default = 0.1
-            The random split ratio for `val_data` if `val_data==None`.
+            The random split ratio for `tuning_data` if `tuning_data==None`.
         random_state : numpy.random.state, default = None
-            The random_state for shuffling, only used if `val_data==None`.
+            The random_state for shuffling, only used if `tuning_data==None`.
             Note that the `random_state` only affect the splitting process, not model training.
-        time_limit : int, default = 43200
-            Time limit in seconds, default is 12 hours. If `time_limit` is hit during `fit`, the
+        time_limit : int, default = None
+            Time limit in seconds, if not specified, will run until all tuning and training finished.
+            If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
         num_trials : int, default = 1
             The number of HPO trials. If `None`, will run infinite trials until `time_limit` is met.
@@ -87,18 +102,18 @@ class ImagePredictor(object):
             ‘skopt’ (SKopt Bayesian optimization), ‘grid’ (grid search).
         scheduler_options : dict, default = None
             Extra options for HPO scheduler, please refer to `autogluon.core.Searcher` for details.
-        nthreads_per_trial : int, default = (# cpu cores)
+        num_cpus : int, default = (# cpu cores)
             Number of CPU threads for each trial, if `None`, will detect the # cores on current instance.
-        ngpus_per_trial : int, default = (# gpus)
+        num_gpus : int, default = (# gpus)
             Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
-        dist_ip_addrs : list, default = None
-            If not `None`, will spawn tasks on distributed nodes.
-        verbosity : int, default = 3
-            Controls how detailed of a summary to ouput.
-            Set <= 0 for no output printing, 1 to print just high-level summary,
-            2 to print summary and create plots, >= 3 to print all information produced during fit().
         """
-        log_level = verbosity2loglevel(verbosity)
+        if self._problem_type is None:
+            # options: multiclass
+            self._problem_type = 'multiclass'
+        if self._eval_metric is None:
+            # options: accuracy, 
+            self._eval_metric = 'accuracy'
+        log_level = verbosity2loglevel(self._verbosity)
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
             logging.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +
@@ -109,7 +124,7 @@ class ImagePredictor(object):
                          'rec_val : ~/.mxnet/datasets/imagenet/rec/val.rec\n' +
                          'rec_val_idx : ~/.mxnet/datasets/imagenet/rec/val.idx\n')
             train_data = pd.DataFrame({'image': [], 'label': []})
-            val_data = pd.DataFrame({'image': [], 'label': []})
+            tuning_data = pd.DataFrame({'image': [], 'label': []})
             use_rec = True
         if isinstance(train_data, str):
             from d8.image_classification import Dataset as D8D
@@ -119,20 +134,20 @@ class ImagePredictor(object):
             else:
                 valid_names = '\n'.join(names)
                 raise ValueError(f'`train_data` {train_data} is not among valid list {valid_names}')
-            if val_data is None:
-                train_data, val_data = train_data.split(1 - holdout_frac)
-        if isinstance(val_data, str):
+            if tuning_data is None:
+                train_data, tuning_data = train_data.split(1 - holdout_frac)
+        if isinstance(tuning_data, str):
             from d8.image_classification import Dataset as D8D
             names = D8D.list()
-            if val_data.lower() in names:
-                val_data = D8D.get(val_data)
+            if tuning_data.lower() in names:
+                tuning_data = D8D.get(tuning_data)
             else:
                 valid_names = '\n'.join(names)
-                raise ValueError(f'`val_data` {val_data} is not among valid list {valid_names}')
+                raise ValueError(f'`tuning_data` {tuning_data} is not among valid list {valid_names}')
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
             self._classifier._logger.setLevel(log_level)
-            self._fit_summary = self._classifier.fit(train_data, val_data, 1 - holdout_frac, random_state, resume=False)
+            self._fit_summary = self._classifier.fit(train_data, tuning_data, 1 - holdout_frac, random_state, resume=False)
             return
 
         # new HPO task
@@ -144,12 +159,10 @@ class ImagePredictor(object):
                 'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
                 'search_strategy': search_strategy,
                 }
-        if nthreads_per_trial is not None:
-            config['nthreads_per_trial'] = nthreads_per_trial
-        if ngpus_per_trial is not None:
-            config['ngpus_per_trial'] = ngpus_per_trial
-        if dist_ip_addrs is not None:
-            config['dist_ip_addrs'] = dist_ip_addrs
+        if num_cpus is not None:
+            config['nthreads_per_trial'] = num_cpus
+        if num_gpus is not None:
+            config['ngpus_per_trial'] = num_gpus
         if isinstance(hyperparameters, dict):
             net = hyperparameters.pop('net', None)
             if net is not None:
@@ -174,7 +187,7 @@ class ImagePredictor(object):
         task = _ImageClassification(config=config)
         task._logger.setLevel(log_level)
         task._logger.propagate = True
-        self._classifier = task.fit(train_data, val_data, 1 - holdout_frac, random_state)
+        self._classifier = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
         self._classifier._logger.setLevel(log_level)
         self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
@@ -246,17 +259,17 @@ class ImagePredictor(object):
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         return self._classifier.predict_feature(x)
 
-    def evaluate(self, val_data):
+    def evaluate(self, tuning_data):
         """Evaluate model performance on validation data.
 
         Parameters
         ----------
-        val_data : pd.DataFrame or iterator
+        tuning_data : pd.DataFrame or iterator
             The validation data.
         """
         if self._classifier is None:
             raise RuntimeError('Classifier not initialized, try `fit` first.')
-        return self._classifier.evaluate(val_data)
+        return self._classifier.evaluate(tuning_data)
 
     def fit_summary(self):
         """Return summary of last `fit` process.

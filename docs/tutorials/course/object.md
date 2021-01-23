@@ -90,7 +90,7 @@ scripts using :func:`autogluon.autogluon_register_args`. We can start fitting:
 ```{.python .input}
 from autogluon.vision import ImagePredictor as Task
 classifier = Task()
-classifier.fit('cifar10', ngpus_per_trial=1, hyperparameters={'net': mynet, 'optimizer': myoptim, 'epochs': 1})
+classifier.fit('cifar10', num_gpus=1, hyperparameters={'net': mynet, 'optimizer': myoptim, 'epochs': 1})
 ```
 
 ```{.python .input}
