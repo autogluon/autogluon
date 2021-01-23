@@ -813,7 +813,6 @@ class AbstractTrainer:
                 save_bag_folds = True
 
         weighted_ensemble_model = self.get_models(
-            stopping_metric=self.eval_metric,
             hyperparameters={
                 'default': {
                     'ENS_WEIGHTED': [child_hyperparameters],
