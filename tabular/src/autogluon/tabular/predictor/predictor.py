@@ -813,7 +813,7 @@ class TabularPredictor(TabularPredictorV1):
         learner = predictor._learner_type.load(path)
         predictor._set_post_fit_vars(learner=learner)
         try:
-            from ...version import __version__
+            from ..version import __version__
             version_inference = __version__
         except:
             version_inference = None
