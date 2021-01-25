@@ -705,7 +705,7 @@ class BertForTextPredictionBasic:
                                                       stopping_metric=self._stopping_metric,
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
-        if scheduler_options['num_trials'] == 1 and auto_turnoff_hpo:
+        if scheduler_options['num_trials'] == 1 and turnoff_hpo:
             train_fn()
         else:
             force_forkserver()
@@ -767,6 +767,7 @@ class BertForTextPredictionBasic:
                             ctx=ctx_l)
         self._net = net
         mx.npx.waitall()
+        self.save(self._output_directory)
 
     def evaluate(self, valid_data, metrics):
         """ Report the predictive performance evaluated for a given dataset.
