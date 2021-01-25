@@ -3,6 +3,7 @@ import logging
 import difflib
 import inspect
 import os
+import pickle
 import io
 import struct
 import sys
@@ -11,6 +12,28 @@ import zipfile
 import tempfile
 import warnings
 from contextlib import closing, contextmanager
+import builtins
+safe_builtins = {
+    'range',
+    'complex',
+    'set',
+    'frozenset',
+    'slice',
+}
+
+class RestrictedUnpickler(pickle.Unpickler):
+
+    def find_class(self, module, name):
+        """Only allow safe classes from builtins"""
+        if module == "builtins" and name in safe_builtins:
+            return getattr(builtins, name)
+        """Forbid everything else"""
+        raise pickle.UnpicklingError("global '%s.%s' is forbidden" %
+                                     (module, name))
+
+def restricted_loads(s):
+    """Helper function analogous to pickle.loads()"""
+    return RestrictedUnpickler(io.BytesIO(s)).load()
 
 if sys.version_info[0] == 2:
     import cPickle as pickle
@@ -72,9 +95,11 @@ def load(f, map_location=None, pickle_module=pickle, **pickle_load_args):
             (sys.version_info[0] == 2 and isinstance(f, unicode)):
         new_fd = True
         f = open(f, 'rb')
+        restricted_loads(f.read())
     elif (sys.version_info[0] == 3 and isinstance(f, pathlib.Path)):
         new_fd = True
         f = f.open('rb')
+        restricted_loads(f.read())
     try:
         return _load(f, map_location, pickle_module, **pickle_load_args)
     finally:
