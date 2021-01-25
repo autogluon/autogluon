@@ -270,6 +270,8 @@ class TextPredictionV1Model(AbstractModel):
             time_limit = time_limit - (time.time() - time_start)
 
         # FIXME: Inner error message if no text features is not helpful
+        assert self.params['hpo_params']['num_trials'] == 1 \
+               or self.params['hpo_params']['num_trials'] is None
         self.model.train(train_data=train_data,
                          tuning_data=tuning_data,
                          resource=resource,
@@ -280,6 +282,7 @@ class TextPredictionV1Model(AbstractModel):
                          num_trials=self.params['hpo_params']['num_trials'],
                          console_log=verbosity >= 3,
                          ignore_warning=verbosity < 3,
+                         turnoff_hpo=True,
                          verbosity=verbosity-1)
 
     def save(self, path: str = None, verbose=True) -> str:
