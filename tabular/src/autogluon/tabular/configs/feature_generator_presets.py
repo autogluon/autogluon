@@ -1,7 +1,7 @@
 
 import copy
 
-from ...features import AutoMLPipelineFeatureGenerator, IdentityFeatureGenerator
+from ..features import AutoMLPipelineFeatureGenerator, IdentityFeatureGenerator
 
 
 def get_default_feature_generator(feature_generator, feature_metadata=None, init_kwargs=None):

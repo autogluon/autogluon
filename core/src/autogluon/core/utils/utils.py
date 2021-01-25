@@ -43,40 +43,43 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
         return [[train_index, test_index] for train_index, test_index in kf.split(X)]
 
 
-def setup_outputdir(output_directory, warn_if_exist=True):
-    if output_directory is None:
+def setup_outputdir(path, warn_if_exist=True):
+    if path is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        output_directory = f"AutogluonModels/ag-{timestamp}{os.path.sep}"
+        path = f"AutogluonModels/ag-{timestamp}{os.path.sep}"
         for i in range(1, 1000):
             try:
-                os.makedirs(output_directory, exist_ok=False)
+                os.makedirs(path, exist_ok=False)
                 break
             except FileExistsError as e:
-                output_directory = f"AutogluonModels/ag-{timestamp}-{i:03d}{os.path.sep}"
+                path = f"AutogluonModels/ag-{timestamp}-{i:03d}{os.path.sep}"
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
-        logger.log(25, f"No output_directory specified. Models will be saved in: {output_directory}")
+        logger.log(25, f'No path specified. Models will be saved in: "{path}"')
     elif warn_if_exist:
         try:
-            os.makedirs(output_directory, exist_ok=False)
+            os.makedirs(path, exist_ok=False)
         except FileExistsError as e:
-            logger.warning(f'Warning: output_directory already exists! This predictor may overwrite an existing predictor! output_directory="{output_directory}"')
-    output_directory = os.path.expanduser(output_directory)  # replace ~ with absolute path if it exists
-    if output_directory[-1] != os.path.sep:
-        output_directory = output_directory + os.path.sep
-    return output_directory
+            logger.warning(f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"')
+    path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
+    if path[-1] != os.path.sep:
+        path = path + os.path.sep
+    return path
 
 
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
-    if nthreads_per_trial is None or nthreads_per_trial == 'auto':  # FIXME: Use 'auto' downstream
-        nthreads_per_trial = multiprocessing.cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
+    if nthreads_per_trial is None or nthreads_per_trial == 'all' or nthreads_per_trial == 'auto':  # FIXME: Use 'auto' downstream
+        nthreads_per_trial = get_cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
 
     if ngpus_per_trial is None or ngpus_per_trial == 'auto':  # FIXME: Use 'auto' downstream
         ngpus_per_trial = 0  # do not use GPU by default
-    elif ngpus_per_trial > 1:
-        ngpus_per_trial = 1
-        logger.debug("tabular_prediction currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
+    elif ngpus_per_trial == 'all':
+        ngpus_per_trial = get_gpu_count()
+    if not isinstance(nthreads_per_trial, int) and nthreads_per_trial != 'auto':
+        raise ValueError(f'nthreads_per_trial must be an integer or "auto": nthreads_per_trial = {nthreads_per_trial}')
+    if not isinstance(ngpus_per_trial, int) and ngpus_per_trial != 'auto':
+        raise ValueError(f'ngpus_per_trial must be an integer or "auto": ngpus_per_trial = {ngpus_per_trial}')
     return nthreads_per_trial, ngpus_per_trial
 
 

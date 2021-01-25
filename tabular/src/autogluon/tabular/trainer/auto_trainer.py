@@ -20,9 +20,7 @@ class AutoTrainer(AbstractTrainer):
         return get_preset_models(path=path, problem_type=problem_type, eval_metric=eval_metric,
                                  num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names, feature_metadata=feature_metadata, **kwargs)
 
-    # TODO: v0.1 rename to .fit
-    # TODO: v0.1 rename stack_ensemble_levels -> num_stack_levels
-    def train(self, X_train, y_train, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, hyperparameter_tune_kwargs=None, feature_prune=False, holdout_frac=0.1, stack_ensemble_levels=0, core_kwargs: dict = None, time_limit=None, **kwargs):
+    def fit(self, X_train, y_train, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, hyperparameter_tune_kwargs=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, **kwargs):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.train()`. Argument: {key}')
 
@@ -41,4 +39,4 @@ class AutoTrainer(AbstractTrainer):
 
         self._train_multi_and_ensemble(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters,
                                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune,
-                                       stack_ensemble_levels=stack_ensemble_levels, time_limit=time_limit, core_kwargs=core_kwargs)
+                                       num_stack_levels=num_stack_levels, time_limit=time_limit, core_kwargs=core_kwargs)

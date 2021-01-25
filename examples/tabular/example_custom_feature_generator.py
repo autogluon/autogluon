@@ -21,8 +21,8 @@ An advanced user may wish to create a custom feature generator to:
 
 from autogluon.tabular import TabularDataset, TabularPredictor
 
-train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')  # can be local CSV file as well, returns Pandas DataFrame
-test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv')  # another Pandas DataFrame
+train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')  # can be local CSV file as well, returns Pandas DataFrame
+test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv')  # another Pandas DataFrame
 label = 'class'  # specifies which column do we want to predict
 sample_train_data = train_data.head(100)  # subsample for faster demo
 

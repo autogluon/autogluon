@@ -1,7 +1,7 @@
 """ Example script for defining and using custom models in AutoGluon Tabular """
 
 from autogluon.tabular import TabularDataset, TabularPredictor
-from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
+from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 from autogluon.tabular.data.label_cleaner import LabelCleaner
 from autogluon.tabular.models import AbstractModel
 from autogluon.tabular.utils import infer_problem_type
@@ -58,8 +58,8 @@ class AdvancedNaiveBayesModel(AbstractModel):
 # Loading Data #
 ################
 
-train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')  # can be local CSV file as well, returns Pandas DataFrame
-test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')  # another Pandas DataFrame
+train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')  # can be local CSV file as well, returns Pandas DataFrame
+test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')  # another Pandas DataFrame
 label = 'class'  # specifies which column do we want to predict
 train_data = train_data.head(1000)  # subsample for faster demo
 

@@ -133,7 +133,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             num_pred_cols_per_model = 1
         return stack_columns, num_pred_cols_per_model
 
-    def _hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options=None, compute_base_preds=True, **kwargs):
+    def _hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options, compute_base_preds=True, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
         self._add_stack_to_feature_metadata()

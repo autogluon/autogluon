@@ -17,10 +17,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         self.base_model_names = base_model_names
         if self.base_model_names is not None:
             self.features = self._set_stack_columns(base_model_names=self.base_model_names)
-
-    @property
-    def weights_(self):
-        return self.model.weights_
+        self.weights_ = None
 
     def _set_default_params(self):
         default_params = {'ensemble_size': 100}
@@ -45,6 +42,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
         self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.params_trained['ensemble_size'] = self.model.ensemble_size
+        self.weights_ = self.model.weights_
 
     def convert_pred_probas_df_to_list(self, pred_probas_df) -> list:
         pred_probas = []

@@ -7,8 +7,8 @@ from autogluon.tabular import TabularPredictor
 # Loading data #
 ################
 
-train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+train_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+test_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 label = 'class'
 eval_metric = 'roc_auc'
 hyperparameters = {'RF': {}}

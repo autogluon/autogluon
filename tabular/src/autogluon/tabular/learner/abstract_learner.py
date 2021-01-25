@@ -38,13 +38,13 @@ class AbstractLearner:
     learner_info_name = 'info.pkl'
     learner_info_json_name = 'info.json'
 
-    def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, id_columns: list = None, label_count_threshold=10,
+    def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
                  problem_type=None, eval_metric=None, cache_data=True, is_trainer_present=False, random_seed=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
-        self.id_columns = id_columns
-        if self.id_columns is None:
-            self.id_columns = []
+        self.ignored_columns = ignored_columns
+        if self.ignored_columns is None:
+            self.ignored_columns = []
         self.threshold = label_count_threshold
         self.problem_type = problem_type
         self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
@@ -172,9 +172,9 @@ class AbstractLearner:
     def fit_transform_features(self, X, y=None):
         if self.label in X:
             X = X.drop(columns=[self.label])
-        if self.id_columns:
-            logger.log(20, f'Dropping ID columns: {self.id_columns}')
-            X = X.drop(columns=self.id_columns, errors='ignore')
+        if self.ignored_columns:
+            logger.log(20, f'Dropping user-specified ignored columns: {self.ignored_columns}')
+            X = X.drop(columns=self.ignored_columns, errors='ignore')
         for feature_generator in self.feature_generators:
             X = feature_generator.fit_transform(X, y)
         return X

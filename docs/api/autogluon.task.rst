@@ -4,25 +4,32 @@
 AutoGluon Tasks
 ===============
 
-.. admonition:: Example (image prediction task):
+.. note::
 
-   Tell AutoGluon that task is image prediction:
+   TabularPredictor is replacing TabularPrediction in the upcoming v0.1 release. TabularPredictor has a very similar API to TabularPrediction, but certain arguments have been renamed. Please refer to the TabularPredictor documentation below for details, and refer to the updated tutorials which use TabularPredictor.
 
-   >>> import autogluon.core as ag
-   >>> from autogluon.vision import ImagePredictor as Task
 
-   Load a toy image dataset:
+.. admonition:: Example (Tabular Prediction Task):
 
-   >>> train, val, test = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/fashion-mnist-demo.zip')
+   Import TabularDataset and TabularPredictor:
 
-   Fit classification models:
+   >>> from autogluon.tabular import TabularDataset, TabularPredictor
 
-   >>> mytask = Task()
-   >>> mytask.fit(train, epochs=2)
+   Load a tabular dataset:
+
+   >>> train_data = TabularDataset("https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv")
+
+   Fit classification models predicting the "class" column:
+
+   >>> predictor = TabularPredictor(label="class").fit(train_data)
+
+   Load test data:
+
+   >>> test_data = TabularDataset("https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv")
 
    Evaluate predictions on test data:
 
-   >>> test_acc = mytask.evaluate(test)
+   >>> test_acc = predictor.evaluate(test_data)
 
 
 
@@ -35,7 +42,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 .. autosummary::
    :nosignatures:
 
-   TabularPrediction
+   TabularPredictor
 
 .. automodule:: autogluon.vision
 .. autosummary::
@@ -51,18 +58,17 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
    TextPrediction
 
 
-:hidden:`TabularPrediction`
+:hidden:`TabularPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.tabular
 
-.. autoclass:: TabularPrediction
-   :members: fit, load, Predictor, Dataset
-   :no-inherited-members:
-   :exclude-members: run_fit
+.. autoclass:: TabularPredictor
+   :members:
+   :inherited-members:
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TabularPrediction
+    .. autoautosummary:: TabularPredictor
         :methods:
 
 
@@ -111,34 +117,24 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-Additional Tabular Prediction APIs
+Additional Tabular APIs
 ----------------------------------
 
-.. automodule:: autogluon.tabular.tabular_prediction
-
-:hidden:`TabularPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.tabular
-
-.. autoclass:: TabularPredictor
-   :members:
-   :no-inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: TabularPredictor
-        :methods:
-
-    .. rubric:: Attributes
-
-    .. autoautosummary:: TabularPredictor
-        :attributes:
 
 :hidden:`TabularDataset`
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularDataset
+   :no-members:
    :no-inherited-members:
+
+:hidden:`FeatureMetadata`
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: FeatureMetadata
+   :members:
+   :inherited-members:
 
 
 Additional Image Prediction APIs

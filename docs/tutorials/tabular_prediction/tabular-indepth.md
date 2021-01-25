@@ -12,7 +12,7 @@ from autogluon.tabular import TabularDataset, TabularPredictor
 
 import numpy as np
 
-train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 subsample_size = 500  # subsample subset of data for faster demo, try setting this to much larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
@@ -20,7 +20,7 @@ print(train_data.head())
 label_column = 'occupation'
 print("Summary of occupation column: \n", train_data['occupation'].describe())
 
-new_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+new_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 test_data = new_data[5000:].copy()  # this should be separate data in your applications
 y_test = test_data[label_column]
 test_data_nolabel = test_data.drop(columns=[label_column])  # delete label column
@@ -103,7 +103,7 @@ predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(train_d
 )
 ```
 
-You should not provide `tuning_data` when stacking/bagging, and instead provide all your available data as `train_data` (which AutoGluon will split in more intellgent ways). `num_bagging_sets` controls how many times the k-fold bagging process is repeated to further reduce variance (increasing this may further boost accuracy but will substantially increase training times, inference latency, and memory/disk usage). Rather than manually searching for good bagging/stacking values yourself, AutoGluon will automatically select good values for you if you specify `auto_stack` instead:
+You should not provide `tuning_data` when stacking/bagging, and instead provide all your available data as `train_data` (which AutoGluon will split in more intellgent ways). `num_bag_sets` controls how many times the k-fold bagging process is repeated to further reduce variance (increasing this may further boost accuracy but will substantially increase training times, inference latency, and memory/disk usage). Rather than manually searching for good bagging/stacking values yourself, AutoGluon will automatically select good values for you if you specify `auto_stack` instead:
 
 ```{.python .input}
 save_path = 'agModels-predictOccupation'  # folder where to store trained models
@@ -162,7 +162,7 @@ The leaderboard shows each model's predictive performance on the test data (`sco
 predictor.leaderboard(extra_info=True, silent=True)
 ```
 
-The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`), and how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [leaderboard documentation](../../api/autogluon.task.html#autogluon.task.tabular_prediction.TabularPredictor.leaderboard) for full details.
+The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`), and how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [leaderboard documentation](../../api/autogluon.task.html#autogluon.tabular.TabularPredictor.leaderboard) for full details.
 
 Here's how to specify a particular model to use for prediction instead of AutoGluon's default model-choice:
 
@@ -188,7 +188,7 @@ The `predictor` also remembers what metric predictions should be evaluated with,
 
 ```{.python .input}
 y_pred = predictor.predict(test_data_nolabel)
-predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
+perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
 ```
 
 However, you must be careful here as certain metrics require predicted probabilities rather than classes.

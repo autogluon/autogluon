@@ -12,10 +12,10 @@ from autogluon.tabular import TabularDataset, TabularPredictor
 Load training data from a [CSV file](https://en.wikipedia.org/wiki/Comma-separated_values) into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
 
 ```{.python .input}
-train_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 subsample_size = 500  # subsample subset of data for faster demo, try setting this to much larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
-print(train_data.head())
+train_data.head()
 ```
 
 Note that we loaded data from a CSV file stored in the cloud ([AWS s3 bucket](https://aws.amazon.com/s3/)), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (e.g., using [wget](https://www.gnu.org/software/wget/)).
@@ -24,24 +24,24 @@ Each row in the table `train_data` corresponds to a single training example. In 
 Let's first use these features to predict whether the person's income exceeds $50,000 or not, which is recorded in the `class` column of this table.
 
 ```{.python .input}
-label_column = 'class'
-print("Summary of class variable: \n", train_data[label_column].describe())
+label = 'class'
+print("Summary of class variable: \n", train_data[label].describe())
 ```
 
 Now use AutoGluon to train multiple models:
 
 ```{.python .input}
 save_path = 'agModels-predictClass'  # specifies folder to store trained models
-predictor = TabularPredictor(label=label_column, path=save_path).fit(train_data)
+predictor = TabularPredictor(label=label, path=save_path).fit(train_data)
 ```
 
 Next, load separate test data to demonstrate how to make predictions on new examples at inference time:
 
 ```{.python .input}
-test_data = TabularDataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
-y_test = test_data[label_column]  # values to predict
-test_data_nolab = test_data.drop(columns=[label_column])  # delete label column to prove we're not cheating
-print(test_data_nolab.head())
+test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+y_test = test_data[label]  # values to predict
+test_data_nolab = test_data.drop(columns=[label])  # delete label column to prove we're not cheating
+test_data_nolab.head()
 ```
 
 We use our trained models to make predictions on the new data and then evaluate performance:
@@ -122,7 +122,8 @@ To get the best predictive accuracy with AutoGluon, you should generally use it 
 ```{.python .input}
 time_limit = 60  # for quick demonstration only, you should set this to longest time you are willing to wait (in seconds)
 metric = 'roc_auc'  # specify your evaluation metric here
-predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, time_limit=time_limit, presets='best_quality')
+predictor = TabularPredictor(label, eval_metric=metric).fit(train_data, time_limit=time_limit, presets='best_quality')
+predictor.leaderboard(test_data, silent=True)
 ```
 
 This command implements the following strategy to maximize accuracy:
@@ -133,7 +134,7 @@ This command implements the following strategy to maximize accuracy:
 
 - Include all your data in `train_data` and do not provide `tuning_data` (AutoGluon will split the data more intelligently to fit its needs).
 
-- Do not specify the `hyperparameter_tune` argument (counterintuitively, hyperparameter tuning is not the best way to spend a limited training time budgets, as model ensembling is often superior). We recommend you only use `hyperparameter_tune` if your goal is to deploy a single model rather than an ensemble.
+- Do not specify the `hyperparameter_tune_kwargs` argument (counterintuitively, hyperparameter tuning is not the best way to spend a limited training time budgets, as model ensembling is often superior). We recommend you only use `hyperparameter_tune_kwargs` if your goal is to deploy a single model rather than an ensemble.
 
 - Do not specify `hyperparameters` argument (allow AutoGluon to adaptively select which models/hyperparameters to use).
 

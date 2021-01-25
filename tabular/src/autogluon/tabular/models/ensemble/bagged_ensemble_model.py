@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class BaggedEnsembleModel(AbstractModel):
     _oof_filename = 'oof.pkl'
 
-    def __init__(self, model_base: AbstractModel, save_bagged_folds=True, random_state=0, **kwargs):
+    def __init__(self, model_base: AbstractModel, random_state=0, **kwargs):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
@@ -39,7 +39,6 @@ class BaggedEnsembleModel(AbstractModel):
         self._random_state = random_state
         self.low_memory = True
         self.bagged_mode = None
-        self.save_bagged_folds = save_bagged_folds
 
         try:
             feature_metadata = self.model_base.feature_metadata
@@ -51,11 +50,17 @@ class BaggedEnsembleModel(AbstractModel):
 
         super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_metadata=feature_metadata, **kwargs)
 
+    def _set_default_params(self):
+        default_params = {'save_bag_folds': True}
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+        super()._set_default_params()
+
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
 
     def can_infer(self):
-        return self.is_fit() and self.save_bagged_folds
+        return self.is_fit() and self.params.get('save_bag_folds', True)
 
     def is_stratified(self):
         if self.problem_type == REGRESSION or self.problem_type == SOFTCLASS:
@@ -141,7 +146,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._k_per_n_repeat = [1]
             self.bagged_mode = False
             model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-            if not self.save_bagged_folds:
+            if not self.params.get('save_bag_folds', True):
                 model_base.model = None
             if self.low_memory:
                 self.save_child(model_base, verbose=False)
@@ -205,7 +210,7 @@ class BaggedEnsembleModel(AbstractModel):
                 fold_model.predict_time = time_predict_end_fold - time_train_end_fold
                 fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=pred_proba)
                 fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-                if not self.save_bagged_folds:
+                if not self.params.get('save_bag_folds', True):
                     fold_model.model = None
                 if self.low_memory:
                     self.save_child(fold_model, verbose=False)
@@ -342,7 +347,7 @@ class BaggedEnsembleModel(AbstractModel):
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
     def convert_to_refit_full_template(self):
         init_args = self._get_init_args()
-        init_args['save_bagged_folds'] = True  # refit full models must save folds
+        init_args['hyperparameters']['save_bag_folds'] = True  # refit full models must save folds
         model_base_name_orig = init_args['model_base'].name
         init_args['model_base'] = self.convert_to_refitfull_template_child()
         model_base_name_new = init_args['model_base'].name
@@ -366,7 +371,6 @@ class BaggedEnsembleModel(AbstractModel):
     def _get_init_args(self):
         init_args = dict(
             model_base=self._get_model_base(),
-            save_bagged_folds=self.save_bagged_folds,
             random_state=self._random_state,
         )
         init_args.update(super()._get_init_args())
@@ -603,7 +607,7 @@ class BaggedEnsembleModel(AbstractModel):
         return kwargs
 
     # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
-    def _hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options=None, preprocess_kwargs=None, **kwargs):
+    def _hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options, preprocess_kwargs=None, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
@@ -649,7 +653,7 @@ class BaggedEnsembleModel(AbstractModel):
             bag._oof_pred_model_repeats = oof_pred_model_repeats
             child.name = child.name + '_fold_0'
             child.set_contexts(bag.path + child.name + os.path.sep)
-            if not self.save_bagged_folds:
+            if not self.params.get('save_bag_folds', True):
                 child.model = None
             if bag.low_memory:
                 bag.save_child(child, verbose=False)

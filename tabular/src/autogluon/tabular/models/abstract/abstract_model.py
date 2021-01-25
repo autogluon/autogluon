@@ -520,9 +520,9 @@ class AbstractModel:
         params_copy = self.params.copy()
         directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
-        scheduler_func, scheduler_options = scheduler_options  # Unpack tuple
-        if scheduler_func is None or scheduler_options is None:
-            raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
+        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
+        if scheduler_cls is None or scheduler_params is None:
+            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         dataset_train_filename = 'dataset_train.p'
         train_path = directory + dataset_train_filename
         save_pkl.save(path=train_path, object=(X_train, y_train))
@@ -545,12 +545,12 @@ class AbstractModel:
             directory=directory,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_options['time_out'],
+            time_limit=scheduler_params['time_out'],
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)
-        scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_options)
-        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+        scheduler: FIFOScheduler = scheduler_cls(model_trial, **scheduler_params)
+        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
             scheduler.upload_files([train_path, val_path])  # TODO: currently does not work.
@@ -561,9 +561,9 @@ class AbstractModel:
         scheduler.run()
         scheduler.join_jobs()
 
-        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
 
-    def _get_hpo_results(self, scheduler, scheduler_options, time_start):
+    def _get_hpo_results(self, scheduler, scheduler_params: dict, time_start):
         # Store results / models from this HPO run:
         best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
         hpo_results = {
@@ -578,7 +578,7 @@ class AbstractModel:
         }
 
         hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model
-        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
             raise NotImplementedError("need to fetch model files from remote Workers")
             # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
             # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']

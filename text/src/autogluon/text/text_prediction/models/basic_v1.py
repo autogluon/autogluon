@@ -446,8 +446,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
             log_num_samples = sum(log_num_samples_l)
             logger.info(
-                '[Iter {}/{}, Epoch {}] train loss={}, gnorm={}, lr={}, #samples processed={},'
-                ' #sample per second={}'
+                '[Iter {}/{}, Epoch {}] train loss={:0.4e}, gnorm={:0.4e}, lr={:0.4e}, #samples processed={},'
+                ' #sample per second={:.2f}'
                     .format(update_idx + 1, max_update,
                             int(update_idx / updates_per_epoch),
                             log_loss / log_num_samples, total_norm, trainer.learning_rate,
@@ -479,9 +479,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 find_better = False
                 no_better_rounds += 1
             mx.npx.waitall()
-            loss_string = ', '.join(['{}={}'.format(metric.name, score)
+            loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
-            logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={},'
+            logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
                          ' total_time={:.2f}min'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60))
@@ -634,7 +634,8 @@ class BertForTextPredictionBasic:
               plot_results=False,
               turnoff_hpo=False,
               console_log=True,
-              ignore_warning=True):
+              ignore_warning=True,
+              verbosity=2):
         """
 
         Parameters
@@ -726,8 +727,9 @@ class BertForTextPredictionBasic:
                                    'further investigate the root cause, you can also try to train with '
                                    '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
             best_config = scheduler.get_best_config()
-            self._logger.info('Results=', scheduler.searcher._results)
-            self._logger.info('Best_config={}'.format(best_config))
+            if verbosity >= 2:
+                self._logger.info('Results=', scheduler.searcher._results)
+                self._logger.info('Best_config={}'.format(best_config))
             best_task_id = scheduler.get_best_task_id()
             best_model_saved_dir_path = os.path.join(self._output_directory,
                                                      'task{}'.format(best_task_id))

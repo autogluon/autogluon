@@ -164,7 +164,7 @@ tabular_multimodel_hparam_v1 = {
 }
 
 predictor_model3 = TabularPredictor(label=label, eval_metric='accuracy', path='model3').fit(
-    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_gpus=1
+    train_df, hyperparameters=tabular_multimodel_hparam_v1
 )
 ```
 
@@ -180,7 +180,7 @@ A more advanced strategy is to use 5-fold bagging and call stack ensembling. Thi
 
 ```{.python .input}
 predictor_model4 = TabularPredictor(label=label, eval_metric='accuracy', path='model4').fit(
-    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_gpus=1, num_bag_folds=5, num_stack_levels=1
+    train_df, hyperparameters=tabular_multimodel_hparam_v1, num_bag_folds=5, num_stack_levels=1
 )
 ```
 
@@ -222,7 +222,7 @@ However, we should notice that the training time will be longer and the inferenc
 
 ```{.python .input}
 from autogluon.text.text_prediction.text_prediction import ag_text_prediction_params
-from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
+from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 import copy
 
 text_nn_params = ag_text_prediction_params.create('default_electra_base_no_hpo')
