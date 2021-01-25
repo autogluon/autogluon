@@ -644,9 +644,11 @@ class BertForTextPredictionBasic:
         tuning_data
             The tuning data
         resource
-
+            Computational resources
         time_limits
+            The time limits
         search_strategy
+
         search_options
         scheduler_options
         num_trials
