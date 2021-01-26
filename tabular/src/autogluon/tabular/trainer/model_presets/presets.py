@@ -132,91 +132,93 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
     if level_key not in hyperparameters.keys() and level_key == 'default':
         hyperparameters = {'default': hyperparameters}
     hp_level = hyperparameters[level_key]
-    priority_dict = defaultdict(list)
+    model_cfg_priority_dict = defaultdict(list)
     for model_type in hp_level:
         models_of_type = hp_level[model_type]
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]
-        for model in models_of_type:
-            model = clean_model_config(model=model, model_type=model_type, ag_args=ag_args, ag_args_ensemble=ag_args_ensemble, ag_args_fit=ag_args_fit)
-            model[AG_ARGS]['priority'] = model[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
-            model_priority = model[AG_ARGS]['priority']
-            # Check if model is valid
-            is_valid = is_model_valid(model, level=level)
+        for model_cfg in models_of_type:
+            model_cfg = clean_model_cfg(model_cfg=model_cfg, model_type=model_type, ag_args=ag_args, ag_args_ensemble=ag_args_ensemble, ag_args_fit=ag_args_fit)
+            model_cfg[AG_ARGS]['priority'] = model_cfg[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
+            model_priority = model_cfg[AG_ARGS]['priority']
+            # Check if model_cfg is valid
+            is_valid = is_model_cfg_valid(model_cfg, level=level)
+            if AG_ARGS_FIT in model_cfg and not model_cfg[AG_ARGS_FIT]:
+                model_cfg.pop(AG_ARGS_FIT)
             if is_valid:
-                priority_dict[model_priority].append(model)
+                model_cfg_priority_dict[model_priority].append(model_cfg)
 
-    model_priority_list = [model for priority in sorted(priority_dict.keys(), reverse=True) for model in priority_dict[priority]]
+    model_cfg_priority_list = [model for priority in sorted(model_cfg_priority_dict.keys(), reverse=True) for model in model_cfg_priority_dict[priority]]
 
     if not silent:
-        logger.log(20, 'Model configs to train:')
+        logger.log(20, 'Model configs that will be trained (in order):')
     models = []
     model_args_fit = {}
-    for model in model_priority_list:
-        model_init = model_factory(model, path=path, problem_type=problem_type, eval_metric=eval_metric,
-                                   num_classes=num_classes, name_suffix=name_suffix, ensemble_type=ensemble_type, ensemble_kwargs=ensemble_kwargs,
-                                   invalid_name_set=invalid_name_set, level=level, feature_metadata=feature_metadata)
-        invalid_name_set.add(model_init.name)
-        if 'hyperparameter_tune_kwargs' in model[AG_ARGS]:
-            model_args_fit[model_init.name] = {'hyperparameter_tune_kwargs': model[AG_ARGS]['hyperparameter_tune_kwargs']}
+    for model_cfg in model_cfg_priority_list:
+        model = model_factory(model_cfg, path=path, problem_type=problem_type, eval_metric=eval_metric,
+                              num_classes=num_classes, name_suffix=name_suffix, ensemble_type=ensemble_type, ensemble_kwargs=ensemble_kwargs,
+                              invalid_name_set=invalid_name_set, level=level, feature_metadata=feature_metadata)
+        invalid_name_set.add(model.name)
+        if 'hyperparameter_tune_kwargs' in model_cfg[AG_ARGS]:
+            model_args_fit[model.name] = {'hyperparameter_tune_kwargs': model_cfg[AG_ARGS]['hyperparameter_tune_kwargs']}
         if not silent:
-            logger.log(20, f'\t{model_init.name}: \t{model}')
-        models.append(model_init)
+            logger.log(20, f'\t{model.name}: \t{model_cfg}')
+        models.append(model)
     return models, model_args_fit
 
 
-def clean_model_config(model: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None):
-    model = copy.deepcopy(model)
-    if AG_ARGS not in model:
-        model[AG_ARGS] = dict()
-    if 'model_type' not in model[AG_ARGS]:
-        model[AG_ARGS]['model_type'] = model_type
-    if model[AG_ARGS]['model_type'] is None:
-        raise AssertionError(f'model_type was not specified for model! Model: {model}')
-    model_type = model[AG_ARGS]['model_type']
+def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None):
+    model_cfg = copy.deepcopy(model_cfg)
+    if AG_ARGS not in model_cfg:
+        model_cfg[AG_ARGS] = dict()
+    if 'model_type' not in model_cfg[AG_ARGS]:
+        model_cfg[AG_ARGS]['model_type'] = model_type
+    if model_cfg[AG_ARGS]['model_type'] is None:
+        raise AssertionError(f'model_type was not specified for model! Model: {model_cfg}')
+    model_type = model_cfg[AG_ARGS]['model_type']
     if not inspect.isclass(model_type):
         model_type = MODEL_TYPES[model_type]
     elif not issubclass(model_type, AbstractModel):
         logger.warning(f'Warning: Custom model type {model_type} does not inherit from {AbstractModel}. This may lead to instability. Consider wrapping {model_type} with an implementation of {AbstractModel}!')
     else:
         logger.log(20, f'Custom Model Type Detected: {model_type}')
-    model[AG_ARGS]['model_type'] = model_type
-    model_type_real = model[AG_ARGS]['model_type']
+    model_cfg[AG_ARGS]['model_type'] = model_type
+    model_type_real = model_cfg[AG_ARGS]['model_type']
     if not inspect.isclass(model_type_real):
         model_type_real = MODEL_TYPES[model_type_real]
     default_ag_args = model_type_real._get_default_ag_args()
     if ag_args is not None:
         model_extra_ag_args = ag_args.copy()
-        model_extra_ag_args.update(model[AG_ARGS])
-        model[AG_ARGS] = model_extra_ag_args
+        model_extra_ag_args.update(model_cfg[AG_ARGS])
+        model_cfg[AG_ARGS] = model_extra_ag_args
     if ag_args_ensemble is not None:
         model_extra_ag_args_ensemble = ag_args_ensemble.copy()
-        model_extra_ag_args_ensemble.update(model.get(AG_ARGS_ENSEMBLE, dict()))
-        model[AG_ARGS_ENSEMBLE] = model_extra_ag_args_ensemble
+        model_extra_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
+        model_cfg[AG_ARGS_ENSEMBLE] = model_extra_ag_args_ensemble
     if ag_args_fit is not None:
-        if AG_ARGS_FIT not in model:
-            model[AG_ARGS_FIT] = dict()
+        if AG_ARGS_FIT not in model_cfg:
+            model_cfg[AG_ARGS_FIT] = dict()
         model_extra_ag_args_fit = ag_args_fit.copy()
-        model_extra_ag_args_fit.update(model[AG_ARGS_FIT])
-        model[AG_ARGS_FIT] = model_extra_ag_args_fit
+        model_extra_ag_args_fit.update(model_cfg[AG_ARGS_FIT])
+        model_cfg[AG_ARGS_FIT] = model_extra_ag_args_fit
     if default_ag_args is not None:
-        default_ag_args.update(model[AG_ARGS])
-        model[AG_ARGS] = default_ag_args
-    return model
+        default_ag_args.update(model_cfg[AG_ARGS])
+        model_cfg[AG_ARGS] = default_ag_args
+    return model_cfg
 
 
 # Check if model is valid
-def is_model_valid(model, level=0):
+def is_model_cfg_valid(model_cfg, level=0):
     is_valid = True
-    if AG_ARGS not in model:
+    if AG_ARGS not in model_cfg:
         is_valid = False  # AG_ARGS is required
-    elif model[AG_ARGS].get('model_type', None) is None:
+    elif model_cfg[AG_ARGS].get('model_type', None) is None:
         is_valid = False  # model_type is required
-    elif model[AG_ARGS].get('hyperparameter_tune_kwargs', None) and model[AG_ARGS].get('disable_in_hpo', False):
+    elif model_cfg[AG_ARGS].get('hyperparameter_tune_kwargs', None) and model_cfg[AG_ARGS].get('disable_in_hpo', False):
         is_valid = False
-    elif not model[AG_ARGS].get('valid_stacker', True) and level > 0:
+    elif not model_cfg[AG_ARGS].get('valid_stacker', True) and level > 0:
         is_valid = False  # Not valid as a stacker model
-    elif not model[AG_ARGS].get('valid_base', True) and level == 0:
+    elif not model_cfg[AG_ARGS].get('valid_base', True) and level == 0:
         is_valid = False  # Not valid as a base model
     return is_valid
 

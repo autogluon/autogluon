@@ -23,14 +23,11 @@ from ..trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
 
-# TODO: Add generic documentation to hyperparameter_tune_kwargs
-# TODO: num_cpus/num_gpus -> ag_args_fit
 # TODO: num_bag_sets -> ag_args
-# TODO: make core_kwargs a kwargs argument to predictor.fit,
-# TODO: HPO in fit_extra, HPO via ag_args, per model.
 # TODO: Document predictor attributes
 
 # Extra TODOs (Stretch): Can occur post v0.1
+# TODO: make core_kwargs a kwargs argument to predictor.fit
 # TODO: add aux_kwargs to predictor.fit
 # TODO: add pip freeze + python version output after fit + log file, validate that same pip freeze on load as cached
 # TODO: predictor.clone()
@@ -289,7 +286,7 @@ class TabularPredictor(TabularPredictorV1):
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
                         Example: `hyperparameters = {'RF': {..., 'ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
-                    ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
+                    ag_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, the problem types it is valid for, and the type of HPO it utilizes.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
                             name_main: (str) The main name of the model. Example: 'RandomForest'.
@@ -297,9 +294,10 @@ class TabularPredictor(TabularPredictorV1):
                             name_suffix: (str) Add a custom suffix to the model name. Unused by default.
                             priority: (int) Determines the order in which the model is trained. Larger values result in the model being trained earlier. Default values range from 100 (RF) to 0 (custom), dictated by model type. If you want this model to be trained first, set priority = 999.
                             problem_types: (list) List of valid problem types for the model. `problem_types=['binary']` will result in the model only being trained if `problem_type` is 'binary'.
-                            disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune=False`.
+                            disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune_kwargs=None`.
                             valid_stacker: (bool) If False, the model will not be trained as a level 1 or higher stacker model.
                             valid_base: (bool) If False, the model will not be trained as a level 0 (base) model.
+                            hyperparameter_tune_kwargs: (dict) Refer to :meth:`TabularPredictor.fit` hyperparameter_tune_kwargs argument. If specified here, will override global HPO settings for this model.
                         Reference the default hyperparameters for example usage of these options.
                     ag_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
                         Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limit` argument given during `fit()` but is not the same.
@@ -310,7 +308,14 @@ class TabularPredictor(TabularPredictorV1):
                             min_time_limit: (float, default=0) Allow this model to train for at least this long (in sec), regardless of the time limit it would otherwise be granted.
                                 If `min_time_limit >= max_time_limit`, time_limit will be set to min_time_limit.
                                 If `min_time_limit=None`, time_limit will be set to None and the model will have no training time restriction.
-                    ag_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled. Only models in stack levels >=1 are impacted by these parameters.
+                            num_cpus : (int or str, default='auto')
+                                How many CPUs to use during model fit.
+                                If 'auto', model will decide.
+                            num_gpus : (int or str, default='auto')
+                                How many GPUs to use during model fit.
+                                If 'auto', model will decide. Some models can use GPUs but don't by default due to differences in model quality.
+                                Set to 0 to disable usage of GPUs.
+                    ag_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled, if bag mode is enabled.
                         Valid keys:
                             use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
                             max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
@@ -425,13 +430,6 @@ class TabularPredictor(TabularPredictorV1):
                 This has NO impact on inference accuracy.
                 It is recommended if the only goal is to use the trained model for prediction.
                 Certain advanced functionality may no longer be available if `save_space=True`. Refer to `predictor.save_space()` documentation for more details.
-            num_cpus : int, default = 'auto'
-                How many CPUs to use during fit.
-                If 'auto', will use all available CPUs.
-            num_gpus : int, default = 'auto'
-                How many GPUs to use during fit.
-                If 'auto', will use all available GPUs.
-                Set to 0 to disable usage of GPUs.
             feature_generator : :class:`autogluon.tabular.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.tabular.features.generators.AutoMLPipelineFeatureGenerator`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
@@ -524,9 +522,6 @@ class TabularPredictor(TabularPredictorV1):
         num_bag_sets = kwargs['num_bag_sets']
         num_stack_levels = kwargs['num_stack_levels']
         auto_stack = kwargs['auto_stack']
-        hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
-        num_cpus = kwargs['num_cpus']
-        num_gpus = kwargs['num_gpus']
         feature_generator = kwargs['feature_generator']
         unlabeled_data = kwargs['unlabeled_data']
 
@@ -534,6 +529,18 @@ class TabularPredictor(TabularPredictorV1):
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
+
+        if ag_args is None:
+            ag_args = {}
+        if kwargs['hyperparameter_tune_kwargs'] is not None and 'hyperparameter_tune_kwargs' not in ag_args:
+            if 'hyperparameter_tune_kwargs' in ag_args:
+                AssertionError('hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
+            else:
+                ag_args['hyperparameter_tune_kwargs'] = kwargs['hyperparameter_tune_kwargs']
+        if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs'), time_limit):
+            ag_args.pop('hyperparameter_tune_kwargs', None)
+        if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
+            logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
 
         feature_generator_init_kwargs = kwargs['_feature_generator_kwargs']
         if feature_generator_init_kwargs is None:
@@ -569,32 +576,13 @@ class TabularPredictor(TabularPredictorV1):
             time_limit=time_limit, auto_stack=auto_stack, num_train_rows=len(train_data),
         )
 
-        if hyperparameter_tune_kwargs is not None:
-            scheduler_options = self._init_scheduler_tabular(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels)
-        else:
-            scheduler_options = None
-        hyperparameter_tune = scheduler_options is not None
-        if hyperparameter_tune:
-            logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
-
         if holdout_frac is None:
-            holdout_frac = default_holdout_frac(len(train_data), hyperparameter_tune)
-
-        if ag_args_fit is None:
-            ag_args_fit = dict()
-        if 'num_cpus' not in ag_args_fit and num_cpus != 'auto':
-            ag_args_fit['num_cpus'] = num_cpus
-        if 'num_gpus' not in ag_args_fit and num_gpus != 'auto':
-            ag_args_fit['num_gpus'] = num_gpus
+            holdout_frac = default_holdout_frac(len(train_data), ag_args.get('hyperparameter_tune_kwargs', None) is not None)
 
         if kwargs['_save_bag_folds'] is not None:
             if ag_args_ensemble is None:
                 ag_args_ensemble = {}
             ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
-        if scheduler_options is not None:
-            if ag_args is None:
-                ag_args = {}
-            ag_args['hyperparameter_tune_kwargs'] = scheduler_options
 
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
@@ -686,9 +674,6 @@ class TabularPredictor(TabularPredictorV1):
         # TODO: num_bag_sets
         # num_bag_sets = kwargs['num_bag_sets']
         num_stack_levels = kwargs['num_stack_levels']
-        hyperparameter_tune_kwargs = kwargs['hyperparameter_tune_kwargs']
-        num_cpus = kwargs['num_cpus']
-        num_gpus = kwargs['num_gpus']
         # save_bag_folds = kwargs['save_bag_folds']  # TODO: Enable
 
         ag_args = kwargs['ag_args']
@@ -696,8 +681,20 @@ class TabularPredictor(TabularPredictorV1):
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
 
-        fit_new_weighted_ensemble = False  # TODO v0.1: Add as option
-        aux_kwargs = None  # TODO v0.1: Add as option
+        if ag_args is None:
+            ag_args = {}
+        if kwargs['hyperparameter_tune_kwargs'] is not None and 'hyperparameter_tune_kwargs' not in ag_args:
+            if 'hyperparameter_tune_kwargs' in ag_args:
+                AssertionError('hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
+            else:
+                ag_args['hyperparameter_tune_kwargs'] = kwargs['hyperparameter_tune_kwargs']
+        if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs', None), time_limit):
+            ag_args.pop('hyperparameter_tune_kwargs', None)
+        if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
+            logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
+
+        fit_new_weighted_ensemble = False  # TODO: Add as option
+        aux_kwargs = None  # TODO: Add as option
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -710,22 +707,7 @@ class TabularPredictor(TabularPredictorV1):
                     highest_level = max(key, highest_level)
             num_stack_levels = highest_level
 
-        if hyperparameter_tune_kwargs is not None:
-            scheduler_options = self._init_scheduler_tabular(hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, self._trainer.k_fold, num_stack_levels)
-        else:
-            scheduler_options = None
-        hyperparameter_tune = scheduler_options is not None
-        if hyperparameter_tune:
-            raise ValueError('Hyperparameter Tuning is not allowed in `fit_extra`.')  # FIXME: Change this
-            # logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
-        if ag_args_fit is None:
-            ag_args_fit = dict()
-        if 'num_cpus' not in ag_args_fit and num_cpus != 'auto':
-            ag_args_fit['num_cpus'] = num_cpus
-        if 'num_gpus' not in ag_args_fit and num_gpus != 'auto':
-            ag_args_fit['num_gpus'] = num_gpus
-
-        # TODO: v0.1: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
+        # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
 
         # TODO: Add special error message if called and training/val data was not cached.
@@ -755,33 +737,30 @@ class TabularPredictor(TabularPredictorV1):
         self.save()
         return self
 
-    def _init_scheduler_tabular(self, hyperparameter_tune_kwargs, time_limit, hyperparameters, num_cpus, num_gpus, num_bag_folds, num_stack_levels):
-        num_cpus, num_gpus = setup_compute(num_cpus, num_gpus)  # TODO: use 'auto' downstream
-        time_limit_hpo = time_limit
-        if num_bag_folds >= 2 and (time_limit_hpo is not None):
-            time_limit_hpo = time_limit_hpo / (1 + num_bag_folds * (1 + num_stack_levels))
-        # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
-        time_limit_hpo, num_trials = setup_trial_limits(time_limit_hpo, None, hyperparameters)  # TODO: Move HPO time allocation to Trainer
-        if time_limit is not None:
-            time_limit_hpo = None
+    def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limit=None):
+        """
+        Returns True if hyperparameter_tune_kwargs is None or can construct a valid scheduler.
+        Returns False if hyperparameter_tune_kwargs results in an invalid scheduler.
+        """
         if hyperparameter_tune_kwargs is None:
-            return None
-        scheduler_options = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit_hpo, num_trials=num_trials, nthreads_per_trial=num_cpus, ngpus_per_trial=num_gpus)
+            return True
 
-        assert scheduler_options[1]['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
-        # TODO: Fix or remove in v0.1
-        if scheduler_options[1].get('dist_ip_addrs', None):
-            logger.log(30, 'Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
+        scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit,
+                                                            nthreads_per_trial='auto', ngpus_per_trial='auto')
 
-        if scheduler_options[1]['num_trials'] == 1:
-            logger.log(30, 'Warning: Specified num_trials == 1 or time_limit is too small for hyperparameter_tune, disabling HPO.')
-            return None
-        scheduler_ngpus = scheduler_options[1]['resource'].get('num_gpus', 0)
+        assert scheduler_params['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
+        if scheduler_params.get('dist_ip_addrs', None):
+            logger.warning('Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
+
+        if scheduler_params['num_trials'] == 1:
+            logger.warning('Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. This can occur if time_limit was not specified in `fit()`.')
+            return False
+
+        scheduler_ngpus = scheduler_params['resource'].get('num_gpus', 0)
         if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
-            scheduler_options[1]['resource']['num_gpus'] = 1
-            logger.warning("Warning: TabularPredictor currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
+            logger.warning(f"Warning: TabularPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
 
-        return scheduler_options
+        return True
 
     def _set_post_fit_vars(self, learner: AbstractLearner = None):
         if learner is not None:
@@ -905,10 +884,6 @@ class TabularPredictor(TabularPredictorV1):
             keep_only_best=False,
             save_space=False,
             refit_full=False,
-
-            # move into ag_args_fit? +1
-            num_cpus='auto',
-            num_gpus='auto',
 
             # other
             verbosity=self.verbosity,
