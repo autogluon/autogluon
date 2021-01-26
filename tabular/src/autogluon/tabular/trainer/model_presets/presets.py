@@ -94,6 +94,21 @@ DEFAULT_MODEL_NAMES = {
 }
 
 
+VALID_AG_ARGS_KEYS = {
+    'name',
+    'name_main',
+    'name_prefix',
+    'name_suffix',
+    'model_type',
+    'priority',
+    'problem_types',
+    'disable_in_hpo',
+    'valid_stacker',
+    'valid_base',
+    'hyperparameter_tune_kwargs',
+}
+
+
 # DONE: Add levels, including 'default'
 # DONE: Add lists
 # DONE: Add custom which can append to lists
@@ -210,6 +225,9 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
 # Check if model is valid
 def is_model_cfg_valid(model_cfg, level=0):
     is_valid = True
+    for key in model_cfg.get(AG_ARGS, {}):
+        if key not in VALID_AG_ARGS_KEYS:
+            logger.warning(f'WARNING: Unknown ag_args key: {key}')
     if AG_ARGS not in model_cfg:
         is_valid = False  # AG_ARGS is required
     elif model_cfg[AG_ARGS].get('model_type', None) is None:
