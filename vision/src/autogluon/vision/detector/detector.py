@@ -171,7 +171,7 @@ class ObjectDetector(object):
         kwargs['random_state'] = kwargs.get('random_state', None)
         kwargs['nthreads_per_trial'] = kwargs.get('nthreads_per_trial', None)
         kwargs['ngpus_per_trial'] = kwargs.get('ngpus_per_trial', None)
-        if kwargs['ngpus_per_trial'] > 0:
+        if kwargs['ngpus_per_trial'] is not None and kwargs['ngpus_per_trial'] > 0:
             detected_gpu = get_gpu_count()
             if detected_gpu < kwargs['ngpus_per_trial']:
                 raise ValueError(f"Insufficient detected # gpus {detected_gpu} vs requested {kwargs['ngpus_per_trial']}")

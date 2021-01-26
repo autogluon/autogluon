@@ -36,8 +36,7 @@ class Classifier(BasePredictor):
     >>> classifier = task.fit(dataset,
     >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
     >>>                       time_limit=time_limit,
-    >>>                       num_gpus=1,
-    >>>                       num_trials=4)
+    >>>                       ngpus_per_trial=1)
     >>> image = 'data/test/BabyShirt/BabyShirt_323.jpg'
     >>> ind, prob = classifier.predict(image)
     """
@@ -115,7 +114,7 @@ class Classifier(BasePredictor):
         >>> train_data = task.Dataset(train_path='~/data/train')
         >>> classifier = task.fit(train_data,
         >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-        >>>                       time_limits=600, ngpus_per_trial=1, num_trials=4)
+        >>>                       time_limit=600, ngpus_per_trial=1)
         >>> test_data = task.Dataset('~/data/test', train=False)
         >>> class_index, class_probability = classifier.predict('example.jpg')
         """
@@ -237,7 +236,7 @@ class Classifier(BasePredictor):
         >>> train_data = task.Dataset(train_path='~/data/train')
         >>> classifier = task.fit(train_data,
         >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-        >>>                       time_limits=600, ngpus_per_trial=1, num_trials = 4)
+        >>>                       time_limit=600, ngpus_per_trial=1)
         >>> test_data = task.Dataset('~/data/test', train=False)
         >>> test_acc = classifier.evaluate(test_data)
         """
