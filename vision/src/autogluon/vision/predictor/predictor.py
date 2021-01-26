@@ -98,7 +98,6 @@ class ImagePredictor(object):
             hyperparameter_tune_kwargs: dict, default = None
                 num_trials : int, default = 1
                     The number of HPO trials when `time_limit` is None. 
-                    If `time_limit` is set, `num_trials` will be overwritten with an infinite large number.
                 search_strategy : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
                     Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
@@ -166,6 +165,8 @@ class ImagePredictor(object):
             return
 
         # new HPO task
+        if time_limit is not None and num_trials is None:
+            num_trials = 99999
         if time_limit is None and num_trials is None:
             raise ValueError('`time_limit` and `num_trials` can not be `None` at the same time, '
                              'otherwise the training will not be terminated gracefully.')

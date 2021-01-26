@@ -30,10 +30,11 @@ In this section, we demonstrate how to apply AutoGluon to fit our detection mode
 We `fit` a classifier using AutoGluon as follows. In each experiment (one trial in our searching space), we train the model for 5 epochs to avoid bursting our tutorial runtime.
 
 ```{.python .input}
-time_limit = 60*60  # 1 hour
+time_limit = 60*30  # at most 0.5 hour
 detector = ObjectDetector()
 hyperparameters = {'epochs': 5}
-detector.fit(dataset_train, time_limit=time_limit, num_trials=2, hyperparameters=hyperparameters)
+hyperparamter_tune_kwargs={'num_trials': 2}
+detector.fit(dataset_train, time_limit=time_limit, hyperparameters=hyperparameters, hyperparamter_tune_kwargs=hyperparamter_tune_kwargs)
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal
