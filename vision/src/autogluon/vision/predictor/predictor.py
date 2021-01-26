@@ -103,7 +103,7 @@ class ImagePredictor(object):
                     Searcher strategy for HPO, 'random' by default.
                     Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
                     ‘grid’ (grid search).
-                max_reward : float, default = 0.9
+                max_reward : float, default = 0.95
                     The reward threashold for stopping criteria. If `max_reward` is reached during HPO, the scheduler
                     will terminate earlier to reduce time cost.
                 scheduler_options : dict, default = None
@@ -115,6 +115,19 @@ class ImagePredictor(object):
         if self._eval_metric is None:
             # options: accuracy, 
             self._eval_metric = 'accuracy'
+
+        # init/validate kwargs
+        kwargs = self._validate_kwargs(kwargs)
+        # unpack
+        num_trials = kwargs['hyperparameter_tune_kwargs']['num_trials']
+        nthreads_per_trial = kwargs['nthreads_per_trial']
+        ngpus_per_trial = kwargs['ngpus_per_trial']
+        holdout_frac = kwargs['holdout_frac']
+        random_state = kwargs['random_state']
+        search_strategy = kwargs['hyperparameter_tune_kwargs']['search_strategy']
+        max_reward = kwargs['hyperparameter_tune_kwargs']['max_reward']
+        scheduler_options = kwargs['hyperparameter_tune_kwargs']['scheduler_options']
+
         log_level = verbosity2loglevel(self._verbosity)
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
@@ -151,18 +164,6 @@ class ImagePredictor(object):
             self._classifier._logger.setLevel(log_level)
             self._fit_summary = self._classifier.fit(train_data, tuning_data, 1 - holdout_frac, random_state, resume=False)
             return
-
-        # init/validate kwargs
-        kwargs = self._validate_kwargs(kwargs)
-        # unpack
-        num_trials = kwargs['hyperparameter_tune_kwargs']['num_trials']
-        nthreads_per_trial = kwargs['nthreads_per_trial']
-        ngpus_per_trial = kwargs['ngpus_per_trial']
-        holdout_frac = kwargs['holdout_frac']
-        random_state = kwargs['random_state']
-        search_strategy = kwargs['hyperparameter_tune_kwargs']['search_strategy']
-        max_reward = kwargs['hyperparameter_tune_kwargs']['max_reward']
-        scheduler_options = kwargs['hyperparameter_tune_kwargs']['scheduler_options']
 
         # new HPO task
         if time_limit is None and num_trials is None:
@@ -239,7 +240,7 @@ class ImagePredictor(object):
         hpo_tune_args['search_strategy'] = hpo_tune_args.get('search_strategy', 'random')
         if not hpo_tune_args['search_strategy'] in ('random', 'bayesopt', 'grid'):
             raise ValueError(f"Invalid search strategy: {hpo_tune_args['search_strategy']}, supported: ('random', 'bayesopt', 'grid')")
-        hpo_tune_args['max_reward'] = hpo_tune_args.get('max_reward', 0.9)
+        hpo_tune_args['max_reward'] = hpo_tune_args.get('max_reward', 0.95)
         if hpo_tune_args['max_reward'] < 0:
             raise ValueError(f"Expected `max_reward` to be a positive float number between 0 and 1.0, given hpo_tune_args['max_reward']")
         hpo_tune_args['scheduler_options'] = hpo_tune_args.get('scheduler_options', None)
