@@ -272,10 +272,10 @@ class AbstractModel:
         elif time_limit is not None:
             time_limit = max(time_limit, min_time_limit)
         kwargs['time_limit'] = time_limit
-        kwargs = self._preprocess_fit_resources(kwargs)
+        kwargs = self._preprocess_fit_resources(**kwargs)
         return kwargs
 
-    def _preprocess_fit_resources(self, kwargs):
+    def _preprocess_fit_resources(self, **kwargs):
         default_num_cpus, default_num_gpus = self._get_default_resources()
         num_cpus = self.params_aux.get('num_cpus', 'auto')
         num_gpus = self.params_aux.get('num_gpus', 'auto')
@@ -508,6 +508,7 @@ class AbstractModel:
 
     def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
         scheduler_options = copy.deepcopy(scheduler_options)
+        scheduler_options[1]['resource'] = self._preprocess_fit_resources(**scheduler_options[1]['resource'])
         if 'time_out' not in scheduler_options[1]:
             scheduler_options[1]['time_out'] = time_limit
         return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)

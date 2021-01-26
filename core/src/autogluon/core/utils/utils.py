@@ -69,10 +69,9 @@ def setup_outputdir(path, warn_if_exist=True):
 
 
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
-    if nthreads_per_trial is None or nthreads_per_trial == 'all' or nthreads_per_trial == 'auto':  # FIXME: Use 'auto' downstream
+    if nthreads_per_trial is None or nthreads_per_trial == 'all':
         nthreads_per_trial = get_cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
-
-    if ngpus_per_trial is None or ngpus_per_trial == 'auto':  # FIXME: Use 'auto' downstream
+    if ngpus_per_trial is None:
         ngpus_per_trial = 0  # do not use GPU by default
     elif ngpus_per_trial == 'all':
         ngpus_per_trial = get_gpu_count()
