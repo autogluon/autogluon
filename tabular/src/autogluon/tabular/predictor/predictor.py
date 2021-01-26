@@ -12,7 +12,7 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
+from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import set_presets, unpack
@@ -532,15 +532,7 @@ class TabularPredictor(TabularPredictorV1):
 
         if ag_args is None:
             ag_args = {}
-        if kwargs['hyperparameter_tune_kwargs'] is not None and 'hyperparameter_tune_kwargs' not in ag_args:
-            if 'hyperparameter_tune_kwargs' in ag_args:
-                AssertionError('hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
-            else:
-                ag_args['hyperparameter_tune_kwargs'] = kwargs['hyperparameter_tune_kwargs']
-        if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs'), time_limit):
-            ag_args.pop('hyperparameter_tune_kwargs', None)
-        if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
-            logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
+        ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)
 
         feature_generator_init_kwargs = kwargs['_feature_generator_kwargs']
         if feature_generator_init_kwargs is None:
@@ -570,7 +562,6 @@ class TabularPredictor(TabularPredictorV1):
             feature_metadata = None
         self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata, init_kwargs=feature_generator_init_kwargs)
 
-        # Process kwargs to create trainer, schedulers, searchers:
         num_bag_folds, num_bag_sets, num_stack_levels = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
             time_limit=time_limit, auto_stack=auto_stack, num_train_rows=len(train_data),
@@ -683,15 +674,7 @@ class TabularPredictor(TabularPredictorV1):
 
         if ag_args is None:
             ag_args = {}
-        if kwargs['hyperparameter_tune_kwargs'] is not None and 'hyperparameter_tune_kwargs' not in ag_args:
-            if 'hyperparameter_tune_kwargs' in ag_args:
-                AssertionError('hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
-            else:
-                ag_args['hyperparameter_tune_kwargs'] = kwargs['hyperparameter_tune_kwargs']
-        if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs', None), time_limit):
-            ag_args.pop('hyperparameter_tune_kwargs', None)
-        if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
-            logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
+        ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
         aux_kwargs = None  # TODO: Add as option
@@ -761,6 +744,18 @@ class TabularPredictor(TabularPredictorV1):
             logger.warning(f"Warning: TabularPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
 
         return True
+
+    def _set_hyperparameter_tune_kwargs_in_ag_args(self, hyperparameter_tune_kwargs, ag_args, time_limit):
+        if hyperparameter_tune_kwargs is not None and 'hyperparameter_tune_kwargs' not in ag_args:
+            if 'hyperparameter_tune_kwargs' in ag_args:
+                AssertionError('hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
+            else:
+                ag_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
+        if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs', None), time_limit):
+            ag_args.pop('hyperparameter_tune_kwargs', None)
+        if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
+            logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
+        return ag_args
 
     def _set_post_fit_vars(self, learner: AbstractLearner = None):
         if learner is not None:
