@@ -66,11 +66,15 @@ class AbstractGluonTSModel(AbstractModel):
         self.fit_time = None
         self.predict_time = None
         self.quantiles = kwargs.get("quantiles", ["0.5"])
+        self.params["quantiles"] = self.quantiles
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
         self.path_suffix = self.name + os.path.sep
         self.path_root = self.path.rsplit(self.path_suffix, 1)[0]
+
+    def set_default_parameters(self):
+        self.params = {"epochs": 50, "num_batches_per_epoch": 32}
 
     @staticmethod
     def create_contexts(path_context):
@@ -89,21 +93,17 @@ class AbstractGluonTSModel(AbstractModel):
         file_path = path + self.model_file_name
         save_pkl.save(path=file_path, object=self)
 
-
         return path
 
     @classmethod
     def load(cls, path: str, reset_path=True):
         file_path = path + cls.model_file_name
         model = load_pkl.load(path=file_path,)
-        if reset_path:
-            model.set_context(path)
+        # if reset_path:
+        #     model.set_context(path)
         weight_path = path + cls.gluonts_model_path
         model.model = Predictor.deserialize(Path(weight_path))
         return model
-
-    def set_default_parameters(self):
-        self.params = {}
 
     def create_model(self):
         pass
@@ -170,7 +170,7 @@ class AbstractGluonTSModel(AbstractModel):
         if metric is not None and metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
             raise ValueError(f"metric {metric} is not available yet.")
 
-        # if quantiles are given, use the given on, otherwise use the default
+        # if quantiles are given, use the given one, otherwise use the default
         if "quantiles" in self.params:
             evaluator = Evaluator(quantiles=self.params["quantiles"])
         else:
@@ -246,5 +246,17 @@ class AbstractGluonTSModel(AbstractModel):
         logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
         logger.log(15, str(best_hp))
         return hpo_models, hpo_model_performances, hpo_results
+
+    def get_info(self):
+        info = {
+            'name': self.name,
+            'model_type': type(self).__name__,
+            'eval_metric': self.eval_metric,
+            'fit_time': self.fit_time,
+            'predict_time': self.predict_time,
+            'val_score': self.val_score,
+            'hyperparameters': self.params,
+        }
+        return info
 
 

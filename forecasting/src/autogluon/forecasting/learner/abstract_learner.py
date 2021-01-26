@@ -77,9 +77,9 @@ class AbstractLearner:
         trainer = self.load_trainer()
         return trainer.score(data, model=model, quantiles=quantiles)
 
-    def leaderboard(self):
+    def leaderboard(self, data=None):
         trainer = self.load_trainer()
-        return trainer.leaderboard()
+        return trainer.leaderboard(data)
 
     def save(self):
         trainer = None

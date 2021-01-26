@@ -1,8 +1,7 @@
 from autogluon.core.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
 from .dataset import TimeSeriesDataset
-from autogluon.tabular.task.tabular_prediction.dataset import TabularDataset
+from autogluon.core.dataset import TabularDataset
 from ...utils.dataset_utils import rebuild_tabular, train_test_split
-from ...learner.abstract_learner import AbstractLearner
 from ...learner import DefaultLearner as Learner
 from .predictor import ForecastingPredictor
 from ...trainer import AutoTrainer
@@ -36,7 +35,6 @@ class Forecasting(BaseTask):
             verbosity=2,
             **kwargs):
 
-        # TODO: Maybe we can infer freq and prediction length inside fit from train_data and test data?
         # TODO: allow user to input more scheduler options and use compile_scheduler_options()
         output_directory = setup_outputdir(output_directory)
         train_data = rebuild_tabular(train_data,
@@ -86,6 +84,7 @@ class Forecasting(BaseTask):
                                          index_column=index_column,
                                          target_column=target_column,
                                          time_column=time_column)
+        predictor.save(output_directory)
         return predictor
 
 

@@ -20,10 +20,7 @@ class AutoTrainer(AbstractTrainer):
                                  prediction_length=self.prediction_length,
                                  quantiles=self.quantiles)
 
-    # TODO: rename to .fit for 0.1
     def train(self, train_data, val_data=None, hyperparameter_tune=False, hyperparameters=None):
-        if hyperparameters is None:
-            hyperparameters = {}
         self._train_multi(train_data,
                           val_data=val_data,
                           hyperparameters=hyperparameters,

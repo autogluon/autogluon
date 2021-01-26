@@ -1,13 +1,13 @@
 from autogluon.forecasting.models.gluonts_model.abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 from gluonts.model.deepar import DeepAREstimator
-from gluonts.distribution.neg_binomial import NegativeBinomialOutput
+from gluonts.mx.distribution.neg_binomial import NegativeBinomialOutput
 from autogluon.forecasting.utils.dataset_utils import train_test_split, time_series_dataset, rebuild_tabular
 from autogluon.forecasting.task.forecasting.forecasting import Forecasting as task
 
 
 class CustomDeepARModel(AbstractGluonTSModel):
 
-    def __init__(self, path: str, freq: str, prediction_length: int, name: str = "DeepAR",
+    def __init__(self, path: str, freq: str, prediction_length: int, name: str = "DeepAR_custom",
                  eval_metric: str = None, hyperparameters=None, model=None, **kwargs):
         super().__init__(path=path,
                          freq=freq,

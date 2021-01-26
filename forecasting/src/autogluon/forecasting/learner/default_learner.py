@@ -21,8 +21,6 @@ class DefaultLearner(AbstractLearner):
 
     def _fit(self, train_data, freq, prediction_length, val_data=None, scheduler_options=None, hyperparameter_tune=False,
             hyperparameters=None, time_limit=None, **kwargs):
-        if hyperparameters is None:
-            hyperparameters = {'MQCNN': {}}
         self._time_limit = time_limit
         time_start = time.time()
         if time_limit:

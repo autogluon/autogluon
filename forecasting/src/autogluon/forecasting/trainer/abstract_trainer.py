@@ -53,6 +53,21 @@ class AbstractTrainer:
 
         self.hyperparameters = {}
 
+    def set_contexts(self, path_context):
+        self.path, model_paths = self.create_contexts(path_context)
+        for model, path in model_paths.items():
+            self.set_model_attribute(model=model, attribute='path', val=path)
+
+    def create_contexts(self, path_context: str) -> (str, dict):
+        path = path_context
+        model_paths = self.get_models_attribute_dict(attribute='path')
+        for model, prev_path in model_paths.items():
+            model_local_path = prev_path.split(self.path, 1)[1]
+            new_path = path + model_local_path
+            model_paths[model] = new_path
+
+        return path, model_paths
+
     def get_models(self, hyperparameters):
         raise NotImplementedError
 
@@ -60,7 +75,11 @@ class AbstractTrainer:
         models = self.models
         if self.low_memory:
             self.models = {}
-        save_pkl.save(path=self.path + self.trainer_file_name, object=self)
+        try:
+            save_pkl.save(path=self.path + self.trainer_file_name, object=self)
+        except:
+            self.models = {}
+            save_pkl.save(path=self.path + self.trainer_file_name, object=self)
         if self.low_memory:
             self.models = models
 
@@ -76,10 +95,7 @@ class AbstractTrainer:
             return obj
 
     def save_model(self, model):
-        if self.low_memory:
-            model.save()
-        else:
-            self.models[model.name] = model
+        model.save()
 
     def load_model(self, model_name, path=None, model_type=None) -> AbstractGluonTSModel:
         if isinstance(model_name, AbstractGluonTSModel):
@@ -117,7 +133,6 @@ class AbstractTrainer:
                 model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
                 self._add_model(model_hpo)
                 model_names_trained.append(model_hpo.name)
-            # self.model_best = self.get_model_best()
         else:
             model_names_trained = self._train_and_save(train_data, model=model, val_data=val_data, time_limit=time_limit)
 
@@ -159,9 +174,8 @@ class AbstractTrainer:
         return model_names_trained
 
     def _train_multi(self, train_data, val_data=None, hyperparameters=None, hyperparameter_tune=False):
-        if hyperparameters is None:
-            hyperparameters = self.hyperparameters
-        hyperparameters = copy.deepcopy(hyperparameters)
+        if hyperparameters is not None:
+            hyperparameters = copy.deepcopy(hyperparameters)
         models = self.get_models(hyperparameters)
 
         for i, model in enumerate(models):
@@ -191,7 +205,12 @@ class AbstractTrainer:
             model = model.name
         return self.model_info[model][attribute]
 
-    def leaderboard(self, extra_info=False):
+    def set_model_attribute(self, model, attribute: str, val):
+        if not isinstance(model, str):
+            model = model.name
+        self.model_info[model][attribute] = val
+
+    def leaderboard(self, data=None, extra_info=False):
         model_names = self.get_model_names_all()
         score_val = []
         fit_time_marginal = []
@@ -202,11 +221,18 @@ class AbstractTrainer:
             score_val.append(score_dict[model_name])
             fit_time_marginal.append(fit_time_marginal_dict[model_name])
 
+        test_score = []
+        if data is not None:
+            for model_name in model_names:
+                model = self.load_model(model_name)
+                test_score.append(-model.score(data))
         df = pd.DataFrame(data={
             'model': model_names,
             'score': score_val,
             'fit_order': fit_order,
         })
+        if test_score:
+            df["test_score"] = test_score
 
         df_sorted = df.sort_values(by=['score', 'model'], ascending=[False, False]).reset_index(drop=True)
 
@@ -241,8 +267,7 @@ class AbstractTrainer:
         if quantiles is not None:
             evaluator = Evaluator(quantiles=quantiles)
         else:
-            evaluator = Evaluator()
-
+            evaluator = Evaluator(quantiles=self.quantiles)
         forecasts, tss = self.predict(data, model=model, for_score=True)
         num_series = len(tss)
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)

@@ -3,8 +3,9 @@ import logging
 
 import pandas as pd
 
-from .dataset import TimeSeriesDataset
 from autogluon.core.task.base import BasePredictor
+from autogluon.core.utils.savers import save_pkl
+from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
@@ -16,6 +17,8 @@ logger = logging.getLogger()  # return root logger
 
 
 class ForecastingPredictor(BasePredictor):
+
+    predictor_file_name = "predictor.pkl"
 
     def __init__(self, learner, index_column="index", target_column="target", time_column="date"):
         """ Creates TabularPredictor object.
@@ -69,15 +72,23 @@ class ForecastingPredictor(BasePredictor):
 
         output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
         learner = Learner.load(output_directory)
-
-        return cls(learner=learner)
+        predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
+        predictor._learner = learner
+        predictor._trainer = learner.load_trainer()
+        return predictor
 
     def save(self, output_directory):
         """ Save this predictor to file in directory specified by this Predictor's `output_directory`.
             Note that `fit()` already saves the predictor object automatically
             (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
-        self._learner.save()
+        tmp_learner = self._learner
+        tmp_trainer = self._trainer
+        self._learner = None
+        self._trainer = None
+        save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
+        self._learner = tmp_learner
+        self._trainer = tmp_trainer
 
     def predict_proba(self, X):
         pass
@@ -88,9 +99,11 @@ class ForecastingPredictor(BasePredictor):
     def get_model_best(self):
         return self._trainer.get_model_best()
 
-    def leaderboard(self):
+    def leaderboard(self, data=None):
         # TODO: allow a dataset as input
-        return self._learner.leaderboard()
+        if data is not None:
+            data = self.preprocessing(data)
+        return self._learner.leaderboard(data)
 
     def fit_summary(self, verbosity=3):
         """
@@ -142,16 +155,6 @@ class ForecastingPredictor(BasePredictor):
             print("Number of models trained: %s" % len(results['model_performance']))
             print("Types of models trained:")
             print(unique_model_types)
-            num_fold_str = ""
-            bagging_used = results['num_bagging_folds'] > 0
-            if bagging_used:
-                num_fold_str = f" (with {results['num_bagging_folds']} folds)"
-            print("Bagging used: %s %s" % (bagging_used, num_fold_str))
-            num_stack_str = ""
-            stacking_used = results['stack_ensemble_levels'] > 0
-            if stacking_used:
-                num_stack_str = f" (with {results['stack_ensemble_levels']} levels)"
-            print("Stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
             hpo_str = ""
             if hpo_used and verbosity <= 2:
                 hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"
@@ -161,21 +164,6 @@ class ForecastingPredictor(BasePredictor):
             print(results['hyperparameters_userspecified'])
             print("Feature Metadata (Processed):")
             print("(raw dtype, special dtypes):")
-        if verbosity > 1:  # create plots
-            plot_tabular_models(results, output_directory=self.output_directory,
-                                save_file="SummaryOfModels.html",
-                                plot_title="Models produced during fit()")
-            if hpo_used:
-                for model_type in results['hpo_results']:
-                    if 'trial_info' in results['hpo_results'][model_type]:
-                        plot_summary_of_models(
-                            results['hpo_results'][model_type],
-                            output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
-                            plot_title=f"Models produced during {model_type} HPO")
-                        plot_performance_vs_trials(
-                            results['hpo_results'][model_type],
-                            output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
-                            plot_title=f"HPO trials for {model_type} models")
         if verbosity > 2:  # print detailed information
             if hpo_used:
                 hpo_results = results['hpo_results']
