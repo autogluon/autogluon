@@ -1,2 +1,5 @@
-from .image_prediction import *
-from .object_detection import *
+from .predictor import ImagePredictor
+from .detector import ObjectDetector
+
+ImageDataset = ImagePredictor.Dataset
+ImageDetectionDataset = ObjectDetector.Dataset

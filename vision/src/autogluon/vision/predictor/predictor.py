@@ -45,15 +45,9 @@ class ImagePredictor(object):
     def fit(self,
             train_data,
             tuning_data=None,
-            holdout_frac=0.1,
-            random_state=None,
             time_limit=None,
-            num_trials=1,
             hyperparameters=None,
-            search_strategy='random',
-            scheduler_options=None,
-            num_cpus=None,
-            num_gpus=None):
+            **kwargs):
         """Automatic fit process for image prediction.
 
         Parameters
@@ -66,21 +60,14 @@ class ImagePredictor(object):
             `http://preview.d2l.ai/d8/main/image_classification/getting_started.html`.
             If a string is provided, will search for k8 built-in datasets.
         tuning_data : pd.DataFrame or str, default = None
-            Another dataset containing validation data reserved for tuning processes,
+            Another dataset containing validation data reserved for model selection and hyperparameter-tuning,
             can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
             If `None`, the validation dataset will be randomly split from `train_data` according to `holdout_frac`.
-        holdout_frac : float, default = 0.1
-            The random split ratio for `tuning_data` if `tuning_data==None`.
-        random_state : numpy.random.state, default = None
-            The random_state for shuffling, only used if `tuning_data==None`.
-            Note that the `random_state` only affect the splitting process, not model training.
         time_limit : int, default = None
             Time limit in seconds, if not specified, will run until all tuning and training finished.
             If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
-        num_trials : int, default = 1
-            The number of HPO trials. If `None`, will run infinite trials until `time_limit` is met.
         hyperparameters : dict, default = None
             Extra hyperparameters for specific models.
             Accepted args includes(not limited to):
@@ -97,16 +84,30 @@ class ImagePredictor(object):
             lr : float
                 Trainer learning rate for optimization process.
             You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
-        search_strategy : str, default = 'random'
-            Searcher strategy for HPO, 'random' by default.
-            Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
-            ‘skopt’ (SKopt Bayesian optimization), ‘grid’ (grid search).
-        scheduler_options : dict, default = None
-            Extra options for HPO scheduler, please refer to `autogluon.core.Searcher` for details.
-        num_cpus : int, default = (# cpu cores)
-            Number of CPU threads for each trial, if `None`, will detect the # cores on current instance.
-        num_gpus : int, default = (# gpus)
-            Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
+        **kwargs :
+            holdout_frac : float, default = 0.1
+                The random split ratio for `tuning_data` if `tuning_data==None`.
+            random_state : int, default = None
+                The random_state(seed) for shuffling data, only used if `tuning_data==None`.
+                Note that the `random_state` only affect the splitting process, not model training.
+                If not specified(None), will leave the original random sampling intact.
+            nthreads_per_trial : int, default = (# cpu cores)
+                Number of CPU threads for each trial, if `None`, will detect the # cores on current instance.
+            ngpus_per_trial : int, default = (# gpus)
+                Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
+            hyperparameter_tune_kwargs: dict, default = None
+                num_trials : int, default = 1
+                    The number of HPO trials when `time_limit` is None. 
+                    If `time_limit` is set, `num_trials` will be overwritten with an infinite large number.
+                search_strategy : str, default = 'random'
+                    Searcher strategy for HPO, 'random' by default.
+                    Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
+                    ‘grid’ (grid search).
+                max_reward : float, default = 0.9
+                    The reward threashold for stopping criteria. If `max_reward` is reached during HPO, the scheduler
+                    will terminate earlier to reduce time cost.
+                scheduler_options : dict, default = None
+                    Extra options for HPO scheduler, please refer to `autogluon.core.Searcher` for details.
         """
         if self._problem_type is None:
             # options: multiclass
@@ -151,6 +152,18 @@ class ImagePredictor(object):
             self._fit_summary = self._classifier.fit(train_data, tuning_data, 1 - holdout_frac, random_state, resume=False)
             return
 
+        # init/validate kwargs
+        kwargs = self._validate_kwargs(kwargs)
+        # unpack
+        num_trials = kwargs['hyperparameter_tune_kwargs']['num_trials']
+        nthreads_per_trial = kwargs['nthreads_per_trial']
+        ngpus_per_trial = kwargs['ngpus_per_trial']
+        holdout_frac = kwargs['holdout_frac']
+        random_state = kwargs['random_state']
+        search_strategy = kwargs['hyperparameter_tune_kwargs']['search_strategy']
+        max_reward = kwargs['hyperparameter_tune_kwargs']['max_reward']
+        scheduler_options = kwargs['hyperparameter_tune_kwargs']['scheduler_options']
+
         # new HPO task
         if time_limit is None and num_trials is None:
             raise ValueError('`time_limit` and `num_trials` can not be `None` at the same time, '
@@ -159,24 +172,27 @@ class ImagePredictor(object):
                 'num_trials': 99999 if num_trials is None else max(1, num_trials),
                 'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
                 'search_strategy': search_strategy,
+                'max_reward': max_reward,
                 }
-        if num_cpus is not None:
-            config['nthreads_per_trial'] = num_cpus
-        if num_gpus is not None:
-            config['ngpus_per_trial'] = num_gpus
+        if nthreads_per_trial is not None:
+            config['nthreads_per_trial'] = nthreads_per_trial
+        if ngpus_per_trial is not None:
+            config['ngpus_per_trial'] = ngpus_per_trial
         if isinstance(hyperparameters, dict):
             if 'batch_size' in hyperparameters:
                 bs = hyperparameters['batch_size']
-                if num_gpus is not None and num_gpus > 1 and bs > 64:
+                if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs > 64:
                     # using gpus, check batch size vs. available gpu memory
                     free_gpu_memory = get_gpu_free_memory()
                     if not free_gpu_memory:
-                        warnings.warn('Unable to detect free GPU memory, we are unable to verify your batch_size setting.')
-                    elif len(free_gpu_memory) < num_gpus:
-                        warnings.warn(f'Detected GPU memory for {len(free_gpu_memory)} gpus but {num_gpus} is requested.')
-                    elif sum(free_gpu_memory[:num_gpus]) / bs < 128:
+                        warnings.warn('Unable to detect free GPU memory, we are unable to verify '
+                                      'whether your data mini-batches will fit on the GPU for the specified batch_size.')
+                    elif len(free_gpu_memory) < ngpus_per_trial:
+                        warnings.warn(f'Detected GPU memory for {len(free_gpu_memory)} gpus but {ngpus_per_trial} is requested.')
+                    elif sum(free_gpu_memory[:ngpus_per_trial]) / bs < 128:
                         warnings.warn(f'batch-size: {bs} is potentially larger than what your gpus can support ' +
-                                      f'free memory: {free_gpu_memory[:num_gpus]}')
+                                      f'free memory: {free_gpu_memory[:ngpus_per_trial]} ' +
+                                      'Try reducing "batch_size" if you encounter memory issues')
             net = hyperparameters.pop('net', None)
             if net is not None:
                 config['custom_net'] = net
@@ -205,14 +221,42 @@ class ImagePredictor(object):
         self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
 
-    def predict_proba(self, x):
+    def _validate_kwargs(self, kwargs):
+        """validate and initialize default kwargs"""
+        kwargs['holdout_frac'] = kwargs.get('holdout_frac', 0.1)
+        if not (0 < kwargs['holdout_frac'] < 1.0):
+            raise ValueError(f'Range error for `holdout_frac`, expected to be within range (0, 1), given {kwargs["holdout_frac"]}')
+        kwargs['random_state'] = kwargs.get('random_state', None)
+        kwargs['nthreads_per_trial'] = kwargs.get('nthreads_per_trial', None)
+        kwargs['ngpus_per_trial'] = kwargs.get('ngpus_per_trial', None)
+        if kwargs['ngpus_per_trial'] > 0:
+            detected_gpu = get_gpu_count()
+            if detected_gpu < kwargs['ngpus_per_trial']:
+                raise ValueError(f"Insufficient detected # gpus {detected_gpu} vs requested {kwargs['ngpus_per_trial']}")
+        # tune kwargs
+        hpo_tune_args = kwargs.get('hyperparameter_tune_kwargs', {})
+        hpo_tune_args['num_trials'] = hpo_tune_args.get('num_trials', 1)
+        hpo_tune_args['search_strategy'] = hpo_tune_args.get('search_strategy', 'random')
+        if not hpo_tune_args['search_strategy'] in ('random', 'bayesopt', 'grid'):
+            raise ValueError(f"Invalid search strategy: {hpo_tune_args['search_strategy']}, supported: ('random', 'bayesopt', 'grid')")
+        hpo_tune_args['max_reward'] = hpo_tune_args.get('max_reward', 0.9)
+        if hpo_tune_args['max_reward'] < 0:
+            raise ValueError(f"Expected `max_reward` to be a positive float number between 0 and 1.0, given hpo_tune_args['max_reward']")
+        hpo_tune_args['scheduler_options'] = hpo_tune_args.get('scheduler_options', None)
+        kwargs['hyperparameter_tune_kwargs'] = hpo_tune_args
+        return kwargs
+
+    def predict_proba(self, data, as_pandas=True):
         """Predict images as a whole, return the probabilities of each category rather
         than class-labels.
 
         Parameters
         ----------
-        x : str, pd.DataFrame or ndarray
+        data : str, pd.DataFrame or ndarray
             The input, can be str(filepath), pd.DataFrame with 'image' column, or raw ndarray input.
+        as_pandas : bool, default = True
+            Whether to return the output as a pandas object (True) or list of numpy array(s) (False).
+            Pandas object is a DataFrame.
 
         Returns
         -------
@@ -223,18 +267,25 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
-        proba = self._classifier.predict(x)
+        proba = self._classifier.predict(data)
         if 'image' in proba.columns:
-            return proba.groupby(["image"]).agg(list)
-        return proba
+            ret = proba.groupby(["image"]).agg(list)
+        ret = proba
+        if as_pandas:
+            return ret
+        else:
+            return ret.as_numpy()
 
-    def predict(self, x):
+    def predict(self, data, as_pandas=True):
         """Predict images as a whole, return labels(class category).
 
         Parameters
         ----------
-        x : str, pd.DataFrame or ndarray
+        data : str, pd.DataFrame or ndarray
             The input, can be str(filepath), pd.DataFrame with 'image' column, or raw ndarray input.
+        as_pandas : bool, default = True
+            Whether to return the output as a pandas object (True) or list of numpy array(s) (False).
+            Pandas object is a DataFrame.
 
         Returns
         -------
@@ -245,21 +296,28 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
-        proba = self._classifier.predict(x)
+        proba = self._classifier.predict(data)
         if 'image' in proba.columns:
             # multiple images
-            return proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
+            ret = proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
         else:
             # single image
-            return proba.loc[[proba["score"].idxmax()]]
+            ret = proba.loc[[proba["score"].idxmax()]]
+        if as_pandas:
+            return ret
+        else:
+            return ret.as_numpy()
 
-    def predict_feature(self, x):
+    def predict_feature(self, data, as_pandas=True):
         """Predict images visual feature representations, return the features as numpy (1xD) vector.
 
         Parameters
         ----------
-        x : str, pd.DataFrame or ndarray
+        data : str, pd.DataFrame or ndarray
             The input, can be str(filepath), pd.DataFrame with 'image' column, or raw ndarray input.
+        as_pandas : bool, default = True
+            Whether to return the output as a pandas object (True) or list of numpy array(s) (False).
+            Pandas object is a DataFrame.
 
         Returns
         -------
@@ -270,19 +328,23 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
-        return self._classifier.predict_feature(x)
+        ret = self._classifier.predict_feature(data)
+        if as_pandas:
+            return ret
+        else:
+            return ret.as_numpy()
 
-    def evaluate(self, tuning_data):
+    def evaluate(self, data):
         """Evaluate model performance on validation data.
 
         Parameters
         ----------
-        tuning_data : pd.DataFrame or iterator
+        data : pd.DataFrame or iterator
             The validation data.
         """
         if self._classifier is None:
             raise RuntimeError('Classifier not initialized, try `fit` first.')
-        return self._classifier.evaluate(tuning_data)
+        return self._classifier.evaluate(data)
 
     def fit_summary(self):
         """Return summary of last `fit` process.
@@ -308,17 +370,23 @@ class ImagePredictor(object):
             pickle.dump(self, fid)
 
     @classmethod
-    def load(cls, file_name):
+    def load(cls, file_name, verbosity=2):
         """Load previously saved predictor.
 
         Parameters
         ----------
         file_name : str
             The file name for saved pickle file.
+        verbosity : int, default = 2
+            Verbosity levels range from 0 to 4 and control how much information is printed. 
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings). 
+            If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+            where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
 
         """
         with open(file_name, 'rb') as fid:
             obj = pickle.load(fid)
+        obj._verbosity = verbosity
         return obj
 
     @classmethod
