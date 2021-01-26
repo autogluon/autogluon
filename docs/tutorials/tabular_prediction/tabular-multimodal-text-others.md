@@ -234,7 +234,7 @@ tabular_multimodel_hparam_v2 = {
 }
 
 predictor_model6 = TabularPredictor(label=label, eval_metric='accuracy', path='model6').fit(
-    train_df, hyperparameters=tabular_multimodel_hparam_v2, num_gpus=1
+    train_df, hyperparameters=tabular_multimodel_hparam_v2
 )
 ```
 
