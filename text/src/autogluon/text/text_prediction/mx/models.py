@@ -4,6 +4,7 @@ from mxnet.gluon import nn, HybridBlock
 from mxnet.util import use_np
 from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.layers import get_activation, get_norm_layer
+from autogluon_contrib_nlp.models.transformer import TransformerEncoder
 from .. import constants as _C
 
 
@@ -280,6 +281,9 @@ class FeatureAggregator(HybridBlock):
                 agg_features = F.np.mean(agg_features, axis=0)
             elif self.cfg.agg_type == 'concat':
                 agg_features = F.np.concatenate(field_proj_features, axis=-1)
+            elif self.cfg.agg_type == 'attention':
+                # TBA
+                raise NotImplementedError
             else:
                 # TODO(sxjscience) May try to implement more advanced pooling methods for
                 #  multimodal data.
@@ -299,10 +303,11 @@ class FeatureAggregator(HybridBlock):
 
 
 @use_np
-class BERTForTabularBasicV1(HybridBlock):
-    """The basic model for tabular classification + regression with
-    BERT (and its variants like ALBERT, MobileBERT, ELECTRA, etc.)
-    as the backbone for handling text data.
+class MultiModalWithTextMultiTower(HybridBlock):
+    """The basic model for classification + regression of multimodal tabular data.
+
+    It uses BERT (and its variants like ALBERT, RoBERTa, ELECTRA, etc.) as the backbone for
+    handling text data.
 
     Here, we use the backbone network to extract the contextual embeddings and use
     another dense layer to map the contextual embeddings to the class scores.
@@ -311,9 +316,20 @@ class BERTForTabularBasicV1(HybridBlock):
 
     TextField + EntityField --> TextNet -------> TextFeature
         ...
-    CategoricalField --> CategoricalNet --> CategoricalFeature  ==> AggregateNet --> logits/scores
+    CategoricalField --> CategoricalNet --> CategoricalFeature  ==> AggregateNet --> Dense --> logits/scores
         ...
     NumericalField ----> NumericalNet ----> NumericalFeature
+
+
+    We support three aggregators:
+    - mean
+        Take the average of the input features
+    - concat
+        Concatenate the input features
+    - max
+        Take the maximum of the input features
+    - attention
+        We use a single transformer-encoder layer to aggregate the information.
     """
     def __init__(self, text_backbone,
                  feature_field_info,
@@ -336,12 +352,12 @@ class BERTForTabularBasicV1(HybridBlock):
         cfg
             The configuration of the network
         get_embedding
-            Whether to get the aggregated embedding from the network
+            Whether to get the aggregated intermediate embedding from the network
         prefix
         params
         """
         super().__init__(prefix=prefix, params=params)
-        self.cfg = BERTForTabularBasicV1.get_cfg()
+        self.cfg = MultiModalWithTextMultiTower.get_cfg()
         if cfg is not None:
             self.cfg = self.cfg.clone_merge(cfg)
         assert self.cfg.text_net.pool_type == 'cls'
@@ -433,7 +449,6 @@ class BERTForTabularBasicV1(HybridBlock):
             Shape (batch_size,) + out_shape
         """
         field_features = []
-        text_contextual_features = dict()
         categorical_count = 0
         numerical_samples = []
         for i, (field_type_code, field_attrs) in enumerate(self.feature_field_info):
@@ -446,7 +461,6 @@ class BERTForTabularBasicV1(HybridBlock):
                 else:
                     contextual_embedding = self.text_backbone(batch_token_ids, batch_valid_length)
                     pooled_output = contextual_embedding[:, 0, :]
-                text_contextual_features[i] = contextual_embedding
                 field_features.append(pooled_output)
             elif field_type_code == _C.ENTITY:
                 # TODO Implement via segment-pool

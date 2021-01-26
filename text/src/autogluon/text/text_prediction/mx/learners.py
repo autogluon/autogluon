@@ -19,6 +19,7 @@ from autogluon_contrib_nlp.utils.misc import logging_config, grouper,\
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from autogluon.core import args, space
+from autogluon.core.utils import in_ipynb
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric, Scorer
@@ -26,7 +27,7 @@ from autogluon.core.utils.multiprocessing_utils import force_forkserver
 
 from .. import constants as _C
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
-from ..preprocessing import TabularBasicBERTPreprocessor
+from .preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
 from ..dataset import TabularDataset
 from ... import version
@@ -250,7 +251,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     args
         The arguments
     reporter
-        The reporter. If it is set to None, we will
+        The reporter. If it is set to None, we won't use the reporter and will just
+        run a single trial.
     train_df_path
         Path of the training dataframe
     tuning_df_path
@@ -514,36 +516,55 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         best_report_items_dict['report_idx'] = report_idx + 1
         reporter(**best_report_items_dict)
 
-@use_np
-class BertForTextPredictionBasic:
-    """A model object returned by `fit()` in TextPrediction tasks. 
-       Use for making predictions on new data and viewing information about models trained during `fit()`.
+
+class MultiModalTextLearner:
+    """Learner of the multimodal text data.
+
+    It will be called if the user call `fit()` in TextPrediction tasks.
+
+    It is used for making predictions on new data and viewing information about
+    models trained during `fit()`.
     """
     
-    def __init__(self, column_properties, label_columns, feature_columns,
-                 label_shapes, problem_types, stopping_metric, log_metrics,
-                 output_directory=None, logger=None, base_config=None, search_space=None):
+    def __init__(self, column_types,
+                 feature_columns,
+                 label_columns,
+                 label_shapes,
+                 problem_types,
+                 stopping_metric,
+                 log_metrics,
+                 output_directory=None,
+                 logger=None,
+                 base_config=None,
+                 search_space=None):
         """Creates model object.
 
         Parameters
         ----------
-        column_properties
-            The column properties.
-        label_columns
-            Label columns.
+        column_types
+            The column types.
         feature_columns
+            Name of the feature columns
+        label_columns
+            Name of the label columns.
         label_shapes
+            Shapes of each label
         problem_types
+            Types of the problems
         stopping_metric
+            The stopping metric
         log_metrics
+            The logging metric
         output_directory
+            The output directory to save the model
         logger
+            The logger
         base_config
             The basic configuration that the search space will be based upon.
         search_space
             The hyperparameter search space.
         """
-        super(BertForTextPredictionBasic, self).__init__()
+        super(MultiModalTextLearner, self).__init__()
         if base_config is None:
             self._base_config = base_cfg()
         else:
@@ -560,7 +581,7 @@ class BertForTextPredictionBasic:
         else:
             assert isinstance(search_space, dict)
             self._search_space = search_space
-        self._column_properties = column_properties
+        self._column_types = column_types
         self._stopping_metric = stopping_metric
         self._log_metrics = log_metrics
         self._logger = logger
@@ -572,42 +593,59 @@ class BertForTextPredictionBasic:
         self._problem_types = problem_types
 
         # Need to be set in the fit call
-        self._net = None
-        self._embed_net = None
-        self._preprocessor = None
+        self._net = None                       # Network for training and inference
+        self._embed_net = None                 # Network for embedding extraction
+        self._column_transforms = None        # The feature transforms
+        self._label_transforms = None
+        self._multimodal_preprocessor = None   # The inner preprocessor
         self._config = None
         self._results = None
 
     @property
+    def output_directory(self):
+        """ Get the output directory. The trained model and the training logs
+        will be saved to this folder """
+        return self._output_directory
+
+    @property
     def label_columns(self):
+        """Name of the label columns"""
         return self._label_columns
 
     @property
     def label_shapes(self):
+        """The shapes of the labels"""
         return self._label_shapes
 
     @property
     def problem_types(self):
+        """Types of the problems"""
         return self._problem_types
 
     @property
     def feature_columns(self):
+        """Name of the features"""
         return self._feature_columns
 
     @property
     def search_space(self):
+        """The search space"""
         return self._search_space
 
     @property
     def base_config(self):
+        """The basic configuration. Internally, we will fill values in the base config by values
+        in the search space."""
         return self._base_config
 
     @property
     def results(self):
+        """Results of the final model"""
         return self._results
 
     @property
     def config(self):
+        """The configuration of the final trained model."""
         return self._config
 
     @property
@@ -632,11 +670,10 @@ class BertForTextPredictionBasic:
               scheduler_options=None,
               num_trials=None,
               plot_results=False,
-              turnoff_hpo=False,
               console_log=True,
               ignore_warning=True,
               verbosity=2):
-        """
+        """The train function.
 
         Parameters
         ----------
@@ -649,17 +686,14 @@ class BertForTextPredictionBasic:
         time_limits
             The time limits
         search_strategy
-
+            The search strategy
         search_options
+            The search options
         scheduler_options
         num_trials
         plot_results
-        auto_turnoff_hpo
         console_log
         ignore_warning
-
-        Returns
-        -------
 
         """
         start_tick = time.time()
@@ -688,6 +722,8 @@ class BertForTextPredictionBasic:
             time_attr='report_idx',
             reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
+        column_types =
+
         # Create a temporary cache file. The internal train function will load the
         # temporary cache.
         train_df_path = os.path.join(self._output_directory, 'cache_train_dataframe.pq')
@@ -735,6 +771,11 @@ class BertForTextPredictionBasic:
                                                      'task{}'.format(best_task_id))
             best_cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
             cfg = self.base_config.clone_merge(best_cfg_path)
+            if plot_results is None:
+                if in_ipynb():
+                    plot_results = True
+                else:
+                    plot_results = False
             if plot_results:
                 plot_training_curves = os.path.join(self._output_directory,
                                                     'plot_training_curves.png')
@@ -776,17 +817,17 @@ class BertForTextPredictionBasic:
     def evaluate(self, valid_data, metrics):
         """ Report the predictive performance evaluated for a given dataset.
             
-            Parameters
-            ----------
-            valid_data : str or :class:`TabularDataset` or `pandas.DataFrame`
-                This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
-                If str is passed, `valid_data` will be loaded using the str value as the file path.
-            metrics : List[str]
-                A list of names of metrics to report.
- 
-            Returns
-            -------
-            Dict mapping metric -> score calculated over the given dataset.
+        Parameters
+        ----------
+        valid_data : str or :class:`TabularDataset` or `pandas.DataFrame`
+            This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
+            If str is passed, `valid_data` will be loaded using the str value as the file path.
+        metrics : List[str]
+            A list of names of metrics to report.
+
+        Returns
+        -------
+        Dict mapping metric -> score calculated over the given dataset.
         """
         if isinstance(metrics, str):
             metrics = [metrics]
@@ -911,9 +952,7 @@ class BertForTextPredictionBasic:
         self.net.save_parameters(os.path.join(dir_path, 'net.params'))
         with open(os.path.join(dir_path, 'cfg.yml'), 'w') as of:
             of.write(self.config.dump())
-        with open(os.path.join(dir_path, 'column_metadata.json'), 'w') as of:
-            json.dump(get_column_property_metadata(self._column_properties),
-                      of, ensure_ascii=True)
+        with open(os.path.join())
         # Save an additional assets about the parsed dataset information
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump(
@@ -922,6 +961,7 @@ class BertForTextPredictionBasic:
                     'label_shapes': self._label_shapes,
                     'problem_types': self._problem_types,
                     'feature_columns': self._feature_columns,
+                    'column_types': self._column_types
                     'version': version.__version__,
                 }, of, ensure_ascii=True)
 

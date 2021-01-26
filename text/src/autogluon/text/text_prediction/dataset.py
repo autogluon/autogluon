@@ -11,142 +11,35 @@ from autogluon_contrib_nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
 from typing import List, Optional, Union, Dict, Tuple
 
 
-def random_split_train_val(df, valid_ratio=0.15,
-                           stratified=False, label=None, num_repeats=1, rng=None):
-    """Randomly split a given dataset into train + valid dataset with stratified sampling.
 
-    Parameters
-    ----------
-    df
-    valid_ratio
-    stratified
-        Whether to use Stratified split.
-        If it's a categorical column, we will split based on the categorical value.
-    label
-        The label column. Will be used if conducting stratified sampling
-    num_repeats
-        The number of repeats
-    rng
-        The random number generator
+# TODO(sxjscience) Later when we have autogluon.core.features, try to revise the code here.
 
-    Returns
-    -------
-    ret
-        1. num_repeats == 1
-            train_dataset
-                The split training dataset
-            valid_dataset
-                The split validation dataset
-        2. num_repeats > 1
-            returns a list of (train_dataset, valid_dataset)
-    """
-    if rng is None:
-        rng = np.random.RandomState()
-    if not stratified:
-        num_total = len(df)
-        num_valid = np.ceil(num_total * valid_ratio).astype('int')
-        indices = np.arange(num_total)
-        if num_repeats == 1:
-            rng.shuffle(indices)
-            valid_indices = indices[:num_valid]
-            train_indices = indices[num_valid:]
-            return df.iloc[train_indices], df.iloc[valid_indices]
-        else:
-            out = []
-            for i in range(num_repeats):
-                rng.shuffle(indices)
-                valid_indices = indices[:num_valid]
-                train_indices = indices[num_valid:]
-                out.append((df.iloc[train_indices], df.iloc[valid_indices]))
-            return out
-    else:
-        raise NotImplementedError('Currently, stratified sampling is not supported.')
-
-
-def is_categorical_column(data: pd.Series,
-                          threshold: int = 100,
-                          ratio: float = 0.1,
-                          is_label_columns: bool = False,
-                          default_allow_missing: bool = True) -> Tuple[bool, bool]:
-    """Check whether the column is a categorical column.
-
-    If the number of unique elements in the column is smaller than
-
-        min(#Total Sample * ratio, threshold),
-
-    it will be treated as a categorical column
-
-    Parameters
-    ----------
-    data
-        The column data
-    threshold
-        The threshold for detecting categorical column
-    is_label_columns
-        Whether the column is a label column
-    ratio
-        The ratio for detecting categorical column
-
-    Returns
-    -------
-    is_categorical
-        Whether the column is a categorical column
-    parsed_allow_missing
-    """
-    if data.dtype.name == 'category':
-        return True, default_allow_missing
-    threshold = min(int(len(data) * ratio), threshold)
-    sample_set = set()
-    element = data[data.first_valid_index()]
-    if isinstance(element, str):
-        for idx, sample in data.items():
-            sample_set.add(sample)
-            if len(sample_set) > threshold:
-                return False, False
-        if is_label_columns:
-            return True, False
-        else:
-            return True, default_allow_missing
-    elif isinstance(element, INT_TYPES):
-        value_counts = data.value_counts()
-        if value_counts.keys().min() == 0 and value_counts.keys().max() == len(value_counts) - 1:
-            return True, False
-        else:
-            return False, False
-    elif isinstance(element, BOOL_TYPES):
-        return True, False
-    else:
-        return False, False
-
-
-def get_column_properties(
-        df: 'DataFrame',
-        label_columns: Optional[Union[str, List[str]]],
-        metadata: Optional[Dict] = None,
-        provided_column_properties: Optional[Dict] = None,
-        categorical_default_handle_missing_value: bool = True) -> collections.OrderedDict:
+def infer_column_types(
+        train_df: pd.DataFrame,
+        valid_df: pd.DataFrame,
+        label_columns: Union[str, List[str]],
+        problem_type: Optional[str] = None,
+        provided_column_types: Optional[Dict] = None) -> collections.OrderedDict:
     """Inference the column types of the data frame
 
     Parameters
     ----------
-    df
-        Pandas Dataframe
+    train_df
+        The training Pandas DataFrame
+    valid_df
+        The validation Pandas DataFrame
     label_columns
         The chosen column names of the table
-    metadata
-        The additional metadata object to help specify the column types
+    problem_type
+        The type of the problem
+    provided_column_types
+        Additional dictionary that you can use to
         {'col_name': {'type': type_string}}
-    provided_column_properties
-        The column properties provided.
-        For example, these can be the column properties of the training set and you provide this
-        to help infer the column properties of the dev/test set.
-    categorical_default_handle_missing_value
-        Whether to handle missing values for categorical columns by default
 
     Returns
     -------
-    column_properties
-        Dictionary of column properties
+    column_types
+        Dictionary of column types
 
     """
     if label_columns is None:
@@ -155,10 +48,10 @@ def get_column_properties(
         label_columns_set = set([label_columns])
     else:
         label_columns_set = set(label_columns)
-    column_properties = collections.OrderedDict()
+    column_types = collections.OrderedDict()
     # Process all feature columns
     column_properties_from_metadata = get_column_properties_from_metadata(metadata)
-    for col_name in df.columns:
+    for col_name in train_df.columns:
         if provided_column_properties is not None and col_name in provided_column_properties:
             column_properties[col_name] = provided_column_properties[col_name].clone()
             column_properties[col_name].parse(df[col_name])

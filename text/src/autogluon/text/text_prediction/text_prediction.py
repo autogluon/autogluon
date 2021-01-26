@@ -3,7 +3,7 @@ import copy
 import warnings
 import os
 from packaging import version
-
+import sklearn
 import numpy as np
 import pandas as pd
 import mxnet
@@ -12,12 +12,10 @@ from autogluon_contrib_nlp.utils.registry import Registry
 from autogluon_contrib_nlp.utils.misc import logging_config
 
 from . import constants as _C
-from .dataset import random_split_train_val, TabularDataset, infer_problem_type,\
-    get_column_properties
-from .models.basic_v1 import BertForTextPredictionBasic
+from .dataset import TabularDataset, infer_problem_type, infer_column_types
+from .models.basic_v1 import MultiModalTextPrediction
 from autogluon.core.task.base import BaseTask
 from autogluon.core import space
-from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count, default_holdout_frac
 from autogluon.core.utils.miscs import verbosity2loglevel
@@ -38,9 +36,9 @@ def default() -> dict:
     Each model has its own search space inside.
     """
     ret = {
-        'version': 1,
+        'version': 1,                     # Version of TextPrediction Model
         'models': {
-            'BertForTextPredictionBasic': {
+            'MultiModalTextLearner': {
                 'search_space': {
                     'model.backbone.name': 'google_electra_small',
                     'optimization.batch_size': 32,
@@ -242,7 +240,9 @@ class TextPrediction(BaseTask):
             tuning_data=None,
             time_limits=None,
             output_directory='./ag_text',
+            problem_type=None,
             feature_columns=None,
+            column_types=None,
             holdout_frac=None,
             eval_metric=None,
             stopping_metric=None,
@@ -262,11 +262,12 @@ class TextPrediction(BaseTask):
 
         Parameters
         ----------
-        train_data : :class:`autogluon.tabular.TabularDataset` or :class:`pd.DataFrame`
+        train_data : :class:`pd.DataFrame`
             Training dataset where rows = individual training examples, columns = features.
         label : str
-            Name of the label column. It can be a stringBy default, we will search for a column named
-        tuning_data : :class:`autogluon.tabular.TabularDataset` or :class:`pd.DataFrame`, default = None
+            Name of the label column. It can be a string. By default, we will search for a column
+            named "label".
+        tuning_data : :class:`pd.DataFrame`, default = None
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
             If `tuning_data = None`, `fit()` will automatically hold out random examples from `train_data` for validation.
         time_limits : int or str, default = None
@@ -276,9 +277,16 @@ class TextPrediction(BaseTask):
             If not specified, `fit()` will run until all models to try by default have completed training.
         output_directory : str, default = './ag_text'
             Path to directory where models and intermediate outputs should be saved.
+        problem_type
+            Type of the problem. i.e. is this a binary/multiclass classification or regression problem
+            (options: 'classification', 'regression').
+            If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
         feature_columns : List[str], default = None
             Which columns of table to consider as predictive features (other columns will be ignored, except for label-column).
             If None (by default), all columns of table are considered predictive features.
+        column_types : Dict[str, str], default = None
+            Additional column types. For example, you may specify {'product_type': 'categorical'}.
+            We will later ensure that the
         holdout_frac : float, default = None
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`).
             If None, default value is selected based on the number of training examples.
@@ -342,11 +350,7 @@ class TextPrediction(BaseTask):
             raise ImportError('You will need to ensure that you have mxnet>=1.7.0, <2.0.0. '
                               'For more information about how to install mxnet, you can refer to '
                               'https://sxjscience.github.io/KDD2020/ .')
-
-        if verbosity < 0:
-            verbosity = 0
-        elif verbosity > 4:
-            verbosity = 4
+        verbosity = max(min(verbosity, 0), 4)
         console_log = verbosity >= 2
         logging_config(folder=output_directory, name='ag_text_prediction',
                        logger=logger, level=verbosity2loglevel(verbosity),
@@ -361,7 +365,9 @@ class TextPrediction(BaseTask):
             hyperparameters = merge_params(base_params, hyperparameters)
         if seed is not None:
             hyperparameters['seed'] = seed
-        np.random.seed(hyperparameters['seed'])
+        else:
+            seed = hyperparameters['seed']
+        np.random.seed(seed)
         if not isinstance(train_data, pd.DataFrame):
             train_data = load_pd.load(train_data)
         # Inference the label
@@ -386,23 +392,32 @@ class TextPrediction(BaseTask):
                     'all columns = "{}"'.format(col, train_data.columns)
             all_columns = feature_columns + label_columns
             all_columns = [ele for ele in train_data.columns if ele in all_columns]
+        train_data = train_data[all_columns]
+        if tuning_data is not None:
+            tuning_data = tuning_data[all_columns]
+        if num_trials is None:
+            num_trials = hyperparameters['hpo_params']['num_trials']
         if tuning_data is None:
             if holdout_frac is None:
-                holdout_frac = default_holdout_frac(len(train_data), True)
-            train_data, tuning_data = random_split_train_val(train_data,
-                                                             valid_ratio=holdout_frac)
+                if num_trials == 1:
+                    holdout_frac = default_holdout_frac(len(train_data), False)
+                else:
+                    # For HPO, we will need to use a larger held-out ratio
+                    holdout_frac = default_holdout_frac(len(train_data), True)
+            train_data, tuning_data =\
+                sklearn.model_selection.train_test_split(train_data,
+                                                         test_size=holdout_frac,
+                                                         random_state=np.random.RandomState(seed))
 
         else:
             if not isinstance(tuning_data, pd.DataFrame):
                 tuning_data = load_pd.load(tuning_data)
         train_data = train_data[all_columns]
         tuning_data = tuning_data[all_columns]
-        column_properties = get_column_properties(
-            pd.concat([train_data, tuning_data]),
-            metadata=None,
-            label_columns=label_columns,
-            provided_column_properties=None,
-            categorical_default_handle_missing_value=True)
+        column_types = infer_column_types(train_data, tuning_data,
+                                          label_columns=label_columns,
+                                          problem_type=problem_type)
+
         has_text_column = False
         for k, v in column_properties.items():
             if v.type == _C.TEXT:
@@ -481,8 +496,6 @@ class TextPrediction(BaseTask):
                 else:
                     raise ValueError('The given time_limits="{}" cannot be parsed!'
                                      .format(time_limits))
-        if num_trials is None:
-            num_trials = hyperparameters['hpo_params']['num_trials']
         if scheduler_options is None:
             scheduler_options = hyperparameters['hpo_params']['scheduler_options']
             if scheduler_options is None:
@@ -515,11 +528,6 @@ class TextPrediction(BaseTask):
                                    '"AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU=1" to force the model to '
                                    'use CPU for training.')
         model = model_candidates[0]
-        if plot_results is None:
-            if in_ipynb():
-                plot_results = True
-            else:
-                plot_results = False
         model.train(train_data=train_data,
                     tuning_data=tuning_data,
                     resource=recommended_resource,

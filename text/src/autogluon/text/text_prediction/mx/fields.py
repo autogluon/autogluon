@@ -1,4 +1,4 @@
-from . import constants as _C
+from .. import constants as _C
 from autogluon_contrib_nlp.data import batchify as bf
 
 

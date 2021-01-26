@@ -6,80 +6,16 @@ from typing import Dict, Optional, List, Tuple, Union
 import numpy as np
 from autogluon_contrib_nlp.data import batchify as bf
 from autogluon_contrib_nlp.utils.preprocessing import get_trimmed_lengths, match_tokens_with_char_spans
-from autogluon_contrib_nlp.utils.misc import num_mp_workers
-from .dataset import TabularDataset
 from .fields import TextTokenIdsField, EntityField, CategoricalField, NumericalField
-from . import constants as _C
+from .. import constants as _C
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-
-def infer_problem_type(label_column_property):
-    """Infer the type of the problem based on the column property
-
-    Parameters
-    ----------
-    label_column_property
-
-    Returns
-    -------
-    problem_type
-        classification or regression
-    problem_label_shape
-        For classification problem it will be the number of classes.
-        For regression problem, it will be the label shape.
-    """
-    if label_column_property.type == _C.CATEGORICAL:
-        return _C.CLASSIFICATION, label_column_property.num_class
-    elif label_column_property.type == _C.NUMERICAL:
-        return _C.REGRESSION, label_column_property.shape
-    else:
-        raise NotImplementedError
 
 
 def _chunk_processor(chunk, processing_fn):
     out = []
     for idx, row in chunk.iterrows():
         out.append(processing_fn(row))
-    return out
-
-
-def parallel_transform(df, processing_fn,
-                       num_process=None,
-                       fallback_threshold=1000):
-    """Apply the function to each row of the pandas dataframe and store the results
-    in a python list.
-
-    Parameters
-    ----------
-    df
-        Pandas Dataframe
-    processing_fn
-        The processing function
-    num_process
-        If not set. We use the default value
-    fallback_threshold
-        If the number of samples in df is smaller than fallback_threshold.
-        Directly transform the data without multiprocessing
-
-    Returns
-    -------
-    out
-        List of samples
-    """
-    if num_process is None:
-        num_process = num_mp_workers()
-    if len(df) <= fallback_threshold:
-        out = []
-        for idx, row in df.iterrows():
-            out.append(processing_fn(row))
-        return out
-    else:
-        chunks = np.array_split(df, num_process * 8)
-        with mp.Pool(num_process) as pool:
-            out_l = pool.map(functools.partial(_chunk_processor, processing_fn=processing_fn),
-                             chunks)
-        out = sum(out_l, [])
     return out
 
 
@@ -225,7 +161,7 @@ def process_text_entity_features(
     return text_features, entity_features
 
 
-class TabularBasicBERTPreprocessor:
+class MultimodalWithPretrainedPreprocessor:
     def __init__(self, *,
                  tokenizer,
                  column_properties,
@@ -236,10 +172,12 @@ class TabularBasicBERTPreprocessor:
                  merge_text: bool = True):
         """Preprocess the inputs to work with a pretrained model.
 
+        We support multiple
+
         Parameters
         ----------
         tokenizer
-            The tokenizer
+            The tokenizer of the pretrained model
         column_properties
             A dictionary that contains the column properties
         max_length
