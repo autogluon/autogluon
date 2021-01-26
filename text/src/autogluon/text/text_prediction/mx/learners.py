@@ -26,7 +26,6 @@ from autogluon.core.metrics import get_metric, Scorer
 from autogluon.core.utils.multiprocessing_utils import force_forkserver
 
 from .. import constants as _C
-from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from .preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
 from ..dataset import TabularDataset

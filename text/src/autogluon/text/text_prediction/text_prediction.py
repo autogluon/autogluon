@@ -13,7 +13,6 @@ from autogluon_contrib_nlp.utils.misc import logging_config
 
 from . import constants as _C
 from .dataset import TabularDataset, infer_problem_type, infer_column_types
-from .models.basic_v1 import MultiModalTextPrediction
 from autogluon.core.task.base import BaseTask
 from autogluon.core import space
 from autogluon.core.utils.loaders import load_pd
@@ -464,19 +463,20 @@ class TextPrediction(BaseTask):
         model_candidates = []
         for model_type, kwargs in hyperparameters['models'].items():
             search_space = kwargs['search_space']
-            if model_type == 'BertForTextPredictionBasic':
-                model = BertForTextPredictionBasic(column_properties=column_properties,
-                                                   label_columns=label_columns,
-                                                   feature_columns=feature_columns,
-                                                   label_shapes=label_shapes,
-                                                   problem_types=problem_types,
-                                                   stopping_metric=stopping_metric,
-                                                   log_metrics=log_metrics,
-                                                   base_config=None,
-                                                   search_space=search_space,
-                                                   output_directory=output_directory,
-                                                   logger=logger)
-                model_candidates.append(model)
+            if model_type == 'MultiModalTextLearner':
+                from .mx.learners import MultiModalTextLearner
+                learner = MultiModalTextLearner(column_types=column_types,
+                                                label_columns=label_columns,
+                                                feature_columns=feature_columns,
+                                                label_shapes=label_shapes,
+                                                problem_types=problem_types,
+                                                stopping_metric=stopping_metric,
+                                                log_metrics=log_metrics,
+                                                base_config=None,
+                                                search_space=search_space,
+                                                output_directory=output_directory,
+                                                logger=logger)
+                model_candidates.append(learner)
             else:
                 raise ValueError('model_type = "{}" is not supported. You can try to use '
                                  'model_type = "BertForTextPredictionBasic"'.format(model_type))
