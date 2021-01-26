@@ -413,13 +413,14 @@ class TextPrediction(BaseTask):
                 tuning_data = load_pd.load(tuning_data)
         train_data = train_data[all_columns]
         tuning_data = tuning_data[all_columns]
+        problem_type = infer_problem_type()
         column_types = infer_column_types(train_data, tuning_data,
                                           label_columns=label_columns,
                                           problem_type=problem_type)
 
         has_text_column = False
-        for k, v in column_properties.items():
-            if v.type == _C.TEXT:
+        for k, v in column_types.items():
+            if v == _C.TEXT:
                 has_text_column = True
                 break
         if not has_text_column:
@@ -428,6 +429,7 @@ class TextPrediction(BaseTask):
                                  'autogluon.tabular.TabularPredictor.\n'
                                  'The inferred column properties of the training data is {}'
                                  .format(train_data))
+        train_data = TabularDataset
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)

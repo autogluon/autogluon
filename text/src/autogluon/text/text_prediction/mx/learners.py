@@ -76,13 +76,14 @@ def get_optimizer(cfg, updates_per_epoch):
 @use_np
 def apply_layerwise_decay(model, layerwise_decay, backbone_name, not_included=None):
     """Apply the layer-wise gradient decay
+
     .. math::
         lr = lr * layerwise_decay^(max_depth - layer_depth)
 
     Parameters:
     ----------
     model
-        qa_net
+        The backbone model
     layerwise_decay: int
         layer-wise decay power
     not_included: list of str
@@ -92,6 +93,9 @@ def apply_layerwise_decay(model, layerwise_decay, backbone_name, not_included=No
         not_included = []
     # consider the task specific fine-tuning layer as the last layer, following with pooler
     # In addition, the embedding parameters have the smaller learning rate based on this setting.
+    if 'albert' in backbone_name:
+        # Skip if it is the ALBERT model.
+        return
     if 'electra' in backbone_name:
         all_layers = model.encoder.all_encoder_layers
     else:
@@ -237,12 +241,20 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
         return scorer._sign * scorer(ground_truth, predictions)
 
 
+def batch_size_finder():
+    """
+
+    Returns
+    -------
+
+    """
+
+
 @use_np
 def train_function(args, reporter, train_df_path, tuning_df_path,
                    time_limits, time_start, base_config, problem_types,
-                   column_properties, label_columns, label_shapes,
-                   log_metrics, stopping_metric, console_log,
-                   ignore_warning=False):
+                   label_columns, label_shapes, log_metrics, stopping_metric,
+                   console_log, ignore_warning=False):
     """
 
     Parameters
@@ -250,8 +262,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     args
         The arguments
     reporter
-        The reporter. If it is set to None, we won't use the reporter and will just
-        run a single trial.
+        Reporter of the HPO scheduler.
+        If it is set to None, we won't use the reporter and will just run a single trial.
     train_df_path
         Path of the training dataframe
     tuning_df_path
@@ -264,8 +276,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Base configuration
     problem_types
         Types of the problem. Each label can have one problem_type
-    column_properties
-        Column properties
     label_columns
         Label columns
     label_shapes

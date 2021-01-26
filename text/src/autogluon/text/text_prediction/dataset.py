@@ -137,14 +137,14 @@ def normalize_df(df, convert_text_to_numerical=True, remove_none=True):
         return new_df
 
 
-def infer_problem_type(column_properties, label_col_name):
+def infer_problem_type(column_types, label_column):
     """
 
     Parameters
     ----------
-    column_properties
-        The property of the columns
-    label_col_name
+    column_types
+        Types of the columns
+    label_column
         Name of the label column
 
     Returns
