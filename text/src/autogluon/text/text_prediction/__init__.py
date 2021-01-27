@@ -1,11 +1,10 @@
-from . import mx
 from . import column_property
 from . import constants
-from . import dataset
-from . import fields
+from . import infer_types
 from . import text_prediction
 from .metrics import *
-from .text_prediction import TextPrediction
+from . import predictor
+from .predictor.predictor import TextPredictor
 
-__all__ = ['models', 'modules', 'column_property', 'constants', 'dataset', 'fields',
+__all__ = ['column_property', 'constants', 'infer_types',
            'preprocessing', 'text_prediction'] + metrics.__all__ + ['TextPrediction']

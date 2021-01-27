@@ -12,7 +12,6 @@ from autogluon_contrib_nlp.utils.registry import Registry
 from autogluon_contrib_nlp.utils.misc import logging_config
 
 from . import constants as _C
-from .dataset import TabularDataset, infer_problem_type, infer_column_types
 from autogluon.core.task.base import BaseTask
 from autogluon.core import space
 from autogluon.core.utils.loaders import load_pd
@@ -37,7 +36,7 @@ def default() -> dict:
     ret = {
         'version': 1,                     # Version of TextPrediction Model
         'models': {
-            'MultiModalTextLearner': {
+            'TextPredictionModel': {
                 'search_space': {
                     'model.backbone.name': 'google_electra_small',
                     'optimization.batch_size': 32,
@@ -62,7 +61,7 @@ def default() -> dict:
 
 
 @ag_text_prediction_params.register()
-def default_no_hpo() -> dict:
+def text_no_hpo() -> dict:
     """The default hyperparameters without HPO"""
     cfg = default()
     cfg['hpo_params']['num_trials'] = 1
@@ -70,9 +69,9 @@ def default_no_hpo() -> dict:
 
 
 @ag_text_prediction_params.register()
-def default_electra_small_no_hpo() -> dict:
+def text_electra_small_no_hpo() -> dict:
     """The default search space that uses ELECTRA Small as the backbone."""
-    cfg = default_no_hpo()
+    cfg = text_no_hpo()
     cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
         = 'google_electra_small'
     cfg['models']['BertForTextPredictionBasic']['search_space'][
@@ -81,9 +80,9 @@ def default_electra_small_no_hpo() -> dict:
 
 
 @ag_text_prediction_params.register()
-def default_electra_base_no_hpo() -> dict:
+def text_electra_base_no_hpo() -> dict:
     """The default search space that uses ELECTRA Base as the backbone"""
-    cfg = default_no_hpo()
+    cfg = text_no_hpo()
     cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
         = 'google_electra_base'
     cfg['models']['BertForTextPredictionBasic']['search_space'][
@@ -94,7 +93,7 @@ def default_electra_base_no_hpo() -> dict:
 @ag_text_prediction_params.register()
 def default_electra_large_no_hpo() -> dict:
     """The default search space that uses ELECTRA Base as the backbone"""
-    cfg = default_no_hpo()
+    cfg = text_no_hpo()
     cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
         = 'google_electra_large'
     cfg['models']['BertForTextPredictionBasic']['search_space'][
@@ -163,7 +162,7 @@ def get_recommended_resource(nthreads_per_trial=None,
             num_parallel_jobs = get_gpu_count() // ngpus_per_trial
             nthreads_per_trial = max(get_cpu_count() // num_parallel_jobs, 1)
         else:
-            nthreads_per_trial = min(get_cpu_count(), 4)
+            nthreads_per_trial = get_cpu_count()
     nthreads_per_trial = min(nthreads_per_trial, get_cpu_count())
     ngpus_per_trial = min(ngpus_per_trial, get_gpu_count())
     assert nthreads_per_trial > 0 and ngpus_per_trial >= 0,\
@@ -413,7 +412,10 @@ class TextPrediction(BaseTask):
                 tuning_data = load_pd.load(tuning_data)
         train_data = train_data[all_columns]
         tuning_data = tuning_data[all_columns]
-        problem_type = infer_problem_type()
+        if problem_type is not None:
+            problem_type = problem_type
+        else:
+            problem_type = infer_problem_type(column_types)
         column_types = infer_column_types(train_data, tuning_data,
                                           label_columns=label_columns,
                                           problem_type=problem_type)
@@ -466,7 +468,7 @@ class TextPrediction(BaseTask):
         for model_type, kwargs in hyperparameters['models'].items():
             search_space = kwargs['search_space']
             if model_type == 'MultiModalTextLearner':
-                from .mx.learners import MultiModalTextLearner
+                from .mx.models import MultiModalTextLearner
                 learner = MultiModalTextLearner(column_types=column_types,
                                                 label_columns=label_columns,
                                                 feature_columns=feature_columns,

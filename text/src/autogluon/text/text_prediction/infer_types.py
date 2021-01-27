@@ -3,13 +3,15 @@ import pandas as pd
 import warnings
 from typing import Union, Optional, List, Dict
 from autogluon_contrib_nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
-from . import constants as _C
+from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
+from .constants import NULL, CATEGORICAL, NUMERICAL, TEXT
 
 
 def is_categorical_column(data: pd.Series,
-                          valid_data: Optional[pd.Series] = None,
-                          threshold: int = 100,
+                          valid_data: pd.Series,
+                          threshold: int = 20,
                           ratio: float = 0.1,
+                          oov_ratio_threshold: float = 0.1,
                           is_label: bool = False) -> bool:
     """Check whether the column is a categorical column.
 
@@ -28,7 +30,11 @@ def is_categorical_column(data: pd.Series,
     threshold
         The threshold for detecting categorical column
     ratio
-        The ratio for detecting categorical column
+        The ratio detecting categorical column
+    oov_ratio_threshold
+        The out-of-vocabulary ratio between training and validation.
+        This is used to determine if the column is a categorical column.
+        Usually, a categorical column can tolerate a small OOV ratio
     is_label
         Whether the column is a label column.
 
@@ -41,18 +47,19 @@ def is_categorical_column(data: pd.Series,
         return True
     else:
         threshold = min(int(len(data) * ratio), threshold)
-        unique_values = data.unique()
-        if len(unique_values) < threshold:
-            if is_label:
-                # If it is a label column, we will usually treat it as a categorical column.
-                # We will use the validation data as additional verification of whether the
-                # inference result is correct or not.
-                if valid_data is not None:
-                    unique_values_set = set(unique_values)
-                    valid_unique_values = valid_data.unique()
-                    for ele in valid_unique_values:
-                        if ele not in unique_values_set:
-                            return False
+        data_value_counts = data.value_counts(dropna=False)
+        key_set = set(data_value_counts.keys())
+        if len(data_value_counts) < threshold:
+            valid_value_counts = valid_data.value_counts(dropna=False)
+            total_valid_num = len(valid_data)
+            oov_num = 0
+            for k, v in zip(valid_value_counts.keys(), valid_value_counts.values()):
+                if k not in key_set:
+                    oov_num += v
+            if oov_num / total_valid_num > oov_ratio_threshold:
+                return False
+            if is_label and oov_num != 0:
+                return False
             return True
         return False
 
@@ -84,30 +91,7 @@ def is_numerical_column(data: pd.Series,
         return False
 
 
-def infer_problem_type(label_column_property):
-    """Infer the type of the problem based on the column property
-
-    Parameters
-    ----------
-    label_column_property
-
-    Returns
-    -------
-    problem_type
-        classification or regression
-    problem_label_shape
-        For classification problem it will be the number of classes.
-        For regression problem, it will be the label shape.
-    """
-    if label_column_property.type == _C.CATEGORICAL:
-        return _C.CLASSIFICATION, label_column_property.num_class
-    elif label_column_property.type == _C.NUMERICAL:
-        return _C.REGRESSION, label_column_property.shape
-    else:
-        raise NotImplementedError
-
-
-def infer_column_types(
+def infer_column_problem_types(
         train_df: pd.DataFrame,
         valid_df: pd.DataFrame,
         label_columns: Union[str, List[str]],
@@ -137,21 +121,22 @@ def infer_column_types(
         type = NULL
     """
     if label_columns is None:
-        label_columns_set = set()
+        label_set = set()
     elif isinstance(label_columns, str):
-        label_columns_set = set([label_columns])
+        label_set = set([label_columns])
     elif isinstance(label_columns, (list, tuple)):
-        label_columns_set = set(label_columns)
+        label_set = set(label_columns)
     else:
         raise NotImplementedError
     column_types = collections.OrderedDict()
     # Process all feature columns
 
     for col_name in train_df.columns:
+        is_label = col_name in label_set
         if provided_column_types is not None and col_name in provided_column_types:
             column_types[col_name] = provided_column_types[col_name]
             continue
-        if col_name in label_columns_set:
+        if is_label:
             num_train_missing = train_df[col_name].is_null().sum()
             num_valid_missing = valid_df[col_name].is_null().sum()
             if num_train_missing > 0:
@@ -162,22 +147,58 @@ def infer_column_types(
                 raise ValueError(f'Label column "{col_name}" contains missing values in the '
                                  f'validation data frame. You may want to filter your data because '
                                  f'missing label is currently not supported.')
-            if problem_type == _C.CLASSIFICATION:
-                column_types[col_name] = _C.CATEGORICAL
+            if problem_type == MULTICLASS or problem_type == BINARY:
+                column_types[col_name] = CATEGORICAL
                 continue
-            elif problem_type == _C.REGRESSION:
-                column_types[col_name] = _C.NUMERICAL
+            elif problem_type == REGRESSION:
+                column_types[col_name] = NUMERICAL
                 continue
         # Identify columns that provide no information
         idx = train_df[col_name].first_valid_index()
         if idx is None or len(train_df[col_name].unique()) == 1:
             # No valid index, thus, we will just ignore the column
-            if col_name not in label_columns_set:
-                column_types[col_name] = _C.NULL
+            if not is_label:
+                column_types[col_name] = NULL
             else:
                 warnings.warn(f'Label column "{col_name}" contains only one label. You may want'
                               f' to check your dataset again.')
         ele = train_df[col_name][idx]
         # Try to inference the categorical column
+        if is_categorical_column(train_df[col_name], valid_df[col_name],
+                                 is_label=is_label):
+            column_types[col_name] = CATEGORICAL
+        elif is_numerical_column(train_df[col_name], valid_df[col_name]):
+            column_types[col_name] = NUMERICAL
+        else:
+            column_types[col_name] = TEXT
+    return column_types
 
-    return column_properties
+
+def infer_problem_type(column_types, label_column, train_df):
+    """Inference the type of the problem based on type of the column and
+    the training and validation data.
+
+    Parameters
+    ----------
+    column_types
+        Type of the columns
+    label_column
+        The label column
+    train_df
+        The training dataframe
+
+    Returns
+    -------
+    problem_type
+        Type of the problem
+    """
+    if column_types[label_column] == CATEGORICAL:
+        if len(train_df[label_column].value_counts()) == 2:
+            return BINARY
+        else:
+            return MULTICLASS
+    elif column_types[label_column] == NUMERICAL:
+        return REGRESSION
+    else:
+        raise ValueError(f'The label column "{label_column}" has type'
+                         f' "{column_types[label_column]}" and is supported yet.')
