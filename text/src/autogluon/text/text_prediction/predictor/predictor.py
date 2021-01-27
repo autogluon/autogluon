@@ -81,6 +81,7 @@ class TextPredictor:
         set_logger_verbosity(self.verbosity, logger=logger)
         self._label = label
         self._problem_type = problem_type
+        self._eval_metric = eval_metric
         self._path = setup_outputdir(path)
 
     @property

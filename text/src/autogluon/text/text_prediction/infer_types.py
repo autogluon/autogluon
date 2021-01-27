@@ -136,8 +136,8 @@ def infer_column_problem_types(
             column_types[col_name] = provided_column_types[col_name]
             continue
         if is_label:
-            num_train_missing = train_df[col_name].is_null().sum()
-            num_valid_missing = valid_df[col_name].is_null().sum()
+            num_train_missing = train_df[col_name].isnull().sum()
+            num_valid_missing = valid_df[col_name].isnull().sum()
             if num_train_missing > 0:
                 raise ValueError(f'Label column "{col_name}" contains missing values in the '
                                  f'training data frame. You may want to filter your data because '
