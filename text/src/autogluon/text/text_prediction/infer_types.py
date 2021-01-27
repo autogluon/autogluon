@@ -2,7 +2,6 @@ import collections
 import pandas as pd
 import warnings
 from typing import Union, Optional, List, Dict
-from autogluon_contrib_nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from .constants import NULL, CATEGORICAL, NUMERICAL, TEXT
 
@@ -162,8 +161,10 @@ def infer_column_problem_types(
             else:
                 warnings.warn(f'Label column "{col_name}" contains only one label. You may want'
                               f' to check your dataset again.')
-        ele = train_df[col_name][idx]
-        # Try to inference the categorical column
+        # Use the following way for type inference
+        # 1) Inference categorical column
+        # 2) Inference numerical column
+        # 3) All the other columns are treated as text column
         if is_categorical_column(train_df[col_name], valid_df[col_name],
                                  is_label=is_label):
             column_types[col_name] = CATEGORICAL
