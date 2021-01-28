@@ -180,8 +180,7 @@ def infer_problem_type(column_types, label_column, data_df,
     """Inference the type of the problem based on type of the column and
     the training data.
 
-    Also, it will try to check the correctness of the column types and the provided problem_type
-    if it is given
+    Also, it will try to check the correctness of the column types and the provided problem_type.
 
     Parameters
     ----------
