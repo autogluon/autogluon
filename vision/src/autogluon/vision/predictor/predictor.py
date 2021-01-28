@@ -6,10 +6,15 @@ import warnings
 
 import pandas as pd
 from autogluon.core.utils import verbosity2loglevel, get_gpu_free_memory, get_gpu_count
+from autogluon.core.utils import set_logger_verbosity
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
+from ..configs.presets_configs import unpack
 
 __all__ = ['ImagePredictor']
+
+logger = logging.getLogger()  # return root logger
+
 
 class ImagePredictor(object):
     """AutoGluon Predictor for predicting image category based on their whole contents
@@ -42,10 +47,12 @@ class ImagePredictor(object):
         self._classifier = None
         self._fit_summary = {}
 
+    @unpack('preset_image_predictor')
     def fit(self,
             train_data,
             tuning_data=None,
             time_limit=None,
+            presets=None,
             hyperparameters=None,
             **kwargs):
         """Automatic fit process for image prediction.
@@ -68,6 +75,80 @@ class ImagePredictor(object):
             Time limit in seconds, if not specified, will run until all tuning and training finished.
             If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
+        presets : list or str or dict, default = ['medium_quality_faster_train']
+            List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, 
+            and various other properties of the returned `predictor`.
+            It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
+            As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
+            To get good quality with faster inference speed, set `presets='good_quality_faster_inference'`
+            Any user-specified arguments in `fit()` will override the values used by presets.
+            If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
+            For precise definitions of the provided presets, see file: `autogluon/vision/configs/presets_configs.py`.
+            Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
+            Available Presets: ['best_quality', 'high_quality_fast_inference', 'good_quality_faster_inference', 'medium_quality_faster_train']
+            It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
+            
+            Note that depending on your specific hardware limitation(# gpu, size of gpu memory...) your mileage may vary a lot, you may choose lower quality presets if necessary, and 
+            try to reduce `batch_size` if OOM("RuntimeError: CUDA error: out of memory") happens frequently during the `fit`.
+
+            In-depth Preset Info:
+                best_quality={
+                    'hyperparameters': {
+                        'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
+                        'lr': Real(1e-2, 1e-6, log=True),
+                        'batch_size': Categorical(8, 16, 32, 64, 128),
+                        'epochs': 200
+                        },
+                    'hyperparameter_tune_kwargs': {
+                        'num_trials': 1024,
+                        'search_strategy': 'bayesopt',
+                        'max_reward': 1.0}}
+                    Best predictive accuracy with little consideration to inference time or model size. Achieve even better results by specifying a large time_limit value.
+                    Recommended for applications that benefit from the best possible model accuracy.
+
+                good_quality_fast_inference={
+                    'hyperparameters': {
+                        'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
+                        'lr': Real(1e-2, 1e-6, log=True),
+                        'batch_size': Categorical(8, 16, 32, 64, 128),
+                        'epochs': 150
+                        },
+                    'hyperparameter_tune_kwargs': {
+                        'num_trials': 512,
+                        'search_strategy': 'bayesopt',
+                        'max_reward': 0.95}}
+                    Good predictive accuracy with fast inference.
+                    Recommended for applications that require reasonable inference speed and/or model size.
+
+                medium_quality_faster_train={
+                    'hyperparameters': {
+                        'model': 'resnet50_v1b',
+                        'lr': 0.01,
+                        'batch_size': 64,
+                        'epochs': 50
+                        },
+                    'hyperparameter_tune_kwargs': {
+                        'num_trials': 8,
+                        'search_strategy': 'random',
+                        'max_reward': 0.85}}
+
+                    Medium predictive accuracy with very fast inference and very fast training time. 
+                    This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
+
+                medium_quality_faster_inference={
+                    'hyperparameters': {
+                        'model': Categorical('resnet18_v1b', 'mobilenetv3_small'),
+                        'lr': Categorical(0.01, 0.005, 0.001),
+                        'batch_size': Categorical(64, 128),
+                        'epochs': Categorical(50, 100),
+                        },
+                    'hyperparameter_tune_kwargs': {
+                        'num_trials': 32,
+                        'search_strategy': 'bayesopt',
+                        'max_reward': 0.95}}
+                    
+                    Medium predictive accuracy with very fast inference.
+                    Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
         hyperparameters : dict, default = None
             Extra hyperparameters for specific models.
             Accepted args includes(not limited to):
@@ -128,6 +209,11 @@ class ImagePredictor(object):
         scheduler_options = kwargs['hyperparameter_tune_kwargs']['scheduler_options']
 
         log_level = verbosity2loglevel(self._verbosity)
+        set_logger_verbosity(self._verbosity, logger=logger)
+        if presets:
+            if not isinstance(presets, list):
+                presets = [presets]
+            logger.log(20, f'Presets specified: {presets}')
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
             logging.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +
