@@ -126,7 +126,7 @@ def infer_column_problem_types(
     elif isinstance(label_columns, (list, tuple)):
         label_set = set(label_columns)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(f'label_columns is not supported. label_columns={label_columns}.')
     column_types = collections.OrderedDict()
     # Process all feature columns
 
