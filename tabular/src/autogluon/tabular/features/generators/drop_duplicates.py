@@ -3,8 +3,9 @@ from collections import defaultdict
 
 from pandas import DataFrame
 
+from autogluon.core.features.feature_metadata import R_INT, R_FLOAT
+
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import R_INT, R_FLOAT
 
 logger = logging.getLogger(__name__)
 

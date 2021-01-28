@@ -3,9 +3,8 @@ import math
 
 from pandas import DataFrame
 
-from ..features.types import get_type_map_raw
-from ..features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY
-
+from autogluon.core.features.types import get_type_map_raw
+from autogluon.core.features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY
 
 logger = logging.getLogger(__name__)
 

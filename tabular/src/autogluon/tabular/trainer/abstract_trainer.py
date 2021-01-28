@@ -1006,12 +1006,6 @@ class AbstractTrainer:
             k_fold = self.k_fold
         if n_repeats is None:
             n_repeats = self.n_repeats
-        if feature_prune:
-            if n_repeat_start != 0:
-                raise ValueError(f'n_repeat_start must be 0 to feature_prune, value = {n_repeat_start}')
-            elif k_fold_start != 0:
-                raise ValueError(f'k_fold_start must be 0 to feature_prune, value = {k_fold_start}')
-            self._autotune(X_train=X_train, X_holdout=X_val, y_train=y_train, y_holdout=y_val, model_base=model)  # TODO: Update to use CV instead of holdout
         model_fit_kwargs = dict(
             time_limit=time_limit,
             verbosity=self.verbosity,
@@ -1246,11 +1240,6 @@ class AbstractTrainer:
         if len(self.get_model_names()) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
         return model_names_fit
-
-    # TODO: Refactor
-    # FIXME: This will likely not work properly
-    def _autotune(self, X_train, X_holdout, y_train, y_holdout, model_base: AbstractModel):
-        model_base.feature_prune(X_train, X_holdout, y_train, y_holdout)
 
     def _predict_model(self, X, model, model_pred_proba_dict=None):
         if isinstance(model, str):

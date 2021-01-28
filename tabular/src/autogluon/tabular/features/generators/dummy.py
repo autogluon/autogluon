@@ -2,8 +2,9 @@ import logging
 
 from pandas import DataFrame
 
+from autogluon.core.features.feature_metadata import FeatureMetadata
+
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 

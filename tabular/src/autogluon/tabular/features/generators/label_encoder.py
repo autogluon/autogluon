@@ -3,8 +3,9 @@ import logging
 
 from pandas import DataFrame
 
+from autogluon.core.features.feature_metadata import R_CATEGORY, S_TEXT_AS_CATEGORY
+
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import R_CATEGORY, S_TEXT_AS_CATEGORY
 
 logger = logging.getLogger(__name__)
 

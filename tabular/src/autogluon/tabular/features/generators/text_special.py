@@ -5,9 +5,10 @@ from typing import List
 import pandas as pd
 from pandas import DataFrame, Series
 
+from autogluon.core.features.feature_metadata import S_TEXT, S_TEXT_SPECIAL
+
 from .abstract import AbstractFeatureGenerator
 from .binned import BinnedFeatureGenerator
-from ..feature_metadata import S_TEXT, S_TEXT_SPECIAL
 
 logger = logging.getLogger(__name__)
 

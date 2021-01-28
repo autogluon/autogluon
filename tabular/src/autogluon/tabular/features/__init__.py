@@ -1,2 +1,2 @@
-from .feature_metadata import *
+from autogluon.core.features.feature_metadata import *
 from .generators import *

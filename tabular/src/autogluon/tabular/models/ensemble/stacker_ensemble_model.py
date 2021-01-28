@@ -7,10 +7,10 @@ from collections import defaultdict
 
 from autogluon.core.utils.utils import generate_kfold
 from autogluon.core.constants import MULTICLASS
+from autogluon.core.features.feature_metadata import FeatureMetadata, R_FLOAT, S_STACK
 
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
-from ...features.feature_metadata import FeatureMetadata, R_FLOAT, S_STACK
 
 logger = logging.getLogger(__name__)
 

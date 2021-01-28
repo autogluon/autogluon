@@ -12,13 +12,12 @@ from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
-from autogluon.tabular.features import R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.core.features.feature_metadata import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ..abstract.model_trial import skip_hpo
-from ...features.feature_metadata import R_OBJECT
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS

@@ -1,12 +1,13 @@
 import logging
 
+from autogluon.core.features.feature_metadata import R_INT, R_FLOAT, S_TEXT
+
 from .pipeline import PipelineFeatureGenerator
 from .category import CategoryFeatureGenerator
 from .datetime import DatetimeFeatureGenerator
 from .identity import IdentityFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
-from ..feature_metadata import R_INT, R_FLOAT, S_TEXT
 
 logger = logging.getLogger(__name__)
 
