@@ -95,7 +95,7 @@ class ImagePredictor(object):
                 best_quality={
                     'hyperparameters': {
                         'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
-                        'lr': Real(1e-2, 1e-6, log=True),
+                        'lr': Real(1e-6, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
                         'epochs': 200
                         },
@@ -109,7 +109,7 @@ class ImagePredictor(object):
                 good_quality_fast_inference={
                     'hyperparameters': {
                         'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
-                        'lr': Real(1e-2, 1e-6, log=True),
+                        'lr': Real(1e-6, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
                         'epochs': 150
                         },

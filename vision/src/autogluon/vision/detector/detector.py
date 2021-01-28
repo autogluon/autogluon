@@ -83,7 +83,7 @@ class ObjectDetector(object):
                 best_quality={
                     'hyperparameters': {
                         'transfer': Categorical('faster_rcnn_fpn_resnet101_v1b_coco'),
-                        'lr': Real(1e-3, 1e-5, log=True),
+                        'lr': Real(1e-5, 1e-3, log=True),
                         'batch_size': Categorical(4, 8),
                         'epochs': 30
                         },
@@ -99,7 +99,7 @@ class ObjectDetector(object):
                         'transfer': Categorical('ssd_512_resnet50_v1_coco',
                                                 'yolo3_darknet53_coco',
                                                 'center_net_resnet50_v1b_coco'),
-                        'lr': Real(1e-2, 1e-5, log=True),
+                        'lr': Real(1e-5, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64),
                         'epochs': 50
                         },
