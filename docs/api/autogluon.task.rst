@@ -129,6 +129,8 @@ Additional Tabular APIs
    :no-members:
    :no-inherited-members:
 
+.. automodule:: autogluon.core.features.feature_metadata
+
 :hidden:`FeatureMetadata`
 ~~~~~~~~~~~~~~~~~~~~~~~~
 

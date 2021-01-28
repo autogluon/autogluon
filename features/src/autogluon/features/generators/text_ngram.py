@@ -7,9 +7,10 @@ import pandas as pd
 import psutil
 from pandas import DataFrame
 
+from autogluon.core.features.types import S_TEXT, S_TEXT_NGRAM
+
 from .abstract import AbstractFeatureGenerator
 from ..vectorizers import get_ngram_freq, downscale_vectorizer, vectorizer_auto_ml_default
-from ..feature_metadata import S_TEXT, S_TEXT_NGRAM
 
 logger = logging.getLogger(__name__)
 

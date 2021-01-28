@@ -9,10 +9,15 @@ python3 -m pip uninstall -y autogluon.text
 python3 -m pip uninstall -y autogluon.mxnet
 python3 -m pip uninstall -y autogluon.extra
 python3 -m pip uninstall -y autogluon.tabular
+python3 -m pip uninstall -y autogluon.features
 python3 -m pip uninstall -y autogluon.core
 python3 -m pip uninstall -y autogluon-contrib-nlp
 
 cd core/
+python3 -m pip install --upgrade -e .
+cd ..
+
+cd features/
 python3 -m pip install --upgrade -e .
 cd ..
 

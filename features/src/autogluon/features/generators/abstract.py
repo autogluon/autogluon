@@ -7,10 +7,11 @@ from typing import Dict, List
 
 from pandas import DataFrame, Series
 
-from ..feature_metadata import FeatureMetadata
-from ..types import get_type_map_raw, get_type_map_real, get_type_group_map_special
-from ..utils import is_useless_feature
+from autogluon.core.features.infer_types import get_type_map_raw, get_type_map_real, get_type_group_map_special
+from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.utils.savers import save_pkl
+
+from ..utils import is_useless_feature
 
 logger = logging.getLogger(__name__)
 

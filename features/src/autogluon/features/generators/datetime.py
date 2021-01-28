@@ -3,8 +3,9 @@ import logging
 import pandas as pd
 from pandas import DataFrame
 
+from autogluon.core.features.types import R_DATETIME, S_DATETIME_AS_OBJECT
+
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import R_DATETIME, S_DATETIME_AS_OBJECT
 
 logger = logging.getLogger(__name__)
 

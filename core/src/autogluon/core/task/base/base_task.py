@@ -204,6 +204,7 @@ def compile_scheduler_options_v2(
         scheduler_options = dict()
     else:
         assert isinstance(scheduler_options, dict)
+    scheduler_options = copy.copy(scheduler_options)
     if dist_ip_addrs is None:
         dist_ip_addrs = []
     if search_strategy is None:
@@ -231,7 +232,13 @@ def compile_scheduler_options_v2(
         'visualizer': visualizer,
         'dist_ip_addrs': dist_ip_addrs,
     }
-    scheduler_params.update(copy.copy(scheduler_options))
+    resource = None
+    if 'resource' in scheduler_options:
+        scheduler_params['resource'].update(scheduler_options['resource'])
+        resource = scheduler_params['resource'].copy()
+    scheduler_params.update(scheduler_options)
+    if resource:
+        scheduler_params['resource'] = resource
 
     scheduler_params['resource']['num_cpus'], scheduler_params['resource']['num_gpus'] = setup_compute(
         nthreads_per_trial=scheduler_params['resource']['num_cpus'],

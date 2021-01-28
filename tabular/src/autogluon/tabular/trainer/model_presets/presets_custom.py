@@ -9,7 +9,7 @@ def get_preset_custom(name, problem_type, num_classes):
     # Custom model
     if name == 'GBM':
         model = get_param_baseline_custom(problem_type, num_classes=num_classes)
-        model[AG_ARGS] = dict(model_type='GBM', name_suffix='Custom', disable_in_hpo=True)
+        model[AG_ARGS] = dict(model_type='GBM', name_suffix='Custom', disable_in_hpo=True, hyperparameter_tune_kwargs=None)
         return [model]
     elif name == 'ELECTRA_BASE':
         return _get_preset_electra('google_electra_base', 'default_no_hpo', 'Base')
