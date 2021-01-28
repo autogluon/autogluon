@@ -46,10 +46,7 @@ class RayTuneScheduler(object):
     def __init__(self, task_fn, reward_attr, time_attr='epoch', **tune_args):
         self.task_fn = task_fn
 
-        # print(tune_args)  # FIXME: ALEX - WIP:
         self.tune_args = self._repackage_tune_kwargs(tune_args, reward_attr)
-        # print(self.tune_args)  # FIXME: ALEX - WIP:
-
         self.training_history = None
         self.config_history = None
         self._reward_attr = reward_attr
@@ -86,6 +83,9 @@ class RayTuneScheduler(object):
             'num_trials': 'num_samples',
         }
 
+        if 'verbose' not in tune_args:
+            tune_args['verbose'] = 0
+
         for ag_arg, tune_arg in ag_to_tune_arg_mapping.items():
             self._replace_ag_arg_with_tune(tune_args, ag_arg, tune_arg)
 
@@ -93,8 +93,6 @@ class RayTuneScheduler(object):
 
         ignore_args = ['searcher', 'search_options', 'checkpoint', 'visualizer', 'dist_ip_addrs', 'resume']
         tune_args = {k: v for k, v in tune_args.items() if k not in ignore_args}
-
-        tune_args
 
         return tune_args
 
@@ -165,7 +163,7 @@ class RayTuneScheduler(object):
 
     def get_best_config(self):
         # Required by autogluon
-        best_trial = self.result.get_best_trial(self._reward_attr, self.tune_args['mode'], "last")
+        best_trial = self.result.get_best_trial(self._reward_attr, 'max', 'last')
         config = deepcopy(best_trial.config)
         if 'util_args' in config:
             config.pop('util_args')
@@ -173,7 +171,7 @@ class RayTuneScheduler(object):
 
     def get_best_reward(self):
         # Required by autogluon
-        best_trial = self.result.get_best_trial(self._reward_attr, self.tune_args['mode'], "last")
+        best_trial = self.result.get_best_trial(self._reward_attr, 'max', 'last')
         return best_trial.last_result[self._reward_attr]
 
     def join_jobs(self, timeout=None):
@@ -196,11 +194,15 @@ class RayTuneScheduler(object):
         if filename is None and not plot:
             logger.warning('Please either provide filename or allow plot in get_training_curves')
         import matplotlib.pyplot as plt
-        plt.ylabel(self._reward_attr)
+
+        eval_metric = self.__get_training_history_metric('eval_metric', default='validation_performance')
+        sign_mult = int(self.__get_training_history_metric('greater_is_better', default=True)) * 2 - 1
+
+        plt.ylabel(eval_metric)
         plt.xlabel(self.time_attr)
         plt.title("Performance vs Training-Time in each HPO Trial")
         for task_id, task_res in self.training_history.items():
-            rewards = [x[self._reward_attr] for x in task_res]
+            rewards = [x[self._reward_attr] * sign_mult for x in task_res]
             x = [x[self.time_attr] for x in task_res]
             plt.plot(x, rewards, label=f'task {task_id}')
         if use_legend:
@@ -210,3 +212,9 @@ class RayTuneScheduler(object):
             plt.savefig(filename)
         if plot:
             plt.show()
+
+    def __get_training_history_metric(self, metric, default=None):
+        for _, task_res in self.training_history.items():
+            if task_res and metric in task_res[0]:
+                return task_res[0][metric]
+        return default
