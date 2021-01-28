@@ -4,8 +4,9 @@ import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 from autogluon.core.metrics import mean_squared_error
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.features.feature_metadata import FeatureMetadata
+
 from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
-from ..features.feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 

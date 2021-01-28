@@ -17,11 +17,8 @@ DEFAULT_DISTILL_PRIORITY = dict(
 
 
 def get_preset_models_distillation(path, problem_type, eval_metric, feature_metadata, hyperparameters, num_classes=None,
-                                   hyperparameter_tune_kwargs=None, distill_level=0, name_suffix='_DSTL', invalid_model_names: list = None):
-    if problem_type == MULTICLASS:
-        models = get_preset_models_softclass(path=path, num_classes=num_classes, hyperparameters=hyperparameters, feature_metadata=feature_metadata,
-                                             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, name_suffix=name_suffix, invalid_model_names=invalid_model_names)
-    elif problem_type == BINARY:  # convert to regression in distillation
+                                   distill_level=0, name_suffix='_DSTL', invalid_model_names: list = None):
+    if problem_type == BINARY:  # convert to regression in distillation
         eval_metric = mean_squared_error
         # Constrain output-range of NN:
         nn_outputrange = {'y_range': (0.0,1.0), 'y_range_extend': 0.0}
@@ -59,14 +56,16 @@ def get_preset_models_distillation(path, problem_type, eval_metric, feature_meta
         elif 'default' in hyperparameters and 'RF' in hyperparameters['default']:
             hyperparameters['default']['RF'] = rf_hyperparameters
 
-    if problem_type == REGRESSION or problem_type == BINARY:
-        models = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=eval_metric, hyperparameters=hyperparameters, feature_metadata=feature_metadata,
-                                   hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, name_suffix=name_suffix,
-                                   default_priorities=DEFAULT_DISTILL_PRIORITY, invalid_model_names=invalid_model_names)
+    if problem_type == MULTICLASS:
+        models, model_args_fit = get_preset_models_softclass(path=path, num_classes=num_classes, hyperparameters=hyperparameters, feature_metadata=feature_metadata,
+                                             name_suffix=name_suffix, invalid_model_names=invalid_model_names)
+    else:  # BINARY or REGRESSION
+        models, model_args_fit = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=eval_metric, hyperparameters=hyperparameters, feature_metadata=feature_metadata,
+                                   name_suffix=name_suffix, default_priorities=DEFAULT_DISTILL_PRIORITY, invalid_model_names=invalid_model_names)
 
     if problem_type in [MULTICLASS, BINARY]:
         for model in models:
             model.normalize_pred_probas = True
 
     logger.log(20, f"Distilling with each of these student models: {[model.name for model in models]}")
-    return models
+    return models, model_args_fit

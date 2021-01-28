@@ -9,10 +9,10 @@ import pandas as pd
 
 import networkx as nx
 
-from .dataset import TabularDataset
-from .hyperparameter_configs import get_hyperparameter_config
+from autogluon.core.dataset import TabularDataset
+from ...configs.hyperparameter_configs import get_hyperparameter_config
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
-from ...utils import BINARY, MULTICLASS, REGRESSION, get_pred_from_proba
+from autogluon.core.utils import BINARY, MULTICLASS, REGRESSION, get_pred_from_proba
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
 from ...data.label_cleaner import LabelCleanerMulticlassToBinary

@@ -1,6 +1,6 @@
 import logging
 
-from ...abstract import model_trial
+from autogluon.core.models.abstract import model_trial
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils import try_import_lightgbm
