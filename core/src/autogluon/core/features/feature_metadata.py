@@ -5,7 +5,7 @@ from collections import defaultdict
 
 import pandas as pd
 
-from .types import get_type_map_raw, get_type_group_map_special
+from .infer_types import get_type_map_raw, get_type_group_map_special
 
 logger = logging.getLogger(__name__)
 

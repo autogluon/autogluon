@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.constants import BINARY, MULTICLASS
-from autogluon.core.features.constants import S_TEXT
+from autogluon.core.features.types import S_TEXT
 
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.abstract.model_trial import skip_hpo

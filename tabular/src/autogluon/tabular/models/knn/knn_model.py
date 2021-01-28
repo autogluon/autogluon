@@ -8,7 +8,7 @@ from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 
 from autogluon.core.constants import REGRESSION
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
-from autogluon.core.features.constants import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
+from autogluon.core.features.types import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
 
 from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 from autogluon.core.models.abstract.model_trial import skip_hpo

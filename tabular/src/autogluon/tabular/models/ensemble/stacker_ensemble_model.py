@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from autogluon.core.utils.utils import generate_kfold
 from autogluon.core.constants import MULTICLASS
-from autogluon.core.features.constants import R_FLOAT, S_STACK
+from autogluon.core.features.types import R_FLOAT, S_STACK
 from autogluon.core.features.feature_metadata import FeatureMetadata
 
 from autogluon.core.models import AbstractModel

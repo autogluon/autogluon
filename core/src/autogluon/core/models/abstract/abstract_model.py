@@ -19,7 +19,7 @@ from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
 from ... import metrics
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-from ...features.constants import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...features.feature_metadata import FeatureMetadata
 from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
 from . import model_trial

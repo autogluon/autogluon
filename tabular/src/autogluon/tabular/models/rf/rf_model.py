@@ -10,7 +10,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from autogluon.core.constants import MULTICLASS, REGRESSION
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
-from autogluon.core.features.constants import R_OBJECT
+from autogluon.core.features.types import R_OBJECT
 
 from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.models import AbstractModel

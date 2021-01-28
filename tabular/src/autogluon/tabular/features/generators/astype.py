@@ -2,9 +2,9 @@ import logging
 
 from pandas import DataFrame, Series
 
-from autogluon.core.features.constants import R_INT
+from autogluon.core.features.types import R_INT
 from autogluon.core.features.feature_metadata import FeatureMetadata
-from autogluon.core.features.types import get_type_map_real
+from autogluon.core.features.infer_types import get_type_map_real
 
 from .abstract import AbstractFeatureGenerator
 

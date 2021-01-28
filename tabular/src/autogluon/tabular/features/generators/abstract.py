@@ -7,7 +7,7 @@ from typing import Dict, List
 
 from pandas import DataFrame, Series
 
-from autogluon.core.features.types import get_type_map_raw, get_type_map_real, get_type_group_map_special
+from autogluon.core.features.infer_types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.utils.savers import save_pkl
 

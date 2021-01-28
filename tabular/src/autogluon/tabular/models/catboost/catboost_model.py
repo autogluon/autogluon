@@ -10,7 +10,7 @@ import numpy as np
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils import try_import_catboost, try_import_catboostdev
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
-from autogluon.core.features.constants import R_OBJECT
+from autogluon.core.features.types import R_OBJECT
 
 from .catboost_utils import construct_custom_catboost_metric # make_softclass_metric, make_softclass_objective  # TODO: replace with SoftclassObjective, SoftclassCustomMetric once lazy import no longer needed.
 from .hyperparameters.parameters import get_param_baseline

@@ -5,7 +5,7 @@ import psutil
 from pandas import DataFrame
 
 from autogluon.core.features.feature_metadata import FeatureMetadata
-from autogluon.core.features.types import get_type_map_real
+from autogluon.core.features.infer_types import get_type_map_real
 
 from .bulk import BulkFeatureGenerator
 from .dummy import DummyFeatureGenerator

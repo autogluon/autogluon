@@ -3,7 +3,7 @@ import time
 import logging
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
-from autogluon.core.features.constants import R_OBJECT
+from autogluon.core.features.types import R_OBJECT
 from autogluon.core.utils import try_import_xgboost
 
 from . import xgboost_utils
