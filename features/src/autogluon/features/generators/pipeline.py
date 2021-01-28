@@ -4,13 +4,14 @@ import logging
 import psutil
 from pandas import DataFrame
 
+from autogluon.core.features.feature_metadata import FeatureMetadata
+from autogluon.core.features.infer_types import get_type_map_real
+from autogluon.core.utils import get_approximate_df_mem_usage
+
 from .bulk import BulkFeatureGenerator
 from .dummy import DummyFeatureGenerator
 from .drop_unique import DropUniqueFeatureGenerator
 from .fillna import FillNaFeatureGenerator
-from ..feature_metadata import FeatureMetadata
-from ..types import get_type_map_real
-from ...data.utils import get_approximate_df_mem_usage
 
 logger = logging.getLogger(__name__)
 

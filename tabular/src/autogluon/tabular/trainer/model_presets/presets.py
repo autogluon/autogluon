@@ -7,7 +7,7 @@ from collections import defaultdict
 from autogluon.core.metrics import soft_log_loss, mean_squared_error
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS,\
     REGRESSION, SOFTCLASS
-from ...models.abstract.abstract_model import AbstractModel
+from autogluon.core.models import AbstractModel
 from ...models.fastainn.tabular_nn_fastai import NNFastAiTabularModel
 from ...models.lgb.lgb_model import LGBModel
 from ...models.lr.lr_model import LinearModel

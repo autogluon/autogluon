@@ -7,7 +7,7 @@ from pandas import DataFrame, Series
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
-from ..utils import get_pred_from_proba
+from autogluon.core.utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)
 

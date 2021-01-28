@@ -1,7 +1,6 @@
 import copy
 import gc
 import logging
-import math
 import os
 import pickle
 import sys
@@ -11,20 +10,19 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from autogluon.core.utils import get_cpu_count
-from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.core import Space
-from autogluon.core.scheduler import FIFOScheduler
-from autogluon.core.task.base import BasePredictor
-from autogluon.core import metrics
-from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-
-from .model_trial import model_trial
-from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
-from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from ...utils import get_cpu_count
+from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
+from ...utils.loaders import load_pkl
+from ...utils.savers import save_json, save_pkl
+from ... import Space
+from ...scheduler import FIFOScheduler
+from ...task.base import BasePredictor
+from ... import metrics
+from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from ...features.feature_metadata import FeatureMetadata
+from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
+from . import model_trial
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +40,7 @@ class AbstractModel:
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
                 eval_metric (str or autogluon.core.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-                feature_metadata (autogluon.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
+                feature_metadata (autogluon.core.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
         self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
         self.path_root = path
@@ -598,14 +596,6 @@ class AbstractModel:
         logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
         logger.log(15, str(best_hp))
         return hpo_models, hpo_model_performances, hpo_results
-
-    def feature_prune(self, X_train, X_holdout, y_train, y_holdout):
-        feature_pruner = FeaturePruner(model_base=self)
-        X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=0.2)
-        feature_pruner.tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, X_holdout=X_holdout, y_holdout=y_holdout)
-        features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
-        logger.debug(str(features_to_keep))
-        self.features = features_to_keep
 
     # Resets metrics for the model
     def reset_metrics(self):

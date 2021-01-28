@@ -4,7 +4,7 @@ from collections import Counter
 
 from autogluon.core.constants import PROBLEM_TYPES
 from autogluon.core.metrics import calculate_score, _ProbaScorer, _ThresholdScorer
-from ..utils import get_pred_from_proba
+from autogluon.core.utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)
 

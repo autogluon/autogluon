@@ -14,9 +14,9 @@ from autogluon.core.utils.utils import generate_kfold
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
+from autogluon.core.utils.utils import _compute_fi_with_stddev
 
-from ..abstract.abstract_model import AbstractModel
-from ...utils import _compute_fi_with_stddev
+from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
 

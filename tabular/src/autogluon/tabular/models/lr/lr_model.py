@@ -9,13 +9,13 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
 from autogluon.core.constants import BINARY, REGRESSION
+from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
 from .hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
-from ..abstract.model_trial import skip_hpo
-from ...models.abstract.abstract_model import AbstractModel
-from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from autogluon.core.models.abstract.model_trial import skip_hpo
+from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
 

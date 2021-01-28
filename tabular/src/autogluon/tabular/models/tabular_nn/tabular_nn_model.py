@@ -27,17 +27,18 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionT
 
 from autogluon.core import Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.utils import try_import_mxboard
 from autogluon.core.utils.exceptions import TimeLimitExceeded
+
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .embednet import EmbedNet
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from .tabular_nn_dataset import TabularNNDataset
 from .tabular_nn_trial import tabular_nn_trial
-from ..abstract.abstract_model import AbstractNeuralNetworkModel
+from autogluon.core.models.abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
-from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)

@@ -56,6 +56,7 @@ requirements = [
     'torch>=1.0,<2.0',  # TODO: v0.1 make optional
     'fastai>=1.0,<2.0',  # TODO: v0.1 make optional
     f'autogluon.core=={version}',
+    f'autogluon.features=={version}',
 ]
 
 test_requirements = [

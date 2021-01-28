@@ -4,8 +4,9 @@ from typing import List
 import pandas as pd
 from pandas import DataFrame
 
+from autogluon.core.features.feature_metadata import FeatureMetadata
+
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     --------
     >>> from autogluon.tabular import TabularDataset
     >>> from autogluon.tabular.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, CategoryFeatureGenerator, DropDuplicatesFeatureGenerator, FillNaFeatureGenerator, IdentityFeatureGenerator
-    >>> from autogluon.tabular.features.feature_metadata import R_INT, R_FLOAT
+    >>> from autogluon.core.features.constants import R_INT, R_FLOAT
     >>>
     >>> generators = [
     >>>     [AsTypeFeatureGenerator()],  # Convert all input features to the exact same types as they were during fit.

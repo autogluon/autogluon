@@ -3,9 +3,10 @@ import logging
 import numpy as np
 from pandas import DataFrame
 
+from autogluon.core.features.types import R_CATEGORY, R_INT
+
 from . import AbstractFeatureGenerator
 from ..utils import clip_and_astype
-from ..feature_metadata import R_CATEGORY, R_INT
 
 logger = logging.getLogger(__name__)
 
