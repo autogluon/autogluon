@@ -1,7 +1,7 @@
 import logging
 
 from autogluon.core.constants import MULTICLASS
-from autogluon.core.features.feature_metadata import S_STACK
+from autogluon.core.features.constants import S_STACK
 
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.abstract.model_trial import skip_hpo

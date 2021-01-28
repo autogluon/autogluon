@@ -27,7 +27,7 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionT
 
 from autogluon.core import Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.core.features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.core.features.constants import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.utils import try_import_mxboard
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 

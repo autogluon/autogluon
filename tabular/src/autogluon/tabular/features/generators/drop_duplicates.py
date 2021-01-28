@@ -3,7 +3,7 @@ from collections import defaultdict
 
 from pandas import DataFrame
 
-from autogluon.core.features.feature_metadata import R_INT, R_FLOAT
+from autogluon.core.features.constants import R_INT, R_FLOAT
 
 from .abstract import AbstractFeatureGenerator
 

@@ -4,11 +4,10 @@ import logging
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
-from autogluon.core.features.feature_metadata import R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_TEXT, S_TEXT_AS_CATEGORY
+from autogluon.core.features.constants import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_TEXT, S_TEXT_AS_CATEGORY
 
 from .abstract import AbstractFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
-from .. import R_BOOL
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,8 @@ import logging
 
 from pandas import DataFrame
 
-from autogluon.core.features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, S_TEXT
+from autogluon.core.features.constants import R_CATEGORY, R_OBJECT, S_TEXT
+from autogluon.core.features.feature_metadata import FeatureMetadata
 
 from .abstract import AbstractFeatureGenerator
 

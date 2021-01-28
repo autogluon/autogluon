@@ -9,7 +9,7 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
 from autogluon.core.constants import BINARY, REGRESSION
-from autogluon.core.features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from autogluon.core.features.constants import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
 from .hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
 from .hyperparameters.searchspaces import get_default_searchspace
