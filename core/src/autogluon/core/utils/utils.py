@@ -60,7 +60,7 @@ def setup_outputdir(path, warn_if_exist=True):
     if path is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = f"{pathlib.Path().absolute()}/AutogluonModels/ag-{timestamp}{os.path.sep}"
+        path = get_absolute_path(f'AutogluonModels/ag-{timestamp}{os.path.sep}')
         for i in range(1, 1000):
             try:
                 os.makedirs(path, exist_ok=False)
@@ -647,3 +647,7 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
             memory_usage_inexact = df[columns_inexact].head(num_rows_sample).memory_usage(deep=True)[columns_inexact] / sample_ratio
             memory_usage = memory_usage_inexact.combine_first(memory_usage)
         return memory_usage
+
+
+def get_absolute_path(path: str) -> str:
+    return path if path.startswith('s3') else str(pathlib.Path(path).absolute())

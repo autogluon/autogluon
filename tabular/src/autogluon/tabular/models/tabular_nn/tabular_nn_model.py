@@ -15,6 +15,7 @@ import random
 import time
 import warnings
 from collections import OrderedDict
+from webbrowser import get
 
 import numpy as np
 import pandas as pd
@@ -26,7 +27,7 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionT
 from autogluon.core import Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.core.utils import try_import_mxboard, try_import_mxnet
+from autogluon.core.utils import try_import_mxboard, try_import_mxnet, get_absolute_path
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
@@ -721,7 +722,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         util_args = dict(
             # using absolute path - child jobs can have different working directory
             # this allow to load datasets consistently
-            directory=str(pathlib.Path().absolute()) + '/',
+            directory=get_absolute_path('.') + '/',
             train_path=train_path,
             val_path=val_path,
             model=self,

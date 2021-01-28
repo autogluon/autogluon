@@ -24,6 +24,8 @@ from autogluon.core import args, space
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric
+from autogluon.core.utils import get_absolute_path
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
 
 from .. import constants as _C
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
@@ -528,7 +530,7 @@ class BertForTextPredictionBasic:
         self._stopping_metric = stopping_metric
         self._log_metrics = log_metrics
         self._logger = logger
-        self._output_directory = str(pathlib.Path(output_directory).absolute())
+        self._output_directory = get_absolute_path(output_directory)
         self._label_columns = label_columns
         self._feature_columns = feature_columns
         self._label_shapes = label_shapes
@@ -598,7 +600,8 @@ class BertForTextPredictionBasic:
               console_log=True,
               ignore_warning=True,
               verbosity=2):
-        # FIXME: force_forkserver()
+        if search_strategy != 'raytune':
+            force_forkserver()
         start_tick = time.time()
         logging_config(folder=self._output_directory, name='main',
                        console=console_log,

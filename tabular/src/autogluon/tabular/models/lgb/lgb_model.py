@@ -11,7 +11,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils import try_import_lightgbm
+from autogluon.core.utils import try_import_lightgbm, get_absolute_path
 from autogluon.core import Int, Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.features.types import R_OBJECT
@@ -350,7 +350,7 @@ class LGBModel(AbstractModel):
             dataset_val_pkl_filename=dataset_val_pkl_filename,
             # using absolute path - child jobs can have different working directory
             # this allow to load datasets consistently
-            directory=str(pathlib.Path().absolute() / directory) + '/',
+            directory=get_absolute_path(directory) + '/',
             model=self,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],
