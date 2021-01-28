@@ -175,9 +175,13 @@ def infer_column_problem_types(
     return column_types
 
 
-def infer_problem_type(column_types, label_column, train_df):
+def infer_problem_type(column_types, label_column, data_df,
+                       provided_problem_type=None):
     """Inference the type of the problem based on type of the column and
-    the training and validation data.
+    the training data.
+
+    Also, it will try to check the correctness of the column types and the provided problem_type
+    if it is given
 
     Parameters
     ----------
@@ -185,21 +189,33 @@ def infer_problem_type(column_types, label_column, train_df):
         Type of the columns
     label_column
         The label column
-    train_df
-        The training dataframe
+    data_df
+        The dataframe
+    provided_problem_type
+        The provided problem type
 
     Returns
     -------
     problem_type
         Type of the problem
     """
-    if column_types[label_column] == CATEGORICAL:
-        if len(train_df[label_column].value_counts()) == 2:
-            return BINARY
-        else:
-            return MULTICLASS
-    elif column_types[label_column] == NUMERICAL:
-        return REGRESSION
+    if provided_problem_type is not None:
+        if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
+            err_msg = f'Provided problem type is "{provided_problem_type}" while the number of ' \
+                      f'unique value in the label column is {len(data_df[label_column].unique())}'
+            if provided_problem_type == BINARY and len(data_df[label_column].unique()) != 2:
+                raise AssertionError(err_msg)
+            elif provided_problem_type == MULTICLASS and len(data_df[label_column].unique()) <= 2:
+                raise AssertionError(err_msg)
+        return provided_problem_type
     else:
-        raise ValueError(f'The label column "{label_column}" has type'
-                         f' "{column_types[label_column]}" and is supported yet.')
+        if column_types[label_column] == CATEGORICAL:
+            if len(data_df[label_column].value_counts()) == 2:
+                return BINARY
+            else:
+                return MULTICLASS
+        elif column_types[label_column] == NUMERICAL:
+            return REGRESSION
+        else:
+            raise ValueError(f'The label column "{label_column}" has type'
+                             f' "{column_types[label_column]}" and is supported yet.')
