@@ -69,7 +69,6 @@ class TextPredictionV1Model(AbstractModel):
         self._feature_generator = None
 
     def _preprocess(self, X, fit=False, **kwargs):
-        from ...features.feature_metadata import R_CATEGORY
         if fit:
             from ...features.generators import BulkFeatureGenerator, CategoryFeatureGenerator, IdentityFeatureGenerator
             # TODO: This feature generator improves scores for TextPrediction when rare categories are present. This should be fixed in TextPrediction.
