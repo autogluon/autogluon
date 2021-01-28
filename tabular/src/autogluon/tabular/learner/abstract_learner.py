@@ -24,7 +24,7 @@ from autogluon.core.utils import get_pred_from_proba, infer_problem_type
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from ..data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from ..features.generators import PipelineFeatureGenerator
+from autogluon.features.generators import PipelineFeatureGenerator
 
 logger = logging.getLogger(__name__)
 

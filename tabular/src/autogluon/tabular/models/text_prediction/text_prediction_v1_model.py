@@ -69,7 +69,7 @@ class TextPredictionV1Model(AbstractModel):
 
     def _preprocess(self, X, fit=False, **kwargs):
         if fit:
-            from ...features.generators import BulkFeatureGenerator, CategoryFeatureGenerator, IdentityFeatureGenerator
+            from autogluon.features.generators import BulkFeatureGenerator, CategoryFeatureGenerator, IdentityFeatureGenerator
             # TODO: This feature generator improves scores for TextPrediction when rare categories are present. This should be fixed in TextPrediction.
             self._feature_generator = BulkFeatureGenerator(generators=[
                 [

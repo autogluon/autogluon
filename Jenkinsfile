@@ -24,10 +24,48 @@ stage("Unit Test") {
           pip uninstall -y autogluon.mxnet
           pip uninstall -y autogluon.extra
           pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.features
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
           cd core/
+          python3 -m pip install --upgrade -e .
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'features': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-features-py3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon_features_py3 -f docs/build.yml
+          conda activate autogluon_features_py3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+          export MPLBACKEND=Agg
+          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+
+          pip uninstall -y autogluon
+          pip uninstall -y autogluon.vision
+          pip uninstall -y autogluon.text
+          pip uninstall -y autogluon.mxnet
+          pip uninstall -y autogluon.extra
+          pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.features
+          pip uninstall -y autogluon.core
+          pip uninstall -y autogluon-contrib-nlp
+
+          cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../features/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
@@ -58,10 +96,13 @@ stage("Unit Test") {
           pip uninstall -y autogluon.mxnet
           pip uninstall -y autogluon.extra
           pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.features
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
           cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../features/
           python3 -m pip install --upgrade -e .
           cd ../tabular/
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
@@ -101,6 +142,7 @@ stage("Unit Test") {
           pip uninstall -y autogluon.mxnet
           pip uninstall -y autogluon.extra
           pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.features
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
@@ -139,6 +181,7 @@ stage("Unit Test") {
           pip uninstall -y autogluon.mxnet
           pip uninstall -y autogluon.extra
           pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.features
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
@@ -177,10 +220,13 @@ stage("Unit Test") {
           pip uninstall -y autogluon.mxnet
           pip uninstall -y autogluon.extra
           pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.features
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
           cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../features/
           python3 -m pip install --upgrade -e .
           cd ../tabular/
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
@@ -219,6 +265,7 @@ stage("Unit Test") {
           pip uninstall -y autogluon.mxnet
           pip uninstall -y autogluon.extra
           pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.features
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
@@ -259,10 +306,13 @@ stage("Unit Test") {
           pip uninstall -y autogluon.mxnet
           pip uninstall -y autogluon.extra
           pip uninstall -y autogluon.tabular
+          pip uninstall -y autogluon.features
           pip uninstall -y autogluon.core
           pip uninstall -y autogluon-contrib-nlp
 
           cd core/
+          python3 -m pip install --upgrade -e .
+          cd ../features/
           python3 -m pip install --upgrade -e .
           cd ../tabular/
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
@@ -544,16 +594,15 @@ stage("Build Docs") {
         pip uninstall -y autogluon.mxnet
         pip uninstall -y autogluon.extra
         pip uninstall -y autogluon.tabular
+        pip uninstall -y autogluon.features
         pip uninstall -y autogluon.core
         pip uninstall -y autogluon-contrib-nlp
-        pip uninstall -y autogluon-core
-        pip uninstall -y autogluon-extra
-        pip uninstall -y autogluon-mxnet
-        pip uninstall -y autogluon-tabular
-        pip uninstall -y autogluon-text
-        pip uninstall -y autogluon-vision
 
         cd core/
+        python3 -m pip install --upgrade -e .
+        cd ..
+
+        cd features/
         python3 -m pip install --upgrade -e .
         cd ..
 

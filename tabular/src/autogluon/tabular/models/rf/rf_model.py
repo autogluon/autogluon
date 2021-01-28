@@ -14,7 +14,7 @@ from autogluon.core.features.types import R_OBJECT
 
 from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.models import AbstractModel
-from ...features.generators import LabelEncoderFeatureGenerator
+from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
