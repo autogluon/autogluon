@@ -15,7 +15,7 @@ from mxnet.gluon.data import DataLoader
 from autogluon_contrib_nlp.models import get_backbone
 from autogluon_contrib_nlp.lr_scheduler import InverseSquareRootScheduler
 from autogluon_contrib_nlp.utils.config import CfgNode
-from autogluon_contrib_nlp.utils.misc import logging_config, grouper,\
+from autogluon_contrib_nlp.utils.misc import logging_config, grouper, \
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from autogluon.core import args, space
@@ -25,10 +25,11 @@ from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric, Scorer
 from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 from .. import constants as _C
 from .preprocessing import MultimodalWithPretrainedPreprocessor
-from .modules import MultiModalWithTextMultiTower
+from .modules import MultiModalWithPretrainedTextNN
 from ... import version
 
 
@@ -133,7 +134,7 @@ def apply_layerwise_decay(model, layerwise_decay, backbone_name, not_included=No
             for pn in not_included:
                 if pn in key:
                     continue
-            value.lr_mult = layerwise_decay**(max_depth - (layer_depth + 1))
+            value.lr_mult = layerwise_decay ** (max_depth - (layer_depth + 1))
 
 
 def base_optimization_config():
@@ -149,6 +150,8 @@ def base_optimization_config():
     cfg.batch_size = 32
     cfg.model_average = 5
     cfg.per_device_batch_size = 16  # Per-device batch-size
+    cfg.auto_per_device_batch_size = True  # Whether to automatically determine the runnable
+                                           # per-device batch_size.
     cfg.val_batch_size_mult = 2  # By default, we double the batch size for validation
     cfg.lr = 1E-4
     cfg.final_lr = 0.0
@@ -167,20 +170,23 @@ def base_optimization_config():
 def base_model_config():
     cfg = CfgNode()
     cfg.preprocess = CfgNode()
-    cfg.preprocess.merge_text = True
-    cfg.preprocess.max_length = 128
+    cfg.preprocess.merge_text = True              # Whether we will merge different text columns
+                                                  # or treat them independently.
+    cfg.preprocess.max_length = 512               # We use 512 by default.
+    cfg.preprocess.auto_max_length = True         # Try to automatically shrink the maximal length
+                                                  # based on the statistics of the dataset.
     cfg.backbone = CfgNode()
     cfg.backbone.name = 'google_electra_base'
-    cfg.network = BERTForTabularBasicV1.get_cfg()
+    cfg.network = MultiModalWithPretrainedTextNN.get_cfg()
     return cfg
 
 
 def base_learning_config():
     cfg = CfgNode()
     cfg.early_stopping_patience = 10  # Stop if we cannot find a better checkpoint
-    cfg.valid_ratio = 0.15      # The ratio of dataset to split for validation
-    cfg.stop_metric = 'auto'    # Automatically define the stopping metric
-    cfg.log_metrics = 'auto'    # Automatically determine the metrics used in logging
+    cfg.valid_ratio = 0.15  # The ratio of dataset to split for validation
+    cfg.stop_metric = 'auto'  # Automatically define the stopping metric
+    cfg.log_metrics = 'auto'  # Automatically determine the metrics used in logging
     return cfg
 
 
@@ -252,20 +258,39 @@ def _classification_regression_predict(net, dataloader, problem_type,
 
 
 def calculate_metric(scorer, ground_truth, predictions, problem_type):
-    if problem_type == _C.CLASSIFICATION and scorer.name == 'roc_auc':
+    if problem_type ==  and scorer.name == 'roc_auc':
         # For ROC_AUC, we need to feed in the probability of positive class to the scorer.
         return scorer._sign * scorer(ground_truth, predictions[:, 1])
     else:
         return scorer._sign * scorer(ground_truth, predictions)
 
 
-def batch_size_finder():
-    """
+def infer_max_length(train_df, column_types):
+    """Try to infer the maximum length that we should use for this dataset.
+
+    Parameters
+    ----------
+    train_df
+        The training dataframe.
+    column_types
+        Type of the columns.
 
     Returns
     -------
-
+    max_length
+        The inferred maximum length to use for this task.
     """
+    pass
+
+
+def infer_batch_size(model, train_data):
+    """Get the maximal possible per-device batch size that we should use to train this model.
+
+    Returns
+    -------
+    batch_size
+    """
+    pass
 
 
 @use_np
@@ -393,7 +418,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     net.hybridize()
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
     logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
-                                                           num_total_fixed_params))
+                                                          num_total_fixed_params))
     # Initialize the optimizer
     updates_per_epoch = int(len(train_dataloader) / (num_accumulated * len(ctx_l)))
     optimizer, optimizer_params, max_update \
@@ -511,13 +536,13 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
             logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
-                         ' total_time={:.2f}min'.format(
+                        ' total_time={:.2f}min'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60))
             if reporter is not None:
                 report_items = [('iteration', update_idx + 1),
                                 ('report_idx', report_idx + 1),
-                                ('epoch', int(update_idx / updates_per_epoch))] +\
+                                ('epoch', int(update_idx / updates_per_epoch))] + \
                                [(metric.name, score)
                                 for score, metric in zip(log_scores, log_metric_scorers)] + \
                                [('find_better', find_better),
@@ -544,7 +569,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         reporter(**best_report_items_dict)
 
 
-class MultiModalTextLearner:
+class MultiModalTextModel:
     """Learner of the multimodal text data.
 
     It will be called if the user call `fit()` in TextPrediction tasks.
@@ -552,17 +577,14 @@ class MultiModalTextLearner:
     It is used for making predictions on new data and viewing information about
     models trained during `fit()`.
     """
-    
+
     def __init__(self, column_types,
                  feature_columns,
                  label_columns,
-                 label_shapes,
-                 problem_types,
-                 stopping_metric,
-                 log_metrics,
+                 problem_type,
+                 eval_metric,
                  output_directory=None,
                  logger=None,
-                 base_config=None,
                  search_space=None):
         """Creates model object.
 
@@ -574,28 +596,19 @@ class MultiModalTextLearner:
             Name of the feature columns
         label_columns
             Name of the label columns.
-        label_shapes
-            Shapes of each label
-        problem_types
-            Types of the problems
-        stopping_metric
-            The stopping metric
-        log_metrics
-            The logging metric
+        problem_type
+            Type of the problem
+        eval_metric
+            The evaluation metric
         output_directory
             The output directory to save the model
         logger
             The logger
-        base_config
-            The basic configuration that the search space will be based upon.
         search_space
             The hyperparameter search space.
         """
-        super(MultiModalTextLearner, self).__init__()
-        if base_config is None:
-            self._base_config = base_cfg()
-        else:
-            self._base_config = base_cfg().clone_merge(base_config)
+        super(MultiModalTextModel, self).__init__()
+        self._base_config = base_cfg()
         self._base_config.defrost()
         if output_directory is not None:
             self._base_config.misc.exp_dir = output_directory
@@ -609,22 +622,19 @@ class MultiModalTextLearner:
             assert isinstance(search_space, dict)
             self._search_space = search_space
         self._column_types = column_types
-        self._stopping_metric = stopping_metric
-        self._log_metrics = log_metrics
+        self._eval_metric = eval_metric
         self._logger = logger
         self._output_directory = output_directory
 
         self._label_columns = label_columns
         self._feature_columns = feature_columns
-        self._label_shapes = label_shapes
-        self._problem_types = problem_types
+        self._problem_type = problem_type
 
-        # Need to be set in the fit call
-        self._net = None                       # Network for training and inference
-        self._embed_net = None                 # Network for embedding extraction
-        self._column_transforms = None        # The feature transforms
-        self._label_transforms = None
-        self._multimodal_preprocessor = None   # The inner preprocessor
+        # Need to be set in the train call
+        self._net = None  # Network for training and inference
+        self._embed_net = None  # Network for extract the embedding
+        self._feature_generator = None  # The feature transforms
+        self._multimodal_preprocessor = None  # The inner preprocessor
         self._config = None
         self._results = None
 
@@ -843,7 +853,7 @@ class MultiModalTextLearner:
 
     def evaluate(self, valid_data, metrics):
         """ Report the predictive performance evaluated for a given dataset.
-            
+
         Parameters
         ----------
         valid_data : str or :class:`TabularDataset` or `pandas.DataFrame`
@@ -870,7 +880,7 @@ class MultiModalTextLearner:
         else:
             predictions = self.predict(valid_data)
         metric_scores = {metric: calculate_metric(get_metric(metric), ground_truth, predictions,
-                                          self.problem_types[0]) for metric in metrics}
+                                                  self.problem_types[0]) for metric in metrics}
         return metric_scores
 
     def _internal_predict(self, test_data, get_original_labels=True, get_probabilities=False):
@@ -883,7 +893,7 @@ class MultiModalTextLearner:
                                        columns=self._feature_columns,
                                        column_properties=self._column_properties)
         processed_test = self._preprocessor.process_test(test_data)
-        inference_batch_size = self.config.optimization.per_device_batch_size\
+        inference_batch_size = self.config.optimization.per_device_batch_size \
                                * self.config.optimization.val_batch_size_mult
         test_dataloader = DataLoader(processed_test,
                                      batch_size=inference_batch_size,
@@ -1073,7 +1083,7 @@ class MultiModalTextLearner:
                                   columns=self._feature_columns,
                                   column_properties=self._column_properties)
         processed_data = self._preprocessor.process_test(data)
-        inference_batch_size = self.config.optimization.per_device_batch_size\
+        inference_batch_size = self.config.optimization.per_device_batch_size \
                                * self.config.optimization.val_batch_size_mult
         dataloader = DataLoader(processed_data,
                                 batch_size=inference_batch_size,

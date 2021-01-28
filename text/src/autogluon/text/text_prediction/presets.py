@@ -1,17 +1,21 @@
-__all__ = ['ag_text_config']
+__all__ = ['ag_text_presets', 'list_presets']
 
 import copy
 import logging
 from autogluon_contrib_nlp.utils.registry import Registry
-from autogluon_contrib_nlp.utils.misc import logging_config
 from autogluon.core import space
 
 logger = logging.getLogger(__name__)  # return root logger
 
-ag_text_config = Registry('ag_text_config')
+ag_text_presets = Registry('ag_text_presets')
 
 
-@ag_text_config.register()
+def list_presets():
+    """List the presets available in AutoGluon-Text"""
+    return ag_text_presets.list_keys()
+
+
+@ag_text_presets.register()
 def default() -> dict:
     """The default hyperparameters.
 
@@ -22,15 +26,19 @@ def default() -> dict:
         'version': 1,                     # Version of TextPrediction Model
         'models': {
             'MultimodalTextModel': {
+                'backend': 'gluonnlp_v0',
                 'search_space': {
                     'model.backbone.name': 'google_electra_base',
                     'optimization.batch_size': 32,
-                    'optimization.per_device_batch_size': 16,
+                    'optimization.per_device_batch_size': 8,
                     'optimization.num_train_epochs': 4,
                     'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5),
                     'optimization.layerwise_lr_decay': 0.8
                 }
             },
+        },
+        'misc': {
+            'holdout_frac': None,  # If it is not provided, we will use the default strategy.
         },
         'hpo_params': {
             'search_strategy': 'random',   # Can be 'random', 'bayesopt', 'skopt',
@@ -45,7 +53,7 @@ def default() -> dict:
     return ret
 
 
-@ag_text_config.register()
+@ag_text_presets.register()
 def text_no_hpo() -> dict:
     """The default hyperparameters without HPO"""
     cfg = default()
@@ -53,7 +61,7 @@ def text_no_hpo() -> dict:
     return cfg
 
 
-@ag_text_config.register()
+@ag_text_presets.register()
 def text_electra_small_no_hpo() -> dict:
     """The default search space that uses ELECTRA Small as the backbone."""
     cfg = text_no_hpo()
@@ -64,7 +72,7 @@ def text_electra_small_no_hpo() -> dict:
     return cfg
 
 
-@ag_text_config.register()
+@ag_text_presets.register()
 def text_electra_base_no_hpo() -> dict:
     """The default search space that uses ELECTRA Base as the backbone"""
     cfg = text_no_hpo()
@@ -75,7 +83,7 @@ def text_electra_base_no_hpo() -> dict:
     return cfg
 
 
-@ag_text_config.register()
+@ag_text_presets.register()
 def default_electra_large_no_hpo() -> dict:
     """The default search space that uses ELECTRA Base as the backbone"""
     cfg = text_no_hpo()

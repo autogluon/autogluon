@@ -1,7 +1,7 @@
 import collections
 import pandas as pd
 import warnings
-from typing import Union, Optional, List, Dict
+from typing import Union, Optional, List, Dict, Tuple
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from .constants import NULL, CATEGORICAL, NUMERICAL, TEXT
 
@@ -95,8 +95,8 @@ def infer_column_problem_types(
         valid_df: pd.DataFrame,
         label_columns: Union[str, List[str]],
         problem_type: Optional[str] = None,
-        provided_column_types: Optional[Dict] = None) -> collections.OrderedDict:
-    """Infer the column types of the data frame
+        provided_column_types: Optional[Dict] = None) -> Tuple[collections.OrderedDict, str]:
+    """Infer the column types of the data frame + the problem type
 
     Parameters
     ----------
@@ -118,7 +118,10 @@ def infer_column_problem_types(
         Dictionary of column types
         If the column does not contain any useful information, we will filter the column with
         type = NULL
+    problem_type
+        The inferred problem type
     """
+    assert len(label_columns) == 1
     if label_columns is None:
         label_set = set()
     elif isinstance(label_columns, str):
@@ -172,7 +175,8 @@ def infer_column_problem_types(
             column_types[col_name] = NUMERICAL
         else:
             column_types[col_name] = TEXT
-    return column_types
+    problem_type = infer_problem_type(column_types, label_columns[0], train_df, problem_type)
+    return column_types, problem_type
 
 
 def infer_problem_type(column_types, label_column, data_df,

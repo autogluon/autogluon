@@ -3,7 +3,8 @@ import logging
 import math
 import pprint
 import time
-
+import sklearn
+from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
 
@@ -13,11 +14,12 @@ from autogluon_contrib_nlp.utils.misc import logging_config
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
-from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits,\
     default_holdout_frac
-from ..config import ag_text_config, merge_params
+from ..presets import ag_text_presets, merge_params
+from ..infer_types import infer_problem_type, infer_column_problem_types
 
 
 logger = logging.getLogger()  # return root logger
@@ -83,10 +85,19 @@ class TextPredictor:
         self._problem_type = problem_type
         self._eval_metric = eval_metric
         self._path = setup_outputdir(path)
+        self._model = None
 
     @property
     def path(self):
         return self._path
+
+    @property
+    def label(self):
+        return self._label
+
+    @property
+    def problem_type(self):
+        return self._problem_type
 
     def fit(self,
             train_data,
@@ -94,9 +105,11 @@ class TextPredictor:
             time_limit=None,
             presets=None,
             hyperparameters=None,
+            feature_columns=None,
             column_types=None,
             num_cpus=None,
-            num_gpus=None):
+            num_gpus=None,
+            seed=None):
         """Fit the predictor
 
         Parameters
@@ -108,28 +121,92 @@ class TextPredictor:
         time_limit
             The time limits
         presets
-            The user can specify the presets for providing the
+            The user can specify the presets of the hyper-parameters.
         hyperparameters
             The hyper-parameters
+        feature_columns
+            Specify which columns in the data
         column_types
-            Type of the columns
+            The provided type of the columns
         num_cpus
             The number of CPUs to use for each trial
         num_gpus
             The number of GPUs to use for each trial
+        seed
+            The seed of the experiment
 
         Returns
         -------
         self
         """
         if presets is not None:
-            preset_hparams = ag_text_config.create(presets)
-            hyperparameters = merge_params(preset_hparams, hyperparameters)
-
-
+            preset_hparams = ag_text_presets.create(presets)
+        else:
+            preset_hparams = ag_text_presets.create('default')
+        hyperparameters = merge_params(preset_hparams, hyperparameters)
+        if seed is not None:
+            hyperparameters['seed'] = seed
+        seed = hyperparameters['seed']
+        if isinstance(self._label, str):
+            label_columns = [self._label]
+        else:
+            label_columns = list(self._label)
+        # Get the training and tuning data as pandas dataframe
+        if not isinstance(train_data, pd.DataFrame):
+            train_data = load_pd.load(train_data)
+        if feature_columns is None:
+            all_columns = list(train_data.columns)
+            feature_columns = [ele for ele in all_columns if ele not in label_columns]
+        else:
+            if isinstance(feature_columns, str):
+                feature_columns = [feature_columns]
+            for col in feature_columns:
+                assert col not in label_columns, 'Feature columns and label columns cannot overlap.'
+                assert col in train_data.columns,\
+                    'Feature columns must be in the pandas dataframe! Received col = "{}", ' \
+                    'all columns = "{}"'.format(col, train_data.columns)
+            all_columns = feature_columns + label_columns
+        train_data = train_data[all_columns]
+        # Get tuning data
+        if tuning_data is not None:
+            if not isinstance(tuning_data, pd.DataFrame):
+                tuning_data = load_pd.load(tuning_data)
+            tuning_data = tuning_data[all_columns]
+        else:
+            if hyperparameters['misc']['holdout_frac'] is not None:
+                holdout_frac = hyperparameters['misc']['holdout_frac']
+            else:
+                num_trials = hyperparameters['hpo_params']['num_trials']
+                if num_trials == 1:
+                    holdout_frac = default_holdout_frac(len(train_data), False)
+                else:
+                    # For HPO, we will need to use a larger held-out ratio
+                    holdout_frac = default_holdout_frac(len(train_data), True)
+            train_data, tuning_data = train_test_split(train_data,
+                                                       test_size=holdout_frac,
+                                                       random_state=np.random.RandomState(seed))
+        column_types, problem_type = infer_column_problem_types(train_data, tuning_data,
+                                                                label_columns=label_columns,
+                                                                problem_type=self._problem_type,
+                                                                provided_column_types=column_types)
+        self._problem_type = problem_type
+        model_hparams = hyperparameters['models']['MultimodalTextModel']
+        if model_hparams['backend'] == 'gluonnlp_v0':
+            from ..mx.models import MultiModalTextModel
+            self._model = MultiModalTextModel(column_types=column_types,
+                                              feature_columns=feature_columns,
+                                              label_columns=label_columns,
+                                              problem_type=self._problem_type,
+                                              eval_metric=self._eval_metric,
+                                              output_directory=self._path,
+                                              logger=logger,
+                                              search_space=model_hparams['search_spaces'])
+        else:
+            raise NotImplementedError("Currently, we only support using "
+                                      "the autogluon-contrib-nlp and MXNet "
+                                      "as the backend of AutoGluon-Text. In the future, "
+                                      "we will support other models.")
         return self
-
-
 
     def predict(self, dataset, as_pandas=False):
         """Predict the
@@ -157,7 +234,7 @@ class TextPredictor:
         """
 
     def save(self):
-        save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
+        self.
 
     @classmethod
     def load(cls, path, verbosity=2):
