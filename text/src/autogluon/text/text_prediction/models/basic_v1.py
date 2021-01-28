@@ -659,7 +659,6 @@ class BertForTextPredictionBasic:
                                'further investigate the root cause, you can also try to train with '
                                '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
         best_config = scheduler.get_best_config()
-        self._logger.info('Results=', scheduler.searcher._results)
         self._logger.info('Best_config={}'.format(best_config))
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,
