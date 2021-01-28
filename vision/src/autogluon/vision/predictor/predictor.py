@@ -47,7 +47,7 @@ class ImagePredictor(object):
         self._classifier = None
         self._fit_summary = {}
 
-    @unpack('preset_image_predictor')
+    @unpack('image_predictor')
     def fit(self,
             train_data,
             tuning_data=None,

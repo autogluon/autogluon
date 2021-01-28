@@ -37,7 +37,7 @@ class ObjectDetector(object):
         self._detector = None
         self._fit_summary = {}
 
-    @unpack('preset_object_detector')
+    @unpack('object_detector')
     def fit(self,
             train_data,
             tuning_data=None,
