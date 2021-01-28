@@ -9,7 +9,7 @@ from autogluon.core.utils import try_import_xgboost
 from . import xgboost_utils
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
-from ..abstract.abstract_model import AbstractModel
+from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
 

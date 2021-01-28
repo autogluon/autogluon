@@ -10,19 +10,18 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from autogluon.core.utils import get_cpu_count
-from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.core import Space
-from autogluon.core.scheduler import FIFOScheduler
-from autogluon.core.task.base import BasePredictor
-from autogluon.core import metrics
-from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-from autogluon.core.features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
-from autogluon.core.utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
-
-from .model_trial import model_trial
+from ...utils import get_cpu_count
+from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
+from ...utils.loaders import load_pkl
+from ...utils.savers import save_json, save_pkl
+from ... import Space
+from ...scheduler import FIFOScheduler
+from ...task.base import BasePredictor
+from ... import metrics
+from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
+from . import model_trial
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from . import tab_transformer_encoder
 from .tab_transformer_encoder import WontEncodeError, NullEnc
 import logging
 from autogluon.core import args
-from ..abstract import model_trial
+from autogluon.core.models.abstract import model_trial
 
 logger = logging.getLogger(__name__)
 

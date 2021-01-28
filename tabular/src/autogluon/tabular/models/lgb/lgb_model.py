@@ -22,7 +22,7 @@ from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset
-from ..abstract.abstract_model import AbstractModel
+from autogluon.core.models import AbstractModel
 from ..utils import fixedvals_from_searchspaces
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning

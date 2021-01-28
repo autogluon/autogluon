@@ -17,7 +17,7 @@ from autogluon.core.metrics import scorer_expects_y_pred
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance
 
-from ..models.abstract.abstract_model import AbstractModel
+from autogluon.core.models import AbstractModel
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets_custom import get_preset_custom
 from ..trainer.model_presets.presets_distill import get_preset_models_distillation

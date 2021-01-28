@@ -15,7 +15,7 @@ from autogluon.core.features.feature_metadata import R_OBJECT
 from .catboost_utils import construct_custom_catboost_metric # make_softclass_metric, make_softclass_objective  # TODO: replace with SoftclassObjective, SoftclassCustomMetric once lazy import no longer needed.
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
-from ..abstract.abstract_model import AbstractModel
+from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
 

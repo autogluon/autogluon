@@ -37,7 +37,7 @@ from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from .tabular_nn_dataset import TabularNNDataset
 from .tabular_nn_trial import tabular_nn_trial
-from ..abstract.abstract_model import AbstractNeuralNetworkModel
+from autogluon.core.models.abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning

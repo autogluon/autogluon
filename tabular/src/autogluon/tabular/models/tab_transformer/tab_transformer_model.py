@@ -14,7 +14,7 @@ from autogluon.core.utils.loaders import load_pkl
 
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
-from ..abstract.abstract_model import AbstractNeuralNetworkModel
+from autogluon.core.models.abstract.abstract_model import AbstractNeuralNetworkModel
 
 logger = logging.getLogger(__name__)
 

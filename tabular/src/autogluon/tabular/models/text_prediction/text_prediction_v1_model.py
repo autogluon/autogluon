@@ -14,8 +14,7 @@ from autogluon.core.features.feature_metadata import R_OBJECT, R_INT, R_FLOAT, R
 from autogluon.core.utils import get_cpu_count, get_gpu_count
 from autogluon.core.utils.exceptions import NoGPUError, NoValidFeatures
 from autogluon.core.utils.utils import default_holdout_frac
-
-from ..abstract.abstract_model import AbstractModel
+from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
 

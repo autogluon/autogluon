@@ -16,8 +16,8 @@ from autogluon.core.features.feature_metadata import R_OBJECT, R_INT, R_FLOAT, R
 
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
-from ..abstract.abstract_model import AbstractModel
-from ..abstract.model_trial import skip_hpo
+from autogluon.core.models import AbstractModel
+from autogluon.core.models.abstract.model_trial import skip_hpo
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS

@@ -13,8 +13,8 @@ import pandas as pd
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.core.features.feature_metadata import S_TEXT
 
-from ..abstract.abstract_model import AbstractModel
-from ..abstract.model_trial import skip_hpo
+from autogluon.core.models import AbstractModel
+from autogluon.core.models.abstract.model_trial import skip_hpo
 from .hyperparameters.parameters import get_param_baseline
 
 logger = logging.getLogger(__name__)

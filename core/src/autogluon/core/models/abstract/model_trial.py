@@ -2,10 +2,10 @@ import os
 import time
 import logging
 
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.core import args
-from autogluon.core.scheduler.reporter import LocalStatusReporter
+from ...utils.loaders import load_pkl
+from ...utils.exceptions import TimeLimitExceeded
+from ... import args
+from ...scheduler.reporter import LocalStatusReporter
 
 logger = logging.getLogger(__name__)
 
