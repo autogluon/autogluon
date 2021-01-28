@@ -29,8 +29,8 @@ import pandas as pd
 import pytest
 
 import autogluon.core as ag
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular import TabularDataset, TabularPredictor
-from autogluon.tabular.utils import BINARY, MULTICLASS, REGRESSION
 
 
 def test_tabular():

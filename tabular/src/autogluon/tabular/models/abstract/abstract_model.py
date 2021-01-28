@@ -20,9 +20,9 @@ from autogluon.core.task.base import BasePredictor
 from autogluon.core import metrics
 from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from autogluon.core.features.feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from autogluon.core.utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
 
 from .model_trial import model_trial
-from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
 
 logger = logging.getLogger(__name__)
 

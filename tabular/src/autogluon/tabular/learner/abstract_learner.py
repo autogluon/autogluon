@@ -19,10 +19,10 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.utils import get_pred_from_proba, infer_problem_type
 
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
-from ..utils import get_pred_from_proba, infer_problem_type
 from ..data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ..features.generators import PipelineFeatureGenerator
 
