@@ -94,6 +94,8 @@ class TabularPredictor(TabularPredictorV1):
             trainer_type : AbstractTrainer, default = AutoTrainer
                 A class inheriting from `AbstractTrainer` that controls training/ensembling of many models.
     """
+
+    Dataset = TabularDataset
     predictor_file_name = 'predictor.pkl'
 
     def __init__(

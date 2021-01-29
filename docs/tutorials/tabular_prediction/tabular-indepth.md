@@ -132,13 +132,13 @@ We can make a prediction on an individual example rather than a full dataset:
 ```{.python .input}
 datapoint = test_data_nolabel.iloc[[0]]  # Note: .iloc[0] won't work because it returns pandas Series instead of DataFrame
 print(datapoint)
-print(predictor.predict(datapoint))
+predictor.predict(datapoint)
 ```
 
 To output predicted class probabilities instead of predicted classes, you can use:
 
 ```{.python .input}
-predictor.predict_proba(datapoint, as_pandas=True)  # as_pandas shows which probability corresponds to which class
+predictor.predict_proba(datapoint)  # returns a DataFrame that shows which probability corresponds to which class
 ```
 
 By default, `predict()` and `predict_proba()` will utilize the model that AutoGluon thinks is most accurate, which is usually an ensemble of many individual models. Here's how to see which model this is:
@@ -170,7 +170,7 @@ Here's how to specify a particular model to use for prediction instead of AutoGl
 i = 0  # index of model to use
 model_to_use = predictor.get_model_names()[i]
 model_pred = predictor.predict(datapoint, model=model_to_use)
-print("Prediction from %s model: %s" % (model_to_use, model_pred))
+print("Prediction from %s model: %s" % (model_to_use, model_pred.iloc[0]))
 ```
 
 We can easily access various information about the trained predictor or a particular model:
@@ -206,8 +206,7 @@ which will correctly select between `predict()` or `predict_proba()` depending o
 To better understand our trained predictor, we can estimate the overall importance of each feature:
 
 ```{.python .input}
-importance_scores = predictor.feature_importance(test_data)
-print(importance_scores)
+predictor.feature_importance(test_data)
 ```
 
 Computed via [permutation-shuffling](https://explained.ai/rf-importance/), these feature importance scores quantify the drop in predictive performance (of the already trained predictor) when one column's values are randomly shuffled across rows. The top features in this list contribute most to AutoGluon's accuracy (for predicting when/if a patient will be readmitted to the hospital). Features with non-positive importance score hardly contribute to the predictor's accuracy, or may even be actively harmful to include in the data (consider removing these features from your data and calling `fit` again). These scores facilitate interpretability of the predictor's global behavior (which features it relies on for *all* predictions) rather than [local explanations](https://christophm.github.io/interpretable-ml-book/taxonomy-of-interpretability-methods.html) that only rationalize one particular prediction.
@@ -228,7 +227,7 @@ num_test = 20
 preds = np.array(['']*num_test, dtype='object')
 for i in range(num_test):
     datapoint = test_data_nolabel.iloc[[i]]
-    pred_numpy = predictor.predict(datapoint)
+    pred_numpy = predictor.predict(datapoint, as_pandas=False)
     preds[i] = pred_numpy[0]
 
 perf = predictor.evaluate_predictions(y_test[:num_test], preds, auxiliary_metrics=True)
@@ -278,7 +277,7 @@ While computationally-favorable, single individual models will usually have lowe
 student_models = predictor.distill(time_limit=30)  # specify much longer time limit in real applications
 print(student_models)
 preds_student = predictor.predict(test_data_nolabel, model=student_models[0])
-print(f"predictions from {student_models[0]}:", preds_student)
+print(f"predictions from {student_models[0]}:", list(preds_student)[:5])
 predictor.leaderboard(test_data)
 ```
 

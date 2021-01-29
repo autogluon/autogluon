@@ -23,6 +23,7 @@ __all__ = ['TabularPredictorV1']
 logger = logging.getLogger()  # return root logger
 
 
+# TODO v0.1: Remove
 class TabularPredictorV1:
     """
     Object returned by `fit()` in Tabular Prediction tasks.
@@ -63,16 +64,6 @@ class TabularPredictorV1:
         For other problem types, will equal None.
         For multiclass, it is possible for not all of the label values to have a mapping.
             This indicates that the internal models will never predict those missing labels, and training rows associated with the missing labels were dropped.
-
-    Examples
-    --------
-    >>> from autogluon.tabular import TabularPrediction as task
-    >>> train_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-    >>> predictor = task.fit(train_data=train_data, label='class')
-    >>> results = predictor.fit_summary()
-    >>> test_data = task.Dataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
-    >>> perf = predictor.evaluate(test_data)
-
     """
 
     def __init__(self, learner):
@@ -130,21 +121,20 @@ class TabularPredictorV1:
     def output_directory(self):
         return self._learner.path
 
-    # TODO: v0.1 as_pandas=True by default to avoid user confusion and errors with mismatching indices?
-    def predict(self, dataset, model=None, as_pandas=False):
+    def predict(self, data, model=None, as_pandas=True):
         """
         Use trained models to produce predicted labels (in classification) or response values (in regression).
 
         Parameters
         ----------
-        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            The dataset to make predictions for. Should contain same column names as training Dataset and follow same format
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            The data to make predictions for. Should contain same column names as training Dataset and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
-            If str is passed, `dataset` will be loaded using the str value as the file path.
+            If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
             The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
-        as_pandas : bool (optional)
+        as_pandas : bool, default = True
             Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False)
 
         Returns
@@ -152,29 +142,28 @@ class TabularPredictorV1:
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
 
         """
-        dataset = self.__get_dataset(dataset)
-        return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas)
+        data = self.__get_dataset(data)
+        return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
 
-    # TODO: v0.1 as_pandas=True by default to avoid user confusion on class names and errors with mismatching indices?
-    def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
+    def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=False):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
         If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
 
         Parameters
         ----------
-        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            The dataset to make predictions for. Should contain same column names as training Dataset and follow same format
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            The data to make predictions for. Should contain same column names as training Dataset and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
-            If str is passed, `dataset` will be loaded using the str value as the file path.
+            If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
             The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
-        as_pandas : bool (optional)
+        as_pandas : bool, default = True
             Whether to return the output as a pandas object (True) or numpy array (False).
             Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
             If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
-        as_multiclass : bool (optional)
+        as_multiclass : bool, default = False
             Whether to return binary classification probabilities as if they were for multiclass classification.
                 Output will contain two columns, and if `as_pandas=True`, the column names will correspond to the binary class labels.
                 The columns will be the same order as `predictor.class_labels`.
@@ -182,24 +171,24 @@ class TabularPredictorV1:
 
         Returns
         -------
-        Array of predicted class-probabilities, corresponding to each row in the given dataset.
+        Array of predicted class-probabilities, corresponding to each row in the given data.
         May be a :class:`np.ndarray` or :class:`pd.Series` / :class:`pd.DataFrame` depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
         For binary classification problems, the output contains for each datapoint only the predicted probability of the positive class, unless you specify `as_multiclass=True`.
         """
-        dataset = self.__get_dataset(dataset)
-        return self._learner.predict_proba(X=dataset, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
+        data = self.__get_dataset(data)
+        return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
-    def evaluate(self, dataset, silent=False):
+    def evaluate(self, data, silent=False):
         """
         Report the predictive performance evaluated for a given Dataset.
-        This is basically a shortcut for: `pred = predict(dataset); evaluate_predictions(dataset[label_column], preds, auxiliary_metrics=False)`
+        This is basically a shortcut for: `pred = predict(data); evaluate_predictions(data[label_column], preds, auxiliary_metrics=False)`
         that automatically uses `predict_proba()` instead of `predict()` when appropriate.
 
         Parameters
         ----------
-        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
             This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
-            If str is passed, `dataset` will be loaded using the str value as the file path.
+            If str is passed, `data` will be loaded using the str value as the file path.
 
         silent : bool (optional)
             Should performance results be printed?
@@ -208,12 +197,12 @@ class TabularPredictorV1:
         -------
         Predictive performance value on the given dataset, based on the `eval_metric` used by this Predictor.
         """
-        dataset = self.__get_dataset(dataset)
-        perf = self._learner.score(dataset)
+        data = self.__get_dataset(data)
+        perf = self._learner.score(data)
         sign = self._learner.eval_metric._sign
         perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
         if not silent:
-            print("Predictive performance on given dataset: %s = %s" % (self.eval_metric, perf))
+            print("Predictive performance on given data: %s = %s" % (self.eval_metric, perf))
         return perf
 
     def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True):
@@ -243,7 +232,7 @@ class TabularPredictorV1:
         return self._learner.evaluate(y_true=y_true, y_pred=y_pred, silent=silent,
                                       auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, dataset=None, extra_info=False, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, data=None, extra_info=False, only_pareto_frontier=False, silent=False):
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
         Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -267,15 +256,15 @@ class TabularPredictorV1:
 
         Parameters
         ----------
-        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
             This Dataset must also contain the label-column with the same column-name as specified during fit().
             If specified, then the leaderboard returned will contain additional columns 'score_test', 'pred_time_test', and 'pred_time_test_marginal'.
-                'score_test': The score of the model on the 'eval_metric' for the dataset provided.
-                'pred_time_test': The true end-to-end wall-clock inference time of the model for the dataset provided.
+                'score_test': The score of the model on the 'eval_metric' for the data provided.
+                'pred_time_test': The true end-to-end wall-clock inference time of the model for the data provided.
                     Equivalent to the sum of all 'pred_time_test_marginal' values for the model and all of its base models.
-                'pred_time_test_marginal': The inference time of the model for the dataset provided, minus the inference time for the model's base models, if it has any.
+                'pred_time_test_marginal': The inference time of the model for the data provided, minus the inference time for the model's base models, if it has any.
                     Note that this ignores the time required to load the model into memory when bagging is disabled.
-            If str is passed, `dataset` will be loaded using the str value as the file path.
+            If str is passed, `data` will be loaded using the str value as the file path.
         extra_info : bool, default = False
             If `True`, will return extra columns with advanced info.
             This requires additional computation as advanced info data is calculated on demand.
@@ -347,8 +336,8 @@ class TabularPredictorV1:
         -------
         :class:`pd.DataFrame` of model performance summary information.
         """
-        dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        return self._learner.leaderboard(X=dataset, extra_info=extra_info, only_pareto_frontier=only_pareto_frontier, silent=silent)
+        data = self.__get_dataset(data) if data is not None else data
+        return self._learner.leaderboard(X=data, extra_info=extra_info, only_pareto_frontier=only_pareto_frontier, silent=silent)
 
     def fit_summary(self, verbosity=3):
         """
@@ -470,45 +459,45 @@ class TabularPredictorV1:
             print("*** End of fit() summary ***")
         return results
 
-    def transform_features(self, dataset=None, model=None, base_models=None, return_original_features=True):
+    def transform_features(self, data=None, model=None, base_models=None, return_original_features=True):
         """
-        Transforms dataset features through the AutoGluon feature generator.
-        This is useful to gain an understanding of how AutoGluon interprets the dataset features.
+        Transforms data features through the AutoGluon feature generator.
+        This is useful to gain an understanding of how AutoGluon interprets the data features.
         The output of this function can be used to train further models, even outside of AutoGluon.
         This can be useful for training your own models on the same data representation as AutoGluon.
         Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
         This method only applies universal transforms employed by all AutoGluon models.
-        When `dataset=None`, `base_models=[{best_model}], and bagging was enabled during fit():
+        When `data=None`, `base_models=[{best_model}], and bagging was enabled during fit():
             This returns the out-of-fold predictions of the best model, which can be used as training input to a custom user stacker model.
 
         Parameters
         ----------
-        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
-            The dataset to apply feature transformation to.
-            This dataset does not require the label column.
-            If str is passed, `dataset` will be loaded using the str value as the file path.
-            If not specified, the original dataset used during fit() will be used if fit() was previously called with `cache_data=True`. Otherwise, an exception will be raised.
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+            The data to apply feature transformation to.
+            This data does not require the label column.
+            If str is passed, `dat` will be loaded using the str value as the file path.
+            If not specified, the original data used during fit() will be used if fit() was previously called with `cache_data=True`. Otherwise, an exception will be raised.
                 For non-bagged mode predictors:
-                    The dataset used when not specified is the validation set.
+                    The data used when not specified is the validation set.
                     This can either be an automatically generated validation set or the user-defined `tuning_data` if passed during fit().
-                    If all parameters are unspecified, then the output is equivalent to `predictor.load_data_internal(dataset='val', return_X=True, return_y=False)[0]`.
-                    To get the label values of the output, call `predictor.load_data_internal(dataset='val', return_X=False, return_y=True)[1]`.
-                    If the original training set is desired, it can be passed in through `dataset`.
+                    If all parameters are unspecified, then the output is equivalent to `predictor.load_data_internal(data='val', return_X=True, return_y=False)[0]`.
+                    To get the label values of the output, call `predictor.load_data_internal(data='val', return_X=False, return_y=True)[1]`.
+                    If the original training set is desired, it can be passed in through `data`.
                         Warning: Do not pass the original training set if `model` or `base_models` are set. This will result in overfit feature transformation.
                 For bagged mode predictors:
-                    The dataset used when not specified is the full training set.
-                    If all parameters are unspecified, then the output is equivalent to `predictor.load_data_internal(dataset='train', return_X=True, return_y=False)[0]`.
-                    To get the label values of the output, call `predictor.load_data_internal(dataset='train', return_X=False, return_y=True)[1]`.
+                    The data used when not specified is the full training set.
+                    If all parameters are unspecified, then the output is equivalent to `predictor.load_data_internal(data='train', return_X=True, return_y=False)[0]`.
+                    To get the label values of the output, call `predictor.load_data_internal(data='train', return_X=False, return_y=True)[1]`.
                     `base_model` features generated in this instance will be from out-of-fold predictions.
                     Note that the training set may differ from the training set originally passed during fit(), as AutoGluon may choose to drop or duplicate rows during training.
-                    Warning: Do not pass the original training set through `dataset` if `model` or `base_models` are set. This will result in overfit feature transformation. Instead set `dataset=None`.
+                    Warning: Do not pass the original training set through `data` if `model` or `base_models` are set. This will result in overfit feature transformation. Instead set `data=None`.
         model : str, default = None
             Model to generate input features for.
             The output data will be equivalent to the input data that would be sent into `model.predict_proba(data)`.
-                Note: This only applies to cases where `dataset` is not the training data.
+                Note: This only applies to cases where `data` is not the training data.
             If `None`, then only return generically preprocessed features prior to any model fitting.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
-            Specifying a `refit_full` model will cause an exception if `dataset=None`.
+            Specifying a `refit_full` model will cause an exception if `data=None`.
             `base_models=None` is a requirement when specifying `model`.
         base_models : list, default = None
             List of model names to use as base_models for a hypothetical stacker model when generating input features.
@@ -523,8 +512,8 @@ class TabularPredictorV1:
 
         Returns
         -------
-        :class:`pd.DataFrame` of the provided `dataset` after feature transformation has been applied.
-        This output does not include the label column, and will remove it if present in the supplied `dataset`.
+        :class:`pd.DataFrame` of the provided `data` after feature transformation has been applied.
+        This output does not include the label column, and will remove it if present in the supplied `data`.
         If a transformed label column is desired, use `predictor.transform_labels`.
 
         Examples
@@ -536,12 +525,12 @@ class TabularPredictorV1:
         >>> test_data_transformed = predictor.transform_features('test.csv', model=model)  # Internal test DataFrame used as input to `model.predict_proba()` during `predictor.predict_proba(test_data, model=model)`
 
         """
-        dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        return self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models, use_orig_features=return_original_features)
+        data = self.__get_dataset(data) if data is not None else data
+        return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models, use_orig_features=return_original_features)
 
     def transform_labels(self, labels, inverse=False, proba=False):
         """
-        Transforms dataset labels to the internal label representation.
+        Transforms data labels to the internal label representation.
         This can be useful for training your own models on the same data label representation as AutoGluon.
         Regression problems do not differ between original and internal representation, and thus this method will return the provided labels.
         Warning: When `inverse=False`, it is possible for the output to contain NaN label values in multiclass problems if the provided label was dropped during training.
@@ -582,25 +571,25 @@ class TabularPredictorV1:
         return labels_transformed
 
     # TODO: Add option to specify list of features within features list, to check importances of groups of features. Make tuple to specify new feature name associated with group.
-    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, silent=False):
+    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, silent=False):
         """
         Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
-        A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
+        A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the data where this feature's values have been randomly shuffled across rows.
         A feature score of 0.01 would indicate that the predictive performance dropped by 0.01 when the feature was randomly shuffled.
         The higher the score a feature has, the more important it is to the model's performance.
         If a feature has a negative score, this means that the feature is likely harmful to the final model, and a model trained with the feature removed would be expected to achieve a better predictive performance.
         Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
-        To estimate how long `feature_importance(model, dataset, features)` will take, it is roughly the time taken by `predict_proba(dataset, model)` multiplied by the number of features.
+        To estimate how long `feature_importance(model, data, features)` will take, it is roughly the time taken by `predict_proba(data, model)` multiplied by the number of features.
 
         Note: For highly accurate importance and p_value estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
 
         Parameters
         ----------
-        dataset : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
-            This dataset must also contain the label-column with the same column-name as specified during `fit()`.
-            If specified, then the dataset is used to calculate the feature importance scores.
-            If str is passed, `dataset` will be loaded using the str value as the file path.
-            If not specified, the original dataset used during `fit()` will be used if `cache_data=True`. Otherwise, an exception will be raised.
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+            This data must also contain the label-column with the same column-name as specified during `fit()`.
+            If specified, then the data is used to calculate the feature importance scores.
+            If str is passed, `data` will be loaded using the str value as the file path.
+            If not specified, the original data used during `fit()` will be used if `cache_data=True`. Otherwise, an exception will be raised.
             Do not pass the training data through this argument, as the feature importance scores calculated will be biased due to overfitting.
                 More accurate feature importances will be obtained from new data that was held-out during `fit()`.
         model : str, default = None
@@ -617,17 +606,17 @@ class TabularPredictorV1:
             Options:
                 'original':
                     Compute importances of the original features.
-                    Warning: `dataset` must be specified with this option, otherwise an exception will be raised.
+                    Warning: `data` must be specified with this option, otherwise an exception will be raised.
                 'transformed':
                     Compute importances of the post-internal-transformation features (after automated feature engineering). These features may be missing some original features, or add new features entirely.
                     An example of new features would be ngram features generated from a text column.
-                    Warning: For bagged models, feature importance calculation is not yet supported with this option when `dataset=None`. Doing so will raise an exception.
+                    Warning: For bagged models, feature importance calculation is not yet supported with this option when `data=None`. Doing so will raise an exception.
                 'transformed_model':
                     Compute importances of the post-model-transformation features. These features are the internal features used by the requested model. They may differ greatly from the original features.
                     If the model is a stack ensemble, this will include stack ensemble features such as the prediction probability features of the stack ensemble's base (ancestor) models.
         subsample_size : int, default = 1000
-            The number of rows to sample from `dataset` when computing feature importance.
-            If `subsample_size=None` or `dataset` contains fewer than `subsample_size` rows, all rows will be used during computation.
+            The number of rows to sample from `data` when computing feature importance.
+            If `subsample_size=None` or `data` contains fewer than `subsample_size` rows, all rows will be used during computation.
             Larger values increase the accuracy of the feature importance scores.
             Runtime linearly scales with `subsample_size`.
         time_limit : float, default = None
@@ -660,15 +649,15 @@ class TabularPredictorV1:
             'p99_high': Upper end of 99% confidence interval for true feature importance score.
             'p99_low': Lower end of 99% confidence interval for true feature importance score.
         """
-        dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        if (dataset is None) and (not self._trainer.is_data_saved):
-            raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
+        data = self.__get_dataset(data) if data is not None else data
+        if (data is None) and (not self._trainer.is_data_saved):
+            raise AssertionError('No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
 
         if num_shuffle_sets is None:
             num_shuffle_sets = 10 if time_limit else 3
 
-        fi_df = self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage,
-                                                    subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
+        fi_df = self._learner.get_feature_importance(model=model, X=data, features=features, feature_stage=feature_stage,
+                                                     subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
 
         if include_confidence_band:
             import scipy.stats
@@ -757,7 +746,7 @@ class TabularPredictorV1:
         This process does not alter the original models, but instead adds additional models.
         If stacker models are refit by this process, they will use the refit_full versions of the ancestor models during inference.
         Models produced by this process will not have validation scores, as they use all of the data for training.
-            Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
+            Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(test_data)`.
             If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
                 Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -817,12 +806,12 @@ class TabularPredictorV1:
         return self._learner.get_info(include_model_info=True)
 
     # TODO: Handle cases where name is same as a previously fit model, currently overwrites old model.
-    # TODO: Add dataset argument
+    # TODO: Add data argument
     # TODO: Add option to disable OOF generation of newly fitted models
     # TODO: Move code logic to learner/trainer
     # TODO: Add task.fit arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
-    def fit_weighted_ensemble(self, base_models: list = None, name_suffix='_custom', expand_pareto_frontier=False, time_limit=None):
+    def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False, time_limit=None):
         """
         Fits new weighted ensemble models to combine predictions of previously-trained models.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -833,10 +822,8 @@ class TabularPredictorV1:
             List of model names the weighted ensemble can consider as candidates.
             If None, all previously trained models are considered except for weighted ensemble models.
             As an example, to train a weighted ensemble that can only have weights assigned to the models 'model_a' and 'model_b', set `base_models=['model_a', 'model_b']`
-        name_suffix : str, default = '_custom'
+        name_suffix : str, default = 'Best'
             Name suffix to add to the name of the newly fitted ensemble model.
-            Warning: If the name of a trained model from this function is identical to an existing model, it will overwrite the existing model.
-            Ensure that `name_suffix` is unique each time `fit_weighted_ensemble` is called to avoid this.
         expand_pareto_frontier : bool, default = False
             If True, will train N-1 weighted ensemble models instead of 1, where `N=len(base_models)`.
             The final model trained when True is equivalent to the model trained when False.
@@ -1053,12 +1040,11 @@ class TabularPredictorV1:
         self._learner.save()
         logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(\"%s\")" % self.output_directory)
 
-    def load_data_internal(self, dataset='train', return_X=True, return_y=True):
+    def load_data_internal(self, data='train', return_X=True, return_y=True):
         """
         Loads the internal data representation used during model training.
         Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
         This method only applies universal transforms employed by all AutoGluon models.
-        This will raise an exception if `cache_data=False` was previously set in `task.fit()`.
         Warning, the internal representation may:
             Have different features compared to the original data.
             Have different row counts compared to the original data.
@@ -1068,8 +1054,8 @@ class TabularPredictorV1:
 
         Parameters
         ----------
-        dataset : str, default = 'train'
-            The dataset to load.
+        data : str, default = 'train'
+            The data to load.
             Valid values are:
                 'train':
                     Load the training data used during model training.
@@ -1091,14 +1077,14 @@ class TabularPredictorV1:
         Tuple of (:class:`pd.DataFrame`, :class:`pd.Series`) corresponding to the internal data features and internal data labels, respectively.
 
         """
-        if dataset == 'train':
+        if data == 'train':
             load_X = self._trainer.load_X_train
             load_y = self._trainer.load_y_train
-        elif dataset == 'val':
+        elif data == 'val':
             load_X = self._trainer.load_X_val
             load_y = self._trainer.load_y_val
         else:
-            raise ValueError(f'dataset must be one of: [\'train\', \'val\'], but was \'{dataset}\'.')
+            raise ValueError(f'data must be one of: [\'train\', \'val\'], but was \'{data}\'.')
         X = load_X() if return_X else None
         y = load_y() if return_y else None
         return X, y
@@ -1340,15 +1326,15 @@ class TabularPredictorV1:
             print(msg + ": " + str(results[key]))
 
     @staticmethod
-    def __get_dataset(dataset):
-        if isinstance(dataset, TabularDataset):
-            return dataset
-        elif isinstance(dataset, pd.DataFrame):
-            return TabularDataset(dataset)
-        elif isinstance(dataset, str):
-            return TabularDataset(dataset)
-        elif isinstance(dataset, pd.Series):
-            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
-                   To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
+    def __get_dataset(data):
+        if isinstance(data, TabularDataset):
+            return data
+        elif isinstance(data, pd.DataFrame):
+            return TabularDataset(data)
+        elif isinstance(data, str):
+            return TabularDataset(data)
+        elif isinstance(data, pd.Series):
+            raise TypeError("data must be TabularDataset or pandas.DataFrame, not pandas.Series. \
+                   To predict on just single example (ith row of table), use data.iloc[[i]] rather than data.iloc[i]")
         else:
-            raise TypeError("dataset must be TabularDataset or pandas.DataFrame or str file path to dataset")
+            raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")

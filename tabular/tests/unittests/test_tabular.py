@@ -83,20 +83,20 @@ def test_advanced_functionality():
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = TabularPredictor(label=label, path=savedir).fit(train_data)
-    leaderboard = predictor.leaderboard(dataset=test_data)
-    leaderboard_extra = predictor.leaderboard(dataset=test_data, extra_info=True)
+    leaderboard = predictor.leaderboard(data=test_data)
+    leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True)
     assert set(predictor.get_model_names()) == set(leaderboard['model'])
     assert set(predictor.get_model_names()) == set(leaderboard_extra['model'])
     assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
     assert len(leaderboard) == len(leaderboard_extra)
     num_models = len(predictor.get_model_names())
-    feature_importances = predictor.feature_importance(dataset=test_data)
+    feature_importances = predictor.feature_importance(data=test_data)
     original_features = set(train_data.columns)
     original_features.remove(label)
     assert set(feature_importances.index) == original_features
     assert set(feature_importances.columns) == {'importance', 'stddev', 'p_value', 'n', 'p99_high', 'p99_low'}
     predictor.transform_features()
-    predictor.transform_features(dataset=test_data)
+    predictor.transform_features(data=test_data)
     predictor.info()
 
     assert predictor.get_model_names_persisted() == []  # Assert that no models were persisted during training
@@ -120,7 +120,7 @@ def test_advanced_functionality():
     predictor.persist_models(models='all', max_memory=None)
     predictor.save()  # Save predictor while models are persisted: Intended functionality is that they won't be persisted when loaded.
     predictor_loaded = TabularPredictor.load(predictor.path)  # Assert that predictor loading works
-    leaderboard_loaded = predictor_loaded.leaderboard(dataset=test_data)
+    leaderboard_loaded = predictor_loaded.leaderboard(data=test_data)
     assert len(leaderboard) == len(leaderboard_loaded)
     assert predictor_loaded.get_model_names_persisted() == []  # Assert that models were not still persisted after loading predictor
 
@@ -129,19 +129,19 @@ def test_advanced_functionality():
     assert(len(predictor.get_model_full_dict()) == num_models)
     assert(len(predictor.get_model_names()) == num_models * 2)
     for model in predictor.get_model_names():
-        predictor.predict(dataset=test_data, model=model)
+        predictor.predict(data=test_data, model=model)
     predictor.refit_full()  # Confirm that refit_models aren't further refit.
     assert(len(predictor.get_model_full_dict()) == num_models)
     assert(len(predictor.get_model_names()) == num_models * 2)
     predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
     assert(len(predictor.get_model_names()) == num_models * 2)
-    predictor.predict(dataset=test_data)
+    predictor.predict(data=test_data)
     predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
     assert len(predictor.get_model_names()) == 0
     assert len(predictor.leaderboard()) == 0
     assert len(predictor.leaderboard(extra_info=True)) == 0
     try:
-        predictor.predict(dataset=test_data)
+        predictor.predict(data=test_data)
     except:
         pass
     else:

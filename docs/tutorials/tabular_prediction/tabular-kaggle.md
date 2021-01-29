@@ -73,25 +73,25 @@ test_transaction = pd.read_csv(directory+'test_transaction.csv')
 test_data = pd.merge(test_transaction, test_identity, on='TransactionID', how='left')  # same join applied to training files
 
 y_predproba = predictor.predict_proba(test_data)
-print(y_predproba[:5]) # some example predicted fraud-probabilities
+y_predproba.head(5)  # some example predicted fraud-probabilities
 ```
 
 When submitting predicted probabilities for classification competitions, it is imperative these correspond to the same class expected by Kaggle. For binary classification tasks, you can see which class AutoGluon's predicted probabilities correspond to via:
 
 ```
-positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1][0]
+predictor.positive_class
 ```
 
 For multiclass classification tasks, you can see which classes AutoGluon's predicted probabilities correspond to via:
 
 ```
-predictor.class_labels # classes in this list correspond to columns of predict_proba() output
+predictor.class_labels  # classes in this list correspond to columns of predict_proba() output
 ```
 
 Alternatively, the following command should clarify which predicted-probability corresponds to which class:
 
 ```
-y_predproba = predictor.predict_proba(test_data, as_pandas=True)
+y_predproba = predictor.predict_proba(test_data)
 ```
 
 Now that we have made a prediction for each row in the test dataset, we can submit these predictions to Kaggle. Most Kaggle competitions provide a sample submission file, in which you can simply overwrite the sample predictions with your own as we do below:
