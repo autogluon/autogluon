@@ -125,7 +125,7 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                     processed_data =\
                         self._generators[col_name].fit_transform(
                             pd.DataFrame(processed_data)).iloc[:, 0]
-                    if len(processed_data.unique()) == 1:
+                    if len(np.unique(processed_data)) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
                     categorical_data_l.append((col_name, processed_data))
