@@ -4,20 +4,7 @@ import functools
 import multiprocessing as mp
 
 
-def _chunk_processor(chunk, processing_fn):
-    out = []
-    if isinstance(chunk, pd.DataFrame):
-        for idx, row in chunk.iterrows():
-            out.append(processing_fn(row))
-    elif isinstance(chunk, pd.Series):
-        for idx, row in chunk.iteritems():
-            out.append(processing_fn(row))
-    else:
-        raise NotImplementedError
-    return out
-
-
-def parallel_transform(df, processing_fn,
+def parallel_transform(df, chunk_processor,
                        num_process=None,
                        fallback_threshold=1000):
     """Apply the function to each row of the pandas dataframe and store the results
@@ -27,7 +14,7 @@ def parallel_transform(df, processing_fn,
     ----------
     df
         Pandas Dataframe
-    processing_fn
+    chunk_processor
         The processing function
     num_process
         If not set. We use the default value
@@ -44,20 +31,10 @@ def parallel_transform(df, processing_fn,
         num_process = mp.cpu_count()
     num_process = max(num_process, 1)
     if len(df) <= fallback_threshold or num_process == 1:
-        out = []
-        if isinstance(df, pd.DataFrame):
-            for idx, row in df.iterrows():
-                out.append(processing_fn(row))
-        elif isinstance(df, pd.Series):
-            for idx, row in df.iteritems():
-                out.append(processing_fn(row))
-        else:
-            raise NotImplementedError
-        return out
+        return chunk_processor(df)
     else:
         chunks = np.array_split(df, num_process * 2)
         with mp.Pool(num_process) as pool:
-            out_l = pool.map(functools.partial(_chunk_processor, processing_fn=processing_fn),
-                             chunks)
+            out_l = pool.map(chunk_processor, chunks)
         out = sum(out_l, [])
     return out
