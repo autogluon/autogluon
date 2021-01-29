@@ -116,10 +116,6 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                     chunk_processor=functools.partial(tokenize_data,
                                                       tokenizer=self._tokenizer))
                 text_data_l.append((col_name, processed_col_value))
-                print(col_name)
-                for ele in text_data_l[-1][1]:
-                    print(ele)
-                    ch = input()
             elif col_type == _C.CATEGORICAL:
                 if self.cfg.categorical.convert_to_text:
                     processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
