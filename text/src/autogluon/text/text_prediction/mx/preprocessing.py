@@ -114,7 +114,9 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                                         processing_fn=functools.partial(tokenize_data,
                                                                         tokenizer=self._tokenizer)))
                 )
-                print(text_data_l)
+                for ele in text_data_l[-1]:
+                    print(ele)
+                    ch = input()
             elif col_type == _C.CATEGORICAL:
                 if self.cfg.categorical.convert_to_text:
                     processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
