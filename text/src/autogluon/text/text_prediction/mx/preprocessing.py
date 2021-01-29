@@ -108,10 +108,10 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                 continue
             col_value = X[col_name]
             if col_type == _C.TEXT:
-                print(col_value)
                 text_data_dict[col_name] = parallel_transform(
                     df=col_value,
                     processing_fn=functools.partial(tokenize_data, tokenizer=self._tokenizer))
+                print(text_data_dict[col_name])
             elif col_type == _C.CATEGORICAL:
                 if self.cfg.categorical.convert_to_text:
                     processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
