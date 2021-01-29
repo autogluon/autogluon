@@ -12,13 +12,6 @@ from .. import constants as _C
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-def _chunk_processor(chunk, processing_fn):
-    out = []
-    for idx, row in chunk.iterrows():
-        out.append(processing_fn(row))
-    return out
-
-
 def process_text_entity_features(
         data,
         tokenizer,

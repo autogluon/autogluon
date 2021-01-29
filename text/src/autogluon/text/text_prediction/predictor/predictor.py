@@ -20,7 +20,7 @@ from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_tri
     default_holdout_frac
 from ..presets import ag_text_presets, merge_params
 from ..infer_types import infer_problem_type, infer_column_problem_types
-
+from .. import constants as _C
 
 logger = logging.getLogger()  # return root logger
 
@@ -189,6 +189,18 @@ class TextPredictor:
                                                                 label_columns=label_columns,
                                                                 problem_type=self._problem_type,
                                                                 provided_column_types=column_types)
+        has_text_column = False
+        for k, v in column_types.items():
+            if v == _C.TEXT:
+                has_text_column = True
+                break
+        if not has_text_column:
+            raise AssertionError('No Text Column is found! This is currently not supported by '
+                                 'the TextPrediction task. You may try to use '
+                                 'autogluon.tabular.TabularPredictor.\n'
+                                 'The inferred column properties of the training data is {}'
+                                 .format(train_data))
+
         self._problem_type = problem_type
         model_hparams = hyperparameters['models']['MultimodalTextModel']
         if model_hparams['backend'] == 'gluonnlp_v0':

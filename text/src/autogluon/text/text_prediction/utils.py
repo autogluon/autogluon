@@ -1,5 +1,21 @@
 import numpy as np
+import pandas as pd
+import functools
+import multiprocessing as mp
 from autogluon_contrib_nlp.utils.misc import num_mp_workers
+
+
+def _chunk_processor(chunk, processing_fn):
+    out = []
+    if isinstance(chunk, pd.DataFrame):
+        for idx, row in chunk.iterrows():
+            out.append(processing_fn(row))
+    elif isinstance(chunk, pd.Series):
+        for row in chunk:
+            out.append(processing_fn(row))
+    else:
+        raise NotImplementedError
+    return out
 
 
 def parallel_transform(df, processing_fn,
@@ -23,14 +39,20 @@ def parallel_transform(df, processing_fn,
     Returns
     -------
     out
-        List of samples
+        The output
     """
     if num_process is None:
         num_process = num_mp_workers()
     if len(df) <= fallback_threshold:
         out = []
-        for idx, row in df.iterrows():
-            out.append(processing_fn(row))
+        if isinstance(df, pd.DataFrame):
+            for idx, row in df.iterrows():
+                out.append(processing_fn(row))
+        elif isinstance(df, pd.Series):
+            for row in df:
+                out.append(processing_fn(row))
+        else:
+            raise NotImplementedError
         return out
     else:
         chunks = np.array_split(df, num_process * 8)
