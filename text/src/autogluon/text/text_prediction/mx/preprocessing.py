@@ -119,7 +119,7 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                 else:
                     processed_data = col_value.astype('category')
                     processed_data =\
-                        self._generators[col_type].fit_transform(
+                        self._generators[col_name].fit_transform(
                             pd.DataFrame(processed_data)).iloc[:, 0]
                     if len(processed_data.unique()) == 1:
                         self._ignore_columns_set.add(col_name)
@@ -131,7 +131,7 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                     processed_data = col_value.apply('{:.3f}'.format)
                     text_data_dict[col_name] = processed_data
                 else:
-                    processed_data = self._generators[col_type].fit_transform(processed_data)
+                    processed_data = self._generators[col_name].fit_transform(processed_data)
                 if len(processed_data.unique()) == 1:
                     self._ignore_columns_set.add(col_name)
                     continue
