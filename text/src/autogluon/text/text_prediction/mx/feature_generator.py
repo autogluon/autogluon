@@ -7,7 +7,7 @@ from autogluon_contrib_nlp.utils.preprocessing import get_trimmed_lengths
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from autogluon.features import CategoryFeatureGenerator
 from .. import constants as _C
 from ..utils import parallel_transform
@@ -48,6 +48,8 @@ class MultiModalTextModelFeatureTransform(TransformerMixin, BaseEstimator):
         self._cfg = cfg
         self._generators = dict()
         for col_name, col_type in self._column_types:
+            if col_name == self._label_column:
+                continue
             if col_type == _C.TEXT:
                 continue
             elif col_type == _C.CATEGORICAL:
@@ -60,6 +62,7 @@ class MultiModalTextModelFeatureTransform(TransformerMixin, BaseEstimator):
                                       StandardScaler(with_mean=cfg.numerical.scaler_with_mean,
                                                      with_std=cfg.numerical.scaler_with_std)])
                 self._generators[col_name] = generator
+        self._label_generator = None
         self._tokenizer = tokenizer
         self._fit_called = False
         self._ignore_columns_set = set()
@@ -102,7 +105,7 @@ class MultiModalTextModelFeatureTransform(TransformerMixin, BaseEstimator):
         -------
         processed_X
             The processed X dataframe
-        processed_y
+        (processed_y)
             The processed Y series
         """
         self._fit_called = True
@@ -128,12 +131,34 @@ class MultiModalTextModelFeatureTransform(TransformerMixin, BaseEstimator):
                     processed_data =\
                         self._generators[col_type].fit_transform(
                             pd.DataFrame(processed_data)).iloc[:, 0]
-                    if processed_data.
+                    if len(processed_data.unique()) == 1:
+                        self._ignore_columns_set.add(col_name)
+                        continue
+                    categorical_data_dict[col_name] = processed_data
+            elif col_type == _C.NUMERICAL:
+                processed_data = pd.to_numeric(col_value)
+                if self.cfg.numerical.convert_to_text:
+                    processed_data = col_value.apply('{:.3f}'.format)
+                    text_data_dict[col_name] = processed_data
+                else:
+                    processed_data = self._generators[col_type].fit_transform(processed_data)
+                if len(processed_data.unique()) == 1:
+                    self._ignore_columns_set.add(col_name)
+                    continue
+                numerical_data_dict[col_name] = processed_data
+        if self._column_types[self._label_column] == _C.CATEGORICAL:
+            if self._label_generator is None:
+                self._label_generator = LabelEncoder().fit(y)
+            y = self._label_generator.transform(y)
+        elif self._column_types[self._label_column] == _C.NUMERICAL:
+            y = pd.to_numeric(y)
+        else:
+            raise NotImplementedError(f'Type of label column is not supported. '
+                                      f'Label column type={self._label_column}')
+        # Begin to merge the en
 
     def transform(self, X_df, y_df=None):
         """"
 
         """
-
-
-    def __getstate__(self):
+        pass
