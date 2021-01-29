@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import functools
 import multiprocessing as mp
-from autogluon_contrib_nlp.utils.misc import num_mp_workers
 
 
 def _chunk_processor(chunk, processing_fn):
@@ -42,7 +41,7 @@ def parallel_transform(df, processing_fn,
         The output
     """
     if num_process is None:
-        num_process = num_mp_workers()
+        num_process = mp.cpu_count()
     if len(df) <= fallback_threshold:
         out = []
         if isinstance(df, pd.DataFrame):
