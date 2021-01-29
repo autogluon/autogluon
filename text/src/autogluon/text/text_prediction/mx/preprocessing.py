@@ -41,7 +41,6 @@ def tokenize_data(data: pd.Series, tokenizer):
     out = []
     if data is not None:
         for idx, ele in data.iteritems():
-            print(ele)
             if ele is None:
                 out.append(np.ones((0,), dtype=np.int32))
             else:
