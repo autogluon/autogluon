@@ -10,7 +10,7 @@ def _chunk_processor(chunk, processing_fn):
         for idx, row in chunk.iterrows():
             out.append(processing_fn(row))
     elif isinstance(chunk, pd.Series):
-        for row in chunk:
+        for idx, row in chunk.iteritems():
             out.append(processing_fn(row))
     else:
         raise NotImplementedError
@@ -49,7 +49,7 @@ def parallel_transform(df, processing_fn,
             for idx, row in df.iterrows():
                 out.append(processing_fn(row))
         elif isinstance(df, pd.Series):
-            for row in df:
+            for idx, row in df.iteritems():
                 out.append(processing_fn(row))
         else:
             raise NotImplementedError
