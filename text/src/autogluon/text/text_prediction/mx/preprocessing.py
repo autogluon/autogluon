@@ -136,7 +136,7 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                     text_data_l.append((col_name, processed_data.to_numpy()))
                 else:
                     processed_data = self._generators[col_name]\
-                        .fit_transform(np.expand_dims(processed_data.to_numpy(), dim=-1))[:, -1]
+                        .fit_transform(np.expand_dims(processed_data.to_numpy(), axis=-1))[:, 0]
                 if len(processed_data.unique()) == 1:
                     self._ignore_columns_set.add(col_name)
                     continue
