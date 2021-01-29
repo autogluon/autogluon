@@ -98,9 +98,9 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
             The processed Y series
         """
         self._fit_called = True
-        text_data_dict = collections.OrderedDict()
-        categorical_data_dict = collections.OrderedDict()
-        numerical_data_dict = collections.OrderedDict()
+        text_data_l = []
+        categorical_data_l = []
+        numerical_data_l = []
         for col_name in sorted(X.columns):
             col_type = self._column_types[col_name]
             if col_type == _C.NULL:
@@ -108,14 +108,17 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                 continue
             col_value = X[col_name]
             if col_type == _C.TEXT:
-                text_data_dict[col_name] = parallel_transform(
-                    df=col_value,
-                    processing_fn=functools.partial(tokenize_data, tokenizer=self._tokenizer))
-                print(text_data_dict[col_name])
+                text_data_l.append(
+                    (col_name,
+                     parallel_transform(df=col_value,
+                                        processing_fn=functools.partial(tokenize_data,
+                                                                        tokenizer=self._tokenizer)))
+                )
+                print(text_data_l)
             elif col_type == _C.CATEGORICAL:
                 if self.cfg.categorical.convert_to_text:
                     processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
-                    text_data_dict[col_name] = processed_data
+                    text_data_l.append((col_name, processed_data))
                 else:
                     processed_data = col_value.astype('category')
                     processed_data =\
@@ -124,18 +127,18 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                     if len(processed_data.unique()) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
-                    categorical_data_dict[col_name] = processed_data
+                    categorical_data_l.append((col_name, processed_data))
             elif col_type == _C.NUMERICAL:
                 processed_data = pd.to_numeric(col_value)
                 if self.cfg.numerical.convert_to_text:
                     processed_data = col_value.apply('{:.3f}'.format)
-                    text_data_dict[col_name] = processed_data
+                    text_data_l.append((col_name, processed_data))
                 else:
                     processed_data = self._generators[col_name].fit_transform(processed_data)
                 if len(processed_data.unique()) == 1:
                     self._ignore_columns_set.add(col_name)
                     continue
-                numerical_data_dict[col_name] = processed_data
+                numerical_data_l.append((col_name, processed_data))
         if self._column_types[self._label_column] == _C.CATEGORICAL:
             if self._label_generator is None:
                 self._label_generator = LabelEncoder().fit(y)
@@ -146,7 +149,7 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
             raise NotImplementedError(f'Type of label column is not supported. '
                                       f'Label column type={self._label_column}')
         # Return the processed features and labels
-        return text_data_dict, categorical_data_dict, numerical_data_dict, y
+        return text_data_l, categorical_data_l, numerical_data_l, y
 
     def transform(self, X_df, y_df=None):
         """"
