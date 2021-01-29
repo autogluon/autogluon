@@ -62,9 +62,11 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                     maximum_num_cat=cfg.categorical.maximum_num_cat)
                 self._generators[col_name] = generator
             elif col_type == _C.NUMERICAL:
-                generator = Pipeline([SimpleImputer(),
-                                      StandardScaler(with_mean=cfg.numerical.scaler_with_mean,
-                                                     with_std=cfg.numerical.scaler_with_std)])
+                generator = Pipeline(
+                    [('imputer', SimpleImputer()),
+                     ('scaler', StandardScaler(with_mean=cfg.numerical.scaler_with_mean,
+                                               with_std=cfg.numerical.scaler_with_std))]
+                )
                 self._generators[col_name] = generator
         self._label_generator = None
         self._tokenizer = tokenizer
