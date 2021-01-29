@@ -22,7 +22,7 @@ preset_image_predictor = dict(
     best_quality={
         'hyperparameters': {
             'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
-            'lr': Real(1e-6, 1e-2, log=True),
+            'lr': Real(1e-5, 1e-2, log=True),
             'batch_size': Categorical(8, 16, 32, 64, 128),
             'epochs': 200
             },
@@ -38,7 +38,7 @@ preset_image_predictor = dict(
     good_quality_fast_inference={
         'hyperparameters': {
             'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
-            'lr': Real(1e-6, 1e-2, log=True),
+            'lr': Real(1e-4, 1e-2, log=True),
             'batch_size': Categorical(8, 16, 32, 64, 128),
             'epochs': 150
             },
@@ -107,7 +107,7 @@ preset_object_detector = dict(
             'transfer': Categorical('ssd_512_resnet50_v1_coco',
                                     'yolo3_darknet53_coco',
                                     'center_net_resnet50_v1b_coco'),
-            'lr': Real(1e-5, 1e-2, log=True),
+            'lr': Real(1e-4, 1e-2, log=True),
             'batch_size': Categorical(8, 16, 32, 64),
             'epochs': 50
             },

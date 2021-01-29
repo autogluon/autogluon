@@ -99,7 +99,7 @@ class ObjectDetector(object):
                         'transfer': Categorical('ssd_512_resnet50_v1_coco',
                                                 'yolo3_darknet53_coco',
                                                 'center_net_resnet50_v1b_coco'),
-                        'lr': Real(1e-5, 1e-2, log=True),
+                        'lr': Real(1e-4, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64),
                         'epochs': 50
                         },
@@ -249,6 +249,7 @@ class ObjectDetector(object):
         self._detector._logger.setLevel(log_level)
         self._detector._logger.propagate = True
         self._fit_summary = task.fit_summary()
+        return self
 
     def _validate_kwargs(self, kwargs):
         """validate and initialize default kwargs"""

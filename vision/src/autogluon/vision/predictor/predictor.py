@@ -95,7 +95,7 @@ class ImagePredictor(object):
                 best_quality={
                     'hyperparameters': {
                         'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
-                        'lr': Real(1e-6, 1e-2, log=True),
+                        'lr': Real(1e-5, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
                         'epochs': 200
                         },
@@ -109,7 +109,7 @@ class ImagePredictor(object):
                 good_quality_fast_inference={
                     'hyperparameters': {
                         'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
-                        'lr': Real(1e-6, 1e-2, log=True),
+                        'lr': Real(1e-4, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
                         'epochs': 150
                         },
@@ -308,6 +308,7 @@ class ImagePredictor(object):
         self._classifier._logger.setLevel(log_level)
         self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
+        return self
 
     def _validate_kwargs(self, kwargs):
         """validate and initialize default kwargs"""
