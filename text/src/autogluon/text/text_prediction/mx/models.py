@@ -269,7 +269,7 @@ def _classification_regression_predict(net, dataloader, problem_type,
 
 
 def calculate_metric(scorer, ground_truth, predictions, problem_type):
-    if problem_type ==  and scorer.name == 'roc_auc':
+    if problem_type == BINARY and scorer.name == 'roc_auc':
         # For ROC_AUC, we need to feed in the probability of positive class to the scorer.
         return scorer._sign * scorer(ground_truth, predictions[:, 1])
     else:
@@ -396,7 +396,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     # Build Preprocessor + Preprocess the training dataset + Inference problem type
     # TODO Move preprocessor + Dataloader to outer loop to better cache the dataloader
     preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
-                                                column_properties=column_properties,
                                                 label_columns=label_columns,
                                                 max_length=cfg.model.preprocess.max_length,
                                                 merge_text=cfg.model.preprocess.merge_text)
