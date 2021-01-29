@@ -28,42 +28,6 @@ class TabularPredictorV1:
     """
     Object returned by `fit()` in Tabular Prediction tasks.
     Use for making predictions on new data and viewing information about models trained during `fit()`.
-
-    Attributes
-    ----------
-    output_directory : str
-        Path to directory where all models used by this Predictor are stored.
-    problem_type : str
-        What type of prediction problem this Predictor has been trained for.
-    eval_metric : function or str
-        What metric is used to evaluate predictive performance.
-    label_column : str
-        Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-    feature_metadata : :class:`autogluon.tabular.FeatureMetadata`
-        Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label_column`).
-        Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
-        Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
-            `feature_metadata.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
-            `feature_metadata.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
-    class_labels : list
-        For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
-        For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
-            `class_labels[0]` corresponds to internal label = 0 (negative class), `class_labels[1]` corresponds to internal label = 1 (positive class).
-            This is relevant for certain metrics such as F1 where True and False labels impact the metric score differently.
-        For other problem types, will equal None.
-        For example if `pred = predict_proba(x, as_multiclass=True)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
-    class_labels_internal : list
-        For multiclass problems, this list contains the internal class labels in sorted order of internal `predict_proba()` output.
-        For binary problems, this list contains the internal class labels in sorted order of internal `predict_proba(as_multiclass=True)` output.
-            The value will always be `class_labels_internal=[0, 1]` for binary problems, with 0 as the negative class, and 1 as the positive class.
-        For other problem types, will equal None.
-    class_labels_internal_map : dict
-        For binary and multiclass classification problems, this dictionary contains the mapping of the original labels to the internal labels.
-        For example, in binary classification, label values of 'True' and 'False' will be mapped to the internal representation `1` and `0`.
-            Therefore, class_labels_internal_map would equal {'True': 1, 'False': 0}
-        For other problem types, will equal None.
-        For multiclass, it is possible for not all of the label values to have a mapping.
-            This indicates that the internal models will never predict those missing labels, and training rows associated with the missing labels were dropped.
     """
 
     def __init__(self, learner):
@@ -111,14 +75,12 @@ class TabularPredictorV1:
     def feature_metadata_in(self):
         return self._learner.feature_generator.feature_metadata_in
 
-    # TODO: v0.1 rename to label
     @property
-    def label_column(self):
+    def label(self):
         return self._learner.label
 
-    # TODO: v0.1 rename to path
     @property
-    def output_directory(self):
+    def path(self):
         return self._learner.path
 
     def predict(self, data, model=None, as_pandas=True):
@@ -181,7 +143,7 @@ class TabularPredictorV1:
     def evaluate(self, data, silent=False):
         """
         Report the predictive performance evaluated for a given Dataset.
-        This is basically a shortcut for: `pred = predict(data); evaluate_predictions(data[label_column], preds, auxiliary_metrics=False)`
+        This is basically a shortcut for: `pred = predict(data); evaluate_predictions(data[label], preds, auxiliary_metrics=False)`
         that automatically uses `predict_proba()` instead of `predict()` when appropriate.
 
         Parameters
@@ -423,7 +385,7 @@ class TabularPredictorV1:
             print("(raw dtype, special dtypes):")
             print(self.feature_metadata)
         if verbosity > 1:  # create plots
-            plot_tabular_models(results, output_directory=self.output_directory,
+            plot_tabular_models(results, output_directory=self.path,
                                 save_file="SummaryOfModels.html",
                                 plot_title="Models produced during fit()")
             if hpo_used:
@@ -431,11 +393,11 @@ class TabularPredictorV1:
                     if 'trial_info' in results['hpo_results'][model_type]:
                         plot_summary_of_models(
                             results['hpo_results'][model_type],
-                            output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
+                            output_directory=self.path, save_file=model_type + "_HPOmodelsummary.html",
                             plot_title=f"Models produced during {model_type} HPO")
                         plot_performance_vs_trials(
                             results['hpo_results'][model_type],
-                            output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
+                            output_directory=self.path, save_file=model_type + "_HPOperformanceVStrials.png",
                             plot_title=f"HPO trials for {model_type} models")
         if verbosity > 2:  # print detailed information
             if hpo_used:
@@ -900,7 +862,7 @@ class TabularPredictorV1:
         y_pred_proba_oof_transformed = self.get_oof_pred_proba(model=model, transformed=True)
         y_index = y_pred_proba_oof_transformed.index
         y_pred_oof_transformed = get_pred_from_proba(y_pred_proba=y_pred_proba_oof_transformed.to_numpy(), problem_type=self._trainer.problem_type)
-        y_pred_oof_transformed = pd.Series(data=y_pred_oof_transformed, index=y_index, name=self.label_column)
+        y_pred_oof_transformed = pd.Series(data=y_pred_oof_transformed, index=y_index, name=self.label)
         if transformed:
             return y_pred_oof_transformed
         else:
@@ -955,8 +917,8 @@ class TabularPredictorV1:
         if self.problem_type == MULTICLASS:
             y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
         else:
-            y_pred_proba_oof_transformed.columns = [self.label_column]
-            y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label_column]
+            y_pred_proba_oof_transformed.columns = [self.label]
+            y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label]
             if as_multiclass and self.problem_type == BINARY:
                 y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba_oof_transformed, as_pandas=True)
                 if not transformed:
@@ -1038,7 +1000,7 @@ class TabularPredictorV1:
             (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
         self._learner.save()
-        logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(\"%s\")" % self.output_directory)
+        logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(\"%s\")" % self.path)
 
     def load_data_internal(self, data='train', return_X=True, return_y=True):
         """
@@ -1314,7 +1276,7 @@ class TabularPredictorV1:
                 node.attr['style'] = 'filled'
                 node.attr['fillcolor'] = '#ffcc00'
 
-        model_image_fname = os.path.join(self.output_directory, 'ensemble_model.png')
+        model_image_fname = os.path.join(self.path, 'ensemble_model.png')
 
         A.draw(model_image_fname, format='png', prog='dot')
 

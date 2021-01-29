@@ -17,13 +17,13 @@ subsample_size = 500  # subsample subset of data for faster demo, try setting th
 train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
 
-label_column = 'occupation'
+label = 'occupation'
 print("Summary of occupation column: \n", train_data['occupation'].describe())
 
 new_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 test_data = new_data[5000:].copy()  # this should be separate data in your applications
-y_test = test_data[label_column]
-test_data_nolabel = test_data.drop(columns=[label_column])  # delete label column
+y_test = test_data[label]
+test_data_nolabel = test_data.drop(columns=[label])  # delete label column
 val_data = new_data[:5000].copy()
 
 metric = 'accuracy' # we specify eval-metric just for demo (unnecessary as it's the default)
@@ -69,7 +69,7 @@ hyperparameter_tune_kwargs = {  # HPO is not performed unless hyperparameter_tun
     'searcher': search_strategy,
 }
 
-predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(
+predictor = TabularPredictor(label=label, eval_metric=metric).fit(
     train_data, tuning_data=val_data, time_limit=time_limit,
     hyperparameters=hyperparameters, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
 )
@@ -97,7 +97,7 @@ In the above example, the predictive performance may be poor because we specifie
 Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two other methods to boost predictive performance are [bagging and stack-ensembling](https://arxiv.org/abs/2003.06505).  You'll often see performance improve if you specify `num_bag_folds` = 5-10, `num_stack_levels` = 1-3 in the call to `fit()`, but this will increase training times and memory/disk usage.
 
 ```{.python .input}
-predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data,
+predictor = TabularPredictor(label=label, eval_metric=metric).fit(train_data,
     num_bag_folds=5, num_bag_sets=1, num_stack_levels=1,
     hyperparameters = {'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
 )
