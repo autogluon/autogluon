@@ -54,7 +54,7 @@ def parallel_transform(df, processing_fn,
             raise NotImplementedError
         return out
     else:
-        chunks = np.array_split(df, num_process * 8)
+        chunks = np.array_split(df, num_process * 2)
         with mp.Pool(num_process) as pool:
             out_l = pool.map(functools.partial(_chunk_processor, processing_fn=processing_fn),
                              chunks)
