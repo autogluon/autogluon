@@ -1011,7 +1011,6 @@ class MultiModalTextModel:
         self.net.save_parameters(os.path.join(dir_path, 'net.params'))
         with open(os.path.join(dir_path, 'cfg.yml'), 'w') as of:
             of.write(self.config.dump())
-        with open(os.path.join())
         # Save an additional assets about the parsed dataset information
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump(
