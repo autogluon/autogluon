@@ -116,6 +116,7 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                     processing_fn=functools.partial(tokenize_data,
                                                     tokenizer=self._tokenizer))
                 text_data_l.append((col_name, processed_col_value))
+                print(col_name)
                 for ele in text_data_l[-1][1]:
                     print(ele)
                     ch = input()
