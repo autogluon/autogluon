@@ -39,8 +39,11 @@ def base_preprocess_cfg():
 
 def tokenize_data(data: pd.Series, tokenizer):
     out = []
-    for ele in data:
-        out.append(np.array(tokenizer.encode(ele, int)))
+    if data is not None:
+        for ele in data:
+            if ele is None:
+                out.append(np.ones((0,), dtype=np.int32))
+            out.append(np.array(tokenizer.encode(ele, int), dtype=np.int32))
     return out
 
 
