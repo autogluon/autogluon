@@ -108,7 +108,7 @@ You should not provide `tuning_data` when stacking/bagging, and instead provide 
 ```{.python .input}
 save_path = 'agModels-predictOccupation'  # folder where to store trained models
 
-predictor = TabularPredictor(label=label_column, eval_metric=metric, path=save_path).fit(
+predictor = TabularPredictor(label=label, eval_metric=metric, path=save_path).fit(
     train_data, auto_stack=True,
     time_limit=30, hyperparameters={'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
 )
@@ -289,13 +289,13 @@ One option is to specify more lightweight `presets`:
 
 ```{.python .input}
 presets = ['good_quality_faster_inference_only_refit', 'optimize_for_deployment']
-predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, presets=presets, time_limit=30)
+predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, presets=presets, time_limit=30)
 ```
 
 Another option is to specify more lightweight hyperparameters:
 
 ```{.python .input}
-predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, hyperparameters='very_light', time_limit=30)
+predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, hyperparameters='very_light', time_limit=30)
 ```
 
 Here you can set `hyperparameters` to either 'light', 'very_light', or 'toy' to obtain progressively smaller (but less accurate) models and predictors. Advanced users may instead try manually specifying particular models' hyperparameters in order to make them faster/smaller.
@@ -304,7 +304,7 @@ Finally, you may also exclude specific unwieldy models from being trained at all
 
 ```{.python .input}
 excluded_model_types = ['KNN', 'NN', 'custom']
-predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
+predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
 ```
 
 

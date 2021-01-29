@@ -169,10 +169,10 @@ def load_data(directory_prefix, train_file, test_file, name, url=None):
 
 def run_tabular_benchmark_toy(fit_args):
     dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyClassification.zip',
-                          'name': 'toyClassification',
-                          'problem_type': MULTICLASS,
-                          'label_column': 'y',
-                          'performance_val': 0.436}
+               'name': 'toyClassification',
+               'problem_type': MULTICLASS,
+               'label': 'y',
+               'performance_val': 0.436}
     # 2-D toy noisy, imbalanced 4-class classification task with: feature missingness, out-of-vocabulary feature categories in test data, out-of-vocabulary labels in test data, training column missing from test data, extra distraction columns in test data
     # toyclassif_dataset should produce 1 warning and 1 error during inference:
     # Warning: Ignoring 181 (out of 1000) training examples for which the label value in column 'y' is missing
@@ -189,7 +189,7 @@ def run_tabular_benchmark_toy(fit_args):
     directory = directory_prefix + dataset['name'] + "/"
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    predictor = TabularPredictor(label=dataset['label_column'], path=savedir).fit(train_data, **fit_args)
+    predictor = TabularPredictor(label=dataset['label'], path=savedir).fit(train_data, **fit_args)
     print(predictor.feature_metadata)
     print(predictor.feature_metadata.type_map_raw)
     print(predictor.feature_metadata.type_group_map_special)
@@ -214,26 +214,26 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
     binary_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
                       'name': 'AdultIncomeBinaryClassification',
                       'problem_type': BINARY,
-                      'label_column': 'class',
-                      'performance_val': 0.129} # Mixed types of features.
+                      'label': 'class',
+                      'performance_val': 0.129}  # Mixed types of features.
 
     multi_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
-                      'name': 'CoverTypeMulticlassClassification',
-                      'problem_type': MULTICLASS,
-                      'label_column': 'Cover_Type',
-                      'performance_val': 0.032} # big dataset with 7 classes, all features are numeric. Runs SLOW.
+                     'name': 'CoverTypeMulticlassClassification',
+                     'problem_type': MULTICLASS,
+                     'label': 'Cover_Type',
+                     'performance_val': 0.032}  # big dataset with 7 classes, all features are numeric. Runs SLOW.
 
     regression_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
-                       'name': 'AmesHousingPriceRegression',
-                      'problem_type': REGRESSION,
-                      'label_column': 'SalePrice',
-                      'performance_val': 0.076} # Regression with mixed feature-types, skewed Y-values.
+                          'name': 'AmesHousingPriceRegression',
+                          'problem_type': REGRESSION,
+                          'label': 'SalePrice',
+                          'performance_val': 0.076}  # Regression with mixed feature-types, skewed Y-values.
 
     toyregres_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip',
                          'name': 'toyRegression',
                          'problem_type': REGRESSION,
-                        'label_column': 'y',
-                        'performance_val': 0.183}
+                         'label': 'y',
+                         'performance_val': 0.183}
     # 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
 
     # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
@@ -261,17 +261,17 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             print("Evaluating Benchmark Dataset %s (%d of %d)" % (dataset['name'], idx+1, len(datasets)))
             directory = directory_prefix + dataset['name'] + "/"
             savedir = directory + 'AutogluonOutput/'
-            shutil.rmtree(savedir, ignore_errors=True) # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-            label_column = dataset['label_column']
-            y_test = test_data[label_column]
-            test_data = test_data.drop(labels=[label_column], axis=1)
+            shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+            label = dataset['label']
+            y_test = test_data[label]
+            test_data = test_data.drop(labels=[label], axis=1)
             if fast_benchmark:
                 if subsample_size is None:
                     raise ValueError("fast_benchmark specified without subsample_size")
                 if subsample_size < len(train_data):
                     # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
                     train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
-            predictor = TabularPredictor(label=label_column, path=savedir).fit(train_data, **fit_args)
+            predictor = TabularPredictor(label=label, path=savedir).fit(train_data, **fit_args)
             results = predictor.fit_summary(verbosity=4)
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
