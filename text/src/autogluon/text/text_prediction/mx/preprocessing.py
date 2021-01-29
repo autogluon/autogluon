@@ -51,7 +51,7 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
         cfg = base_preprocess_cfg().clone_merge(cfg)
         self._cfg = cfg
         self._generators = dict()
-        for col_name, col_type in self._column_types:
+        for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
             if col_type == _C.TEXT:
