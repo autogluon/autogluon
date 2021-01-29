@@ -33,6 +33,8 @@ class ObjectDetector(object):
     Dataset = _ObjectDetection.Dataset
 
     def __init__(self, path=None, verbosity=2):
+        if path is None:
+            path = os.getcwd()
         self._log_dir = path
         self._verbosity = verbosity
         self._detector = None

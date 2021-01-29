@@ -43,6 +43,8 @@ class ImagePredictor(object):
     def __init__(self, problem_type=None, eval_metric=None, path=None, verbosity=2):
         self._problem_type = problem_type
         self._eval_metric = eval_metric
+        if path is None:
+            path = os.getcwd()
         self._log_dir = path
         self._verbosity = verbosity
         self._classifier = None
