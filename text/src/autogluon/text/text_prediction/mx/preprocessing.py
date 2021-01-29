@@ -164,7 +164,6 @@ def process_text_entity_features(
 class MultimodalWithPretrainedPreprocessor:
     def __init__(self, *,
                  tokenizer,
-                 column_properties,
                  max_length: int,
                  label_columns,
                  feature_columns: Optional[Union[str, List[str]]] = None,
@@ -178,8 +177,6 @@ class MultimodalWithPretrainedPreprocessor:
         ----------
         tokenizer
             The tokenizer of the pretrained model
-        column_properties
-            A dictionary that contains the column properties
         max_length
             The maximum length of the encoded token sequence.
         label_columns
@@ -194,7 +191,6 @@ class MultimodalWithPretrainedPreprocessor:
             [CLS] token_ids1 [SEP] token_ids2 [SEP] token_ids3 [SEP] token_ids4 [SEP] ...
         """
         self._tokenizer = tokenizer
-        self._column_properties = column_properties
         if isinstance(label_columns, str):
             self._label_columns = [label_columns]
         else:

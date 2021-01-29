@@ -221,6 +221,7 @@ class TextPredictor:
         output
             Array of predictions. One element corresponds to the prediction value of one
         """
+        pass
 
     def predict_proba(self, dataset, as_pandas=False):
         """Predict the probability from the input
@@ -229,6 +230,7 @@ class TextPredictor:
         -------
 
         """
+        pass
 
     def predict_feature(self):
         """Extract the feature from the neural network
@@ -237,9 +239,10 @@ class TextPredictor:
         -------
 
         """
+        pass
 
     def save(self):
-        self.
+        pass
 
     @classmethod
     def load(cls, path, verbosity=2):
