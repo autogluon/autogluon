@@ -42,7 +42,8 @@ def parallel_transform(df, processing_fn,
     """
     if num_process is None:
         num_process = mp.cpu_count()
-    if len(df) <= fallback_threshold:
+    num_process = max(num_process, 1)
+    if len(df) <= fallback_threshold or num_process == 1:
         out = []
         if isinstance(df, pd.DataFrame):
             for idx, row in df.iterrows():
