@@ -43,17 +43,20 @@ def tokenize_data(data: pd.Series, tokenizer):
         for ele in data:
             if ele is None:
                 out.append(np.ones((0,), dtype=np.int32))
-            out.append(np.array(tokenizer.encode(ele, int), dtype=np.int32))
+            else:
+                out.append(np.array(tokenizer.encode(ele, int), dtype=np.int32))
     return out
 
 
 class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
-    def __init__(self, column_types, label_column, tokenizer, cfg=None):
+    def __init__(self, column_types, label_column, tokenizer,
+                 logger=None, cfg=None):
         self._column_types = column_types
         self._label_column = label_column
         cfg = base_preprocess_cfg().clone_merge(cfg)
         self._cfg = cfg
         self._generators = dict()
+        self._logger = logger
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
@@ -108,13 +111,12 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
                 continue
             col_value = X[col_name]
             if col_type == _C.TEXT:
-                text_data_l.append(
-                    (col_name,
-                     parallel_transform(df=col_value,
-                                        processing_fn=functools.partial(tokenize_data,
-                                                                        tokenizer=self._tokenizer)))
-                )
-                for ele in text_data_l[-1]:
+                processed_col_value = parallel_transform(
+                    df=col_value,
+                    processing_fn=functools.partial(tokenize_data,
+                                                    tokenizer=self._tokenizer))
+                text_data_l.append((col_name, processed_col_value))
+                for ele in text_data_l[-1][1]:
                     print(ele)
                     ch = input()
             elif col_type == _C.CATEGORICAL:
