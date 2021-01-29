@@ -48,6 +48,7 @@ class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
     def __init__(self, column_types, label_column, tokenizer, cfg=None):
         self._column_types = column_types
         self._label_column = label_column
+        cfg = base_preprocess_cfg().clone_merge(cfg)
         self._cfg = cfg
         self._generators = dict()
         for col_name, col_type in self._column_types:
