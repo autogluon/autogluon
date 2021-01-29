@@ -1019,7 +1019,7 @@ class MultiModalTextModel:
                     'label_shapes': self._label_shapes,
                     'problem_types': self._problem_types,
                     'feature_columns': self._feature_columns,
-                    'column_types': self._column_types
+                    'column_types': self._column_types,
                     'version': version.__version__,
                 }, of, ensure_ascii=True)
 
