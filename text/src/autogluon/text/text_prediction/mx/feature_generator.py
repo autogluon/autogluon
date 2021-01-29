@@ -24,7 +24,7 @@ def base_preprocess_cfg():
 
 
 def tokenizer_columns():
-
+    
 
 
 class MultiModalTextModelDataTransformer(TransformerMixin, BaseEstimator):
