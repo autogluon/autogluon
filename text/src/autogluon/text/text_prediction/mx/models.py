@@ -20,6 +20,7 @@ from autogluon_contrib_nlp.utils.misc import logging_config, grouper, \
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from autogluon.core import args, space
 from autogluon.core.utils import in_ipynb
+from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric, Scorer
@@ -891,11 +892,9 @@ class MultiModalTextModel:
         if isinstance(metrics, str):
             metrics = [metrics]
         assert self.net is not None
-        if not isinstance(valid_data, )
-        if not isinstance(valid_data, TabularDataset):
-            valid_data = TabularDataset(valid_data,
-                                        columns=self._feature_columns + self._label_columns,
-                                        column_properties=self._column_properties)
+        if not isinstance(valid_data, pd.DataFrame):
+            valid_data = load_pd.load(valid_data)
+        valid_data = valid_data[self._feature_columns + self._label_columns]
         ground_truth = np.array(valid_data.table[self._label_columns[0]].apply(
             self._column_properties[self._label_columns[0]].transform))
         if self._problem_types[0] == _C.CLASSIFICATION:
