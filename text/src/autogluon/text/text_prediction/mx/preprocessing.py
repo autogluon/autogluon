@@ -44,7 +44,7 @@ def tokenize_data(data: pd.Series, tokenizer):
     return out
 
 
-class MultiModalTextModelFeatureTransform(TransformerMixin, BaseEstimator):
+class MultiModalTextFeatureTransformer(TransformerMixin, BaseEstimator):
     def __init__(self, column_types, label_column, tokenizer, cfg=None):
         self._column_types = column_types
         self._label_column = label_column
