@@ -3,6 +3,7 @@ import copy
 import pickle
 import logging
 import warnings
+import os
 
 import pandas as pd
 from autogluon.core.utils import verbosity2loglevel, get_gpu_free_memory, get_gpu_count
@@ -46,6 +47,11 @@ class ImagePredictor(object):
         self._verbosity = verbosity
         self._classifier = None
         self._fit_summary = {}
+        os.makedirs(self._log_dir, exist_ok=True)
+
+    @property
+    def path(self):
+        return self._log_dir
 
     @unpack('image_predictor')
     def fit(self,
@@ -101,8 +107,7 @@ class ImagePredictor(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 1024,
-                        'search_strategy': 'bayesopt',
-                        'max_reward': 1.0}}
+                        'search_strategy': 'bayesopt'}}
                     Best predictive accuracy with little consideration to inference time or model size. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
@@ -115,8 +120,7 @@ class ImagePredictor(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 512,
-                        'search_strategy': 'bayesopt',
-                        'max_reward': 0.95}}
+                        'search_strategy': 'bayesopt'}}
                     Good predictive accuracy with fast inference.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
@@ -129,8 +133,7 @@ class ImagePredictor(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 8,
-                        'search_strategy': 'random',
-                        'max_reward': 0.85}}
+                        'search_strategy': 'random'}}
 
                     Medium predictive accuracy with very fast inference and very fast training time. 
                     This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
@@ -144,8 +147,7 @@ class ImagePredictor(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 32,
-                        'search_strategy': 'bayesopt',
-                        'max_reward': 0.95}}
+                        'search_strategy': 'bayesopt'}}
                     
                     Medium predictive accuracy with very fast inference.
                     Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
@@ -178,16 +180,17 @@ class ImagePredictor(object):
                 Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
             hyperparameter_tune_kwargs: dict, default = None
                 num_trials : int, default = 1
-                    The number of HPO trials when `time_limit` is None. 
+                    The limit of HPO trials that can be performed within `time_limit`. The HPO process will be terminated 
+                    when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first.
                 search_strategy : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
                     Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
                     ‘grid’ (grid search).
-                max_reward : float, default = 0.95
+                max_reward : float, default = None
                     The reward threashold for stopping criteria. If `max_reward` is reached during HPO, the scheduler
                     will terminate earlier to reduce time cost.
                 scheduler_options : dict, default = None
-                    Extra options for HPO scheduler, please refer to `autogluon.core.Searcher` for details.
+                    Extra options for HPO scheduler, please refer to :class:`autogluon.core.Searcher` for details.
         """
         if self._problem_type is None:
             # options: multiclass
@@ -260,8 +263,9 @@ class ImagePredictor(object):
                 'num_trials': 99999 if num_trials is None else max(1, num_trials),
                 'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
                 'search_strategy': search_strategy,
-                'max_reward': max_reward,
                 }
+        if max_reward is not None:
+            config['max_reward'] = max_reward
         if nthreads_per_trial is not None:
             config['nthreads_per_trial'] = nthreads_per_trial
         if ngpus_per_trial is not None:
@@ -328,9 +332,9 @@ class ImagePredictor(object):
         hpo_tune_args['search_strategy'] = hpo_tune_args.get('search_strategy', 'random')
         if not hpo_tune_args['search_strategy'] in ('random', 'bayesopt', 'grid'):
             raise ValueError(f"Invalid search strategy: {hpo_tune_args['search_strategy']}, supported: ('random', 'bayesopt', 'grid')")
-        hpo_tune_args['max_reward'] = hpo_tune_args.get('max_reward', 0.95)
-        if hpo_tune_args['max_reward'] < 0:
-            raise ValueError(f"Expected `max_reward` to be a positive float number between 0 and 1.0, given hpo_tune_args['max_reward']")
+        hpo_tune_args['max_reward'] = hpo_tune_args.get('max_reward', None)
+        if hpo_tune_args['max_reward'] is not None and hpo_tune_args['max_reward'] < 0:
+            raise ValueError(f"Expected `max_reward` to be a positive float number between 0 and 1.0, given {hpo_tune_args['max_reward']}")
         hpo_tune_args['scheduler_options'] = hpo_tune_args.get('scheduler_options', None)
         kwargs['hyperparameter_tune_kwargs'] = hpo_tune_args
         return kwargs
@@ -446,26 +450,30 @@ class ImagePredictor(object):
         """
         return copy.copy(self._fit_summary)
 
-    def save(self, file_name):
+    def save(self, path=None):
         """Dump predictor to disk.
 
         Parameters
         ----------
-        file_name : str
-            The file name of saved copy.
+        path : str, default = None
+            The path of saved copy. If not specified(None), will automatically save to `self.path` directory
+            with filename `image_predictor.ag`
 
         """
-        with open(file_name, 'wb') as fid:
+        if path is None:
+            path = os.path.join(self.path, 'image_predictor.ag')
+        with open(path, 'wb') as fid:
             pickle.dump(self, fid)
 
     @classmethod
-    def load(cls, file_name, verbosity=2):
+    def load(cls, path, verbosity=2):
         """Load previously saved predictor.
 
         Parameters
         ----------
-        file_name : str
-            The file name for saved pickle file.
+        path : str
+            The file name for saved pickle file. If `path` is a directory, will try to load the file `image_predictor.ag` in
+            this directory.
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed. 
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings). 
@@ -473,7 +481,9 @@ class ImagePredictor(object):
             where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
 
         """
-        with open(file_name, 'rb') as fid:
+        if os.path.isdir(path):
+            path = os.path.join(path, 'image_predictor.ag')
+        with open(path, 'rb') as fid:
             obj = pickle.load(fid)
         obj._verbosity = verbosity
         return obj

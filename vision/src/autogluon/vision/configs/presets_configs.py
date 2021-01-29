@@ -28,8 +28,7 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 1024,
-            'search_strategy': 'bayesopt',
-            'max_reward': 1.0
+            'search_strategy': 'bayesopt'
         }
     },
 
@@ -44,8 +43,7 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
-            'search_strategy': 'bayesopt',
-            'max_reward': 0.95
+            'search_strategy': 'bayesopt'
         }
     },
 
@@ -60,8 +58,7 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 8,
-            'search_strategy': 'random',
-            'max_reward': 0.85
+            'search_strategy': 'random'
         }
     },
 
@@ -76,8 +73,7 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
-            'search_strategy': 'bayesopt',
-            'max_reward': 0.95
+            'search_strategy': 'bayesopt'
         }
     },
 )
@@ -95,8 +91,7 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 128,
-            'search_strategy': 'bayesopt',
-            'max_reward': 1.0
+            'search_strategy': 'bayesopt'
         }
     },
 
@@ -113,8 +108,7 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
-            'search_strategy': 'bayesopt',
-            'max_reward': 1.0
+            'search_strategy': 'bayesopt'
         }
     },
 
@@ -129,8 +123,7 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 16,
-            'search_strategy': 'random',
-            'max_reward': 0.85
+            'search_strategy': 'random'
         }
     },
 
@@ -145,8 +138,7 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
-            'search_strategy': 'bayesopt',
-            'max_reward': 0.9
+            'search_strategy': 'bayesopt'
         }
     },
 
