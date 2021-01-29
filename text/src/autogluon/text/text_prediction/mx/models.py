@@ -28,11 +28,11 @@ from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
-from .. import constants as _C
-from .preprocessing import MultimodalWithPretrainedPreprocessor
 from .modules import MultiModalWithPretrainedTextNN
-from ... import version
+from .. import constants as _C
 from ..presets import ag_text_presets
+from ... import version
+
 
 
 @use_np
