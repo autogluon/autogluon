@@ -20,7 +20,7 @@ from autogluon_contrib_nlp.utils.misc import logging_config, grouper, \
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from autogluon.core import args, space
 from autogluon.core.utils import in_ipynb
-from autogluon.core.task.base import compile_scheduler_options
+from autogluon.core.task.base import compile_scheduler_options_v2
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric, Scorer
 from autogluon.core.utils.multiprocessing_utils import force_forkserver
@@ -31,6 +31,7 @@ from .. import constants as _C
 from .preprocessing import MultimodalWithPretrainedPreprocessor
 from .modules import MultiModalWithPretrainedTextNN
 from ... import version
+from ..presets import ag_text_presets
 
 
 @use_np
@@ -170,11 +171,21 @@ def base_optimization_config():
 def base_model_config():
     cfg = CfgNode()
     cfg.preprocess = CfgNode()
-    cfg.preprocess.merge_text = True              # Whether we will merge different text columns
-                                                  # or treat them independently.
-    cfg.preprocess.max_length = 512               # We use 512 by default.
-    cfg.preprocess.auto_max_length = True         # Try to automatically shrink the maximal length
-                                                  # based on the statistics of the dataset.
+    cfg.preprocess.text = CfgNode()
+    cfg.preprocess.text.merge = True                     # Whether we will merge different text columns
+                                                         # or treat them independently.
+    cfg.preprocess.text.max_length = 512                 # The maximum possible length.
+    cfg.preprocess.text.auto_max_length = True           # Try to automatically shrink the maximal length
+                                                         # based on the statistics of the dataset.
+    cfg.preprocess.categorical = CfgNode()
+    cfg.preprocess.categorical.minimum_cat_count = 100      # The minimal number of data per categorical group
+    cfg.preprocess.categorical.maximum_num_cat = 20         # The minimal number of data per categorical group
+    cfg.preprocess.categorical.convert_to_text = False      # Whether to convert the feature to text
+
+    cfg.preprocess.numerical = CfgNode()
+    cfg.preprocess.numerical.convert_to_text = False        # Whether to convert the feature to text
+    cfg.preprocess.numerical.impute_strategy = 'mean'       # Whether to use mean to fill in the missing values.
+
     cfg.backbone = CfgNode()
     cfg.backbone.name = 'google_electra_base'
     cfg.network = MultiModalWithPretrainedTextNN.get_cfg()
@@ -633,7 +644,7 @@ class MultiModalTextModel:
         # Need to be set in the train call
         self._net = None  # Network for training and inference
         self._embed_net = None  # Network for extract the embedding
-        self._feature_generator = None  # The feature transforms
+        self._feature_generator = None  # The feature generator
         self._multimodal_preprocessor = None  # The inner preprocessor
         self._config = None
         self._results = None
@@ -650,14 +661,19 @@ class MultiModalTextModel:
         return self._label_columns
 
     @property
-    def label_shapes(self):
-        """The shapes of the labels"""
-        return self._label_shapes
+    def class_labels(self):
+        """The internal class labels"""
+        pass
 
     @property
-    def problem_types(self):
-        """Types of the problems"""
-        return self._problem_types
+    def class_labels_internal(self):
+        """The internal class labels once we have converted to integers"""
+        pass
+
+    @property
+    def problem_type(self):
+        """Types of the problem"""
+        return self._problem_type
 
     @property
     def feature_columns(self):
@@ -689,23 +705,25 @@ class MultiModalTextModel:
     def net(self):
         return self._net
 
-    @staticmethod
-    def default_config():
-        """Get the default configuration
+    def preprocess(self, data_df, column_types, inplace=False):
+        if inplace:
+            processed_df = data_df
+        else:
+            processed_df = data_df.copy()
+        for col_name in processed_df.columns:
+            if col_name == _C.TEXT:
+                processed_df[col_name] = processed_df[col_name].apply(str)
+            elif col_name == _C.NUMERICAL:
+                processed_df[col_name] = pd.to_numeric(processed_df[col_name])
+            elif col_name == _C.CATEGORICAL:
+                processed_df[col_name] = processed_df[col_name].astype('category')
 
-        Returns
-        -------
-        cfg
-            The configuration specified by the key
-        """
-        return base_cfg()
-
-    def train(self, train_data, tuning_data, resource,
-              time_limits=None,
-              search_strategy='random',
-              search_options=None,
-              scheduler_options=None,
-              num_trials=None,
+    def train(self, train_data, tuning_data,
+              num_cpus=None,
+              num_gpus=None,
+              time_limit=None,
+              hpo_params=None,
+              search_space=None,
               plot_results=False,
               console_log=True,
               ignore_warning=True,
@@ -718,49 +736,54 @@ class MultiModalTextModel:
             The training data
         tuning_data
             The tuning data
-        resource
-            Computational resources
-        time_limits
+        num_cpus
+            Number of CPUs for each trial
+        num_gpus
+            Number of GPUs for each trial
+        time_limit
             The time limits
-        search_strategy
-            The search strategy
-        search_options
+        hpo_params
+            Parameters of the HPO
+        search_space
             The search options
-        scheduler_options
-        num_trials
         plot_results
+            Plotting the results
         console_log
+            Whether to log into the console
         ignore_warning
-
+            Whether to ignore the warning
+        verbosity
+            Verbosity
         """
         start_tick = time.time()
-        logging_config(folder=self._output_directory,
-                       name='main',
-                       console=console_log,
-                       logger=self._logger)
-        assert len(self._label_columns) == 1
+        assert len(self._label_columns) == 1, 'Currently, we only support single label.'
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
         search_space_reg = args(search_space=space.Dict(**self.search_space))
         # Scheduler and searcher for HPO
+        if hpo_params is None:
+            hpo_params = ag_text_presets.create('default')['hpo_params']
+        if search_space is None:
+            search_space =\
+                ag_text_presets.create('default')['models']['MultimodalTextModel']['search_space']
+        scheduler_options = hpo_params['scheduler_options']
         if scheduler_options is None:
             scheduler_options = dict()
-        scheduler_options = compile_scheduler_options(
+        scheduler_options = compile_scheduler_options_v2(
             scheduler_options=scheduler_options,
-            search_strategy=search_strategy,
-            search_options=search_options,
-            nthreads_per_trial=resource['num_cpus'],
-            ngpus_per_trial=resource['num_gpus'],
+            search_strategy=hpo_params['search_strategy'],
+            search_options=hpo_params['search_options'],
+            nthreads_per_trial=num_cpus,
+            ngpus_per_trial=num_gpus,
             checkpoint=os.path.join(self._output_directory, 'checkpoint.ag'),
-            num_trials=num_trials,
-            time_out=time_limits,
+            num_trials=hpo_params['num_trials'],
+            time_out=time_limit,
             resume=False,
             visualizer=scheduler_options.get('visualizer'),
             time_attr='report_idx',
             reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
-        column_types =
-
+        feature_generator = self.get_feature_generator()
         # Create a temporary cache file. The internal train function will load the
         # temporary cache.
         train_df_path = os.path.join(self._output_directory, 'cache_train_dataframe.pq')
@@ -869,6 +892,7 @@ class MultiModalTextModel:
         if isinstance(metrics, str):
             metrics = [metrics]
         assert self.net is not None
+        if not isinstance(valid_data, )
         if not isinstance(valid_data, TabularDataset):
             valid_data = TabularDataset(valid_data,
                                         columns=self._feature_columns + self._label_columns,

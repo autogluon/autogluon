@@ -201,6 +201,11 @@ class TextPredictor:
                                               output_directory=self._path,
                                               logger=logger,
                                               search_space=model_hparams['search_spaces'])
+            self._model.train(train_data=train_data,
+                              tuning_data=tuning_data,
+                              num_cpus=num_cpus,
+                              num_gpus=num_gpus,
+                              time_limit=time_limit)
         else:
             raise NotImplementedError("Currently, we only support using "
                                       "the autogluon-contrib-nlp and MXNet "

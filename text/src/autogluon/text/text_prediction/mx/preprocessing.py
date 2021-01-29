@@ -375,10 +375,8 @@ class MultimodalWithPretrainedPreprocessor:
             return bf.Tuple(bf.Tuple(feature_batchify_fn_l),
                             bf.Tuple(label_batchify_fn_l))
 
-    def process_train(self, df_or_dataset):
-        if isinstance(df_or_dataset, TabularDataset):
-            df_or_dataset = df_or_dataset.table
-        return parallel_transform(df_or_dataset, functools.partial(self.__call__, is_test=False))
+    def process_train(self, df):
+        return parallel_transform(df, functools.partial(self.__call__, is_test=False))
 
     def process_test(self, df_or_dataset):
         if isinstance(df_or_dataset, TabularDataset):
