@@ -5,7 +5,8 @@ import pandas as pd
 import pytest
 import tempfile
 from autogluon.core.utils.loaders import load_pd
-from autogluon.text import TextPrediction as task
+from autogluon.text import TextPredictor
+
 
 test_hyperparameters = {
     'models': {
