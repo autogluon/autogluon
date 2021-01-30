@@ -218,6 +218,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             raise NotImplementedError(f'Type of label column is not supported. '
                                       f'Label column type={self._label_column}')
         # Wrap the processed features and labels into a training dataset
+        print(categorical_features)
         all_data = text_features + categorical_features + [numerical_features, y]
         dataset = ArrayDataset(*all_data)
         return dataset
