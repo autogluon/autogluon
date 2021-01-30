@@ -183,7 +183,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                         continue
                     num_categories = len(generator.category_map[col_name]) + 1
                     self._categorical_num_categories.append(num_categories)
-                    processed_data = processed_data.to_numpy()
+                    processed_data = processed_data.to_numpy(np.int32)
                     processed_data[processed_data < 0] = num_categories - 1
                     categorical_features.append(processed_data)
                     self._categorical_feature_names.append(col_name)
