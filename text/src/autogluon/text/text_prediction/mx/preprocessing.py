@@ -47,8 +47,14 @@ def tokenize_data(data: pd.Series, tokenizer):
     return out
 
 
+def get_tokenizer(tokenizer_name):
+    _, _, tokenizer, _, _ \
+        = get_backbone(backbone_name)
+    return tokenizer
+
+
 class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
-    def __init__(self, column_types, label_column, tokenizer,
+    def __init__(self, column_types, label_column, tokenizer_name,
                  logger=None, cfg=None):
         self._column_types = column_types
         self._label_column = label_column
@@ -78,7 +84,8 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         if self._column_types[label_column] == _C.CATEGORICAL:
             self._label_generator = LabelEncoder()
 
-        self._tokenizer = tokenizer
+        self._tokenizer_name = tokenizer_name
+        self._tokenizer =
         self._fit_called = False
 
         # Some columns will be ignored
@@ -207,6 +214,8 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             raise NotImplementedError(f'Type of label column is not supported. '
                                       f'Label column type={self._label_column}')
         # Wrap the processed features and labels into a training dataset
+        print(len(text_features))
+        print(len(categorical_features))
         dataset = ArrayDataset(text_features + categorical_features + [numerical_features, y])
         return dataset
 

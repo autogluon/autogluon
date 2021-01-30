@@ -599,12 +599,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         reporter(**best_report_items_dict)
 
 
-def get_tokenizer(backbone_name):
-    _, _, tokenizer, _, _ \
-        = get_backbone(backbone_name)
-    return tokenizer
-
-
 class MultiModalTextModel:
     """Learner of the multimodal text data.
 
