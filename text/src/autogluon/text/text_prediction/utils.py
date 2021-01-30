@@ -4,7 +4,7 @@ import functools
 import logging
 import os
 import multiprocessing as mp
-from typing import List
+from typing import List, Optional
 import inspect
 
 

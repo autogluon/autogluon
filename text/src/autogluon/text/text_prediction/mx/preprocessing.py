@@ -2,7 +2,6 @@ import numpy as np
 import os
 import pandas as pd
 import functools
-import collections
 from mxnet.gluon.data import ArrayDataset
 from autogluon_contrib_nlp.utils.config import CfgNode
 from sklearn.base import TransformerMixin, BaseEstimator
