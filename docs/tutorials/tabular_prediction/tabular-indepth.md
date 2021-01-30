@@ -17,13 +17,13 @@ subsample_size = 500  # subsample subset of data for faster demo, try setting th
 train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
 
-label_column = 'occupation'
+label = 'occupation'
 print("Summary of occupation column: \n", train_data['occupation'].describe())
 
 new_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 test_data = new_data[5000:].copy()  # this should be separate data in your applications
-y_test = test_data[label_column]
-test_data_nolabel = test_data.drop(columns=[label_column])  # delete label column
+y_test = test_data[label]
+test_data_nolabel = test_data.drop(columns=[label])  # delete label column
 val_data = new_data[:5000].copy()
 
 metric = 'accuracy' # we specify eval-metric just for demo (unnecessary as it's the default)
@@ -69,7 +69,7 @@ hyperparameter_tune_kwargs = {  # HPO is not performed unless hyperparameter_tun
     'searcher': search_strategy,
 }
 
-predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(
+predictor = TabularPredictor(label=label, eval_metric=metric).fit(
     train_data, tuning_data=val_data, time_limit=time_limit,
     hyperparameters=hyperparameters, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
 )
@@ -97,7 +97,7 @@ In the above example, the predictive performance may be poor because we specifie
 Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two other methods to boost predictive performance are [bagging and stack-ensembling](https://arxiv.org/abs/2003.06505).  You'll often see performance improve if you specify `num_bag_folds` = 5-10, `num_stack_levels` = 1-3 in the call to `fit()`, but this will increase training times and memory/disk usage.
 
 ```{.python .input}
-predictor = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data,
+predictor = TabularPredictor(label=label, eval_metric=metric).fit(train_data,
     num_bag_folds=5, num_bag_sets=1, num_stack_levels=1,
     hyperparameters = {'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
 )
@@ -108,7 +108,7 @@ You should not provide `tuning_data` when stacking/bagging, and instead provide 
 ```{.python .input}
 save_path = 'agModels-predictOccupation'  # folder where to store trained models
 
-predictor = TabularPredictor(label=label_column, eval_metric=metric, path=save_path).fit(
+predictor = TabularPredictor(label=label, eval_metric=metric, path=save_path).fit(
     train_data, auto_stack=True,
     time_limit=30, hyperparameters={'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
 )
@@ -132,13 +132,13 @@ We can make a prediction on an individual example rather than a full dataset:
 ```{.python .input}
 datapoint = test_data_nolabel.iloc[[0]]  # Note: .iloc[0] won't work because it returns pandas Series instead of DataFrame
 print(datapoint)
-print(predictor.predict(datapoint))
+predictor.predict(datapoint)
 ```
 
 To output predicted class probabilities instead of predicted classes, you can use:
 
 ```{.python .input}
-predictor.predict_proba(datapoint, as_pandas=True)  # as_pandas shows which probability corresponds to which class
+predictor.predict_proba(datapoint)  # returns a DataFrame that shows which probability corresponds to which class
 ```
 
 By default, `predict()` and `predict_proba()` will utilize the model that AutoGluon thinks is most accurate, which is usually an ensemble of many individual models. Here's how to see which model this is:
@@ -170,7 +170,7 @@ Here's how to specify a particular model to use for prediction instead of AutoGl
 i = 0  # index of model to use
 model_to_use = predictor.get_model_names()[i]
 model_pred = predictor.predict(datapoint, model=model_to_use)
-print("Prediction from %s model: %s" % (model_to_use, model_pred))
+print("Prediction from %s model: %s" % (model_to_use, model_pred.iloc[0]))
 ```
 
 We can easily access various information about the trained predictor or a particular model:
@@ -206,8 +206,7 @@ which will correctly select between `predict()` or `predict_proba()` depending o
 To better understand our trained predictor, we can estimate the overall importance of each feature:
 
 ```{.python .input}
-importance_scores = predictor.feature_importance(test_data)
-print(importance_scores)
+predictor.feature_importance(test_data)
 ```
 
 Computed via [permutation-shuffling](https://explained.ai/rf-importance/), these feature importance scores quantify the drop in predictive performance (of the already trained predictor) when one column's values are randomly shuffled across rows. The top features in this list contribute most to AutoGluon's accuracy (for predicting when/if a patient will be readmitted to the hospital). Features with non-positive importance score hardly contribute to the predictor's accuracy, or may even be actively harmful to include in the data (consider removing these features from your data and calling `fit` again). These scores facilitate interpretability of the predictor's global behavior (which features it relies on for *all* predictions) rather than [local explanations](https://christophm.github.io/interpretable-ml-book/taxonomy-of-interpretability-methods.html) that only rationalize one particular prediction.
@@ -228,7 +227,7 @@ num_test = 20
 preds = np.array(['']*num_test, dtype='object')
 for i in range(num_test):
     datapoint = test_data_nolabel.iloc[[i]]
-    pred_numpy = predictor.predict(datapoint)
+    pred_numpy = predictor.predict(datapoint, as_pandas=False)
     preds[i] = pred_numpy[0]
 
 perf = predictor.evaluate_predictions(y_test[:num_test], preds, auxiliary_metrics=True)
@@ -278,7 +277,7 @@ While computationally-favorable, single individual models will usually have lowe
 student_models = predictor.distill(time_limit=30)  # specify much longer time limit in real applications
 print(student_models)
 preds_student = predictor.predict(test_data_nolabel, model=student_models[0])
-print(f"predictions from {student_models[0]}:", preds_student)
+print(f"predictions from {student_models[0]}:", list(preds_student)[:5])
 predictor.leaderboard(test_data)
 ```
 
@@ -290,13 +289,13 @@ One option is to specify more lightweight `presets`:
 
 ```{.python .input}
 presets = ['good_quality_faster_inference_only_refit', 'optimize_for_deployment']
-predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, presets=presets, time_limit=30)
+predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, presets=presets, time_limit=30)
 ```
 
 Another option is to specify more lightweight hyperparameters:
 
 ```{.python .input}
-predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, hyperparameters='very_light', time_limit=30)
+predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, hyperparameters='very_light', time_limit=30)
 ```
 
 Here you can set `hyperparameters` to either 'light', 'very_light', or 'toy' to obtain progressively smaller (but less accurate) models and predictors. Advanced users may instead try manually specifying particular models' hyperparameters in order to make them faster/smaller.
@@ -305,7 +304,7 @@ Finally, you may also exclude specific unwieldy models from being trained at all
 
 ```{.python .input}
 excluded_model_types = ['KNN', 'NN', 'custom']
-predictor_light = TabularPredictor(label=label_column, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
+predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
 ```
 
 

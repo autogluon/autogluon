@@ -42,7 +42,7 @@ import numpy as np
 from autogluon.tabular import TabularPredictor
 
 directory = '~/IEEEfraud/'  # directory where you have downloaded the data CSV files from the competition
-label_column = 'isFraud'  # name of target variable to predict in this competition
+label = 'isFraud'  # name of target variable to predict in this competition
 eval_metric = 'roc_auc'  # Optional: specify that competition evaluation metric is AUC
 save_path = directory + 'AutoGluonModels/'  # where to store trained models
 
@@ -58,7 +58,7 @@ train_data = pd.merge(train_transaction, train_identity, on='TransactionID', how
 
 Note that a left-join on the `TransactionID` key happened to be most appropriate for this Kaggle competition, but for others involving multiple training data files, you will likely need to use a different join strategy (always consider this very carefully). Now that all our training data resides within a single table, we can apply AutoGluon. Below, we specify the `presets` argument to maximize AutoGluon's predictive accuracy which usually requires that you run `fit()` with longer time limits (3600s below should likely be increased in your run):
 ```
-predictor = TabularPredictor(label=label_column, eval_metric=eval_metric, path=save_path, verbosity=3).fit(
+predictor = TabularPredictor(label=label, eval_metric=eval_metric, path=save_path, verbosity=3).fit(
     train_data, presets='best_quality', time_limit=3600
 )
 
@@ -73,25 +73,25 @@ test_transaction = pd.read_csv(directory+'test_transaction.csv')
 test_data = pd.merge(test_transaction, test_identity, on='TransactionID', how='left')  # same join applied to training files
 
 y_predproba = predictor.predict_proba(test_data)
-print(y_predproba[:5]) # some example predicted fraud-probabilities
+y_predproba.head(5)  # some example predicted fraud-probabilities
 ```
 
 When submitting predicted probabilities for classification competitions, it is imperative these correspond to the same class expected by Kaggle. For binary classification tasks, you can see which class AutoGluon's predicted probabilities correspond to via:
 
 ```
-positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1][0]
+predictor.positive_class
 ```
 
 For multiclass classification tasks, you can see which classes AutoGluon's predicted probabilities correspond to via:
 
 ```
-predictor.class_labels # classes in this list correspond to columns of predict_proba() output
+predictor.class_labels  # classes in this list correspond to columns of predict_proba() output
 ```
 
 Alternatively, the following command should clarify which predicted-probability corresponds to which class:
 
 ```
-y_predproba = predictor.predict_proba(test_data, as_pandas=True)
+y_predproba = predictor.predict_proba(test_data)
 ```
 
 Now that we have made a prediction for each row in the test dataset, we can submit these predictions to Kaggle. Most Kaggle competitions provide a sample submission file, in which you can simply overwrite the sample predictions with your own as we do below:
