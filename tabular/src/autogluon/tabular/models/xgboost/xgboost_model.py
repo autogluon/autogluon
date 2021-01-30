@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class XGBoostModel(AbstractModel):
+    """
+    XGBoost model: https://xgboost.readthedocs.io/en/latest/
+
+    Hyperparameter options: https://xgboost.readthedocs.io/en/latest/parameter.html
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._ohe_generator = None

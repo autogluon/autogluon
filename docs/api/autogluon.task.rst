@@ -126,8 +126,7 @@ Additional Tabular APIs
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularDataset
-   :no-members:
-   :no-inherited-members:
+   :members: init
 
 .. automodule:: autogluon.core.features.feature_metadata
 

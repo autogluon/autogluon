@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 # TODO: Consider having CatBoost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatBoostModel(AbstractModel):
+    """
+    CatBoost model: https://catboost.ai/
+
+    Hyperparameter options: https://catboost.ai/docs/concepts/python-reference_parameters-list.html
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._category_features = None

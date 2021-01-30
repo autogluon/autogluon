@@ -28,20 +28,25 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractModel:
+    """
+    Abstract model implementation from which all AutoGluon models inherit.
+
+    Parameters
+    ----------
+    path (str): directory where to store all outputs.
+    name (str): name of subdirectory inside path where model will be saved.
+    problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
+    eval_metric (str or autogluon.core.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
+    hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
+    feature_metadata (autogluon.core.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
+    """
+
     model_file_name = 'model.pkl'
     model_info_name = 'info.pkl'
     model_info_json_name = 'info.json'
 
     def __init__(self, path: str, name: str, problem_type: str, eval_metric: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_metadata: FeatureMetadata = None, debug=0, **kwargs):
-        """ Creates a new model.
-            Args:
-                path (str): directory where to store all outputs.
-                name (str): name of subdirectory inside path where model will be saved.
-                problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-                eval_metric (str or autogluon.core.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
-                hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-                feature_metadata (autogluon.core.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
-        """
+
         self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
         self.path_root = path
         self.path_suffix = self.name + os.path.sep  # TODO: Make into function to avoid having to reassign on load?

@@ -4,8 +4,8 @@
 autogluon.features
 ==================
 
-Generators
-----------
+Feature Generators
+------------------
 
 .. automodule:: autogluon.features.generators
 .. currentmodule:: autogluon.features.generators
@@ -50,13 +50,13 @@ Generators
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: AutoMLPipelineFeatureGenerator
-   :members:
+   :members: init
 
 :hidden:`PipelineFeatureGenerator`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: PipelineFeatureGenerator
-   :members:
+   :members: init
 
 :hidden:`BulkFeatureGenerator`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
