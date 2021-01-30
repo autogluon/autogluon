@@ -84,7 +84,7 @@ preset_object_detector = dict(
     # Recommended for applications that benefit from the best possible model accuracy.
     best_quality={
         'hyperparameters': {
-            'transfer': Categorical('faster_rcnn_fpn_resnet101_v1b_coco'),
+            'transfer': 'faster_rcnn_fpn_resnet101_v1d_coco',
             'lr': Real(1e-5, 1e-3, log=True),
             'batch_size': Categorical(4, 8),
             'epochs': 30
@@ -116,7 +116,7 @@ preset_object_detector = dict(
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
     medium_quality_faster_train={
         'hyperparameters': {
-            'transfer': Categorical('ssd_512_resnet50_v1_coco'),
+            'transfer': 'ssd_512_resnet50_v1_coco',
             'lr': 0.01,
             'batch_size': Categorical(8, 16),
             'epochs': 30

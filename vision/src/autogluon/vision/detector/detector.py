@@ -90,7 +90,7 @@ class ObjectDetector(object):
             In-depth Preset Info:
                 best_quality={
                     'hyperparameters': {
-                        'transfer': Categorical('faster_rcnn_fpn_resnet101_v1b_coco'),
+                        'transfer': Categorical('faster_rcnn_fpn_resnet101_v1d_coco'),
                         'lr': Real(1e-5, 1e-3, log=True),
                         'batch_size': Categorical(4, 8),
                         'epochs': 30
@@ -98,8 +98,8 @@ class ObjectDetector(object):
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 128,
                         'search_strategy': 'bayesopt'}}
-                    Best predictive accuracy with little consideration to inference time or model size. Achieve even better results by specifying a large time_limit value.
-                    Recommended for applications that benefit from the best possible model accuracy.
+                    Best predictive accuracy with little consideration to training/inference time or model size. Achieve even better results by specifying a large time_limit value.
+                    Recommended for applications that benefit from the best possible model accuracy and be prepared with the extremly long training time.
 
                 good_quality_fast_inference={
                     'hyperparameters': {
@@ -251,7 +251,9 @@ class ObjectDetector(object):
         task = _ObjectDetection(config=config)
         task._logger.setLevel(log_level)
         task._logger.propagate = True
-        self._detector = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            self._detector = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
         self._detector._logger.setLevel(log_level)
         self._detector._logger.propagate = True
         self._fit_summary = task.fit_summary()
