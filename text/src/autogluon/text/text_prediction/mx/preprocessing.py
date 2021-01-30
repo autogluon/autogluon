@@ -177,13 +177,13 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                     processed_data = col_value.astype('category')
                     generator = self._feature_generators[col_name]
                     processed_data = generator.fit_transform(
-                        pd.DataFrame({col_name: processed_data}))[col_name].cat.codes
+                        pd.DataFrame({col_name: processed_data}))[col_name]\
+                        .cat.codes.to_numpy(np.int32, copy=True)
                     if len(np.unique(processed_data)) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
                     num_categories = len(generator.category_map[col_name]) + 1
                     self._categorical_num_categories.append(num_categories)
-                    processed_data = processed_data.to_numpy(np.int32, copy=True)
                     processed_data[processed_data < 0] = num_categories - 1
                     categorical_features.append(processed_data)
                     self._categorical_feature_names.append(col_name)
