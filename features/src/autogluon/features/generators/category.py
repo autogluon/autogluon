@@ -49,7 +49,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             None : Keep missing values as is. They will appear as NaN and have no category assigned to them.
             'mode' : Set missing values to the most frequent category in their feature.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
     def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = None, maximum_num_cat: int = None, fillna: str = None, **kwargs):
         super().__init__(**kwargs)

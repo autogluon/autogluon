@@ -464,7 +464,7 @@ class TabularPredictor(TabularPredictorV1):
                 This has NO impact on inference accuracy.
                 It is recommended if the only goal is to use the trained model for prediction.
                 Certain advanced functionality may no longer be available if `save_space=True`. Refer to `predictor.save_space()` documentation for more details.
-            feature_generator : :class:`autogluon.tabular.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.tabular.features.generators.AutoMLPipelineFeatureGenerator`
+            feature_generator : :class:`autogluon.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.features.generators.AutoMLPipelineFeatureGenerator`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
                 To control aspects of the default feature generation process, you can pass in an :class:`AutoMLPipelineFeatureGenerator` object constructed using some of these kwargs:

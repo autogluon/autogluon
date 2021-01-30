@@ -21,7 +21,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    generators : List[List[AbstractFeatureGenerator]]
+    generators : List[List[:class:`AbstractFeatureGenerator`]]
         generators is a list of generator groups, where a generator group is a list of generators.
         Feature generators within generators[i] (generator group) are all fit on the same data, and their outputs are then concatenated to form the output of generators[i].
         generators[i+1] are then fit on the output of generators[i].
@@ -40,9 +40,9 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         pre_generators are generators which are sequentially fit prior to generators.
         Functions identically to post_generators argument, but pre_generators are called before generators, while post_generators are called after generators.
         Provided for convenience to classes inheriting from BulkFeatureGenerator.
-        Common pre_generator's include AsTypeFeatureGenerator and FillNaFeatureGenerator, which act to prune and clean the data instead of generating entirely new features.
+        Common pre_generator's include :class:`AsTypeFeatureGenerator` and :class:`FillNaFeatureGenerator`, which act to prune and clean the data instead of generating entirely new features.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
 
     Examples
     --------

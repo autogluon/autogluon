@@ -2,7 +2,7 @@
     :class: hidden-section
 
 autogluon.features
-=========================
+==================
 
 Generators
 ----------
@@ -14,9 +14,11 @@ Generators
    :nosignatures:
 
    AbstractFeatureGenerator
+   AutoMLPipelineFeatureGenerator
+   PipelineFeatureGenerator
+   BulkFeatureGenerator
    AsTypeFeatureGenerator
    BinnedFeatureGenerator
-   BulkFeatureGenerator
    CategoryFeatureGenerator
    DatetimeFeatureGenerator
    DropDuplicatesFeatureGenerator
@@ -30,11 +32,10 @@ Generators
    RenameFeatureGenerator
    TextNgramFeatureGenerator
    TextSpecialFeatureGenerator
-   PipelineFeatureGenerator
-   AutoMLPipelineFeatureGenerator
+   
 
 :hidden:`AbstractFeatureGenerator`
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: AbstractFeatureGenerator
    :members:
@@ -46,36 +47,109 @@ Generators
         :methods:
 
 :hidden:`AutoMLPipelineFeatureGenerator`
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: AutoMLPipelineFeatureGenerator
    :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: AutoMLPipelineFeatureGenerator
-        :methods:
 
 :hidden:`PipelineFeatureGenerator`
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: PipelineFeatureGenerator
    :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: PipelineFeatureGenerator
-        :methods:
 
 :hidden:`BulkFeatureGenerator`
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: BulkFeatureGenerator
-   :members:
+   :members: init
 
-    .. rubric:: Methods
+:hidden:`AsTypeFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    .. autoautosummary:: BulkFeatureGenerator
-        :methods:
+.. autoclass:: AsTypeFeatureGenerator
+   :members: init
+
+:hidden:`BinnedFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: BinnedFeatureGenerator
+   :members: init
+
+:hidden:`CategoryFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: CategoryFeatureGenerator
+   :members: init
+
+:hidden:`DatetimeFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: DatetimeFeatureGenerator
+   :members: init
+
+:hidden:`DropDuplicatesFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: DropDuplicatesFeatureGenerator
+   :members: init
+
+:hidden:`DropUniqueFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: DropUniqueFeatureGenerator
+   :members: init
+
+:hidden:`DummyFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: DummyFeatureGenerator
+   :members: init
+
+:hidden:`FillNaFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: FillNaFeatureGenerator
+   :members: init
+
+:hidden:`IdentityFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: IdentityFeatureGenerator
+   :members: init
+
+:hidden:`LabelEncoderFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: LabelEncoderFeatureGenerator
+   :members: init
+
+:hidden:`CategoryMemoryMinimizeFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: CategoryMemoryMinimizeFeatureGenerator
+   :members: init
+
+:hidden:`NumericMemoryMinimizeFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: NumericMemoryMinimizeFeatureGenerator
+   :members: init
+
+:hidden:`RenameFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: RenameFeatureGenerator
+   :members: init
+
+:hidden:`TextNgramFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TextNgramFeatureGenerator
+   :members: init
+
+:hidden:`TextSpecialFeatureGenerator`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TextSpecialFeatureGenerator
+   :members: init

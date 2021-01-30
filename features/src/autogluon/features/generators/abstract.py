@@ -34,8 +34,8 @@ class AbstractFeatureGenerator:
         Any feature in an incoming DataFrame that is not present in features_in is dropped and will not influence the transformation logic.
         If None, infer during fit from the _infer_features_in method.
         Equivalent to feature_metadata_in.get_features() post-fit.
-    feature_metadata_in : FeatureMetadata, default None
-        FeatureMetadata object corresponding to the training data input features.
+    feature_metadata_in : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`, default None
+        :class:`FeatureMetadata` object corresponding to the training data input features.
         If None, infer during fit from the _infer_feature_metadata_in method.
         Any features not present in features_in (if provided) will be removed from feature_metadata_in.
     post_generators : list of FeatureGenerators, default None
@@ -47,7 +47,7 @@ class AbstractFeatureGenerator:
     pre_drop_useless : bool, default False
         If True, features_in will be pruned at fit time of features containing only a single unique value across all rows.
     post_drop_duplicates : bool, default False
-        If True, a DropDuplicatesFeatureGenerator will be appended to post_generators.
+        If True, a :class:`DropDuplicatesFeatureGenerator` will be appended to post_generators.
         This feature generator will drop any duplicate features found in the data, keeping only one feature within any duplicate feature sets.
         Warning: For large datasets with many features, this may be very computationally expensive or even computationally infeasible.
     reset_index : bool, default False

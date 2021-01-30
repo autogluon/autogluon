@@ -70,7 +70,7 @@ class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
         dtype to clip and convert features to.
         Clipping will automatically use the correct min and max values for the dtype provided.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
     def __init__(self, dtype_out=np.uint8, **kwargs):
         super().__init__(**kwargs)

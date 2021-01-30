@@ -30,12 +30,12 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
         If True, then the NaN values are filled inplace without copying the input data.
         This will alter the input data outside of the scope of this function.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
     def __init__(self, fillna_map=None, fillna_default=np.nan, inplace=False, **kwargs):
         super().__init__(**kwargs)
         if fillna_map is None:
-            fillna_map = {'object': ''}
+            fillna_map = {R_OBJECT: ''}
         self.fillna_map = fillna_map
         self.fillna_default = fillna_default
         self._fillna_feature_map = None
