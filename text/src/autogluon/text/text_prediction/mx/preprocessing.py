@@ -2,6 +2,7 @@ import numpy as np
 import os
 import pandas as pd
 import functools
+import logging
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
@@ -15,6 +16,8 @@ from .. import constants as _C
 from ..utils import parallel_transform
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+logger = logging.getLogger(__name__)
 
 
 def base_preprocess_cfg():
@@ -55,15 +58,14 @@ def get_tokenizer(backbone_name):
 
 
 class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
-    def __init__(self, column_types, label_column, tokenizer_name,
-                 logger=None, cfg=None):
+    def __init__(self, column_types, label_column, tokenizer_name, cfg=None):
         self._column_types = column_types
         self._label_column = label_column
         cfg = base_preprocess_cfg().clone_merge(cfg)
         self._cfg = cfg
         self._feature_generators = dict()
         self._label_generator = None
-        self._logger = logger
+
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
@@ -147,6 +149,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         numerical_features = []
         for col_name in sorted(X.columns):
             col_type = self._column_types[col_name]
+            logger.log(15, f'Process col "{col_name}" with type "{col_type}"')
             col_value = X[col_name]
             if col_type == _C.NULL:
                 self._ignore_columns_set.add(col_name)
@@ -215,9 +218,8 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             raise NotImplementedError(f'Type of label column is not supported. '
                                       f'Label column type={self._label_column}')
         # Wrap the processed features and labels into a training dataset
-        print(len(text_features))
-        print(len(categorical_features))
-        dataset = ArrayDataset(text_features + categorical_features + [numerical_features, y])
+        all_data = text_features + categorical_features + [numerical_features, y]
+        dataset = ArrayDataset(*all_data)
         return dataset
 
     def transform(self, X_df, y_df=None):
@@ -232,10 +234,12 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
     def __getstate__(self):
         state = self.__dict__.copy()
         state['_tokenizer'] = None
+        state['_logger'] = None
         return state
 
     def __setstate__(self, state):
         tokenizer_name = state['_tokenizer_name']
         tokenizer = get_tokenizer(tokenizer_name)
         state['_tokenizer'] = tokenizer
+        state['_logger'] = logging
         self.__dict__ = state
