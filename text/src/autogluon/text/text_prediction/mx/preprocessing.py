@@ -120,8 +120,12 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         return self._cfg
 
     @property
-    def label_maps(self):
-        return self._label_maps
+    def label_type(self):
+        return self._column_types[self._label_column]
+
+    @property
+    def label_generator(self):
+        return self._label_generator
 
     def fit_transform(self, X, y):
         """Fit and Transform the dataframe
@@ -210,9 +214,9 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                                           f'Received {col_name}={col_type}.')
         if len(numerical_features) > 0:
             numerical_features = np.stack(numerical_features, axis=-1)
-        if self._column_types[self._label_column] == _C.CATEGORICAL:
+        if self.label_type == _C.CATEGORICAL:
             y = self._label_generator.fit_transform(y)
-        elif self._column_types[self._label_column] == _C.NUMERICAL:
+        elif self.label_type == _C.NUMERICAL:
             y = pd.to_numeric(y).to_numpy()
         else:
             raise NotImplementedError(f'Type of label column is not supported. '
@@ -223,13 +227,57 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         return dataset
 
     def transform(self, X_df, y_df=None):
-        """"
-
-        """
+        """"Transform the columns"""
         assert self._fit_called, 'You will need to first call ' \
                                  'preprocessor.fit_transform before calling ' \
                                  'preprocessor.transform.'
-        pass
+        text_features = []
+        categorical_features = []
+        numerical_features = []
+        for col_name in self._text_feature_names:
+            col_value = X_df[col_name]
+            col_type = self._column_types[col_name]
+            if col_type == _C.TEXT or col_type == _C.CATEGORICAL:
+                processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
+            elif col_type == _C.NUMERICAL:
+                processed_data = pd.to_numeric(col_value).apply('{:.3f}'.format)
+            else:
+                raise  NotImplementedError
+            processed_data = parallel_transform(
+                df=processed_data,
+                chunk_processor=functools.partial(tokenize_data,
+                                                  tokenizer=self._tokenizer))
+            text_features.append(processed_data)
+
+        for col_name, num_category in zip(self._categorical_feature_names,
+                                          self._categorical_num_categories):
+            col_value = X_df[col_name]
+            processed_data = col_value.astype('category')
+            generator = self._feature_generators[col_name]
+            processed_data = generator.transform(
+                pd.DataFrame({col_name: processed_data}))[col_name] \
+                .cat.codes.to_numpy(np.int32, copy=True)
+            processed_data[processed_data < 0] = num_category - 1
+            categorical_features.append(processed_data)
+
+        for col_name in self._numerical_feature_names:
+            generator = self._feature_generators[col_name]
+            col_value = pd.to_numeric(X_df[col_name]).to_numpy()
+            processed_data = generator.transform(np.expand_dims(col_value, axis=-1))[:, 0]
+            numerical_features.append(processed_data)
+        numerical_features = np.stack(numerical_features, axis=-1)
+        if y_df is not None:
+            if self.label_type == _C.CATEGORICAL:
+                y = self.label_generator.transform(y_df)
+            elif self.label_type == _C.NUMERICAL:
+                y = pd.to_numeric(y_df).to_numpy()
+            else:
+                raise NotImplementedError
+            all_data = text_features + categorical_features + [numerical_features, y]
+            return ArrayDataset(*all_data)
+        else:
+            all_data = text_features + categorical_features + [numerical_features]
+            return ArrayDataset(*all_data)
 
     def __getstate__(self):
         state = self.__dict__.copy()
