@@ -17,7 +17,7 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
-from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
+from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, get_absolute_path
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils import get_pred_from_proba, infer_problem_type
@@ -88,8 +88,8 @@ class AbstractLearner:
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
 
     def create_contexts(self, path_context):
-        model_context = path_context + 'models' + os.path.sep
-        save_path = path_context + self.learner_file_name
+        model_context = get_absolute_path(path_context + 'models' + os.path.sep)
+        save_path = get_absolute_path(path_context + self.learner_file_name)
         return path_context, model_context, save_path
 
     def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):

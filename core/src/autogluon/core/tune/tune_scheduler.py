@@ -89,7 +89,18 @@ class RayTuneScheduler(object):
         for ag_arg, tune_arg in ag_to_tune_arg_mapping.items():
             self._replace_ag_arg_with_tune(tune_args, ag_arg, tune_arg)
 
-        tune_args['metric'] = reward_attr
+        set_tune_metrics = True
+        if tune_args.get('scheduler', None):
+            tune_args['scheduler'].set_search_properties(metric=reward_attr, mode='max')
+            set_tune_metrics = False
+
+        if tune_args.get('search_alg', None):
+            tune_args['search_alg']._metric = reward_attr
+            tune_args['search_alg']._mode = 'max'
+            set_tune_metrics = False
+
+        if set_tune_metrics:
+            tune_args['metric'] = reward_attr
 
         ignore_args = ['searcher', 'search_options', 'checkpoint', 'visualizer', 'dist_ip_addrs', 'resume']
         tune_args = {k: v for k, v in tune_args.items() if k not in ignore_args}
@@ -104,6 +115,7 @@ class RayTuneScheduler(object):
 
     def train_fn_wrapper(self, fn, config, reporter=None, **kwargs):
         config = EasyDict(config)
+        print(config)
         config['task_id'] = tune.session.get_session().trial_name
         return fn(config, reporter=TuneReporter(), **kwargs)
 

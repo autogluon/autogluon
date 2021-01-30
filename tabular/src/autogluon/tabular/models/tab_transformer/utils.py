@@ -11,7 +11,7 @@ from autogluon.core.models.abstract import model_trial
 logger = logging.getLogger(__name__)
 
 @args()
-def tt_trial(args, reporter):
+def tt_trial(args, reporter, checkpoint_dir=None):
     """ Training and evaluation function used during a single trial of HPO """
     try:
         model, args, util_args = model_trial.prepare_inputs(args=args)
