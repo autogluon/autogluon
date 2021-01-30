@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from .stacker_ensemble_model import StackerEnsembleModel
-from .greedy_weighted_ensemble_model import GreedyWeightedEnsembleModel
+from ..greedy_ensemble.greedy_weighted_ensemble_model import GreedyWeightedEnsembleModel
 
 logger = logging.getLogger(__name__)
 

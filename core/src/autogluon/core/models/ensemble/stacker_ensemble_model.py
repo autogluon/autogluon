@@ -1,17 +1,19 @@
-import copy, logging, time
-import os
+import copy
+import logging
+import time
 from typing import Dict
-import numpy as np
-import pandas as pd
+
 from collections import defaultdict
 
-from autogluon.core.utils.utils import generate_kfold
-from autogluon.core.constants import MULTICLASS
-from autogluon.core.features.types import R_FLOAT, S_STACK
-from autogluon.core.features.feature_metadata import FeatureMetadata
+import numpy as np
+import pandas as pd
 
-from autogluon.core.models import AbstractModel
+from ...constants import MULTICLASS
+from ...features.feature_metadata import FeatureMetadata
+from ...features.types import R_FLOAT, S_STACK
+
 from .bagged_ensemble_model import BaggedEnsembleModel
+from ..abstract.abstract_model import AbstractModel
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,15 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
+    """
+    Stack ensemble meta-model which functions identically to :class:`BaggedEnsembleModel` with the additional capability to leverage base models.
+
+    By specifying base models during init, stacker models can use the base model predictions as features during training and inference.
+
+    This property allows for significantly improved model quality in many situations compared to non-stacking alternatives.
+
+    Stacker models can act as base models to other stacker models, enabling multi-layer stack ensembling.
+    """
     def __init__(self, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, **kwargs):
         super().__init__(**kwargs)
         if base_model_names is None:

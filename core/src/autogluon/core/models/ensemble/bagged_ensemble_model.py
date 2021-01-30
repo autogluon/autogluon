@@ -9,14 +9,13 @@ from functools import reduce
 import numpy as np
 import pandas as pd
 
-from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
-from autogluon.core.utils.utils import generate_kfold
-from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils.utils import _compute_fi_with_stddev
+from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
+from ...utils.exceptions import TimeLimitExceeded
+from ...utils.loaders import load_pkl
+from ...utils.savers import save_pkl
+from ...utils.utils import generate_kfold, _compute_fi_with_stddev
 
-from autogluon.core.models import AbstractModel
+from ..abstract.abstract_model import AbstractModel
 
 logger = logging.getLogger(__name__)
 

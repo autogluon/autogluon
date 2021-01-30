@@ -59,7 +59,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 
 :hidden:`TabularPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.tabular
 
 .. autoclass:: TabularPredictor
@@ -103,7 +103,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 
 :hidden:`TextPrediction`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.text
 
 .. autoclass:: TextPrediction
@@ -118,7 +118,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 
 Additional Tabular APIs
-----------------------------------
+-----------------------
 
 .. automodule:: autogluon.tabular
 
@@ -144,7 +144,7 @@ Additional Image Prediction APIs
 .. automodule:: autogluon.mxnet
 
 :hidden:`Classifier`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: Classifier
    :members: predict, evaluate, load, save

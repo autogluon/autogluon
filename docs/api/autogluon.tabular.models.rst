@@ -99,8 +99,8 @@ Models
 Ensemble Models
 ---------------
 
-.. automodule:: autogluon.tabular.models
-.. currentmodule:: autogluon.tabular.models
+.. automodule:: autogluon.core.models
+.. currentmodule:: autogluon.core.models
 
 .. autosummary::
    :nosignatures:
