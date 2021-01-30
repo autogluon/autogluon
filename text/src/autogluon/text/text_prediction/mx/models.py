@@ -15,9 +15,10 @@ from mxnet.gluon.data import DataLoader
 from autogluon_contrib_nlp.models import get_backbone
 from autogluon_contrib_nlp.lr_scheduler import InverseSquareRootScheduler
 from autogluon_contrib_nlp.utils.config import CfgNode
-from autogluon_contrib_nlp.utils.misc import logging_config, grouper, \
+from autogluon_contrib_nlp.utils.misc import grouper, \
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
+
 from autogluon.core import args, space
 from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.loaders import load_pkl, load_pd
@@ -29,7 +30,9 @@ from autogluon.core.dataset import TabularDataset
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 from .modules import MultiModalWithPretrainedTextNN
+from .preprocessing import MultiModalTextFeatureProcessor
 from .. import constants as _C
+from ..utils import logging_config
 from ..presets import ag_text_presets
 from ... import version
 
@@ -307,8 +310,10 @@ def infer_batch_size(model, train_data):
 
 @use_np
 def train_function(args, reporter, train_df_path, tuning_df_path,
-                   time_limits, time_start, base_config, problem_types,
-                   label_columns, label_shapes, log_metrics, stopping_metric,
+                   time_limit, time_start, base_config,
+                   problem_type, column_types,
+                   feature_columns, label_column, label_shape,
+                   log_metrics, stopping_metric,
                    console_log, ignore_warning=False):
     """
 
@@ -323,18 +328,24 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Path of the training dataframe
     tuning_df_path
         Path of the tuning dataframe
-    time_limits
-        Time limits
+    time_limit
+        The time limit of calling this function
     time_start
         The starting timestamp of the experiment
     base_config
-        Base configuration
-    problem_types
-        Types of the problem. Each label can have one problem_type
-    label_columns
-        Label columns
-    label_shapes
-        Shapes of the labels
+        Basic configuration
+    problem_type
+        Type of the problem.
+    column_types
+        Type of columns
+    feature_columns
+        The feature columns
+    label_column
+        Label column
+    label_shape
+        Shapes of the label.
+        If label is a numerical column, it means the size of the label.
+        If label is a categorical column, it means the number of choices of the label
     log_metrics
         Metrics for logging
     stopping_metric
@@ -345,9 +356,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Whether to ignore warning
 
     """
-    if time_limits is not None:
+    if time_limit is not None:
         start_train_tick = time.time()
-        time_left = time_limits - (start_train_tick - time_start)
+        time_left = time_limit - (start_train_tick - time_start)
         if time_left <= 0:
             if reporter is not None:
                 reporter.terminate()
@@ -380,9 +391,14 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         # When the reporter is not None,
         # we create the saved directory based on the task_id + time
         task_id = args.task_id
-        exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
+        exp_dir = os.path.join(exp_dir, 'task{}_{}'.format(task_id, time.time()))
         os.makedirs(exp_dir, exist_ok=True)
         cfg.defrost()
+        cfg.misc.exp_dir = exp_dir
+        cfg.freeze()
+    else:
+        exp_dir = os.path.join(exp_dir, 'task0_{}'.format(time.time()))
+        os.makedirs(exp_dir, exist_ok=True)
         cfg.misc.exp_dir = exp_dir
         cfg.freeze()
     logger = logging.getLogger()
@@ -395,12 +411,15 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         f.write(str(cfg))
     text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
     # Build Preprocessor + Preprocess the training dataset + Inference problem type
-    # TODO Move preprocessor + Dataloader to outer loop to better cache the dataloader
-    preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
-                                                label_columns=label_columns,
-                                                max_length=cfg.model.preprocess.max_length,
-                                                merge_text=cfg.model.preprocess.merge_text)
-    logger.info('Process training set...')
+    # TODO Dynamically cache the preprocessor that has been fitted.
+    preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
+                                                  label_column=label_column,
+                                                  tokenizer=tokenizer,
+                                                  logger=logger,
+                                                  cfg=cfg.preprocess)
+    logger.info('Fitting and transforming the train data...')
+    processed_train_dataset = preprocessor.fit_transform(train_data[feature_columns],
+                                                         train_data[label_column])
     processed_train = preprocessor.process_train(train_data)
     logger.info('Done!')
     logger.info('Process dev set...')
@@ -465,9 +484,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     no_better_rounds = 0
     report_idx = 0
     start_tick = time.time()
-    if time_limits is not None:
-        time_limits -= start_tick - time_start
-        if time_limits <= 0:
+    if time_limit is not None:
+        time_limit -= start_tick - time_start
+        if time_limit <= 0:
             reporter.terminate()
             return
     best_report_items = None
@@ -580,6 +599,12 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         reporter(**best_report_items_dict)
 
 
+def get_tokenizer(backbone_name):
+    _, _, tokenizer, _, _ \
+        = get_backbone(backbone_name)
+    return tokenizer
+
+
 class MultiModalTextModel:
     """Learner of the multimodal text data.
 
@@ -623,19 +648,13 @@ class MultiModalTextModel:
         self._base_config.defrost()
         if output_directory is not None:
             self._base_config.misc.exp_dir = output_directory
-        else:
-            output_directory = self._base_config.misc.exp_dir
         self._base_config.misc.exp_dir = os.path.abspath(self._base_config.misc.exp_dir)
         self._base_config.freeze()
-        if search_space is None:
-            self._search_space = dict()
-        else:
-            assert isinstance(search_space, dict)
-            self._search_space = search_space
+        self._output_directory = self._base_config.misc.exp_dir
+        self._search_space = search_space
         self._column_types = column_types
         self._eval_metric = eval_metric
         self._logger = logger
-        self._output_directory = output_directory
 
         self._label_columns = label_columns
         self._feature_columns = feature_columns
@@ -743,11 +762,12 @@ class MultiModalTextModel:
         time_limit
             The time limits
         hpo_params
-            Parameters of the HPO
+            Parameters of the HPO algorithms. For example, the scheduling
+            algorithm, scheduling backend, HPO algorithm.
         search_space
-            The search options
+            The search space options
         plot_results
-            Plotting the results
+            Whether to plot results or not
         console_log
             Whether to log into the console
         ignore_warning
@@ -783,7 +803,6 @@ class MultiModalTextModel:
             time_attr='report_idx',
             reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
-        feature_generator = self.get_feature_generator()
         # Create a temporary cache file. The internal train function will load the
         # temporary cache.
         train_df_path = os.path.join(self._output_directory, 'cache_train_dataframe.pq')
@@ -792,7 +811,7 @@ class MultiModalTextModel:
         tuning_data.table.to_parquet(tuning_df_path)
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_df_path=train_df_path,
-                                                      time_limits=time_limits,
+                                                      time_limit=time_limit,
                                                       time_start=start_tick,
                                                       tuning_df_path=tuning_df_path,
                                                       base_config=self.base_config,
@@ -804,7 +823,7 @@ class MultiModalTextModel:
                                                       stopping_metric=self._stopping_metric,
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
-        if scheduler_options['num_trials'] == 1 and turnoff_hpo:
+        if scheduler_options['num_trials'] == 1:
             train_fn()
         else:
             force_forkserver()

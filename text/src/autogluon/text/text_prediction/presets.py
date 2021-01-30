@@ -84,7 +84,7 @@ def text_electra_base_no_hpo() -> dict:
 
 
 @ag_text_presets.register()
-def default_electra_large_no_hpo() -> dict:
+def text_electra_large_no_hpo() -> dict:
     """The default search space that uses ELECTRA Base as the backbone"""
     cfg = text_no_hpo()
     cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
@@ -92,6 +92,11 @@ def default_electra_large_no_hpo() -> dict:
     cfg['models']['BertForTextPredictionBasic']['search_space'][
         'optimization.per_device_batch_size'] = 4
     return cfg
+
+
+@ag_text_presets.register()
+def text_electra_albert_backbones() -> dict:
+    """The """
 
 
 def merge_params(base_params, partial_params=None):

@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 
 from autogluon_contrib_nlp.utils.registry import Registry
-from autogluon_contrib_nlp.utils.misc import logging_config
 
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -18,6 +17,8 @@ from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits,\
     default_holdout_frac
+
+from ..utils import logging_config
 from ..presets import ag_text_presets, merge_params
 from ..infer_types import infer_problem_type, infer_column_problem_types
 from .. import constants as _C
@@ -211,12 +212,12 @@ class TextPredictor:
                                               problem_type=self._problem_type,
                                               eval_metric=self._eval_metric,
                                               output_directory=self._path,
-                                              logger=logger,
-                                              search_space=model_hparams['search_spaces'])
+                                              logger=logger)
             self._model.train(train_data=train_data,
                               tuning_data=tuning_data,
                               num_cpus=num_cpus,
                               num_gpus=num_gpus,
+                              search_space=model_hparams['search_spaces'],
                               time_limit=time_limit)
         else:
             raise NotImplementedError("Currently, we only support using "
