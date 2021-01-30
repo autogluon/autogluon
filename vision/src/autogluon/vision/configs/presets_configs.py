@@ -173,4 +173,8 @@ def set_presets(preset_name, *args, **kwargs):
         for key in preset_kwargs:
             if key not in kwargs:
                 kwargs[key] = preset_kwargs[key]
+            elif isinstance(kwargs[key], dict) and isinstance(preset_kwargs[key], dict):
+                # allow partially specify dict keys to override default presets
+                preset_kwargs[key].update(kwargs[key])
+                kwargs[key] = preset_kwargs[key]
     return args, kwargs
