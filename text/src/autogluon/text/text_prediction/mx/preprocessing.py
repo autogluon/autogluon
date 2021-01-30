@@ -281,6 +281,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
 
     def __getstate__(self):
         state = self.__dict__.copy()
+        state['_cfg'] = self._cfg.dump()
         state['_tokenizer'] = None
         state['_logger'] = None
         return state
@@ -290,4 +291,5 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         tokenizer = get_tokenizer(tokenizer_name)
         state['_tokenizer'] = tokenizer
         state['_logger'] = logging
+        state['_cfg'] = CfgNode.load_cfg(state['_cfg'])
         self.__dict__ = state
