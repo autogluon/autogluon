@@ -2,13 +2,15 @@ import numpy as np
 import os
 import pandas as pd
 import functools
-from mxnet.gluon.data import ArrayDataset
-from autogluon_contrib_nlp.utils.config import CfgNode
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from mxnet.gluon.data import ArrayDataset
+from autogluon_contrib_nlp.utils.config import CfgNode
+from autogluon_contrib_nlp.models import get_backbone
 from autogluon.features import CategoryFeatureGenerator
+
 from .. import constants as _C
 from ..utils import parallel_transform
 
@@ -47,9 +49,8 @@ def tokenize_data(data: pd.Series, tokenizer):
     return out
 
 
-def get_tokenizer(tokenizer_name):
-    _, _, tokenizer, _, _ \
-        = get_backbone(backbone_name)
+def get_tokenizer(backbone_name):
+    _, _, tokenizer, _, _ = get_backbone(backbone_name)
     return tokenizer
 
 
@@ -85,7 +86,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             self._label_generator = LabelEncoder()
 
         self._tokenizer_name = tokenizer_name
-        self._tokenizer =
+        self._tokenizer = get_tokenizer(tokenizer_name)
         self._fit_called = False
 
         # Some columns will be ignored
@@ -228,3 +229,13 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                                  'preprocessor.transform.'
         pass
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state['_tokenizer'] = None
+        return state
+
+    def __setstate__(self, state):
+        tokenizer_name = state['_tokenizer_name']
+        tokenizer = get_tokenizer(tokenizer_name)
+        state['_tokenizer'] = tokenizer
+        self.__dict__ = state
