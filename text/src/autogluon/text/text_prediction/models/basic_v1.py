@@ -592,7 +592,7 @@ class BertForTextPredictionBasic:
 
     def train(self, train_data, tuning_data, resource,
               time_limits=None,
-              search_strategy='random',
+              search_strategy='raytune',
               search_options=None,
               scheduler_options=None,
               num_trials=None,

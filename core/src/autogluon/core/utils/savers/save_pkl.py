@@ -1,6 +1,7 @@
 # TODO: Standardize / unify this code with ag.save()
 import os, pickle, tempfile, logging, boto3
 
+from .. import get_absolute_path
 from ...utils import s3_utils
 
 logger = logging.getLogger(__name__)
@@ -8,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: object -> obj?
 def save(path, object, format=None, verbose=True):
+    print(f'>>>>> {get_absolute_path(path)}')
     pickle_fn = lambda o, buffer: pickle.dump(o, buffer, protocol=4)
     save_with_fn(path, object, pickle_fn, format=format, verbose=verbose)
 

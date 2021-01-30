@@ -77,7 +77,7 @@ hyperparameters = {
             },
     },
     'hpo_params': {
-        'search_strategy': 'random'  # perform HPO via simple random search
+        'search_strategy': 'raytune'  # perform HPO via simple random search
     }
 }
 ```

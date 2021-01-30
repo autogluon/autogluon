@@ -52,8 +52,8 @@ def default() -> dict:
             },
         },
         'hpo_params': {
-            'search_strategy': 'random',   # Can be 'random', 'bayesopt', 'skopt',
-                                           # 'hyperband', 'bayesopt_hyperband'
+            'search_strategy': 'raytune',  # Can be 'random', 'bayesopt', 'skopt',
+                                           # 'hyperband', 'bayesopt_hyperband', 'raytune'
             'search_options': None,        # Extra kwargs passed to searcher
             'scheduler_options': None,     # Extra kwargs passed to scheduler
             'time_limits': None,           # The total time limit
@@ -302,11 +302,11 @@ class TextPrediction(BaseTask):
             The number of trials in the HPO search
         search_strategy : str, default = None
             Which hyperparameter search algorithm to use. Options include:
-            'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization),
+            'raytune' (random search), 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization),
             'skopt' (SKopt Bayesian optimization), 'grid' (grid search),
             'hyperband' (Hyperband scheduling with random search), 'bayesopt-hyperband'
             (Hyperband scheduling with GP-BO search).
-            If unspecified, the default is 'random'.
+            If unspecified, the default is 'raytune'.
         search_options : dict, default = None
             Options passed to searcher.
         scheduler_options : dict, default = None

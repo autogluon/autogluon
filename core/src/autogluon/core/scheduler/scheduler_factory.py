@@ -8,7 +8,7 @@ logger = logging.getLogger()
 
 
 _scheduler_presets = {
-    'auto': {'searcher': 'random'},
+    'auto': {'searcher': 'raytune'},
     # 'grid': {'searcher': 'grid'},  # grid commented out as it isn't compatible with most default model search spaces
     'random': {'searcher': 'random'},
     'bayesopt': {'searcher': 'bayesopt'},
@@ -84,7 +84,7 @@ def scheduler_factory(
     >>>
     >>>
     >>> @ag.args()
-    >>> def train_fn(args, reporter):
+    >>> def train_fn(args, reporter, checkpoint_dir=None):
     >>>     for e in range(args.epochs):
     >>>         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
     >>>         reporter(epoch=e+1, validation_performance=dummy_accuracy, lr=args.lr, wd=args.wd)

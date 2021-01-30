@@ -373,7 +373,7 @@ def test_tabularHPObagstack():
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 10000 # random seed
     subsample_size = None
-    hyperparameter_tune_kwargs = {'searcher': 'random'}
+    hyperparameter_tune_kwargs = {'searcher': 'raytune'}
     num_stack_levels = 2
     num_bag_folds = 2
     verbosity = 2 # how much output to print
@@ -415,7 +415,7 @@ def test_tabularHPO():
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 99 # random seed
     subsample_size = None
-    hyperparameter_tune_kwargs = {'searcher': 'random'}
+    hyperparameter_tune_kwargs = {'searcher': 'raytune'}
     verbosity = 2 # how much output to print
     hyperparameters = None
     time_limit = None

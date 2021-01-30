@@ -4,11 +4,11 @@ from autogluon.core.task.base import BaseTask
 import autogluon.core as ag
 
 @ag.args()
-def _train_fn_bad(args, reporter):
+def _train_fn_bad(args, reporter, checkpoint_dir=None):
     raise NotImplementedError
 
 @ag.args()
-def _train_fn_good(args, reporter):
+def _train_fn_good(args, reporter, checkpoint_dir=None):
     reporter(epoch=1, accuracy=0)
 
 class TestTask(BaseTask):

@@ -67,6 +67,6 @@ def test_category_feature_generator(generator_helper, data_helper):
         output_data = output_datas[i]
         for col in ['obj', 'cat']:
             assert output_data[col].dtype.name == 'category'
-            assert list(output_data[col].cat.categories) == expected_cat_categories_lst[i]
-            assert list(output_data[col]) == expected_cat_values_lst[i]
-            assert list(output_data[col].cat.codes) == expected_cat_codes_lst[i]
+            assert sorted(output_data[col].cat.categories) == sorted(expected_cat_categories_lst[i])
+            assert sorted(output_data[col]) == sorted(expected_cat_values_lst[i])
+            assert sorted(output_data[col].cat.codes) == sorted(expected_cat_codes_lst[i])
