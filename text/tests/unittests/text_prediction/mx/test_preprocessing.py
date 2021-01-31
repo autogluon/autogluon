@@ -13,7 +13,10 @@ from autogluon.text.text_prediction.infer_types import infer_column_problem_type
 TEST_CASES = [
     ['melbourne_airbnb_sample',
      'https://autogluon-text-data.s3.amazonaws.com/test_cases/melbourne_airbnb_sample_1000.pq',
-     'price_label']
+     'price_label'],
+    ['women_clothing_rating',
+     'https://autogluon-text-data.s3.amazonaws.com/test_cases/women_clothing_sample.pq',
+     ]
 ]
 
 

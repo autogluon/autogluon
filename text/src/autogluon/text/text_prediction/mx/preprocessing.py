@@ -207,9 +207,9 @@ def get_stats_string(processor, dataset, is_train=False):
     ret += '\n'
     ret += f'Numerical Columns: {processor.numerical_feature_names}\n\n'
     if is_train:
-        ret += f'Label Column: {dataset.label_column}'
-        if dataset._column_types[dataset.label_column] == _C.CATEGORICAL:
-            ret += f', Labels={dataset.label_generator.classes_}\n'
+        ret += f'Label Column: {processor.label_column}'
+        if processor._column_types[processor.label_column] == _C.CATEGORICAL:
+            ret += f', Labels={processor.label_generator.classes_}\n'
     return ret
 
 
