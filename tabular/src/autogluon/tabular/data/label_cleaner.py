@@ -21,13 +21,13 @@ class LabelCleaner:
     problem_type_transform = None
 
     @staticmethod
-    def construct(problem_type: str, y: Union[Series, np.ndarray, list], y_uncleaned: Union[Series, np.ndarray, list] = None):
+    def construct(problem_type: str, y: Union[Series, np.ndarray, list], y_uncleaned: Union[Series, np.ndarray, list] = None, positive_class=None):
         y = LabelCleaner._convert_to_valid_series(y)
         if y_uncleaned is not None:
             y_uncleaned = LabelCleaner._convert_to_valid_series(y_uncleaned)
 
         if problem_type == BINARY:
-            return LabelCleanerBinary(y)
+            return LabelCleanerBinary(y, positive_class=positive_class)
         elif problem_type == MULTICLASS:
             if y_uncleaned is None:
                 y_uncleaned = copy.deepcopy(y)
@@ -144,18 +144,24 @@ class LabelCleanerMulticlass(LabelCleaner):
 
 # TODO: Expand print statement to multiclass as well
 class LabelCleanerBinary(LabelCleaner):
-    def __init__(self, y: Series):
+    def __init__(self, y: Series, positive_class=None):
         self.problem_type_transform = BINARY
         y = self._convert_to_valid_series(y)
         self.num_classes = 2
         self.unique_values = list(y.unique())
         if len(self.unique_values) != 2:
             raise AssertionError('y does not contain exactly 2 unique values:', self.unique_values)
+        try:
+            self.unique_values.sort()
+        except TypeError:
+            # Contains both str and int
+            self.unique_values = list(y.unique())
         # TODO: Clean this code, for loop
-        if (1 in self.unique_values) and (2 in self.unique_values):
-            self.inv_map: dict = {1: 0, 2: 1}
-        elif ('1' in self.unique_values) and ('2' in self.unique_values):
-            self.inv_map: dict = {'1': 0, '2': 1}
+        if positive_class is not None:
+            if positive_class not in self.unique_values:
+                raise ValueError(f'positive_class is not a valid class: {self.unique_values} (positive_class={positive_class})')
+            negative_class = [c for c in self.unique_values if c != positive_class][0]
+            self.inv_map: dict = {negative_class: 0, positive_class: 1}
         elif ((str(False) in [str(val) for val in self.unique_values]) and
               (str(True) in [str(val) for val in self.unique_values])):
             false_val = [val for val in self.unique_values if str(val) == str(False)][0]  # may be str or bool
@@ -163,18 +169,6 @@ class LabelCleanerBinary(LabelCleaner):
             self.inv_map: dict = {false_val: 0, true_val: 1}
         elif (0 in self.unique_values) and (1 in self.unique_values):
             self.inv_map: dict = {0: 0, 1: 1}
-        elif ('0' in self.unique_values) and ('1' in self.unique_values):
-            self.inv_map: dict = {'0': 0, '1': 1}
-        elif ('No' in self.unique_values) and ('Yes' in self.unique_values):
-            self.inv_map: dict = {'No': 0, 'Yes': 1}
-        elif ('N' in self.unique_values) and ('Y' in self.unique_values):
-            self.inv_map: dict = {'N': 0, 'Y': 1}
-        elif ('n' in self.unique_values) and ('y' in self.unique_values):
-            self.inv_map: dict = {'n': 0, 'y': 1}
-        elif ('F' in self.unique_values) and ('T' in self.unique_values):
-            self.inv_map: dict = {'F': 0, 'T': 1}
-        elif ('f' in self.unique_values) and ('t' in self.unique_values):
-            self.inv_map: dict = {'f': 0, 't': 1}
         else:
             self.inv_map: dict = {self.unique_values[0]: 0, self.unique_values[1]: 1}
             logger.log(15, 'Note: For your binary classification, AutoGluon arbitrarily selects which label-value represents positive vs negative class')

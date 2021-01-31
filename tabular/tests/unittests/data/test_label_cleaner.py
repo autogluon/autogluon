@@ -16,11 +16,18 @@ def test_label_cleaner_binary():
     input_labels_with_shifted_index.index += 5
     input_labels_new = np.array(['new', 'l1', 'l2'])
     expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1])
+    expected_output_labels_pos_class_l1 = pd.Series([1, 0, 0, 1, 1, 0])
     expected_output_labels_new = pd.Series([np.nan, 0, 1])
+    expected_output_labels_new_pos_class_l1 = pd.Series([np.nan, 1, 0])
     expected_output_labels_new_inverse = pd.Series([np.nan, 'l1', 'l2'])
 
     # When
-    label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=input_labels)
+    label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=input_labels)  # positive_class='l2'
+    label_cleaner_pos_class_l1 = LabelCleaner.construct(problem_type=problem_type, y=input_labels, positive_class='l1')
+
+    # Raise exception
+    with pytest.raises(ValueError):
+        LabelCleaner.construct(problem_type=problem_type, y=input_labels, positive_class='unknown_class')
 
     # Raise exception
     with pytest.raises(AssertionError):
@@ -30,28 +37,37 @@ def test_label_cleaner_binary():
     assert isinstance(label_cleaner, LabelCleanerBinary)
     assert label_cleaner.problem_type_transform == BINARY
     assert label_cleaner.cat_mappings_dependent_var == {0: 'l1', 1: 'l2'}
+    assert label_cleaner_pos_class_l1.cat_mappings_dependent_var == {0: 'l2', 1: 'l1'}
 
     output_labels = label_cleaner.transform(input_labels)
+    output_labels_pos_class_l1 = label_cleaner_pos_class_l1.transform(input_labels)
     output_labels_with_numpy = label_cleaner.transform(input_labels_numpy)
     output_labels_category = label_cleaner.transform(input_labels_category)
     output_labels_with_shifted_index = label_cleaner.transform(input_labels_with_shifted_index)
     output_labels_new = label_cleaner.transform(input_labels_new)
+    output_labels_new_pos_class_l1 = label_cleaner_pos_class_l1.transform(input_labels_new)
 
     output_labels_inverse = label_cleaner.inverse_transform(output_labels)
+    output_labels_inverse_pos_class_l1 = label_cleaner_pos_class_l1.inverse_transform(output_labels_pos_class_l1)
     output_labels_with_shifted_index_inverse = label_cleaner.inverse_transform(output_labels_with_shifted_index)
     output_labels_new_inverse = label_cleaner.inverse_transform(output_labels_new)
+    output_labels_new_inverse_pos_class_l1 = label_cleaner_pos_class_l1.inverse_transform(output_labels_new_pos_class_l1)
 
     assert expected_output_labels.equals(output_labels)
+    assert expected_output_labels_pos_class_l1.equals(output_labels_pos_class_l1)
     assert expected_output_labels.equals(output_labels_with_numpy)
     assert expected_output_labels.equals(output_labels_category)
     assert not expected_output_labels.equals(output_labels_with_shifted_index)
     output_labels_with_shifted_index.index -= 5
     assert expected_output_labels.equals(output_labels_with_shifted_index)
     assert expected_output_labels_new.equals(output_labels_new)
+    assert expected_output_labels_new_pos_class_l1.equals(output_labels_new_pos_class_l1)
 
     assert input_labels.equals(output_labels_inverse)
+    assert input_labels.equals(output_labels_inverse_pos_class_l1)
     assert input_labels_with_shifted_index.equals(output_labels_with_shifted_index_inverse)
     assert expected_output_labels_new_inverse.equals(output_labels_new_inverse)
+    assert expected_output_labels_new_inverse.equals(output_labels_new_inverse_pos_class_l1)
 
 
 def test_label_cleaner_multiclass():

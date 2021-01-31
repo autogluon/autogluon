@@ -82,6 +82,13 @@ class TabularPredictor(TabularPredictorV1):
         learner_kwargs : dict, default = None
             Kwargs to send to the learner. Options include:
 
+            positive_class : str or int, default = None
+                Used to determine the positive class in binary classification.
+                This is used for certain metrics such as 'f1' which produce different scores depending on which class is considered the positive class.
+                If not set, will be inferred as the second element of the existing unique classes after sorting them.
+                    If classes are [0, 1], then 1 will be selected as the positive class.
+                    If classes are ['def', 'abc'], then 'def' will be selected as the positive class.
+                    If classes are [True, False], then True will be selected as the positive class.
             ignored_columns : list, default = None
                 Banned subset of column names that predictor may not use as predictive features (e.g. unique identifier to a row or user-ID).
                 These columns are ignored during `fit()`.
