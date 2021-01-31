@@ -1,6 +1,9 @@
 import pytest
 import numpy as np
 import numpy.testing as npt
+import tempfile
+import pickle
+import os
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.loaders import load_pd
 from autogluon.text.text_prediction.mx.preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg
@@ -12,6 +15,13 @@ TEST_CASES = [
      'https://autogluon-text-data.s3.amazonaws.com/test_cases/melbourne_airbnb_sample_1000.pq',
      'price_label']
 ]
+
+
+def assert_dataset_match(lhs_dataset, rhs_dataset, threshold=1E-4):
+    assert len(lhs_dataset) == len(rhs_dataset)
+    for i in range(len(lhs_dataset)):
+        for j in range(lhs_dataset[0]):
+            npt.assert_allclose(lhs_dataset[i][j], rhs_dataset[i][j], threshold, threshold)
 
 
 @pytest.mark.parametrize('dataset_name,url,label_column', TEST_CASES)
@@ -53,3 +63,15 @@ def test_preprocessor(dataset_name, url, label_column,
             npt.assert_allclose(valid_dataset[i][j],
                                 test_dataset[i][j],
                                 1E-4, 1E-4)
+    # Test for pickle dump and load
+    with tempfile.TemporaryDirectory() as tmp_dir_name:
+        with open(os.path.join(tmp_dir_name, 'preprocessor.pkl'), 'wb') as out_f:
+            pickle.dump(preprocessor, out_f)
+        with open(os.path.join(tmp_dir_name, 'preprocessor.pkl'), 'rb') as in_f:
+            preprocessor_loaded = pickle.load(in_f)
+        valid_dataset_loaded = preprocessor_loaded.transform(valid_df[feature_columns],
+                                                             valid_df[label_column])
+        assert_dataset_match(valid_dataset_loaded, valid_dataset)
+        test_dataset_loaded = preprocessor_loaded.transform(valid_df[feature_columns])
+        assert_dataset_match(test_dataset_loaded, test_dataset)
+
