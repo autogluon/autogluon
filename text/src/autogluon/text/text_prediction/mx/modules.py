@@ -133,6 +133,20 @@ class NumericalFeatureNet(HybridBlock):
         with self.name_scope():
             if self.cfg.input_centering:
                 self.data_bn = nn.BatchNorm(in_channels=self.in_units)
+            if self.cfg.gated_activation:
+                self.gate_proj = BasicMLP(in_units=self.in_units,
+                                          mid_units=cfg.mid_units,
+                                          out_units=out_units,
+                                          num_layers=cfg.num_layers,
+                                          normalization=cfg.normalization,
+                                          norm_eps=cfg.norm_eps,
+                                          data_dropout=cfg.data_dropout,
+                                          dropout=cfg.dropout,
+                                          activation='sigmoid',
+                                          weight_initializer=weight_initializer,
+                                          bias_initializer=bias_initializer)
+            else:
+                self.gate_proj = None
             self.proj = BasicMLP(in_units=self.in_units,
                                  mid_units=cfg.mid_units,
                                  out_units=out_units,
@@ -150,6 +164,7 @@ class NumericalFeatureNet(HybridBlock):
         if key is None:
             cfg = CfgNode()
             cfg.input_centering = False
+            cfg.gated_activation = True
             cfg.mid_units = 128
             cfg.num_layers = 1
             cfg.data_dropout = False
@@ -169,7 +184,10 @@ class NumericalFeatureNet(HybridBlock):
             features = F.np.reshape(features, (-1, self.in_units))
         if self.cfg.input_centering:
             features = self.data_bn(features)
-        return self.proj(features)
+        if self.gate_proj is not None:
+            return self.gate_proj(features) * self.proj(features)
+        else:
+            return self.proj(features)
 
 
 @use_np
