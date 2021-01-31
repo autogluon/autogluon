@@ -795,7 +795,7 @@ class MultiModalTextModel:
             fn_args = sample_config(train_fn.args['search_space'],
                                     train_fn.args['_default_config'])
             print(fn_args)
-            train_fn(fn_args, None)
+            train_fn(train_fn.args, None)
             best_model_saved_dir_path = os.path.join(self._output_directory,'task0'.format(best_task_id))
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
             cfg = self.base_config.clone_merge(cfg_path)
