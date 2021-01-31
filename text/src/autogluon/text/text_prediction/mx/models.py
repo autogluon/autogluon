@@ -31,6 +31,7 @@ from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.decorator import sample_config
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.scheduler.reporter import FakeReporter
 
 from .modules import MultiModalWithPretrainedTextNN
 from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg
@@ -316,7 +317,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Whether to ignore warning
 
     """
-    print('args=', args, 'reporter=', reporter)
     if time_limit is not None:
         start_train_tick = time.time()
         time_left = time_limit - (start_train_tick - time_start)
@@ -331,11 +331,12 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     train_data = pd.read_parquet(train_df_path)
     tuning_data = pd.read_parquet(tuning_df_path)
     log_metric_scorers = [get_metric(ele) for ele in log_metrics]
-    stopping_metric_scorer = get_metric(stopping_metric)
-    greater_is_better = stopping_metric_scorer.greater_is_better
-    os.environ['MKL_NUM_THREADS'] = '1'
-    os.environ['OMP_NUM_THREADS'] = '1'
-    os.environ['MKL_DYNAMIC'] = 'FALSE'
+    eval_metric_scorer = get_metric(eval_metric)
+    greater_is_better = eval_metric_scorer.greater_is_better
+
+    # os.environ['MKL_NUM_THREADS'] = '1'
+    # os.environ['OMP_NUM_THREADS'] = '1'
+    # os.environ['MKL_DYNAMIC'] = 'FALSE'
     if ignore_warning:
         import warnings
         warnings.filterwarnings("ignore")
@@ -347,23 +348,17 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         specified_values.append(search_space[key])
     cfg.merge_from_list(specified_values)
     exp_dir = cfg.misc.exp_dir
-    if reporter is not None:
-        # When the reporter is not None,
-        # we create the saved directory based on the task_id + time
-        task_id = args.task_id
-        exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
-        os.makedirs(exp_dir, exist_ok=True)
-        cfg.defrost()
-        cfg.misc.exp_dir = exp_dir
-        cfg.freeze()
-    else:
-        exp_dir = os.path.join(exp_dir, 'task0')
-        os.makedirs(exp_dir, exist_ok=True)
-        cfg.misc.exp_dir = exp_dir
-        cfg.freeze()
+
+    task_id = args.task_id
+    exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
+    os.makedirs(exp_dir, exist_ok=True)
+    cfg.defrost()
+    cfg.misc.exp_dir = exp_dir
+    cfg.freeze()
     logger = logging.getLogger()
     logging_config(folder=exp_dir, name='training', logger=logger, console=console_log)
     logger.info(cfg)
+
     # Load backbone model
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
         = get_backbone(cfg.model.backbone.name)
@@ -709,7 +704,7 @@ class MultiModalTextModel:
               search_space=None,
               plot_results=False,
               console_log=True,
-              ignore_warning=True):
+              ignore_warning=False):
         """The train function.
 
         Parameters
