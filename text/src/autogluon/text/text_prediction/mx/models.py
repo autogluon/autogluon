@@ -678,7 +678,7 @@ class MultiModalTextModel:
     @property
     def class_labels_internal(self):
         """The internal class labels once we have converted to integers"""
-        pass
+        raise NotImplementedError
 
     @property
     def problem_type(self):
@@ -795,8 +795,8 @@ class MultiModalTextModel:
                                                       time_start=start_tick,
                                                       tuning_df_path=tuning_df_path,
                                                       base_config=self.base_config,
-                                                      problem_types=self.problem_types,
-                                                      column_properties=self._column_properties,
+                                                      problem_type=self.problem_type,
+                                                      column_types=self._column_types,
                                                       label_columns=self._label_columns,
                                                       label_shapes=self._label_shapes,
                                                       log_metrics=self._log_metrics,
