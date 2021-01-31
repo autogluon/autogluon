@@ -20,7 +20,7 @@ TEST_CASES = [
      'price_label'],
     ['women_clothing_rating',
      'https://autogluon-text-data.s3.amazonaws.com/test_cases/women_clothing_sample.pq',
-     ]
+     'Rating']
 ]
 
 
