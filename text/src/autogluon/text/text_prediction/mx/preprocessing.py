@@ -155,7 +155,7 @@ class MultiModalTextBatchify:
                     start_ptr = 0
                 token_ids.extend(ele[i][start_ptr:(start_ptr + trim_length)].tolist())
                 segment_ids.extend([seg] * trim_length)
-                if self._insert_sep or i == len(trim_length) - 1:
+                if self._insert_sep or i == len(trimmed_lengths) - 1:
                     token_ids.append(self._sep_token_id)
                     segment_ids.append(seg)
             text_token_ids.append(np.array(token_ids, dtype=np.int32))
