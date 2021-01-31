@@ -46,7 +46,7 @@ def default() -> dict:
             'search_options': None,        # Extra kwargs passed to searcher
             'scheduler_options': None,     # Extra kwargs passed to scheduler
             'time_limits': None,           # The total time limit
-            'num_trials': 2,               # The number of trials
+            'num_trials': 1,               # The number of trials
         },
         'seed': None,                      # The seed value
     }
