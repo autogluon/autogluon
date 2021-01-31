@@ -54,7 +54,7 @@ class AutoTrainer(AbstractTrainer):
         invalid_model_names = kwargs.pop('invalid_model_names', self.get_model_names())
         feature_metadata = kwargs.pop('feature_metadata', self.feature_metadata)
 
-        models_distill, _ = get_preset_models_distillation(
+        return get_preset_models_distillation(
             path=path,
             problem_type=problem_type,
             eval_metric=eval_metric,
@@ -64,4 +64,3 @@ class AutoTrainer(AbstractTrainer):
             invalid_model_names=invalid_model_names,
             **kwargs,
         )
-        return models_distill
