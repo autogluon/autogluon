@@ -159,10 +159,10 @@ class MultiModalTextBatchify:
 
 
 def auto_shrink_max_length(train_dataset, insert_sep,
-                        num_text_features,
-                        auto_max_length_quantile,
-                        round_to,
-                        max_length):
+                           num_text_features,
+                           auto_max_length_quantile,
+                           round_to,
+                           max_length):
     """Automatically shrink the max length based on the training data
 
     Parameters
