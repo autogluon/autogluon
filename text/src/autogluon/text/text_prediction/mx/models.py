@@ -315,6 +315,7 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
         except Exception as exp:
             last_exp = exp
             per_device_batch_size = per_device_batch_size // 2
+            ctx.empty_cache()
             continue
         passed = True
         break
