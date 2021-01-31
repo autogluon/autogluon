@@ -105,6 +105,17 @@ def albert_base_no_hpo() -> dict:
     return cfg
 
 
+@ag_text_presets.register()
+def multi_cased_bert_base_no_hpo() -> dict:
+    """The default search space that use Multi-lingual BERT-Base as the backbone."""
+    cfg = no_hpo()
+    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
+        = 'google_multi_cased_bert_base'
+    cfg['models']['MultimodalTextModel']['search_space'][
+        'optimization.per_device_batch_size'] = 8
+    return cfg
+
+
 def merge_params(base_params, partial_params=None):
     """Merge a partial change to the base configuration.
 
