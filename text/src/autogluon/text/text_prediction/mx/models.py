@@ -288,6 +288,7 @@ def infer_per_device_batch_size(model, max_length, num_categories,
         The batch size that we will use per device. This is determined based on the current
         memory requirement of the network.
     """
+    import gc
     per_device_batch_size = init_batch_size
     passed = False
     last_exp = None
@@ -318,6 +319,7 @@ def infer_per_device_batch_size(model, max_length, num_categories,
                 del fake_inputs
                 last_exp = exp
                 ctx.empty_cache()
+                gc.collect()
                 mx.npx.waitall()
                 break
         passed = True
