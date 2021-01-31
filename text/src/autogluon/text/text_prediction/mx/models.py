@@ -798,16 +798,14 @@ class MultiModalTextModel:
                                                       problem_type=self.problem_type,
                                                       column_types=self._column_types,
                                                       label_columns=self._label_columns,
-                                                      label_shapes=self._label_shapes,
                                                       log_metrics=self._log_metrics,
-                                                      stopping_metric=self._stopping_metric,
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
         if scheduler_options['num_trials'] == 1:
             train_fn()
         else:
             force_forkserver()
-            scheduler_cls = schedulers[search_strategy.lower()]
+            scheduler_cls = schedulers[scheduler_options['searcher']]
             # Create scheduler, run HPO experiment
             scheduler = scheduler_cls(train_fn, **scheduler_options)
             scheduler.run()
@@ -818,9 +816,9 @@ class MultiModalTextModel:
                                    '1) The time_limits is too small, '
                                    'or 2) There are some internal errors in AutoGluon. '
                                    'For the first case, you can increase the time_limits or set it to '
-                                   'None, e.g., setting "TextPrediction.fit(..., time_limits=None). To '
+                                   'None, e.g., setting "predictor.fit(..., time_limit=None). To '
                                    'further investigate the root cause, you can also try to train with '
-                                   '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
+                                   '"verbosity=3", i.e., predictor.fit(..., verbosity=3).')
             best_config = scheduler.get_best_config()
             if verbosity >= 2:
                 self._logger.info('Results=', scheduler.searcher._results)

@@ -90,6 +90,10 @@ class TextPredictor:
         self._model = None
         self._fit_called = False
 
+    def set_verbosity(self, target_verbosity):
+        self.verbosity = target_verbosity
+        set_logger_verbosity(self.verbosity, logger=logger)
+
     @property
     def path(self):
         return self._path
