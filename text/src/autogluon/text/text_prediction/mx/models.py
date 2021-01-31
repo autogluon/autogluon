@@ -290,7 +290,7 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
     per_device_batch_size = init_batch_size
     passed = False
     last_exp = None
-    while per_device_batch_size >= 1:
+    while per_device_batch_size <= 64:
         fake_inputs = []
         fake_text_tokens = mx.np.random.randint(0, 100, (per_device_batch_size, max_length),
                                                 dtype=np.int32, ctx=ctx)
@@ -315,11 +315,11 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
         except Exception as exp:
             del fake_inputs
             last_exp = exp
-            per_device_batch_size = per_device_batch_size // 2
             ctx.empty_cache()
-            continue
+            break
         passed = True
-        break
+        per_device_batch_size = per_device_batch_size * 2
+        continue
     if not passed:
         print('We cannot determine an appropriate batch size for your problem. '
               'This may be due to that your GPU memory size is too small. '
