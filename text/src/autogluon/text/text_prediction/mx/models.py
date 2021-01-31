@@ -8,6 +8,7 @@ import time
 import json
 import functools
 import tqdm
+from typing import Tuple
 import mxnet as mx
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
@@ -21,6 +22,7 @@ from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_
 
 from autogluon.core import args, space
 from autogluon.core.utils import in_ipynb
+from autogluon.core.utils.utils import get_cpu_count, get_gpu_count
 from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
 from autogluon.core.task.base.base_task import schedulers
@@ -560,6 +562,44 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         reporter(**best_report_items_dict)
 
 
+def get_recommended_resource(nthreads_per_trial=None,
+                             ngpus_per_trial=None) -> Tuple[int, int]:
+    """Get the recommended resources.
+
+    Internally, we will try to use GPU whenever it's possible. That means, we will use
+    a single GPU for finetuning.
+
+    Parameters
+    ----------
+    nthreads_per_trial
+        The number of threads per trial provided by the user.
+    ngpus_per_trial
+        The number of GPUs per trial provided by the user.
+
+    Returns
+    -------
+    nthreads_per_trial
+        The recommended resource.
+    ngpus_per_trial
+    """
+    if nthreads_per_trial is None and ngpus_per_trial is None:
+        nthreads_per_trial = get_cpu_count()
+        ngpus_per_trial = get_gpu_count()
+    elif nthreads_per_trial is not None and ngpus_per_trial is None:
+        ngpus_per_trial = get_gpu_count()
+    elif nthreads_per_trial is None and ngpus_per_trial is not None:
+        if ngpus_per_trial != 0:
+            num_parallel_jobs = get_gpu_count() // ngpus_per_trial
+            nthreads_per_trial = max(get_cpu_count() // num_parallel_jobs, 1)
+        else:
+            nthreads_per_trial = get_cpu_count()
+    nthreads_per_trial = min(nthreads_per_trial, get_cpu_count())
+    ngpus_per_trial = min(ngpus_per_trial, get_gpu_count())
+    assert nthreads_per_trial > 0 and ngpus_per_trial >= 0,\
+        'Invalid number of threads and number of GPUs.'
+    return nthreads_per_trial, ngpus_per_trial
+
+
 class MultiModalTextModel:
     """Learner of the multimodal text data.
 
@@ -718,14 +758,12 @@ class MultiModalTextModel:
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
         if search_space is None:
-            search_space = dict()
+            search_space = \
+                ag_text_presets.create('default')['models']['MultimodalTextModel']['search_space']
         search_space_reg = args(search_space=space.Dict(**search_space))
         # Scheduler and searcher for HPO
         if hpo_params is None:
             hpo_params = ag_text_presets.create('default')['hpo_params']
-        if search_space is None:
-            search_space =\
-                ag_text_presets.create('default')['models']['MultimodalTextModel']['search_space']
         scheduler_options = hpo_params['scheduler_options']
         if scheduler_options is None:
             scheduler_options = dict()
