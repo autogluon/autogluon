@@ -180,7 +180,7 @@ def auto_shrink_max_length(train_dataset, insert_sep,
     new_max_length
     """
     lengths = []
-    for sample in range(train_dataset):
+    for sample in train_dataset:
         if insert_sep:
             lengths.append(num_text_features + 1 + sum([len(sample[i])
                                                         for i in range(num_text_features)]))
