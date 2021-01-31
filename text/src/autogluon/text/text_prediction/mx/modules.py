@@ -557,14 +557,12 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         ptr = 0
         for i in range(self.num_text_features):
             batch_token_ids, batch_valid_length, batch_segment_ids = features[i]
-            print('batch_token_ids=', batch_token_ids)
             if self.cfg.text_net.use_segment_id:
                 contextual_embedding, _ = self.text_backbone(batch_token_ids,
                                                              batch_segment_ids,
                                                              batch_valid_length)
             else:
                 contextual_embedding = self.text_backbone(batch_token_ids, batch_valid_length)
-            print(contextual_embedding)
             pooled_output = contextual_embedding[:, 0, :]
             field_features.append(pooled_output)
         ptr += self.num_text_features
