@@ -24,7 +24,6 @@ from ..trainer import AbstractTrainer
 logger = logging.getLogger()  # return root logger
 
 # TODO: num_bag_sets -> ag_args
-# TODO: add positive_class kwarg argument to predictor init (learner kwarg?)
 
 # Extra TODOs (Stretch): Can occur post v0.1
 # TODO: make core_kwargs a kwargs argument to predictor.fit
