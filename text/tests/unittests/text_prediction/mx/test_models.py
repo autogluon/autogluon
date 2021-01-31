@@ -22,6 +22,7 @@ def test_infer_per_device_batch_size(num_categories,
                                      agg_type,
                                      input_gating,
                                      out_shape):
+    ctx = mx.gpu(0)
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ = get_backbone(backbone)
     text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
     cfg = MultiModalWithPretrainedTextNN.get_cfg()
@@ -37,10 +38,12 @@ def test_infer_per_device_batch_size(num_categories,
                                          num_categories=num_categories,
                                          out_shape=out_shape,
                                          cfg=cfg)
+    net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx)
+    net.hybridize()
     per_device_batch_size = infer_per_device_batch_size(net, init_batch_size=1024,
                                                         max_length=max_length,
                                                         num_categories=num_categories,
                                                         numerical_units=numerical_units,
-                                                        ctx=mx.gpu(0))
+                                                        ctx=ctx)
     assert per_device_batch_size >= 1
     print(per_device_batch_size)
