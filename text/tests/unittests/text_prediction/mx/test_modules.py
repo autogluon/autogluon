@@ -57,7 +57,7 @@ def test_multimodal_with_pretrained_text_nn(num_text_features,
         numerical_features.append(mx.np.random.normal(0, 1, (batch_size, units)))
     gt = mx.np.random.normal(0, 1, (batch_size, out_shape))
     with mx.autograd.record():
-        logits = net(text_features + categorical_features + num_categorical_features)
+        logits = net(text_features + categorical_features + numerical_features)
         loss = mx.np.square(logits - gt).mean()
         loss.backward()
 
