@@ -277,7 +277,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    time_limit, time_start, base_config,
                    problem_type, column_types,
                    feature_columns, label_column,
-                   log_metrics, stopping_metric,
+                   log_metrics, eval_metric,
                    console_log, ignore_warning=False):
     """
 
@@ -308,7 +308,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Label column
     log_metrics
         Metrics for logging
-    stopping_metric
+    eval_metric
         The stopping metric
     console_log
         Whether to log it to console
@@ -787,8 +787,10 @@ class MultiModalTextModel:
                                                       base_config=self.base_config,
                                                       problem_type=self.problem_type,
                                                       column_types=self._column_types,
+                                                      feature_columns=self._feature_columns,
                                                       label_column=self._label_columns[0],
                                                       log_metrics=self._log_metrics,
+                                                      eval_metric=self._eval_metric,
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
         if scheduler_options['num_trials'] == 1:
