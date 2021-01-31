@@ -455,7 +455,8 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         self.cfg = cfg = MultiModalWithPretrainedTextNN.get_cfg().clone_merge(cfg)
         assert self.cfg.text_net.pool_type == 'cls'
         text_units = self.cfg.text_units
-
+        if not isinstance(out_shape, (list, tuple)):
+            out_shape = (out_shape,)
         if text_units == -1:
             text_units = text_backbone.units
         categorical_units = self.cfg.categorical_units
