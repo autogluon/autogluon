@@ -355,7 +355,7 @@ class FeatureAggregator(HybridBlock):
                 gating_features = agg_features
                 if self.gating_pre_proj is not None:
                     gating_features = self.gating_pre_proj(gating_features)
-                gating_features = self.gating_attention_enc(gating_features, None)
+                gating_features = self.gating_transformer_enc(gating_features, None)
                 gating_logits = self.gating_post_proj(gating_features)
                 gating_probs = F.npx.sigmoid(gating_logits)  # (B, T, 1)
                 agg_features = gating_probs * agg_features
