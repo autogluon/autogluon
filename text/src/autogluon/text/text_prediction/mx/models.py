@@ -792,8 +792,9 @@ class MultiModalTextModel:
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
         if scheduler_options['num_trials'] == 1:
-            print(train_fn.args)
-            train_fn()
+            args = sample_config(train_fn.args, dict())
+            print(args)
+            train_fn(args, None)
             best_model_saved_dir_path = os.path.join(self._output_directory,'task0'.format(best_task_id))
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
             cfg = self.base_config.clone_merge(cfg_path)
