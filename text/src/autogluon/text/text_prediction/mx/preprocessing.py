@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 def base_preprocess_cfg():
     cfg = CfgNode()
-    cfg.insert_sep = True                     # Whether to insert sep tokens between columns
     cfg.text = CfgNode()
     cfg.text.merge = True                     # Whether we will merge different text columns
                                               # or treat them independently.
