@@ -146,7 +146,14 @@ def test_multimodal_batchify(dataset_name, url, label_column,
         features, label = sample[0], sample[1]
         assert len(features) == train_batchify_fn.num_text_outputs + \
                train_batchify_fn.num_categorical_outputs + train_batchify_fn.num_numerical_outputs
+        text_token_ids, text_valid_length, text_segment_ids = features[0]
+        assert text_token_ids.shape[1] <= auto_max_length
+        assert text_segment_ids.shape[1] <= auto_max_length
+        assert text_token_ids.shape == text_segment_ids.shape
     for sample in test_dataloader:
         assert len(sample) == test_batchify_fn.num_text_outputs + \
                test_batchify_fn.num_categorical_outputs + test_batchify_fn.num_numerical_outputs
-
+        text_token_ids, text_valid_length, text_segment_ids = sample[0]
+        assert text_token_ids.shape[1] <= auto_max_length
+        assert text_segment_ids.shape[1] <= auto_max_length
+        assert text_token_ids.shape == text_segment_ids.shape
