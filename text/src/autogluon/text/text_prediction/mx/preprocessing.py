@@ -63,7 +63,7 @@ def get_tokenizer(backbone_name):
     return tokenizer
 
 
-class MultiModalTextBatchify():
+class MultiModalTextBatchify:
     def __init__(self,
                  num_text_features,
                  num_categorical_features,
