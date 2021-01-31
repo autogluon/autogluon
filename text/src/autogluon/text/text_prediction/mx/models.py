@@ -575,8 +575,7 @@ class MultiModalTextModel:
                  problem_type,
                  eval_metric,
                  output_directory=None,
-                 logger=None,
-                 search_space=None):
+                 logger=None):
         """Creates model object.
 
         Parameters
@@ -595,8 +594,6 @@ class MultiModalTextModel:
             The output directory to save the model
         logger
             The logger
-        search_space
-            The hyperparameter search space.
         """
         super(MultiModalTextModel, self).__init__()
         self._base_config = base_cfg()
@@ -606,7 +603,6 @@ class MultiModalTextModel:
         self._base_config.misc.exp_dir = os.path.abspath(self._base_config.misc.exp_dir)
         self._base_config.freeze()
         self._output_directory = self._base_config.misc.exp_dir
-        self._search_space = search_space
         self._column_types = column_types
         self._eval_metric = eval_metric
         self._logger = logger
