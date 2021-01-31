@@ -368,7 +368,6 @@ class FeatureAggregator(HybridBlock):
                     agg_features = self.attention_net_pre_proj(agg_features)
                 agg_features = self.attention_transformer_enc(agg_features, None)
                 agg_features = F.np.mean(agg_features, axis=1)
-                raise NotImplementedError
             else:
                 # TODO(sxjscience) May try to implement more advanced pooling methods for
                 #  multimodal data.
