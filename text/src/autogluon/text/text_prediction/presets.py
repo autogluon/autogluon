@@ -54,7 +54,7 @@ def default() -> dict:
 
 
 @ag_text_presets.register()
-def text_no_hpo() -> dict:
+def no_hpo() -> dict:
     """The default hyperparameters without HPO"""
     cfg = default()
     cfg['hpo_params']['num_trials'] = 1
@@ -62,41 +62,47 @@ def text_no_hpo() -> dict:
 
 
 @ag_text_presets.register()
-def text_electra_small_no_hpo() -> dict:
+def electra_small_no_hpo() -> dict:
     """The default search space that uses ELECTRA Small as the backbone."""
-    cfg = text_no_hpo()
-    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+    cfg = no_hpo()
+    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
         = 'google_electra_small'
-    cfg['models']['BertForTextPredictionBasic']['search_space'][
+    cfg['models']['MultimodalTextModel']['search_space'][
         'optimization.per_device_batch_size'] = 16
     return cfg
 
 
 @ag_text_presets.register()
-def text_electra_base_no_hpo() -> dict:
+def electra_base_no_hpo() -> dict:
     """The default search space that uses ELECTRA Base as the backbone"""
-    cfg = text_no_hpo()
-    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+    cfg = no_hpo()
+    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
         = 'google_electra_base'
-    cfg['models']['BertForTextPredictionBasic']['search_space'][
+    cfg['models']['MultimodalTextModel']['search_space'][
         'optimization.per_device_batch_size'] = 8
     return cfg
 
 
 @ag_text_presets.register()
-def text_electra_large_no_hpo() -> dict:
-    """The default search space that uses ELECTRA Base as the backbone"""
-    cfg = text_no_hpo()
-    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+def electra_large_no_hpo() -> dict:
+    """The default search space that uses ELECTRA Base as the backbone."""
+    cfg = no_hpo()
+    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
         = 'google_electra_large'
-    cfg['models']['BertForTextPredictionBasic']['search_space'][
+    cfg['models']['MultimodalTextModel']['search_space'][
         'optimization.per_device_batch_size'] = 4
     return cfg
 
 
 @ag_text_presets.register()
-def text_electra_albert_backbones() -> dict:
-    """The """
+def albert_base_no_hpo() -> dict:
+    """The default search space that use ALBERT Base as the backbone."""
+    cfg = no_hpo()
+    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
+        = 'google_albert_base_v2'
+    cfg['models']['MultimodalTextModel']['search_space'][
+        'optimization.per_device_batch_size'] = 8
+    return cfg
 
 
 def merge_params(base_params, partial_params=None):
