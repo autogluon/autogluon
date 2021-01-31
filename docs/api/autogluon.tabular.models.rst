@@ -108,7 +108,6 @@ Ensemble Models
    BaggedEnsembleModel
    StackerEnsembleModel
    WeightedEnsembleModel
-   GreedyWeightedEnsembleModel
 
 :hidden:`BaggedEnsembleModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -126,12 +125,6 @@ Ensemble Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: WeightedEnsembleModel
-   :members: init
-
-:hidden:`GreedyWeightedEnsembleModel`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: GreedyWeightedEnsembleModel
    :members: init
 
 Experimental Models

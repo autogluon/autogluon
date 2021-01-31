@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
+    """
+    Bagged ensemble meta-model which fits a given model multiple times across different splits of the training data.
+    """
     _oof_filename = 'oof.pkl'
 
     def __init__(self, model_base: AbstractModel, random_state=0, **kwargs):
