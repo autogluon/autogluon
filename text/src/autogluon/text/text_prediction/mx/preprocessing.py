@@ -94,6 +94,16 @@ class MultiModalTextBatchify:
         assert self._num_numerical_inputs == 0 or self._num_numerical_inputs == 1
 
     @property
+    def num_text_outputs(self):
+        return 1
+
+    @property
+    def num_categorical_outputs(self):
+        return self._num_categorical_inputs
+
+    @property
+    def num_numerical_outputs(self):
+        return self._num_numerical_inputs
 
     @property
     def cfg(self):
