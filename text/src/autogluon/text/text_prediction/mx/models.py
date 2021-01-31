@@ -270,8 +270,9 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
 
 
 @use_np
-def infer_per_device_batch_size(model, init_batch_size, max_length, num_categories,
-                                numerical_units, ctx):
+def infer_per_device_batch_size(model, max_length, num_categories,
+                                numerical_units, ctx, init_batch_size=4,
+                                max_batch_size=64):
     """Get the maximal possible per-device batch size that we will use to train this model.
 
     We will construct fake samples and run forward + backward pass of the model to see if it
@@ -290,7 +291,7 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
     per_device_batch_size = init_batch_size
     passed = False
     last_exp = None
-    while per_device_batch_size <= 64:
+    while per_device_batch_size <= max_batch_size:
         fake_inputs = []
         fake_text_tokens = mx.np.random.randint(0, 100, (per_device_batch_size, max_length),
                                                 dtype=np.int32, ctx=ctx)
