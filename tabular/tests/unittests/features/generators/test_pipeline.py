@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY
-from autogluon.tabular.features import PipelineFeatureGenerator, IdentityFeatureGenerator, CategoryFeatureGenerator, DatetimeFeatureGenerator, TextSpecialFeatureGenerator, TextNgramFeatureGenerator
+from autogluon.features.generators import PipelineFeatureGenerator, IdentityFeatureGenerator, CategoryFeatureGenerator, DatetimeFeatureGenerator, TextSpecialFeatureGenerator, TextNgramFeatureGenerator
 
 
 def test_pipeline_feature_generator(generator_helper, data_helper):

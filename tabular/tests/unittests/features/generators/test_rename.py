@@ -1,5 +1,5 @@
 
-from autogluon.tabular.features import RenameFeatureGenerator
+from autogluon.features.generators import RenameFeatureGenerator
 
 
 def test_rename(generator_helper, data_helper):

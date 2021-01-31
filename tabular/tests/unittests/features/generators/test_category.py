@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from autogluon.tabular.features import CategoryFeatureGenerator
+from autogluon.features.generators import CategoryFeatureGenerator
 
 
 def test_category_feature_generator(generator_helper, data_helper):
