@@ -792,7 +792,8 @@ class MultiModalTextModel:
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
         if scheduler_options['num_trials'] == 1:
-            fn_args = sample_config(train_fn.args, dict())
+            fn_args = sample_config(train_fn.args['search_space'],
+                                    train_fn.args['_default_config'])
             print(fn_args)
             train_fn(fn_args, None)
             best_model_saved_dir_path = os.path.join(self._output_directory,'task0'.format(best_task_id))
