@@ -24,7 +24,7 @@ from ..trainer import AbstractTrainer
 logger = logging.getLogger()  # return root logger
 
 # TODO: num_bag_sets -> ag_args
-# TODO: Document predictor attributes
+# TODO: add positive_class kwarg argument to predictor init (learner kwarg?)
 
 # Extra TODOs (Stretch): Can occur post v0.1
 # TODO: make core_kwargs a kwargs argument to predictor.fit
@@ -93,6 +93,7 @@ class TabularPredictor(TabularPredictorV1):
                 Enables advanced functionality in predictor such as `fit_extra()` and feature importance calculation on the original data.
             trainer_type : AbstractTrainer, default = AutoTrainer
                 A class inheriting from `AbstractTrainer` that controls training/ensembling of many models.
+                If you don't know what this is, keep it as the default.
 
     Attributes
     ----------
@@ -104,12 +105,21 @@ class TabularPredictor(TabularPredictorV1):
         What metric is used to evaluate predictive performance.
     label : str
         Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-    feature_metadata : :class:`autogluon.tabular.FeatureMetadata`
+    feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`
         Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label`).
         Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
         Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
             `feature_metadata.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
             `feature_metadata.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
+    positive_class : str or int
+        Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
+        In binary classification, :meth:`TabularPredictor.predict_proba` returns the estimated probability that each row belongs to the positive class.
+        Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
+
+        Returns
+        -------
+        The positive class name in binary classification or None if the problem is not binary classification.
+
     class_labels : list
         For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
         For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
