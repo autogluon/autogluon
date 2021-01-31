@@ -220,7 +220,7 @@ class TextPredictor:
                               tuning_data=tuning_data,
                               num_cpus=num_cpus,
                               num_gpus=num_gpus,
-                              search_space=model_hparams['search_spaces'],
+                              search_space=model_hparams['search_space'],
                               time_limit=time_limit)
         else:
             raise NotImplementedError("Currently, we only support using "
