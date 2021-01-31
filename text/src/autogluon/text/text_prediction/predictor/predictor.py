@@ -27,7 +27,7 @@ logger = logging.getLogger()  # return root logger
 
 
 class TextPredictor:
-    """AutoGluon Predictor predicts values in a column of a tabular dataset that contains text
+    """AutoGluon TextPredictor predicts values in a column of a tabular dataset that contains texts
     (classification or regression).
 
     Parameters
