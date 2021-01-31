@@ -121,14 +121,13 @@ def infer_column_problem_types(
     problem_type
         The inferred problem type
     """
-    if label_columns is None:
-        label_set = set()
-    elif isinstance(label_columns, str):
-        label_set = set([label_columns])
+    if isinstance(label_columns, str):
+        label_columns = [label_columns]
     elif isinstance(label_columns, (list, tuple)):
-        label_set = set(label_columns)
+        pass
     else:
         raise NotImplementedError(f'label_columns is not supported. label_columns={label_columns}.')
+    label_set = set(label_columns)
     assert len(label_set) == 1, 'Currently, only a single label column is supported.'
     column_types = collections.OrderedDict()
     # Process all feature columns
