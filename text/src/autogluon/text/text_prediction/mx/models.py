@@ -1024,39 +1024,31 @@ class MultiModalTextModel:
     @classmethod
     def load(cls, dir_path: str):
         """Load a model object previously produced by `fit()` from disk and return this object.
-           It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
-
+           It is highly recommended the predictor be loaded with the exact AutoGluon version
+           it was fit with.
 
         Parameters
         ----------
         dir_path
             Path to directory where this model was previously saved.
-        use_gpu
-            Whether try to use GPU if possible.
 
         Returns
         -------
         model
             A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
-        loaded_config = cls.default_config().clone_merge(os.path.join(dir_path, 'cfg.yml'))
+        # TODO In general, we will need to support compatible version check
+        loaded_config = base_cfg().clone_merge(os.path.join(dir_path, 'cfg.yml'))
         with open(os.path.join(dir_path, 'assets.json'), 'r') as f:
             assets = json.load(f)
         label_columns = assets['label_columns']
         feature_columns = assets['feature_columns']
         label_shapes = assets['label_shapes']
-        problem_types = assets['problem_types']
-        column_properties = get_column_properties_from_metadata(
-            os.path.join(dir_path, 'column_metadata.json'))
+        problem_type = assets['problem_type']
+        column_types = assets['column_types']
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(loaded_config.model.backbone.name)
         # Initialize the preprocessor
-        preprocessor = TabularBasicBERTPreprocessor(
-            tokenizer=tokenizer,
-            column_properties=column_properties,
-            label_columns=label_columns,
-            max_length=loaded_config.model.preprocess.max_length,
-            merge_text=loaded_config.model.preprocess.merge_text)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
         net = BERTForTabularBasicV1(text_backbone=text_backbone,
                                     feature_field_info=preprocessor.feature_field_info(),
@@ -1065,13 +1057,11 @@ class MultiModalTextModel:
         net.hybridize()
         ctx_l = get_mxnet_available_ctx()
         net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=ctx_l)
-        model = cls(column_properties=column_properties,
-                    label_columns=label_columns,
+        model = cls(label_columns=label_columns,
                     feature_columns=feature_columns,
-                    label_shapes=label_shapes,
-                    problem_types=problem_types,
-                    stopping_metric=None,
-                    log_metrics=None,
+                    problem_type=problem_type,
+                    eval_metric=eval_metric,
+                    log_metrics=log_metrics,
                     base_config=loaded_config)
         model._net = net
         model._preprocessor = preprocessor
