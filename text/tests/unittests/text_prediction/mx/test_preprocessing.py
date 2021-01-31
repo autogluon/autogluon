@@ -20,7 +20,7 @@ TEST_CASES = [
 def assert_dataset_match(lhs_dataset, rhs_dataset, threshold=1E-4):
     assert len(lhs_dataset) == len(rhs_dataset)
     for i in range(len(lhs_dataset)):
-        for j in range(lhs_dataset[0]):
+        for j in range(len(lhs_dataset[0])):
             npt.assert_allclose(lhs_dataset[i][j], rhs_dataset[i][j], threshold, threshold)
 
 
@@ -53,11 +53,7 @@ def test_preprocessor(dataset_name, url, label_column,
                                 1E-4, 1E-4)
     valid_dataset = preprocessor.transform(valid_df[feature_columns], valid_df[label_column])
     test_dataset = preprocessor.transform(valid_df[feature_columns])
-    for i in range(len(train_dataset)):
-        for j in range(len(train_dataset[0])):
-            npt.assert_allclose(train_dataset[i][j],
-                                train_dataset_after_transform[i][j],
-                                1E-4, 1E-4)
+    assert_dataset_match(train_dataset, train_dataset_after_transform)
     for i in range(len(test_dataset)):
         for j in range(len(test_dataset[0])):
             npt.assert_allclose(valid_dataset[i][j],
