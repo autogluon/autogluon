@@ -362,7 +362,7 @@ class FeatureAggregator(HybridBlock):
             if self.cfg.agg_type == 'mean':
                 agg_features = F.np.mean(agg_features, axis=1)
             elif self.cfg.agg_type == 'concat':
-                agg_features = F.np.reshape(features, (0, -1))
+                agg_features = F.npx.reshape(features, (-2, -1))
             elif self.cfg.agg_type == 'attention':
                 if self.attention_net_pre_proj is not None:
                     agg_features = self.attention_net_pre_proj(agg_features)
