@@ -23,7 +23,7 @@ class AutoTrainer(AbstractTrainer):
 
     def fit(self, X_train, y_train, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, **kwargs):
         for key in kwargs:
-            logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.train()`. Argument: {key}')
+            logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
 
         if self.bagged_mode:
             if (y_val is not None) and (X_val is not None):
@@ -35,7 +35,7 @@ class AutoTrainer(AbstractTrainer):
             y_val = None
         else:
             if (y_val is None) or (X_val is None):
-                X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_seed)
+                X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_state)
                 logger.log(20, f'Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X_train)}, Val Rows: {len(X_val)}')
 
         self._train_multi_and_ensemble(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters,

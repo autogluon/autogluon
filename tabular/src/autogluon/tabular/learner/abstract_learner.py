@@ -39,7 +39,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, cache_data=True, is_trainer_present=False, random_seed=0):
+                 problem_type=None, eval_metric=None, cache_data=True, is_trainer_present=False, random_state=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.ignored_columns = ignored_columns
@@ -52,9 +52,9 @@ class AbstractLearner:
         if not self.cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
         self.is_trainer_present = is_trainer_present
-        if random_seed is None:
-            random_seed = random.randint(0, 1000000)
-        self.random_seed = random_seed
+        if random_state is None:
+            random_state = random.randint(0, 1000000)
+        self.random_state = random_state
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
@@ -578,7 +578,7 @@ class AbstractLearner:
         learner_info = {
             'path': self.path,
             'label': self.label,
-            'random_seed': self.random_seed,
+            'random_state': self.random_state,
             'version': self.version,
         }
 

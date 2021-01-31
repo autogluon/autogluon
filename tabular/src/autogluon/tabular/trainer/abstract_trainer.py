@@ -39,12 +39,12 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, eval_metric=None,
                  num_classes=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
-                 save_data=False, random_seed=0, verbosity=2):
+                 save_data=False, random_state=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
-        self.random_seed = random_seed  # Integer value added to the stack level to get the random_seed for kfold splits or the train/val split if bagging is disabled
+        self.random_state = random_state  # Integer value added to the stack level to get the random_state for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
         if eval_metric is not None:
             self.eval_metric = eval_metric
@@ -328,7 +328,7 @@ class AbstractTrainer:
                     'base_model_names': base_model_names,
                     'base_model_paths_dict': base_model_paths,
                     'base_model_types_dict': base_model_types,
-                    'random_state': level + self.random_seed,
+                    'random_state': level + self.random_state,
                 }
                 get_models_kwargs.update(dict(
                     ag_args_ensemble=ag_args_ensemble,
@@ -833,7 +833,7 @@ class AbstractTrainer:
                 base_model_types_inner_dict=self.get_models_attribute_dict(attribute='type_inner', models=base_model_names),
                 base_model_performances_dict=self.get_models_attribute_dict(attribute='val_score', models=base_model_names),
                 hyperparameters=hyperparameters,
-                random_state=level + self.random_seed,
+                random_state=level + self.random_state,
             ),
             ag_args={'name_bag_suffix': ''},
             ag_args_ensemble={'save_bag_folds': save_bag_folds},
@@ -1275,7 +1275,7 @@ class AbstractTrainer:
             base_models_dict=base_models_dict,
             base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=model_names),
             base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=model_names),
-            hyperparameters=hyperparameters, num_classes=self.num_classes, random_state=level+self.random_seed
+            hyperparameters=hyperparameters, num_classes=self.num_classes, random_state=level+self.random_state
         )
         return dummy_stacker
 

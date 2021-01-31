@@ -78,7 +78,7 @@ class DefaultLearner(AbstractLearner):
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
             save_data=self.cache_data,
-            random_seed=self.random_seed,
+            random_state=self.random_state,
             verbosity=verbosity
         )
 
