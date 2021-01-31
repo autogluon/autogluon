@@ -275,7 +275,7 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
 def train_function(args, reporter, train_df_path, tuning_df_path,
                    time_limit, time_start, base_config,
                    problem_type, column_types,
-                   feature_columns, label_column, label_shape,
+                   feature_columns, label_column,
                    log_metrics, stopping_metric,
                    console_log, ignore_warning=False):
     """
@@ -305,10 +305,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         The feature columns
     label_column
         Label column
-    label_shape
-        Shapes of the label.
-        If label is a numerical column, it means the size of the label.
-        If label is a categorical column, it means the number of choices of the label
     log_metrics
         Metrics for logging
     stopping_metric

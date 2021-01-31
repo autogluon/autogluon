@@ -1,14 +1,67 @@
-import ast
-import operator as op
-
 __all__ = ['calculate_metric_by_expr']
 
+import ast
+import operator as op
 
 # supported operators
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
              ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
              ast.USub: op.neg}
 
+
+def infer_eval_stop_log_metrics(problem_type,
+                                eval_metric=None,
+                                stopping_metric=None):
+    """Decide default evaluation, stopping, and logging metrics (based on type of prediction problem).
+
+    Parameters
+    ----------
+    problem_type
+        Type of the problem. Either regression, multiclass, or binary
+    eval_metric
+        The eval metric provided by the user
+    stopping_metric
+        The stopping metric provided by the user
+
+    Returns
+    -------
+    eval_metric
+        The updated evaluation metric
+    stopping_metric
+        The updated stopping metric
+    log_metrics
+        The updated logging metric
+    """
+    if eval_metric is not None and stopping_metric is None:
+        stopping_metric = eval_metric
+        if isinstance(eval_metric, list):
+            stopping_metric = eval_metric[0]
+    if problem_type == _C.CLASSIFICATION:
+        if stopping_metric is None:
+            stopping_metric = 'acc'
+        if eval_metric is None:
+            eval_metric = 'acc'
+        if label_shape == 2:
+            log_metrics = ['f1', 'mcc', 'roc_auc', 'acc', 'log_loss']
+        else:
+            log_metrics = ['acc', 'log_loss']
+    elif problem_type == _C.REGRESSION:
+        if stopping_metric is None:
+            stopping_metric = 'mse'
+        if eval_metric is None:
+            eval_metric = 'mse'
+        log_metrics = ['mse', 'rmse', 'mae']
+    else:
+        raise NotImplementedError('The problem type is not supported yet!')
+    for other_log_metric in [stopping_metric, eval_metric]:
+        if isinstance(other_log_metric, str) and other_log_metric not in log_metrics:
+            log_metrics.append(other_log_metric)
+        else:
+            if isinstance(other_log_metric, list):
+                for ele in other_log_metric:
+                    if ele not in log_metrics:
+                        log_metrics.append(ele)
+    return eval_metric, stopping_metric, log_metrics
 
 def eval_math_expr(expr):
     """Evaluate an expression
