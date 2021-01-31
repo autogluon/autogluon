@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from mxnet.gluon.data import ArrayDataset
 from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.models import get_backbone
+from autogluon_contrib_nlp.data.batchify import Pad, Stack
 from autogluon.features import CategoryFeatureGenerator
 
 from .. import constants as _C
@@ -56,6 +57,16 @@ def tokenize_data(data: pd.Series, tokenizer):
 def get_tokenizer(backbone_name):
     _, _, tokenizer, _, _ = get_backbone(backbone_name)
     return tokenizer
+
+
+class MultiModalTextBatchify():
+    def __init__(self, mode='train', cfg=None):
+        """"""
+        self._cfg = base_preprocess_cfg().clone_merge(cfg)
+        self._mode = mode
+
+    def __call__(self, samples):
+        pass
 
 
 class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
@@ -198,7 +209,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                     self._ignore_columns_set.add(col_name)
                     continue
                 if self.cfg.numerical.convert_to_text:
-                    processed_data = col_value.apply('{:.3f}'.format)
+                    processed_data = processed_data.apply('{:.3f}'.format)
                     processed_data = parallel_transform(
                         df=processed_data,
                         chunk_processor=functools.partial(tokenize_data, tokenizer=self._tokenizer))
