@@ -87,6 +87,7 @@ class TextPredictor:
         self._eval_metric = eval_metric
         self._path = setup_outputdir(path)
         self._model = None
+        self._fit_called = False
 
     @property
     def path(self):
@@ -140,6 +141,7 @@ class TextPredictor:
         -------
         self
         """
+        assert self._fit_called is False
         if presets is not None:
             preset_hparams = ag_text_presets.create(presets)
         else:
@@ -244,7 +246,7 @@ class TextPredictor:
         -------
 
         """
-        pass
+        assert self._fit_called is True
 
     def predict_feature(self):
         """Extract the feature from the neural network
@@ -253,14 +255,13 @@ class TextPredictor:
         -------
 
         """
-        pass
+        assert self._fit_called is True
 
     def save(self):
-        pass
+        assert self._fit_called is True
 
     @classmethod
     def load(cls, path, verbosity=2):
-        set_logger_verbosity(verbosity,
-                             logger=logger)  # Reset logging after load (may be in new Python session)
+        set_logger_verbosity(verbosity, logger=logger)
         if path is None:
             raise ValueError("path cannot be None in load()")
