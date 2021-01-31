@@ -194,7 +194,7 @@ class BaggedEnsembleModel(AbstractModel):
                 X_train_fold, X_val_fold = X_train.iloc[train_index, :], X_train.iloc[val_index, :]
                 y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
                 fold_model = copy.deepcopy(model_base)
-                fold_model.name = f'{fold_model.name}_fold_{i}'
+                fold_model.name = f'{fold_model.name}_F{i+1}'
                 fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
                 fold_model.fit(X_train=X_train_fold, y_train=y_train_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs)
                 time_train_end_fold = time.time()
