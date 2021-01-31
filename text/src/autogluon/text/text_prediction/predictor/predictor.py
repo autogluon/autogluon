@@ -20,7 +20,7 @@ from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_tri
 
 from ..utils import logging_config
 from ..presets import ag_text_presets, merge_params
-from ..infer_types import infer_problem_type, infer_column_problem_types
+from ..infer_types import infer_column_problem_types, printable_column_type_string
 from .. import constants as _C
 
 logger = logging.getLogger()  # return root logger
@@ -203,8 +203,8 @@ class TextPredictor:
                                  'autogluon.tabular.TabularPredictor.\n'
                                  'The inferred column properties of the training data is {}'
                                  .format(train_data))
-        logger.info(f'We have inferred the columns types are {column_types}. '
-                    f'The problem type is "{problem_type}"')
+        logger.info(printable_column_type_string(column_types))
+        logger.info('Problem Type={}'.format(problem_type))
         self._problem_type = problem_type
         model_hparams = hyperparameters['models']['MultimodalTextModel']
         if model_hparams['backend'] == 'gluonnlp_v0':

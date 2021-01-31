@@ -178,6 +178,13 @@ def infer_column_problem_types(
     return column_types, problem_type
 
 
+def printable_column_type_string(column_types):
+    ret = 'Infer Type Result=\n'
+    for col_name, col_type in column_types.items():
+        ret += f'   - "{col_name}": {col_type}\n'
+    return ret
+
+
 def infer_problem_type(column_types, label_column, data_df,
                        provided_problem_type=None):
     """Inference the type of the problem based on type of the column and
