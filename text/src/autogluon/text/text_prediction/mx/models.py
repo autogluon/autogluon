@@ -691,11 +691,6 @@ class MultiModalTextModel:
         return self._feature_columns
 
     @property
-    def search_space(self):
-        """The search space"""
-        return self._search_space
-
-    @property
     def base_config(self):
         """The basic configuration. Internally, we will fill values in the base config by values
         in the search space."""
@@ -765,6 +760,10 @@ class MultiModalTextModel:
         if hpo_params is None:
             hpo_params = ag_text_presets.create('default')['hpo_params']
         scheduler_options = hpo_params['scheduler_options']
+        num_cpus, num_gpus = get_recommended_resource(num_cpus, num_gpus)
+        self._logger.log(25, f"The GluonNLP V0 backend is used. "
+                             f"We will use {num_cpus} cpus and "
+                             f"{num_gpus} gpus to train each trial.")
         if scheduler_options is None:
             scheduler_options = dict()
         scheduler_options = compile_scheduler_options_v2(
