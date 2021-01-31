@@ -782,10 +782,12 @@ class MultiModalTextModel:
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
         # Create a temporary cache file. The internal train function will load the
         # temporary cache.
-        train_df_path = os.path.join(self._output_directory, 'cache_train_dataframe.pq')
-        tuning_df_path = os.path.join(self._output_directory, 'cache_tuning_dataframe.pq')
-        train_data.table.to_parquet(train_df_path)
-        tuning_data.table.to_parquet(tuning_df_path)
+        train_df_path = os.path.join(self._output_directory, 'data_cache',
+                                     'cache_train_dataframe.pq')
+        tuning_df_path = os.path.join(self._output_directory,  'data_cache',
+                                      'cache_tuning_dataframe.pq')
+        train_data.to_parquet(train_df_path)
+        tuning_data.to_parquet(tuning_df_path)
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_df_path=train_df_path,
                                                       time_limit=time_limit,
