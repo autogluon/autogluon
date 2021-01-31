@@ -233,7 +233,7 @@ class FeatureAggregator(HybridBlock):
                     if cfg.gating_net.units != self.in_units:
                         self.gating_pre_proj = nn.Dense(units=cfg.gating_net.units,
                                                         in_units=in_units,
-                                                        bias=False,
+                                                        use_bias=False,
                                                         weight_initializer=weight_initializer,
                                                         bias_initializer=bias_initializer,
                                                         flatten=False,
@@ -247,7 +247,7 @@ class FeatureAggregator(HybridBlock):
                                                                      activation=cfg.gating_net.activation)
                     self.gating_post_proj = nn.Dense(units=1,
                                                      in_units=cfg.gating_net.units,
-                                                     bias=False,
+                                                     use_bias=False,
                                                      weight_initializer=weight_initializer,
                                                      bias_initializer=bias_initializer,
                                                      flatten=False,
