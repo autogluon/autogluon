@@ -313,6 +313,7 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
                 loss.backward()
             mx.npx.waitall()
         except Exception as exp:
+            del fake_inputs
             last_exp = exp
             per_device_batch_size = per_device_batch_size // 2
             ctx.empty_cache()
