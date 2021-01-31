@@ -193,21 +193,21 @@ def auto_shrink_max_length(train_dataset, insert_sep,
 
 def get_stats_string(processor, dataset, is_train=False):
     ret = 'Features:\n'
-    ret += 'Text Column:\n'
+    ret += '   Text Column:\n'
     for i, col_name in enumerate(processor.text_feature_names):
         lengths = [len(ele[i]) for ele in dataset]
-        ret += '   - "{}":' \
+        ret += '      - "{}":' \
                ' Tokenized Length Min/Avg/Max=' \
                '{}/{:.2f}/{}\n'.format(col_name, np.min(lengths),
                                        np.mean(lengths),
                                        np.max(lengths))
-    ret += 'Categorical Column:\n'
+    ret += '   Categorical Column:\n'
     for col_name, num_category in zip(processor.categorical_feature_names,
                                       processor.categorical_num_categories):
-        ret += f'   - "{col_name}": Num Class={num_category}\n'
-    ret += f'Numerical Columns: \n'
+        ret += f'      - "{col_name}": Num Class={num_category}\n'
+    ret += f'   Numerical Columns: \n'
     for col_name in processor.numerical_feature_names:
-        ret += f'   - "{col_name}"'
+        ret += f'      - "{col_name}"'
     if is_train:
         ret += f'Label: "{processor.label_column}"'
         if processor._column_types[processor.label_column] == _C.CATEGORICAL:
