@@ -1,6 +1,7 @@
 import copy
 import math
 import os
+import warnings
 from collections import OrderedDict, defaultdict
 
 import cloudpickle as pkl
@@ -23,6 +24,7 @@ __all__ = ['Classifier']
 
 class Classifier(BasePredictor):
     """Trained Image Classifier returned by fit() that can be used to make predictions on new images.
+    Deprecated: please use autogluon.vision.ImagePredictor starting v0.1.0.
 
     Attributes
     ----------
@@ -30,10 +32,10 @@ class Classifier(BasePredictor):
     Examples
     --------
     >>> import autogluon.core as ag
-    >>> from autogluon.vision import ImagePredictor as task
-    >>> dataset = task.Dataset(train_path='data/train',
+    >>> from autogluon.vision import ImagePredictor
+    >>> dataset = ImagePredictor.Dataset(train_path='data/train',
     >>>                        test_path='data/test')
-    >>> classifier = task.fit(dataset,
+    >>> classifier = ImagePredictor().fit(dataset,
     >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
     >>>                       time_limit=time_limit,
     >>>                       ngpus_per_trial=1)
@@ -43,6 +45,7 @@ class Classifier(BasePredictor):
 
     def __init__(self, model, results, eval_func, scheduler_checkpoint,
                  args, ensemble=0, format_results=True, **kwargs):
+        warnings.warn('Classifier is deprecated starting v0.1.0, please use `autogluon.vision.ImagePredictor`.')
         self.model = model
         self.eval_func = eval_func
         self.results = self._format_results(results) if format_results else results
@@ -96,10 +99,10 @@ class Classifier(BasePredictor):
         
         Parameters
         ----------
-        X : str or :class:`autogluon.task.ImagePredictor.Dataset` or list of `autogluon.task.ImagePredictor.Dataset`
+        X : str or :class:`autogluon.vision.ImagePredictor.Dataset` or list of `autogluon.vision.ImagePredictor.Dataset`
             If str, should be path to the input image (when we just want to predict on single image).
-            If class:`autogluon.task.ImagePredictor.Dataset`, should be dataset of multiple images in same format as training dataset.
-            If list of `autogluon.task.ImagePredictor.Dataset`, should be a set of test dataset with different scales of origin images.
+            If class:`autogluon.vision.ImagePredictor.Dataset`, should be dataset of multiple images in same format as training dataset.
+            If list of `autogluon.vision.ImagePredictor.Dataset`, should be a set of test dataset with different scales of origin images.
         input_size : int
             Size of the images (pixels).
         plot : bool
@@ -110,12 +113,12 @@ class Classifier(BasePredictor):
         Examples
         --------
         >>> import autogluon.core as ag
-        >>> from autogluon.vision import ImagePredictor as task
-        >>> train_data = task.Dataset(train_path='~/data/train')
-        >>> classifier = task.fit(train_data,
+        >>> from autogluon.vision import ImagePredictor
+        >>> train_data = ImagePredictor.Dataset(train_path='~/data/train')
+        >>> classifier = ImagePredictor().fit(train_data,
         >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
         >>>                       time_limit=600, ngpus_per_trial=1)
-        >>> test_data = task.Dataset('~/data/test', train=False)
+        >>> test_data = ImagePredictor.Dataset('~/data/test', train=False)
         >>> class_index, class_probability = classifier.predict('example.jpg')
         """
 
@@ -222,7 +225,7 @@ class Classifier(BasePredictor):
         
         Parameters
         ----------
-        dataset : :class:`autogluon.task.ImagePredictor.Dataset`
+        dataset : :class:`autogluon.vision.ImagePredictor.Dataset`
             The dataset containing test images (must be in same format as the training dataset).
         input_size : int
             Size of the images (pixels).
@@ -232,12 +235,12 @@ class Classifier(BasePredictor):
         Examples
         --------
         >>> import autogluon.core as ag
-        >>> from autogluon.vision import ImagePredictor as task
-        >>> train_data = task.Dataset(train_path='~/data/train')
-        >>> classifier = task.fit(train_data,
+        >>> from autogluon.vision import ImagePredictor as vision
+        >>> train_data = ImagePredictor.Dataset(train_path='~/data/train')
+        >>> classifier = ImagePredictor().fit(train_data,
         >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
         >>>                       time_limit=600, ngpus_per_trial=1)
-        >>> test_data = task.Dataset('~/data/test', train=False)
+        >>> test_data = ImagePredictor.Dataset('~/data/test', train=False)
         >>> test_acc = classifier.evaluate(test_data)
         """
         args = self.args

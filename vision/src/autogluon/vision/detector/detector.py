@@ -54,6 +54,12 @@ class ObjectDetector(object):
             hyperparameters=None,
             **kwargs):
         """Automatic fit process for object detection.
+        Tip: if you observe very slow training speed only happening at the first epoch and your overall time budget 
+        is not large, you may disable `CUDNN_AUTOTUNE` by setting the environment variable 
+        `export MXNET_CUDNN_AUTOTUNE_DEFAULT=0` before running your python script or 
+        insert `import os; os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = '0'` before any code block.
+        The tuning is beneficial in terms of training speed in the long run, but may cost your noticeble overhead at 
+        the begining of each trial.
 
         Parameters
         ----------
