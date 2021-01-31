@@ -283,8 +283,8 @@ class FeatureAggregator(HybridBlock):
     def get_cfg(key=None):
         if key is None:
             cfg = CfgNode()
-            cfg.agg_type = 'concat'
-            cfg.input_gating = False
+            cfg.agg_type = 'attention'
+            cfg.input_gating = True
 
             # Attention Aggregator
             cfg.attention_net = CfgNode()
