@@ -179,7 +179,7 @@ def infer_column_problem_types(
 
 
 def printable_column_type_string(column_types):
-    ret = 'Infer Type Result=\n'
+    ret = 'Column Types:\n'
     for col_name, col_type in column_types.items():
         ret += f'   - "{col_name}": {col_type}\n'
     return ret
