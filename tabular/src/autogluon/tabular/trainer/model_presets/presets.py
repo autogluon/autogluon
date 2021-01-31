@@ -7,6 +7,8 @@ from autogluon.core.metrics import soft_log_loss, mean_squared_error
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel
 
+from .presets_custom import get_preset_custom
+from ..utils import process_hyperparameters
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetModel, NNFastAiTabularModel, FastTextModel, TextPredictionV1Model
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
@@ -115,8 +117,9 @@ VALID_AG_ARGS_KEYS = {
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
 def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_metadata=None, num_classes=None,
                       level: int = 0, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, ag_args_fit=None, ag_args=None, ag_args_ensemble=None,
-                      name_suffix: str = None, default_priorities=None, invalid_model_names: list = None,
+                      name_suffix: str = None, default_priorities=None, invalid_model_names: list = None, excluded_model_types: list = None,
                       hyperparameter_preprocess_func=None, hyperparameter_preprocess_kwargs=None, silent=True):
+    hyperparameters = process_hyperparameters(hyperparameters)
     if hyperparameter_preprocess_func is not None:
         if hyperparameter_preprocess_kwargs is None:
             hyperparameter_preprocess_kwargs = dict()
@@ -126,6 +129,10 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
     invalid_name_set = set()
     if invalid_model_names is not None:
         invalid_name_set.update(invalid_model_names)
+    invalid_type_set = set()
+    if excluded_model_types is not None:
+        logger.log(20, f'Excluded Model Types: {excluded_model_types}')
+        invalid_type_set.update(excluded_model_types)
     if default_priorities is None:
         default_priorities = copy.deepcopy(DEFAULT_MODEL_PRIORITY)
         if problem_type in PROBLEM_TYPE_MODEL_PRIORITY:
@@ -140,12 +147,21 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
         models_of_type = hp_level[model_type]
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]
+        model_cfgs_to_process = []
         for model_cfg in models_of_type:
+            if model_type in invalid_type_set:
+                logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
+                continue  # Don't include excluded models
+            if isinstance(model_cfg, str):
+                model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type, num_classes=num_classes)
+            else:
+                model_cfgs_to_process.append(model_cfg)
+        for model_cfg in model_cfgs_to_process:
             model_cfg = clean_model_cfg(model_cfg=model_cfg, model_type=model_type, ag_args=ag_args, ag_args_ensemble=ag_args_ensemble, ag_args_fit=ag_args_fit)
             model_cfg[AG_ARGS]['priority'] = model_cfg[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             model_priority = model_cfg[AG_ARGS]['priority']
             # Check if model_cfg is valid
-            is_valid = is_model_cfg_valid(model_cfg, level=level)
+            is_valid = is_model_cfg_valid(model_cfg, level=level, problem_type=problem_type)
             if AG_ARGS_FIT in model_cfg and not model_cfg[AG_ARGS_FIT]:
                 model_cfg.pop(AG_ARGS_FIT)
             if is_valid:
@@ -211,7 +227,7 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
 
 
 # Check if model is valid
-def is_model_cfg_valid(model_cfg, level=0):
+def is_model_cfg_valid(model_cfg, level=0, problem_type=None):
     is_valid = True
     for key in model_cfg.get(AG_ARGS, {}):
         if key not in VALID_AG_ARGS_KEYS:
@@ -226,6 +242,8 @@ def is_model_cfg_valid(model_cfg, level=0):
         is_valid = False  # Not valid as a stacker model
     elif not model_cfg[AG_ARGS].get('valid_base', True) and level == 0:
         is_valid = False  # Not valid as a base model
+    elif problem_type is not None and problem_type not in model_cfg[AG_ARGS].get('problem_types', [problem_type]):
+        is_valid = False  # Not valid for this problem_type
     return is_valid
 
 
