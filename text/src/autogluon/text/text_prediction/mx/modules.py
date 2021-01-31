@@ -75,11 +75,7 @@ class BasicMLP(HybridBlock):
 class CategoricalFeatureNet(HybridBlock):
     def __init__(self, num_class, out_units, cfg=None, prefix=None, params=None):
         super().__init__(prefix=prefix, params=params)
-        if cfg is None:
-            cfg = CategoricalFeatureNet.get_cfg()
-        else:
-            cfg = CategoricalFeatureNet.get_cfg().clone_merge(cfg)
-        self.cfg = cfg
+        self.cfg = cfg = CategoricalFeatureNet.get_cfg().clone_merge(cfg)
         embed_initializer = mx.init.create(*cfg.initializer.embed)
         weight_initializer = mx.init.create(*cfg.initializer.weight)
         bias_initializer = mx.init.create(*cfg.initializer.bias)
@@ -128,12 +124,10 @@ class CategoricalFeatureNet(HybridBlock):
 class NumericalFeatureNet(HybridBlock):
     def __init__(self, input_shape, out_units, cfg=None, prefix=None, params=None):
         super().__init__(prefix=prefix, params=params)
-        if cfg is None:
-            cfg = NumericalFeatureNet.get_cfg()
+        self.cfg = cfg = NumericalFeatureNet.get_cfg().clone_merge(cfg)
         self.input_shape = input_shape
         self.need_first_reshape = isinstance(input_shape, (list, tuple)) and len(input_shape) != 1
         self.in_units = int(np.prod(input_shape))
-        self.cfg = NumericalFeatureNet.get_cfg().clone_merge(cfg)
         weight_initializer = mx.init.create(*cfg.initializer.weight)
         bias_initializer = mx.init.create(*cfg.initializer.bias)
         with self.name_scope():
@@ -441,9 +435,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         params
         """
         super().__init__(prefix=prefix, params=params)
-        self.cfg = MultiModalWithPretrainedTextNN.get_cfg()
-        if cfg is not None:
-            self.cfg = cfg = self.cfg.clone_merge(cfg)
+        self.cfg = cfg = MultiModalWithPretrainedTextNN.get_cfg().clone_merge(cfg)
         assert self.cfg.text_net.pool_type == 'cls'
         text_units = self.cfg.text_units
 
