@@ -610,6 +610,7 @@ class MultiModalTextModel:
                  label_columns,
                  problem_type,
                  eval_metric,
+                 log_metrics,
                  output_directory=None,
                  logger=None):
         """Creates model object.
@@ -626,6 +627,8 @@ class MultiModalTextModel:
             Type of the problem
         eval_metric
             The evaluation metric
+        log_metrics
+            The metrics for logging
         output_directory
             The output directory to save the model
         logger
@@ -641,6 +644,7 @@ class MultiModalTextModel:
         self._output_directory = self._base_config.misc.exp_dir
         self._column_types = column_types
         self._eval_metric = eval_metric
+        self._log_metrics = log_metrics
         self._logger = logger
 
         self._label_columns = label_columns

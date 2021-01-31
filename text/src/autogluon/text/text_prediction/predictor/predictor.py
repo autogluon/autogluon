@@ -21,6 +21,7 @@ from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_tri
 from ..utils import logging_config
 from ..presets import ag_text_presets, merge_params
 from ..infer_types import infer_column_problem_types, printable_column_type_string
+from ..metrics import infer_eval_log_metrics
 from .. import constants as _C
 
 logger = logging.getLogger()  # return root logger
@@ -192,6 +193,8 @@ class TextPredictor:
                                                                 label_columns=label_columns,
                                                                 problem_type=self._problem_type,
                                                                 provided_column_types=column_types)
+        self._eval_metric, log_metric = infer_eval_log_metrics(problem_type=problem_type,
+                                                               eval_metric=self._eval_metric)
         has_text_column = False
         for k, v in column_types.items():
             if v == _C.TEXT:
@@ -214,6 +217,7 @@ class TextPredictor:
                                               label_columns=label_columns,
                                               problem_type=self._problem_type,
                                               eval_metric=self._eval_metric,
+                                              log_metrics=log_metrics,
                                               output_directory=self._path,
                                               logger=logger)
             self._model.train(train_data=train_data,
