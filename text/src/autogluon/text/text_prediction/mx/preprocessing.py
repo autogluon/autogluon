@@ -60,13 +60,25 @@ def get_tokenizer(backbone_name):
 
 
 class MultiModalTextBatchify():
-    def __init__(self, mode='train', cfg=None):
+    def __init__(self,
+                 mode='train',
+                 stochastic_start=True,
+                 cfg=None):
         """"""
         self._cfg = base_preprocess_cfg().clone_merge(cfg)
         self._mode = mode
 
     def __call__(self, samples):
         pass
+
+
+def get_appropriate_length(train_dataset, num_text_features):
+
+    for sample in range(train_dataset):
+
+
+def print_stats(processor, dataset, is_train=False):
+
 
 
 class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):

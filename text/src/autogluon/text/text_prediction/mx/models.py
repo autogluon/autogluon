@@ -718,19 +718,6 @@ class MultiModalTextModel:
     def net(self):
         return self._net
 
-    def preprocess(self, data_df, column_types, inplace=False):
-        if inplace:
-            processed_df = data_df
-        else:
-            processed_df = data_df.copy()
-        for col_name in processed_df.columns:
-            if col_name == _C.TEXT:
-                processed_df[col_name] = processed_df[col_name].apply(str)
-            elif col_name == _C.NUMERICAL:
-                processed_df[col_name] = pd.to_numeric(processed_df[col_name])
-            elif col_name == _C.CATEGORICAL:
-                processed_df[col_name] = processed_df[col_name].astype('category')
-
     def train(self, train_data, tuning_data,
               num_cpus=None,
               num_gpus=None,
