@@ -31,7 +31,14 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     Stacker models can act as base models to other stacker models, enabling multi-layer stack ensembling.
     """
-    def __init__(self, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, **kwargs):
+    def __init__(self,
+                 base_model_names=None,
+                 base_models_dict=None,
+                 base_model_paths_dict=None,
+                 base_model_types_dict=None,
+                 base_model_types_inner_dict=None,
+                 base_model_performances_dict=None,
+                 **kwargs):
         super().__init__(**kwargs)
         if base_model_names is None:
             base_model_names = []
