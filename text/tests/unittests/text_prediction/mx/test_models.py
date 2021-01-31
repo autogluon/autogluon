@@ -40,7 +40,7 @@ def test_infer_per_device_batch_size(num_categories,
                                          cfg=cfg)
     net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx)
     net.hybridize()
-    per_device_batch_size = infer_per_device_batch_size(net, init_batch_size=1024,
+    per_device_batch_size = infer_per_device_batch_size(net, init_batch_size=8,
                                                         max_length=max_length,
                                                         num_categories=num_categories,
                                                         numerical_units=numerical_units,
