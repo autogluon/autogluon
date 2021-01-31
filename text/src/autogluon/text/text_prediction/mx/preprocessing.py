@@ -10,11 +10,11 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from mxnet.gluon.data import ArrayDataset
 from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.models import get_backbone
-from autogluon_contrib_nlp.data.batchify import Pad, Stack
+from autogluon_contrib_nlp.data.batchify import Pad, Stack, Tuple
 from autogluon.features import CategoryFeatureGenerator
 
 from .. import constants as _C
-from ..utils import parallel_transform
+from ..utils import parallel_transform, get_trimmed_lengths
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def base_preprocess_cfg():
     cfg = CfgNode()
-    cfg.merge_with_sep = True                 # Whether to merge the text columns with the SEP token
+    cfg.insert_sep = True                     # Whether to insert sep tokens between columns
     cfg.stochastic_chunk = True               # Whether to sample a stochastic chunk from the training text
     cfg.test_stochastic_chunk = False         # Whether to use stochastic hunk in testing
     cfg.text = CfgNode()
@@ -32,7 +32,8 @@ def base_preprocess_cfg():
     cfg.text.max_length = 512                 # The maximum possible length.
     cfg.text.auto_max_length = True           # Try to automatically shrink the maximal length
                                               # based on the statistics of the dataset.
-    cfg.text.auto_max_length_threshold = 0.9  # We will ensure that the new max_length is
+    cfg.text.auto_max_length_quantile = 0.9   # We will ensure that the new max_length is around the quantile of the lengths of all samples
+    cfg.text.auto_max_length_round_to = 8     # We will ensure that the automatically determined max length will be divisible by round_to
     cfg.categorical = CfgNode()
     cfg.categorical.minimum_cat_count = 100   # The minimal number of data per categorical group
     cfg.categorical.maximum_num_cat = 20      # The minimal number of data per categorical group
@@ -64,26 +65,152 @@ def get_tokenizer(backbone_name):
 
 class MultiModalTextBatchify():
     def __init__(self,
+                 num_text_features,
+                 num_categorical_features,
+                 num_numerical_features,
+                 cls_token_id,
+                 sep_token_id,
+                 max_length,
                  mode='train',
                  stochastic_chunk=True,
                  cfg=None):
-        """"""
+        """Batchify function for the multimodal text column"""
         self._cfg = base_preprocess_cfg().clone_merge(cfg)
         self._mode = mode
+        self._cls_token_id = cls_token_id
+        self._sep_token_id = sep_token_id
+        self._stochastic_chunk = stochastic_chunk
+        self._num_text_features = num_text_features
+        self._num_categorical_features = num_categorical_features
+        self._num_numerical_features = num_numerical_features
+        self._max_length = max_length
+        self._pad_batchify = Pad()
+        self._stack_batchify = Stack()
+        if self._num_categorical_features > 0:
+            self._categorical_batchify = Tuple([Stack()
+                                                for _ in range(self._num_categorical_features)])
+        else:
+            self._categorical_batchify = None
+        assert self._num_numerical_features == 0 or self._num_numerical_features == 1
+
+    @property
+    def cfg(self):
+        return self._cfg
 
     def __call__(self, samples):
-        pass
+        text_token_ids = []
+        text_valid_length = []
+        text_segment_ids = []
+        categorical_features = []
+        numerical_features = []
+        labels = []
+        for ele in samples:
+            # Get text features
+            if self.cfg.insert_sep:
+                max_length = self._max_length - (self._num_text_features + 1)
+            else:
+                max_length = self._max_length - 2
+            trimmed_lengths = get_trimmed_lengths([len(ele[i])
+                                                   for i in range(self._num_text_features)],
+                                                  max_length,
+                                                  do_merge=True)
+            token_ids = [self._cls_token_id]
+            segment_ids = [0]
+            seg = 1
+            for i, trim_length in enumerate(trimmed_lengths):
+                if self._stochastic_chunk:
+                    start_ptr = np.random.randint(0, len(ele[i]) - trim_length + 1)
+                else:
+                    start_ptr = 0
+                token_ids.extend(ele[i][start_ptr:(start_ptr + trim_length)].tolist())
+                segment_ids.extend([seg] * trim_length)
+                if self.cfg.insert_sep or i == len(trim_length) - 1:
+                    token_ids.append(self._sep_token_id)
+                    segment_ids.append(seg)
+                seg = (seg + 1) % 2
+            text_token_ids.append(np.array(token_ids, dtype=np.int32))
+            text_valid_length.append(len(token_ids))
+            text_segment_ids.append(np.array(segment_ids, dtype=np.int32))
+            # Get categorical features
+            ptr = self._num_text_features
+            if self._num_categorical_features > 0:
+                categorical_features.append(ele[ptr:(ptr + self._num_categorical_features)])
+            ptr += self._num_categorical_features
+
+            # Get numerical features
+            if self._num_numerical_features > 0:
+                numerical_features.append(ele[ptr])
+            ptr += self._num_text_features
+            if self._mode == 'train':
+                labels.append(ele[ptr])
+        features = []
+        features.append((self._pad_batchify(text_token_ids),
+                         self._stack_batchify(text_valid_length),
+                         self._pad_batchify(text_segment_ids)))
+        if self._num_categorical_features > 0:
+            features.extend(self._categorical_batchify(categorical_features))
+        if self._num_numerical_features > 0:
+            features.append(self._stack_batchify(numerical_features))
+        if self._mode == 'train':
+            labels = self._stack_batchify(labels)
+            return features, labels
+        else:
+            return features
 
 
-def get_auto_max_length(train_dataset, merge_with_sep, num_text_features):
+def auto_shrink_max_length(train_dataset, insert_sep,
+                        num_text_features,
+                        auto_max_length_quantile,
+                        round_to,
+                        max_length):
+    """Automatically shrink the max length based on the training data
+
+    Parameters
+    ----------
+    train_dataset
+        The training dataset
+    insert_sep
+    num_text_features
+    auto_max_length_quantile
+    round_to
+    max_length
+
+    Returns
+    -------
+    new_max_length
+    """
+    lengths = []
     for sample in range(train_dataset):
-
+        if insert_sep:
+            lengths.append(num_text_features + 1 + sum([len(sample[i])
+                                                        for i in range(num_text_features)]))
+        else:
+            lengths.append(2 + sum([len(sample[i]) for i in range(num_text_features)]))
+    quantile_length = np.quantile(lengths, auto_max_length_quantile)
+    quantile_length = int(round_to * np.ceil(quantile_length / round_to))
+    return min(quantile_length, max_length)
 
 
 def get_stats_string(processor, dataset, is_train=False):
-    ret = ''
-    for col_name in processor.text_feature_names:
-
+    ret = 'Features:\n'
+    ret += 'Text Column:\n'
+    for i, col_name in enumerate(processor.text_feature_names):
+        lengths = [len(ele[i]) for ele in dataset]
+        ret += f'   - "{col_name}":' \
+               f' Tokenized Length Min/Avg/Max=' \
+               f'{np.min(lengths)}/{np.mean(lengths)}/{np.max(lengths)}\n'
+    ret += '\n'
+    ret += 'Categorical Column:\n'
+    for col_name, num_category in zip(processor.categorical_feature_names,
+                                      processor.categorical_num_categories):
+        ret += f'   - "{col_name}": Num Class={num_category}\n'
+    ret += '\n'
+    ret += f'Numerical Columns: {processor.numerical_feature_names}\n\n'
+    if is_train:
+        ret += f'Label Column: {dataset.label_column}'
+        if dataset._column_types[dataset.label_column] == _C.CATEGORICAL:
+            ret += f', Labels={dataset.label_generator.classes_}\n'
+    return ret
 
 
 class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
@@ -126,6 +253,10 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         self._categorical_feature_names = []
         self._categorical_num_categories = []
         self._numerical_feature_names = []
+
+    @property
+    def label_column(self):
+        return self._label_column
 
     @property
     def text_feature_names(self):
