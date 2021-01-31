@@ -24,8 +24,6 @@ logger = logging.getLogger(__name__)
 def base_preprocess_cfg():
     cfg = CfgNode()
     cfg.insert_sep = True                     # Whether to insert sep tokens between columns
-    cfg.stochastic_chunk = True               # Whether to sample a stochastic chunk from the training text
-    cfg.test_stochastic_chunk = False         # Whether to use stochastic hunk in testing
     cfg.text = CfgNode()
     cfg.text.merge = True                     # Whether we will merge different text columns
                                               # or treat them independently.
@@ -44,6 +42,7 @@ def base_preprocess_cfg():
     cfg.numerical.impute_strategy = 'mean'    # Whether to use mean to fill in the missing values.
     cfg.numerical.scaler_with_mean = True     # Whether to normalize with mean
     cfg.numerical.scaler_with_std = True      # Whether to normalize with std
+    cfg.freeze()
     return cfg
 
 
@@ -71,11 +70,33 @@ class MultiModalTextBatchify:
                  cls_token_id,
                  sep_token_id,
                  max_length,
+                 num_segments=2,
                  mode='train',
                  stochastic_chunk=True,
-                 cfg=None):
-        """Batchify function for the multimodal text column"""
-        self._cfg = base_preprocess_cfg().clone_merge(cfg)
+                 insert_sep=True):
+        """Batchify function for the multimodal text column
+
+        Parameters
+        ----------
+        num_text_inputs
+            number of text inputs
+        num_categorical_inputs
+            number of categorical inputs
+        num_numerical_inputs
+            number of numerical inputs
+        cls_token_id
+            CLS ID
+        sep_token_id
+        max_length
+        num_segments
+            The supported number of segments of the pretraiend backbone.
+            For BERT + ELECTRA, it's 2. For RoBERTa, it's 1
+        mode
+        stochastic_chunk
+        insert_sep
+            Whether to insert sep
+        """
+        self._insert_sep = insert_sep
         self._mode = mode
         self._cls_token_id = cls_token_id
         self._sep_token_id = sep_token_id
@@ -84,6 +105,7 @@ class MultiModalTextBatchify:
         self._num_categorical_inputs = num_categorical_inputs
         self._num_numerical_inputs = num_numerical_inputs
         self._max_length = max_length
+        self._num_segments = num_segments
         self._pad_batchify = Pad()
         self._stack_batchify = Stack()
         if self._num_categorical_inputs > 0:
@@ -105,10 +127,6 @@ class MultiModalTextBatchify:
     def num_numerical_outputs(self):
         return self._num_numerical_inputs
 
-    @property
-    def cfg(self):
-        return self._cfg
-
     def __call__(self, samples):
         text_token_ids = []
         text_valid_length = []
@@ -118,7 +136,7 @@ class MultiModalTextBatchify:
         labels = []
         for ele in samples:
             # Get text features
-            if self.cfg.insert_sep:
+            if self._insert_sep:
                 max_length = self._max_length - (self._num_text_inputs + 1)
             else:
                 max_length = self._max_length - 2
@@ -126,20 +144,20 @@ class MultiModalTextBatchify:
                                                    for i in range(self._num_text_inputs)],
                                                   max_length,
                                                   do_merge=True)
+            seg = 0
             token_ids = [self._cls_token_id]
-            segment_ids = [0]
-            seg = 1
+            segment_ids = [seg]
             for i, trim_length in enumerate(trimmed_lengths):
+                seg = (seg + 1) % self._num_segments
                 if self._stochastic_chunk:
                     start_ptr = np.random.randint(0, len(ele[i]) - trim_length + 1)
                 else:
                     start_ptr = 0
                 token_ids.extend(ele[i][start_ptr:(start_ptr + trim_length)].tolist())
                 segment_ids.extend([seg] * trim_length)
-                if self.cfg.insert_sep or i == len(trim_length) - 1:
+                if self._insert_sep or i == len(trim_length) - 1:
                     token_ids.append(self._sep_token_id)
                     segment_ids.append(seg)
-                seg = (seg + 1) % 2
             text_token_ids.append(np.array(token_ids, dtype=np.int32))
             text_valid_length.append(len(token_ids))
             text_segment_ids.append(np.array(segment_ids, dtype=np.int32))
@@ -227,6 +245,18 @@ def get_stats_string(processor, dataset, is_train=False):
     return ret
 
 
+def get_cls_sep_id(tokenizer):
+    if hasattr(tokenizer, 'cls_id'):
+        cls_id = tokenizer.cls_id
+        sep_id = tokenizer.sep_id
+    elif hasattr(tokenizer, 'bos_id'):
+        cls_id = tokenizer.bos_id
+        sep_id = tokenizer.eos_id
+    else:
+        raise NotImplementedError
+    return cls_id, sep_id
+
+
 class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
     def __init__(self, column_types, label_column, tokenizer_name, cfg=None):
         self._column_types = column_types
@@ -267,6 +297,10 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         self._categorical_feature_names = []
         self._categorical_num_categories = []
         self._numerical_feature_names = []
+
+    @property
+    def tokenizer(self):
+        return self._tokenizer
 
     @property
     def label_column(self):

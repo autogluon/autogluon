@@ -177,6 +177,9 @@ def base_model_config():
     cfg.backbone = CfgNode()
     cfg.backbone.name = 'google_electra_base'
     cfg.network = MultiModalWithPretrainedTextNN.get_cfg()
+    cfg.train_stochastic_chunk = True  # Whether to sample a stochastic chunk from the training text
+    cfg.test_stochastic_chunk = False  # Whether to use stochastic chunk in testing
+    cfg.inference_num_repeat = 1       # Whether to turn on randomness and repeat the inference for multiple times.
     return cfg
 
 
