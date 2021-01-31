@@ -350,13 +350,13 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         # When the reporter is not None,
         # we create the saved directory based on the task_id + time
         task_id = args.task_id
-        exp_dir = os.path.join(exp_dir, 'task{}_{}'.format(task_id, time.time()))
+        exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
         os.makedirs(exp_dir, exist_ok=True)
         cfg.defrost()
         cfg.misc.exp_dir = exp_dir
         cfg.freeze()
     else:
-        exp_dir = os.path.join(exp_dir, 'task0_{}'.format(time.time()))
+        exp_dir = os.path.join(exp_dir, 'task0')
         os.makedirs(exp_dir, exist_ok=True)
         cfg.misc.exp_dir = exp_dir
         cfg.freeze()
@@ -671,16 +671,6 @@ class MultiModalTextModel:
         return self._label_columns
 
     @property
-    def class_labels(self):
-        """The internal class labels"""
-        pass
-
-    @property
-    def class_labels_internal(self):
-        """The internal class labels once we have converted to integers"""
-        raise NotImplementedError
-
-    @property
     def problem_type(self):
         """Types of the problem"""
         return self._problem_type
@@ -718,8 +708,7 @@ class MultiModalTextModel:
               search_space=None,
               plot_results=False,
               console_log=True,
-              ignore_warning=True,
-              verbosity=2):
+              ignore_warning=True):
         """The train function.
 
         Parameters
@@ -803,6 +792,9 @@ class MultiModalTextModel:
                                                       ignore_warning=ignore_warning))
         if scheduler_options['num_trials'] == 1:
             train_fn()
+            best_model_saved_dir_path = os.path.join(self._output_directory,'task0'.format(best_task_id))
+            cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
+            cfg = self.base_config.clone_merge(cfg_path)
         else:
             force_forkserver()
             scheduler_cls = schedulers[scheduler_options['searcher']]
@@ -817,12 +809,11 @@ class MultiModalTextModel:
                                    'or 2) There are some internal errors in AutoGluon. '
                                    'For the first case, you can increase the time_limits or set it to '
                                    'None, e.g., setting "predictor.fit(..., time_limit=None). To '
-                                   'further investigate the root cause, you can also try to train with '
-                                   '"verbosity=3", i.e., predictor.fit(..., verbosity=3).')
+                                   'further investigate the root cause, you can also try to set the '
+                                   '"verbosity=3" and try again, i.e., predictor.set_verbosity(3).')
             best_config = scheduler.get_best_config()
-            if verbosity >= 2:
-                self._logger.info('Results=', scheduler.searcher._results)
-                self._logger.info('Best_config={}'.format(best_config))
+            self._logger.log(25, 'Results=', scheduler.searcher._results)
+            self._logger.log(25, 'Best_config={}'.format(best_config))
             best_task_id = scheduler.get_best_task_id()
             best_model_saved_dir_path = os.path.join(self._output_directory,
                                                      'task{}'.format(best_task_id))
@@ -871,7 +862,7 @@ class MultiModalTextModel:
         mx.npx.waitall()
         self.save(self._output_directory)
 
-    def evaluate(self, valid_data, metrics):
+    def evaluate(self, valid_data, metrics=None, return_type='list'):
         """ Report the predictive performance evaluated for a given dataset.
 
         Parameters
@@ -879,12 +870,15 @@ class MultiModalTextModel:
         valid_data : str or :class:`TabularDataset` or `pandas.DataFrame`
             This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
             If str is passed, `valid_data` will be loaded using the str value as the file path.
-        metrics : List[str]
-            A list of names of metrics to report.
+        metrics : str or List[str] or None
+            Name of metric or a list of names of metrics to report.
+            If it is not given, we will return the score of the stored eval_metric.
+        return_type :
+            Can be list or dict
 
         Returns
         -------
-        Dict mapping metric -> score calculated over the given dataset.
+        List of metric scores
         """
         if isinstance(metrics, str):
             metrics = [metrics]
@@ -948,11 +942,11 @@ class MultiModalTextModel:
         ret
             List that contain the class names
         """
-        if self._problem_types[0] != _C.CLASSIFICATION:
+        if self.problem_type != MULTICLASS or self.problem_type != BINARY:
             warnings.warn('Accessing class names for a non-classification problem. Return None.')
             return None
         else:
-            return self._column_properties[self._label_columns[0]].categories
+            return self.
 
     def predict_proba(self, test_data):
         """Predict class probabilities instead of class labels (for classification tasks).
