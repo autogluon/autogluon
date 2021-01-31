@@ -312,7 +312,7 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
                 loss.backward()
             mx.npx.waitall()
         except Exception:
-            per_device_batch_size = per_device_batch_size / 2
+            per_device_batch_size = per_device_batch_size // 2
             continue
         passed = True
     if not passed:
