@@ -258,7 +258,7 @@ class FeatureAggregator(HybridBlock):
                     if cfg.attention_net.units != self.in_units:
                         self.attention_net_pre_proj = nn.Dense(units=cfg.attention_net.units,
                                                                in_units=in_units,
-                                                               bias=False,
+                                                               use_bias=False,
                                                                weight_initializer=weight_initializer,
                                                                bias_initializer=bias_initializer,
                                                                flatten=False,
