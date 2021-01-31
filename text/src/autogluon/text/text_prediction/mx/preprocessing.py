@@ -196,20 +196,22 @@ def get_stats_string(processor, dataset, is_train=False):
     ret += 'Text Column:\n'
     for i, col_name in enumerate(processor.text_feature_names):
         lengths = [len(ele[i]) for ele in dataset]
-        ret += f'   - "{col_name}":' \
-               f' Tokenized Length Min/Avg/Max=' \
-               f'{np.min(lengths)}/{np.mean(lengths)}/{np.max(lengths)}\n'
-    ret += '\n'
+        ret += '   - "{}":' \
+               ' Tokenized Length Min/Avg/Max=' \
+               '{}/{:.2f}/{}\n'.format(col_name, np.min(lengths),
+                                       np.mean(lengths),
+                                       np.max(lengths))
     ret += 'Categorical Column:\n'
     for col_name, num_category in zip(processor.categorical_feature_names,
                                       processor.categorical_num_categories):
         ret += f'   - "{col_name}": Num Class={num_category}\n'
-    ret += '\n'
-    ret += f'Numerical Columns: {processor.numerical_feature_names}\n\n'
+    ret += f'Numerical Columns: \n'
+    for col_name in processor.numerical_feature_names:
+        ret += f'   - "{col_name}"'
     if is_train:
-        ret += f'Label Column: {processor.label_column}'
+        ret += f'Label: {processor.label_column}'
         if processor._column_types[processor.label_column] == _C.CATEGORICAL:
-            ret += f', Labels={processor.label_generator.classes_}\n'
+            ret += f', Num Class="{processor.label_generator.classes_}"\n'
     return ret
 
 
