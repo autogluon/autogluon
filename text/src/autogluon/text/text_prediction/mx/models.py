@@ -269,32 +269,58 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
         return scorer._sign * scorer(ground_truth, predictions)
 
 
-def infer_max_length(train_df, column_types):
-    """Try to infer the maximum length that we should use for this dataset.
+@use_np
+def infer_per_device_batch_size(model, init_batch_size, max_length, num_categories,
+                                numerical_units, ctx):
+    """Get the maximal possible per-device batch size that we will use to train this model.
 
-    Parameters
-    ----------
-    train_df
-        The training dataframe.
-    column_types
-        Type of the columns.
+    We will construct fake samples and run forward + backward pass of the model to see if it
+    will raise memory error.
 
-    Returns
-    -------
-    max_length
-        The inferred maximum length to use for this task.
-    """
-    pass
-
-
-def infer_batch_size(model, train_data):
-    """Get the maximal possible per-device batch size that we should use to train this model.
+    We will ensure that the inferred batch_size will be a power of 2 and the
+    minimal is 1. If the model is not runnable for batch_size = 1, we will raise an error.
+    Usually it means that you will need a GPU with larger memory.
 
     Returns
     -------
-    batch_size
+    per_device_batch_size
+        The batch size that we will use per device. This is determined based on the current
+        memory requirement of the network.
     """
-    pass
+    per_device_batch_size = init_batch_size
+    passed = False
+    while per_device_batch_size >= 1:
+        fake_inputs = []
+        fake_text_tokens = mx.np.random.randint(0, 100, (per_device_batch_size, max_length),
+                                                dtype=np.int32, ctx=ctx)
+        fake_valid_length = mx.np.random.randint(max_length // 2, max_length,
+                                                 (per_device_batch_size,), dtype=np.int32,
+                                                 ctx=ctx)
+        fake_segment_ids = mx.np.zeros((per_device_batch_size, max_length), dtype=np.int32, ctx=ctx)
+        fake_inputs.append((fake_text_tokens, fake_valid_length, fake_segment_ids))
+        for num_category in num_categories:
+            fake_inputs.append(mx.np.random.randint(0, num_category,
+                                                    (per_device_batch_size,),
+                                                    dtype=np.int32, ctx=ctx))
+        if numerical_units is not None:
+            fake_inputs.append(mx.np.random.normal(0, 1, (per_device_batch_size, numerical_units),
+                                                   dtype=np.float32, ctx=ctx))
+        try:
+            with mx.autograd.record():
+                out = model(fake_inputs)
+                loss = out.mean()
+                loss.backward()
+            mx.npx.waitall()
+        except Exception:
+            per_device_batch_size = per_device_batch_size / 2
+            continue
+        passed = True
+    if not passed:
+        raise RuntimeError('We cannot determine an appropriate batch size for your problem. '
+                           'This may be due to that your GPU memory size is too small. '
+                           'Try to reduce the number of columns in the dataset or '
+                           'try a smaller network.')
+    return per_device_batch_size
 
 
 @use_np
