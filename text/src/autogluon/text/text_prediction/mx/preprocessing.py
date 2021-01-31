@@ -150,10 +150,9 @@ class MultiModalTextBatchify:
             ptr += self._num_categorical_inputs
 
             # Get numerical features
-            print(len(ele), ptr)
             if self._num_numerical_inputs > 0:
                 numerical_features.append(ele[ptr])
-            ptr += self._num_text_inputs
+            ptr += self._num_numerical_inputs
             if self._mode == 'train':
                 labels.append(ele[ptr])
         features = []
