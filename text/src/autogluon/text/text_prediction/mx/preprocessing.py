@@ -213,7 +213,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                 raise NotImplementedError(f'Type of the column is not supported currently. '
                                           f'Received {col_name}={col_type}.')
         if len(numerical_features) > 0:
-            numerical_features = np.stack(numerical_features, axis=-1)
+            numerical_features = [np.stack(numerical_features, axis=-1)]
         if self.label_type == _C.CATEGORICAL:
             y = self._label_generator.fit_transform(y)
         elif self.label_type == _C.NUMERICAL:
@@ -222,7 +222,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             raise NotImplementedError(f'Type of label column is not supported. '
                                       f'Label column type={self._label_column}')
         # Wrap the processed features and labels into a training dataset
-        all_data = text_features + categorical_features + [numerical_features, y]
+        all_data = text_features + categorical_features + numerical_features + [y]
         dataset = ArrayDataset(*all_data)
         return dataset
 
@@ -265,7 +265,8 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             col_value = pd.to_numeric(X_df[col_name]).to_numpy()
             processed_data = generator.transform(np.expand_dims(col_value, axis=-1))[:, 0]
             numerical_features.append(processed_data)
-        numerical_features = np.stack(numerical_features, axis=-1)
+        if len(numerical_features) > 0:
+            numerical_features = [np.stack(numerical_features, axis=-1)]
         if y_df is not None:
             if self.label_type == _C.CATEGORICAL:
                 y = self.label_generator.transform(y_df)
@@ -273,10 +274,10 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                 y = pd.to_numeric(y_df).to_numpy()
             else:
                 raise NotImplementedError
-            all_data = text_features + categorical_features + [numerical_features, y]
+            all_data = text_features + categorical_features + numerical_features + [y]
             return ArrayDataset(*all_data)
         else:
-            all_data = text_features + categorical_features + [numerical_features]
+            all_data = text_features + categorical_features + numerical_features
             return ArrayDataset(*all_data)
 
     def __getstate__(self):
