@@ -246,12 +246,12 @@ def get_stats_string(processor, dataset, is_train=False):
 
 
 def get_cls_sep_id(tokenizer):
-    if hasattr(tokenizer, 'cls_id'):
-        cls_id = tokenizer.cls_id
-        sep_id = tokenizer.sep_id
-    elif hasattr(tokenizer, 'bos_id'):
-        cls_id = tokenizer.bos_id
-        sep_id = tokenizer.eos_id
+    if hasattr(tokenizer.vocab, 'cls_id'):
+        cls_id = tokenizer.vocab.cls_id
+        sep_id = tokenizer.vocab.sep_id
+    elif hasattr(tokenizer.vocab, 'bos_id'):
+        cls_id = tokenizer.vocab.bos_id
+        sep_id = tokenizer.vocab.eos_id
     else:
         raise NotImplementedError
     return cls_id, sep_id
