@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 def base_preprocess_cfg():
     cfg = CfgNode()
+    cfg.merge_with_sep = True                 # Whether to merge the text columns with the SEP token
     cfg.text = CfgNode()
     cfg.text.merge = True                     # Whether we will merge different text columns
                                               # or treat them independently.
