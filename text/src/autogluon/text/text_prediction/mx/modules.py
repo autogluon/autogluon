@@ -459,13 +459,17 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         self.num_text_features = num_text_features
         self.num_categorical_features = num_categorical_features
         self.num_numerical_features = num_numerical_features
+        if numerical_input_units is None:
+            numerical_input_units = []
+        elif not isinstance(numerical_input_units, (list, tuple)):
+            numerical_input_units = [numerical_input_units] * self.num_numerical_features
         self.numerical_input_units = numerical_input_units
         self.num_categories = num_categories
         if self.num_categorical_features > 0:
             assert len(self.num_categories) == self.num_categorical_features
         with self.name_scope():
             self.text_backbone = text_backbone
-            if len(self.num_categorical_features) > 0:
+            if self.num_categorical_features > 0:
                 self.categorical_networks = nn.HybridSequential()
                 for i in range(self.num_categorical_features):
                     with self.categorical_networks.name_scope():
@@ -473,7 +477,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                             CategoricalFeatureNet(num_class=self.num_categories[i],
                                                   out_units=categorical_units,
                                                   cfg=cfg.categorical_net))
-            if len(self.num_numerical_features) > 0:
+            if self.num_numerical_features > 0:
                 self.numerical_networks = nn.HybridSequential()
                 for i in range(self.num_numerical_features):
                     with self.numerical_networks.name_scope():
