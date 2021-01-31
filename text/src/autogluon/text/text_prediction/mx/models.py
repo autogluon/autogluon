@@ -946,7 +946,7 @@ class MultiModalTextModel:
             warnings.warn('Accessing class names for a non-classification problem. Return None.')
             return None
         else:
-            return self.
+            raise NotImplementedError
 
     def predict_proba(self, test_data):
         """Predict class probabilities instead of class labels (for classification tasks).
@@ -965,7 +965,7 @@ class MultiModalTextModel:
             Here, the i-th number means the probability of belonging to the i-th class.
             You can access the class names by calling `self.class_names`.
         """
-        assert self.problem_types[0] == _C.CLASSIFICATION
+        assert self.problem_type == MULTICLASS or self.problem_type == BINARY
         return self._internal_predict(test_data,
                                       get_original_labels=False,
                                       get_probabilities=True)
@@ -1006,9 +1006,8 @@ class MultiModalTextModel:
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump(
                 {
+                    'problem_type': self._problem_type,
                     'label_columns': self._label_columns,
-                    'label_shapes': self._label_shapes,
-                    'problem_types': self._problem_types,
                     'feature_columns': self._feature_columns,
                     'column_types': self._column_types,
                     'version': version.__version__,
