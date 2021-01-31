@@ -289,6 +289,7 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
     """
     per_device_batch_size = init_batch_size
     passed = False
+    last_exp = None
     while per_device_batch_size >= 1:
         fake_inputs = []
         fake_text_tokens = mx.np.random.randint(0, 100, (per_device_batch_size, max_length),
@@ -311,15 +312,17 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
                 loss = out.mean()
                 loss.backward()
             mx.npx.waitall()
-        except Exception:
+        except Exception as exp:
+            last_exp = exp
             per_device_batch_size = per_device_batch_size // 2
             continue
         passed = True
     if not passed:
-        raise RuntimeError('We cannot determine an appropriate batch size for your problem. '
-                           'This may be due to that your GPU memory size is too small. '
-                           'Try to reduce the number of columns in the dataset or '
-                           'try a smaller network.')
+        print('We cannot determine an appropriate batch size for your problem. '
+              'This may be due to that your GPU memory size is too small. '
+              'Try to reduce the number of columns in the dataset or '
+              'try a smaller network. Raise the previous exception:')
+        raise last_exp
     return per_device_batch_size
 
 
