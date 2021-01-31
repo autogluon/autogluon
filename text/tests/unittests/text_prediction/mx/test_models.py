@@ -9,7 +9,7 @@ from autogluon.text.text_prediction.mx.models import infer_per_device_batch_size
 
 @use_np
 @pytest.mark.parametrize('num_categories,numerical_units,max_length',
-                         [([20, 32, 2, 5, 4], 32, 256)])
+                         [([20, 32, 2, 5, 4], 32, 512)])
 @pytest.mark.parametrize('backbone',
                          ['google_electra_small'])
 @pytest.mark.parametrize('agg_type', ['attention'])

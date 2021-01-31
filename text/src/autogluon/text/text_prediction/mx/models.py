@@ -272,7 +272,7 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
 @use_np
 def infer_per_device_batch_size(model, max_length, num_categories,
                                 numerical_units, ctx, init_batch_size=4,
-                                max_batch_size=64):
+                                max_batch_size=128):
     """Get the maximal possible per-device batch size that we will use to train this model.
 
     We will construct fake samples and run forward + backward pass of the model to see if it
