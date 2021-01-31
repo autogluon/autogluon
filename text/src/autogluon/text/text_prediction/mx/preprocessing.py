@@ -65,9 +65,9 @@ def get_tokenizer(backbone_name):
 
 class MultiModalTextBatchify:
     def __init__(self,
-                 num_text_features,
-                 num_categorical_features,
-                 num_numerical_features,
+                 num_text_inputs,
+                 num_categorical_inputs,
+                 num_numerical_inputs,
                  cls_token_id,
                  sep_token_id,
                  max_length,
@@ -80,18 +80,20 @@ class MultiModalTextBatchify:
         self._cls_token_id = cls_token_id
         self._sep_token_id = sep_token_id
         self._stochastic_chunk = stochastic_chunk
-        self._num_text_features = num_text_features
-        self._num_categorical_features = num_categorical_features
-        self._num_numerical_features = num_numerical_features
+        self._num_text_inputs = num_text_inputs
+        self._num_categorical_inputs = num_categorical_inputs
+        self._num_numerical_inputs = num_numerical_inputs
         self._max_length = max_length
         self._pad_batchify = Pad()
         self._stack_batchify = Stack()
-        if self._num_categorical_features > 0:
+        if self._num_categorical_inputs > 0:
             self._categorical_batchify = Tuple([Stack()
-                                                for _ in range(self._num_categorical_features)])
+                                                for _ in range(self._num_categorical_inputs)])
         else:
             self._categorical_batchify = None
-        assert self._num_numerical_features == 0 or self._num_numerical_features == 1
+        assert self._num_numerical_inputs == 0 or self._num_numerical_inputs == 1
+
+    @property
 
     @property
     def cfg(self):
@@ -107,11 +109,11 @@ class MultiModalTextBatchify:
         for ele in samples:
             # Get text features
             if self.cfg.insert_sep:
-                max_length = self._max_length - (self._num_text_features + 1)
+                max_length = self._max_length - (self._num_text_inputs + 1)
             else:
                 max_length = self._max_length - 2
             trimmed_lengths = get_trimmed_lengths([len(ele[i])
-                                                   for i in range(self._num_text_features)],
+                                                   for i in range(self._num_text_inputs)],
                                                   max_length,
                                                   do_merge=True)
             token_ids = [self._cls_token_id]
@@ -132,24 +134,24 @@ class MultiModalTextBatchify:
             text_valid_length.append(len(token_ids))
             text_segment_ids.append(np.array(segment_ids, dtype=np.int32))
             # Get categorical features
-            ptr = self._num_text_features
-            if self._num_categorical_features > 0:
-                categorical_features.append(ele[ptr:(ptr + self._num_categorical_features)])
-            ptr += self._num_categorical_features
+            ptr = self._num_text_inputs
+            if self._num_categorical_inputs > 0:
+                categorical_features.append(ele[ptr:(ptr + self._num_categorical_inputs)])
+            ptr += self._num_categorical_inputs
 
             # Get numerical features
-            if self._num_numerical_features > 0:
+            if self._num_numerical_inputs > 0:
                 numerical_features.append(ele[ptr])
-            ptr += self._num_text_features
+            ptr += self._num_text_inputs
             if self._mode == 'train':
                 labels.append(ele[ptr])
         features = []
         features.append((self._pad_batchify(text_token_ids),
                          self._stack_batchify(text_valid_length),
                          self._pad_batchify(text_segment_ids)))
-        if self._num_categorical_features > 0:
+        if self._num_categorical_inputs > 0:
             features.extend(self._categorical_batchify(categorical_features))
-        if self._num_numerical_features > 0:
+        if self._num_numerical_inputs > 0:
             features.append(self._stack_batchify(numerical_features))
         if self._mode == 'train':
             labels = self._stack_batchify(labels)
