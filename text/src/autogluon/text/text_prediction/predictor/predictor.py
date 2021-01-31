@@ -203,8 +203,8 @@ class TextPredictor:
                                  'autogluon.tabular.TabularPredictor.\n'
                                  'The inferred column properties of the training data is {}'
                                  .format(train_data))
-        logger.log(10, 'Problem Type={}'.format(problem_type))
-        logger.log(10, printable_column_type_string(column_types))
+        logger.log(25, 'Problem Type={}'.format(problem_type))
+        logger.log(25, printable_column_type_string(column_types))
         self._problem_type = problem_type
         model_hparams = hyperparameters['models']['MultimodalTextModel']
         if model_hparams['backend'] == 'gluonnlp_v0':
