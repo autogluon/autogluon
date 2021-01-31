@@ -292,32 +292,34 @@ def infer_per_device_batch_size(model, max_length, num_categories,
     passed = False
     last_exp = None
     while per_device_batch_size <= max_batch_size:
-        fake_inputs = []
-        fake_text_tokens = mx.np.random.randint(0, 100, (per_device_batch_size, max_length),
-                                                dtype=np.int32, ctx=ctx)
-        fake_valid_length = mx.np.random.randint(max_length // 2, max_length,
-                                                 (per_device_batch_size,), dtype=np.int32,
-                                                 ctx=ctx)
-        fake_segment_ids = mx.np.zeros((per_device_batch_size, max_length), dtype=np.int32, ctx=ctx)
-        fake_inputs.append((fake_text_tokens, fake_valid_length, fake_segment_ids))
-        for num_category in num_categories:
-            fake_inputs.append(mx.np.random.randint(0, num_category,
-                                                    (per_device_batch_size,),
-                                                    dtype=np.int32, ctx=ctx))
-        if numerical_units is not None:
-            fake_inputs.append(mx.np.random.normal(0, 1, (per_device_batch_size, numerical_units),
-                                                   dtype=np.float32, ctx=ctx))
-        try:
-            with mx.autograd.record():
-                out = model(fake_inputs)
-                loss = out.mean()
-                loss.backward()
-            mx.npx.waitall()
-        except Exception as exp:
-            del fake_inputs
-            last_exp = exp
-            ctx.empty_cache()
-            break
+        with ctx:
+            fake_inputs = []
+            fake_text_tokens = mx.np.random.randint(0, 100, (per_device_batch_size, max_length),
+                                                    dtype=np.int32)
+            fake_valid_length = mx.np.random.randint(max_length // 2, max_length,
+                                                     (per_device_batch_size,), dtype=np.int32,
+                                                     ctx=ctx)
+            fake_segment_ids = mx.np.zeros((per_device_batch_size, max_length), dtype=np.int32)
+            fake_inputs.append((fake_text_tokens, fake_valid_length, fake_segment_ids))
+            for num_category in num_categories:
+                fake_inputs.append(mx.np.random.randint(0, num_category,
+                                                        (per_device_batch_size,),
+                                                        dtype=np.int32))
+            if numerical_units is not None:
+                fake_inputs.append(mx.np.random.normal(0, 1, (per_device_batch_size, numerical_units),
+                                                       dtype=np.float32))
+            try:
+                with mx.autograd.record():
+                    out = model(fake_inputs)
+                    loss = out.mean()
+                    loss.backward()
+                loss.wait_to_read()
+            except Exception as exp:
+                del fake_inputs
+                last_exp = exp
+                ctx.empty_cache()
+                mx.npx.waitall()
+                break
         passed = True
         per_device_batch_size = per_device_batch_size * 2
         continue
