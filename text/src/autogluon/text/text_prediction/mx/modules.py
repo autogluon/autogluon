@@ -486,6 +486,8 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                             CategoricalFeatureNet(num_class=self.num_categories[i],
                                                   out_units=categorical_units,
                                                   cfg=cfg.categorical_net))
+            else:
+                self.categorical_networks = None
             if self.num_numerical_features > 0:
                 self.numerical_networks = nn.HybridSequential()
                 for i in range(self.num_numerical_features):
@@ -494,6 +496,8 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                             NumericalFeatureNet(input_shape=self.numerical_input_units[i],
                                                 out_units=numerical_units,
                                                 cfg=cfg.numerical_net))
+            else:
+                self.numerical_networks = None
             assert text_units == categorical_units == numerical_units, \
                 'Currently, we only support having equivalent text + categorical + numerical units.'
             self.agg_layer = FeatureAggregator(num_fields=num_text_features

@@ -14,7 +14,7 @@ from autogluon.text.text_prediction.mx.modules import MultiModalWithPretrainedTe
                           (2, 0, 1)])
 @pytest.mark.parametrize('agg_type', ['mean', 'concat', 'attention'])
 @pytest.mark.parametrize('input_gating', [False, True])
-@pytest.mark.parametrize('out_shape', [2, 10])
+@pytest.mark.parametrize('out_shape', [2])
 def test_multimodal_with_pretrained_text_nn(num_text_features,
                                             num_categorical_features,
                                             num_numerical_features,
