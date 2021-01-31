@@ -11,7 +11,7 @@ from autogluon.text.text_prediction.mx.models import infer_per_device_batch_size
 @pytest.mark.parametrize('num_categories,numerical_units,max_length',
                          [([20, 32, 2, 5, 4], 32, 256)])
 @pytest.mark.parametrize('backbone',
-                         ['google_electra_small', 'google_electra_base'])
+                         ['google_electra_small'])
 @pytest.mark.parametrize('agg_type', ['mean', 'concat', 'attention'])
 @pytest.mark.parametrize('input_gating', [False, True])
 @pytest.mark.parametrize('out_shape', [100])
