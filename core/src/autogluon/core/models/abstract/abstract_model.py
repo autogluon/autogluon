@@ -57,7 +57,6 @@ class AbstractModel:
 
         self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
         self.path_root = path
-        self.path_suffix = self.name + os.path.sep  # TODO: Make into function to avoid having to reassign on load?
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
         self.num_classes = num_classes
         self.model = None
@@ -107,6 +106,10 @@ class AbstractModel:
             self.params.update(hyperparameters)
             self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
+
+    @property
+    def path_suffix(self):
+        return self.name + os.path.sep
 
     # Checks if model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
     def is_valid(self) -> bool:
@@ -190,10 +193,6 @@ class AbstractModel:
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
-        self.path_suffix = self.name + os.path.sep
-        # TODO: This should be added in future once naming conventions have been standardized for WeightedEnsembleModel
-        # if self.path_suffix not in self.path:
-        #     raise ValueError('Expected path_suffix not in given path! Values: (%s, %s)' % (self.path_suffix, self.path))
         self.path_root = self.path.rsplit(self.path_suffix, 1)[0]
 
     @staticmethod
