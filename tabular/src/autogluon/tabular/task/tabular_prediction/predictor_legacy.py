@@ -15,7 +15,7 @@ from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_mod
 from autogluon.core.utils import BINARY, MULTICLASS, REGRESSION, get_pred_from_proba
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
-from ...data.label_cleaner import LabelCleanerMulticlassToBinary
+from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.utils.utils import setup_outputdir
 
 __all__ = ['TabularPredictorV1']

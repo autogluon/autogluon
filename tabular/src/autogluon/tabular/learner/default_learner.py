@@ -11,8 +11,8 @@ from autogluon.core.utils.utils import augment_rare_classes
 
 from .abstract_learner import AbstractLearner
 from ..trainer.auto_trainer import AutoTrainer
-from ..data.cleaner import Cleaner
-from ..data.label_cleaner import LabelCleaner
+from autogluon.core.data import LabelCleaner
+from autogluon.core.data.cleaner import Cleaner
 
 logger = logging.getLogger(__name__)
 
