@@ -24,12 +24,15 @@ logger = logging.getLogger(__name__)
 def base_preprocess_cfg():
     cfg = CfgNode()
     cfg.merge_with_sep = True                 # Whether to merge the text columns with the SEP token
+    cfg.stochastic_chunk = True               # Whether to sample a stochastic chunk from the training text
+    cfg.test_stochastic_chunk = False         # Whether to use stochastic hunk in testing
     cfg.text = CfgNode()
     cfg.text.merge = True                     # Whether we will merge different text columns
                                               # or treat them independently.
     cfg.text.max_length = 512                 # The maximum possible length.
     cfg.text.auto_max_length = True           # Try to automatically shrink the maximal length
                                               # based on the statistics of the dataset.
+    cfg.text.auto_max_length_threshold = 0.9  # We will ensure that the new max_length is
     cfg.categorical = CfgNode()
     cfg.categorical.minimum_cat_count = 100   # The minimal number of data per categorical group
     cfg.categorical.maximum_num_cat = 20      # The minimal number of data per categorical group
@@ -62,7 +65,7 @@ def get_tokenizer(backbone_name):
 class MultiModalTextBatchify():
     def __init__(self,
                  mode='train',
-                 stochastic_start=True,
+                 stochastic_chunk=True,
                  cfg=None):
         """"""
         self._cfg = base_preprocess_cfg().clone_merge(cfg)
@@ -72,12 +75,14 @@ class MultiModalTextBatchify():
         pass
 
 
-def get_appropriate_length(train_dataset, num_text_features):
-
+def get_auto_max_length(train_dataset, merge_with_sep, num_text_features):
     for sample in range(train_dataset):
 
 
-def print_stats(processor, dataset, is_train=False):
+
+def get_stats_string(processor, dataset, is_train=False):
+    ret = ''
+    for col_name in processor.text_feature_names:
 
 
 

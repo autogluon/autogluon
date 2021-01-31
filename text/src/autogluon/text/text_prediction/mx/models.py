@@ -30,7 +30,7 @@ from autogluon.core.dataset import TabularDataset
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 from .modules import MultiModalWithPretrainedTextNN
-from .preprocessing import MultiModalTextFeatureProcessor
+from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg
 from .. import constants as _C
 from ..utils import logging_config
 from ..presets import ag_text_presets
@@ -174,22 +174,6 @@ def base_optimization_config():
 
 def base_model_config():
     cfg = CfgNode()
-    cfg.preprocess = CfgNode()
-    cfg.preprocess.text = CfgNode()
-    cfg.preprocess.text.merge = True                     # Whether we will merge different text columns
-                                                         # or treat them independently.
-    cfg.preprocess.text.max_length = 512                 # The maximum possible length.
-    cfg.preprocess.text.auto_max_length = True           # Try to automatically shrink the maximal length
-                                                         # based on the statistics of the dataset.
-    cfg.preprocess.categorical = CfgNode()
-    cfg.preprocess.categorical.minimum_cat_count = 100      # The minimal number of data per categorical group
-    cfg.preprocess.categorical.maximum_num_cat = 20         # The minimal number of data per categorical group
-    cfg.preprocess.categorical.convert_to_text = False      # Whether to convert the feature to text
-
-    cfg.preprocess.numerical = CfgNode()
-    cfg.preprocess.numerical.convert_to_text = False        # Whether to convert the feature to text
-    cfg.preprocess.numerical.impute_strategy = 'mean'       # Whether to use mean to fill in the missing values.
-
     cfg.backbone = CfgNode()
     cfg.backbone.name = 'google_electra_base'
     cfg.network = MultiModalWithPretrainedTextNN.get_cfg()
@@ -217,6 +201,7 @@ def base_cfg():
     cfg.version = 1
     cfg.optimization = base_optimization_config()
     cfg.learning = base_learning_config()
+    cfg.preprocessing = base_preprocess_cfg()
     cfg.model = base_model_config()
     cfg.misc = base_misc_config()
     cfg.freeze()
