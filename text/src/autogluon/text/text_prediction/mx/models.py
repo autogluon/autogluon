@@ -717,7 +717,9 @@ class MultiModalTextModel:
         assert len(self._label_columns) == 1, 'Currently, we only support single label.'
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
-        search_space_reg = args(search_space=space.Dict(**self.search_space))
+        if search_space is None:
+            search_space = dict()
+        search_space_reg = args(search_space=space.Dict(**search_space))
         # Scheduler and searcher for HPO
         if hpo_params is None:
             hpo_params = ag_text_presets.create('default')['hpo_params']
