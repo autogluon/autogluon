@@ -29,6 +29,7 @@ from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric, Scorer
 from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.decorator import sample_config
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
 from .modules import MultiModalWithPretrainedTextNN
@@ -791,6 +792,7 @@ class MultiModalTextModel:
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
         if scheduler_options['num_trials'] == 1:
+            print(train_fn.args)
             train_fn()
             best_model_saved_dir_path = os.path.join(self._output_directory,'task0'.format(best_task_id))
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
