@@ -787,7 +787,7 @@ class MultiModalTextModel:
                                                       base_config=self.base_config,
                                                       problem_type=self.problem_type,
                                                       column_types=self._column_types,
-                                                      label_columns=self._label_columns,
+                                                      label_column=self._label_columns[0],
                                                       log_metrics=self._log_metrics,
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
