@@ -86,7 +86,7 @@ def test_preprocessor(dataset_name, url, label_column,
 @pytest.mark.parametrize('dataset_name,url,label_column', TEST_CASES)
 @pytest.mark.parametrize('backbone_name', ['google_electra_small',
                                            'google_albert_base_v2',
-                                           'roberta_base'])
+                                           'fairseq_roberta_base'])
 @pytest.mark.parametrize('all_to_text', [False, True])
 @pytest.mark.parametrize('insert_sep', [False, True])
 @pytest.mark.parametrize('stochastic_chunk', [False, True])
