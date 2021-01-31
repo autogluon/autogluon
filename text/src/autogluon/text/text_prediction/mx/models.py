@@ -317,6 +317,7 @@ def infer_per_device_batch_size(model, init_batch_size, max_length, num_categori
             per_device_batch_size = per_device_batch_size // 2
             continue
         passed = True
+        break
     if not passed:
         print('We cannot determine an appropriate batch size for your problem. '
               'This may be due to that your GPU memory size is too small. '
