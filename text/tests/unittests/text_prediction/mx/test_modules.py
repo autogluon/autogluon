@@ -26,13 +26,19 @@ def test_multimodal_with_pretrained_text_nn(num_text_features,
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ = get_backbone(
         'google_electra_small')
     text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+    cfg = MultiModalWithPretrainedTextNN.get_cfg()
+    cfg.defrost()
+    cfg.agg_net.agg_type = agg_type
+    cfg.agg_net.input_gating = input_gating
+    cfg.freeze()
     net = MultiModalWithPretrainedTextNN(text_backbone=text_backbone,
                                          num_text_features=num_text_features,
                                          num_categorical_features=num_categorical_features,
                                          num_numerical_features=num_numerical_features,
                                          numerical_input_units=numerical_input_units,
                                          num_categories=num_categories,
-                                         out_shape=out_shape)
+                                         out_shape=out_shape,
+                                         cfg=cfg)
     net.initialize_with_pretrained_backbone(backbone_params_path)
     net.hybridize()
     batch_size = 2
