@@ -443,7 +443,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         super().__init__(prefix=prefix, params=params)
         self.cfg = MultiModalWithPretrainedTextNN.get_cfg()
         if cfg is not None:
-            self.cfg = self.cfg.clone_merge(cfg)
+            self.cfg = cfg = self.cfg.clone_merge(cfg)
         assert self.cfg.text_net.pool_type == 'cls'
         text_units = self.cfg.text_units
 
