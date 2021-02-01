@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.special
 import os
 import math
 import logging
@@ -223,7 +224,8 @@ def base_cfg():
 
 @use_np
 def _classification_regression_predict(net, dataloader, problem_type,
-                                       has_label=True, extract_embedding=False):
+                                       has_label=True, extract_embedding=False,
+                                       num_repeat=1):
     """
 
     Parameters
@@ -238,36 +240,59 @@ def _classification_regression_predict(net, dataloader, problem_type,
         Whether label is used
     extract_embedding
         Whether to extract the embedding
+    num_repeat
+        The number of repeats to get the prediction.
+        If it is larger than 1, we will average the predictions.
+        If it is a regression problem, we will directly average the outputs.
+        If it is a classification problem, we will average the logits
 
     Returns
     -------
     predictions
         The predictions
     """
-    predictions = []
+    predictions = [[] for _ in range(num_repeat)]
+    use_logits = num_repeat > 1 and (problem_type == MULTICLASS or problem_type == BINARY)
+    if use_logits:
+        logits = [[] for _ in range(num_repeat)]
     ctx_l = net.collect_params().list_ctx()
-    for sample_l in grouper(dataloader, len(ctx_l)):
-        iter_pred_l = []
-        for sample, ctx in zip(sample_l, ctx_l):
-            if sample is None:
-                continue
-            if has_label:
-                batch_feature, batch_label = sample
-            else:
-                batch_feature = sample
-            batch_feature = move_to_ctx(batch_feature, ctx)
-            if extract_embedding:
-                _, embeddings = net(batch_feature)
-                iter_pred_l.append(embeddings)
-            else:
-                pred = net(batch_feature)
-                if problem_type == MULTICLASS or problem_type == BINARY:
-                    pred = mx.npx.softmax(pred, axis=-1)
-                iter_pred_l.append(pred)
-        for pred in iter_pred_l:
-            predictions.append(pred.asnumpy())
-    predictions = np.concatenate(predictions, axis=0)
-    return predictions
+    for i in range(num_repeat):
+        for sample_l in grouper(dataloader, len(ctx_l)):
+            iter_pred_l = []
+            if use_logits:
+                iter_logits_l = []
+            for sample, ctx in zip(sample_l, ctx_l):
+                if sample is None:
+                    continue
+                if has_label:
+                    batch_feature, batch_label = sample
+                else:
+                    batch_feature = sample
+                batch_feature = move_to_ctx(batch_feature, ctx)
+                if extract_embedding:
+                    _, embeddings = net(batch_feature)
+                    iter_pred_l.append(embeddings)
+                else:
+                    pred = net(batch_feature)
+                    if problem_type == MULTICLASS or problem_type == BINARY:
+                        if num_repeat > 1:
+                            iter_logits_l.append(pred)
+                        pred = mx.npx.softmax(pred, axis=-1)
+                    iter_pred_l.append(pred)
+            for pred in iter_pred_l:
+                predictions[i].append(pred.asnumpy())
+            if use_logits:
+                for logits in iter_logits_l:
+                    logits[i].append(logits.asnumpy())
+        predictions[i] = np.concatenate(predictions, axis=0)
+    if num_repeat == 1:
+        return predictions[0]
+    else:
+        if use_logits:
+            logits = np.stack(logits, axis=0).mean(axis=0)
+            return scipy.special.softmax(logits, axis=-1)
+        else:
+            return np.stack(predictions, axis=0).mean(axis=0)
 
 
 def calculate_metric(scorer, ground_truth, predictions, problem_type):
