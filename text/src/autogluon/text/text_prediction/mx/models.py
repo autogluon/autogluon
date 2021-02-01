@@ -153,6 +153,7 @@ def base_optimization_config():
     cfg = CfgNode()
     cfg.lr_scheduler = 'triangular'
     cfg.optimizer = 'adamw'
+    cfg.early_stopping_patience = 10  # Stop if we cannot find a better checkpoint
     cfg.optimizer_params = [('beta1', 0.9),
                             ('beta2', 0.999),
                             ('epsilon', 1e-6),
@@ -192,15 +193,6 @@ def base_model_config():
     return cfg
 
 
-def base_learning_config():
-    cfg = CfgNode()
-    cfg.early_stopping_patience = 10  # Stop if we cannot find a better checkpoint
-    cfg.valid_ratio = 0.15  # The ratio of dataset to split for validation
-    cfg.stop_metric = 'auto'  # Automatically define the stopping metric
-    cfg.log_metrics = 'auto'  # Automatically determine the metrics used in logging
-    return cfg
-
-
 def base_misc_config():
     cfg = CfgNode()
     cfg.seed = 123
@@ -212,7 +204,6 @@ def base_cfg():
     cfg = CfgNode()
     cfg.version = 1
     cfg.optimization = base_optimization_config()
-    cfg.learning = base_learning_config()
     cfg.preprocessing = base_preprocess_cfg()
     cfg.model = base_model_config()
     cfg.misc = base_misc_config()
@@ -677,7 +668,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 report_local_jsonl_f.write(json.dumps(dict(report_items)) + '\n')
                 report_local_jsonl_f.flush()
                 report_idx += 1
-            if no_better_rounds >= cfg.learning.early_stopping_patience:
+            if no_better_rounds >= cfg.optimization.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
                 break
             total_time_spent = time.time() - start_tick
