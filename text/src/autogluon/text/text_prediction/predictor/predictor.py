@@ -18,7 +18,6 @@ from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits,\
     default_holdout_frac
 
-from ..utils import logging_config
 from ..presets import ag_text_presets, merge_params
 from ..infer_types import infer_column_problem_types, printable_column_type_string
 from ..metrics import infer_eval_log_metrics

@@ -24,7 +24,7 @@ from autogluon_contrib_nlp.utils.misc import grouper, \
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 
 from autogluon.core import args, space
-from autogluon.core.utils import in_ipynb
+from autogluon.core.utils import in_ipynb, verbosity2loglevel
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count
 from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
@@ -364,7 +364,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     logger = logging.getLogger()
     set_logger_verbosity(verbosity, logger)
     logging_config(folder=exp_dir, name='training', logger=logger, console=console_log,
-                   level=logging.DEBUG, console_level=logging.INFO)
+                   level=logging.DEBUG,
+                   console_level=verbosity2loglevel(verbosity))
     logger.log(15, cfg)
 
     # Load backbone model
@@ -889,7 +890,6 @@ class MultiModalTextModel:
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning,
                                                       verbosity=verbosity))
-        print(scheduler_options)
         if scheduler_options['num_trials'] == 1:
             train_fn(train_fn.args['search_space'],
                      train_fn.args['_default_config'])
