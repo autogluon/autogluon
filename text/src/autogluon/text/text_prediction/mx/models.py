@@ -318,6 +318,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
 
     """
     print('args=', args, 'reporter=', reporter)
+    if isinstance(reporter, FakeReporter):
+        args = sample_config(args, dict())
+    print('args=', args)
     if time_limit is not None:
         start_train_tick = time.time()
         time_left = time_limit - (start_train_tick - time_start)
@@ -790,8 +793,6 @@ class MultiModalTextModel:
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
         if scheduler_options['num_trials'] == 1:
-            fn_args = sample_config(train_fn.args['search_space'],
-                                    train_fn.args['_default_config'])
             train_fn(train_fn.args['search_space'],
                      train_fn.args['_default_config'])
             best_model_saved_dir_path = os.path.join(self._output_directory,'task0'.format(best_task_id))
