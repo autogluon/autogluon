@@ -319,8 +319,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     """
     if isinstance(reporter, FakeReporter):
         search_space = args.rand
+        task_id = 0
     else:
         search_space = args['search_space']
+        task_id = args.task_id
     print(search_space, reporter)
     if time_limit is not None:
         start_train_tick = time.time()
@@ -353,7 +355,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.merge_from_list(specified_values)
     exp_dir = cfg.misc.exp_dir
 
-    task_id = args.task_id
     exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
     os.makedirs(exp_dir, exist_ok=True)
     cfg.defrost()
