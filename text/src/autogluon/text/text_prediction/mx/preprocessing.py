@@ -156,7 +156,6 @@ class MultiModalTextBatchify:
                 seg = (seg + 1) % self._num_segments
                 if self._stochastic_chunk:
                     start_ptr = np.random.randint(0, len(ele[i]) - trim_length + 1)
-                    print(start_ptr)
                 else:
                     start_ptr = 0
                 token_ids.extend(ele[i][start_ptr:(start_ptr + trim_length)].tolist())
