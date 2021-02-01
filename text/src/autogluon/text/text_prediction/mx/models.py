@@ -1131,10 +1131,7 @@ class MultiModalTextModel:
             num_repeat=num_repeat)
         if self._problem_type == MULTICLASS or self._problem_type == BINARY:
             if get_probabilities:
-                if self._problem_type == BINARY:
-                    return test_predictions[:, 0]
-                else:
-                    return test_predictions
+                return test_predictions
             else:
                 test_predictions = test_predictions.argmax(axis=-1)
                 if get_original_labels:
