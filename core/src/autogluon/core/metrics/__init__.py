@@ -312,7 +312,7 @@ pearsonr = make_scorer('pearsonr',
 
 
 def rmse_func(predictions, targets):
-    return np.sqrt(((predictions - targets) ** 2).mean())
+    return sklearn.metrics.mean_squared_error(targets, predictions, squared=False)
 
 
 root_mean_squared_error = make_scorer('root_mean_squared_error',
