@@ -414,7 +414,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     train_batchify_fn = MultiModalTextBatchify(
         num_text_inputs=len(preprocessor.text_feature_names),
         num_categorical_inputs=len(preprocessor.categorical_feature_names),
-        num_numerical_inputs=len(preprocessor.numerical_feature_names),
+        num_numerical_inputs=len(preprocessor.numerical_feature_names) > 0,
         cls_token_id=cls_id, sep_token_id=sep_id, max_length=max_length,
         mode='train', stochastic_chunk=train_stochastic_chunk,
         insert_sep=cfg.model.insert_sep)
