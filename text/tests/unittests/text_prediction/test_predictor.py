@@ -13,6 +13,8 @@ from autogluon.text.text_prediction.presets import default
 def small_config_no_hpo_for_test():
     cfg = default()
     cfg['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 1
+    cfg['models']['MultimodalTextModel']['search_space']['model.test_stochastic_chunk'] = False
+    cfg['models']['MultimodalTextModel']['search_space']['model.inference_num_repeat'] = 1
     return cfg
 
 
