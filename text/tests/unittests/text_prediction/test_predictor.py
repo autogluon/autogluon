@@ -28,7 +28,7 @@ def verify_predictor_save_load(predictor, df, verify_proba=False,
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
         predictions = predictor.predict(df)
-        loaded_predictor = task.load(root)
+        loaded_predictor = TextPredictor.load(root)
         predictions2 = loaded_predictor.predict(df)
         npt.assert_equal(predictions, predictions2)
         if verify_proba:
@@ -36,10 +36,11 @@ def verify_predictor_save_load(predictor, df, verify_proba=False,
             predictions2_prob = loaded_predictor.predict_proba(df)
             npt.assert_equal(predictions_prob, predictions2_prob)
         if verify_embedding:
-            embeddings = predictor.extract_embedding(df)
+            embeddings = predictor.predict_features(df)
             assert embeddings.shape[0] == len(df)
 
 
+@pytest.mark.parametrize('')
 def test_sst():
     train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
                               'glue/sst/train.parquet')
@@ -50,6 +51,7 @@ def test_sst():
     valid_perm = rng_state.permutation(len(dev_data))
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
+    predictor = TextPredictor(eval_metric='acc')
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='label', num_trials=1,
                          ngpus_per_trial=1,
