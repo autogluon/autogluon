@@ -115,6 +115,10 @@ class MultiModalTextBatchify:
         assert self._num_numerical_inputs == 0 or self._num_numerical_inputs == 1
 
     @property
+    def num_inputs(self):
+        return self._num_text_inputs + self._num_categorical_inputs + self._num_numerical_inputs
+
+    @property
     def num_text_outputs(self):
         return 1
 
@@ -134,12 +138,13 @@ class MultiModalTextBatchify:
         numerical_features = []
         labels = []
         for ele in samples:
+            if self.num_inputs == 1:
+                ele = (ele,)
             # Get text features
             if self._insert_sep:
                 max_length = self._max_length - (self._num_text_inputs + 1)
             else:
                 max_length = self._max_length - 2
-            print(ele)
             trimmed_lengths = get_trimmed_lengths([len(ele[i])
                                                    for i in range(self._num_text_inputs)],
                                                   max_length,
