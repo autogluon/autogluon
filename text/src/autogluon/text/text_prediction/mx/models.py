@@ -37,7 +37,7 @@ from autogluon.core.scheduler.reporter import FakeReporter
 
 from .modules import MultiModalWithPretrainedTextNN
 from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
-    MultiModalTextBatchify, get_stats_string, auto_shrink_max_length
+    MultiModalTextBatchify, get_stats_string, auto_shrink_max_length, get_cls_sep_id
 from .. import constants as _C
 from ..utils import logging_config
 from ..presets import ag_text_presets
@@ -160,7 +160,7 @@ def base_optimization_config():
                             ('correct_bias', False)]
     cfg.begin_lr = 0.0
     cfg.batch_size = 32
-    cfg.model_average = 5
+    cfg.keep_nbest = 5              # Keep the top K performed models
     cfg.per_device_batch_size = 16  # Per-device batch-size
     cfg.auto_per_device_batch_size = True  # Whether to automatically determine the runnable
                                            # per-device batch_size.
@@ -187,6 +187,7 @@ def base_model_config():
     cfg.insert_sep = True              # Whether to insert sep tokens between columns
     cfg.train_stochastic_chunk = True  # Whether to sample a stochastic chunk from the training text
     cfg.test_stochastic_chunk = False  # Whether to use stochastic chunk in testing
+    cfg.average_nbest = True           # Whether to average the top performed models. This will usually give us better performance.
     cfg.inference_num_repeat = 1       # Whether to turn on randomness and repeat the inference for multiple times.
     return cfg
 
@@ -321,13 +322,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Whether to ignore warning
 
     """
-    if isinstance(reporter, FakeReporter):
-        search_space = args.rand
-        task_id = 0
-    else:
-        search_space = args['search_space']
-        task_id = args.task_id
-    print(search_space, reporter)
     if time_limit is not None:
         start_train_tick = time.time()
         time_left = time_limit - (start_train_tick - time_start)
@@ -335,6 +329,12 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             if reporter is not None:
                 reporter.terminate()
             return
+    if isinstance(reporter, FakeReporter):
+        search_space = args.rand
+        task_id = 0
+    else:
+        search_space = args['search_space']
+        task_id = args.task_id
     # Get the log metric scorers
     if isinstance(log_metrics, str):
         log_metrics = [log_metrics]
@@ -409,9 +409,23 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     test_stochastic_chunk = cfg.model.test_stochastic_chunk
     inference_num_repeat = cfg.model.inference_num_repeat
     logger.info(f'Max length for chunking text: {max_length}, '
-                f'Train stochastic chunk: {train_stochastic_chunk}, '
-                f'Test stochastic chunk: {test_stochastic_chunk}, '
-                f'Test num repeat: {inference_num_repeat}.')
+                f'Stochastic chunk: Train-{train_stochastic_chunk}/Test-{test_stochastic_chunk}, '
+                f'Test #repeat: {inference_num_repeat}.')
+    cls_id, sep_id = get_cls_sep_id(tokenizer)
+    train_batchify_fn = MultiModalTextBatchify(
+        num_text_inputs=len(preprocessor.text_feature_names),
+        num_categorical_inputs=len(preprocessor.categorical_feature_names),
+        num_numerical_inputs=len(preprocessor.numerical_feature_names),
+        cls_token_id=cls_id, sep_token_id=sep_id, max_length=max_length,
+        mode='train', stochastic_chunk=train_stochastic_chunk,
+        insert_sep=cfg.model.insert_sep)
+    test_batchify_fn = MultiModalTextBatchify(
+        num_text_inputs=len(preprocessor.text_feature_names),
+        num_categorical_inputs=len(preprocessor.categorical_feature_names),
+        num_numerical_inputs=len(preprocessor.numerical_feature_names) > 0,
+        cls_token_id=cls_id, sep_token_id=sep_id, max_length=max_length,
+        mode='test', stochastic_chunk=test_stochastic_chunk,
+        insert_sep=cfg.model.insert_sep)
 
     # Get the ground-truth dev labels
     gt_dev_labels = np.array([ele[-1] for ele in tuning_dataset])
@@ -422,15 +436,30 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=base_batch_size,
                                   shuffle=True,
-                                  batchify_fn=preprocessor.batchify(is_test=False))
-    dev_dataloader = DataLoader(processed_dev,
+                                  batchify_fn=train_batchify_fn)
+    dev_dataloader = DataLoader(tuning_dataset,
                                 batch_size=inference_base_batch_size,
                                 shuffle=False,
-                                batchify_fn=preprocessor.batchify(is_test=True))
-    net = BERTForTabularBasicV1(text_backbone=text_backbone,
-                                feature_field_info=preprocessor.feature_field_info(),
-                                label_shape=label_shapes[0],
-                                cfg=cfg.model.network)
+                                batchify_fn=test_batchify_fn)
+    if problem_type == REGRESSION:
+        out_shape = 1
+    elif problem_type == MULTICLASS:
+        out_shape = len(label_generator.classes_)
+    elif problem_type == BINARY:
+        assert len(label_generator.classes_) == 2
+        out_shape = 2
+    else:
+        raise NotImplementedError
+    net = MultiModalWithPretrainedTextNN(
+        text_backbone=text_backbone,
+        num_text_features=1,
+        num_categorical_features=len(preprocessor.categorical_feature_names),
+        num_numerical_features=len(preprocessor.numerical_feature_names) > 0,
+        numerical_input_units=None if len(preprocessor.numerical_feature_names) == 0 else len(preprocessor.numerical_feature_names),
+        num_categories=preprocessor.categorical_num_categories,
+        get_embedding=False,
+        cfg=cfg.model.network,
+        out_shape=out_shape)
     net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
@@ -580,10 +609,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             total_time_spent = time.time() - start_tick
             if time_limits is not None and total_time_spent > time_limits:
                 break
-    if reporter is not None:
-        best_report_items_dict = dict(best_report_items)
-        best_report_items_dict['report_idx'] = report_idx + 1
-        reporter(**best_report_items_dict)
+    best_report_items_dict = dict(best_report_items)
+    best_report_items_dict['report_idx'] = report_idx + 1
+    reporter(**best_report_items_dict)
 
 
 def get_recommended_resource(nthreads_per_trial=None,
