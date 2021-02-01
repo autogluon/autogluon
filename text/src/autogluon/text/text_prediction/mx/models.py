@@ -508,7 +508,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             reporter.terminate()
             return
     best_report_items = None
-    for update_idx in tqdm.tqdm(range(max_update), disable=None):
+    for update_idx in range(max_update):
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)
             loss_l = []
