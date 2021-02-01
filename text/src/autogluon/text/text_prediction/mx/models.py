@@ -936,9 +936,11 @@ class MultiModalTextModel:
         if scheduler_options['num_trials'] == 1:
             train_fn(train_fn.args['search_space'],
                      train_fn.args['_default_config'])
-            best_model_saved_dir_path = os.path.join(self._output_directory,'task0'.format(best_task_id))
+            best_model_saved_dir_path = os.path.join(self._output_directory, 'task0')
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
             cfg = self.base_config.clone_merge(cfg_path)
+            local_results = pd.read_json(os.path.join(self._output_directory, 'task0',
+                                                      'results_local.jsonl'), lines=True)
         else:
             force_forkserver()
             scheduler_cls = schedulers[scheduler_options['searcher']]
