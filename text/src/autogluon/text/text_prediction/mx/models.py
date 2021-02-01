@@ -545,6 +545,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             reporter.terminate()
             return
     best_report_items = None
+    report_local_jsonl_f = open(os.path.join(exp_dir, 'results_local.jsonl'), 'w')
     for update_idx in range(max_update):
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)
@@ -677,6 +678,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 if find_better:
                     best_report_items = report_items
                 reporter(**dict(report_items))
+                report_local_jsonl_f.write(json.dumps(dict(report_items)) + '\n')
+                report_local_jsonl_f.flush()
                 report_idx += 1
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
@@ -688,6 +691,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     best_report_items_dict = dict(best_report_items)
     best_report_items_dict['report_idx'] = report_idx + 1
     reporter(**best_report_items_dict)
+    report_local_jsonl_f.write(json.dumps(best_report_items_dict) + '\n')
+    report_local_jsonl_f.close()
 
 
 def get_recommended_resource(nthreads_per_trial=None,
