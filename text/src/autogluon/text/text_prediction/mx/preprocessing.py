@@ -274,7 +274,8 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                 generator = CategoryFeatureGenerator(
                     cat_order='count',
                     minimum_cat_count=cfg.categorical.minimum_cat_count,
-                    maximum_num_cat=cfg.categorical.maximum_num_cat)
+                    maximum_num_cat=cfg.categorical.maximum_num_cat,
+                    verbosity=1)
                 self._feature_generators[col_name] = generator
             elif col_type == _C.NUMERICAL:
                 generator = Pipeline(
