@@ -317,8 +317,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Whether to ignore warning
 
     """
+    print(args, reporter)
     if isinstance(reporter, FakeReporter):
         search_space = sample_config(args, dict())
+        print(search_space)
     else:
         search_space = args['search_space']
     if time_limit is not None:
