@@ -116,6 +116,7 @@ class TextPredictor:
             column_types=None,
             num_cpus=None,
             num_gpus=None,
+            num_trials=None,
             seed=None):
         """Fit the predictor
 
@@ -139,6 +140,9 @@ class TextPredictor:
             The number of CPUs to use for each trial
         num_gpus
             The number of GPUs to use for each trial
+        num_trials
+            The number of trials. By default, we will use the provided number of trials in the
+            hyperparameters or presets. This will overwrite the provided value.
         seed
             The seed of the experiment
 
@@ -155,6 +159,8 @@ class TextPredictor:
         if seed is not None:
             hyperparameters['seed'] = seed
         seed = hyperparameters['seed']
+        if num_trials is not None:
+            hyperparameters['hpo_params']['num_trials'] = num_trials
         if isinstance(self._label, str):
             label_columns = [self._label]
         else:

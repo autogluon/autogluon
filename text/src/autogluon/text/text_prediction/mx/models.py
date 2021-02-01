@@ -319,8 +319,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     """
     print(args, reporter)
     if isinstance(reporter, FakeReporter):
-        search_space = sample_config(args, dict())
-        print(search_space)
+        search_space = args
     else:
         search_space = args['search_space']
     if time_limit is not None:
