@@ -139,6 +139,7 @@ class MultiModalTextBatchify:
                 max_length = self._max_length - (self._num_text_inputs + 1)
             else:
                 max_length = self._max_length - 2
+            print(ele)
             trimmed_lengths = get_trimmed_lengths([len(ele[i])
                                                    for i in range(self._num_text_inputs)],
                                                   max_length,
