@@ -229,7 +229,7 @@ class TextPredictor:
                               num_cpus=num_cpus,
                               num_gpus=num_gpus,
                               search_space=model_hparams['search_space'],
-                              hpo_params=model_hparams['hpo_params'],
+                              hpo_params=hyperparameters['hpo_params'],
                               time_limit=time_limit)
         else:
             raise NotImplementedError("Currently, we only support using "
