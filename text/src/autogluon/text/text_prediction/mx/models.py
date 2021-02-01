@@ -69,8 +69,8 @@ def get_optimizer(cfg, updates_per_epoch):
     max_update
         Maximum update
     """
-    max_update = int(updates_per_epoch * cfg.num_train_epochs)
-    warmup_steps = int(updates_per_epoch * cfg.num_train_epochs * cfg.warmup_portion)
+    max_update = int(np.ceil(updates_per_epoch * cfg.num_train_epochs))
+    warmup_steps = int(np.ceil(updates_per_epoch * cfg.num_train_epochs * cfg.warmup_portion))
     if cfg.lr_scheduler == 'triangular':
         lr_scheduler = PolyScheduler(max_update=max_update,
                                      base_lr=cfg.lr,
@@ -80,17 +80,12 @@ def get_optimizer(cfg, updates_per_epoch):
                                      warmup_steps=warmup_steps,
                                      warmup_mode='linear')
     elif cfg.lr_scheduler == 'inv_sqrt':
-        warmup_steps = int(updates_per_epoch * cfg.num_train_epochs
-                           * cfg.warmup_portion)
         lr_scheduler = InverseSquareRootScheduler(warmup_steps=warmup_steps,
                                                   base_lr=cfg.lr,
                                                   warmup_init_lr=cfg.begin_lr)
     elif cfg.lr_scheduler == 'constant':
         lr_scheduler = None
     elif cfg.lr_scheduler == 'cosine':
-        max_update = int(updates_per_epoch * cfg.num_train_epochs)
-        warmup_steps = int(updates_per_epoch * cfg.num_train_epochs
-                           * cfg.warmup_portion)
         lr_scheduler = CosineScheduler(max_update=max_update,
                                        base_lr=cfg.lr,
                                        final_lr=cfg.final_lr,
