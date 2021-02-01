@@ -388,12 +388,12 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     with open(os.path.join(exp_dir, 'preprocessor.pkl'), 'wb') as of:
         pickle.dump(preprocessor, of)
     logger.log(25, f'Done! Preprocessor saved to {os.path.join(exp_dir, "preprocessor.pkl")}')
-    logger.log(25, 'Train Data')
-    logger.log(25, get_stats_string(preprocessor, train_dataset, is_train=True))
+    logger.log(15, 'Train Data')
+    logger.log(15, get_stats_string(preprocessor, train_dataset, is_train=True))
     logger.log(25, 'Process dev set...')
     tuning_dataset = preprocessor.transform(tuning_data[feature_columns],
                                             tuning_data[label_column])
-    logger.info('Done!')
+    logger.log(25, 'Done!')
     # Auto Max Length
     if cfg.preprocessing.text.auto_max_length:
         max_length = auto_shrink_max_length(
