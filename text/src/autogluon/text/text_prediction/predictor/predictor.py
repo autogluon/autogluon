@@ -289,9 +289,9 @@ class TextPredictor:
         output
         """
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
-        output = self._model.predict(dataset,
-                                     stochastic_chunk=stochastic_chunk,
-                                     num_repeat=num_repeat)
+        output = self._model.predict_proba(dataset,
+                                           stochastic_chunk=stochastic_chunk,
+                                           num_repeat=num_repeat)
         if as_pandas:
             output = pd.DataFrame({self.label: output})
         return output
