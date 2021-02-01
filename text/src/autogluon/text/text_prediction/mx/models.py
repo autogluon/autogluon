@@ -294,6 +294,7 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
     else:
         print(ground_truth)
         print(ground_truth.dtype, predictions.dtype)
+        print(predictions)
         return scorer._sign * scorer(ground_truth, predictions)
 
 
