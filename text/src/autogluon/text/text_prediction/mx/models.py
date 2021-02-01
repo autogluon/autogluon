@@ -292,9 +292,6 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
         # For ROC_AUC, we need to feed in the probability of positive class to the scorer.
         return scorer._sign * scorer(ground_truth, predictions[:, 1])
     else:
-        print(ground_truth)
-        print(ground_truth.dtype, predictions.dtype)
-        print(predictions)
         return scorer._sign * scorer(ground_truth, predictions)
 
 
