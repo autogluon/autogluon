@@ -168,7 +168,7 @@ class MultiModalTextBatchify:
 
             # Get numerical features
             if self._num_numerical_inputs > 0:
-                numerical_features.append(ele[ptr])
+                numerical_features.append(ele[ptr].astype(np.float32))
             ptr += self._num_numerical_inputs
             if self._mode == 'train':
                 labels.append(ele[ptr])
@@ -413,7 +413,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     processed_data = generator.fit_transform(
                         np.expand_dims(processed_data.to_numpy(), axis=-1))[:, 0]
-                    numerical_features.append(processed_data)
+                    numerical_features.append(processed_data.astype(np.float32))
                     self._numerical_feature_names.append(col_name)
             else:
                 raise NotImplementedError(f'Type of the column is not supported currently. '
@@ -427,7 +427,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             else:
                 y = self._label_generator.transform(y)
         elif self.label_type == _C.NUMERICAL:
-            y = pd.to_numeric(y).to_numpy()
+            y = pd.to_numeric(y).to_numpy().astype(np.float32)
         else:
             raise NotImplementedError(f'Type of label column is not supported. '
                                       f'Label column type={self._label_column}')
@@ -474,14 +474,14 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             generator = self._feature_generators[col_name]
             col_value = pd.to_numeric(X_df[col_name]).to_numpy()
             processed_data = generator.transform(np.expand_dims(col_value, axis=-1))[:, 0]
-            numerical_features.append(processed_data)
+            numerical_features.append(processed_data.astype(np.float32))
         if len(numerical_features) > 0:
             numerical_features = [np.stack(numerical_features, axis=-1)]
         if y_df is not None:
             if self.label_type == _C.CATEGORICAL:
                 y = self.label_generator.transform(y_df)
             elif self.label_type == _C.NUMERICAL:
-                y = pd.to_numeric(y_df).to_numpy()
+                y = pd.to_numeric(y_df).to_numpy().astype(np.float32)
             else:
                 raise NotImplementedError
             all_data = text_features + categorical_features + numerical_features + [y]
