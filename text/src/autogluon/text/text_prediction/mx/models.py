@@ -520,7 +520,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                     pred = net(feature_batch)
                     if problem_type == MULTICLASS or problem_type == BINARY:
                         logits = mx.npx.log_softmax(pred, axis=-1)
-                        loss = - mx.npx.pick(logits, label_batch[0])
+                        loss = - mx.npx.pick(logits,
+                                             mx.np.expand_dims(label_batch[0], axis=-1))
                     elif problem_type == REGRESSION:
                         loss = mx.np.square(pred - label_batch[0])
                     loss_l.append(loss.mean() / len(ctx_l) / num_accumulated)
