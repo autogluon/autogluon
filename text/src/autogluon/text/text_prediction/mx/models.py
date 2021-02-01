@@ -517,6 +517,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 feature_batch, label_batch = sample
                 feature_batch = move_to_ctx(feature_batch, ctx)
                 label_batch = move_to_ctx(label_batch, ctx)
+                print('Line 520:')
                 with mx.autograd.record():
                     pred = net(feature_batch)
                     if problem_type == MULTICLASS or problem_type == BINARY:
