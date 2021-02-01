@@ -236,7 +236,8 @@ class TextPredictor:
                               num_gpus=num_gpus,
                               search_space=model_hparams['search_space'],
                               hpo_params=hyperparameters['hpo_params'],
-                              time_limit=time_limit)
+                              time_limit=time_limit,
+                              verbosity=self.verbosity)
         else:
             raise NotImplementedError("Currently, we only support using "
                                       "the autogluon-contrib-nlp and MXNet "

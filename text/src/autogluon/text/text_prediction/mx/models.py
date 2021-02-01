@@ -9,6 +9,7 @@ import json
 import functools
 import tqdm
 from typing import Tuple
+from autogluon.core.utils import set_logger_verbosity
 from sklearn.preprocessing import LabelEncoder
 import mxnet as mx
 from mxnet.util import use_np
@@ -281,7 +282,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    problem_type, column_types,
                    feature_columns, label_column,
                    log_metrics, eval_metric,
-                   console_log, ignore_warning=False):
+                   console_log, ignore_warning=False,
+                   verbosity=2):
     """
 
     Parameters
@@ -364,6 +366,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.freeze()
     logger = logging.getLogger()
     logging_config(folder=exp_dir, name='training', logger=logger, console=console_log)
+    set_logger_verbosity(verbosity, logger)
     logger.info(cfg)
 
     # Load backbone model
@@ -735,7 +738,8 @@ class MultiModalTextModel:
               search_space=None,
               plot_results=False,
               console_log=True,
-              ignore_warning=False):
+              ignore_warning=False,
+              verbosity=2):
         """The train function.
 
         Parameters
@@ -818,7 +822,8 @@ class MultiModalTextModel:
                                                       log_metrics=self._log_metrics,
                                                       eval_metric=self._eval_metric,
                                                       console_log=console_log,
-                                                      ignore_warning=ignore_warning))
+                                                      ignore_warning=ignore_warning,
+                                                      verbosity=verbosity))
         print(scheduler_options)
         if scheduler_options['num_trials'] == 1:
             train_fn(train_fn.args['search_space'],
