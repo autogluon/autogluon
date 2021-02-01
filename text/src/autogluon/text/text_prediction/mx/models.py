@@ -315,8 +315,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    problem_type, column_types,
                    feature_columns, label_column,
                    log_metrics, eval_metric,
-                   console_log, ignore_warning=False,
-                   verbosity=2):
+                   console_log, verbosity=2):
     """
 
     Parameters
@@ -350,8 +349,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         The stopping metric
     console_log
         Whether to log it to console
-    ignore_warning
-        Whether to ignore warning
+    verbosity
+        The verbosity
 
     """
     import warnings
@@ -378,10 +377,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     log_metric_scorers = [get_metric(ele) for ele in log_metrics]
     eval_metric_scorer = get_metric(eval_metric)
     greater_is_better = eval_metric_scorer.greater_is_better
-
-    if ignore_warning:
-        import warnings
-        warnings.filterwarnings("ignore")
     cfg = base_config.clone()
     specified_values = []
     for key in search_space.keys():
@@ -852,7 +847,6 @@ class MultiModalTextModel:
               search_space=None,
               plot_results=False,
               console_log=True,
-              ignore_warning=False,
               verbosity=2):
         """The train function.
 
@@ -877,8 +871,6 @@ class MultiModalTextModel:
             Whether to plot results or not
         console_log
             Whether to log into the console
-        ignore_warning
-            Whether to ignore the warning
         verbosity
             Verbosity
         """
@@ -942,7 +934,6 @@ class MultiModalTextModel:
                                                       log_metrics=self._log_metrics,
                                                       eval_metric=self._eval_metric,
                                                       console_log=console_log,
-                                                      ignore_warning=ignore_warning,
                                                       verbosity=verbosity))
         if scheduler_options['num_trials'] == 1:
             train_fn(train_fn.args['search_space'],
