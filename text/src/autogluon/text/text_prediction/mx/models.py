@@ -160,7 +160,7 @@ def base_optimization_config():
                             ('correct_bias', False)]
     cfg.begin_lr = 0.0
     cfg.batch_size = 32
-    cfg.keep_nbest = 5              # Keep the top K performed models
+    cfg.nbest = 5                   # Keep the top K performed models
     cfg.per_device_batch_size = 16  # Per-device batch-size
     cfg.auto_per_device_batch_size = True  # Whether to automatically determine the runnable
                                            # per-device batch_size.
@@ -260,7 +260,7 @@ def _classification_regression_predict(net, dataloader, problem_type,
                 iter_pred_l.append(embeddings)
             else:
                 pred = net(batch_feature)
-                if problem_type == _C.CLASSIFICATION:
+                if problem_type == MULTICLASS or problem_type == BINARY:
                     pred = mx.npx.softmax(pred, axis=-1)
                 iter_pred_l.append(pred)
         for pred in iter_pred_l:
@@ -345,9 +345,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     eval_metric_scorer = get_metric(eval_metric)
     greater_is_better = eval_metric_scorer.greater_is_better
 
-    # os.environ['MKL_NUM_THREADS'] = '1'
-    # os.environ['OMP_NUM_THREADS'] = '1'
-    # os.environ['MKL_DYNAMIC'] = 'FALSE'
     if ignore_warning:
         import warnings
         warnings.filterwarnings("ignore")
@@ -495,7 +492,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
     log_num_samples_l = [0 for _ in ctx_l]
     logging_start_tick = time.time()
-    best_performance_score = None
+    nbest = cfg.optimization.nbest
+    best_performance_score = []   # Stores the best performing checkpoints
+    best_performance_update_idx = []   # Stores the update index that reached the best validation performance
+    best_score = None
     mx.npx.waitall()
     no_better_rounds = 0
     report_idx = 0
@@ -507,37 +507,29 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             return
     best_report_items = None
     for update_idx in tqdm.tqdm(range(max_update), disable=None):
-        num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)
             loss_l = []
-            num_samples_l = [0 for _ in ctx_l]
             for i, (sample, ctx) in enumerate(zip(sample_l, ctx_l)):
                 feature_batch, label_batch = sample
                 feature_batch = move_to_ctx(feature_batch, ctx)
                 label_batch = move_to_ctx(label_batch, ctx)
                 with mx.autograd.record():
                     pred = net(feature_batch)
-                    if problem_types[0] == _C.CLASSIFICATION:
+                    if problem_type == MULTICLASS or problem_type == BINARY:
                         logits = mx.npx.log_softmax(pred, axis=-1)
                         loss = - mx.npx.pick(logits, label_batch[0])
-                    elif problem_types[0] == _C.REGRESSION:
+                    elif problem_type == REGRESSION:
                         loss = mx.np.square(pred - label_batch[0])
-                    loss_l.append(loss.mean() / len(ctx_l))
-                    num_samples_l[i] = loss.shape[0]
-                    num_samples_per_update_l[i] += loss.shape[0]
+                    loss_l.append(loss.mean() / len(ctx_l) / num_accumulated)
+                log_loss_l[i] += loss_l[i] * len(ctx_l) * loss.shape[0] * num_accumulated
+                log_num_samples_l[i] += loss.shape[0]
             for loss in loss_l:
                 loss.backward()
-            for i in range(len(ctx_l)):
-                log_loss_l[i] += loss_l[i] * len(ctx_l) * num_samples_l[i]
-                log_num_samples_l[i] += num_samples_per_update_l[i]
         # Begin to update
         trainer.allreduce_grads()
-        num_samples_per_update = sum(num_samples_per_update_l)
-        total_norm, ratio, is_finite = \
-            clip_grad_global_norm(params, cfg.optimization.max_grad_norm * num_accumulated)
-        total_norm = total_norm / num_accumulated
-        trainer.update(num_samples_per_update)
+        total_norm, ratio, is_finite = clip_grad_global_norm(params, cfg.optimization.max_grad_norm)
+        trainer.update(1.0)
 
         # Clear after update
         if num_accumulated > 1:
@@ -547,44 +539,85 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             log_num_samples = sum(log_num_samples_l)
             logger.info(
                 '[Iter {}/{}, Epoch {}] train loss={:0.4e}, gnorm={:0.4e}, lr={:0.4e}, #samples processed={},'
-                ' #sample per second={:.2f}'
+                ' #sample per second={:.2f}. ETA={:.2f}min'
                     .format(update_idx + 1, max_update,
                             int(update_idx / updates_per_epoch),
                             log_loss / log_num_samples, total_norm, trainer.learning_rate,
                             log_num_samples,
-                            log_num_samples / (time.time() - logging_start_tick)))
+                            log_num_samples / (time.time() - logging_start_tick),
+                            (time.time() - start_tick) / (update_idx + 1)
+                            * (max_update - update_idx - 1) / 60))
             logging_start_tick = time.time()
             log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
             log_num_samples_l = [0 for _ in ctx_l]
         if (update_idx + 1) % valid_interval == 0 or (update_idx + 1) == max_update:
             valid_start_tick = time.time()
             dev_predictions = \
-                _classification_regression_predict(net, dataloader=dev_dataloader,
-                                                   problem_type=problem_types[0],
+                _classification_regression_predict(net,
+                                                   dataloader=dev_dataloader,
+                                                   problem_type=problem_type,
                                                    has_label=False)
-            log_scores = [calculate_metric(scorer, gt_dev_labels, dev_predictions, problem_types[0])
+            log_scores = [calculate_metric(scorer, gt_dev_labels,
+                                           dev_predictions,
+                                           problem_type)
                           for scorer in log_metric_scorers]
-            dev_score = calculate_metric(stopping_metric_scorer, gt_dev_labels, dev_predictions,
-                                         problem_types[0])
+            dev_score = calculate_metric(eval_metric_scorer, gt_dev_labels,
+                                         dev_predictions,
+                                         problem_type)
             valid_time_spent = time.time() - valid_start_tick
-
-            if best_performance_score is None or \
-                    (greater_is_better and dev_score >= best_performance_score) or \
-                    (not greater_is_better and dev_score <= best_performance_score):
-                find_better = True
-                no_better_rounds = 0
-                best_performance_score = dev_score
-                net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
+            find_better = False
+            find_topn_better = False
+            if len(best_performance_score) < nbest:
+                best_performance_score.append(dev_score)
+                best_performance_update_idx.append(update_idx + 1)
+                net.save_parameters(
+                    os.path.join(exp_dir,
+                                 f'nbest_model{len(best_performance_score) - 1}.params'))
+                find_topn_better = True
+                if best_score is None or greater_is_better and dev_score >= best_score\
+                        or (not greater_is_better and dev_score <= best_score):
+                    find_better = True
+                    net.save_parameters(os.path.join(exp_dir, f'best_model.params'))
+                    best_score = dev_score
             else:
-                find_better = False
+                # First try to update the top-K
+                if greater_is_better:
+                    if dev_score >= min(best_performance_score):
+                        find_topn_better = True
+                        replace_idx = np.argmin(best_performance_score)
+                        best_performance_score[replace_idx] = dev_score
+                        best_performance_update_idx[replace_idx] = update_idx + 1
+                        net.save_parameters(
+                            os.path.join(exp_dir, f'nbest_model{replace_idx}.params'))
+                        if dev_score >= best_score:
+                            find_better = True
+                            net.save_parameters(os.path.join(exp_dir, f'best_model.params'))
+                            best_score = dev_score
+
+                else:
+                    if dev_score <= max(best_performance_score):
+                        find_topn_better = True
+                        replace_idx = np.argmax(best_performance_score)
+                        best_performance_score[replace_idx] = dev_score
+                        best_performance_update_idx[replace_idx] = update_idx + 1
+                        net.save_parameters(
+                            os.path.join(exp_dir, f'nbest_model{replace_idx}.params'))
+                        if dev_score <= best_score:
+                            find_better = True
+                            net.save_parameters(os.path.join(exp_dir, f'best_model.params'))
+                            best_score = dev_score
+            if not find_better:
                 no_better_rounds += 1
+            else:
+                no_better_rounds = 0
             mx.npx.waitall()
             loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
             logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
-                        ' total_time={:.2f}min'.format(
+                        ' total time spent={:.2f}min. Find new best={}, Find new top-{}={}'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
-                loss_string, valid_time_spent, (time.time() - start_tick) / 60))
+                loss_string, valid_time_spent, (time.time() - start_tick) / 60,
+                find_better, nbest, find_topn_better))
             if reporter is not None:
                 report_items = [('iteration', update_idx + 1),
                                 ('report_idx', report_idx + 1),
@@ -592,12 +625,13 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                                [(metric.name, score)
                                 for score, metric in zip(log_scores, log_metric_scorers)] + \
                                [('find_better', find_better),
+                                ('find_new_topn', find_topn_better),
                                 ('time_spent', int(time.time() - start_tick))]
-                if stopping_metric_scorer._sign < 0:
+                if eval_metric_scorer._sign < 0:
                     report_items.append(('reward_attr', -dev_score))
                 else:
                     report_items.append(('reward_attr', dev_score))
-                report_items.append(('eval_metric', stopping_metric_scorer.name))
+                report_items.append(('eval_metric', eval_metric_scorer.name))
                 report_items.append(('exp_dir', exp_dir))
                 if find_better:
                     best_report_items = report_items
@@ -607,8 +641,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 logger.info('Early stopping patience reached!')
                 break
             total_time_spent = time.time() - start_tick
-            if time_limits is not None and total_time_spent > time_limits:
+            if time_limit is not None and total_time_spent > time_limit:
                 break
+    # Average checkpoints
     best_report_items_dict = dict(best_report_items)
     best_report_items_dict['report_idx'] = report_idx + 1
     reporter(**best_report_items_dict)
