@@ -457,6 +457,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         base_feature_units = self.cfg.base_feature_units
         if not isinstance(out_shape, (list, tuple)):
             out_shape = (out_shape,)
+        self.out_shape = out_shape
         if base_feature_units == -1:
             base_feature_units = text_backbone.units
         self.get_embedding = get_embedding

@@ -46,6 +46,7 @@ from ..utils import logging_config
 from ..presets import ag_text_presets
 from ... import version
 
+logger = logging.getLogger(__name__)  # return logger
 
 
 @use_np
@@ -254,7 +255,8 @@ def _classification_regression_predict(net, dataloader, problem_type,
         The predictions
     """
     predictions = [[] for _ in range(num_repeat)]
-    use_logits = num_repeat > 1 and (problem_type == MULTICLASS or problem_type == BINARY)
+    use_logits = num_repeat > 1 and (problem_type == MULTICLASS or problem_type == BINARY)\
+                 and not extract_embedding
     if use_logits:
         logits = [[] for _ in range(num_repeat)]
     ctx_l = net.collect_params().list_ctx()
@@ -752,8 +754,7 @@ class MultiModalTextModel:
                  problem_type,
                  eval_metric,
                  log_metrics,
-                 output_directory=None,
-                 logger=None):
+                 output_directory=None):
         """Creates model object.
 
         Parameters
@@ -779,14 +780,13 @@ class MultiModalTextModel:
         self._base_config = base_cfg()
         self._base_config.defrost()
         if output_directory is not None:
-            self._base_config.misc.exp_dir = output_directory
+            self._output_directory = self._base_config.misc.exp_dir = output_directory
         self._base_config.misc.exp_dir = os.path.abspath(self._base_config.misc.exp_dir)
         self._base_config.freeze()
         self._output_directory = self._base_config.misc.exp_dir
         self._column_types = column_types
         self._eval_metric = eval_metric
         self._log_metrics = log_metrics
-        self._logger = logger
 
         self._label_columns = label_columns
         self._feature_columns = feature_columns
@@ -795,8 +795,6 @@ class MultiModalTextModel:
         # Need to be set in the train call
         self._net = None  # Network for training and inference
         self._embed_net = None  # Network for extract the embedding
-        self._feature_generator = None  # The feature generator
-        self._multimodal_preprocessor = None  # The inner preprocessor
         self._config = None
         self._results = None
         self._preprocessor = None
@@ -884,6 +882,7 @@ class MultiModalTextModel:
         verbosity
             Verbosity
         """
+        set_logger_verbosity(verbosity, logger)
         start_tick = time.time()
         assert len(self._label_columns) == 1, 'Currently, we only support single label.'
         # TODO(sxjscience) Try to support S3
@@ -897,9 +896,9 @@ class MultiModalTextModel:
             hpo_params = ag_text_presets.create('default')['hpo_params']
         scheduler_options = hpo_params['scheduler_options']
         num_cpus, num_gpus = get_recommended_resource(num_cpus, num_gpus)
-        self._logger.log(25, f"The GluonNLP V0 backend is used. "
-                             f"We will use {num_cpus} cpus and "
-                             f"{num_gpus} gpus to train each trial.")
+        logger.log(25, f"The GluonNLP V0 backend is used. "
+                       f"We will use {num_cpus} cpus and "
+                       f"{num_gpus} gpus to train each trial.")
         if scheduler_options is None:
             scheduler_options = dict()
         if plot_results is None:
@@ -983,8 +982,8 @@ class MultiModalTextModel:
                                    'further investigate the root cause, you can also try to set the '
                                    '"verbosity=3" and try again, i.e., predictor.set_verbosity(3).')
             best_config = scheduler.get_best_config()
-            self._logger.log(25, 'Results=', scheduler.searcher._results)
-            self._logger.log(25, 'Best_config={}'.format(best_config))
+            logger.log(25, 'Results=', scheduler.searcher._results)
+            logger.log(25, 'Best_config={}'.format(best_config))
             best_task_id = scheduler.get_best_task_id()
             best_model_saved_dir_path = os.path.join(self._output_directory,
                                                      'task{}'.format(best_task_id))
@@ -1091,6 +1090,8 @@ class MultiModalTextModel:
         if not isinstance(data, pd.DataFrame):
             if isinstance(data, (list, dict)):
                 data = pd.DataFrame(data)
+            elif isinstance(data, str):
+                data = load_pd.load(data)
             else:
                 raise NotImplementedError(f'The format of data is not understood. '
                                           f'We have type(data)="{type(data)}"')
@@ -1107,7 +1108,7 @@ class MultiModalTextModel:
             cls_token_id=cls_id, sep_token_id=sep_id,
             max_length=self.config.preprocessing.text.max_length,
             mode='test',
-            stochastic_chunk=self.config.model.test_stochastic_chunk,
+            stochastic_chunk=stochastic_chunk,
             insert_sep=self.config.model.insert_sep)
         dataloader = DataLoader(dataset,
                                 batch_size=inference_batch_size,
@@ -1221,24 +1222,21 @@ class MultiModalTextModel:
         self.net.save_parameters(os.path.join(dir_path, 'net.params'))
         with open(os.path.join(dir_path, 'cfg.yml'), 'w') as of:
             of.write(self.config.dump())
-        # Save an additional assets about the parsed dataset information
+        # Save preprocessor
+        with open(os.path.join(dir_path, 'preprocessor.pkl'), 'wb') as of:
+            pickle.dump(self.preprocessor, of)
+        # Save additional assets about the parsed dataset information
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump(
                 {
                     'problem_type': self._problem_type,
                     'label_columns': self._label_columns,
+                    'eval_metric': self._eval_metric,
+                    'log_metrics': self._log_metrics,
                     'feature_columns': self._feature_columns,
                     'column_types': self._column_types,
                     'version': version.__version__,
                 }, of, ensure_ascii=True)
-
-    def cuda(self):
-        """Try to use CUDA for inference"""
-        self._net.collect_params().reset_ctx(mx.gpu())
-
-    def cpu(self):
-        """Switch to use CPU for inference"""
-        self._net.collect_params().reset_ctx(mx.cpu())
 
     @classmethod
     def load(cls, dir_path: str):
@@ -1256,39 +1254,67 @@ class MultiModalTextModel:
         model
             A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
-        # TODO In general, we will need to support compatible version check
-        loaded_config = base_cfg().clone_merge(os.path.join(dir_path, 'cfg.yml'))
+        cfg = base_cfg().clone_merge(os.path.join(dir_path, 'cfg.yml'))
+        with open(os.path.join(dir_path, 'preprocessor.pkl'), 'rb') as in_f:
+            preprocessor = pickle.load(in_f)
         with open(os.path.join(dir_path, 'assets.json'), 'r') as f:
             assets = json.load(f)
         label_columns = assets['label_columns']
         feature_columns = assets['feature_columns']
-        label_shapes = assets['label_shapes']
+        eval_metric = assets['eval_metric']
+        log_metrics = assets['log_metrics']
         problem_type = assets['problem_type']
         column_types = assets['column_types']
+        # TODO(0.2) In general, we will need to support compatible version check
+        version = assets['version']
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(loaded_config.model.backbone.name)
-        # Initialize the preprocessor
+            = get_backbone(cfg.model.backbone.name)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
-        net = BERTForTabularBasicV1(text_backbone=text_backbone,
-                                    feature_field_info=preprocessor.feature_field_info(),
-                                    label_shape=label_shapes[0],
-                                    cfg=loaded_config.model.network)
+        if problem_type == REGRESSION:
+            out_shape = 1
+        elif problem_type == MULTICLASS:
+            out_shape = len(preprocessor.label_generator.classes_)
+        elif problem_type == BINARY:
+            assert len(preprocessor.label_generator.classes_) == 2
+            out_shape = 2
+        else:
+            raise NotImplementedError
+        net = MultiModalWithPretrainedTextNN(
+            text_backbone=text_backbone,
+            num_text_features=1,
+            num_categorical_features=len(preprocessor.categorical_feature_names),
+            num_numerical_features=len(preprocessor.numerical_feature_names) > 0,
+            numerical_input_units=None if len(preprocessor.numerical_feature_names) == 0
+                                       else len(preprocessor.numerical_feature_names),
+            num_categories=preprocessor.categorical_num_categories,
+            get_embedding=False,
+            cfg=cfg.model.network,
+            out_shape=out_shape)
         net.hybridize()
         ctx_l = get_mxnet_available_ctx()
         net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=ctx_l)
-        model = cls(label_columns=label_columns,
+        model = cls(column_types=column_types,
+                    label_columns=label_columns,
                     feature_columns=feature_columns,
                     problem_type=problem_type,
                     eval_metric=eval_metric,
-                    log_metrics=log_metrics,
-                    base_config=loaded_config)
+                    log_metrics=log_metrics)
         model._net = net
+        model._config = cfg
         model._preprocessor = preprocessor
-        model._config = loaded_config
         return model
 
-    def extract_embedding(self, data):
+    def extract_embedding(self, data, stochastic_chunk=None, num_repeats=None):
         """Extract the embedding from the pretrained model.
+
+        Parameters
+        ----------
+        data
+            Data that can be parsed to pandas dataframe
+        stochastic_chunk
+            Whether to use stochastic chunk
+        num_repeats
+            The number of repeats
 
         Returns
         -------
@@ -1296,33 +1322,52 @@ class MultiModalTextModel:
             The output embeddings will have shape
             (#samples, embedding_dim)
         """
-        if not isinstance(data, TabularDataset):
+        if not isinstance(data, pd.DataFrame):
             if isinstance(data, (list, dict)):
                 data = pd.DataFrame(data)
-            data = TabularDataset(data,
-                                  columns=self._feature_columns,
-                                  column_properties=self._column_properties)
-        processed_data = self._preprocessor.process_test(data)
+            elif isinstance(data, str):
+                data = load_pd.load(data)
+            else:
+                raise NotImplementedError(f'The format of data is not understood. '
+                                          f'We have type(data)="{type(data)}"')
+        dataset = self.preprocessor.transform(data[self.feature_columns])
         inference_batch_size = self.config.optimization.per_device_batch_size \
                                * self.config.optimization.val_batch_size_mult
-        dataloader = DataLoader(processed_data,
+        cls_id, sep_id = get_cls_sep_id(self.preprocessor.tokenizer)
+        if stochastic_chunk is None:
+            stochastic_chunk = self.config.model.test_stochastic_chunk
+        batchify_fn = MultiModalTextBatchify(
+            num_text_inputs=len(self.preprocessor.text_feature_names),
+            num_categorical_inputs=len(self.preprocessor.categorical_feature_names),
+            num_numerical_inputs=len(self.preprocessor.numerical_feature_names) > 0,
+            cls_token_id=cls_id, sep_token_id=sep_id,
+            max_length=self.config.preprocessing.text.max_length,
+            mode='test',
+            stochastic_chunk=stochastic_chunk,
+            insert_sep=self.config.model.insert_sep)
+        dataloader = DataLoader(dataset,
                                 batch_size=inference_batch_size,
                                 shuffle=False,
-                                batchify_fn=self._preprocessor.batchify(is_test=True))
+                                batchify_fn=batchify_fn)
         if self._embed_net is None:
-            embed_net = BERTForTabularBasicV1(
+            embed_net = MultiModalWithPretrainedTextNN(
                 text_backbone=self.net.text_backbone,
-                feature_field_info=self._preprocessor.feature_field_info(),
-                label_shape=self.label_shapes[0],
-                cfg=self.config.model.network,
+                num_text_features=1,
+                num_categorical_features=len(self.preprocessor.categorical_feature_names),
+                num_numerical_features=len(self.preprocessor.numerical_feature_names) > 0,
+                numerical_input_units=None if len(self.preprocessor.numerical_feature_names) == 0
+                                           else len(self.preprocessor.numerical_feature_names),
+                num_categories=self.preprocessor.categorical_num_categories,
                 get_embedding=True,
-                params=self.net.collect_params(),
-                prefix='embed_net_')
+                cfg=self.config.model.network,
+                out_shape=self.net.out_shape,
+                params=self.net.params)
             embed_net.hybridize()
             self._embed_net = embed_net
         embeddings = _classification_regression_predict(self._embed_net,
                                                         dataloader=dataloader,
-                                                        problem_type=self._problem_types[0],
+                                                        problem_type=self._problem_type,
                                                         has_label=False,
-                                                        extract_embedding=True)
+                                                        extract_embedding=True,
+                                                        num_repeat=num_repeats)
         return embeddings
