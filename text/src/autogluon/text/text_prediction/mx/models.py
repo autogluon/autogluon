@@ -1136,7 +1136,7 @@ class MultiModalTextModel:
                 test_predictions = test_predictions.argmax(axis=-1)
                 if get_original_labels:
                     test_predictions = np.array(
-                        self.preprocessor.label_generator.inv_transform(test_predictions))
+                        self.preprocessor.label_generator.inverse_transform(test_predictions))
         return test_predictions
 
     @property
