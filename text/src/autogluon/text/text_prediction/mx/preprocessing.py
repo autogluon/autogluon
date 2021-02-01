@@ -29,7 +29,7 @@ def base_preprocess_cfg():
     cfg.text.max_length = 512                 # The maximum possible length.
     cfg.text.auto_max_length = True           # Try to automatically shrink the maximal length
                                               # based on the statistics of the dataset.
-    cfg.text.auto_max_length_quantile = 0.9   # We will ensure that the new max_length is around the quantile of the lengths of all samples
+    cfg.text.auto_max_length_quantile = 0.95  # We will ensure that the new max_length is around the quantile of the lengths of all samples
     cfg.text.auto_max_length_round_to = 32    # We will ensure that the automatically determined max length will be divisible by round_to
     cfg.categorical = CfgNode()
     cfg.categorical.minimum_cat_count = 100   # The minimal number of data per categorical group
