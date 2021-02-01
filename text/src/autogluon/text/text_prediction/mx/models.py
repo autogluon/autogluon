@@ -792,6 +792,7 @@ class MultiModalTextModel:
                                                       eval_metric=self._eval_metric,
                                                       console_log=console_log,
                                                       ignore_warning=ignore_warning))
+        print(scheduler_options)
         if scheduler_options['num_trials'] == 1:
             train_fn(train_fn.args['search_space'],
                      train_fn.args['_default_config'])
