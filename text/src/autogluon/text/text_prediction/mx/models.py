@@ -160,7 +160,7 @@ def base_optimization_config():
                             ('correct_bias', False)]
     cfg.begin_lr = 0.0
     cfg.batch_size = 128
-    cfg.nbest = 5                   # Keep the top K performed models
+    cfg.nbest = 1                   # Keep the top K performed models
     cfg.per_device_batch_size = 16  # Per-device batch-size
     cfg.auto_per_device_batch_size = True  # Whether to automatically determine the runnable
                                            # per-device batch_size.
@@ -184,12 +184,12 @@ def base_model_config():
     cfg.backbone = CfgNode()
     cfg.backbone.name = 'google_electra_base'
     cfg.network = MultiModalWithPretrainedTextNN.get_cfg()
-    cfg.insert_sep = True              # Whether to insert sep tokens between columns
-    cfg.train_stochastic_chunk = False # Whether to sample a stochastic chunk from the training text
-    cfg.test_stochastic_chunk = False  # Whether to use stochastic chunk in testing
-    cfg.use_avg_nbest = True           # Whether to average the top performed models and use that as the final model.
-                                       # This will usually give us better performance.
-    cfg.inference_num_repeat = 1       # Whether to turn on randomness and repeat the inference for multiple times.
+    cfg.insert_sep = True                # Whether to insert sep tokens between columns
+    cfg.train_stochastic_chunk = False   # Whether to sample a stochastic chunk from the training text
+    cfg.test_stochastic_chunk = False    # Whether to use stochastic chunk in testing
+    cfg.use_avg_nbest = False            # Whether to average the top performed models and use that as the final model.
+                                         # This will usually give us better performance.
+    cfg.inference_num_repeat = 1         # Whether to turn on randomness and repeat the inference for multiple times.
     return cfg
 
 
