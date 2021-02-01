@@ -332,9 +332,6 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
     def label_generator(self):
         return self._label_generator
 
-    def fit_label_generator(self, y):
-
-
     def fit_transform(self, X, y):
         """Fit and Transform the dataframe
 
