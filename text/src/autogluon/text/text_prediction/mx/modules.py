@@ -454,17 +454,11 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         super().__init__(prefix=prefix, params=params)
         self.cfg = cfg = MultiModalWithPretrainedTextNN.get_cfg().clone_merge(cfg)
         assert self.cfg.text_net.pool_type == 'cls'
-        text_units = self.cfg.text_units
+        base_feature_units = self.cfg.base_feature_units
         if not isinstance(out_shape, (list, tuple)):
             out_shape = (out_shape,)
-        if text_units == -1:
-            text_units = text_backbone.units
-        categorical_units = self.cfg.categorical_units
-        if categorical_units == -1:
-            categorical_units = text_backbone.units
-        numerical_units = self.cfg.numerical_units
-        if numerical_units == -1:
-            numerical_units = text_backbone.units
+        if base_feature_units == -1:
+            base_feature_units = text_backbone.units
         self.get_embedding = get_embedding
         self.num_text_features = num_text_features
         self.num_categorical_features = num_categorical_features
@@ -477,15 +471,29 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         self.num_categories = num_categories
         if self.num_categorical_features > 0:
             assert len(self.num_categories) == self.num_categorical_features
+        weight_initializer = mx.init.create(*cfg.initializer.weight)
+        bias_initializer = mx.init.create(*cfg.initializer.bias)
         with self.name_scope():
             self.text_backbone = text_backbone
+            if base_feature_units != text_backbone.units:
+                self.text_proj = nn.HybridSequential()
+                for i in range(self.num_text_features):
+                    with self.text_proj.name_scope():
+                        self.text_proj.add(nn.Dense(in_units=text_backbone.units,
+                                                    units=base_feature_units,
+                                                    use_bias=False,
+                                                    weight_initializer=weight_initializer,
+                                                    bias_initializer=bias_initializer,
+                                                    flatten=False))
+            else:
+                self.text_proj = None
             if self.num_categorical_features > 0:
                 self.categorical_networks = nn.HybridSequential()
                 for i in range(self.num_categorical_features):
                     with self.categorical_networks.name_scope():
                         self.categorical_networks.add(
                             CategoricalFeatureNet(num_class=self.num_categories[i],
-                                                  out_units=categorical_units,
+                                                  out_units=base_feature_units,
                                                   cfg=cfg.categorical_net))
             else:
                 self.categorical_networks = None
@@ -495,17 +503,15 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                     with self.numerical_networks.name_scope():
                         self.numerical_networks.add(
                             NumericalFeatureNet(input_shape=self.numerical_input_units[i],
-                                                out_units=numerical_units,
+                                                out_units=base_feature_units,
                                                 cfg=cfg.numerical_net))
             else:
                 self.numerical_networks = None
-            assert text_units == categorical_units == numerical_units, \
-                'Currently, we only support having equivalent text + categorical + numerical units.'
             self.agg_layer = FeatureAggregator(num_fields=num_text_features
                                                           + num_categorical_features
                                                           + num_numerical_features,
                                                out_shape=out_shape,
-                                               in_units=text_units,
+                                               in_units=base_feature_units,
                                                cfg=cfg.agg_net,
                                                get_embedding=get_embedding)
 
@@ -513,9 +519,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
     def get_cfg(key=None):
         if key is None:
             cfg = CfgNode()
-            cfg.text_units = -1  # -1 means not given and we will use the units of BERT
-            cfg.categorical_units = -1  # -1 means not given and we will use the units of BERT
-            cfg.numerical_units = -1  # -1 means not given and we will use the units of BERT
+            cfg.base_feature_units = -1  # -1 means not given and we will use the units of BERT
             # TODO(sxjscience) Use a class to store the TextNet
             cfg.text_net = CfgNode()
             cfg.text_net.use_segment_id = True
@@ -533,6 +537,8 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
     def initialize_with_pretrained_backbone(self, backbone_params_path, ctx=None):
         self.text_backbone.load_parameters(backbone_params_path, ctx=ctx)
         self.agg_layer.initialize(ctx=ctx)
+        if self.text_proj is not None:
+            self.text_proj.initialize(ctx=ctx)
         if self.categorical_networks is not None:
             self.categorical_networks.initialize(ctx=ctx)
         if self.numerical_networks is not None:
@@ -569,6 +575,8 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             else:
                 contextual_embedding = self.text_backbone(batch_token_ids, batch_valid_length)
             pooled_output = contextual_embedding[:, 0, :]
+            if self.text_proj is not None:
+                pooled_output = self.text_proj[i](pooled_output)
             field_features.append(pooled_output)
         ptr += self.num_text_features
         for i in range(ptr, ptr + self.num_categorical_features):

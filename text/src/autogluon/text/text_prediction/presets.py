@@ -84,6 +84,21 @@ def electra_base_no_hpo() -> dict:
 
 
 @ag_text_presets.register()
+def electra_base_search_aggregator() -> dict:
+    cfg = electra_base_no_hpo()
+    cfg['hpo_params']['num_trials'] = 64
+    cfg['models']['MultimodalTextModel']['search_space']['model.network.agg_net.agg_type']\
+        = space.Categorical('attention', 'mean', 'max')
+    cfg['models']['MultimodalTextModel']['search_space']['model.network.agg_net.input_gating'] \
+        = space.Categorical(False, True)
+    cfg['models']['MultimodalTextModel']['search_space']['model.network.agg_net.activation'] \
+        = space.Categorical('gelu', 'leaky', 'relu')
+    cfg['models']['MultimodalTextModel']['search_space']['model.network.agg_net.base_feature_units'] \
+        = space.Categorical(-1, 64, 128, 256)
+    return cfg
+
+
+@ag_text_presets.register()
 def electra_large_no_hpo() -> dict:
     """The default search space that uses ELECTRA Base as the backbone."""
     cfg = no_hpo()
