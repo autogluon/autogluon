@@ -6,6 +6,7 @@ import pandas as pd
 import warnings
 import time
 import json
+import pickle
 import functools
 import tqdm
 from typing import Tuple
@@ -355,7 +356,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         specified_values.append(search_space[key])
     cfg.merge_from_list(specified_values)
     exp_dir = cfg.misc.exp_dir
-
     exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
     os.makedirs(exp_dir, exist_ok=True)
     cfg.defrost()
@@ -384,7 +384,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     logger.info('Fitting and transforming the train data...')
     train_dataset = preprocessor.fit_transform(train_data[feature_columns],
                                                train_data[label_column])
-    logger.info('Done!')
+    with open(os.path.join(exp_dir, 'preprocessor.pkl'), 'wb') as of:
+        pickle.dump(preprocessor, of)
+    logger.info(f'Done! Preprocessor saved to {os.path.join(exp_dir, "preprocessor.pkl")}')
     logger.info('Train Data')
     logger.info(get_stats_string(preprocessor, train_dataset, is_train=True))
     logger.info('Process dev set...')
