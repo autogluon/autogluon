@@ -1056,8 +1056,7 @@ class MultiModalTextModel:
         mx.npx.waitall()
         self.save(os.path.join(self._output_directory, 'saved_model'))
 
-    def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None,
-                 return_type='dict'):
+    def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.
 
         Parameters
@@ -1077,7 +1076,7 @@ class MultiModalTextModel:
 
         Returns
         -------
-        ret : list of metric scores or dict of metric --> metric scores
+        ret : single number or a dict of metric --> metric scores
             Output
         """
         if isinstance(metrics, str):
@@ -1104,8 +1103,8 @@ class MultiModalTextModel:
                                        stochastic_chunk=stochastic_chunk,
                                        num_repeat=num_repeat)
         metric_scores = [calculate_metric(get_metric(metric), ground_truth, predictions, self._problem_type) for metric in metrics]
-        if return_type == 'list':
-            return metric_scores
+        if len(metric_scores) == 1:
+            return metric_scores[0]
         else:
             return {metric: score for metric, score in zip(metrics, metric_scores)}
 

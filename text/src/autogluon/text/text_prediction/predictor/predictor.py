@@ -237,8 +237,7 @@ class TextPredictor:
                                       "we will support other models.")
         return self
 
-    def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None,
-                 return_type='dict'):
+    def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.
 
         Parameters
@@ -258,11 +257,12 @@ class TextPredictor:
 
         Returns
         -------
-        ret : list of metric scores or dict of metric --> metric scores
+        ret : a single number or a dict of metric --> metric scores
             Output
         """
-        return self._model.evaluate(data, metrics=metrics, stochastic_chunk=stochastic_chunk,
-                                    num_repeat=num_repeat, return_type=return_type)
+        return self._model.evaluate(data, metrics=metrics,
+                                    stochastic_chunk=stochastic_chunk,
+                                    num_repeat=num_repeat)
 
     def predict(self, dataset, stochastic_chunk=None, num_repeat=None,
                 as_pandas=False):
