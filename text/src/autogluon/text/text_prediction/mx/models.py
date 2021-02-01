@@ -546,6 +546,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             return
     best_report_items = None
     report_local_jsonl_f = open(os.path.join(exp_dir, 'results_local.jsonl'), 'w')
+    logger.log(25, f'Local training results will be saved to '
+                   f'{os.path.join(exp_dir, "results_local.jsonl")}.')
     for update_idx in range(max_update):
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)
