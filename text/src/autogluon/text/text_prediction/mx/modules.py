@@ -309,14 +309,14 @@ class FeatureAggregator(HybridBlock):
             cfg.attention_net.num_layers = 1
             cfg.attention_net.units = 128
             cfg.attention_net.hidden_size = -1  # Size of the FFN network used in attention
-            cfg.attention_net.activation = 'gelu'   # Activation of the attention
+            cfg.attention_net.activation = 'leaky'   # Activation of the attention
 
             # Gating Network
             cfg.gating_net = CfgNode()
             cfg.gating_net.num_layers = 1
             cfg.gating_net.units = 64
             cfg.gating_net.hidden_size = -1
-            cfg.gating_net.activation = 'gelu'
+            cfg.gating_net.activation = 'leaky'
 
             # Other parameters
             cfg.mid_units = 256
@@ -324,7 +324,7 @@ class FeatureAggregator(HybridBlock):
             cfg.out_proj_num_layers = 0
             cfg.data_dropout = False
             cfg.dropout = 0.1
-            cfg.activation = 'gelu'
+            cfg.activation = 'leaky'
             cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
             cfg.initializer = CfgNode()
