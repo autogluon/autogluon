@@ -236,7 +236,7 @@ def get_stats_string(processor, dataset, is_train=False):
         ret += f'      - "{col_name}": Num Class={num_category}\n'
     ret += f'   Numerical Columns: \n'
     for col_name in processor.numerical_feature_names:
-        ret += f'      - "{col_name}"'
+        ret += f'      - "{col_name}"\n'
     if is_train:
         ret += f'Label: "{processor.label_column}"'
         if processor._column_types[processor.label_column] == _C.CATEGORICAL:

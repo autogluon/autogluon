@@ -394,8 +394,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     tuning_dataset = preprocessor.transform(tuning_data[feature_columns],
                                             tuning_data[label_column])
     logger.info('Done!')
-    logger.info('Tuning Data')
-    logger.info(get_stats_string(preprocessor, tuning_dataset, is_train=False))
     # Auto Max Length
     if cfg.preprocessing.text.auto_max_length:
         max_length = auto_shrink_max_length(
