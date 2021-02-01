@@ -221,8 +221,7 @@ class TextPredictor:
                                               problem_type=self._problem_type,
                                               eval_metric=self._eval_metric,
                                               log_metrics=log_metrics,
-                                              output_directory=self._path,
-                                              logger=logger)
+                                              output_directory=self._path)
             self._model.train(train_data=train_data,
                               tuning_data=tuning_data,
                               num_cpus=num_cpus,

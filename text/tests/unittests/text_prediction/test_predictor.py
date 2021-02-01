@@ -42,16 +42,16 @@ def verify_predictor_save_load(predictor, df, verify_proba=False,
 
 @pytest.mark.parametrize('')
 def test_sst():
-    train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
+    train_data = load_pd.load('https://autogluon-text-data.s3-accelerate.amazonaws.com/'
                               'glue/sst/train.parquet')
-    dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
+    dev_data = load_pd.load('https://autogluon-text-data.s3-accelerate.amazonaws.com/'
                             'glue/sst/dev.parquet')
     rng_state = np.random.RandomState(123)
     train_perm = rng_state.permutation(len(train_data))
     valid_perm = rng_state.permutation(len(dev_data))
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
-    predictor = TextPredictor(eval_metric='acc')
+    predictor = TextPredictor(label='label', eval_metric='acc')
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='label', num_trials=1,
                          ngpus_per_trial=1,
