@@ -581,7 +581,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
             log_num_samples = sum(log_num_samples_l)
             logger.log(25,
-                '[Iter {}/{}, Epoch {}] train loss={:0.4e}, gnorm={:0.4e}, lr={:0.4e}, #samples processed={},'
+                '[Iter {}/{}, Epoch {}] train loss={:0.2e}, gnorm={:0.2e}, lr={:0.2e}, #samples processed={},'
                 ' #sample per second={:.2f}. ETA={:.2f}min'
                     .format(update_idx + 1, max_update,
                             int(update_idx / updates_per_epoch),
