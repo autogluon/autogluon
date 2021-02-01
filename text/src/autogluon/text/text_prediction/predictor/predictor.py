@@ -296,7 +296,7 @@ class TextPredictor:
             output = pd.DataFrame({self.label: output})
         return output
 
-    def predict_feature(self, dataset, stochastic_chunk=None, num_repeat=None, as_pandas=False):
+    def extract_embedding(self, dataset, stochastic_chunk=None, num_repeat=None, as_pandas=False):
         """Extract the feature from the neural network
 
         Returns
