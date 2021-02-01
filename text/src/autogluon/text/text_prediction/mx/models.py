@@ -510,6 +510,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     best_report_items = None
     for update_idx in range(max_update):
         for accum_idx in range(num_accumulated):
+            print(update_idx, accum_idx)
             sample_l = next(train_loop_dataloader)
             loss_l = []
             for i, (sample, ctx) in enumerate(zip(sample_l, ctx_l)):
@@ -638,7 +639,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 report_items.append(('exp_dir', exp_dir))
                 if find_better:
                     best_report_items = report_items
-                #reporter(**dict(report_items))
+                reporter(**dict(report_items))
                 report_idx += 1
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
