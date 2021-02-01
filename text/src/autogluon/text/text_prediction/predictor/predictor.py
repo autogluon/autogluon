@@ -229,6 +229,7 @@ class TextPredictor:
                               search_space=model_hparams['search_space'],
                               hpo_params=hyperparameters['hpo_params'],
                               time_limit=time_limit,
+                              seed=seed,
                               verbosity=self.verbosity)
         else:
             raise NotImplementedError("Currently, we only support using "

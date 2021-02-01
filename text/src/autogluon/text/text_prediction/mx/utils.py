@@ -1,5 +1,7 @@
 import mxnet as mx
 from mxnet.util import use_np
+import numpy as np
+import random
 
 
 @use_np
@@ -19,3 +21,10 @@ def average_checkpoints(checkpoint_paths, out_path):
         arr /= len(data_dict_l)
         avg_param_dict[key] = arr
     mx.npx.save(out_path, avg_param_dict)
+
+
+@use_np
+def set_seed(seed):
+    mx.random.seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)

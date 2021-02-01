@@ -40,7 +40,7 @@ from autogluon.core.scheduler.reporter import FakeReporter
 from .modules import MultiModalWithPretrainedTextNN
 from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
     MultiModalTextBatchify, get_stats_string, auto_shrink_max_length, get_cls_sep_id
-from .utils import average_checkpoints
+from .utils import average_checkpoints, set_seed
 from .. import constants as _C
 from ..utils import logging_config
 from ..presets import ag_text_presets
@@ -301,7 +301,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    problem_type, column_types,
                    feature_columns, label_column,
                    log_metrics, eval_metric,
-                   console_log, verbosity=2):
+                   console_log, seed=None, verbosity=2):
     """
 
     Parameters
@@ -335,12 +335,15 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         The stopping metric
     console_log
         Whether to log it to console
+    seed
+        The random seed
     verbosity
         The verbosity
 
     """
     import warnings
     warnings.filterwarnings('ignore', module='mxnet')
+    set_seed(seed)
     if time_limit is not None:
         start_train_tick = time.time()
         time_left = time_limit - (start_train_tick - time_start)
@@ -833,6 +836,7 @@ class MultiModalTextModel:
               search_space=None,
               plot_results=False,
               console_log=True,
+              seed=None,
               verbosity=2):
         """The train function.
 
@@ -857,9 +861,12 @@ class MultiModalTextModel:
             Whether to plot results or not
         console_log
             Whether to log into the console
+        seed
+            The seed
         verbosity
             Verbosity
         """
+        set_seed(seed)
         set_logger_verbosity(verbosity, logger)
         start_tick = time.time()
         assert len(self._label_columns) == 1, 'Currently, we only support single label.'
