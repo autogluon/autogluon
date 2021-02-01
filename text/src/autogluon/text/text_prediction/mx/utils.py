@@ -26,7 +26,7 @@ def average_checkpoints(checkpoint_paths, out_path):
 @use_np
 def set_seed(seed):
     if seed is None:
-        seed = np.random.randint(0, 1000)
+        seed = np.random.randint(0, 100000)
     mx.random.seed(seed)
     np.random.seed(seed)
     random.seed(seed)
