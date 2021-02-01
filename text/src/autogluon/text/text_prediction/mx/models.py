@@ -1036,7 +1036,8 @@ class MultiModalTextModel:
         mx.npx.waitall()
         self.save(os.path.join(self._output_directory, 'saved_model'))
 
-    def evaluate(self, data, metrics=None, return_type='list'):
+    def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None,
+                 return_type='dict'):
         """ Report the predictive performance evaluated for a given dataset.
 
         Parameters
@@ -1047,27 +1048,44 @@ class MultiModalTextModel:
         metrics : str or List[str] or None
             Name of metric or a list of names of metrics to report.
             If it is not given, we will return the score of the stored eval_metric.
+        stochastic_chunk
+            Whether to use stochastic chunk
+        num_repeat
+            The number of repeats
         return_type :
             Can be list or dict
 
         Returns
         -------
-        List of metric scores
+        ret : list of metric scores or dict of metric --> metric scores
+            Output
         """
         if isinstance(metrics, str):
             metrics = [metrics]
         assert self.net is not None
         if not isinstance(data, pd.DataFrame):
-            data = load_pd.load(data)
+            if isinstance(data, (list, dict)):
+                data = pd.DataFrame(data)
+            elif isinstance(data, str):
+                data = load_pd.load(data)
+            else:
+                raise NotImplementedError(f'The format of data is not understood. '
+                                          f'We have type(data)="{type(data)}"')
         data = data[self._feature_columns + self._label_columns]
         ground_truth = self.preprocessor.label_generator.transform(data[self._label_columns[0]])
-        if self._problem_types[0] == _C.CLASSIFICATION:
-            predictions = self.predict_proba(valid_data)
+        if self._problem_type == MULTICLASS or self._problem_type == BINARY:
+            predictions = self.predict_proba(data,
+                                             stochastic_chunk=stochastic_chunk,
+                                             num_repeat=num_repeat)
         else:
-            predictions = self.predict(valid_data)
-        metric_scores = {metric: calculate_metric(get_metric(metric), ground_truth, predictions,
-                                                  self.problem_types[0]) for metric in metrics}
-        return metric_scores
+            predictions = self.predict(data,
+                                       stochastic_chunk=stochastic_chunk,
+                                       num_repeat=num_repeat)
+        metric_scores = [calculate_metric(get_metric(metric), ground_truth, predictions, self._problem_type) for metric in metrics]
+        if return_type == 'list':
+            return metric_scores
+        else:
+            return {metric: score for metric, score in zip(metrics, metric_scores)}
 
     def _internal_predict(self, data, get_original_labels=True, get_probabilities=False,
                           stochastic_chunk=None, num_repeat=None):

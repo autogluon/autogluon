@@ -237,7 +237,34 @@ class TextPredictor:
                                       "we will support other models.")
         return self
 
-    def predict(self, dataset, stochastic_chunk=None, num_repeats=None,
+    def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None,
+                 return_type='dict'):
+        """ Report the predictive performance evaluated for a given dataset.
+
+        Parameters
+        ----------
+        data : str or :class:`TabularDataset` or `pandas.DataFrame`
+            This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
+            If str is passed, `valid_data` will be loaded using the str value as the file path.
+        metrics : str or List[str] or None
+            Name of metric or a list of names of metrics to report.
+            If it is not given, we will return the score of the stored eval_metric.
+        stochastic_chunk
+            Whether to use stochastic chunk
+        num_repeat
+            The number of repeats
+        return_type :
+            Can be list or dict
+
+        Returns
+        -------
+        ret : list of metric scores or dict of metric --> metric scores
+            Output
+        """
+        return self._model.evaluate(data, metrics=metrics, stochastic_chunk=stochastic_chunk,
+                                    num_repeat=num_repeat, return_type=return_type)
+
+    def predict(self, dataset, stochastic_chunk=None, num_repeat=None,
                 as_pandas=False):
         """Get the prediction from
 
@@ -249,12 +276,12 @@ class TextPredictor:
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         output = self._model.predict(dataset,
                                      stochastic_chunk=stochastic_chunk,
-                                     num_repeats=num_repeats)
+                                     num_repeat=num_repeat)
         if as_pandas:
             output = pd.DataFrame({self.label: output})
         return output
 
-    def predict_proba(self, dataset, stochastic_chunk=None, num_repeats=None, as_pandas=False):
+    def predict_proba(self, dataset, stochastic_chunk=None, num_repeat=None, as_pandas=False):
         """Predict the probability from the input
 
         Returns
@@ -264,12 +291,12 @@ class TextPredictor:
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         output = self._model.predict(dataset,
                                      stochastic_chunk=stochastic_chunk,
-                                     num_repeats=num_repeats)
+                                     num_repeat=num_repeat)
         if as_pandas:
             output = pd.DataFrame({self.label: output})
         return output
 
-    def predict_feature(self, dataset, stochastic_chunk=None, num_repeats=None, as_pandas=False):
+    def predict_feature(self, dataset, stochastic_chunk=None, num_repeat=None, as_pandas=False):
         """Extract the feature from the neural network
 
         Returns
@@ -279,7 +306,7 @@ class TextPredictor:
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         output = self._model.extract_embedding(dataset,
                                                stochastic_chunk=stochastic_chunk,
-                                               num_repeats=num_repeats)
+                                               num_repeat=num_repeat)
         if as_pandas:
             output = pd.DataFrame({self.label: output})
         return output
