@@ -323,6 +323,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Whether to ignore warning
 
     """
+    import warnings
+    warnings.filterwarnings('ignore', module='mxnet')
     if time_limit is not None:
         start_train_tick = time.time()
         time_left = time_limit - (start_train_tick - time_start)
