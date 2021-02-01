@@ -21,7 +21,7 @@ def small_config_no_hpo_for_test():
 def small_config_hpo_for_test():
     cfg = small_config_no_hpo_for_test()
     cfg['models']['MultimodalTextModel']['search_space']['optimization.lr']\
-        = space.choice(1E-4, 1E-5)
+        = space.Categorical(1E-4, 1E-5)
     return cfg
 
 
@@ -42,7 +42,7 @@ def verify_predictor_save_load(predictor, df, verify_proba=False,
             assert embeddings.shape[0] == len(df)
 
 
-@pytest.mark.parametrize('')
+@pytest.mark.parametrize('hyperparameters', [])
 def test_sst():
     train_data = load_pd.load('https://autogluon-text-data.s3-accelerate.amazonaws.com/'
                               'glue/sst/train.parquet')
@@ -54,7 +54,7 @@ def test_sst():
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
     predictor = TextPredictor(label='label', eval_metric='acc')
-    predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
+    predictor.fit(train_data, hyperparameters=test_hyperparameters,
                          label='label', num_trials=1,
                          ngpus_per_trial=1,
                          verbosity=4,

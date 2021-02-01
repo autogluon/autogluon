@@ -343,6 +343,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     """
     import warnings
     warnings.filterwarnings('ignore', module='mxnet')
+    warnings.filterwarnings('ignore', module='sklearn')
     set_seed(seed)
     if time_limit is not None:
         start_train_tick = time.time()
