@@ -885,6 +885,23 @@ class MultiModalTextModel:
             hpo_params = ag_text_presets.create('default')['hpo_params']
         scheduler_options = hpo_params['scheduler_options']
         num_cpus, num_gpus = get_recommended_resource(num_cpus, num_gpus)
+        if num_gpus == 0:
+            if 'AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU' in os.environ:
+                use_warning = int(os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'])
+            else:
+                use_warning = False
+            if use_warning:
+                warnings.warn('No GPU is detected in the machine and we will recommend you to '
+                              'use TextPrediction on a GPU-enabled instance. Currently, '
+                              'training on CPU is slow.')
+            else:
+                raise RuntimeError('No GPU is detected in the machine and we will '
+                                   'not proceed to run TexPrediction because they will train '
+                                   'too slowly with only CPU. You may try to set `ngpus_per_trial` '
+                                   'to a number larger than 0 when calling `.fit()`. '
+                                   'Also, you can set the environment variable '
+                                   '"AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU=1" to force the model to '
+                                   'use CPU for training.')
         logger.log(25, f"The GluonNLP V0 backend is used. "
                        f"We will use {num_cpus} cpus and "
                        f"{num_gpus} gpus to train each trial.")
