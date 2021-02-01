@@ -379,18 +379,16 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     logger.info('Fitting and transforming the train data...')
     train_dataset = preprocessor.fit_transform(train_data[feature_columns],
                                                train_data[label_column])
+    logger.info('Done!')
+    logger.info('Process dev set...')
     tuning_dataset = preprocessor.transform(tuning_data[feature_columns],
                                             tuning_data[label_column])
     logger.info('Done!')
-    logger.info('Process dev set...')
-    processed_dev = preprocessor.process_test(tuning_data)
-    logger.info('Done!')
-    label = label_columns[0]
     # Get the ground-truth dev labels
-    gt_dev_labels = np.array(tuning_data[label].apply(column_properties[label].transform))
+    gt_dev_labels = np.array([ele[-1] for ele in tuning_dataset])
     ctx_l = get_mxnet_available_ctx()
     base_batch_size = cfg.optimization.per_device_batch_size
-    num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
+    num_accumulated = int(np.ceil(cfg.optimization.batch_size / (base_batch_size * len(ctx_l))))
     inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
     train_dataloader = DataLoader(processed_train,
                                   batch_size=base_batch_size,
