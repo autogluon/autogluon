@@ -1308,7 +1308,7 @@ class MultiModalTextModel:
         model._preprocessor = preprocessor
         return model
 
-    def extract_embedding(self, data, stochastic_chunk=None, num_repeats=None):
+    def extract_embedding(self, data, stochastic_chunk=None, num_repeat=None):
         """Extract the embedding from the pretrained model.
 
         Parameters
@@ -1373,5 +1373,5 @@ class MultiModalTextModel:
                                                         problem_type=self._problem_type,
                                                         has_label=False,
                                                         extract_embedding=True,
-                                                        num_repeat=num_repeats)
+                                                        num_repeat=num_repeat)
         return embeddings
