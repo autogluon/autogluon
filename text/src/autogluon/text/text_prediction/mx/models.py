@@ -374,13 +374,13 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     # TODO Dynamically cache the preprocessor that has been fitted.
     preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
                                                   label_column=label_column,
-                                                  tokenizer=tokenizer,
-                                                  logger=logger,
-                                                  cfg=cfg.preprocess)
+                                                  tokenizer_name=cfg.model.backbone.name,
+                                                  cfg=cfg.preprocessing)
     logger.info('Fitting and transforming the train data...')
-    processed_train_dataset = preprocessor.fit_transform(train_data[feature_columns],
-                                                         train_data[label_column])
-    processed_train = preprocessor.process_train(train_data)
+    train_dataset = preprocessor.fit_transform(train_data[feature_columns],
+                                               train_data[label_column])
+    tuning_dataset = preprocessor.transform(tuning_data[feature_columns],
+                                            tuning_data[label_column])
     logger.info('Done!')
     logger.info('Process dev set...')
     processed_dev = preprocessor.process_test(tuning_data)
