@@ -115,7 +115,7 @@ class MultiModalTextBatchify:
         assert self._num_numerical_inputs == 0 or self._num_numerical_inputs == 1
 
     @property
-    def num_inputs(self):
+    def num_input_features(self):
         return self._num_text_inputs + self._num_categorical_inputs + self._num_numerical_inputs
 
     @property
@@ -138,7 +138,7 @@ class MultiModalTextBatchify:
         numerical_features = []
         labels = []
         for ele in samples:
-            if self.num_inputs == 1:
+            if self.num_input_features == 1 and self._mode != 'train':
                 ele = (ele,)
             # Get text features
             if self._insert_sep:
