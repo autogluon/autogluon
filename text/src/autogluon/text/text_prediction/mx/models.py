@@ -1365,7 +1365,8 @@ class MultiModalTextModel:
                 get_embedding=True,
                 cfg=self.config.model.network,
                 out_shape=self.net.out_shape,
-                params=self.net.params)
+                params=self.net.collect_params(),
+                prefix='embed_net_')
             embed_net.hybridize()
             self._embed_net = embed_net
         if num_repeat is None:
