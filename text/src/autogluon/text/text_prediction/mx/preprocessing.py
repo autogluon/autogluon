@@ -138,7 +138,7 @@ class MultiModalTextBatchify:
         numerical_features = []
         labels = []
         for ele in samples:
-            if self.num_input_features == 1 and self._mode != 'train':
+            if not isinstance(ele, tuple):
                 ele = (ele,)
             # Get text features
             if self._insert_sep:
