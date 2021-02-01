@@ -328,7 +328,8 @@ class TextPredictor:
             assets = json.load(in_f)
         ret = cls(eval_metric=assets['eval_metric'],
                   label=assets['label'],
-                  problem_type=assets['problem_type'])
+                  problem_type=assets['problem_type'],
+                  path=dir_path)
         ret._backend = assets['backend']
         if ret._backend == 'gluonnlp_v0':
             from ..mx.models import MultiModalTextModel
