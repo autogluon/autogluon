@@ -166,7 +166,7 @@ def base_optimization_config():
     cfg.per_device_batch_size = 16  # Per-device batch-size
     cfg.auto_per_device_batch_size = True  # Whether to automatically determine the runnable
                                            # per-device batch_size.
-    cfg.val_batch_size_mult = 2  # By default, we double the batch size for validation
+    cfg.val_batch_size_mult = 4  # By default, we 4X the batch size for validation
     cfg.lr = 1E-4
     cfg.final_lr = 0.0
     cfg.num_train_epochs = 10
