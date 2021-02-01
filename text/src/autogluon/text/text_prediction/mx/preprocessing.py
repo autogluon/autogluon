@@ -240,7 +240,7 @@ def get_stats_string(processor, dataset, is_train=False):
     if is_train:
         ret += f'Label: "{processor.label_column}"'
         if processor._column_types[processor.label_column] == _C.CATEGORICAL:
-            ret += f', Num Class={processor.label_generator.classes_}\n'
+            ret += f', Classes={processor.label_generator.classes_}\n'
     return ret
 
 
