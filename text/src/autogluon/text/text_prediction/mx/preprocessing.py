@@ -222,9 +222,13 @@ def auto_shrink_max_length(train_dataset, insert_sep,
                                                         for i in range(num_text_features)]))
         else:
             lengths.append(2 + sum([len(sample[i]) for i in range(num_text_features)]))
-    quantile_length = np.quantile(lengths, auto_max_length_quantile)
-    quantile_length = int(round_to * np.ceil(quantile_length / round_to))
-    return min(quantile_length, max_length)
+    real_data_max_length = max(lengths)
+    if real_data_max_length >= max_length:
+        quantile_length = np.quantile(lengths, auto_max_length_quantile)
+        quantile_length = int(round_to * np.ceil(quantile_length / round_to))
+        return min(quantile_length, max_length)
+    else:
+        return min(int(round_to * np.ceil(real_data_max_length / round_to)), max_length)
 
 
 def get_stats_string(processor, dataset, is_train=False):
