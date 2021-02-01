@@ -44,8 +44,9 @@ def verify_predictor_save_load(predictor, df, verify_proba=False,
             assert embeddings.shape[0] == len(df)
 
 
-@pytest.mark.parametrize('hyperparameters', [])
-def test_sst():
+@pytest.mark.parametrize('hyperparameters', [small_config_no_hpo_for_test(),
+                                             small_config_hpo_for_test()])
+def test_sst(hyperparameters):
     train_data = load_pd.load('https://autogluon-text-data.s3-accelerate.amazonaws.com/'
                               'glue/sst/train.parquet')
     dev_data = load_pd.load('https://autogluon-text-data.s3-accelerate.amazonaws.com/'
@@ -56,12 +57,7 @@ def test_sst():
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
     predictor = TextPredictor(label='label', eval_metric='acc')
-    predictor.fit(train_data, hyperparameters=test_hyperparameters,
-                         label='label', num_trials=1,
-                         ngpus_per_trial=1,
-                         verbosity=4,
-                         output_directory='./sst',
-                         plot_results=False)
+    predictor.fit(train_data, hyperparameters=hyperparameters)
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
     verify_predictor_save_load(predictor, dev_data, verify_proba=True)
 
