@@ -317,10 +317,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Whether to ignore warning
 
     """
-    print('args=', args, 'reporter=', reporter)
     if isinstance(reporter, FakeReporter):
-        args = sample_config(args, dict())
-    print('args=', args)
+        search_space = sample_config(args, dict())
+    else:
+        search_space = args['search_space']
     if time_limit is not None:
         start_train_tick = time.time()
         time_left = time_limit - (start_train_tick - time_start)
@@ -344,7 +344,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     if ignore_warning:
         import warnings
         warnings.filterwarnings("ignore")
-    search_space = args['search_space']
     cfg = base_config.clone()
     specified_values = []
     for key in search_space:
