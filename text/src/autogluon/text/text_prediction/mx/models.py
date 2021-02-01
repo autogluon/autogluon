@@ -69,7 +69,7 @@ def get_optimizer(cfg, updates_per_epoch):
     max_update
         Maximum update
     """
-    max_update = max(int(np.ceil(updates_per_epoch * cfg.num_train_epochs)), 5)
+    max_update = max(int(np.ceil(updates_per_epoch * cfg.num_train_epochs)), 3)
     warmup_steps = int(np.ceil(updates_per_epoch * cfg.num_train_epochs * cfg.warmup_portion))
     if cfg.lr_scheduler == 'triangular':
         lr_scheduler = PolyScheduler(max_update=max_update,
