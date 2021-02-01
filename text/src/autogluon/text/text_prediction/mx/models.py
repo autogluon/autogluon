@@ -190,7 +190,7 @@ def base_model_config():
     cfg.train_stochastic_chunk = True  # Whether to sample a stochastic chunk from the training text
     cfg.test_stochastic_chunk = True   # Whether to use stochastic chunk in testing
     cfg.average_nbest = True           # Whether to average the top performed models. This will usually give us better performance.
-    cfg.inference_num_repeat = 5       # Whether to turn on randomness and repeat the inference for multiple times.
+    cfg.inference_num_repeat = 3       # Whether to turn on randomness and repeat the inference for multiple times.
     return cfg
 
 
