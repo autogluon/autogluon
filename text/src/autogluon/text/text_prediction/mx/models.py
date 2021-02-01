@@ -168,7 +168,7 @@ def base_optimization_config():
     cfg.val_batch_size_mult = 2  # By default, we double the batch size for validation
     cfg.lr = 1E-4
     cfg.final_lr = 0.0
-    cfg.num_train_epochs = 3
+    cfg.num_train_epochs = 10
     cfg.warmup_portion = 0.1
     cfg.layerwise_lr_decay = 0.8  # The layer_wise decay
     cfg.wd = 0.01  # Weight Decay
