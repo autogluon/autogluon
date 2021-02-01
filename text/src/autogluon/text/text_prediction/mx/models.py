@@ -318,7 +318,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
 
     """
     if isinstance(reporter, FakeReporter):
-        search_space = args.rand()
+        search_space = sample_config(args, dict()).rand()
     else:
         search_space = args['search_space']
     print(search_space, reporter)
