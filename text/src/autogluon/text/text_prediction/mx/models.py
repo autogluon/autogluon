@@ -40,6 +40,7 @@ from autogluon.core.scheduler.reporter import FakeReporter
 from .modules import MultiModalWithPretrainedTextNN
 from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
     MultiModalTextBatchify, get_stats_string, auto_shrink_max_length, get_cls_sep_id
+from .utils import average_checkpoints
 from .. import constants as _C
 from ..utils import logging_config
 from ..presets import ag_text_presets
@@ -189,7 +190,8 @@ def base_model_config():
     cfg.insert_sep = True              # Whether to insert sep tokens between columns
     cfg.train_stochastic_chunk = True  # Whether to sample a stochastic chunk from the training text
     cfg.test_stochastic_chunk = True   # Whether to use stochastic chunk in testing
-    cfg.average_nbest = True           # Whether to average the top performed models. This will usually give us better performance.
+    cfg.use_avg_nbest = True           # Whether to average the top performed models and use that as the final model.
+                                       # This will usually give us better performance.
     cfg.inference_num_repeat = 3       # Whether to turn on randomness and repeat the inference for multiple times.
     return cfg
 
@@ -797,6 +799,11 @@ class MultiModalTextModel:
         self._multimodal_preprocessor = None  # The inner preprocessor
         self._config = None
         self._results = None
+        self._preprocessor = None
+
+    @property
+    def preprocessor(self):
+        return self._preprocessor
 
     @property
     def output_directory(self):
@@ -895,6 +902,11 @@ class MultiModalTextModel:
                              f"{num_gpus} gpus to train each trial.")
         if scheduler_options is None:
             scheduler_options = dict()
+        if plot_results is None:
+            if in_ipynb():
+                plot_results = True
+            else:
+                plot_results = False
         scheduler_options = compile_scheduler_options_v2(
             scheduler_options=scheduler_options,
             search_strategy=hpo_params['search_strategy'],
@@ -941,6 +953,19 @@ class MultiModalTextModel:
             cfg = self.base_config.clone_merge(cfg_path)
             local_results = pd.read_json(os.path.join(self._output_directory, 'task0',
                                                       'results_local.jsonl'), lines=True)
+            if plot_results:
+                plot_training_curves = os.path.join(self._output_directory,
+                                                    'plot_training_curves.png')
+                import matplotlib.pyplot as plt
+                plt.ylabel(self._eval_metric)
+                plt.xlabel('report_idx')
+                plt.title("Performance vs Training-Time")
+                plt.plot(local_results['report_idx'].iloc[:-1],
+                         local_results['eval_metric'].iloc[:-1], label=f'task0')
+                plt.legend(loc='best')
+                plt.savefig(plot_training_curves)
+                plt.show()
+            self._results = local_results
         else:
             force_forkserver()
             scheduler_cls = schedulers[scheduler_options['searcher']]
@@ -965,11 +990,6 @@ class MultiModalTextModel:
                                                      'task{}'.format(best_task_id))
             best_cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
             cfg = self.base_config.clone_merge(best_cfg_path)
-            if plot_results is None:
-                if in_ipynb():
-                    plot_results = True
-                else:
-                    plot_results = False
             if plot_results:
                 plot_training_curves = os.path.join(self._output_directory,
                                                     'plot_training_curves.png')
@@ -987,33 +1007,56 @@ class MultiModalTextModel:
                                  config=cfg)
         # Consider to move this to a separate predictor
         self._config = cfg
+        # Average parameters
+        nbest_path_l = []
+        for best_id in range(cfg.optimization.nbest):
+            nbest_path = os.path.join(best_model_saved_dir_path, f'nbest_model{best_id}.params')
+            if os.path.exists(nbest_path):
+                nbest_path_l.append(nbest_path)
+        avg_nbest_path = os.path.join(best_model_saved_dir_path, 'nbest_model_avg.params')
+        average_checkpoints(nbest_path_l, avg_nbest_path)
+        with open(os.path.join(best_model_saved_dir_path, 'preprocessor.pkl'), 'rb') as in_f:
+            self._preprocessor = pickle.load(in_f)
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
-        preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
-                                                    column_properties=self._column_properties,
-                                                    label_columns=self._label_columns,
-                                                    max_length=cfg.model.preprocess.max_length,
-                                                    merge_text=cfg.model.preprocess.merge_text)
-        self._preprocessor = preprocessor
-        net = BERTForTabularBasicV1(text_backbone=text_backbone,
-                                    feature_field_info=preprocessor.feature_field_info(),
-                                    label_shape=self._label_shapes[0],
-                                    cfg=cfg.model.network)
+        if self._problem_type == REGRESSION:
+            out_shape = 1
+        elif self._problem_type == MULTICLASS:
+            out_shape = len(self._preprocessor.label_generator.classes_)
+        elif self._problem_type == BINARY:
+            assert len(self._preprocessor.label_generator.classes_) == 2
+            out_shape = 2
+        else:
+            raise NotImplementedError
+        net = MultiModalWithPretrainedTextNN(
+            text_backbone=text_backbone,
+            num_text_features=1,
+            num_categorical_features=len(self._preprocessor.categorical_feature_names),
+            num_numerical_features=len(self._preprocessor.numerical_feature_names) > 0,
+            numerical_input_units=None if len(self._preprocessor.numerical_feature_names) == 0 else len(
+                self._preprocessor.numerical_feature_names),
+            num_categories=self._preprocessor.categorical_num_categories,
+            get_embedding=False,
+            cfg=cfg.model.network,
+            out_shape=out_shape)
         net.hybridize()
         ctx_l = get_mxnet_available_ctx()
-        net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
-                            ctx=ctx_l)
+        if cfg.model.use_avg_nbest:
+            net.load_parameters(avg_nbest_path, ctx=ctx_l)
+        else:
+            net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
+                                ctx=ctx_l)
         self._net = net
         mx.npx.waitall()
-        self.save(self._output_directory)
+        self.save(os.path.join(self._output_directory, 'saved_model'))
 
-    def evaluate(self, valid_data, metrics=None, return_type='list'):
+    def evaluate(self, data, metrics=None, return_type='list'):
         """ Report the predictive performance evaluated for a given dataset.
 
         Parameters
         ----------
-        valid_data : str or :class:`TabularDataset` or `pandas.DataFrame`
+        data : str or :class:`TabularDataset` or `pandas.DataFrame`
             This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
             If str is passed, `valid_data` will be loaded using the str value as the file path.
         metrics : str or List[str] or None
@@ -1029,11 +1072,10 @@ class MultiModalTextModel:
         if isinstance(metrics, str):
             metrics = [metrics]
         assert self.net is not None
-        if not isinstance(valid_data, pd.DataFrame):
-            valid_data = load_pd.load(valid_data)
-        valid_data = valid_data[self._feature_columns + self._label_columns]
-        ground_truth = np.array(valid_data.table[self._label_columns[0]].apply(
-            self._column_properties[self._label_columns[0]].transform))
+        if not isinstance(data, pd.DataFrame):
+            data = load_pd.load(data)
+        data = data[self._feature_columns + self._label_columns]
+        ground_truth = self.preprocessor.label_generator.transform(data[self._label_columns[0]])
         if self._problem_types[0] == _C.CLASSIFICATION:
             predictions = self.predict_proba(valid_data)
         else:
@@ -1042,35 +1084,54 @@ class MultiModalTextModel:
                                                   self.problem_types[0]) for metric in metrics}
         return metric_scores
 
-    def _internal_predict(self, test_data, get_original_labels=True, get_probabilities=False):
+    def _internal_predict(self, data, get_original_labels=True, get_probabilities=False,
+                          stochastic_chunk=None, num_repeat=None):
         assert self.net is not None
         assert self.config is not None
-        if not isinstance(test_data, TabularDataset):
-            if isinstance(test_data, (list, dict)):
-                test_data = pd.DataFrame(test_data)
-            test_data = TabularDataset(test_data,
-                                       columns=self._feature_columns,
-                                       column_properties=self._column_properties)
-        processed_test = self._preprocessor.process_test(test_data)
+        if not isinstance(data, pd.DataFrame):
+            if isinstance(data, (list, dict)):
+                data = pd.DataFrame(data)
+            else:
+                raise NotImplementedError(f'The format of data is not understood. '
+                                          f'We have type(data)="{type(data)}"')
+        dataset = self.preprocessor.transform(data[self._feature_columns])
         inference_batch_size = self.config.optimization.per_device_batch_size \
                                * self.config.optimization.val_batch_size_mult
-        test_dataloader = DataLoader(processed_test,
-                                     batch_size=inference_batch_size,
-                                     shuffle=False,
-                                     batchify_fn=self._preprocessor.batchify(is_test=True))
-        test_predictions = _classification_regression_predict(self._net,
-                                                              dataloader=test_dataloader,
-                                                              problem_type=self._problem_types[0],
-                                                              has_label=False)
-        if self._problem_types[0] == _C.CLASSIFICATION:
+        cls_id, sep_id = get_cls_sep_id(self.preprocessor.tokenizer)
+        if stochastic_chunk is None:
+            stochastic_chunk = self.config.model.test_stochastic_chunk
+        batchify_fn = MultiModalTextBatchify(
+            num_text_inputs=len(self.preprocessor.text_feature_names),
+            num_categorical_inputs=len(self.preprocessor.categorical_feature_names),
+            num_numerical_inputs=len(self.preprocessor.numerical_feature_names) > 0,
+            cls_token_id=cls_id, sep_token_id=sep_id,
+            max_length=self.config.preprocessing.text.max_length,
+            mode='test',
+            stochastic_chunk=self.config.model.test_stochastic_chunk,
+            insert_sep=self.config.model.insert_sep)
+        dataloader = DataLoader(dataset,
+                                batch_size=inference_batch_size,
+                                shuffle=False,
+                                batchify_fn=batchify_fn)
+        if num_repeat is None:
+            num_repeat = self.config.model.inference_num_repeat
+        test_predictions = _classification_regression_predict(
+            self._net,
+            dataloader=dataloader,
+            problem_type=self._problem_type,
+            has_label=False,
+            num_repeat=num_repeat)
+        if self._problem_type == MULTICLASS or self._problem_type == BINARY:
             if get_probabilities:
-                return test_predictions
+                if self._problem_type == BINARY:
+                    return test_predictions[:, 0]
+                else:
+                    return test_predictions
             else:
                 test_predictions = test_predictions.argmax(axis=-1)
                 if get_original_labels:
                     test_predictions = np.array(
-                        list(map(self._column_properties[self._label_columns[0]].inv_transform,
-                                 test_predictions)))
+                        self.preprocessor.label_generator.inv_transform(test_predictions))
         return test_predictions
 
     @property
@@ -1092,9 +1153,9 @@ class MultiModalTextModel:
             warnings.warn('Accessing class names for a non-classification problem. Return None.')
             return None
         else:
-            raise NotImplementedError
+            return self._preprocessor.label_generator.classes_
 
-    def predict_proba(self, test_data):
+    def predict_proba(self, test_data, stochastic_chunk=None, num_repeat=None):
         """Predict class probabilities instead of class labels (for classification tasks).
 
         Parameters
@@ -1102,6 +1163,10 @@ class MultiModalTextModel:
         test_data : `pandas.DataFrame`, `autogluon.tabular.TabularDataset`, or str
             The test data to get predictions for. Can be DataFrame/Dataset or a file that can
             be loaded into DataFrame/Dataset.
+        stochastic_chunk : bool
+            Whether to enable stochastic chunk
+        num_repeat : int or None
+            The number of repeats for running the inference model.
 
         Returns
         -------
@@ -1114,9 +1179,11 @@ class MultiModalTextModel:
         assert self.problem_type == MULTICLASS or self.problem_type == BINARY
         return self._internal_predict(test_data,
                                       get_original_labels=False,
-                                      get_probabilities=True)
+                                      get_probabilities=True,
+                                      stochastic_chunk=stochastic_chunk,
+                                      num_repeat=num_repeat)
 
-    def predict(self, test_data, get_original_labels=True):
+    def predict(self, test_data, get_original_labels=True, stochastic_chunk=None, num_repeat=None):
         """Make predictions on new data.
 
         Parameters
@@ -1126,6 +1193,10 @@ class MultiModalTextModel:
         get_original_labels : bool, default = True
             Whether or not predictions should be formatted in terms of the original labels.
             For example, the labels might be "entailment" or "not_entailment" and predictions could either be of this form (if `True`) or integer-indices corresponding to these classes (if `False`).
+        stochastic_chunk : bool or None, default = None
+            Whether to turn on stochastic chunk
+        num_repeat : int or None
+            The number of repeats
 
         Returns
         -------
@@ -1134,7 +1205,9 @@ class MultiModalTextModel:
         """
         return self._internal_predict(test_data,
                                       get_original_labels=get_original_labels,
-                                      get_probabilities=False)
+                                      get_probabilities=False,
+                                      stochastic_chunk=stochastic_chunk,
+                                      num_repeat=num_repeat)
 
     def save(self, dir_path):
         """Save this model to disk.
