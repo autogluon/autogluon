@@ -32,7 +32,7 @@ def default() -> dict:
                     'optimization.batch_size': 32,
                     'optimization.per_device_batch_size': 8,
                     'optimization.num_train_epochs': 4,
-                    'optimization.lr': space.Choice([5E-5]),
+                    'optimization.lr': space.Choice(5E-5),
                     'optimization.layerwise_lr_decay': 0.8
                 }
             },
