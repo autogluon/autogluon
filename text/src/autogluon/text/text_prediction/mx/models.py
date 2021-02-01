@@ -511,16 +511,12 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     best_report_items = None
     for update_idx in range(max_update):
         for accum_idx in range(num_accumulated):
-            print('Line513:')
             sample_l = next(train_loop_dataloader)
-            print('Line515')
             loss_l = []
             for i, (sample, ctx) in enumerate(zip(sample_l, ctx_l)):
-                print('Line 517:')
                 feature_batch, label_batch = sample
                 feature_batch = move_to_ctx(feature_batch, ctx)
                 label_batch = move_to_ctx(label_batch, ctx)
-                print('Line 520:')
                 with mx.autograd.record():
                     pred = net(feature_batch)
                     if problem_type == MULTICLASS or problem_type == BINARY:
@@ -530,12 +526,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                     elif problem_type == REGRESSION:
                         loss = mx.np.square(pred - mx.np.expand_dims(label_batch, axis=-1))
                     loss_l.append(loss.mean() / len(ctx_l) / num_accumulated)
-                print('Line529:')
                 log_loss_l[i] += loss_l[i] * len(ctx_l) * loss.shape[0] * num_accumulated
                 log_num_samples_l[i] += loss.shape[0]
             for loss in loss_l:
                 loss.backward()
-            print('Line534:')
         # Begin to update
         trainer.allreduce_grads()
         total_norm, ratio, is_finite = clip_grad_global_norm(params, cfg.optimization.max_grad_norm)
@@ -616,7 +610,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                             find_better = True
                             net.save_parameters(os.path.join(exp_dir, f'best_model.params'))
                             best_score = dev_score
-            print('Line615:')
             if not find_better:
                 no_better_rounds += 1
             else:
