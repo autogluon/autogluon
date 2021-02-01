@@ -182,6 +182,7 @@ class MultiModalTextBatchify:
             features.extend(self._categorical_batchify(categorical_features))
         if self._num_numerical_inputs > 0:
             features.append(self._stack_batchify(numerical_features))
+        print('Line 185')
         if self._mode == 'train':
             labels = self._stack_batchify(labels)
             return features, labels
