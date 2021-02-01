@@ -93,7 +93,7 @@ def electra_base_search_aggregator() -> dict:
         = space.Categorical(False, True)
     cfg['models']['MultimodalTextModel']['search_space']['model.network.agg_net.activation'] \
         = space.Categorical('gelu', 'leaky', 'relu')
-    cfg['models']['MultimodalTextModel']['search_space']['model.network.agg_net.base_feature_units'] \
+    cfg['models']['MultimodalTextModel']['search_space']['model.network.base_feature_units'] \
         = space.Categorical(-1, 64, 128, 256)
     return cfg
 
