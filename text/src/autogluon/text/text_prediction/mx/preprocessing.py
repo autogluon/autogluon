@@ -173,6 +173,7 @@ class MultiModalTextBatchify:
             ptr += self._num_numerical_inputs
             if self._mode == 'train':
                 labels.append(ele[ptr])
+        print('Line 176 in batchify')
         features = []
         features.append((self._pad_batchify(text_token_ids),
                          self._stack_batchify(text_valid_length),
