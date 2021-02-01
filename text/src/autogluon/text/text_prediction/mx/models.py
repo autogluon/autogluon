@@ -282,8 +282,8 @@ def _classification_regression_predict(net, dataloader, problem_type,
             for pred in iter_pred_l:
                 predictions[i].append(pred.asnumpy())
             if use_logits:
-                for logits in iter_logits_l:
-                    logits[i].append(logits.asnumpy())
+                for ele in iter_logits_l:
+                    logits[i].append(ele.asnumpy())
         predictions[i] = np.concatenate(predictions, axis=0)
     if num_repeat == 1:
         return predictions[0]
