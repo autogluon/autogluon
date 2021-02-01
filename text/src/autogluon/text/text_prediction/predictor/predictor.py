@@ -1,22 +1,14 @@
-import copy
 import logging
-import math
-import pprint
-import time
-import sklearn
+import os
 from sklearn.model_selection import train_test_split
 import numpy as np
+import json
 import pandas as pd
 
-from autogluon_contrib_nlp.utils.registry import Registry
-
-from autogluon.core.dataset import TabularDataset
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils.utils import setup_outputdir, setup_compute, setup_trial_limits,\
-    default_holdout_frac
+from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
 
 from ..presets import ag_text_presets, merge_params
 from ..infer_types import infer_column_problem_types, printable_column_type_string
@@ -88,6 +80,7 @@ class TextPredictor:
         self._path = setup_outputdir(path)
         self._model = None
         self._fit_called = False
+        self._backend = None
 
     def set_verbosity(self, target_verbosity):
         self.verbosity = target_verbosity
@@ -219,6 +212,7 @@ class TextPredictor:
         logger.log(25, printable_column_type_string(column_types))
         self._problem_type = problem_type
         model_hparams = hyperparameters['models']['MultimodalTextModel']
+        self._backend = model_hparams['backend']
         if model_hparams['backend'] == 'gluonnlp_v0':
             from ..mx.models import MultiModalTextModel
             self._model = MultiModalTextModel(column_types=column_types,
@@ -244,39 +238,76 @@ class TextPredictor:
                                       "we will support other models.")
         return self
 
-    def predict(self, dataset, as_pandas=False):
-        """Predict the
+    def predict(self, dataset, stochastic_chunk=None, num_repeats=None,
+                as_pandas=False):
+        """Get the prediction from
 
         Returns
         -------
         output
             Array of predictions. One element corresponds to the prediction value of one
         """
-        pass
+        assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
+        output = self._model.predict(dataset,
+                                     stochastic_chunk=stochastic_chunk,
+                                     num_repeats=num_repeats)
+        if as_pandas:
+            output = pd.DataFrame({self.label: output})
+        return output
 
-    def predict_proba(self, dataset, as_pandas=False):
+    def predict_proba(self, dataset, stochastic_chunk=None, num_repeats=None, as_pandas=False):
         """Predict the probability from the input
 
         Returns
         -------
-
+        output
         """
-        assert self._fit_called is True
+        assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
+        output = self._model.predict(dataset,
+                                     stochastic_chunk=stochastic_chunk,
+                                     num_repeats=num_repeats)
+        if as_pandas:
+            output = pd.DataFrame({self.label: output})
+        return output
 
-    def predict_feature(self):
+    def predict_feature(self, dataset, stochastic_chunk=None, num_repeats=None, as_pandas=False):
         """Extract the feature from the neural network
 
         Returns
         -------
-
+        output
         """
-        assert self._fit_called is True
+        assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
+        output = self._model.extract_embedding(dataset,
+                                               stochastic_chunk=stochastic_chunk,
+                                               num_repeats=num_repeats)
+        if as_pandas:
+            output = pd.DataFrame({self.label: output})
+        return output
 
-    def save(self):
-        assert self._fit_called is True
+    def save(self, dir_path):
+        assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
+        os.makedirs(dir_path, exist_ok=True)
+        with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
+            json.dump({'eval_metric': self._eval_metric,
+                       'label': self._label,
+                       'problem_type': self._problem_type,
+                       'backend': self._backend}, of)
+        self._model.save(os.path.join(dir_path, 'model'))
 
     @classmethod
-    def load(cls, path, verbosity=2):
-        set_logger_verbosity(verbosity, logger=logger)
-        if path is None:
-            raise ValueError("path cannot be None in load()")
+    def load(cls, dir_path):
+        assert os.path.exists(dir_path), f'"{dir_path}" does not exist. You may check the path again.'
+        with open(os.path.join(dir_path, 'assets.json'), 'r') as in_f:
+            assets = json.load(in_f)
+        ret = cls(eval_metric=assets['eval_metric'],
+                  label=assets['label'],
+                  problem_type=assets['problem_type'])
+        ret._backend = assets['backend']
+        if ret._backend == 'gluonnlp_v0':
+            from ..mx.models import MultiModalTextModel
+            model = MultiModalTextModel.load(os.path.join(dir_path, 'model'))
+        else:
+            raise NotImplementedError(f'Backend = "{ret._backend}" is not supported.')
+        ret._model = model
+        return ret
