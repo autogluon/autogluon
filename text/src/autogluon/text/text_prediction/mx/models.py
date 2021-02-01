@@ -160,7 +160,7 @@ def base_optimization_config():
                             ('epsilon', 1e-6),
                             ('correct_bias', False)]
     cfg.begin_lr = 0.0
-    cfg.batch_size = 64
+    cfg.batch_size = 128
     cfg.nbest = 5                   # Keep the top K performed models
     cfg.per_device_batch_size = 16  # Per-device batch-size
     cfg.auto_per_device_batch_size = True  # Whether to automatically determine the runnable
