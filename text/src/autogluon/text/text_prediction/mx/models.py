@@ -496,12 +496,12 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     logger.log(25, '#Total Params/Fixed Params={}/{}'.format(num_total_params,
                                                              num_total_fixed_params))
     # Initialize the optimizer
-    updates_per_epoch = int(len(train_dataloader) / (num_accumulated * len(ctx_l)))
+    updates_per_epoch = int(np.ceil(len(train_dataloader) / (num_accumulated * len(ctx_l))))
     optimizer, optimizer_params, max_update \
         = get_optimizer(cfg.optimization,
                         updates_per_epoch=updates_per_epoch)
-    valid_interval = math.ceil(cfg.optimization.valid_frequency * updates_per_epoch)
-    train_log_interval = math.ceil(cfg.optimization.log_frequency * updates_per_epoch)
+    valid_interval = int(math.ceil(cfg.optimization.valid_frequency * updates_per_epoch))
+    train_log_interval = int(math.ceil(cfg.optimization.log_frequency * updates_per_epoch))
     trainer = mx.gluon.Trainer(net.collect_params(),
                                optimizer, optimizer_params,
                                update_on_kvstore=False)
