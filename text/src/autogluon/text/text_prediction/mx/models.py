@@ -514,6 +514,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             sample_l = next(train_loop_dataloader)
             loss_l = []
             for i, (sample, ctx) in enumerate(zip(sample_l, ctx_l)):
+                print('Line 517:')
                 feature_batch, label_batch = sample
                 feature_batch = move_to_ctx(feature_batch, ctx)
                 label_batch = move_to_ctx(label_batch, ctx)
