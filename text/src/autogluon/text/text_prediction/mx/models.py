@@ -188,9 +188,9 @@ def base_model_config():
     cfg.network = MultiModalWithPretrainedTextNN.get_cfg()
     cfg.insert_sep = True              # Whether to insert sep tokens between columns
     cfg.train_stochastic_chunk = True  # Whether to sample a stochastic chunk from the training text
-    cfg.test_stochastic_chunk = False  # Whether to use stochastic chunk in testing
+    cfg.test_stochastic_chunk = True   # Whether to use stochastic chunk in testing
     cfg.average_nbest = True           # Whether to average the top performed models. This will usually give us better performance.
-    cfg.inference_num_repeat = 1       # Whether to turn on randomness and repeat the inference for multiple times.
+    cfg.inference_num_repeat = 5       # Whether to turn on randomness and repeat the inference for multiple times.
     return cfg
 
 
@@ -398,8 +398,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     # Load backbone model
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
         = get_backbone(cfg.model.backbone.name)
-    with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
-        f.write(str(cfg))
     text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
     # Build Preprocessor + Preprocess the training dataset + Inference problem type
     # TODO Dynamically cache the preprocessor that has been fitted.
@@ -436,6 +434,14 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     train_stochastic_chunk = cfg.model.train_stochastic_chunk
     test_stochastic_chunk = cfg.model.test_stochastic_chunk
     inference_num_repeat = cfg.model.inference_num_repeat
+    if max_length < cfg.preprocessing.text.max_length:
+        inference_num_repeat = 1
+    cfg.defrost()
+    cfg.preprocessing.text.max_length = max_length
+    cfg.model.inference_num_repeat = inference_num_repeat
+    cfg.freeze()
+    with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
+        f.write(str(cfg))
     logger.log(25, f'Max length for chunking text: {max_length}, '
                    f'Stochastic chunk: Train-{train_stochastic_chunk}/Test-{test_stochastic_chunk}, '
                    f'Test #repeat: {inference_num_repeat}.')
@@ -588,7 +594,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 _classification_regression_predict(net,
                                                    dataloader=dev_dataloader,
                                                    problem_type=problem_type,
-                                                   has_label=False)
+                                                   has_label=False,
+                                                   num_repeat=inference_num_repeat)
             log_scores = [calculate_metric(scorer, gt_dev_labels,
                                            dev_predictions,
                                            problem_type)
