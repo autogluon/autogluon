@@ -133,6 +133,7 @@ class MultiModalTextBatchify:
         categorical_features = []
         numerical_features = []
         labels = []
+        print('Line 136 in batchify')
         for ele in samples:
             # Get text features
             if self._insert_sep:
