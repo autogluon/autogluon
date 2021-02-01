@@ -1079,6 +1079,8 @@ class MultiModalTextModel:
         """
         if isinstance(metrics, str):
             metrics = [metrics]
+        elif metrics is None:
+            metrics = [self._eval_metric]
         assert self.net is not None
         if not isinstance(data, pd.DataFrame):
             if isinstance(data, (list, dict)):
