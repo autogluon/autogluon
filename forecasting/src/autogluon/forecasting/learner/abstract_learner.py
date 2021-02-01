@@ -1,10 +1,10 @@
-from ..models.gluonts_model.mqcnn.mqcnn_model import MQCNNModel
 import random
 from ..trainer.abstract_trainer import AbstractTrainer
 import os
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 from gluonts.evaluation import Evaluator
+from gluonts.dataset.common import Dataset, ListDataset, FileDataset
 
 
 class AbstractLearner:

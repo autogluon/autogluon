@@ -1,10 +1,12 @@
 from autogluon.core.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
 from .dataset import TimeSeriesDataset
 from autogluon.core.dataset import TabularDataset
-from ...utils.dataset_utils import rebuild_tabular, train_test_split
+from ...utils.dataset_utils import rebuild_tabular, train_test_split_dataframe, train_test_split_gluonts
 from ...learner import DefaultLearner as Learner
 from .predictor import ForecastingPredictor
 from ...trainer import AutoTrainer
+import pandas as pd
+from gluonts.dataset.common import Dataset, ListDataset, FileDataset
 from autogluon.core.utils.utils import setup_outputdir
 __all__ = ['Forecasting']
 
@@ -37,21 +39,28 @@ class Forecasting(BaseTask):
 
         # TODO: allow user to input more scheduler options and use compile_scheduler_options()
         output_directory = setup_outputdir(output_directory)
-        train_data = rebuild_tabular(train_data,
-                                     index_column=index_column,
-                                     target_column=target_column,
-                                     time_column=time_column)
-        if val_data is None:
-            train_data, val_data = train_test_split(train_data, prediction_length)
+        freq = kwargs.get("freq", None)
+        if isinstance(train_data, pd.DataFrame):
+            train_data = rebuild_tabular(train_data,
+                                         index_column=index_column,
+                                         target_column=target_column,
+                                         time_column=time_column)
+            if val_data is None:
+                train_data, val_data = train_test_split_dataframe(train_data, prediction_length)
+            else:
+                val_data = rebuild_tabular(val_data,
+                                           index_column=index_column,
+                                           target_column=target_column,
+                                           time_column=time_column)
+            train_data = TimeSeriesDataset(train_data, index_column=index_column)
+            freq = train_data.get_freq()
+            if val_data is not None:
+                val_data = TimeSeriesDataset(val_data, index_column=index_column)
+        elif isinstance(train_data, FileDataset) or isinstance(train_data, ListDataset):
+            if val_data is None:
+                train_data, val_data = train_test_split_gluonts(train_data, prediction_length, freq)
         else:
-            val_data = rebuild_tabular(val_data,
-                                       index_column=index_column,
-                                       target_column=target_column,
-                                       time_column=time_column)
-        train_data = TimeSeriesDataset(train_data, index_column=index_column)
-        freq = train_data.get_freq()
-        if val_data is not None:
-            val_data = TimeSeriesDataset(val_data, index_column=index_column)
+            raise TypeError("Does not support dataset type:", type(train_data))
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         random_seed = kwargs.get('random_seed', 0)
         quantiles = kwargs.get("quantiles", ["0.5"])

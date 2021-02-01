@@ -6,11 +6,11 @@ import pandas as pd
 from autogluon.core.task.base import BasePredictor
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
 from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
 from autogluon.core.utils.utils import setup_outputdir
 from ...utils.dataset_utils import time_series_dataset
+
 __all__ = ['ForecastingPredictor']
 
 logger = logging.getLogger()  # return root logger
@@ -45,11 +45,12 @@ class ForecastingPredictor(BasePredictor):
         return self._trainer.get_model_names_all()
 
     def preprocessing(self, data):
-        processed_data = time_series_dataset(data,
-                                             index_column=self.index_column,
-                                             target_column=self.target_column,
-                                             time_column=self.time_column)
-        return processed_data
+        if isinstance(data, pd.DataFrame):
+            data = time_series_dataset(data,
+                                       index_column=self.index_column,
+                                       target_column=self.target_column,
+                                       time_column=self.time_column)
+        return data
 
     def predict(self, data, model=None, for_score=False, **kwargs):
         processed_data = self.preprocessing(data)
@@ -129,9 +130,11 @@ class ForecastingPredictor(BasePredictor):
         # all fit() information that is returned:
         results = {
             'model_types': model_typenames,  # dict with key = model-name, value = type of model (class-name)
-            'model_performance': self._trainer.get_models_attribute_dict('score'),  # dict with key = model-name, value = validation performance
+            'model_performance': self._trainer.get_models_attribute_dict('score'),
+            # dict with key = model-name, value = validation performance
             'model_best': self._trainer.model_best,  # the name of the best model (on validation data)
-            'model_paths': self._trainer.get_models_attribute_dict('path'),  # dict with key = model-name, value = path to model file
+            'model_paths': self._trainer.get_models_attribute_dict('path'),
+            # dict with key = model-name, value = path to model file
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'hyperparameter_tune': hpo_used,
             'hyperparameters_userspecified': self._trainer.hyperparameters,
@@ -171,12 +174,11 @@ class ForecastingPredictor(BasePredictor):
                 for model_type in hpo_results:
                     hpo_model = hpo_results[model_type]
                     if 'trial_info' in hpo_model:
-                        print(f"HPO for {model_type} model:  Num. configurations tried = {len(hpo_model['trial_info'])}, Time spent = {hpo_model['total_time']}s, Search strategy = {hpo_model['search_strategy']}")
-                        print(f"Best hyperparameter-configuration (validation-performance: {self.eval_metric} = {hpo_model['validation_performance']}):")
+                        print(
+                            f"HPO for {model_type} model:  Num. configurations tried = {len(hpo_model['trial_info'])}, Time spent = {hpo_model['total_time']}s, Search strategy = {hpo_model['search_strategy']}")
+                        print(
+                            f"Best hyperparameter-configuration (validation-performance: {self.eval_metric} = {hpo_model['validation_performance']}):")
                         print(hpo_model['best_config'])
         if verbosity > 0:
             print("*** End of fit() summary ***")
         return results
-
-
-

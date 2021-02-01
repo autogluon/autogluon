@@ -1,8 +1,12 @@
 from gluonts.dataset.repository.datasets import dataset_recipes
 from ..task.forecasting.dataset import TimeSeriesDataset
 import pandas as pd
+from gluonts.dataset.common import Dataset, ListDataset, FileDataset
+from copy import deepcopy
 
-__all__ = ['gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset', 'train_test_split']
+
+__all__ = ['gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset', 'train_test_split_dataframe',
+           'train_test_split_gluonts']
 
 
 def gluonts_builtin_datasets():
@@ -71,9 +75,35 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
     return X
 
 
-def train_test_split(df, prediction_length):
-    test_ds = df.copy()
-    train_ds = df.iloc[:, :-prediction_length]
+def train_test_split_dataframe(data, prediction_length):
+    test_ds = data.copy()
+    train_ds = data.iloc[:, :-prediction_length]
+    return train_ds, test_ds
+
+
+def train_test_split_gluonts(data, prediction_length, freq=None):
+    train_data_lst = []
+    test_data_lst = []
+
+    if freq is None:
+        if isinstance(data, ListDataset):
+            freq = data.list_data[0]["start"].freq
+        else:
+            raise ValueError("Cannot infer freq if the data is not ListDataset.")
+
+    for entry in data:
+        test_data_lst.append(entry.copy())
+        tmp = {}
+        for k, v in entry.items():
+            if "dynamic" in k.lower():
+                tmp[k] = v[..., : -prediction_length]
+            elif "target" in k.lower():
+                tmp[k] = v[..., : -prediction_length]
+            else:
+                tmp[k] = deepcopy(v)
+        train_data_lst.append(tmp)
+    train_ds = ListDataset(train_data_lst, freq=freq)
+    test_ds = ListDataset(test_data_lst, freq=freq)
     return train_ds, test_ds
 
 
