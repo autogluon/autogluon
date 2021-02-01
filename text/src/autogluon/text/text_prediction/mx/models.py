@@ -347,7 +347,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         warnings.filterwarnings("ignore")
     cfg = base_config.clone()
     specified_values = []
-    for key in search_space:
+    for key in search_space.keys():
         specified_values.append(key)
         specified_values.append(search_space[key])
     cfg.merge_from_list(specified_values)
