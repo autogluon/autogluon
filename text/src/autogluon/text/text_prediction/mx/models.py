@@ -9,6 +9,7 @@ import json
 import functools
 import tqdm
 from typing import Tuple
+from sklearn.preprocessing import LabelEncoder
 import mxnet as mx
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
@@ -34,7 +35,8 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.scheduler.reporter import FakeReporter
 
 from .modules import MultiModalWithPretrainedTextNN
-from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg
+from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
+    MultiModalTextBatchify, get_stats_string, auto_shrink_max_length
 from .. import constants as _C
 from ..utils import logging_config
 from ..presets import ag_text_presets
@@ -372,25 +374,51 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
     # Build Preprocessor + Preprocess the training dataset + Inference problem type
     # TODO Dynamically cache the preprocessor that has been fitted.
+    label_generator = LabelEncoder()
+    label_generator.fit(pd.concat([train_data[label_column], tuning_data[label_column]]))
     preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
                                                   label_column=label_column,
                                                   tokenizer_name=cfg.model.backbone.name,
+                                                  label_generator=label_generator,
                                                   cfg=cfg.preprocessing)
     logger.info('Fitting and transforming the train data...')
     train_dataset = preprocessor.fit_transform(train_data[feature_columns],
                                                train_data[label_column])
     logger.info('Done!')
+    logger.info('Train Data')
+    logger.info(get_stats_string(preprocessor, train_dataset, is_train=True))
     logger.info('Process dev set...')
     tuning_dataset = preprocessor.transform(tuning_data[feature_columns],
                                             tuning_data[label_column])
     logger.info('Done!')
+    logger.info('Tuning Data')
+    logger.info(get_stats_string(preprocessor, tuning_dataset, is_train=False))
+    # Auto Max Length
+    if cfg.preprocessing.text.auto_max_length:
+        max_length = auto_shrink_max_length(
+            train_dataset,
+            insert_sep=cfg.model.insert_sep,
+            num_text_features=len(preprocessor.text_feature_names),
+            auto_max_length_quantile=cfg.preprocessing.text.auto_max_length_quantile,
+            round_to=cfg.preprocessing.text.auto_max_length_round_to,
+            max_length=cfg.preprocessing.text.max_length)
+    else:
+        max_length = cfg.preprocessing.text.max_length
+    train_stochastic_chunk = cfg.model.train_stochastic_chunk
+    test_stochastic_chunk = cfg.model.test_stochastic_chunk
+    inference_num_repeat = cfg.model.inference_num_repeat
+    logger.info(f'Max length for chunking text: {max_length}, '
+                f'Train stochastic chunk: {train_stochastic_chunk}, '
+                f'Test stochastic chunk: {test_stochastic_chunk}, '
+                f'Test num repeat: {inference_num_repeat}.')
+
     # Get the ground-truth dev labels
     gt_dev_labels = np.array([ele[-1] for ele in tuning_dataset])
     ctx_l = get_mxnet_available_ctx()
     base_batch_size = cfg.optimization.per_device_batch_size
     num_accumulated = int(np.ceil(cfg.optimization.batch_size / (base_batch_size * len(ctx_l))))
     inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
-    train_dataloader = DataLoader(processed_train,
+    train_dataloader = DataLoader(train_dataset,
                                   batch_size=base_batch_size,
                                   shuffle=True,
                                   batchify_fn=preprocessor.batchify(is_test=False))

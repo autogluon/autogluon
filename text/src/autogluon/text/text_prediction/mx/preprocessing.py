@@ -257,13 +257,13 @@ def get_cls_sep_id(tokenizer):
 
 
 class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
-    def __init__(self, column_types, label_column, tokenizer_name, cfg=None):
+    def __init__(self, column_types, label_column, tokenizer_name, label_generator=None, cfg=None):
         self._column_types = column_types
         self._label_column = label_column
         cfg = base_preprocess_cfg().clone_merge(cfg)
         self._cfg = cfg
         self._feature_generators = dict()
-        self._label_generator = None
+        self._label_generator = label_generator
 
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
@@ -283,8 +283,6 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                                                with_std=cfg.numerical.scaler_with_std))]
                 )
                 self._feature_generators[col_name] = generator
-        if self._column_types[label_column] == _C.CATEGORICAL:
-            self._label_generator = LabelEncoder()
 
         self._tokenizer_name = tokenizer_name
         self._tokenizer = get_tokenizer(tokenizer_name)
@@ -333,6 +331,9 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
     @property
     def label_generator(self):
         return self._label_generator
+
+    def fit_label_generator(self, y):
+
 
     def fit_transform(self, X, y):
         """Fit and Transform the dataframe
@@ -422,7 +423,11 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         if len(numerical_features) > 0:
             numerical_features = [np.stack(numerical_features, axis=-1)]
         if self.label_type == _C.CATEGORICAL:
-            y = self._label_generator.fit_transform(y)
+            if self._label_generator is None:
+                self._label_generator = LabelEncoder()
+                y = self._label_generator.fit_transform(y)
+            else:
+                y = self._label_generator.transform(y)
         elif self.label_type == _C.NUMERICAL:
             y = pd.to_numeric(y).to_numpy()
         else:
