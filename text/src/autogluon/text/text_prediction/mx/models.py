@@ -992,13 +992,14 @@ class MultiModalTextModel:
         # Consider to move this to a separate predictor
         self._config = cfg
         # Average parameters
-        nbest_path_l = []
-        for best_id in range(cfg.optimization.nbest):
-            nbest_path = os.path.join(best_model_saved_dir_path, f'nbest_model{best_id}.params')
-            if os.path.exists(nbest_path):
-                nbest_path_l.append(nbest_path)
-        avg_nbest_path = os.path.join(best_model_saved_dir_path, 'nbest_model_avg.params')
-        average_checkpoints(nbest_path_l, avg_nbest_path)
+        if cfg.model.use_avg_nbest:
+            nbest_path_l = []
+            for best_id in range(cfg.optimization.nbest):
+                nbest_path = os.path.join(best_model_saved_dir_path, f'nbest_model{best_id}.params')
+                if os.path.exists(nbest_path):
+                    nbest_path_l.append(nbest_path)
+            avg_nbest_path = os.path.join(best_model_saved_dir_path, 'nbest_model_avg.params')
+            average_checkpoints(nbest_path_l, avg_nbest_path)
         with open(os.path.join(best_model_saved_dir_path, 'preprocessor.pkl'), 'rb') as in_f:
             self._preprocessor = pickle.load(in_f)
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \

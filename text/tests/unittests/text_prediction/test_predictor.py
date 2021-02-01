@@ -15,6 +15,8 @@ def small_config_no_hpo_for_test():
     cfg['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 1
     cfg['models']['MultimodalTextModel']['search_space']['model.test_stochastic_chunk'] = False
     cfg['models']['MultimodalTextModel']['search_space']['model.inference_num_repeat'] = 1
+    cfg['models']['MultimodalTextModel']['search_space']['optimization.nbest'] = 1
+    cfg['models']['MultimodalTextModel']['search_space']['model.use_avg_nbest'] = False
     return cfg
 
 
