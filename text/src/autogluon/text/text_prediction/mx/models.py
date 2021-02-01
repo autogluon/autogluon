@@ -365,8 +365,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.misc.exp_dir = exp_dir
     cfg.freeze()
     logger = logging.getLogger()
-    logging_config(folder=exp_dir, name='training', logger=logger, console=console_log)
     set_logger_verbosity(verbosity, logger)
+    logging_config(folder=exp_dir, name='training', logger=logger, console=console_log)
     logger.info(cfg)
 
     # Load backbone model
