@@ -1317,7 +1317,7 @@ class MultiModalTextModel:
             Data that can be parsed to pandas dataframe
         stochastic_chunk
             Whether to use stochastic chunk
-        num_repeats
+        num_repeat
             The number of repeats
 
         Returns
@@ -1368,6 +1368,8 @@ class MultiModalTextModel:
                 params=self.net.params)
             embed_net.hybridize()
             self._embed_net = embed_net
+        if num_repeat is None:
+            num_repeat = self.config.model.inference_num_repeat
         embeddings = _classification_regression_predict(self._embed_net,
                                                         dataloader=dataloader,
                                                         problem_type=self._problem_type,
