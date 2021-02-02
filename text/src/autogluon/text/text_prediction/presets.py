@@ -101,15 +101,15 @@ def albert_base_no_hpo() -> dict:
     cfg = no_hpo()
     cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
         = 'google_albert_base_v2'
-    cfg['models']['MultimodalTextModel']['search_space'][
-        'optimization.per_device_batch_size'] = 8
+    cfg['models']['MultimodalTextModel']['search_space']['optimization.per_device_batch_size'] = 8
+    cfg['models']['MultimodalTextModel']['search_space']['optimization.layerwise_lr_decay'] = 1.0
     return cfg
 
 
 @ag_text_presets.register()
 def albert_large_no_hpo() -> dict:
     """The default search space that use ALBERT Large as the backbone."""
-    cfg = no_hpo()
+    cfg = albert_base_no_hpo()
     cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
         = 'google_albert_large_v2'
     cfg['models']['MultimodalTextModel']['search_space'][
