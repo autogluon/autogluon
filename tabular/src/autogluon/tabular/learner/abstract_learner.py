@@ -171,14 +171,14 @@ class AbstractLearner:
     def refit_ensemble_full(self, model='all'):
         return self.load_trainer().refit_ensemble_full(model=model)
 
-    def fit_transform_features(self, X, y=None):
+    def fit_transform_features(self, X, y=None, **kwargs):
         if self.label in X:
             X = X.drop(columns=[self.label])
         if self.ignored_columns:
             logger.log(20, f'Dropping user-specified ignored columns: {self.ignored_columns}')
             X = X.drop(columns=self.ignored_columns, errors='ignore')
         for feature_generator in self.feature_generators:
-            X = feature_generator.fit_transform(X, y)
+            X = feature_generator.fit_transform(X, y, **kwargs)
         return X
 
     def transform_features(self, X):
