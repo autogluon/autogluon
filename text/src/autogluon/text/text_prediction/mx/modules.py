@@ -410,9 +410,6 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         Take the maximum of the input features
     - attention
         We use a stack of transformer-encoder layer to aggregate the information.
-    - gated = True
-        We use one attention layer to output a binary gate value for each feature. This helps us
-        select the features that are important.
     """
     def __init__(self, text_backbone,
                  num_text_features,
