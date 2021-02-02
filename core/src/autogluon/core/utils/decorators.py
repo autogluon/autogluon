@@ -6,19 +6,21 @@ logger = logging.getLogger(__name__)
 
 def unpack(g, *other_args):
     """
-    Used to pass *args and **kwargs to a function g prior to entering function f via:
+    Used to pass *args and **kwargs to a function g prior to entering function f.
 
-    def g(a=0, **kwargs):
-        kwargs['b'] = a + 1
-        return **kwargs
+    Examples
+    --------
 
-    @unpack(g)
-    def f(**kwargs):
-        print(**kwargs)
-
-    f(a=2)  # kwargs is now the output of g(a=2), which is {'b': 3}
-    f(c=4)  # kwargs is now the output of g(c=4), which is {'b': 1, 'c': 4}
-
+    >>> def g(a=0, **kwargs):
+    >>>     kwargs['b'] = a + 1
+    >>>     return kwargs
+    >>>
+    >>> @unpack(g)
+    >>> def f(**kwargs):
+    >>>     print(kwargs)
+    >>>
+    >>> f(a=2)  # kwargs is now the output of g(a=2), which is {'b': 3}
+    >>> f(c=4)  # kwargs is now the output of g(c=4), which is {'b': 1, 'c': 4}
     """
     def _unpack_inner(f):
         @functools.wraps(f)
