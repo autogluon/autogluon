@@ -106,6 +106,17 @@ def albert_base_no_hpo() -> dict:
 
 
 @ag_text_presets.register()
+def albert_large_no_hpo() -> dict:
+    """The default search space that use ALBERT Large as the backbone."""
+    cfg = no_hpo()
+    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
+        = 'google_albert_large_v2'
+    cfg['models']['MultimodalTextModel']['search_space'][
+        'optimization.per_device_batch_size'] = 4
+    return cfg
+
+
+@ag_text_presets.register()
 def multi_cased_bert_base_no_hpo() -> dict:
     """The default search space that use Multi-lingual BERT-Base as the backbone."""
     cfg = no_hpo()

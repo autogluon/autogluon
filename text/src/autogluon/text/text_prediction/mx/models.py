@@ -662,6 +662,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                                 for score, metric in zip(log_scores, log_metric_scorers)] + \
                                [('find_better', find_better),
                                 ('find_new_topn', find_topn_better),
+                                ('nbest_stat', json.dumps([best_performance_score,
+                                                           best_performance_update_idx])),
                                 ('time_spent', int(time.time() - start_tick))]
                 if eval_metric_scorer._sign < 0:
                     report_items.append(('reward_attr', -dev_score))
