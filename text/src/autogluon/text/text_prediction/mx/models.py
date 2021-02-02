@@ -356,6 +356,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             if reporter is not None:
                 reporter.terminate()
             return
+    print(args, reporter)
     if isinstance(reporter, FakeReporter):
         search_space = args.rand
         task_id = 0
@@ -960,6 +961,7 @@ class MultiModalTextModel:
                                                       eval_metric=self._eval_metric,
                                                       console_log=console_log,
                                                       verbosity=verbosity))
+        print(scheduler_options)
         if scheduler_options['num_trials'] == 1:
             train_fn(train_fn.args['search_space'],
                      train_fn.args['_default_config'])
