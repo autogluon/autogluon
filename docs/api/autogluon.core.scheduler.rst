@@ -95,37 +95,3 @@ Schedulers
 
     .. autoautosummary:: RLScheduler
         :methods:
-
-
-Early Stopping Managers
------------------------
-
-.. autosummary::
-   :nosignatures:
-
-   HyperbandStopping_Manager
-   HyperbandPromotion_Manager
-
-:hidden:`HyperbandStopping_Manager`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: HyperbandStopping_Manager
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: HyperbandStopping_Manager
-        :methods:
-
-:hidden:`HyperbandPromotion_Manager`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: HyperbandPromotion_Manager
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: HyperbandPromotion_Manager
-        :methods:

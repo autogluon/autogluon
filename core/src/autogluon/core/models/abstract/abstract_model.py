@@ -10,44 +10,56 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from ...utils import get_cpu_count
+from .model_trial import model_trial
+from ... import metrics, Space
+from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...features.feature_metadata import FeatureMetadata
+from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from ...scheduler import FIFOScheduler
+from ...task.base import BasePredictor
+from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
-from ... import Space
-from ...scheduler import FIFOScheduler
-from ...task.base import BasePredictor
-from ... import metrics
-from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
-from ...features.feature_metadata import FeatureMetadata
-from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
-from .model_trial import model_trial
 
 logger = logging.getLogger(__name__)
 
 
 class AbstractModel:
+    """
+    Abstract model implementation from which all AutoGluon models inherit.
+
+    Parameters
+    ----------
+    path (str): directory where to store all outputs.
+    name (str): name of subdirectory inside path where model will be saved.
+    problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
+    eval_metric (str or autogluon.core.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
+    hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
+    feature_metadata (autogluon.core.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
+    """
+
     model_file_name = 'model.pkl'
     model_info_name = 'info.pkl'
     model_info_json_name = 'info.json'
 
-    def __init__(self, path: str, name: str, problem_type: str, eval_metric: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_metadata: FeatureMetadata = None, debug=0, **kwargs):
-        """ Creates a new model.
-            Args:
-                path (str): directory where to store all outputs.
-                name (str): name of subdirectory inside path where model will be saved.
-                problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-                eval_metric (str or autogluon.core.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
-                hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-                feature_metadata (autogluon.core.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
-        """
+    def __init__(self,
+                 path: str,
+                 name: str,
+                 problem_type: str,
+                 eval_metric: Union[str, metrics.Scorer] = None,
+                 hyperparameters=None,
+                 feature_metadata: FeatureMetadata = None,
+                 num_classes=None,
+                 stopping_metric=None,
+                 features=None,
+                 **kwargs):
+
         self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
         self.path_root = path
-        self.path_suffix = self.name + os.path.sep  # TODO: Make into function to avoid having to reassign on load?
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
         self.num_classes = num_classes
-        self.model = model
+        self.model = None
         self.problem_type = problem_type
         if eval_metric is not None:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
@@ -65,7 +77,6 @@ class AbstractModel:
             feature_metadata = copy.deepcopy(feature_metadata)
         self.feature_metadata = feature_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
         self.features = features
-        self.debug = debug
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
@@ -95,6 +106,10 @@ class AbstractModel:
             self.params.update(hyperparameters)
             self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
+
+    @property
+    def path_suffix(self):
+        return self.name + os.path.sep
 
     # Checks if model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
     def is_valid(self) -> bool:
@@ -178,10 +193,6 @@ class AbstractModel:
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
-        self.path_suffix = self.name + os.path.sep
-        # TODO: This should be added in future once naming conventions have been standardized for WeightedEnsembleModel
-        # if self.path_suffix not in self.path:
-        #     raise ValueError('Expected path_suffix not in given path! Values: (%s, %s)' % (self.path_suffix, self.path))
         self.path_root = self.path.rsplit(self.path_suffix, 1)[0]
 
     @staticmethod
@@ -499,8 +510,7 @@ class AbstractModel:
             model=None,
             hyperparameters=hyperparameters,
             features=self.features,
-            feature_metadata=self.feature_metadata,
-            debug=self.debug
+            feature_metadata=self.feature_metadata
         )
         return init_args
 

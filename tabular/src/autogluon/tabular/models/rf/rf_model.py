@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 class RFModel(AbstractModel):
+    """
+    Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._model_type = self._get_model_type()

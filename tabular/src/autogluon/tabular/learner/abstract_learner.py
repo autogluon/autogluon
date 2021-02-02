@@ -14,17 +14,17 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.metrics import confusion_matrix, get_metric
+from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.core.metrics import confusion_matrix, get_metric
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.utils import get_pred_from_proba, infer_problem_type
+from autogluon.features.generators import PipelineFeatureGenerator
 
 from ..trainer.abstract_trainer import AbstractTrainer
-from ..tuning.ensemble_selection import EnsembleSelection
-from ..data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from autogluon.features.generators import PipelineFeatureGenerator
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, cache_data=True, is_trainer_present=False, random_seed=0):
+                 problem_type=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.ignored_columns = ignored_columns
@@ -52,9 +52,9 @@ class AbstractLearner:
         if not self.cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
         self.is_trainer_present = is_trainer_present
-        if random_seed is None:
-            random_seed = random.randint(0, 1000000)
-        self.random_seed = random_seed
+        if random_state is None:
+            random_state = random.randint(0, 1000000)
+        self.random_state = random_state
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
@@ -63,6 +63,8 @@ class AbstractLearner:
         self.trainer_type = None
         self.trainer_path = None
         self.reset_paths = False
+
+        self._positive_class = positive_class
 
         try:
             from ..version import __version__
@@ -578,7 +580,7 @@ class AbstractLearner:
         learner_info = {
             'path': self.path,
             'label': self.label,
-            'random_seed': self.random_seed,
+            'random_state': self.random_state,
             'version': self.version,
         }
 

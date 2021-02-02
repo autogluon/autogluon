@@ -101,4 +101,6 @@ Advanced Topics
    api/autogluon.core.scheduler
    api/autogluon.core.searcher
    api/autogluon.core.utils
+   api/autogluon.features
+   api/autogluon.tabular.models
    model_zoo/index

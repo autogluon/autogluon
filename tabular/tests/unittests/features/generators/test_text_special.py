@@ -1,5 +1,5 @@
 
-from autogluon.tabular.features import TextSpecialFeatureGenerator
+from autogluon.features.generators import TextSpecialFeatureGenerator
 
 
 def test_text_special_feature_generator(generator_helper, data_helper):

@@ -31,6 +31,11 @@ logger = logging.getLogger(__name__)
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
 class LGBModel(AbstractModel):
+    """
+    LightGBM model: https://lightgbm.readthedocs.io/en/latest/
+
+    Hyperparameter options: https://lightgbm.readthedocs.io/en/latest/Parameters.html
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

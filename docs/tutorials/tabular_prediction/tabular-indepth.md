@@ -324,7 +324,7 @@ To reduce memory usage during training, you may try each of the following strate
 
 ```
 from sklearn.feature_extraction.text import CountVectorizer
-from autogluon.tabular.features import AutoMLPipelineFeatureGenerator
+from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 feature_generator = AutoMLPipelineFeatureGenerator(vectorizer=CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=MAX_NGRAM, dtype=np.uint8))
 ```
 

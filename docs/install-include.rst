@@ -159,7 +159,8 @@ Select your preferences below and run the corresponding install commands:
 AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/packaging-namespace-packages/>`_ specialized for tabular, text, or image data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:
 
 - `autogluon.tabular` - only functionality for tabular data (TabularPredictor)
-- `autogluon.image` - only functionality for computer vision (ImagePredictor, ObjectDetector)
+- `autogluon.vision` - only functionality for computer vision (ImagePredictor, ObjectDetector)
 - `autogluon.text` - only functionality for natural language processing (TextPrediction)
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
+- `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
 - `autogluon.extra` - miscellaneous extra functionality such as `Efficient Neural Architecture Search <tutorials/nas/enas_proxylessnas.html>`_

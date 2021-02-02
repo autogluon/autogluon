@@ -24,7 +24,6 @@ from ..trainer import AbstractTrainer
 logger = logging.getLogger()  # return root logger
 
 # TODO: num_bag_sets -> ag_args
-# TODO: Document predictor attributes
 
 # Extra TODOs (Stretch): Can occur post v0.1
 # TODO: make core_kwargs a kwargs argument to predictor.fit
@@ -82,6 +81,13 @@ class TabularPredictor(TabularPredictorV1):
         learner_kwargs : dict, default = None
             Kwargs to send to the learner. Options include:
 
+            positive_class : str or int, default = None
+                Used to determine the positive class in binary classification.
+                This is used for certain metrics such as 'f1' which produce different scores depending on which class is considered the positive class.
+                If not set, will be inferred as the second element of the existing unique classes after sorting them.
+                    If classes are [0, 1], then 1 will be selected as the positive class.
+                    If classes are ['def', 'abc'], then 'def' will be selected as the positive class.
+                    If classes are [True, False], then True will be selected as the positive class.
             ignored_columns : list, default = None
                 Banned subset of column names that predictor may not use as predictive features (e.g. unique identifier to a row or user-ID).
                 These columns are ignored during `fit()`.
@@ -93,6 +99,7 @@ class TabularPredictor(TabularPredictorV1):
                 Enables advanced functionality in predictor such as `fit_extra()` and feature importance calculation on the original data.
             trainer_type : AbstractTrainer, default = AutoTrainer
                 A class inheriting from `AbstractTrainer` that controls training/ensembling of many models.
+                If you don't know what this is, keep it as the default.
 
     Attributes
     ----------
@@ -104,12 +111,21 @@ class TabularPredictor(TabularPredictorV1):
         What metric is used to evaluate predictive performance.
     label : str
         Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-    feature_metadata : :class:`autogluon.tabular.FeatureMetadata`
+    feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`
         Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label`).
         Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
         Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
             `feature_metadata.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
             `feature_metadata.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
+    positive_class : str or int
+        Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
+        In binary classification, :meth:`TabularPredictor.predict_proba` returns the estimated probability that each row belongs to the positive class.
+        Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
+
+        Returns
+        -------
+        The positive class name in binary classification or None if the problem is not binary classification.
+
     class_labels : list
         For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
         For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
@@ -464,7 +480,7 @@ class TabularPredictor(TabularPredictorV1):
                 This has NO impact on inference accuracy.
                 It is recommended if the only goal is to use the trained model for prediction.
                 Certain advanced functionality may no longer be available if `save_space=True`. Refer to `predictor.save_space()` documentation for more details.
-            feature_generator : :class:`autogluon.tabular.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.tabular.features.generators.AutoMLPipelineFeatureGenerator`
+            feature_generator : :class:`autogluon.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.features.generators.AutoMLPipelineFeatureGenerator`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
                 To control aspects of the default feature generation process, you can pass in an :class:`AutoMLPipelineFeatureGenerator` object constructed using some of these kwargs:

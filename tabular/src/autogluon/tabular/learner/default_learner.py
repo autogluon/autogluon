@@ -11,8 +11,8 @@ from autogluon.core.utils.utils import augment_rare_classes
 
 from .abstract_learner import AbstractLearner
 from ..trainer.auto_trainer import AutoTrainer
-from ..data.cleaner import Cleaner
-from ..data.label_cleaner import LabelCleaner
+from autogluon.core.data import LabelCleaner
+from autogluon.core.data.cleaner import Cleaner
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class DefaultLearner(AbstractLearner):
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
             save_data=self.cache_data,
-            random_seed=self.random_seed,
+            random_state=self.random_state,
             verbosity=verbosity
         )
 
@@ -126,7 +126,7 @@ class DefaultLearner(AbstractLearner):
         # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
         X, y = self.extract_label(X)
-        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
+        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned, positive_class=self._positive_class)
         y = self.label_cleaner.transform(y)
 
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:

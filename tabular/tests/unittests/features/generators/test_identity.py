@@ -1,5 +1,5 @@
 
-from autogluon.tabular.features import IdentityFeatureGenerator
+from autogluon.features.generators import IdentityFeatureGenerator
 from autogluon.core.features.types import R_INT, R_FLOAT
 
 

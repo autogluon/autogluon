@@ -9,20 +9,22 @@ from functools import reduce
 import numpy as np
 import pandas as pd
 
-from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
-from autogluon.core.utils.utils import generate_kfold
-from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils.utils import _compute_fi_with_stddev
+from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
+from ...utils.exceptions import TimeLimitExceeded
+from ...utils.loaders import load_pkl
+from ...utils.savers import save_pkl
+from ...utils.utils import generate_kfold, _compute_fi_with_stddev
 
-from autogluon.core.models import AbstractModel
+from ..abstract.abstract_model import AbstractModel
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
+    """
+    Bagged ensemble meta-model which fits a given model multiple times across different splits of the training data.
+    """
     _oof_filename = 'oof.pkl'
 
     def __init__(self, model_base: AbstractModel, random_state=0, **kwargs):
@@ -192,7 +194,7 @@ class BaggedEnsembleModel(AbstractModel):
                 X_train_fold, X_val_fold = X_train.iloc[train_index, :], X_train.iloc[val_index, :]
                 y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
                 fold_model = copy.deepcopy(model_base)
-                fold_model.name = f'{fold_model.name}_fold_{i}'
+                fold_model.name = f'{fold_model.name}_F{i+1}'
                 fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
                 fold_model.fit(X_train=X_train_fold, y_train=y_train_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs)
                 time_train_end_fold = time.time()
