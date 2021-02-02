@@ -592,6 +592,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 _classification_regression_predict(net,
                                                    dataloader=dev_dataloader,
                                                    problem_type=problem_type,
+                                                   label_scaler=preprocessor.label_scaler,
                                                    has_label=False,
                                                    num_repeat=inference_num_repeat)
             log_scores = [calculate_metric(scorer, gt_dev_labels,
@@ -1396,6 +1397,7 @@ class MultiModalTextModel:
         embeddings = _classification_regression_predict(self._embed_net,
                                                         dataloader=dataloader,
                                                         problem_type=self._problem_type,
+                                                        label_scaler=self.preprocessor.label_scaler,
                                                         has_label=False,
                                                         extract_embedding=True,
                                                         num_repeat=num_repeat)
