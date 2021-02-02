@@ -50,14 +50,14 @@ class LGBModel(AbstractModel):
         return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
 
     # Use specialized LightGBM metric if available (fast), otherwise use custom func generator
-    def get_eval_metric(self):
-        eval_metric = lgb_utils.convert_ag_metric_to_lgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
-        if eval_metric is None:
-            eval_metric = lgb_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric.needs_pred, problem_type=self.problem_type)
-            eval_metric_name = self.stopping_metric.name
+    def _get_stopping_metric_internal(self):
+        stopping_metric = lgb_utils.convert_ag_metric_to_lgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
+        if stopping_metric is None:
+            stopping_metric = lgb_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric.needs_pred, problem_type=self.problem_type)
+            stopping_metric_name = self.stopping_metric.name
         else:
-            eval_metric_name = eval_metric
-        return eval_metric, eval_metric_name
+            stopping_metric_name = stopping_metric
+        return stopping_metric, stopping_metric_name
 
     def _fit(self, X_train=None, y_train=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, num_gpus=0, **kwargs):
         start_time = time.time()
@@ -76,7 +76,7 @@ class LGBModel(AbstractModel):
         else:
             verbose_eval = 1
 
-        eval_metric, eval_metric_name = self.get_eval_metric()
+        stopping_metric, stopping_metric_name = self._get_stopping_metric_internal()
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, y_train=y_train, params=params, X_val=X_val, y_val=y_val, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
 
@@ -87,9 +87,8 @@ class LGBModel(AbstractModel):
                 # TODO: lightgbm must have a special install to support GPU: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version
                 #  Before enabling GPU, we should add code to detect that GPU-enabled version is installed and that a valid GPU exists.
                 #  GPU training heavily alters accuracy, often in a negative manner. We will have to be careful about when to use GPU.
-                # TODO: Confirm if GPU is used in HPO (Probably not)
-                # params['device'] = 'gpu'
-                pass
+                params['device'] = 'gpu'
+                logger.log(20, f'\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.')
         logger.log(15, f'Training Gradient Boosting Model for {num_boost_round} rounds...')
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)
@@ -119,7 +118,7 @@ class LGBModel(AbstractModel):
                     params['metric'] = f'{params["metric"]},{train_loss_name}'
             callbacks += [
                 # Note: Don't use self.params_aux['max_memory_usage_ratio'] here as LightGBM handles memory per iteration optimally.  # TODO: Consider using when ratio < 1.
-                early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
+                early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', stopping_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
                                       ignore_dart_warning=True, verbose=False, manual_stop_file=False, reporter=reporter, train_loss_name=train_loss_name),
             ]
             valid_names = ['valid_set'] + valid_names
@@ -135,13 +134,13 @@ class LGBModel(AbstractModel):
             'callbacks': callbacks,
             'verbose_eval': verbose_eval,
         }
-        if not isinstance(eval_metric, str):
-            train_params['feval'] = eval_metric
+        if not isinstance(stopping_metric, str):
+            train_params['feval'] = stopping_metric
         else:
             if 'metric' not in train_params['params'] or train_params['params']['metric'] == '':
-                train_params['params']['metric'] = eval_metric
-            elif eval_metric not in train_params['params']['metric']:
-                train_params['params']['metric'] = f'{train_params["params"]["metric"]},{eval_metric}'
+                train_params['params']['metric'] = stopping_metric
+            elif stopping_metric not in train_params['params']['metric']:
+                train_params['params']['metric'] = f'{train_params["params"]["metric"]},{stopping_metric}'
         if self.problem_type == SOFTCLASS:
             train_params['fobj'] = lgb_utils.softclass_lgbobj
         if seed_val is not None:
@@ -152,11 +151,25 @@ class LGBModel(AbstractModel):
         # Train LightGBM model:
         try_import_lightgbm()
         import lightgbm as lgb
+        from lightgbm.basic import LightGBMError
         with warnings.catch_warnings():
             # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
             warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
             warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
-            self.model = lgb.train(**train_params)
+            try:
+                self.model = lgb.train(**train_params)
+            except LightGBMError:
+                if train_params['params'].get('device', 'cpu') != 'gpu':
+                    raise
+                else:
+                    logger.warning('Warning: GPU mode might not be installed for LightGBM, GPU training raised an exception. Falling back to CPU training...'
+                                   'Refer to LightGBM GPU documentation: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version'
+                                   'One possible method is:'
+                                   '\tpip uninstall lightgbm -y'
+                                   '\tpip install lightgbm --install-option=--gpu'
+                                   )
+                    train_params['params']['device'] = 'cpu'
+                    self.model = lgb.train(**train_params)
             retrain = False
             if train_params['params'].get('boosting_type', '') == 'dart':
                 if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
@@ -337,7 +350,8 @@ class LGBModel(AbstractModel):
             directory=directory,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_params['time_out']
+            time_limit=scheduler_params['time_out'],
+            fit_kwargs=scheduler_params['resource'],
         )
         lgb_trial.register_args(util_args=util_args, **params_copy)
         scheduler = scheduler_cls(lgb_trial, **scheduler_params)

@@ -112,6 +112,7 @@ def test_confusion_matrix_with_invalid_weights():
     with pytest.raises(ValueError):
         observed_output = confusion_matrix(input_solution, input_prediction, labels=labels)
 
+
 def test_confusion_matrix_with_empty_inputs():
     # Given
     input_solution = []
@@ -169,3 +170,6 @@ def test_log_loss_with_sklearn(gt, probs):
     # In AutoGluon, the metrics will always return score that is higher the better.
     # Thus, the true value should be the negation of the real log_loss
     np.testing.assert_allclose(ag_loss, -sklearn_log_loss)
+
+    ag_loss_as_sklearn = log_loss.convert_score_to_sklearn_val(ag_loss)
+    np.testing.assert_allclose(ag_loss_as_sklearn, sklearn_log_loss)

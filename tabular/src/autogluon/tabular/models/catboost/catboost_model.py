@@ -12,7 +12,7 @@ from autogluon.core.utils import try_import_catboost, try_import_catboostdev
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
 from autogluon.core.features.types import R_OBJECT
 
-from .catboost_utils import construct_custom_catboost_metric # make_softclass_metric, make_softclass_objective  # TODO: replace with SoftclassObjective, SoftclassCustomMetric once lazy import no longer needed.
+from .catboost_utils import construct_custom_catboost_metric
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from autogluon.core.models import AbstractModel
@@ -63,20 +63,19 @@ class CatBoostModel(AbstractModel):
     def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, **kwargs):
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
+        params = self.params.copy()
         if self.problem_type == SOFTCLASS:
             try_import_catboostdev()  # Need to first import catboost then catboost_dev not vice-versa.
             from catboost_dev import CatBoostClassifier, CatBoostRegressor, Pool
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
-            self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric.needs_pred, self.problem_type))
-            self.params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
-            self.params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
-            self._set_default_param_value('early_stopping_rounds', 50)  # Speeds up training with custom (non-C++) losses
+            params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
+            params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
 
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
-        if isinstance(self.params['eval_metric'], str):
-            metric_name = self.params['eval_metric']
+        if isinstance(params['eval_metric'], str):
+            metric_name = params['eval_metric']
         else:
-            metric_name = type(self.params['eval_metric']).__name__
+            metric_name = type(params['eval_metric']).__name__
         num_rows_train = len(X_train)
         num_cols_train = len(X_train.columns)
         if self.problem_type == MULTICLASS:
@@ -86,7 +85,6 @@ class CatBoostModel(AbstractModel):
                 num_classes = 10  # Guess if not given, can do better by looking at y_train
         elif self.problem_type == SOFTCLASS:  # TODO: delete this elif if it's unnecessary.
             num_classes = y_train.shape[1]
-            self.num_classes = num_classes
         else:
             num_classes = 1
 
@@ -122,10 +120,6 @@ class CatBoostModel(AbstractModel):
             early_stopping_rounds = None
             num_sample_iter_max = 50
 
-        invalid_params = ['num_threads', 'num_gpus']
-        for invalid in invalid_params:
-            if invalid in self.params:
-                self.params.pop(invalid)
         train_dir = None
         if 'allow_writing_files' in self.params and self.params['allow_writing_files']:
             if 'train_dir' not in self.params:
@@ -136,7 +130,6 @@ class CatBoostModel(AbstractModel):
                     pass
                 else:
                     train_dir = self.path + 'catboost_info'
-        logger.log(15, f'\tCatboost model hyperparameters: {self.params}')
 
         # TODO: Add more control over these params (specifically early_stopping_rounds)
         verbosity = kwargs.get('verbosity', 2)
@@ -151,21 +144,14 @@ class CatBoostModel(AbstractModel):
 
         init_model = None
         init_model_tree_count = None
-        init_model_best_iteration = None
         init_model_best_score = None
 
-        params = self.params.copy()
         num_features = len(self.features)
-
-        # FIXME: v0.1 add default as CPU and GPU only if explicitly specified in ag_args_fit.
-        #  Fix num_gpus > 0 and time_limit is not None : Currently crashes.
-        if num_gpus != 0:
-            logger.warning('WARNING: Attempted to run CatBoost with GPU. CatBoost GPU implementation is not yet implemented, using CPU instead.')
-            num_gpus = 0
 
         if num_gpus != 0:
             if 'task_type' not in params:
                 params['task_type'] = 'GPU'
+                logger.log(20, f'\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.')
                 # TODO: Confirm if GPU is used in HPO (Probably not)
                 # TODO: Adjust max_bins to 254?
 
@@ -190,6 +176,11 @@ class CatBoostModel(AbstractModel):
                 params['colsample_bylevel'] = 1.0
                 logger.log(30, f'\t\'colsample_bylevel\' is not supported on GPU, using default value (Default = 1).')
 
+        logger.log(15, f'\tCatboost model hyperparameters: {params}')
+
+        if train_dir is not None:
+            params['train_dir'] = train_dir
+
         if time_limit:
             time_left_start = time_limit - (time.time() - start_time)
             if time_left_start <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
@@ -197,8 +188,6 @@ class CatBoostModel(AbstractModel):
             params_init = params.copy()
             num_sample_iter = min(num_sample_iter_max, params_init['iterations'])
             params_init['iterations'] = num_sample_iter
-            if train_dir is not None:
-                params_init['train_dir'] = train_dir
             self.model = model_type(
                 **params_init,
             )
@@ -211,7 +200,6 @@ class CatBoostModel(AbstractModel):
             )
 
             init_model_tree_count = self.model.tree_count_
-            init_model_best_iteration = self.model.get_best_iteration()
             init_model_best_score = self.model.get_best_score()['validation'][metric_name]
 
             time_left_end = time_limit - (time.time() - start_time)
@@ -219,58 +207,77 @@ class CatBoostModel(AbstractModel):
             estimated_iters_in_time = round(time_left_end / time_taken_per_iter)
             init_model = self.model
 
-            params_final = params.copy()
-
-            # TODO: This only handles memory with time_limit specified, but not with time_limit=None, handle when time_limit=None
-            available_mem = psutil.virtual_memory().available
-            if self.problem_type == SOFTCLASS:  # TODO: remove this once catboost-dev is no longer necessary and SOFTCLASS objectives can be pickled.
-                model_size_bytes = 1  # skip memory check
+            if self.stopping_metric._optimum == init_model_best_score:
+                # Done, pick init_model
+                params_final = None
             else:
-                model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
+                params_final = params.copy()
 
-            max_memory_proportion = 0.3 * max_memory_usage_ratio
-            mem_usage_per_iter = model_size_bytes / num_sample_iter
-            max_memory_iters = math.floor(available_mem * max_memory_proportion / mem_usage_per_iter)
+                # TODO: This only handles memory with time_limit specified, but not with time_limit=None, handle when time_limit=None
+                available_mem = psutil.virtual_memory().available
+                if self.problem_type == SOFTCLASS:  # TODO: remove this once catboost-dev is no longer necessary and SOFTCLASS objectives can be pickled.
+                    model_size_bytes = 1  # skip memory check
+                else:
+                    model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
 
-            params_final['iterations'] = min(params['iterations'] - num_sample_iter, estimated_iters_in_time)
-            if params_final['iterations'] > max_memory_iters - num_sample_iter:
-                if max_memory_iters - num_sample_iter <= 500:
-                    logger.warning('\tWarning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters, params_final['iterations'] + num_sample_iter))
-                params_final['iterations'] = max_memory_iters - num_sample_iter
+                max_memory_proportion = 0.3 * max_memory_usage_ratio
+                mem_usage_per_iter = model_size_bytes / num_sample_iter
+                max_memory_iters = math.floor(available_mem * max_memory_proportion / mem_usage_per_iter)
+                if params.get('task_type', None) == 'GPU':
+                    # Cant use init_model
+                    iterations_left = params['iterations']
+                else:
+                    iterations_left = params['iterations'] - num_sample_iter
+                params_final['iterations'] = min(iterations_left, estimated_iters_in_time)
+                if params_final['iterations'] > max_memory_iters - num_sample_iter:
+                    if max_memory_iters - num_sample_iter <= 500:
+                        logger.warning('\tWarning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters, params_final['iterations'] + num_sample_iter))
+                    params_final['iterations'] = max_memory_iters - num_sample_iter
         else:
             params_final = params.copy()
 
-        if train_dir is not None:
-            params_final['train_dir'] = train_dir
-        if params_final['iterations'] > 0:
+        if params_final is not None and params_final['iterations'] > 0:
             self.model = model_type(
                 **params_final,
             )
 
-            # TODO: Strangely, this performs different if clone init_model is sent in than if trained for same total number of iterations. May be able to optimize catboost models further with this
-            self.model.fit(
-                X_train,
+            fit_final_kwargs = dict(
                 eval_set=eval_set,
                 verbose=verbose,
                 early_stopping_rounds=early_stopping_rounds,
-                # use_best_model=True,
-                init_model=init_model,
             )
+
+            # TODO: Strangely, this performs different if clone init_model is sent in than if trained for same total number of iterations. May be able to optimize catboost models further with this
+            warm_start = False
+            if params_final.get('task_type', None) == 'GPU':
+                # Cant use init_model
+                fit_final_kwargs['use_best_model'] = True
+            elif init_model is not None:
+                fit_final_kwargs['init_model'] = init_model
+                warm_start = True
+            self.model.fit(X_train, **fit_final_kwargs)
 
             if init_model is not None:
                 final_model_best_score = self.model.get_best_score()['validation'][metric_name]
-                if self.stopping_metric._optimum > final_model_best_score:
-                    if final_model_best_score > init_model_best_score:
-                        best_iteration = init_model_tree_count + self.model.get_best_iteration()
-                    else:
-                        best_iteration = init_model_best_iteration
-                else:
-                    if final_model_best_score < init_model_best_score:
-                        best_iteration = init_model_tree_count + self.model.get_best_iteration()
-                    else:
-                        best_iteration = init_model_best_iteration
 
-                self.model.shrink(ntree_start=0, ntree_end=best_iteration+1)
+                if self.stopping_metric._optimum == init_model_best_score:
+                    # Done, pick init_model
+                    self.model = init_model
+                else:
+                    if (init_model_best_score > self.stopping_metric._optimum) or (final_model_best_score > self.stopping_metric._optimum):
+                        logger.warning(f'Warning: Sign differs between AG metric and CatBoost metric variants: {self.stopping_metric.name}, flipping signs.')
+                        init_model_best_score = -init_model_best_score
+                        final_model_best_score = -final_model_best_score
+
+                    if warm_start:
+                        if init_model_best_score >= final_model_best_score:
+                            self.model = init_model
+                        else:
+                            best_iteration = init_model_tree_count + self.model.get_best_iteration()
+                            self.model.shrink(ntree_start=0, ntree_end=best_iteration + 1)
+                    else:
+                        if init_model_best_score >= final_model_best_score:
+                            self.model = init_model
 
         self.params_trained['iterations'] = self.model.tree_count_
 

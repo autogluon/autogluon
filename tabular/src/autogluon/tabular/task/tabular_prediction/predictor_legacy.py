@@ -161,8 +161,7 @@ class TabularPredictorV1:
         """
         data = self.__get_dataset(data)
         perf = self._learner.score(data)
-        sign = self._learner.eval_metric._sign
-        perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
+        perf = self.eval_metric.convert_score_to_sklearn_val(perf)  # flip negative once again back to positive (so higher is no longer necessarily better)
         if not silent:
             print("Predictive performance on given data: %s = %s" % (self.eval_metric, perf))
         return perf

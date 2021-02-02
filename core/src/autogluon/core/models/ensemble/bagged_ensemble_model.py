@@ -604,7 +604,7 @@ class BaggedEnsembleModel(AbstractModel):
         oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
         return oof_pred_proba, oof_pred_model_repeats
 
-    def _preprocess_fit_resources(self, **kwargs):
+    def _preprocess_fit_resources(self, silent=False, **kwargs):
         """Pass along to child models to avoid altering up-front"""
         return kwargs
 

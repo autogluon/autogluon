@@ -89,6 +89,7 @@ VALID_AG_ARGS_KEYS = {
     'name_main',
     'name_prefix',
     'name_suffix',
+    'name_bag_suffix',
     'model_type',
     'priority',
     'problem_types',

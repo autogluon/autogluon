@@ -334,7 +334,7 @@ class AbstractLearner:
         metric = self.eval_metric.name
 
         if not high_always_good:
-            performance = performance * self.eval_metric._sign  # flip negative once again back to positive (so higher is no longer necessarily better)
+            performance = self.eval_metric.convert_score_to_sklearn_val(performance)  # flip negative once again back to positive (so higher is no longer necessarily better)
 
         if not silent:
             logger.log(20, f"Evaluation: {metric} on test data: {performance}")
