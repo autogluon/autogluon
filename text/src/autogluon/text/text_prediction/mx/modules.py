@@ -254,11 +254,8 @@ class FeatureAggregator(HybridBlock):
                     in_units = in_units
                 elif cfg.agg_type == 'concat':
                     in_units = in_units * num_fields
-                elif cfg.agg_type == 'attention':
-                    if num_fields > 1:
-                        in_units = cfg.attention_net.units
-                    else:
-                        in_units = in_units
+                elif cfg.agg_type == 'attention' or cfg.agg_type == 'attention_token':
+                    in_units = cfg.attention_net.units
                 else:
                     raise NotImplementedError
             mid_units = in_units if cfg.mid_units < 0 else cfg.mid_units
