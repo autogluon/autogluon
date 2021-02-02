@@ -1101,12 +1101,14 @@ class MultiModalTextModel:
                 raise NotImplementedError(f'The format of data is not understood. '
                                           f'We have type(data)="{type(data)}"')
         data = data[self._feature_columns + self._label_columns]
-        ground_truth = self.preprocessor.label_generator.transform(data[self._label_columns[0]])
         if self._problem_type == MULTICLASS or self._problem_type == BINARY:
+            ground_truth = self.preprocessor.label_generator.transform(
+                data[self._label_columns[0]])
             predictions = self.predict_proba(data,
                                              stochastic_chunk=stochastic_chunk,
                                              num_repeat=num_repeat)
         else:
+            ground_truth = pd.to_numeric(data[self._label_columns[0]]).to_numpy().astype(np.float32)
             predictions = self.predict(data,
                                        stochastic_chunk=stochastic_chunk,
                                        num_repeat=num_repeat)
