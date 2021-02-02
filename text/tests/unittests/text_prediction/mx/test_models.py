@@ -13,14 +13,12 @@ from autogluon.text.text_prediction.mx.models import infer_per_device_batch_size
 @pytest.mark.parametrize('backbone',
                          ['google_electra_small'])
 @pytest.mark.parametrize('agg_type', ['attention'])
-@pytest.mark.parametrize('input_gating', [True])
 @pytest.mark.parametrize('out_shape', [100])
 def test_infer_per_device_batch_size(num_categories,
                                      numerical_units,
                                      max_length,
                                      backbone,
                                      agg_type,
-                                     input_gating,
                                      out_shape):
     ctx = mx.gpu(0)
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ = get_backbone(backbone)
@@ -28,7 +26,6 @@ def test_infer_per_device_batch_size(num_categories,
     cfg = MultiModalWithPretrainedTextNN.get_cfg()
     cfg.defrost()
     cfg.agg_net.agg_type = agg_type
-    cfg.agg_net.input_gating = input_gating
     cfg.freeze()
     net = MultiModalWithPretrainedTextNN(text_backbone=text_backbone,
                                          num_text_features=1,

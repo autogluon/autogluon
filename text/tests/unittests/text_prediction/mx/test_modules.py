@@ -13,13 +13,11 @@ from autogluon.text.text_prediction.mx.modules import MultiModalWithPretrainedTe
                           (1, 4, 0),
                           (2, 0, 1)])
 @pytest.mark.parametrize('agg_type', ['mean', 'concat', 'attention'])
-@pytest.mark.parametrize('input_gating', [False, True])
 @pytest.mark.parametrize('out_shape', [2])
 def test_multimodal_with_pretrained_text_nn(num_text_features,
                                             num_categorical_features,
                                             num_numerical_features,
                                             agg_type,
-                                            input_gating,
                                             out_shape):
     numerical_input_units = [32] * num_numerical_features
     num_categories = [np.random.randint(2, 10) for _ in range(num_categorical_features)]
@@ -29,7 +27,6 @@ def test_multimodal_with_pretrained_text_nn(num_text_features,
     cfg = MultiModalWithPretrainedTextNN.get_cfg()
     cfg.defrost()
     cfg.agg_net.agg_type = agg_type
-    cfg.agg_net.input_gating = input_gating
     cfg.freeze()
     net = MultiModalWithPretrainedTextNN(text_backbone=text_backbone,
                                          num_text_features=num_text_features,

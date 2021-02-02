@@ -227,32 +227,7 @@ class FeatureAggregator(HybridBlock):
         out_units = int(np.prod(out_shape))
         with self.name_scope():
             if num_fields > 1:
-                if cfg.input_gating:
-                    if cfg.gating_net.hidden_size < 0:
-                        hidden_size = 4 * cfg.gating_net.units
-                    if cfg.gating_net.units != self.in_units:
-                        self.gating_pre_proj = nn.Dense(units=cfg.gating_net.units,
-                                                        in_units=in_units,
-                                                        use_bias=False,
-                                                        weight_initializer=weight_initializer,
-                                                        bias_initializer=bias_initializer,
-                                                        flatten=False,
-                                                        prefix='gating_pre_proj_')
-                    else:
-                        self.gating_pre_proj = None
-                    self.gating_transformer_enc = TransformerEncoder(num_layers=cfg.gating_net.num_layers,
-                                                                     units=cfg.gating_net.units,
-                                                                     hidden_size=hidden_size,
-                                                                     dropout=cfg.dropout,
-                                                                     activation=cfg.gating_net.activation)
-                    self.gating_post_proj = nn.Dense(units=1,
-                                                     in_units=cfg.gating_net.units,
-                                                     use_bias=False,
-                                                     weight_initializer=weight_initializer,
-                                                     bias_initializer=bias_initializer,
-                                                     flatten=False,
-                                                     prefix='gating_post_proj')
-                if cfg.agg_type == 'attention':
+                if cfg.agg_type == 'attention' or cfg.agg_type == 'attention_token':
                     if cfg.attention_net.hidden_size < 0:
                         hidden_size = 4 * cfg.attention_net.units
                     if cfg.attention_net.units != self.in_units:
@@ -265,25 +240,27 @@ class FeatureAggregator(HybridBlock):
                                                                prefix='attention_net_pre_proj_')
                     else:
                         self.attention_net_pre_proj = None
-                    self.attention_transformer_enc = TransformerEncoder(num_layers=cfg.attention_net.num_layers,
-                                                                        units=cfg.attention_net.units,
-                                                                        hidden_size=hidden_size,
-                                                                        dropout=cfg.dropout,
-                                                                        activation=cfg.attention_net.activation,
-                                                                        weight_initializer=weight_initializer,
-                                                                        bias_initializer=bias_initializer)
-            # Construct out proj
-            if cfg.agg_type == 'mean':
-                in_units = in_units
-            elif cfg.agg_type == 'concat':
-                in_units = in_units * num_fields
-            elif cfg.agg_type == 'attention':
-                if num_fields > 1:
-                    in_units = cfg.attention_net.units
-                else:
+                    self.attention_transformer_enc = TransformerEncoder(
+                        num_layers=cfg.attention_net.num_layers,
+                        num_heads=cfg.attention_net.num_heads,
+                        units=cfg.attention_net.units,
+                        hidden_size=hidden_size,
+                        dropout=cfg.dropout,
+                        activation=cfg.attention_net.activation,
+                        weight_initializer=weight_initializer,
+                        bias_initializer=bias_initializer)
+                # Construct out proj
+                if cfg.agg_type == 'mean':
                     in_units = in_units
-            else:
-                raise NotImplementedError
+                elif cfg.agg_type == 'concat':
+                    in_units = in_units * num_fields
+                elif cfg.agg_type == 'attention':
+                    if num_fields > 1:
+                        in_units = cfg.attention_net.units
+                    else:
+                        in_units = in_units
+                else:
+                    raise NotImplementedError
             mid_units = in_units if cfg.mid_units < 0 else cfg.mid_units
             self.out_proj = BasicMLP(in_units=in_units,
                                      mid_units=mid_units,
@@ -302,12 +279,12 @@ class FeatureAggregator(HybridBlock):
         if key is None:
             cfg = CfgNode()
             cfg.agg_type = 'attention'
-            cfg.input_gating = False
 
             # Attention Aggregator
             cfg.attention_net = CfgNode()
             cfg.attention_net.num_layers = 2
             cfg.attention_net.units = 128
+            cfg.attention_net.num_heads = 4
             cfg.attention_net.hidden_size = -1  # Size of the FFN network used in attention
             cfg.attention_net.activation = 'gelu'   # Activation of the attention
 
@@ -334,13 +311,16 @@ class FeatureAggregator(HybridBlock):
             raise NotImplementedError
         return cfg
 
-    def hybrid_forward(self, F, features):
+    def hybrid_forward(self, F, features, valid_length=None):
         """
 
         Parameters
         ----------
         features
+            If it is the
             List of projection features. All elements must have the same shape.
+        valid_length
+            The valid_length of the text column. If it is given it will have shape (B,)
 
         Returns
         -------
@@ -350,28 +330,30 @@ class FeatureAggregator(HybridBlock):
         if len(features) == 1:
             agg_features = features[0]
         else:
-            agg_features = F.np.stack(features, axis=1)
-            if self.cfg.input_gating:
-                gating_features = agg_features
-                if self.gating_pre_proj is not None:
-                    gating_features = self.gating_pre_proj(gating_features)
-                gating_features = self.gating_transformer_enc(gating_features, None)
-                gating_logits = self.gating_post_proj(gating_features)
-                gating_probs = F.npx.sigmoid(gating_logits)  # (B, T, 1)
-                agg_features = gating_probs * agg_features
-            if self.cfg.agg_type == 'mean':
-                agg_features = F.np.mean(agg_features, axis=1)
-            elif self.cfg.agg_type == 'concat':
-                agg_features = F.npx.reshape(agg_features, (-2, -1))
-            elif self.cfg.agg_type == 'attention':
+            if self.cfg.agg_type == 'attention_token':
+                # Features[0] will have shape (B, T, C)
+                other_features = F.np.stack(features[1:], axis=1)
+                agg_features = F.np.concatenate([other_features, features[0]], axis=1)
                 if self.attention_net_pre_proj is not None:
                     agg_features = self.attention_net_pre_proj(agg_features)
-                agg_features = self.attention_transformer_enc(agg_features, None)
-                agg_features = F.np.mean(agg_features, axis=1)
+                agg_features = self.attention_transformer_enc(agg_features,
+                                                              valid_length + self.num_fields - 1)
+                agg_features = agg_features[:, self.num_fields - 1, :]
             else:
-                # TODO(sxjscience) May try to implement more advanced pooling methods for
-                #  multimodal data.
-                raise NotImplementedError
+                agg_features = F.np.stack(features, axis=1)
+                if self.cfg.agg_type == 'mean':
+                    agg_features = F.np.mean(agg_features, axis=1)
+                elif self.cfg.agg_type == 'max':
+                    agg_features = F.np.max(agg_features, axis=1)
+                elif self.cfg.agg_type == 'concat':
+                    agg_features = F.npx.reshape(agg_features, (-2, -1))
+                elif self.cfg.agg_type == 'attention':
+                    if self.attention_net_pre_proj is not None:
+                        agg_features = self.attention_net_pre_proj(agg_features)
+                    agg_features = self.attention_transformer_enc(agg_features, None)
+                    agg_features = F.np.mean(agg_features, axis=1)
+                else:
+                    raise NotImplementedError
         scores = self.out_proj(agg_features)
         if len(self.out_shape) != 1:
             scores = F.np.reshape(scores, (-1,) + self.out_shape)
@@ -410,6 +392,11 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         Take the maximum of the input features
     - attention
         We use a stack of transformer-encoder layer to aggregate the information.
+    - attention_token
+        We use a stack of transformer-encoder layers to aggregate the information.
+        Instead of using one embedding to describe the text data. We keep the original embeddings
+        and fuse it jointly with the other embeddings.
+    -
     """
     def __init__(self, text_backbone,
                  num_text_features,
@@ -471,6 +458,10 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             assert len(self.num_categories) == self.num_categorical_features
         weight_initializer = mx.init.create(*cfg.initializer.weight)
         bias_initializer = mx.init.create(*cfg.initializer.bias)
+        self.agg_type = cfg.agg_net.agg_type
+        if self.agg_type == 'attention_token':
+            assert self.num_text_features == 1, \
+                'Only supports a single text input if use token-level attention'
         with self.name_scope():
             self.text_backbone = text_backbone
             if base_feature_units != text_backbone.units:
@@ -564,6 +555,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         """
         field_features = []
         ptr = 0
+        text_valid_length = None
         for i in range(self.num_text_features):
             batch_token_ids, batch_valid_length, batch_segment_ids = features[i]
             if self.cfg.text_net.use_segment_id:
@@ -572,10 +564,14 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                                                              batch_valid_length)
             else:
                 contextual_embedding = self.text_backbone(batch_token_ids, batch_valid_length)
-            pooled_output = contextual_embedding[:, 0, :]
-            if self.text_proj is not None:
-                pooled_output = self.text_proj[i](pooled_output)
-            field_features.append(pooled_output)
+            if self.agg_type == 'attention_token':
+                text_embeddings = self.text_proj[i](contextual_embedding)
+                text_valid_length = batch_valid_length
+            else:
+                pooled_output = contextual_embedding[:, 0, :]
+                if self.text_proj is not None:
+                    pooled_output = self.text_proj[i](pooled_output)
+                field_features.append(pooled_output)
         ptr += self.num_text_features
         for i in range(ptr, ptr + self.num_categorical_features):
             cat_features = self.categorical_networks[i - ptr](features[i])
@@ -584,4 +580,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         for i in range(ptr, ptr + self.num_numerical_features):
             numerical_features = self.numerical_networks[i - ptr](features[i])
             field_features.append(numerical_features)
-        return self.agg_layer(field_features)
+        if self.agg_type == 'attention_token':
+            return self.agg_layer(field_features, text_valid_length)
+        else:
+            return self.agg_layer(field_features)
