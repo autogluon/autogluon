@@ -319,7 +319,7 @@ class FeatureAggregator(HybridBlock):
             cfg.gating_net.activation = 'gelu'
 
             # Other parameters
-            cfg.mid_units = 256
+            cfg.mid_units = 128
             cfg.feature_proj_num_layers = -1
             cfg.out_proj_num_layers = 1
             cfg.data_dropout = False
