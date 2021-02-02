@@ -160,7 +160,7 @@ class DefaultLearner(AbstractLearner):
                     y_super = pd.concat([y, y_val], ignore_index=True)
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
-                    y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)  # TEST ME
+                    y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)
                 X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
             X = X_super.head(len(X)).set_index(X.index)
 
@@ -180,7 +180,7 @@ class DefaultLearner(AbstractLearner):
                     y_super = y.reset_index(drop=True)
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
-                    y_super = pd.concat([y, y_unlabeled], ignore_index=True)  # TEST ME
+                    y_super = pd.concat([y, y_unlabeled], ignore_index=True)
                 X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
 
             X = X_super.head(len(X)).set_index(X.index)
