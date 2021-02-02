@@ -293,7 +293,7 @@ class TextPredictor:
                                            stochastic_chunk=stochastic_chunk,
                                            num_repeat=num_repeat)
         if as_pandas:
-            output = pd.DataFrame({self.label: output})
+            output = pd.DataFrame(output)
         return output
 
     def extract_embedding(self, dataset, stochastic_chunk=None, num_repeat=None, as_pandas=False):
