@@ -268,7 +268,6 @@ def _classification_regression_predict(net, dataloader, problem_type,
                         if num_repeat > 1:
                             iter_logits_l.append(pred)
                         pred = mx.npx.softmax(pred, axis=-1)
-                        print(pred)
                     elif problem_type == REGRESSION:
                         assert pred.shape[-1] == 1
                         pred = pred[:, 0]
