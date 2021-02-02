@@ -270,9 +270,6 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
                         if num_repeat > 1:
                             iter_logits_l.append(pred)
                         pred = mx.npx.softmax(pred, axis=-1)
-                    elif problem_type == REGRESSION:
-                        assert pred.shape[-1] == 1
-                        pred = pred[:, 0]
                     iter_pred_l.append(pred)
             for pred in iter_pred_l:
                 predictions[i].append(pred.asnumpy())
@@ -281,7 +278,7 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
                     logits[i].append(ele.asnumpy())
         predictions[i] = np.concatenate(predictions[i], axis=0)
         if problem_type == REGRESSION:
-            predictions[i] = label_scaler.inverse_transform(predictions[i])
+            predictions[i] = label_scaler.inverse_transform(predictions[i])[:, 0]
         if use_logits:
             logits[i] = np.concatenate(logits[i], axis=0)
     if num_repeat == 1:
