@@ -212,7 +212,7 @@ def base_cfg():
 
 
 @use_np
-def _classification_regression_predict(net, dataloader, problem_type,
+def _classification_regression_predict(net, dataloader, problem_type, label_scaler,
                                        has_label=True, extract_embedding=False,
                                        num_repeat=1):
     """
@@ -225,6 +225,8 @@ def _classification_regression_predict(net, dataloader, problem_type,
         The dataloader
     problem_type
         Types of the labels
+    label_scaler
+        Label scaler. We will reverse the centering process for regression problem
     has_label
         Whether label is used
     extract_embedding
@@ -278,6 +280,8 @@ def _classification_regression_predict(net, dataloader, problem_type,
                 for ele in iter_logits_l:
                     logits[i].append(ele.asnumpy())
         predictions[i] = np.concatenate(predictions[i], axis=0)
+        if problem_type == REGRESSION:
+            predictions[i] = label_scaler.inverse_transform(predictions[i])
         if use_logits:
             logits[i] = np.concatenate(logits[i], axis=0)
     if num_repeat == 1:
@@ -1147,6 +1151,7 @@ class MultiModalTextModel:
             self._net,
             dataloader=dataloader,
             problem_type=self._problem_type,
+            label_scaler=self.preprocessor.label_scaler,
             has_label=False,
             num_repeat=num_repeat)
         if self._problem_type == MULTICLASS or self._problem_type == BINARY:

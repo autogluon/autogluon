@@ -274,7 +274,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         self._cfg = cfg
         self._feature_generators = dict()
         self._label_generator = label_generator
-
+        self._label_scaler = StandardScaler()   # Scaler used for numerical labels
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
@@ -338,6 +338,10 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
     @property
     def label_type(self):
         return self._column_types[self._label_column]
+
+    @property
+    def label_scaler(self):
+        return self._label_scaler
 
     @property
     def label_generator(self):
@@ -438,6 +442,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                 y = self._label_generator.transform(y)
         elif self.label_type == _C.NUMERICAL:
             y = pd.to_numeric(y).to_numpy().astype(np.float32)
+            y = self._label_scaler.fit_transform(y)
         else:
             raise NotImplementedError(f'Type of label column is not supported. '
                                       f'Label column type={self._label_column}')
@@ -492,6 +497,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                 y = self.label_generator.transform(y_df)
             elif self.label_type == _C.NUMERICAL:
                 y = pd.to_numeric(y_df).to_numpy().astype(np.float32)
+                y = self.label_scaler.fit(y).astype(np.float32)
             else:
                 raise NotImplementedError
             all_data = text_features + categorical_features + numerical_features + [y]
