@@ -365,8 +365,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     if isinstance(log_metrics, str):
         log_metrics = [log_metrics]
     # Load the training and tuning data from the parquet file
-    train_data = pd.read_parquet(train_df_path)
-    tuning_data = pd.read_parquet(tuning_df_path)
+    train_data = pd.read_pickle(train_df_path)
+    tuning_data = pd.read_pickle(tuning_df_path)
     log_metric_scorers = [get_metric(ele) for ele in log_metrics]
     eval_metric_scorer = get_metric(eval_metric)
     greater_is_better = eval_metric_scorer.greater_is_better
@@ -930,11 +930,11 @@ class MultiModalTextModel:
         # temporary cache.
         os.makedirs(os.path.join(self._output_directory, 'data_cache'), exist_ok=True)
         train_df_path = os.path.join(self._output_directory, 'data_cache',
-                                     'cache_train_dataframe.pq')
+                                     'cache_train_dataframe.pd.pkl')
         tuning_df_path = os.path.join(self._output_directory,  'data_cache',
-                                      'cache_tuning_dataframe.pq')
-        train_data.to_parquet(train_df_path)
-        tuning_data.to_parquet(tuning_df_path)
+                                      'cache_tuning_dataframe.pd.pkl')
+        train_data.to_pickle(train_df_path)
+        tuning_data.to_pickle(tuning_df_path)
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_df_path=train_df_path,
                                                       time_limit=time_limit,
