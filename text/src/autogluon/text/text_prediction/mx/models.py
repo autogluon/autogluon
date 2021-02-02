@@ -399,6 +399,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     if problem_type == MULTICLASS or problem_type == BINARY:
         label_generator = LabelEncoder()
         label_generator.fit(pd.concat([train_data[label_column], tuning_data[label_column]]))
+    else:
+        label_generator = None
     preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
                                                   label_column=label_column,
                                                   tokenizer_name=cfg.model.backbone.name,
