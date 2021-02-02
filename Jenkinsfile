@@ -99,6 +99,13 @@ stage("Unit Test") {
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          pip uninstall -y mxnet
+          pip uninstall -y mxnet-cu101
+          pip uninstall -y mxnet-cu102
+          pip uninstall -y pyarrow
+          pip uninstall -y pandas
+          pip uninstall -y numpy
+          pip install -U mxnet-cu101
           env
 
           cd core/
