@@ -88,6 +88,7 @@ class LGBModel(AbstractModel):
                 #  Before enabling GPU, we should add code to detect that GPU-enabled version is installed and that a valid GPU exists.
                 #  GPU training heavily alters accuracy, often in a negative manner. We will have to be careful about when to use GPU.
                 params['device'] = 'gpu'
+                logger.log(20, f'\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.')
         logger.log(15, f'Training Gradient Boosting Model for {num_boost_round} rounds...')
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)

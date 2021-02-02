@@ -173,7 +173,7 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                              train_loss=best_trainloss[i],
                              best_iter_sofar=best_iter[i] + 1,
                              best_valperf_sofar=best_score[i],
-                             eval_metric=eval_metric,  # Actually stopping_metric
+                             eval_metric=eval_metric,  # eval_metric here is the stopping_metric from LGBModel
                              greater_is_better=greater_is_better,
                              )
             if env.iteration - best_iter[i] >= stopping_rounds:

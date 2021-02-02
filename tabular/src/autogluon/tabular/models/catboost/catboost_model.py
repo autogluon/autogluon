@@ -151,6 +151,7 @@ class CatBoostModel(AbstractModel):
         if num_gpus != 0:
             if 'task_type' not in params:
                 params['task_type'] = 'GPU'
+                logger.log(20, f'\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.')
                 # TODO: Confirm if GPU is used in HPO (Probably not)
                 # TODO: Adjust max_bins to 254?
 
