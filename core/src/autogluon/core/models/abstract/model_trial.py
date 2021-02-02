@@ -27,7 +27,7 @@ def model_trial(args, reporter: LocalStatusReporter):
         X_train, y_train = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
         X_val, y_val = load_pkl.load(util_args.directory + util_args.dataset_val_filename)
 
-        fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+        fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **util_args.get('fit_kwargs', dict()))
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
                                    time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=None)

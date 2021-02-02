@@ -284,7 +284,7 @@ class AbstractModel:
         kwargs = self._preprocess_fit_resources(**kwargs)
         return kwargs
 
-    def _preprocess_fit_resources(self, **kwargs):
+    def _preprocess_fit_resources(self, silent=False, **kwargs):
         default_num_cpus, default_num_gpus = self._get_default_resources()
         num_cpus = self.params_aux.get('num_cpus', 'auto')
         num_gpus = self.params_aux.get('num_gpus', 'auto')
@@ -294,7 +294,8 @@ class AbstractModel:
             kwargs['num_cpus'] = default_num_cpus
         if kwargs['num_gpus'] == 'auto':
             kwargs['num_gpus'] = default_num_gpus
-        logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
+        if not silent:
+            logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
         return kwargs
 
     def fit(self, **kwargs):
@@ -516,7 +517,7 @@ class AbstractModel:
 
     def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
         scheduler_options = copy.deepcopy(scheduler_options)
-        scheduler_options[1]['resource'] = self._preprocess_fit_resources(**scheduler_options[1]['resource'])
+        scheduler_options[1]['resource'] = self._preprocess_fit_resources(silent=True, **scheduler_options[1]['resource'])
         if 'time_out' not in scheduler_options[1]:
             scheduler_options[1]['time_out'] = time_limit
         return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
@@ -555,6 +556,7 @@ class AbstractModel:
             model=self,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],
+            fit_kwargs=scheduler_params['resource'],
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)

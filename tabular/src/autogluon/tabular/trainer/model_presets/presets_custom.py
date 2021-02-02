@@ -11,6 +11,8 @@ def get_preset_custom(name, problem_type, num_classes):
         model = get_param_baseline_custom(problem_type, num_classes=num_classes)
         model[AG_ARGS] = dict(model_type='GBM', name_suffix='Large', hyperparameter_tune_kwargs=None)
         return [model]
+    elif name == 'ELECTRA_SMALL':
+        return _get_preset_electra('google_electra_small', 'default_no_hpo', 'Small')
     elif name == 'ELECTRA_BASE':
         return _get_preset_electra('google_electra_base', 'default_no_hpo', 'Base')
     elif name == 'ELECTRA_BASE_HPO':
