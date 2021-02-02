@@ -571,7 +571,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         # Begin to update
         trainer.allreduce_grads()
         total_norm, ratio, is_finite = clip_grad_global_norm(params, cfg.optimization.max_grad_norm)
-        trainer.update(1.0)
+        trainer.update(1.0, ignore_stale_grad=True)
 
         # Clear after update
         if num_accumulated > 1:
