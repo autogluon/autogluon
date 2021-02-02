@@ -396,8 +396,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
     # Build Preprocessor + Preprocess the training dataset + Inference problem type
     # TODO Dynamically cache the preprocessor that has been fitted.
-    label_generator = LabelEncoder()
-    label_generator.fit(pd.concat([train_data[label_column], tuning_data[label_column]]))
+    if problem_type == MULTICLASS or problem_type == BINARY:
+        label_generator = LabelEncoder()
+        label_generator.fit(pd.concat([train_data[label_column], tuning_data[label_column]]))
     preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
                                                   label_column=label_column,
                                                   tokenizer_name=cfg.model.backbone.name,
@@ -458,6 +459,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
 
     # Get the ground-truth dev labels
     gt_dev_labels = np.array([ele[-1] for ele in tuning_dataset])
+    if problem_type == REGRESSION:
+        gt_dev_labels = preprocessor.label_scaler.inverse_transform(np.expand_dims(gt_dev_labels,
+                                                                                   axis=-1))[:, 0]
     ctx_l = get_mxnet_available_ctx()
     base_batch_size = cfg.optimization.per_device_batch_size
     num_accumulated = int(np.ceil(cfg.optimization.batch_size / (base_batch_size * len(ctx_l))))
