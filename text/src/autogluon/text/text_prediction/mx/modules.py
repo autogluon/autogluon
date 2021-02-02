@@ -324,7 +324,7 @@ class FeatureAggregator(HybridBlock):
             cfg.out_proj_num_layers = 1
             cfg.data_dropout = False
             cfg.dropout = 0.1
-            cfg.activation = 'gelu'
+            cfg.activation = 'tanh'
             cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
             cfg.initializer = CfgNode()
