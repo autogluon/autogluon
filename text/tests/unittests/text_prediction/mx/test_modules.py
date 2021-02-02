@@ -20,6 +20,8 @@ def test_multimodal_with_pretrained_text_nn(num_text_features,
                                             num_numerical_features,
                                             agg_type,
                                             out_shape):
+    if agg_type == 'attention_token' and num_text_features != 1:
+        pytest.skip('Not supported!')
     numerical_input_units = [32] * num_numerical_features
     num_categories = [np.random.randint(2, 10) for _ in range(num_categorical_features)]
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ = get_backbone(
