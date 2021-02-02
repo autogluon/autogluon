@@ -250,7 +250,7 @@ class FeatureAggregator(HybridBlock):
                         weight_initializer=weight_initializer,
                         bias_initializer=bias_initializer)
                 # Construct out proj
-                if cfg.agg_type == 'mean':
+                if cfg.agg_type == 'mean' or cfg.agg_type == 'max':
                     in_units = in_units
                 elif cfg.agg_type == 'concat':
                     in_units = in_units * num_fields
