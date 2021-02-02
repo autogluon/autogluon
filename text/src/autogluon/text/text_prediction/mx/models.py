@@ -361,6 +361,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         task_id = 0
     else:
         search_space = args['search_space']
+        print(search_space)
         task_id = args.task_id
     # Get the log metric scorers
     if isinstance(log_metrics, str):
