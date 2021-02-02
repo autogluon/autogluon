@@ -520,6 +520,10 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         else:
             raise NotImplementedError
 
+    @property
+    def num_fields(self):
+        return self.num_text_features + self.num_categorical_features + self.num_numerical_features
+
     def initialize_with_pretrained_backbone(self, backbone_params_path, ctx=None):
         self.text_backbone.load_parameters(backbone_params_path, ctx=ctx)
         self.agg_layer.initialize(ctx=ctx)
@@ -561,7 +565,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                                                              batch_valid_length)
             else:
                 contextual_embedding = self.text_backbone(batch_token_ids, batch_valid_length)
-            if self.agg_type == 'attention_token':
+            if self.agg_type == 'attention_token' and self.num_fields > 1:
                 if self.text_proj is not None:
                     contextual_embedding = self.text_proj[i](contextual_embedding)
                 text_valid_length = batch_valid_length
