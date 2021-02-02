@@ -1,8 +1,6 @@
 """ Metrics for classification with soft (probabilistic) labels """
 
 import logging
-
-import mxnet as mx
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -10,11 +8,13 @@ logger = logging.getLogger(__name__)
 EPS = 1e-10  # clipping threshold to prevent NaN
 
 # assumes predictions are already log-probabilities.
-softloss = mx.gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=True)
 
 
 def soft_log_loss(true_probs, predicted_probs):
     """ Both args must be 2D pandas/numpy arrays """
+    import mxnet as mx
+    softloss = mx.gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=True)
+
     true_probs = np.array(true_probs)
     predicted_probs = np.array(predicted_probs)
     if len(true_probs.shape) != 2 or len(predicted_probs.shape) != 2:
