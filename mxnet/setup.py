@@ -64,7 +64,7 @@ if __name__ == '__main__':
         version=version,
         author='AutoGluon Community',
         url='https://github.com/awslabs/autogluon',
-        description='AutoML Toolkit with MXNet Gluon',
+        description='AutoML for Text, Image, and Tabular Data',
         long_description=long_description,
         long_description_content_type='text/markdown',
         license='Apache',
