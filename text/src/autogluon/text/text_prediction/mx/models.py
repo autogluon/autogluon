@@ -540,9 +540,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         apply_layerwise_decay(net.text_backbone,
                               cfg.optimization.layerwise_lr_decay,
                               backbone_name=cfg.model.backbone.name)
-    freeze_layers(net.text_backbone,
-                  backbone_name=cfg.model.backbone.name,
-                  num_trainable_layers=cfg.model.num_trainable_layers)
+
     # Do not apply weight decay to all the LayerNorm and bias
     for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
         v.wd_mult = 0.0
@@ -555,6 +553,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         for p in params:
             p.grad_req = 'add'
         net.collect_params().zero_grad()
+    freeze_layers(net.text_backbone,
+                  backbone_name=cfg.model.backbone.name,
+                  num_trainable_layers=cfg.model.num_trainable_layers)
     train_loop_dataloader = grouper(repeat(train_dataloader), len(ctx_l))
     log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
     log_num_samples_l = [0 for _ in ctx_l]
