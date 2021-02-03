@@ -600,7 +600,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             else:
                 field_features.append(cat_features)
         if self.categorical_agg is not None:
-            all_cat_features = F.npx.concatenate(all_cat_features, axis=-1)
+            all_cat_features = F.np.concatenate(all_cat_features, axis=-1)
             field_features.append(self.categorical_agg(all_cat_features))
         ptr += self.num_categorical_features
         for i in range(ptr, ptr + self.num_numerical_features):
