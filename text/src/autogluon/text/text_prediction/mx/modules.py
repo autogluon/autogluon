@@ -501,9 +501,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                                                 cfg=cfg.numerical_net))
             else:
                 self.numerical_networks = None
-            self.agg_layer = FeatureAggregator(num_fields=num_text_features
-                                                          + num_categorical_features
-                                                          + num_numerical_features,
+            self.agg_layer = FeatureAggregator(num_fields=self.num_fields,
                                                out_shape=out_shape,
                                                in_units=base_feature_units,
                                                cfg=cfg.agg_net,
@@ -535,7 +533,10 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
 
     @property
     def num_fields(self):
-        return self.num_text_features + self.num_categorical_features + self.num_numerical_features
+        if self.cfg.aggregate_categorical and self.num_categorical_features > 1:
+            return self.num_text_features + 1 + self.num_numerical_features
+        else:
+            return self.num_text_features + self.num_categorical_features + self.num_numerical_features
 
     def initialize_with_pretrained_backbone(self, backbone_params_path, ctx=None):
         self.text_backbone.load_parameters(backbone_params_path, ctx=ctx)
