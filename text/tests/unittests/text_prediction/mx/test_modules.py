@@ -32,6 +32,7 @@ def test_multimodal_with_pretrained_text_nn(num_text_features,
     cfg = MultiModalWithPretrainedTextNN.get_cfg()
     cfg.defrost()
     cfg.agg_net.agg_type = agg_type
+    cfg.aggregate_categorical = aggregate_categorical
     cfg.freeze()
     net = MultiModalWithPretrainedTextNN(text_backbone=text_backbone,
                                          num_text_features=num_text_features,
