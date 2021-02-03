@@ -480,7 +480,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             if self.cfg.aggregate_categorical and self.num_categorical_features > 1:
                 # Use another dense layer to aggregate the categorical features
                 self.categorical_agg = BasicMLP(
-                    in_units=base_feature_units * len(self.num_categorical_features),
+                    in_units=base_feature_units * self.num_categorical_features,
                     mid_units=cfg.categorical_agg.mid_units,
                     out_units=base_feature_units,
                     dropout=cfg.categorical_agg.dropout,
