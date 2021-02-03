@@ -150,6 +150,26 @@ def apply_layerwise_decay(model, layerwise_decay, backbone_name, not_included=No
             value.lr_mult = layerwise_decay ** (max_depth - (layer_depth + 1))
 
 
+@use_np
+def freeze_layers(model, backbone_name, num_trainable_layers):
+    if 'albert' in backbone_name:
+        # Skip if it is the ALBERT model.
+        return
+    if 'electra' in backbone_name:
+        # For ELECTRA, it's called all_encoder_layers
+        all_layers = model.encoder.all_encoder_layers
+    else:
+        # For other models, it's called all_layers
+        all_layers = model.encoder.all_layers
+    if num_trainable_layers < 0:
+        return
+    assert num_trainable_layers <= len(all_layers)
+    for i in range(num_trainable_layers):
+        for p in all_layers[i].collect_params():
+            p.grad_req = 'null'
+    return
+
+
 def base_optimization_config():
     """The basic optimization phase"""
     cfg = CfgNode()
@@ -186,6 +206,7 @@ def base_model_config():
     cfg.backbone = CfgNode()
     cfg.backbone.name = 'google_electra_base'
     cfg.network = MultiModalWithPretrainedTextNN.get_cfg()
+    cfg.num_trainable_layers = -1        # Use a negative number to indicate that all layers are trainable.
     cfg.insert_sep = True                # Whether to insert sep tokens between columns
     cfg.train_stochastic_chunk = False   # Whether to sample a stochastic chunk from the training text
     cfg.test_stochastic_chunk = False    # Whether to use stochastic chunk in testing
@@ -519,6 +540,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         apply_layerwise_decay(net.text_backbone,
                               cfg.optimization.layerwise_lr_decay,
                               backbone_name=cfg.model.backbone.name)
+    freeze_layers(net.text_backbone,
+                  backbone_name=cfg.model.backbone.name,
+                  num_trainable_layers=cfg.model.num_trainable_layers)
     # Do not apply weight decay to all the LayerNorm and bias
     for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
         v.wd_mult = 0.0
