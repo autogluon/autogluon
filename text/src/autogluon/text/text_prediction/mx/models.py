@@ -165,7 +165,7 @@ def freeze_layers(model, backbone_name, num_trainable_layers):
         return
     assert num_trainable_layers <= len(all_layers)
     for i in range(len(all_layers) - num_trainable_layers):
-        for p in all_layers[i].collect_params():
+        for p in all_layers[i].collect_params().values():
             p.grad_req = 'null'
     return
 
