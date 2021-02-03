@@ -1040,7 +1040,7 @@ class MultiModalTextModel:
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
         if 'roberta' in cfg.model.backbone.name:
-            text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=False)
+            text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
         else:
             text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
         if self._problem_type == REGRESSION:
@@ -1313,7 +1313,7 @@ class MultiModalTextModel:
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
         if 'roberta' in cfg.model.backbone.name:
-            text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=False)
+            text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
         else:
             text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
         if problem_type == REGRESSION:
