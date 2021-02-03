@@ -395,7 +395,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     # Load backbone model
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
         = get_backbone(cfg.model.backbone.name)
-    text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+    if 'roberta' in cfg.model.backbone.name:
+        text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
+    else:
+        text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
     # Build Preprocessor + Preprocess the training dataset + Inference problem type
     # TODO Dynamically cache the preprocessor that has been fitted.
     if problem_type == MULTICLASS or problem_type == BINARY:
@@ -1036,7 +1039,10 @@ class MultiModalTextModel:
             self._preprocessor = pickle.load(in_f)
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
-        text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+        if 'roberta' in cfg.model.backbone.name:
+            text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
+        else:
+            text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
         if self._problem_type == REGRESSION:
             out_shape = 1
         elif self._problem_type == MULTICLASS:
@@ -1306,7 +1312,10 @@ class MultiModalTextModel:
         version = assets['version']
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
-        text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+        if 'roberta' in cfg.model.backbone.name:
+            text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
+        else:
+            text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
         if problem_type == REGRESSION:
             out_shape = 1
         elif problem_type == MULTICLASS:
