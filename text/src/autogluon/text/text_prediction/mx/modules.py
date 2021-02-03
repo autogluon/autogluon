@@ -521,6 +521,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             cfg.categorical_agg.mid_units = 128
             cfg.categorical_agg.num_layers = 1
             cfg.categorical_agg.dropout = 0.1
+            cfg.categorical_agg.gated_activation = True
             cfg.agg_net = FeatureAggregator.get_cfg()
             cfg.categorical_net = CategoricalFeatureNet.get_cfg()
             cfg.numerical_net = NumericalFeatureNet.get_cfg()

@@ -161,13 +161,11 @@ def freeze_layers(model, backbone_name, num_trainable_layers):
     else:
         # For other models, it's called all_layers
         all_layers = model.encoder.all_layers
-    print('Num Trainable Layers=', num_trainable_layers)
     if num_trainable_layers < 0:
         return
     assert num_trainable_layers <= len(all_layers)
     for i in range(len(all_layers) - num_trainable_layers):
         for p in all_layers[i].collect_params().values():
-            print('In freeze layer, p=', p)
             p.grad_req = 'null'
     return
 
@@ -551,7 +549,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     trainer = mx.gluon.Trainer(params,
                                optimizer, optimizer_params,
                                update_on_kvstore=False)
-    print(params)
     # Set grad_req if gradient accumulation is required
     if num_accumulated > 1:
         logger.info('Using gradient accumulation.'
