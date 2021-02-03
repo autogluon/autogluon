@@ -32,7 +32,7 @@ def default() -> dict:
                     'model.num_trainable_layers': 1,
                     'optimization.batch_size': 128,
                     'optimization.per_device_batch_size': 8,
-                    'optimization.num_train_epochs': 10,
+                    'optimization.num_train_epochs': 5,
                     'optimization.lr': space.Categorical(5E-5),
                     'optimization.wd': 1E-4,
                     'optimization.layerwise_lr_decay': 0.8
