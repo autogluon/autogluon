@@ -161,6 +161,7 @@ def freeze_layers(model, backbone_name, num_trainable_layers):
     else:
         # For other models, it's called all_layers
         all_layers = model.encoder.all_layers
+    print('Num Trainable Layers=', num_trainable_layers)
     if num_trainable_layers < 0:
         return
     assert num_trainable_layers <= len(all_layers)
