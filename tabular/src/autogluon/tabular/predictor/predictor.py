@@ -13,10 +13,11 @@ from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.decorators import apply_presets
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
-from ..configs.presets_configs import set_presets, unpack
 from ..configs.feature_generator_presets import get_default_feature_generator
+from ..configs.presets_configs import tabular_presets_dict
 from ..task.tabular_prediction.predictor_legacy import TabularPredictorV1
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer
@@ -172,7 +173,7 @@ class TabularPredictor(TabularPredictorV1):
         self._learner_type = type(self._learner)
         self._trainer = None
 
-    @unpack(set_presets)
+    @apply_presets(tabular_presets_dict)
     def fit(self,
             train_data,
             tuning_data=None,
