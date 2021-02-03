@@ -12,12 +12,14 @@ from autogluon.text.text_prediction.mx.modules import MultiModalWithPretrainedTe
                           (1, 0, 0),
                           (1, 4, 0),
                           (2, 0, 1)])
+@pytest.mark.parametrize('aggregate_categorical', [False, True])
 @pytest.mark.parametrize('agg_type', ['mean', 'concat', 'max',
                                       'attention', 'attention_token'])
 @pytest.mark.parametrize('out_shape', [2])
 def test_multimodal_with_pretrained_text_nn(num_text_features,
                                             num_categorical_features,
                                             num_numerical_features,
+                                            aggregate_categorical,
                                             agg_type,
                                             out_shape):
     if agg_type == 'attention_token' and num_text_features != 1:
