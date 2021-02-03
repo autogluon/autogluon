@@ -1,11 +1,8 @@
 #!/usr/bin/env python
 import os
-import shutil
-import subprocess
-import codecs
 import os.path
 
-from setuptools import setup, find_packages, find_namespace_packages
+from setuptools import setup, find_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
@@ -46,7 +43,7 @@ def create_version_file():
 
 long_description = open(os.path.join('..', 'README.md')).read()
 
-MIN_PYTHON_VERSION = '>=3.6.*'
+python_requires = '>=3.6, <3.8'
 
 requirements = [
     f'autogluon.core=={version}',
@@ -73,7 +70,7 @@ if __name__ == '__main__':
         description='AutoML for Text, Image, and Tabular Data',
         long_description=long_description,
         long_description_content_type='text/markdown',
-        license='Apache',
+        license='Apache-2.0',
 
         # Package info
         packages=find_packages('src'),
@@ -82,10 +79,39 @@ if __name__ == '__main__':
         zip_safe=True,
         include_package_data=True,
         install_requires=requirements + test_requirements,
-        python_requires=MIN_PYTHON_VERSION,
+        python_requires=python_requires,
         package_data={'autogluon': [
             'LICENSE',
         ]},
         entry_points={
+        },
+        # TODO: Move classifiers / project_urls / other arguments to a shared file across all submodules?
+        classifiers=[
+            "Development Status :: 4 - Beta",
+            "Intended Audience :: Education",
+            "Intended Audience :: Developers",
+            "Intended Audience :: Science/Research",
+            "Intended Audience :: Customer Service",
+            "Intended Audience :: Financial and Insurance Industry",
+            "Intended Audience :: Healthcare Industry",
+            "Intended Audience :: Telecommunications Industry",
+            "License :: OSI Approved :: Apache Software License",
+            "Operating System :: MacOS",
+            "Operating System :: Microsoft :: Windows",
+            "Operating System :: POSIX",
+            "Operating System :: Unix",
+            'Programming Language :: Python :: 3',
+            "Programming Language :: Python :: 3.6",
+            "Programming Language :: Python :: 3.7",
+            "Topic :: Software Development",
+            "Topic :: Scientific/Engineering :: Artificial Intelligence",
+            "Topic :: Scientific/Engineering :: Information Analysis",
+            "Topic :: Scientific/Engineering :: Image Recognition",
+        ],
+        project_urls={
+            'Documentation': 'https://auto.gluon.ai',
+            'Bug Reports': 'https://github.com/awslabs/autogluon/issues',
+            'Source': 'https://github.com/awslabs/autogluon/',
+            'Contribute!': 'https://github.com/awslabs/autogluon/blob/master/CONTRIBUTING.md',
         },
     )
