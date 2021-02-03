@@ -167,7 +167,7 @@ class NumericalFeatureNet(HybridBlock):
             cfg.input_centering = False
             cfg.gated_activation = True
             cfg.mid_units = 128
-            cfg.num_layers = 2
+            cfg.num_layers = 1
             cfg.data_dropout = False
             cfg.dropout = 0.1
             cfg.activation = 'leaky'
@@ -519,7 +519,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             cfg.aggregate_categorical = True  # Whether to use one network to aggregate the categorical columns.
             cfg.categorical_agg = CfgNode()
             cfg.categorical_agg.mid_units = 128
-            cfg.categorical_agg.num_layers = 2
+            cfg.categorical_agg.num_layers = 1
             cfg.categorical_agg.dropout = 0.1
             cfg.agg_net = FeatureAggregator.get_cfg()
             cfg.categorical_net = CategoricalFeatureNet.get_cfg()
