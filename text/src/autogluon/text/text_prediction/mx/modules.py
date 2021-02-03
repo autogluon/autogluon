@@ -528,13 +528,13 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             cfg.text_net = CfgNode()
             cfg.text_net.use_segment_id = True
             cfg.text_net.pool_type = 'cls'
-            cfg.aggregate_categorical = True  # Whether to use one network to aggregate the categorical columns.
+            cfg.aggregate_categorical = False  # Whether to use one network to aggregate the categorical columns.
             cfg.categorical_agg = CfgNode()
             cfg.categorical_agg.activation = 'leaky'
             cfg.categorical_agg.mid_units = 128
             cfg.categorical_agg.num_layers = 1
             cfg.categorical_agg.dropout = 0.1
-            cfg.categorical_agg.gated_activation = True
+            cfg.categorical_agg.gated_activation = False
             cfg.agg_net = FeatureAggregator.get_cfg()
             cfg.categorical_net = CategoricalFeatureNet.get_cfg()
             cfg.numerical_net = NumericalFeatureNet.get_cfg()
