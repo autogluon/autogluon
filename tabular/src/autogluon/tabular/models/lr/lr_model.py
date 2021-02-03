@@ -23,6 +23,15 @@ logger = logging.getLogger(__name__)
 # TODO: Can Bagged LinearModels be combined during inference to 1 model by averaging their weights?
 #  What about just always using refit_full model? Should we even bag at all? Do we care that its slightly overfit?
 class LinearModel(AbstractModel):
+    """
+    Linear model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
+
+    Model backend differs depending on problem_type:
+
+        'binary' & 'multiclass': https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
+
+        'regression': https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.model_class, self.penalty, self.handle_text = get_model_params(self.problem_type, self.params)

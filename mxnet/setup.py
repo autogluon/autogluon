@@ -44,7 +44,7 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
     'Pillow<=6.2.1',
-    'numpy>=1.16.0',
+    'numpy>=1.16.0,<1.20.0',
     'matplotlib',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',

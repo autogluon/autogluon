@@ -169,7 +169,7 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
             X_temp = check_array(X, dtype=None, force_all_finite=False)
             if (not hasattr(X, 'dtype')
                     and np.issubdtype(X_temp.dtype, np.str_)):
-                X = check_array(X, dtype=np.object)
+                X = check_array(X, dtype=object)
             else:
                 X = X_temp
             needs_validation = False
@@ -247,8 +247,8 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
     def _transform(self, X, handle_unknown='error'):
         X_list, n_samples, n_features = self._check_X(X)
         
-        X_int = np.zeros((n_samples, n_features), dtype=np.int)
-        X_mask = np.ones((n_samples, n_features), dtype=np.bool)
+        X_int = np.zeros((n_samples, n_features), dtype=int)
+        X_mask = np.ones((n_samples, n_features), dtype=bool)
         
         if n_features != len(self.categories_):
             raise ValueError(
@@ -365,7 +365,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
     sparse : boolean, default=True
         Will return sparse matrix if set True else will return an array.
 
-    dtype : number type, default=np.float
+    dtype : number type, default=float
         Desired dtype of output.
         
     max_levels : int, default=None

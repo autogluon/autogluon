@@ -45,4 +45,4 @@ ldr = predictor.leaderboard(test_data)
 model_to_deploy = distilled_model_names[0]
 
 y_pred = predictor.predict_proba(test_data, model_to_deploy)
-print(y_pred[:5])
+print(y_pred.head(5))

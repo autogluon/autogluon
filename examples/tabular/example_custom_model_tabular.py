@@ -3,7 +3,7 @@
 from autogluon.core.utils import infer_problem_type
 from autogluon.tabular import TabularDataset, TabularPredictor
 from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
-from autogluon.tabular.data.label_cleaner import LabelCleaner
+from autogluon.core.data import LabelCleaner
 from autogluon.core.models import AbstractModel
 
 

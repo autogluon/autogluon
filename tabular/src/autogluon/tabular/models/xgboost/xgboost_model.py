@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class XGBoostModel(AbstractModel):
+    """
+    XGBoost model: https://xgboost.readthedocs.io/en/latest/
+
+    Hyperparameter options: https://xgboost.readthedocs.io/en/latest/parameter.html
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._ohe_generator = None
@@ -55,7 +60,7 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, **kwargs):
         start_time = time.time()
 
         params = self.params.copy()
@@ -86,6 +91,11 @@ class XGBoostModel(AbstractModel):
             X_val = self.preprocess(X_val, is_train=False)
             eval_set.append((X_val, y_val))
 
+        if num_gpus != 0:
+            params['tree_method'] = 'gpu_hist'
+            if 'gpu_id' not in params:
+                params['gpu_id'] = 0
+
         try_import_xgboost()
         from .callbacks import print_evaluation, early_stop_custom
         callbacks = []
@@ -107,6 +117,9 @@ class XGBoostModel(AbstractModel):
         )
 
         bst = self.model.get_booster()
+        # TODO: Investigate speed-ups from GPU inference
+        # bst.set_param({"predictor": "gpu_predictor"})
+
         self.params_trained['n_estimators'] = bst.best_ntree_limit
         self._best_ntree_limit = bst.best_ntree_limit
 

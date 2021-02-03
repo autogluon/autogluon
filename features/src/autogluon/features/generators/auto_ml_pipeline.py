@@ -17,7 +17,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     """
     Pipeline feature generator with simplified arguments to handle most Tabular data including text and dates adequately.
     This is the default feature generation pipeline used by AutoGluon when unspecified.
-    For more customization options, refer to PipelineFeatureGenerator and BulkFeatureGenerator.
+    For more customization options, refer to :class:`PipelineFeatureGenerator` and :class:`BulkFeatureGenerator`.
 
     Parameters
     ----------
@@ -42,23 +42,23 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     enable_raw_text_features : bool, default False
         Whether to use the raw text features. The generated raw text features will end up with '_raw_text' suffix.
         For example, 'sentence' --> 'sentence_raw_text'
-    vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
-        sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
+    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
+        sklearn CountVectorizer object to use in :class:`TextNgramFeatureGenerator`.
         Only used if `enable_text_ngram_features=True`.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
 
     Examples
     --------
     >>> from autogluon.tabular import TabularDataset
-    >>> from autogluon.tabular.features.generators import AutoMLPipelineFeatureGenerator
+    >>> from autogluon.features.generators import AutoMLPipelineFeatureGenerator
     >>>
     >>> feature_generator = AutoMLPipelineFeatureGenerator()
     >>>
-    >>> label_column = 'class'
+    >>> label = 'class'
     >>> train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-    >>> X_train = train_data.drop(labels=[label_column], axis=1)
-    >>> y_train = train_data[label_column]
+    >>> X_train = train_data.drop(labels=[label], axis=1)
+    >>> y_train = train_data[label]
     >>>
     >>> X_train_transformed = feature_generator.fit_transform(X=X_train, y=y_train)
     >>>

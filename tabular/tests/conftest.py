@@ -36,28 +36,28 @@ class DatasetLoaderHelper:
             'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
             'name': 'AdultIncomeBinaryClassification',
             'problem_type': BINARY,
-            'label_column': 'class',
+            'label': 'class',
         },
         # Multiclass big dataset with 7 classes, all features are numeric. Runs SLOW.
         covertype={
             'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
             'name': 'CoverTypeMulticlassClassification',
             'problem_type': MULTICLASS,
-            'label_column': 'Cover_Type',
+            'label': 'Cover_Type',
         },
         # Regression with mixed feature-types, skewed Y-values.
         ames={
             'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
             'name': 'AmesHousingPriceRegression',
             'problem_type': REGRESSION,
-            'label_column': 'SalePrice',
+            'label': 'SalePrice',
         },
         # Regression with multiple text field and categorical
         sts={
             'url': 'https://autogluon-text.s3.amazonaws.com/glue_sts.zip',
             'name': 'glue_sts',
             'problem_type': REGRESSION,
-            'label_column': 'score',
+            'label': 'score',
         }
     )
 
@@ -102,10 +102,10 @@ class FitHelper:
     def fit_and_validate_dataset(dataset_name, fit_args, sample_size=1000, refit_full=True, delete_directory=True):
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
-        label_column = dataset_info['label_column']
+        label = dataset_info['label']
         save_path = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
         init_args = dict(
-            label=label_column,
+            label=label,
             path=save_path,
         )
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)

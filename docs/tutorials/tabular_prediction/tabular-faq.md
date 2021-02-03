@@ -109,7 +109,7 @@ reader = pd.read_csv('test.csv', chunksize=1024)
 y_pred = []
 y_true = []
 for df_chunk in reader:
-    y_pred.append(predictor.predict(df_chunk, as_pandas=True))
+    y_pred.append(predictor.predict(df_chunk))
     y_true.append(df_chunk['class'])
 y_pred = pd.concat(y_pred, axis=0, ignore_index=True)
 y_true = pd.concat(y_true, axis=0, ignore_index=True)

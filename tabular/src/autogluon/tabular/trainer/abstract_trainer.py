@@ -8,21 +8,16 @@ import pandas as pd
 import psutil
 from collections import defaultdict
 
-from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from autogluon.core.constants import AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from autogluon.core.metrics import scorer_expects_y_pred
+from autogluon.core.models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
+from autogluon.core.scheduler.scheduler_factory import scheduler_factory
+from autogluon.core.utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance
+from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
-from autogluon.core.utils import default_holdout_frac
-from autogluon.core.metrics import scorer_expects_y_pred
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.utils import get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance
 
-from autogluon.core.models import AbstractModel
-from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from ..trainer.model_presets.presets_custom import get_preset_custom
-from ..trainer.model_presets.presets_distill import get_preset_models_distillation
-from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
-from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
+from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
 
 logger = logging.getLogger(__name__)
@@ -43,12 +38,12 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, eval_metric=None,
                  num_classes=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
-                 save_data=False, random_seed=0, verbosity=2):
+                 save_data=False, random_state=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
-        self.random_seed = random_seed  # Integer value added to the stack level to get the random_seed for kfold splits or the train/val split if bagging is disabled
+        self.random_state = random_state  # Integer value added to the stack level to get the random_state for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
         if eval_metric is not None:
             self.eval_metric = eval_metric
@@ -179,6 +174,10 @@ class AbstractTrainer:
     # TODO: Rename method for v0.1
     def get_models(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
+        raise NotImplementedError
+
+    def get_models_distillation(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
+        """Constructs a list of unfit models based on the hyperparameters dict for softclass distillation."""
         raise NotImplementedError
 
     def get_model_level(self, model_name: str) -> int:
@@ -313,8 +312,7 @@ class AbstractTrainer:
                 name_suffix=name_suffix,
                 ag_args=ag_args,
                 ag_args_fit=ag_args_fit,
-                hyperparameter_preprocess_func=self._process_hyperparameters,
-                hyperparameter_preprocess_kwargs={'excluded_model_types': excluded_model_types},
+                excluded_model_types=excluded_model_types,
             )
 
             if self.bagged_mode:
@@ -332,7 +330,7 @@ class AbstractTrainer:
                     'base_model_names': base_model_names,
                     'base_model_paths_dict': base_model_paths,
                     'base_model_types_dict': base_model_types,
-                    'random_state': level + self.random_seed,
+                    'random_state': level + self.random_state,
                 }
                 get_models_kwargs.update(dict(
                     ag_args_ensemble=ag_args_ensemble,
@@ -837,7 +835,7 @@ class AbstractTrainer:
                 base_model_types_inner_dict=self.get_models_attribute_dict(attribute='type_inner', models=base_model_names),
                 base_model_performances_dict=self.get_models_attribute_dict(attribute='val_score', models=base_model_names),
                 hyperparameters=hyperparameters,
-                random_state=level + self.random_seed,
+                random_state=level + self.random_state,
             ),
             ag_args={'name_bag_suffix': ''},
             ag_args_ensemble={'save_bag_folds': save_bag_folds},
@@ -1279,7 +1277,7 @@ class AbstractTrainer:
             base_models_dict=base_models_dict,
             base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=model_names),
             base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=model_names),
-            hyperparameters=hyperparameters, num_classes=self.num_classes, random_state=level+self.random_seed
+            hyperparameters=hyperparameters, num_classes=self.num_classes, random_state=level+self.random_state
         )
         return dummy_stacker
 
@@ -1755,62 +1753,8 @@ class AbstractTrainer:
         save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
         return info
 
-    def _process_hyperparameters(self, hyperparameters: dict, ag_args_fit=None, excluded_model_types=None) -> dict:
-        if ag_args_fit is None:
-            ag_args_fit = {}
-        if excluded_model_types is None:
-            excluded_model_types = []
-        if excluded_model_types:
-            logger.log(20, f'Excluded Model Types: {excluded_model_types}')
-        hyperparameters = copy.deepcopy(hyperparameters)
-        hyperparameters_valid = dict()
-
-        has_levels = False
-        top_level_keys = hyperparameters.keys()
-        for key in top_level_keys:
-            if isinstance(key, int) or key == 'default':
-                has_levels = True
-        if not has_levels:
-            hyperparameters = {'default': hyperparameters}
-        top_level_keys = hyperparameters.keys()
-        for key in top_level_keys:
-            hyperparameters_valid[key] = {}
-            for subkey in hyperparameters[key].keys():
-                if subkey in excluded_model_types:
-                    logger.log(20, f"\tFound '{subkey}' model in hyperparameters, but '{subkey}' is present in `excluded_model_types` and will be removed.")
-                    continue  # Don't include excluded models
-                if not isinstance(hyperparameters[key][subkey], list):
-                    hyperparameters[key][subkey] = [hyperparameters[key][subkey]]
-                models_expanded = []
-                for i, model in enumerate(hyperparameters[key][subkey]):
-                    if isinstance(model, str):
-                        candidate_models = get_preset_custom(name=model, problem_type=self.problem_type, num_classes=self.num_classes)
-                    else:
-                        candidate_models = [model]
-                    valid_models = []
-                    for candidate in candidate_models:
-                        is_valid = True
-                        if AG_ARGS in candidate:
-                            model_valid_problem_types = candidate[AG_ARGS].get('problem_types', None)
-                            if model_valid_problem_types is not None:
-                                if self.problem_type not in model_valid_problem_types:
-                                    is_valid = False
-                        if ag_args_fit:
-                            model_ag_fit_args = candidate.get(AG_ARGS_FIT, {})
-                            for ag_fit_key in ag_args_fit:
-                                if ag_fit_key not in model_ag_fit_args:
-                                    model_ag_fit_args[ag_fit_key] = ag_args_fit[ag_fit_key]
-                            candidate[AG_ARGS_FIT] = model_ag_fit_args
-                        if is_valid:
-                            valid_models.append(candidate)
-                    models_expanded += valid_models
-
-                hyperparameters_valid[key][subkey] = models_expanded
-        if 'default' not in hyperparameters_valid.keys():
-            level_keys = [key for key in hyperparameters_valid.keys() if isinstance(key, int)]
-            max_level_key = max(level_keys)
-            hyperparameters_valid['default'] = copy.deepcopy(hyperparameters_valid[max_level_key])
-        return hyperparameters_valid
+    def _process_hyperparameters(self, hyperparameters: dict) -> dict:
+        return process_hyperparameters(hyperparameters=hyperparameters)
 
     def _get_full_model_val_score(self, model: str) -> float:
         model_full_dict_inverse = {full: orig for orig, full in self.model_full_dict.items()}
@@ -1942,19 +1886,17 @@ class AbstractTrainer:
         X_train.reset_index(drop=True, inplace=True)
         y_train.reset_index(drop=True, inplace=True)
 
-        student_suffix = '_DSTL'  # all student model names contain this substring
+        name_suffix = '_DSTL'  # all student model names contain this substring
         if models_name_suffix is not None:
-            student_suffix = student_suffix + "_" + models_name_suffix
+            name_suffix = name_suffix + "_" + models_name_suffix
 
         if hyperparameters is None:
             hyperparameters = {'GBM': {}, 'CAT': {}, 'NN': {}, 'RF': {}}
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
         if teacher_preds is None or teacher_preds == 'hard':
-            models_distill, _ = self.get_models(hyperparameters=hyperparameters, name_suffix=student_suffix)
+            models_distill, _ = self.get_models(hyperparameters=hyperparameters, name_suffix=name_suffix)
         else:
-            models_distill, _ = get_preset_models_distillation(path=self.path, problem_type=self.problem_type,
-                                                            eval_metric=self.eval_metric, feature_metadata=self.feature_metadata,
-                                                            num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix, invalid_model_names=self.get_model_names())
+            models_distill, _ = self.get_models_distillation(hyperparameters=hyperparameters, name_suffix=name_suffix)
             if self.problem_type != REGRESSION:
                 self._regress_preds_asprobas = True
 

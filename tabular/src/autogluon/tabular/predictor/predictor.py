@@ -13,10 +13,11 @@ from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.decorators import apply_presets
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
-from ..configs.presets_configs import set_presets, unpack
 from ..configs.feature_generator_presets import get_default_feature_generator
+from ..configs.presets_configs import tabular_presets_dict
 from ..task.tabular_prediction.predictor_legacy import TabularPredictorV1
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer
@@ -24,7 +25,6 @@ from ..trainer import AbstractTrainer
 logger = logging.getLogger()  # return root logger
 
 # TODO: num_bag_sets -> ag_args
-# TODO: Document predictor attributes
 
 # Extra TODOs (Stretch): Can occur post v0.1
 # TODO: make core_kwargs a kwargs argument to predictor.fit
@@ -82,6 +82,13 @@ class TabularPredictor(TabularPredictorV1):
         learner_kwargs : dict, default = None
             Kwargs to send to the learner. Options include:
 
+            positive_class : str or int, default = None
+                Used to determine the positive class in binary classification.
+                This is used for certain metrics such as 'f1' which produce different scores depending on which class is considered the positive class.
+                If not set, will be inferred as the second element of the existing unique classes after sorting them.
+                    If classes are [0, 1], then 1 will be selected as the positive class.
+                    If classes are ['def', 'abc'], then 'def' will be selected as the positive class.
+                    If classes are [True, False], then True will be selected as the positive class.
             ignored_columns : list, default = None
                 Banned subset of column names that predictor may not use as predictive features (e.g. unique identifier to a row or user-ID).
                 These columns are ignored during `fit()`.
@@ -93,7 +100,55 @@ class TabularPredictor(TabularPredictorV1):
                 Enables advanced functionality in predictor such as `fit_extra()` and feature importance calculation on the original data.
             trainer_type : AbstractTrainer, default = AutoTrainer
                 A class inheriting from `AbstractTrainer` that controls training/ensembling of many models.
+                If you don't know what this is, keep it as the default.
+
+    Attributes
+    ----------
+    path : str
+        Path to directory where all models used by this Predictor are stored.
+    problem_type : str
+        What type of prediction problem this Predictor has been trained for.
+    eval_metric : function or str
+        What metric is used to evaluate predictive performance.
+    label : str
+        Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
+    feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`
+        Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label`).
+        Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
+        Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
+            `feature_metadata.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
+            `feature_metadata.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
+    positive_class : str or int
+        Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
+        In binary classification, :meth:`TabularPredictor.predict_proba` returns the estimated probability that each row belongs to the positive class.
+        Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
+
+        Returns
+        -------
+        The positive class name in binary classification or None if the problem is not binary classification.
+
+    class_labels : list
+        For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
+        For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
+            `class_labels[0]` corresponds to internal label = 0 (negative class), `class_labels[1]` corresponds to internal label = 1 (positive class).
+            This is relevant for certain metrics such as F1 where True and False labels impact the metric score differently.
+        For other problem types, will equal None.
+        For example if `pred = predict_proba(x, as_multiclass=True)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
+    class_labels_internal : list
+        For multiclass problems, this list contains the internal class labels in sorted order of internal `predict_proba()` output.
+        For binary problems, this list contains the internal class labels in sorted order of internal `predict_proba(as_multiclass=True)` output.
+            The value will always be `class_labels_internal=[0, 1]` for binary problems, with 0 as the negative class, and 1 as the positive class.
+        For other problem types, will equal None.
+    class_labels_internal_map : dict
+        For binary and multiclass classification problems, this dictionary contains the mapping of the original labels to the internal labels.
+        For example, in binary classification, label values of 'True' and 'False' will be mapped to the internal representation `1` and `0`.
+            Therefore, class_labels_internal_map would equal {'True': 1, 'False': 0}
+        For other problem types, will equal None.
+        For multiclass, it is possible for not all of the label values to have a mapping.
+            This indicates that the internal models will never predict those missing labels, and training rows associated with the missing labels were dropped.
     """
+
+    Dataset = TabularDataset
     predictor_file_name = 'predictor.pkl'
 
     def __init__(
@@ -118,11 +173,7 @@ class TabularPredictor(TabularPredictorV1):
         self._learner_type = type(self._learner)
         self._trainer = None
 
-    @property
-    def path(self):
-        return self._learner.path
-
-    @unpack(set_presets)
+    @apply_presets(tabular_presets_dict)
     def fit(self,
             train_data,
             tuning_data=None,
@@ -430,7 +481,7 @@ class TabularPredictor(TabularPredictorV1):
                 This has NO impact on inference accuracy.
                 It is recommended if the only goal is to use the trained model for prediction.
                 Certain advanced functionality may no longer be available if `save_space=True`. Refer to `predictor.save_space()` documentation for more details.
-            feature_generator : :class:`autogluon.tabular.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.tabular.features.generators.AutoMLPipelineFeatureGenerator`
+            feature_generator : :class:`autogluon.features.generators.AbstractFeatureGenerator`, default = :class:`autogluon.features.generators.AutoMLPipelineFeatureGenerator`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
                 To control aspects of the default feature generation process, you can pass in an :class:`AutoMLPipelineFeatureGenerator` object constructed using some of these kwargs:
@@ -924,12 +975,12 @@ class TabularPredictor(TabularPredictorV1):
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None:
-            train_features = np.array([column for column in train_data.columns if column != self.label_column])
-            tuning_features = np.array([column for column in tuning_data.columns if column != self.label_column])
+            train_features = np.array([column for column in train_data.columns if column != self.label])
+            tuning_features = np.array([column for column in tuning_data.columns if column != self.label])
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
-            train_features = sorted(np.array([column for column in train_data.columns if column != self.label_column]))
+            train_features = sorted(np.array([column for column in train_data.columns if column != self.label]))
             unlabeled_features = sorted(np.array([column for column in unlabeled_data.columns]))
             if np.any(train_features != unlabeled_features):
                 raise ValueError("Column names must match between training and unlabeled data.\n"

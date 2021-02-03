@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from .stacker_ensemble_model import StackerEnsembleModel
-from .greedy_weighted_ensemble_model import GreedyWeightedEnsembleModel
+from ..greedy_ensemble.greedy_weighted_ensemble_model import GreedyWeightedEnsembleModel
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 # TODO: v0.1 see if this can be removed and logic moved to greedy weighted ensemble model -> Use StackerEnsembleModel as stacker instead
 # TODO: Optimize predict speed when fit on kfold, can simply sum weights
 class WeightedEnsembleModel(StackerEnsembleModel):
+    """
+    Weighted ensemble meta-model that implements Ensemble Selection: https://www.cs.cornell.edu/~alexn/papers/shotgun.icml04.revised.rev2.pdf
+
+    A :class:`autogluon.core.models.GreedyWeightedEnsembleModel` must be specified as the `model_base` to properly function.
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.low_memory = False
