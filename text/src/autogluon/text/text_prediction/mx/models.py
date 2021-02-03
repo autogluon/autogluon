@@ -535,9 +535,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                         updates_per_epoch=updates_per_epoch)
     valid_interval = int(math.ceil(cfg.optimization.valid_frequency * updates_per_epoch))
     train_log_interval = int(math.ceil(cfg.optimization.log_frequency * updates_per_epoch))
-    trainer = mx.gluon.Trainer(net.collect_params(),
-                               optimizer, optimizer_params,
-                               update_on_kvstore=False)
+
     if 0 < cfg.optimization.layerwise_lr_decay < 1:
         apply_layerwise_decay(net.text_backbone,
                               cfg.optimization.layerwise_lr_decay,
@@ -550,6 +548,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
         v.wd_mult = 0.0
     params = [p for p in net.collect_params().values() if p.grad_req != 'null']
+    trainer = mx.gluon.Trainer(params,
+                               optimizer, optimizer_params,
+                               update_on_kvstore=False)
     print(params)
     # Set grad_req if gradient accumulation is required
     if num_accumulated > 1:
