@@ -28,6 +28,7 @@ def default() -> dict:
             'MultimodalTextModel': {
                 'backend': 'gluonnlp_v0',
                 'search_space': {
+                    'model.num_trainable_layers': 1,
                     'model.backbone.name': 'google_electra_base',
                     'optimization.batch_size': 128,
                     'optimization.per_device_batch_size': 8,
