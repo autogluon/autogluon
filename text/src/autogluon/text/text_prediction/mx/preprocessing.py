@@ -379,6 +379,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                 self._ignore_columns_set.add(col_name)
                 continue
             elif col_type == _C.TEXT:
+                col_value = col_value.apply(lambda ele: '' if ele is None else str(ele))
                 processed_col_value = parallel_transform(
                     df=col_value,
                     chunk_processor=functools.partial(tokenize_data,
