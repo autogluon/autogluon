@@ -580,7 +580,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                                                              batch_segment_ids,
                                                              batch_valid_length)
             else:
-                _, contextual_embedding = self.text_backbone(batch_token_ids, batch_valid_length)
+                contextual_embedding = self.text_backbone(batch_token_ids, batch_valid_length)
             if self.agg_type == 'attention_token' and self.num_fields > 1:
                 if self.text_proj is not None:
                     contextual_embedding = self.text_proj[i](contextual_embedding)
