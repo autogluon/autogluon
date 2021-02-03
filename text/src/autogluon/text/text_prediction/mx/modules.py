@@ -73,6 +73,7 @@ class BasicMLP(HybridBlock):
 
 @use_np
 class CategoricalFeatureNet(HybridBlock):
+    """Embedding of the categories."""
     def __init__(self, num_class, out_units, cfg=None, prefix=None, params=None):
         super().__init__(prefix=prefix, params=params)
         self.cfg = cfg = CategoricalFeatureNet.get_cfg().clone_merge(cfg)
@@ -166,7 +167,7 @@ class NumericalFeatureNet(HybridBlock):
             cfg.input_centering = False
             cfg.gated_activation = True
             cfg.mid_units = 128
-            cfg.num_layers = 1
+            cfg.num_layers = 2
             cfg.data_dropout = False
             cfg.dropout = 0.1
             cfg.activation = 'leaky'
@@ -279,18 +280,11 @@ class FeatureAggregator(HybridBlock):
 
             # Attention Aggregator
             cfg.attention_net = CfgNode()
-            cfg.attention_net.num_layers = 2
-            cfg.attention_net.units = 128
+            cfg.attention_net.num_layers = 6
+            cfg.attention_net.units = 64
             cfg.attention_net.num_heads = 4
             cfg.attention_net.hidden_size = -1  # Size of the FFN network used in attention
             cfg.attention_net.activation = 'gelu'   # Activation of the attention
-
-            # Gating Network
-            cfg.gating_net = CfgNode()
-            cfg.gating_net.num_layers = 2
-            cfg.gating_net.units = 64
-            cfg.gating_net.hidden_size = -1
-            cfg.gating_net.activation = 'gelu'
 
             # Other parameters
             cfg.mid_units = 128
@@ -298,7 +292,7 @@ class FeatureAggregator(HybridBlock):
             cfg.out_proj_num_layers = 1
             cfg.data_dropout = False
             cfg.dropout = 0.1
-            cfg.activation = 'tanh'
+            cfg.activation = 'leaky'
             cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
             cfg.initializer = CfgNode()
@@ -483,6 +477,20 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                                                   cfg=cfg.categorical_net))
             else:
                 self.categorical_networks = None
+            if self.cfg.aggregate_categorical and self.num_categorical_features > 1:
+                # Use another dense layer to aggregate the categorical features
+                self.categorical_agg = BasicMLP(
+                    in_units=base_feature_units * len(self.num_categorical_features),
+                    mid_units=cfg.categorical_agg.mid_units,
+                    out_units=base_feature_units,
+                    dropout=cfg.categorical_agg.dropout,
+                    num_layers=cfg.categorical_agg.num_layers,
+                    weight_initializer=weight_initializer,
+                    bias_initializer=bias_initializer
+                )
+            else:
+                self.categorical_agg = None
+
             if self.num_numerical_features > 0:
                 self.numerical_networks = nn.HybridSequential()
                 for i in range(self.num_numerical_features):
@@ -510,6 +518,11 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             cfg.text_net = CfgNode()
             cfg.text_net.use_segment_id = True
             cfg.text_net.pool_type = 'cls'
+            cfg.aggregate_categorical = True  # Whether to use one network to aggregate the categorical columns.
+            cfg.categorical_agg = CfgNode()
+            cfg.categorical_agg.mid_units = 128
+            cfg.categorical_agg.num_layers = 2
+            cfg.categorical_agg.dropout = 0.1
             cfg.agg_net = FeatureAggregator.get_cfg()
             cfg.categorical_net = CategoricalFeatureNet.get_cfg()
             cfg.numerical_net = NumericalFeatureNet.get_cfg()
@@ -533,6 +546,8 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             self.categorical_networks.initialize(ctx=ctx)
         if self.numerical_networks is not None:
             self.numerical_networks.initialize(ctx=ctx)
+        if self.categorical_agg is not None:
+            self.categorical_agg.initialize(ctx=ctx)
 
     def hybrid_forward(self, F, features):
         """
@@ -576,9 +591,16 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                     pooled_output = self.text_proj[i](pooled_output)
                 field_features.append(pooled_output)
         ptr += self.num_text_features
+        all_cat_features = []
         for i in range(ptr, ptr + self.num_categorical_features):
             cat_features = self.categorical_networks[i - ptr](features[i])
-            field_features.append(cat_features)
+            if self.categorical_agg is not None:
+                all_cat_features.append(cat_features)
+            else:
+                field_features.append(cat_features)
+        if self.categorical_agg is not None:
+            all_cat_features = F.npx.concatenate(all_cat_features, axis=-1)
+            field_features.append(self.categorical_agg(all_cat_features))
         ptr += self.num_categorical_features
         for i in range(ptr, ptr + self.num_numerical_features):
             numerical_features = self.numerical_networks[i - ptr](features[i])

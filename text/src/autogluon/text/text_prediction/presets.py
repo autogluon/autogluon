@@ -118,6 +118,18 @@ def albert_large_no_hpo() -> dict:
 
 
 @ag_text_presets.register()
+def roberta_base_no_hpo() -> dict:
+    """The default search space that use ALBERT Base as the backbone."""
+    cfg = no_hpo()
+    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
+        = 'fairseq_roberta_base'
+    cfg['models']['MultimodalTextModel']['search_space']['optimization.per_device_batch_size'] = 8
+    cfg['models']['MultimodalTextModel']['search_space']['optimization.layerwise_lr_decay'] = 0.8
+    cfg['models']['MultimodalTextModel']['search_space']['model.network.text_net.use_segment_id'] = False
+    return cfg
+
+
+@ag_text_presets.register()
 def multi_cased_bert_base_no_hpo() -> dict:
     """The default search space that use Multi-lingual BERT-Base as the backbone."""
     cfg = no_hpo()

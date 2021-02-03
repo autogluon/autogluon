@@ -127,8 +127,10 @@ def apply_layerwise_decay(model, layerwise_decay, backbone_name, not_included=No
         # Skip if it is the ALBERT model.
         return
     if 'electra' in backbone_name:
+        # For ELECTRA, it's called all_encoder_layers
         all_layers = model.encoder.all_encoder_layers
     else:
+        # For other models, it's called all_layers
         all_layers = model.encoder.all_layers
     max_depth = len(all_layers) + 2
     for key, value in model.collect_params().items():
