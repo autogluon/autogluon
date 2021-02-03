@@ -143,7 +143,7 @@ class NumericalFeatureNet(HybridBlock):
                                           norm_eps=cfg.norm_eps,
                                           data_dropout=cfg.data_dropout,
                                           dropout=cfg.dropout,
-                                          activation='sigmoid',
+                                          activation=cfg.activation,
                                           weight_initializer=weight_initializer,
                                           bias_initializer=bias_initializer)
             else:
@@ -186,7 +186,7 @@ class NumericalFeatureNet(HybridBlock):
         if self.cfg.input_centering:
             features = self.data_bn(features)
         if self.gate_proj is not None:
-            return self.gate_proj(features) * self.proj(features)
+            return F.npx.sigmoid(self.gate_proj(features)) * self.proj(features)
         else:
             return self.proj(features)
 
@@ -483,11 +483,23 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                     in_units=base_feature_units * self.num_categorical_features,
                     mid_units=cfg.categorical_agg.mid_units,
                     out_units=base_feature_units,
+                    activation=cfg.categorical_agg.activation,
                     dropout=cfg.categorical_agg.dropout,
                     num_layers=cfg.categorical_agg.num_layers,
                     weight_initializer=weight_initializer,
                     bias_initializer=bias_initializer
                 )
+                if self.cfg.categorical_agg.gated_activation:
+                    self.categorical_agg_gate = BasicMLP(
+                        in_units=base_feature_units * self.num_categorical_features,
+                        mid_units=cfg.categorical_agg.mid_units,
+                        out_units=base_feature_units,
+                        activation=cfg.categorical_agg.activation,
+                        dropout=cfg.categorical_agg.dropout,
+                        num_layers=cfg.categorical_agg.num_layers,
+                        weight_initializer=weight_initializer,
+                        bias_initializer=bias_initializer
+                    )
             else:
                 self.categorical_agg = None
 
@@ -518,6 +530,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             cfg.text_net.pool_type = 'cls'
             cfg.aggregate_categorical = True  # Whether to use one network to aggregate the categorical columns.
             cfg.categorical_agg = CfgNode()
+            cfg.categorical_agg.activation = 'leaky'
             cfg.categorical_agg.mid_units = 128
             cfg.categorical_agg.num_layers = 1
             cfg.categorical_agg.dropout = 0.1
@@ -603,7 +616,12 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                 field_features.append(cat_features)
         if self.categorical_agg is not None:
             all_cat_features = F.np.concatenate(all_cat_features, axis=-1)
-            field_features.append(self.categorical_agg(all_cat_features))
+            if self.cfg.categorical_agg.gated_activation:
+                field_features.append(
+                    F.npx.sigmoid(self.categorical_agg_gate(all_cat_features))
+                    * self.categorical_agg(all_cat_features))
+            else:
+                field_features.append(self.categorical_agg(all_cat_features))
         ptr += self.num_categorical_features
         for i in range(ptr, ptr + self.num_numerical_features):
             numerical_features = self.numerical_networks[i - ptr](features[i])
