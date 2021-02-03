@@ -29,6 +29,7 @@ def default() -> dict:
                 'backend': 'gluonnlp_v0',
                 'search_space': {
                     'model.backbone.name': 'google_electra_base',
+                    'model.num_trainable_layers': 1,
                     'optimization.batch_size': 128,
                     'optimization.per_device_batch_size': 8,
                     'optimization.num_train_epochs': 10,
