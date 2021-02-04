@@ -330,6 +330,8 @@ class FeatureAggregator(HybridBlock):
                 agg_features = F.np.concatenate([other_features, features[0]], axis=1)
                 if self.attention_net_pre_proj is not None:
                     agg_features = self.attention_net_pre_proj(agg_features)
+                agg_features = self.attention_agg_ln(agg_features)
+                agg_features = self.attention_net_pre_proj(agg_features)
                 agg_features = self.attention_transformer_enc(agg_features,
                                                               valid_length + len(features) - 1)
                 agg_features = agg_features[:, len(features) - 1, :]
