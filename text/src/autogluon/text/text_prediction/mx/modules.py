@@ -571,6 +571,8 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             self.numerical_networks.initialize(ctx=ctx)
         if self.categorical_agg is not None:
             self.categorical_agg.initialize(ctx=ctx)
+        if self.categorical_agg_gate is not None:
+            self.categorical_agg_gate.initialize(ctx=ctx)
 
     def hybrid_forward(self, F, features):
         """
