@@ -67,16 +67,12 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, y: Series, **kwargs) -> (DataFrame, dict):
         
-        print(kwargs)
         X_out = self._fit_transform_ngrams(X)
         if self.prefilter_tokens:
-            print('shape before: ', X_out.shape)
             selector = SelectKBest(f_classif, k=self.prefilter_token_count) # hard-code f-score for now
             selector.fit(X_out, y)
             self.token_mask = selector.get_support() # create token mask
             X_out = X_out[ X_out.columns[self.token_mask] ] # select the most informative columns
-            print('shape after: ', X_out.shape)
-            print(X_out.head())
 
         type_family_groups_special = {
             S_TEXT_NGRAM: list(X_out.columns)
