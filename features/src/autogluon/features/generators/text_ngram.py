@@ -5,7 +5,8 @@ import traceback
 import numpy as np
 import pandas as pd
 import psutil
-from pandas import DataFrame
+from pandas import DataFrame, Series
+from sklearn.feature_selection import SelectKBest, f_classif
 
 from autogluon.core.features.types import S_TEXT, S_TEXT_NGRAM
 
@@ -43,7 +44,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, **kwargs):
+    def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, prefilter_tokens=False, prefilter_token_count=10, **kwargs):
         super().__init__(**kwargs)
 
         self.vectorizers = []
@@ -60,9 +61,23 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             raise ValueError(f"vectorizer_strategy must be one of {['combined', 'separate', 'both']}, but value is: {vectorizer_strategy}")
         self.vectorizer_strategy = vectorizer_strategy
         self.vectorizer_features = None
+        self.prefilter_tokens = prefilter_tokens
+        self.prefilter_token_count = prefilter_token_count
+        self.token_mask = None
 
-    def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, y: Series, **kwargs) -> (DataFrame, dict):
+        
+        print(kwargs)
         X_out = self._fit_transform_ngrams(X)
+        if self.prefilter_tokens:
+            print('shape before: ', X_out.shape)
+            selector = SelectKBest(f_classif, k=self.prefilter_token_count) # hard-code f-score for now
+            selector.fit(X_out, y)
+            self.token_mask = selector.get_support() # create token mask
+            X_out = X_out[ X_out.columns[self.token_mask] ] # select the most informative columns
+            print('shape after: ', X_out.shape)
+            print(X_out.head())
+
         type_family_groups_special = {
             S_TEXT_NGRAM: list(X_out.columns)
         }
@@ -73,6 +88,8 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             return DataFrame(index=X.index)
         try:
             X_out = self._generate_ngrams(X=X)
+            if self.prefilter_tokens:
+                X_out = X_out[ X_out.columns[self.token_mask] ] # select the columns identified during training
         except Exception:
             self._log(40, '\tError: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
             raise

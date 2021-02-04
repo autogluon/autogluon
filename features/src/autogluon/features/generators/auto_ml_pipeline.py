@@ -69,7 +69,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     def __init__(self, enable_numeric_features=True, enable_categorical_features=True,
                  enable_datetime_features=True,
                  enable_text_special_features=True, enable_text_ngram_features=True,
-                 enable_raw_text_features=False, vectorizer=None, **kwargs):
+                 enable_raw_text_features=False, vectorizer=None, prefilter_tokens=False, prefilter_token_count=10, **kwargs):
         if 'generators' in kwargs:
             raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
         if 'enable_raw_features' in kwargs:
@@ -82,6 +82,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_text_special_features = enable_text_special_features
         self.enable_text_ngram_features = enable_text_ngram_features
         self.enable_raw_text_features = enable_raw_text_features
+        self.prefilter_tokens = prefilter_tokens
+        self.prefilter_token_count = prefilter_token_count
 
         generators = self._get_default_generators(vectorizer=vectorizer)
         super().__init__(generators=generators, **kwargs)
@@ -101,6 +103,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if self.enable_text_special_features:
             generator_group.append(TextSpecialFeatureGenerator())
         if self.enable_text_ngram_features:
-            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer))
+            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, 
+                prefilter_tokens=self.prefilter_tokens, 
+                prefilter_token_count=self.prefilter_token_count))
         generators = [generator_group]
         return generators
