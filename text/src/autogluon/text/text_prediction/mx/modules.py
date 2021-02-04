@@ -241,6 +241,9 @@ class FeatureAggregator(HybridBlock):
                                                                prefix='attention_net_pre_proj_')
                     else:
                         self.attention_net_pre_proj = None
+                    self.attention_agg_ln = nn.LayerNorm(in_channels=cfg.attention_net.units,
+                                                         epsilon=self.cfg.norm_eps)
+                    self.attention_agg_dropout = nn.Dropout(self.cfg.dropout)
                     self.attention_transformer_enc = TransformerEncoder(
                         num_layers=cfg.attention_net.num_layers,
                         num_heads=cfg.attention_net.num_heads,
