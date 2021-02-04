@@ -559,7 +559,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             num_batches = train_dataset.num_examples // params['batch_size']
             lr_decay_epoch = [max(warmup_epochs, int(params['num_epochs']/3)), max(warmup_epochs+1, int(params['num_epochs']/2)),
                               max(warmup_epochs+2, int(2*params['num_epochs']/3))]
-            from gluoncv.utils import LRSequential, LRScheduler
+            from .utils.lr_scheduler import LRSequential, LRScheduler
             lr_scheduler = LRSequential([
                 LRScheduler('linear', base_lr=base_lr, target_lr=target_lr, nepochs=warmup_epochs, iters_per_epoch=num_batches),
                 LRScheduler(lr_mode, base_lr=target_lr, target_lr=base_lr, nepochs=params['num_epochs'] - warmup_epochs,
