@@ -15,11 +15,8 @@ import time
 import warnings
 from collections import OrderedDict
 
-import mxnet as mx
 import numpy as np
 import pandas as pd
-from gluoncv.utils import LRSequential, LRScheduler
-from mxnet import nd, autograd, gluon
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
@@ -28,15 +25,12 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionT
 from autogluon.core import Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.core.utils import try_import_mxboard
+from autogluon.core.utils import try_import_mxboard, try_import_mxnet
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
-from .embednet import EmbedNet
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
-from .tabular_nn_dataset import TabularNNDataset
-from .tabular_nn_trial import tabular_nn_trial
 from autogluon.core.models.abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
 
@@ -64,7 +58,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
     # Constants used throughout this class:
     # model_internals_file_name = 'model-internals.pkl' # store model internals here
     unique_category_str = '!missing!' # string used to represent missing values and unknown categories for categorical features. Should not appear in the dataset
-    rescale_losses = {gluon.loss.L1Loss:'std', gluon.loss.HuberLoss:'std', gluon.loss.L2Loss:'var'} # dict of loss names where we should rescale loss, value indicates how to rescale. Call self.loss_func.name
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
 
@@ -172,6 +165,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             kwargs: Can specify amount of compute resources to utilize (num_cpus, num_gpus).
         """
         start_time = time.time()
+        try_import_mxnet()
+        import mxnet as mx
         params = self.params.copy()
         self.verbosity = kwargs.get('verbosity', 2)
         params = fixedvals_from_searchspaces(params)
@@ -225,6 +220,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         """ Creates a Gluon neural net and context for this dataset.
             Also sets up trainer/optimizer as necessary.
         """
+        from .embednet import EmbedNet
         self.set_net_defaults(train_dataset, params)
         self.model = EmbedNet(train_dataset=train_dataset, params=params, num_net_outputs=self.num_net_outputs, ctx=self.ctx)
 
@@ -241,6 +237,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 setup_trainer (bool): set = False to reuse the same trainer from a previous training run, otherwise creates new trainer from scratch
         """
         start_time = time.time()
+        import mxnet as mx
         logger.log(15, "Training neural network for up to %s epochs..." % params['num_epochs'])
         seed_value = params.get('seed_value')
         if seed_value is not None:  # Set seed
@@ -272,24 +269,26 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         if params['loss_function'] is None:
             if self.problem_type == REGRESSION:
-                params['loss_function'] = gluon.loss.L1Loss()
+                params['loss_function'] = mx.gluon.loss.L1Loss()
             elif self.problem_type == SOFTCLASS:
-                params['loss_function'] = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=self.model.from_logits)
+                params['loss_function'] = mx.gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=self.model.from_logits)
             else:
-                params['loss_function'] = gluon.loss.SoftmaxCrossEntropyLoss(from_logits=self.model.from_logits)
+                params['loss_function'] = mx.gluon.loss.SoftmaxCrossEntropyLoss(from_logits=self.model.from_logits)
 
         loss_func = params['loss_function']
         epochs_wo_improve = params['epochs_wo_improve']
         loss_scaling_factor = 1.0  # we divide loss by this quantity to stabilize gradients
-        loss_torescale = [key for key in self.rescale_losses if isinstance(loss_func, key)]
+
+        rescale_losses = {mx.gluon.loss.L1Loss: 'std', mx.gluon.loss.HuberLoss: 'std', mx.gluon.loss.L2Loss: 'var'}  # dict of loss names where we should rescale loss, value indicates how to rescale.
+        loss_torescale = [key for key in rescale_losses if isinstance(loss_func, key)]
         if loss_torescale:
             loss_torescale = loss_torescale[0]
-            if self.rescale_losses[loss_torescale] == 'std':
+            if rescale_losses[loss_torescale] == 'std':
                 loss_scaling_factor = np.std(train_dataset.get_labels())/5.0 + EPS  # std-dev of labels
-            elif self.rescale_losses[loss_torescale] == 'var':
+            elif rescale_losses[loss_torescale] == 'var':
                 loss_scaling_factor = np.var(train_dataset.get_labels())/5.0 + EPS  # variance of labels
             else:
-                raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (self.rescale_losses[loss_torescale], loss_func))
+                raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (rescale_losses[loss_torescale], loss_func))
 
         if self.verbosity <= 1:
             verbose_eval = -1  # Print losses every verbose epochs, Never if -1
@@ -305,11 +304,11 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             logger.log(20, "Not training Neural Net since num_epochs == 0.  Neural network architecture is:")
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):
                 data_batch = train_dataset.format_batch_data(data_batch, self.ctx)
-                with autograd.record():
+                with mx.autograd.record():
                     output = self.model(data_batch)
                     labels = data_batch['label']
                     loss = loss_func(output, labels) / loss_scaling_factor
-                    # print(str(nd.mean(loss).asscalar()), end="\r")  # prints per-batch losses
+                    # print(str(mx.nd.mean(loss).asscalar()), end="\r")  # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
                 if batch_idx > 0:
@@ -330,11 +329,11 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             cumulative_loss = 0
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):
                 data_batch = train_dataset.format_batch_data(data_batch, self.ctx)
-                with autograd.record():
+                with mx.autograd.record():
                     output = self.model(data_batch)
                     labels = data_batch['label']
                     loss = loss_func(output, labels) / loss_scaling_factor
-                    # print(str(nd.mean(loss).asscalar()), end="\r")  # prints per-batch losses
+                    # print(str(mx.nd.mean(loss).asscalar()), end="\r")  # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
                 cumulative_loss += loss.sum()
@@ -406,6 +405,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             If X is not DataFrame but instead TabularNNDataset object, we can still produce predictions,
             but cannot use preprocess in this case (needs to be already processed).
         """
+        from .tabular_nn_dataset import TabularNNDataset
         if isinstance(X, TabularNNDataset):
             return self._predict_tabular_data(new_data=X, process=False, predict_proba=True)
         elif isinstance(X, pd.DataFrame):
@@ -423,14 +423,16 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 process (bool): should new data be processed (if False, new_data must be TabularNNDataset)
                 predict_proba (bool): should we output class-probabilities (not used for regression)
         """
+        from .tabular_nn_dataset import TabularNNDataset
+        import mxnet as mx
         if process:
             new_data = self.process_test_data(new_data, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers_inference, labels=None)
         if not isinstance(new_data, TabularNNDataset):
             raise ValueError("new_data must of of type TabularNNDataset if process=False")
         if self.problem_type == REGRESSION or not predict_proba:
-            preds = nd.zeros((new_data.num_examples,1))
+            preds = mx.nd.zeros((new_data.num_examples,1))
         else:
-            preds = nd.zeros((new_data.num_examples, self.num_net_outputs))
+            preds = mx.nd.zeros((new_data.num_examples, self.num_net_outputs))
         i = 0
         for batch_idx, data_batch in enumerate(new_data.dataloader):
             data_batch = new_data.format_batch_data(data_batch, self.ctx)
@@ -438,9 +440,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             batch_size = len(preds_batch)
             if self.problem_type != REGRESSION:
                 if not predict_proba: # need to take argmax
-                    preds_batch = nd.argmax(preds_batch, axis=1, keepdims=True)
+                    preds_batch = mx.nd.argmax(preds_batch, axis=1, keepdims=True)
                 else: # need to take softmax
-                    preds_batch = nd.softmax(preds_batch, axis=1)
+                    preds_batch = mx.nd.softmax(preds_batch, axis=1)
             preds[i:(i+batch_size)] = preds_batch
             i = i+batch_size
         if self.problem_type == REGRESSION or not predict_proba:
@@ -457,6 +459,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         embed_min_categories = params['proc.embed_min_categories']
         use_ngram_features = params['use_ngram_features']
 
+        from .tabular_nn_dataset import TabularNNDataset
         if isinstance(X_train, TabularNNDataset):
             train_dataset = X_train
         else:
@@ -487,6 +490,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         Returns:
             Dataset object
         """
+        from .tabular_nn_dataset import TabularNNDataset
         warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
         if labels is not None and len(labels) != len(df):
             raise ValueError("Number of examples in Dataframe does not match number of labels")
@@ -513,6 +517,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         # TODO: no filtering of data-frame columns based on statistics, e.g. categorical columns with all unique variables or zero-variance features.
                 This should be done in default_learner class for all models not just TabularNeuralNetModel...
         """
+        from .tabular_nn_dataset import TabularNNDataset
         warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
         if set(df.columns) != set(self.features):
             raise ValueError("Column names in provided Dataframe do not match self.features")
@@ -541,6 +546,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         """ Set up optimizer needed for training.
             Network must first be initialized before this.
         """
+        import mxnet as mx
         optimizer_opts = {'learning_rate': params['learning_rate'], 'wd': params['weight_decay'], 'clip_gradient': params['clip_gradient']}
         if 'lr_scheduler' in params and params['lr_scheduler'] is not None:
             if train_dataset is None:
@@ -553,6 +559,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             num_batches = train_dataset.num_examples // params['batch_size']
             lr_decay_epoch = [max(warmup_epochs, int(params['num_epochs']/3)), max(warmup_epochs+1, int(params['num_epochs']/2)),
                               max(warmup_epochs+2, int(2*params['num_epochs']/3))]
+            from gluoncv.utils import LRSequential, LRScheduler
             lr_scheduler = LRSequential([
                 LRScheduler('linear', base_lr=base_lr, target_lr=target_lr, nepochs=warmup_epochs, iters_per_epoch=num_batches),
                 LRScheduler(lr_mode, base_lr=target_lr, target_lr=base_lr, nepochs=params['num_epochs'] - warmup_epochs,
@@ -562,9 +569,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if params['optimizer'] == 'sgd':
             if 'momentum' in params:
                 optimizer_opts['momentum'] = params['momentum']
-            optimizer = gluon.Trainer(self.model.collect_params(), 'sgd', optimizer_opts)
+            optimizer = mx.gluon.Trainer(self.model.collect_params(), 'sgd', optimizer_opts)
         elif params['optimizer'] == 'adam':  # TODO: Can we try AdamW?
-            optimizer = gluon.Trainer(self.model.collect_params(), 'adam', optimizer_opts)
+            optimizer = mx.gluon.Trainer(self.model.collect_params(), 'adam', optimizer_opts)
         else:
             raise ValueError("Unknown optimizer specified: %s" % params['optimizer'])
         return optimizer
@@ -674,6 +681,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
     def load(cls, path: str, reset_paths=True, verbose=True):
         model: TabularNeuralNetModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         if model._architecture_desc is not None:
+            from .embednet import EmbedNet
             model.model = EmbedNet(architecture_desc=model._architecture_desc, ctx=model.ctx)  # recreate network from architecture description
             model._architecture_desc = None
             # TODO: maybe need to initialize/hybridize?
@@ -683,6 +691,10 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
     def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         """ Performs HPO and sets self.params to best hyperparameter values """
+        try_import_mxnet()
+        from .tabular_nn_trial import tabular_nn_trial
+        from .tabular_nn_dataset import TabularNNDataset
+
         time_start = time.time()
         self.verbosity = kwargs.get('verbosity', 2)
         logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
@@ -726,10 +738,12 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             # TODO: Ensure proper working directory setup on remote machines
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading preprocessed data to remote workers...")
-            scheduler.upload_files([train_path+TabularNNDataset.DATAOBJ_SUFFIX,
-                                train_path+TabularNNDataset.DATAVALUES_SUFFIX,
-                                val_path+TabularNNDataset.DATAOBJ_SUFFIX,
-                                val_path+TabularNNDataset.DATAVALUES_SUFFIX])  # TODO: currently does not work.
+            scheduler.upload_files([
+                train_path + TabularNNDataset.DATAOBJ_SUFFIX,
+                train_path + TabularNNDataset.DATAVALUES_SUFFIX,
+                val_path + TabularNNDataset.DATAOBJ_SUFFIX,
+                val_path + TabularNNDataset.DATAVALUES_SUFFIX
+            ])  # TODO: currently does not work.
             logger.log(15, "uploaded")
 
         scheduler.run()
