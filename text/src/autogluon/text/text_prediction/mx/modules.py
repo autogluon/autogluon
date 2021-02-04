@@ -165,7 +165,7 @@ class NumericalFeatureNet(HybridBlock):
         if key is None:
             cfg = CfgNode()
             cfg.input_centering = False
-            cfg.gated_activation = True
+            cfg.gated_activation = False
             cfg.mid_units = 128
             cfg.num_layers = 1
             cfg.data_dropout = False
@@ -328,8 +328,8 @@ class FeatureAggregator(HybridBlock):
                 if self.attention_net_pre_proj is not None:
                     agg_features = self.attention_net_pre_proj(agg_features)
                 agg_features = self.attention_transformer_enc(agg_features,
-                                                              valid_length + self.num_fields - 1)
-                agg_features = agg_features[:, self.num_fields - 1, :]
+                                                              valid_length + len(features) - 1)
+                agg_features = agg_features[:, len(features) - 1, :]
             else:
                 agg_features = F.np.stack(features, axis=1)
                 if self.cfg.agg_type == 'mean':
@@ -500,8 +500,11 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                         weight_initializer=weight_initializer,
                         bias_initializer=bias_initializer
                     )
+                else:
+                    self.categorical_agg_gate = None
             else:
                 self.categorical_agg = None
+                self.categorical_agg_gate = None
 
             if self.num_numerical_features > 0:
                 self.numerical_networks = nn.HybridSequential()
