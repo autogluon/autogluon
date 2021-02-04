@@ -46,7 +46,7 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
     'Pillow<=6.2.1',
-    'numpy>=1.16.0,<1.20.0',
+    'numpy>=1.20',
     'matplotlib',
     'gluoncv>=0.9.1,<1.0',
     'graphviz<0.9.0,>=0.8.1',

@@ -1,36 +1,58 @@
 max_time = 180
 
+setup_pip_venv = """
+    rm -rf venv
+    conda list
+
+    python3 -m venv venv
+    source venv/bin/activate
+    python3 -m pip install -U pip
+    python3 -m pip install -U setuptools wheel
+
+    python3 -m pip install 'graphviz'
+    python3 -m pip install 'jupyter-sphinx>=0.2.2'
+    python3 -m pip install 'portalocker'
+    python3 -m pip install 'scipy>=1.3.3,<1.5.0'
+    python3 -m pip install 'nose'
+    python3 -m pip install 'docutils'
+    python3 -m pip install 'mu-notedown'
+    python3 -m pip install 'flake8'
+    python3 -m pip install 'awscli>=1.18.140'
+
+    export MPLBACKEND=Agg
+"""
+
+setup_mxnet_gpu = """
+    python3 -m pip install mxnet-cu101==1.7.0
+    export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+    export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+"""
+
+cleanup_venv = """
+    deactivate
+    rm -rf venv
+"""
+
 stage("Unit Test") {
   parallel 'core': {
     node('linux-cpu') {
-      ws('workspace/autogluon-core-py3') {
+      ws('workspace/autogluon-core-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon_core_py3 -f docs/build.yml
-          conda activate autogluon_core_py3
+          conda env update -n autogluon-core-py3-v3 -f docs/build.yml
+          conda activate autogluon-core-py3-v3
           conda list
-          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          ${setup_pip_venv}
+          python3 -m pip install 'mxnet==1.7.0.*'
           env
-          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-          export MPLBACKEND=Agg
-          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-          pip uninstall -y autogluon
-          pip uninstall -y autogluon.vision
-          pip uninstall -y autogluon.text
-          pip uninstall -y autogluon.mxnet
-          pip uninstall -y autogluon.extra
-          pip uninstall -y autogluon.tabular
-          pip uninstall -y autogluon.features
-          pip uninstall -y autogluon.core
-          pip uninstall -y autogluon-contrib-nlp
 
           cd core/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
           """
         }
       }
@@ -38,36 +60,26 @@ stage("Unit Test") {
   },
   'features': {
     node('linux-gpu') {
-      ws('workspace/autogluon-features-py3') {
+      ws('workspace/autogluon-features-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon_features_py3 -f docs/build.yml
-          conda activate autogluon_features_py3
+          conda env update -n autogluon-features-py3-v3 -f docs/build.yml
+          conda activate autogluon-features-py3-v3
           conda list
+          ${setup_pip_venv}
+          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
-          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-          export MPLBACKEND=Agg
-          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-          pip uninstall -y autogluon
-          pip uninstall -y autogluon.vision
-          pip uninstall -y autogluon.text
-          pip uninstall -y autogluon.mxnet
-          pip uninstall -y autogluon.extra
-          pip uninstall -y autogluon.tabular
-          pip uninstall -y autogluon.features
-          pip uninstall -y autogluon.core
-          pip uninstall -y autogluon-contrib-nlp
 
           cd core/
           python3 -m pip install --upgrade -e .
           cd ../features/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
           """
         }
       }
@@ -75,30 +87,19 @@ stage("Unit Test") {
   },
   'tabular': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tabular-py3') {
+      ws('workspace/autogluon-tabular-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon_tabular_py3 -f docs/build.yml
-          conda activate autogluon_tabular_py3
+          conda env update -n autogluon-tabular-py3-v3 -f docs/build.yml
+          conda activate autogluon-tabular-py3-v3
           conda list
+          ${setup_pip_venv}
+          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
-          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-          export MPLBACKEND=Agg
-          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-          pip uninstall -y autogluon
-          pip uninstall -y autogluon.vision
-          pip uninstall -y autogluon.text
-          pip uninstall -y autogluon.mxnet
-          pip uninstall -y autogluon.extra
-          pip uninstall -y autogluon.tabular
-          pip uninstall -y autogluon.features
-          pip uninstall -y autogluon.core
-          pip uninstall -y autogluon-contrib-nlp
 
           cd core/
           python3 -m pip install --upgrade -e .
@@ -106,7 +107,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade -e .
           cd ../tabular/
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
-          pip uninstall -y typing
+          python3 -m pip uninstall -y typing
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
@@ -114,6 +115,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade -e .
           cd ../tabular/
           python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
           """
         }
       }
@@ -121,30 +123,19 @@ stage("Unit Test") {
   },
   'mxnet': {
     node('linux-gpu') {
-      ws('workspace/autogluon-mxnet-py3') {
+      ws('workspace/autogluon-mxnet-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon_mxnet_py3 -f docs/build.yml
-          conda activate autogluon_mxnet_py3
+          conda env update -n autogluon-mxnet-py3-v3 -f docs/build.yml
+          conda activate autogluon-mxnet-py3-v3
           conda list
+          ${setup_pip_venv}
+          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
-          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-          export MPLBACKEND=Agg
-          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-          pip uninstall -y autogluon
-          pip uninstall -y autogluon.vision
-          pip uninstall -y autogluon.text
-          pip uninstall -y autogluon.mxnet
-          pip uninstall -y autogluon.extra
-          pip uninstall -y autogluon.tabular
-          pip uninstall -y autogluon.features
-          pip uninstall -y autogluon.core
-          pip uninstall -y autogluon-contrib-nlp
 
           cd core/
           python3 -m pip install --upgrade -e .
@@ -153,6 +144,7 @@ stage("Unit Test") {
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
           """
         }
       }
@@ -160,30 +152,19 @@ stage("Unit Test") {
   },
   'extra': {
     node('linux-gpu') {
-      ws('workspace/autogluon-extra-py3') {
+      ws('workspace/autogluon-extra-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon_extra_py3 -f docs/build.yml
-          conda activate autogluon_extra_py3
+          conda env update -n autogluon-extra-py3-v3 -f docs/build.yml
+          conda activate autogluon-extra-py3-v3
           conda list
+          ${setup_pip_venv}
+          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
-          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-          export MPLBACKEND=Agg
-          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-          pip uninstall -y autogluon
-          pip uninstall -y autogluon.vision
-          pip uninstall -y autogluon.text
-          pip uninstall -y autogluon.mxnet
-          pip uninstall -y autogluon.extra
-          pip uninstall -y autogluon.tabular
-          pip uninstall -y autogluon.features
-          pip uninstall -y autogluon.core
-          pip uninstall -y autogluon-contrib-nlp
 
           cd core/
           python3 -m pip install --upgrade -e .
@@ -192,6 +173,7 @@ stage("Unit Test") {
           cd ../extra/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
           """
         }
       }
@@ -199,30 +181,19 @@ stage("Unit Test") {
   },
   'text': {
     node('linux-gpu') {
-      ws('workspace/autogluon-text-py3') {
+      ws('workspace/autogluon-text-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon_text_py3 -f docs/build.yml
-          conda activate autogluon_text_py3
+          conda env update -n autogluon-text-py3-v3 -f docs/build.yml
+          conda activate autogluon-text-py3-v3
           conda list
+          ${setup_pip_venv}
+          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
-          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-          export MPLBACKEND=Agg
-          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-          pip uninstall -y autogluon
-          pip uninstall -y autogluon.vision
-          pip uninstall -y autogluon.text
-          pip uninstall -y autogluon.mxnet
-          pip uninstall -y autogluon.extra
-          pip uninstall -y autogluon.tabular
-          pip uninstall -y autogluon.features
-          pip uninstall -y autogluon.core
-          pip uninstall -y autogluon-contrib-nlp
 
           cd core/
           python3 -m pip install --upgrade -e .
@@ -230,13 +201,14 @@ stage("Unit Test") {
           python3 -m pip install --upgrade -e .
           cd ../tabular/
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
-          pip uninstall -y typing
+          python3 -m pip uninstall -y typing
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
           cd ../text/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
           """
         }
       }
@@ -250,24 +222,13 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon_vision_py3 -f docs/build.yml
-          conda activate autogluon_vision_py3
+          conda env update -n autogluon-vision-py3 -f docs/build.yml
+          conda activate autogluon-vision-py3
           conda list
+          ${setup_pip_venv}
+          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
-          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-          export MPLBACKEND=Agg
-          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-          pip uninstall -y autogluon
-          pip uninstall -y autogluon.vision
-          pip uninstall -y autogluon.text
-          pip uninstall -y autogluon.mxnet
-          pip uninstall -y autogluon.extra
-          pip uninstall -y autogluon.tabular
-          pip uninstall -y autogluon.features
-          pip uninstall -y autogluon.core
-          pip uninstall -y autogluon-contrib-nlp
 
           cd core/
           python3 -m pip install --upgrade -e .
@@ -277,7 +238,12 @@ stage("Unit Test") {
           python3 -m pip install --upgrade -e .
           cd ../vision/
           python3 -m pip install --upgrade -e .
+
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          python3 -m pip uninstall -y typing
+
           python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
           """
         }
       }
@@ -285,30 +251,18 @@ stage("Unit Test") {
   },
   'install': {
     node('linux-cpu') {
-      ws('workspace/autogluon-install-py3') {
+      ws('workspace/autogluon-install-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon_install_py3 -f docs/build.yml
-          conda activate autogluon_install_py3
+          conda env update -n autogluon-install-py3-v3 -f docs/build.yml
+          conda activate autogluon-install-py3-v3
           conda list
-          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          ${setup_pip_venv}
+          python3 -m pip install 'mxnet==1.7.0.*'
           env
-          export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
-          export MPLBACKEND=Agg
-          export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-          pip uninstall -y autogluon
-          pip uninstall -y autogluon.vision
-          pip uninstall -y autogluon.text
-          pip uninstall -y autogluon.mxnet
-          pip uninstall -y autogluon.extra
-          pip uninstall -y autogluon.tabular
-          pip uninstall -y autogluon.features
-          pip uninstall -y autogluon.core
-          pip uninstall -y autogluon-contrib-nlp
 
           cd core/
           python3 -m pip install --upgrade -e .
@@ -316,7 +270,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade -e .
           cd ../tabular/
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
-          pip uninstall -y typing
+          python3 -m pip uninstall -y typing
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
@@ -329,6 +283,7 @@ stage("Unit Test") {
           cd ../autogluon/
           python3 -m pip install --upgrade -e .
           cd ..
+          ${cleanup_venv}
           """
         }
       }
@@ -339,18 +294,20 @@ stage("Unit Test") {
 stage("Build Tutorials") {
   parallel 'course': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-course') {
+      ws('workspace/autogluon-tutorial-course-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_tutorial_course -f docs/build_contrib.yml
-        conda activate autogluon_tutorial_course
+        conda env update -n autogluon-tutorial-course-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-course-v3
         conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
+        env
+
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -358,6 +315,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(course)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
         """
         pwd
         stash includes: 'docs/_build/rst/tutorials/course/*', name: 'course'
@@ -366,18 +324,22 @@ stage("Build Tutorials") {
   },
   'image_prediction': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-image-classification') {
+      ws('workspace/autogluon-tutorial-image-classification-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_tutorial_image_prediction -f docs/build_contrib.yml
-        conda activate autogluon_tutorial_image_prediction
+        conda env update -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-image-classification-v3
         conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
+        env
+
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -388,6 +350,7 @@ stage("Build Tutorials") {
         cat docs/_build/rst/_static/d2l.js
         cat docs/_build/rst/conf.py
         tree -L 2 docs/_build/rst
+        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/image_prediction/*', name: 'image_prediction'
       }
@@ -395,18 +358,20 @@ stage("Build Tutorials") {
   },
   'nas': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-nas') {
+      ws('workspace/autogluon-tutorial-nas-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_tutorial_nas -f docs/build_contrib.yml
-        conda activate autogluon_tutorial_nas
+        conda env update -n autogluon-tutorial-nas-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-nas-v3
         conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
+        env
+
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -414,6 +379,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(nas)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/nas/*', name: 'nas'
       }
@@ -421,18 +387,20 @@ stage("Build Tutorials") {
   },
   'object_detection': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-object-detection') {
+      ws('workspace/autogluon-tutorial-object-detection-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_tutorial_object_detection -f docs/build_contrib.yml
-        conda activate autogluon_tutorial_object_detection
+        conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-object-detection-v3
         conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
+        env
+
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -441,27 +409,30 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         tree -L 2 docs/_build/rst
-        pwd
+        ${cleanup_venv}
         """
-        echo pwd()
         stash includes: 'docs/_build/rst/tutorials/object_detection/*', name: 'object_detection'
       }
     }
   },
   'tabular_prediction': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-tabular') {
+      ws('workspace/autogluon-tutorial-tabular-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_tutorial_tabular -f docs/build_contrib.yml
-        conda activate autogluon_tutorial_tabular
+        conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-tabular-v3
         conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
+        env
+
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -469,6 +440,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/tabular_prediction/*', name: 'tabular'
       }
@@ -476,18 +448,20 @@ stage("Build Tutorials") {
   },
   'text_prediction': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-text') {
+      ws('workspace/autogluon-tutorial-text-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_tutorial_text -f docs/build_contrib.yml
-        conda activate autogluon_tutorial_text
+        conda env update -n autogluon-tutorial-text-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-text-v3
         conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
+
+        env
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -495,6 +469,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/text_prediction/*', name: 'text'
       }
@@ -502,18 +477,19 @@ stage("Build Tutorials") {
   },
   'torch': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-torch') {
+      ws('workspace/autogluon-tutorial-torch-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_tutorial_torch -f docs/build_contrib.yml
-        conda activate autogluon_tutorial_torch
+        conda env update -n autogluon-tutorial-torch-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-torch-v3
         conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
+        env
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -521,6 +497,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(torch)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/torch/*', name: 'torch'
       }
@@ -530,7 +507,7 @@ stage("Build Tutorials") {
 
 stage("Build Docs") {
   node('linux-gpu') {
-    ws('workspace/autogluon-docs') {
+    ws('workspace/autogluon-docs-v3') {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -580,23 +557,28 @@ stage("Build Docs") {
         conda env update -n autogluon_docs -f docs/build_contrib.yml
         conda activate autogluon_docs
         conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
+        env
+
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
+        python3 -m pip install --upgrade jupyter_sphinx
+        python3 -m pip install 'sphinx==3.2.0'
+        python3 -m pip install 'sphinxcontrib-applehelp==1.0.2'
+        python3 -m pip install 'sphinxcontrib-bibtex==1.0.0'
+        python3 -m pip install 'sphinxcontrib-devhelp==1.0.2'
+        python3 -m pip install 'sphinxcontrib-htmlhelp==1.0.3'
+        python3 -m pip install 'sphinxcontrib-jsmath==1.0.1'
+        python3 -m pip install 'sphinxcontrib-qthelp==1.0.3'
+        python3 -m pip install 'sphinxcontrib-serializinghtml==1.1.4'
+        python3 -m pip install 'sphinxcontrib-svg2pdfconverter==1.1.0'
 
-        pip uninstall -y autogluon
-        pip uninstall -y autogluon.vision
-        pip uninstall -y autogluon.text
-        pip uninstall -y autogluon.mxnet
-        pip uninstall -y autogluon.extra
-        pip uninstall -y autogluon.tabular
-        pip uninstall -y autogluon.features
-        pip uninstall -y autogluon.core
-        pip uninstall -y autogluon-contrib-nlp
+        python3 -m pip install 'docutils<0.16'
+        python3 -m pip list
 
         cd core/
         python3 -m pip install --upgrade -e .
@@ -641,6 +623,7 @@ stage("Build Docs") {
         echo "Uploaded doc to http://${site}/index.html"
 
         ${index_update_str}
+        ${cleanup_venv}
         """
 
         if (env.BRANCH_NAME.startsWith("PR-")) {
