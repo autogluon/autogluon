@@ -127,8 +127,9 @@ class TextPredictionV1Model(AbstractModel):
                 label_col_id += 1
         else:
             self._label_column_name = 'label'
-        time_start = time.time()
-
+        X_train = self.preprocess(X_train, fit=True)
+        if X_val is not None:
+            X_val = self.preprocess(X_val)
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus', None)
