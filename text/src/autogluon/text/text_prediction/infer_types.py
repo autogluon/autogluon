@@ -10,7 +10,7 @@ def is_categorical_column(data: pd.Series,
                           valid_data: pd.Series,
                           threshold: int = None,
                           ratio: float = 0.1,
-                          oov_ratio_threshold: float = 0.05,
+                          oov_ratio_threshold: float = 0.0,
                           is_label: bool = False) -> bool:
     """Check whether the column is a categorical column.
 
