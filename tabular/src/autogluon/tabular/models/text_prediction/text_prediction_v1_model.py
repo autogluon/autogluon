@@ -2,6 +2,7 @@
 from typing import Optional
 import logging
 import time
+import copy
 import os
 
 import numpy as np
@@ -135,22 +136,26 @@ class TextPredictionV1Model(AbstractModel):
         num_gpus = kwargs.get('num_gpus', None)
 
         self.model = TextPredictor(label=self._label_column_name,
-                                        problem_type=self.problem_type,
-                                        path=self.path,
-                                        eval_metric=self.eval_metric,
-                                        verbosity=verbosity)
+                                   problem_type=self.problem_type,
+                                   path=self.path,
+                                   eval_metric=self.eval_metric,
+                                   verbosity=verbosity)
         X_train.insert(len(X_train.columns), self._label_column_name, y_train)
         if X_val is not None:
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
         assert self.params['hpo_params']['num_trials'] == 1 \
                or self.params['hpo_params']['num_trials'] is None
+        params = copy.deepcopy(self.params)
+        params['models']['MultimodalTextModel']['search_space']['optimization.per_device_batch_size']\
+            = max(1,
+                  params['models']['MultimodalTextModel']['search_space']['optimization.per_device_batch_size'] // 2)
         self.model.fit(train_data=X_train,
-                            tuning_data=X_val,
-                            time_limit=time_limit,
-                            num_gpus=num_gpus,
-                            num_cpus=num_cpus,
-                            hyperparameters=self.params,
-                            seed=self.params.get('seed'))
+                       tuning_data=X_val,
+                       time_limit=time_limit,
+                       num_gpus=num_gpus,
+                       num_cpus=num_cpus,
+                       hyperparameters=params,
+                       seed=params.get('seed'))
 
     def save(self, path: str = None, verbose=True) -> str:
         model = self.model
@@ -185,7 +190,7 @@ class TextPredictionV1Model(AbstractModel):
             The total memory size in bytes.
         """
         total_size = 0
-        for k, v in self._predictor._model.net.collect_params().items():
+        for k, v in self.model._model.net.collect_params().items():
             total_size += np.dtype(v.dtype).itemsize * np.prod(v.shape)
         return total_size
 
