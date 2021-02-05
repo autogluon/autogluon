@@ -60,17 +60,6 @@ class MOHyperbandScheduler(HyperbandScheduler):
 
         Args:
             task (:class:`autogluon.scheduler.Task`): a new training task
-
-        Relevant entries in kwargs:
-        - bracket: HB bracket to be used. Has been sampled in _promote_config
-        - new_config: If True, task starts new config eval, otherwise it 
-          promotes a config (only if type == 'promotion')
-        - elapsed_time: Time stamp
-          Only if new_config == False:
-        - config_key: Internal key for config
-        - resume_from: config promoted from this milestone
-        - milestone: config promoted to this milestone (next from resume_from)
-        - scalarization_options: Specifies scalarazitation method to be used
         """
         if "num_weights" in self._scalarization_options:
             n_weights = self._scalarization_options["num_weights"]
