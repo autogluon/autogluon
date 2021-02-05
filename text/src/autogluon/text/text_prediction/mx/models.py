@@ -1297,6 +1297,12 @@ class MultiModalTextModel:
             eval_metric = self._eval_metric.name
         else:
             eval_metric = self._eval_metric
+        log_metrics = []
+        for metric in self._log_metrics:
+            if not isinstance(metric, str):
+                log_metrics.append(metric.name)
+            else:
+                log_metrics.append(metric)
         # Save additional assets about the parsed dataset information
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump(
@@ -1304,7 +1310,7 @@ class MultiModalTextModel:
                     'problem_type': self._problem_type,
                     'label_columns': self._label_columns,
                     'eval_metric': eval_metric,
-                    'log_metrics': self._log_metrics,
+                    'log_metrics': log_metrics,
                     'feature_columns': self._feature_columns,
                     'column_types': self._column_types,
                     'version': version.__version__,
