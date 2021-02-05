@@ -154,7 +154,6 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
                 continue  # Don't include excluded models
             if isinstance(model_cfg, str):
-                print(model_type)
                 if model_type == 'TEXT_NN_V1':
                     from autogluon.text import ag_text_presets
                     model_cfgs_to_process += ag_text_presets.create(model_cfg)
@@ -163,6 +162,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
             else:
                 model_cfgs_to_process.append(model_cfg)
         for model_cfg in model_cfgs_to_process:
+            print(model_cfg)
             model_cfg = clean_model_cfg(model_cfg=model_cfg, model_type=model_type, ag_args=ag_args, ag_args_ensemble=ag_args_ensemble, ag_args_fit=ag_args_fit)
             model_cfg[AG_ARGS]['priority'] = model_cfg[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             model_priority = model_cfg[AG_ARGS]['priority']
