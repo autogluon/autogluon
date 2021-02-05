@@ -61,10 +61,7 @@ class MOHyperbandScheduler(HyperbandScheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new training task
         """
-        if "num_weights" in self._scalarization_options:
-            n_weights = self._scalarization_options["num_weights"]
-        else:
-            n_weights = 100
+        n_weights = self._scalarization_options.get('num_weights', 100)
         weights = [_uniform(len(self._objectives)) for _ in range(n_weights)]
         weights = [w * self._sign_vector for w in weights]
         reporter = MODistStatusReporter(self._objectives, weights, 
