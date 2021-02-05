@@ -61,6 +61,8 @@ class TextPredictor:
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+    warn_if_exist
+        Whether to raise warning if the path exists
     """
 
     def __init__(
@@ -76,8 +78,6 @@ class TextPredictor:
         set_logger_verbosity(self.verbosity, logger=logger)
         self._label = label
         self._problem_type = problem_type
-        if not isinstance(eval_metric, str):
-            eval_metric = eval_metric.name
         self._eval_metric = eval_metric
         self._path = setup_outputdir(path, warn_if_exist=warn_if_exist)
         self._model = None
@@ -318,7 +318,11 @@ class TextPredictor:
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         os.makedirs(dir_path, exist_ok=True)
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
-            json.dump({'eval_metric': self._eval_metric,
+            if not isinstance(self._eval_metric, str):
+                eval_metric = self._eval_metric.name
+            else:
+                eval_metric = self._eval_metric
+            json.dump({'eval_metric': eval_metric,
                        'label': self._label,
                        'problem_type': self._problem_type,
                        'backend': self._backend}, of)
