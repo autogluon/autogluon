@@ -1,26 +1,23 @@
-import contextlib
 import copy
 import logging
-import shutil
-import tempfile
 import time
 from functools import partial
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
+from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
 from autogluon.core.utils import try_import_fastai_v1
+from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
+from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
 
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
-from ..abstract.model_trial import skip_hpo
-from ..abstract.abstract_model import AbstractModel
-from ...features.feature_metadata import R_OBJECT
+from autogluon.core.models import AbstractModel
+from autogluon.core.models.abstract.model_trial import skip_hpo
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
@@ -35,17 +32,9 @@ from ...features.feature_metadata import R_OBJECT
 # MacOS issue: torchvision==0.7.0 + torch==1.6.0 can cause segfaults; use torch==1.2.0 torchvision==0.4.0
 
 LABEL = '__label__'
+MISSING = '__!#ag_internal_missing#!__'
 
 logger = logging.getLogger(__name__)
-
-
-@contextlib.contextmanager
-def make_temp_directory():
-    temp_dir = tempfile.mkdtemp()
-    try:
-        yield temp_dir
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 # TODO: Takes extremely long time prior to training start if many (10000) continuous features from ngrams, debug - explore TruncateSVD option to reduce input dimensionality
@@ -83,38 +72,26 @@ class NNFastAiTabularModel(AbstractModel):
     """
 
     model_internals_file_name = 'model-internals.pkl'
-    unique_category_str = '!missing!'
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.cat_columns = []
-        self.cont_columns = []
-        self.col_after_transformer = None
+        self.cat_columns = None
+        self.cont_columns = None
+        self.columns_fills = None
+        self.procs = None
         self.y_scaler = None
+        self._inner_features = None
 
-    def fold_preprocess(self, X, fit=False):
-        if fit:
-            cols_to_use = self.cont_columns + self.cat_columns
-            self.col_after_transformer = [col for col in X.columns if col in cols_to_use]
-        X = pd.DataFrame(data=X, columns=self.col_after_transformer)
-        X = super().preprocess(X)
-        return X
-
-    def preprocess_train(self, X_train, y_train, X_val, y_val, **kwargs):
+    def _preprocess_train(self, X_train, y_train, X_val, y_val, num_workers):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
+
+        X_train = self.preprocess(X_train, fit=True)
+        if X_val is not None:
+            X_val = self.preprocess(X_val)
+
         from fastai.tabular import FillMissing, Categorify, Normalize
-        from fastai.core import defaults
-
-        self.cat_columns = X_train.select_dtypes([
-            'category', 'object', 'bool', 'bool_'
-        ]).columns.values.tolist()
-
-        self.cont_columns = X_train.select_dtypes([
-            'float', 'float_', 'float16', 'float32', 'float64',
-            'int', 'int_', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64',
-            'datetime'
-        ]).columns.values.tolist()
+        self.procs = [FillMissing, Categorify, Normalize]
 
         if self.problem_type == REGRESSION and self.y_scaler is not None:
             y_train_norm = pd.Series(self.y_scaler.fit_transform(y_train.values.reshape(-1, 1)).reshape(-1))
@@ -123,38 +100,60 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             y_train_norm = y_train
             y_val_norm = y_val
-        try:
-            X_train_stats = X_train.describe(include='all').T.reset_index()
-            cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_train_stats['unique'].isna())]['index'].values
-        except:
-            cat_cols_to_drop = []
-        cat_cols_to_keep = [col for col in X_train.columns.values if (col not in cat_cols_to_drop)]
-        cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
-        logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
-        self.cat_columns = cat_cols_to_use
-        self.cat_columns = [feature for feature in self.cat_columns if feature in list(X_train.columns)]
-        self.cont_columns = [feature for feature in self.cont_columns if feature in list(X_train.columns)]
+
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
-        X_train = self.fold_preprocess(X_train, fit=True)
-        if X_val is not None:
-            X_val = self.fold_preprocess(X_val)
         df_train, train_idx, val_idx = self._generate_datasets(X_train, y_train_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
-        procs = [FillMissing, Categorify, Normalize]
 
-        # additional workers are helping only when fork is enabled; in other mp modes, communication overhead reduces performance
-        num_workers = defaults.cpus if is_fork_enabled() else 0
-        data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs)
+        # Copy cat_columns and cont_columns because TabularList is mutating the list
+        data = (TabularList.from_df(df_train, path=self.path,
+                                    cat_names=self.cat_columns.copy(), cont_names=self.cont_columns.copy(), procs=self.procs)
                 .split_by_idxs(train_idx, val_idx)
                 .label_from_df(cols=LABEL, label_cls=label_class)
                 .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32, num_workers=num_workers))
         return data
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+    def _preprocess(self, X: pd.DataFrame, fit=False, **kwargs):
+        X = super()._preprocess(X=X, **kwargs)
+        if fit:
+            self.cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+            self.cont_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
+            try:
+                X_train_stats = X.describe(include='all').T.reset_index()
+                cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_train_stats['unique'].isna())]['index'].values
+            except:
+                cat_cols_to_drop = []
+            cat_cols_to_keep = [col for col in X.columns.values if (col not in cat_cols_to_drop)]
+            cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
+            logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
+            self.cat_columns = cat_cols_to_use
+            self.cat_columns = [feature for feature in self.cat_columns if feature in list(X.columns)]
+            self.cont_columns = [feature for feature in self.cont_columns if feature in list(X.columns)]
+
+            self.columns_fills = {}
+            for c in self.cat_columns:
+                self.columns_fills[c] = MISSING
+            for c in self.cont_columns:
+                self.columns_fills[c] = X[c].mean()
+            self._inner_features = self.cat_columns + self.cont_columns
+        return self._fill_missing(X)
+
+    def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df[self._inner_features].copy()
+        for c in self.cat_columns:
+            df[c] = df[c].cat.add_categories(MISSING)
+            df[c] = df[c].fillna(self.columns_fills[c])
+        for c in self.cont_columns:
+            df[c] = df[c].fillna(self.columns_fills[c])
+        return df
+
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=None, num_gpus=0, **kwargs):
         try_import_fastai_v1()
+        import torch
         from fastai.layers import LabelSmoothingCrossEntropy
         from fastai.tabular import tabular_learner
         from fastai.utils.mod_display import progress_disabled_ctx
+        from fastai.core import defaults
         from .callbacks import EarlyStoppingCallbackWithTimeLimit, SaveModelCallback
 
         start_time = time.time()
@@ -165,8 +164,21 @@ class NNFastAiTabularModel(AbstractModel):
         if self.y_scaler is not None:
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
+        if num_cpus is None:
+            num_cpus = defaults.cpus
+        # additional workers are helping only when fork is enabled; in other mp modes, communication overhead reduces performance
+        num_workers = int(num_cpus / 2)
+        if not is_fork_enabled():
+            num_workers = 0
+        if num_gpus is not None:
+            if num_gpus == 0:
+                # TODO: Does not obviously impact inference speed
+                defaults.device = torch.device('cpu')
+            else:
+                defaults.device = torch.device('cuda')
+
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
-        data = self.preprocess_train(X_train, y_train, X_val, y_val)
+        data = self._preprocess_train(X_train, y_train, X_val, y_val, num_workers=num_workers)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
@@ -314,17 +326,17 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.basic_data import DatasetType
         from fastai.tabular import TabularList
         from fastai.utils.mod_display import progress_disabled_ctx
-        from fastai.tabular import FillMissing, Categorify, Normalize
 
         X = self.preprocess(X, **kwargs)
-        procs = [FillMissing, Categorify, Normalize]
 
         single_row = len(X) == 1
         # fastai has issues predicting on a single row, duplicating the row as a workaround
         if single_row:
             X = pd.concat([X, X]).reset_index(drop=True)
 
-        self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs))
+        # Copy cat_columns and cont_columns because TabularList is mutating the list
+        self.model.data.add_test(TabularList.from_df(
+            X, cat_names=self.cat_columns.copy(), cont_names=self.cont_columns.copy(), procs=self.procs))
         with progress_disabled_ctx(self.model) as model:
             preds, _ = model.get_preds(ds_type=DatasetType.Test)
         if single_row:
@@ -367,7 +379,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
     def _get_default_auxiliary_params(self) -> dict:

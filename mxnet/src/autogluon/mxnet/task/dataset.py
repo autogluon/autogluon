@@ -111,7 +111,7 @@ def get_dataset(path=None, train=True, name=None,
     Parameters
     ----------
     name : str, optional
-        Which built-in dataset to use, will override all other options if specified.
+        Which built-in dataset to use, will override all other options if specified.
         The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
     train : bool, default = True
         Whether this dataset should be used for training or validation.

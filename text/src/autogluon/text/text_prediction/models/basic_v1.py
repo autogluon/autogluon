@@ -3,7 +3,7 @@ import os
 import math
 import logging
 import pandas as pd
-import collections
+import warnings
 import time
 import json
 import functools
@@ -12,23 +12,24 @@ import mxnet as mx
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
-from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef, roc_auc_score
-from scipy.stats import pearsonr, spearmanr
 from autogluon_contrib_nlp.models import get_backbone
 from autogluon_contrib_nlp.lr_scheduler import InverseSquareRootScheduler
 from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.utils.misc import logging_config, grouper,\
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
-from ..metrics import calculate_metric_by_expr
-from .. import constants as _C
 from autogluon.core import args, space
 from autogluon.core.task.base import compile_scheduler_options
 from autogluon.core.task.base.base_task import schedulers
+from autogluon.core.metrics import get_metric, Scorer
+from autogluon.core.utils.multiprocessing_utils import force_forkserver
+
+from .. import constants as _C
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
 from ..dataset import TabularDataset
+from ... import version
 
 
 @use_np
@@ -179,108 +180,9 @@ def base_cfg():
     return cfg
 
 
-def electra_base():
-    """The search space of Electra Base"""
-    cfg = base_cfg()
-    cfg.defrost()
-    cfg.optimization.layerwise_lr_decay = 0.8
-    cfg.freeze()
-    return cfg
-
-
-def mobile_bert():
-    """The search space of MobileBERT"""
-    cfg = base_cfg()
-    cfg.defrost()
-    cfg.optimization.layerwise_lr_decay = -1
-    cfg.model.backbone.name = 'google_uncased_mobilebert'
-    cfg.optimization.lr = 1E-5
-    cfg.optimization.num_train_epochs = 5.0
-    cfg.freeze()
-    return cfg
-
-
-def calculate_metric_scores(metrics, predictions, gt_labels,
-                            pos_label=1):
-    """
-
-    Parameters
-    ----------
-    metrics
-        A list of metric names
-    predictions
-    gt_labels
-    pos_label
-
-    Returns
-    -------
-    metric_scores
-        A dictionary contains key --> metric scores
-    """
-    if isinstance(metrics, str):
-        metrics = [metrics]
-    metric_scores = collections.OrderedDict()
-    for metric_name in metrics:
-        if metric_name == 'acc':
-            metric_scores[metric_name] = float(accuracy_score(gt_labels,
-                                                              predictions.argmax(axis=-1)))
-        elif metric_name == 'f1':
-            metric_scores[metric_name] = float(f1_score(gt_labels,
-                                                        predictions.argmax(axis=-1),
-                                                        pos_label=pos_label))
-        elif metric_name == 'mcc':
-            metric_scores[metric_name] = float(matthews_corrcoef(gt_labels,
-                                                                 predictions.argmax(axis=-1)))
-        elif metric_name == 'auc':
-            metric_scores[metric_name] = float(roc_auc_score(gt_labels, predictions[:, pos_label]))
-        elif metric_name == 'nll':
-            metric_scores[metric_name]\
-                = float(- np.log(predictions[np.arange(gt_labels.shape[0]), gt_labels]).mean())
-        elif metric_name == 'pearsonr':
-            metric_scores[metric_name] = float(pearsonr(gt_labels, predictions)[0])
-        elif metric_name == 'spearmanr':
-            metric_scores[metric_name] = float(spearmanr(gt_labels, predictions)[0])
-        elif metric_name == 'mse':
-            metric_scores[metric_name] = float(np.square(predictions - gt_labels).mean())
-        elif metric_name == 'rmse':
-            metric_scores[metric_name] = float(np.sqrt(np.square(predictions - gt_labels).mean()))
-        elif metric_name == 'mae':
-            metric_scores[metric_name] = float(np.abs(predictions - gt_labels).mean())
-        else:
-            raise ValueError('Unknown metric = {}'.format(metric_name))
-    metric_scores = collections.OrderedDict(
-        [(k, v.item() if isinstance(v, np.ndarray) else v)
-         for k, v in metric_scores.items()])
-    return metric_scores
-
-
-def is_better_score(metric_name, baseline, new_score):
-    """Whether the new score is better than the baseline
-
-    Parameters
-    ----------
-    metric_name
-        Name of the metric
-    baseline
-        The baseline score
-    new_score
-        The new score
-
-    Returns
-    -------
-    ret
-        Whether the new score is better than the baseline
-    """
-    if metric_name in ['acc', 'f1', 'mcc', 'auc', 'pearsonr', 'spearmanr']:
-        return new_score > baseline
-    elif metric_name in ['mse', 'rmse', 'mae']:
-        return new_score < baseline
-    else:
-        raise NotImplementedError
-
-
 @use_np
-def _classification_regression_predict(net, dataloader, problem_type, has_label=True):
+def _classification_regression_predict(net, dataloader, problem_type,
+                                       has_label=True, extract_embedding=False):
     """
 
     Parameters
@@ -292,11 +194,14 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
     problem_type
         Types of the labels
     has_label
-
+        Whether label is used
+    extract_embedding
+        Whether to extract the embedding
 
     Returns
     -------
     predictions
+        The predictions
     """
     predictions = []
     ctx_l = net.collect_params().list_ctx()
@@ -310,23 +215,50 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
             else:
                 batch_feature = sample
             batch_feature = move_to_ctx(batch_feature, ctx)
-            pred = net(batch_feature)
-            if problem_type == _C.CLASSIFICATION:
-                pred = mx.npx.softmax(pred, axis=-1)
-            iter_pred_l.append(pred)
+            if extract_embedding:
+                _, embeddings = net(batch_feature)
+                iter_pred_l.append(embeddings)
+            else:
+                pred = net(batch_feature)
+                if problem_type == _C.CLASSIFICATION:
+                    pred = mx.npx.softmax(pred, axis=-1)
+                iter_pred_l.append(pred)
         for pred in iter_pred_l:
             predictions.append(pred.asnumpy())
     predictions = np.concatenate(predictions, axis=0)
     return predictions
 
 
+def calculate_metric(scorer, ground_truth, predictions, problem_type):
+    if problem_type == _C.CLASSIFICATION and scorer.name == 'roc_auc':
+        # For ROC_AUC, we need to feed in the probability of positive class to the scorer.
+        return scorer._sign * scorer(ground_truth, predictions[:, 1])
+    else:
+        return scorer._sign * scorer(ground_truth, predictions)
+
+
 @use_np
-def train_function(args, reporter, train_data, tuning_data,
-                   time_limits, base_config, problem_types,
+def train_function(args, reporter, train_df_path, tuning_df_path,
+                   time_limits, time_start, base_config, problem_types,
                    column_properties, label_columns, label_shapes,
                    log_metrics, stopping_metric, console_log,
                    ignore_warning=False):
+    if time_limits is not None:
+        start_train_tick = time.time()
+        time_left = time_limits - (start_train_tick - time_start)
+        if time_left <= 0:
+            reporter.terminate()
+            return
     import os
+    # Get the log metric scorers
+    if isinstance(log_metrics, str):
+        log_metrics = [log_metrics]
+    # Load the training and tuning data from the parquet file
+    train_data = pd.read_parquet(train_df_path)
+    tuning_data = pd.read_parquet(tuning_df_path)
+    log_metric_scorers = [get_metric(ele) for ele in log_metrics]
+    stopping_metric_scorer = get_metric(stopping_metric)
+    greater_is_better = stopping_metric_scorer.greater_is_better
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['OMP_NUM_THREADS'] = '1'
     os.environ['MKL_DYNAMIC'] = 'FALSE'
@@ -367,14 +299,14 @@ def train_function(args, reporter, train_data, tuning_data,
                                                 max_length=cfg.model.preprocess.max_length,
                                                 merge_text=cfg.model.preprocess.merge_text)
     logger.info('Process training set...')
-    processed_train = preprocessor.process_train(train_data.table)
+    processed_train = preprocessor.process_train(train_data)
     logger.info('Done!')
     logger.info('Process dev set...')
-    processed_dev = preprocessor.process_test(tuning_data.table)
+    processed_dev = preprocessor.process_test(tuning_data)
     logger.info('Done!')
     label = label_columns[0]
     # Get the ground-truth dev labels
-    gt_dev_labels = np.array(tuning_data.table[label].apply(column_properties[label].transform))
+    gt_dev_labels = np.array(tuning_data[label].apply(column_properties[label].transform))
     ctx_l = get_mxnet_available_ctx()
     base_batch_size = cfg.optimization.per_device_batch_size
     num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
@@ -431,7 +363,13 @@ def train_function(args, reporter, train_data, tuning_data,
     no_better_rounds = 0
     report_idx = 0
     start_tick = time.time()
-    for update_idx in tqdm.tqdm(range(max_update)):
+    if time_limits is not None:
+        time_limits -= start_tick - time_start
+        if time_limits <= 0:
+            reporter.terminate()
+            return
+    best_report_items = None
+    for update_idx in tqdm.tqdm(range(max_update), disable=None):
         num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)
@@ -471,8 +409,8 @@ def train_function(args, reporter, train_data, tuning_data,
             log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
             log_num_samples = sum(log_num_samples_l)
             logger.info(
-                '[Iter {}/{}, Epoch {}] train loss={}, gnorm={}, lr={}, #samples processed={},'
-                ' #sample per second={}'
+                '[Iter {}/{}, Epoch {}] train loss={:0.4e}, gnorm={:0.4e}, lr={:0.4e}, #samples processed={},'
+                ' #sample per second={:.2f}'
                     .format(update_idx + 1, max_update,
                             int(update_idx / updates_per_epoch),
                             log_loss / log_num_samples, total_norm, trainer.learning_rate,
@@ -487,54 +425,54 @@ def train_function(args, reporter, train_data, tuning_data,
                 _classification_regression_predict(net, dataloader=dev_dataloader,
                                                    problem_type=problem_types[0],
                                                    has_label=False)
-            metric_scores = calculate_metric_scores(log_metrics,
-                                                    predictions=dev_predictions,
-                                                    gt_labels=gt_dev_labels)
-            performance_score = calculate_metric_by_expr(
-                {label_columns[0]: metric_scores},
-                [label_columns[0]],
-                stopping_metric
-            )
+            log_scores = [calculate_metric(scorer, gt_dev_labels, dev_predictions, problem_types[0])
+                          for scorer in log_metric_scorers]
+            dev_score = calculate_metric(stopping_metric_scorer, gt_dev_labels, dev_predictions,
+                                         problem_types[0])
             valid_time_spent = time.time() - valid_start_tick
-            if best_performance_score is None or is_better_score(stopping_metric,
-                                                                 best_performance_score,
-                                                                 performance_score):
+
+            if best_performance_score is None or \
+                    (greater_is_better and dev_score >= best_performance_score) or \
+                    (not greater_is_better and dev_score <= best_performance_score):
                 find_better = True
                 no_better_rounds = 0
-                best_performance_score = performance_score
+                best_performance_score = dev_score
+                net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
             else:
                 find_better = False
                 no_better_rounds += 1
-            if find_better:
-                net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
             mx.npx.waitall()
-            loss_string = ', '.join(['{}={}'.format(key, metric_scores[key])
-                                     for key in log_metrics])
-            logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={},'
+            loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
+                                     for score, metric in zip(log_scores, log_metric_scorers)])
+            logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
                          ' total_time={:.2f}min'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60))
             report_items = [('iteration', update_idx + 1),
                             ('report_idx', report_idx + 1),
                             ('epoch', int(update_idx / updates_per_epoch))] +\
-                           list(metric_scores.items()) + \
-                           [('fine_better', find_better),
+                           [(metric.name, score)
+                            for score, metric in zip(log_scores, log_metric_scorers)] + \
+                           [('find_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
             total_time_spent = time.time() - start_tick
-            if time_limits is not None and total_time_spent > time_limits:
-                break
-            report_idx += 1
-            if stopping_metric in ['mse', 'mae', 'rmse']:
-                report_items.append(('reward', -performance_score))
+
+            if stopping_metric_scorer._sign < 0:
+                report_items.append(('reward_attr', -dev_score))
             else:
-                report_items.append(('reward', performance_score))
+                report_items.append(('reward_attr', dev_score))
+            report_items.append(('eval_metric', stopping_metric_scorer.name))
             report_items.append(('exp_dir', exp_dir))
             if find_better:
                 best_report_items = report_items
             reporter(**dict(report_items))
+            report_idx += 1
             if no_better_rounds >= cfg.learning.early_stopping_patience:
                 logger.info('Early stopping patience reached!')
                 break
+            if time_limits is not None and total_time_spent > time_limits:
+                break
+
     best_report_items_dict = dict(best_report_items)
     best_report_items_dict['report_idx'] = report_idx + 1
     reporter(**best_report_items_dict)
@@ -576,6 +514,8 @@ class BertForTextPredictionBasic:
         self._base_config.defrost()
         if output_directory is not None:
             self._base_config.misc.exp_dir = output_directory
+        else:
+            output_directory = self._base_config.misc.exp_dir
         self._base_config.misc.exp_dir = os.path.abspath(self._base_config.misc.exp_dir)
         self._base_config.freeze()
         if search_space is None:
@@ -596,6 +536,7 @@ class BertForTextPredictionBasic:
 
         # Need to be set in the fit call
         self._net = None
+        self._embed_net = None
         self._preprocessor = None
         self._config = None
         self._results = None
@@ -655,7 +596,9 @@ class BertForTextPredictionBasic:
               num_trials=None,
               plot_results=False,
               console_log=True,
-              ignore_warning=True):
+              ignore_warning=True,
+              verbosity=2):
+        force_forkserver()
         start_tick = time.time()
         logging_config(folder=self._output_directory, name='main',
                        console=console_log,
@@ -665,8 +608,6 @@ class BertForTextPredictionBasic:
         os.makedirs(self._output_directory, exist_ok=True)
         search_space_reg = args(search_space=space.Dict(**self.search_space))
         # Scheduler and searcher for HPO
-        if search_strategy.endswith('hyperband') and time_limits is None:
-            time_limits = 5 * 60 * 60  # 5 hours
         if scheduler_options is None:
             scheduler_options = dict()
         scheduler_options = compile_scheduler_options(
@@ -675,18 +616,25 @@ class BertForTextPredictionBasic:
             search_options=search_options,
             nthreads_per_trial=resource['num_cpus'],
             ngpus_per_trial=resource['num_gpus'],
-            checkpoint=None,
+            checkpoint=os.path.join(self._output_directory, 'checkpoint.ag'),
             num_trials=num_trials,
-            time_out=scheduler_options.get('time_out'),
+            time_out=time_limits,
             resume=False,
             visualizer=scheduler_options.get('visualizer'),
             time_attr='report_idx',
-            reward_attr='reward',
+            reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
+        # Create a temporary cache file and then ask the inner function to load the
+        # temporary cache.
+        train_df_path = os.path.join(self._output_directory, 'cache_train_dataframe.pq')
+        tuning_df_path = os.path.join(self._output_directory, 'cache_tuning_dataframe.pq')
+        train_data.table.to_parquet(train_df_path)
+        tuning_data.table.to_parquet(tuning_df_path)
         train_fn = search_space_reg(functools.partial(train_function,
-                                                      train_data=train_data,
+                                                      train_df_path=train_df_path,
                                                       time_limits=time_limits,
-                                                      tuning_data=tuning_data,
+                                                      time_start=start_tick,
+                                                      tuning_df_path=tuning_df_path,
                                                       base_config=self.base_config,
                                                       problem_types=self.problem_types,
                                                       column_properties=self._column_properties,
@@ -711,7 +659,9 @@ class BertForTextPredictionBasic:
                                'further investigate the root cause, you can also try to train with '
                                '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
         best_config = scheduler.get_best_config()
-        self._logger.info('Best_config={}'.format(best_config))
+        if verbosity >= 2:
+            self._logger.info('Results=', scheduler.searcher._results)
+            self._logger.info('Best_config={}'.format(best_config))
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,
                                                  'task{}'.format(best_task_id))
@@ -745,9 +695,10 @@ class BertForTextPredictionBasic:
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=self._label_shapes[0],
                                     cfg=cfg.model.network)
-        # Here, we cannot use GPU due to https://github.com/awslabs/autogluon/issues/602
+        net.hybridize()
+        ctx_l = get_mxnet_available_ctx()
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
-                            ctx=mx.cpu())
+                            ctx=ctx_l)
         self._net = net
         mx.npx.waitall()
 
@@ -766,6 +717,8 @@ class BertForTextPredictionBasic:
             -------
             Dict mapping metric -> score calculated over the given dataset.
         """
+        if isinstance(metrics, str):
+            metrics = [metrics]
         assert self.net is not None
         if not isinstance(valid_data, TabularDataset):
             valid_data = TabularDataset(valid_data,
@@ -777,9 +730,8 @@ class BertForTextPredictionBasic:
             predictions = self.predict_proba(valid_data)
         else:
             predictions = self.predict(valid_data)
-        metric_scores = calculate_metric_scores(metrics=metrics,
-                                                predictions=predictions,
-                                                gt_labels=ground_truth)
+        metric_scores = {metric: calculate_metric(get_metric(metric), ground_truth, predictions,
+                                          self.problem_types[0]) for metric in metrics}
         return metric_scores
 
     def _internal_predict(self, test_data, get_original_labels=True, get_probabilities=False):
@@ -813,18 +765,43 @@ class BertForTextPredictionBasic:
                                  test_predictions)))
         return test_predictions
 
+    @property
+    def class_labels(self):
+        """The original name of the class labels.
+
+        For example, the tabular data may contain classes equal to
+        "entailment", "contradiction", "neutral". Internally, these will be converted to
+        0, 1, 2, ...
+
+        This function returns the original names of these raw labels.
+
+        Returns
+        -------
+        ret
+            List that contain the class names
+        """
+        if self._problem_types[0] != _C.CLASSIFICATION:
+            warnings.warn('Accessing class names for a non-classification problem. Return None.')
+            return None
+        else:
+            return self._column_properties[self._label_columns[0]].categories
+
     def predict_proba(self, test_data):
         """Predict class probabilities instead of class labels (for classification tasks).
 
         Parameters
         ----------
-        test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
-            The test data to get predictions for. Can be DataFrame/Dataset or a file that can be loaded into DataFrame/Dataset.
+        test_data : `pandas.DataFrame`, `autogluon.tabular.TabularDataset`, or str
+            The test data to get predictions for. Can be DataFrame/Dataset or a file that can
+            be loaded into DataFrame/Dataset.
 
         Returns
         -------
         probabilities : array
-            The predicted class probabilities for each sample. Shape of this array is (#Samples, num_class).
+            The predicted class probabilities for each sample.
+            Shape of this array is (#Samples, num_class).
+            Here, the i-th number means the probability of belonging to the i-th class.
+            You can access the class names by calling `self.class_names`.
         """
         assert self.problem_types[0] == _C.CLASSIFICATION
         return self._internal_predict(test_data,
@@ -836,7 +813,7 @@ class BertForTextPredictionBasic:
 
         Parameters
         ----------
-        test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
+        test_data : `pandas.DataFrame`, `autogluon.tabular.TabularDataset`, or str
             The test data to get predictions for. Can be DataFrame/Dataset or a file that can be loaded into DataFrame/Dataset.
         get_original_labels : bool, default = True
             Whether or not predictions should be formatted in terms of the original labels.
@@ -866,26 +843,38 @@ class BertForTextPredictionBasic:
         with open(os.path.join(dir_path, 'column_metadata.json'), 'w') as of:
             json.dump(get_column_property_metadata(self._column_properties),
                       of, ensure_ascii=True)
+        # Save an additional assets about the parsed dataset information
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump(
                 {
                     'label_columns': self._label_columns,
                     'label_shapes': self._label_shapes,
                     'problem_types': self._problem_types,
-                    'feature_columns': self._feature_columns
+                    'feature_columns': self._feature_columns,
+                    'version': version.__version__,
                 }, of, ensure_ascii=True)
 
+    def cuda(self):
+        """Try to use CUDA for inference"""
+        self._net.collect_params().reset_ctx(mx.gpu())
+
+    def cpu(self):
+        """Switch to use CPU for inference"""
+        self._net.collect_params().reset_ctx(mx.cpu())
+
     @classmethod
-    def load(cls, dir_path):
+    def load(cls, dir_path: str):
         """Load a model object previously produced by `fit()` from disk and return this object.
            It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
 
         Parameters
         ----------
-        dir_path : str
+        dir_path
             Path to directory where this model was previously saved.
- 
+        use_gpu
+            Whether try to use GPU if possible.
+
         Returns
         -------
         model
@@ -914,8 +903,9 @@ class BertForTextPredictionBasic:
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=label_shapes[0],
                                     cfg=loaded_config.model.network)
-        net.load_parameters(os.path.join(dir_path, 'net.params'),
-                            ctx=mx.cpu())
+        net.hybridize()
+        ctx_l = get_mxnet_available_ctx()
+        net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=ctx_l)
         model = cls(column_properties=column_properties,
                     label_columns=label_columns,
                     feature_columns=feature_columns,
@@ -928,3 +918,43 @@ class BertForTextPredictionBasic:
         model._preprocessor = preprocessor
         model._config = loaded_config
         return model
+
+    def extract_embedding(self, data):
+        """Extract the embedding from the pretrained model.
+
+        Returns
+        -------
+        embeddings
+            The output embeddings will have shape
+            (#samples, embedding_dim)
+        """
+        if not isinstance(data, TabularDataset):
+            if isinstance(data, (list, dict)):
+                data = pd.DataFrame(data)
+            data = TabularDataset(data,
+                                  columns=self._feature_columns,
+                                  column_properties=self._column_properties)
+        processed_data = self._preprocessor.process_test(data)
+        inference_batch_size = self.config.optimization.per_device_batch_size\
+                               * self.config.optimization.val_batch_size_mult
+        dataloader = DataLoader(processed_data,
+                                batch_size=inference_batch_size,
+                                shuffle=False,
+                                batchify_fn=self._preprocessor.batchify(is_test=True))
+        if self._embed_net is None:
+            embed_net = BERTForTabularBasicV1(
+                text_backbone=self.net.text_backbone,
+                feature_field_info=self._preprocessor.feature_field_info(),
+                label_shape=self.label_shapes[0],
+                cfg=self.config.model.network,
+                get_embedding=True,
+                params=self.net.collect_params(),
+                prefix='embed_net_')
+            embed_net.hybridize()
+            self._embed_net = embed_net
+        embeddings = _classification_regression_predict(self._embed_net,
+                                                        dataloader=dataloader,
+                                                        problem_type=self._problem_types[0],
+                                                        has_label=False,
+                                                        extract_embedding=True)
+        return embeddings

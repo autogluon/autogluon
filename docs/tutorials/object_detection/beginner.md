@@ -27,12 +27,13 @@ dataset_train = ObjectDetector.Dataset.from_voc(url, splits='trainval')
 ## Fit Models by AutoGluon
 In this section, we demonstrate how to apply AutoGluon to fit our detection models. We use mobilenet as the backbone for the YOLOv3 model. Two different learning rates are used to fine-tune the network. The best model is the one that obtains the best performance on the validation dataset. You can also try using more networks and hyperparameters to create a larger searching space.
 
-We `fit` a classifier using AutoGluon as follows. In each experiment (one trial in our searching space), we train the model for 5 epochs to avoid bursting our tutorial.
+We `fit` a classifier using AutoGluon as follows. In each experiment (one trial in our searching space), we train the model for 5 epochs to avoid bursting our tutorial runtime.
 
 ```{.python .input}
 time_limit = 60*60  # 1 hour
 detector = ObjectDetector()
-detector.fit(dataset_train, time_limit=time_limit, num_trials=2, epochs=5)
+hyperparameters = {'batch_size': 8, 'epochs': 5}
+detector.fit(dataset_train, time_limit=time_limit, num_trials=2, hyperparameters=hyperparameters)
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal

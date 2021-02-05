@@ -2,12 +2,14 @@ import copy
 from abc import ABCMeta, abstractmethod
 from functools import partial
 
+import scipy
+import scipy.stats
 import sklearn.metrics
 
 from . import classification_metrics, softclass_metrics
 from .util import sanitize_array
 from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
-from autogluon.core.utils.miscs import warning_filter
+from ..utils.miscs import warning_filter
 from .classification_metrics import *
 
 
@@ -18,6 +20,30 @@ class Scorer(object, metaclass=ABCMeta):
         self._score_func = score_func
         self._optimum = optimum
         self._sign = sign
+        self.alias = set()
+
+    def add_alias(self, alias):
+        if alias == self.name:
+            raise ValueError(f'The alias "{alias}" is the same as the original name "{self.name}". '
+                             f'This is not allowed.')
+        self.alias.add(alias)
+
+    @property
+    def greater_is_better(self) -> bool:
+        """Return whether the score is greater the better.
+
+        We use the stored `sign` object to decide the property.
+
+        Returns
+        -------
+        flag
+            The "greater_is_better" flag.
+        """
+        return self._sign > 0
+
+    def convert_score_to_sklearn_val(self, score):
+        """Scores are always greater_is_better, this flips the sign of metrics who were originally lower_is_better."""
+        return self._sign * score
 
     @abstractmethod
     def __call__(self, y_true, y_pred, sample_weight=None):
@@ -148,6 +174,7 @@ class _ProbaScorer(Scorer):
 class _ThresholdScorer(Scorer):
     def __call__(self, y_true, y_pred, sample_weight=None):
         """Evaluate decision function output for X relative to y_true.
+
         Parameters
         ----------
         y_true : array-like
@@ -209,7 +236,7 @@ def scorer_expects_y_pred(scorer: Scorer):
 
 
 def make_scorer(name, score_func, optimum=1, greater_is_better=True,
-                needs_proba=False, needs_threshold=False, **kwargs):
+                needs_proba=False, needs_threshold=False, **kwargs) -> Scorer:
     """Make a scorer from a performance metric or loss function.
 
     Factory inspired by scikit-learn which wraps scikit-learn scoring functions
@@ -243,7 +270,7 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
 
     Returns
     -------
-    scorer : callable
+    scorer
         Callable object that returns a scalar score; greater is better.
     """
     sign = 1 if greater_is_better else -1
@@ -263,14 +290,29 @@ mean_squared_error = make_scorer('mean_squared_error',
                                  sklearn.metrics.mean_squared_error,
                                  optimum=0,
                                  greater_is_better=False)
+mean_squared_error.add_alias('mse')
+
 mean_absolute_error = make_scorer('mean_absolute_error',
                                   sklearn.metrics.mean_absolute_error,
                                   optimum=0,
                                   greater_is_better=False)
+mean_absolute_error.add_alias('mae')
+
 median_absolute_error = make_scorer('median_absolute_error',
                                     sklearn.metrics.median_absolute_error,
                                     optimum=0,
                                     greater_is_better=False)
+
+spearmanr = make_scorer('spearmanr',
+                        lambda predictions, ground_truth:
+                        float(scipy.stats.spearmanr(ground_truth, predictions)[0]),
+                        optimum=1.0,
+                        greater_is_better=True)
+pearsonr = make_scorer('pearsonr',
+                       lambda predictions, ground_truth:
+                       float(scipy.stats.pearsonr(ground_truth, predictions)[0]),
+                       optimum=1.0,
+                       greater_is_better=True)
 
 
 def rmse_func(predictions, targets):
@@ -281,20 +323,34 @@ root_mean_squared_error = make_scorer('root_mean_squared_error',
                                       rmse_func,
                                       optimum=0,
                                       greater_is_better=False)
+root_mean_squared_error.add_alias('rmse')
 
 # Standard Classification Scores
 accuracy = make_scorer('accuracy',
                        sklearn.metrics.accuracy_score)
+accuracy.add_alias('acc')
+
 balanced_accuracy = make_scorer('balanced_accuracy',
                                 classification_metrics.balanced_accuracy)
 f1 = make_scorer('f1',
                  sklearn.metrics.f1_score)
+mcc = make_scorer('mcc', sklearn.metrics.matthews_corrcoef)
+
 
 # Score functions that need decision values
 roc_auc = make_scorer('roc_auc',
                       sklearn.metrics.roc_auc_score,
                       greater_is_better=True,
                       needs_threshold=True)
+
+roc_auc_ovo_macro = make_scorer('roc_auc_ovo_macro',
+                                sklearn.metrics.roc_auc_score,
+                                multi_class='ovo',
+                                average='macro',
+                                greater_is_better=True,
+                                needs_proba=True,
+                                needs_threshold=False)
+
 average_precision = make_scorer('average_precision',
                                 sklearn.metrics.average_precision_score,
                                 needs_threshold=True)
@@ -303,33 +359,75 @@ precision = make_scorer('precision',
 recall = make_scorer('recall',
                      sklearn.metrics.recall_score)
 
+
+def customized_log_loss(y_true, y_pred, eps=1e-15):
+    """
+
+    Parameters
+    ----------
+    y_true : array-like or label indicator matrix
+        Ground truth (correct) labels for n_samples samples.
+
+    y_pred : array-like of float
+        The predictions. shape = (n_samples, n_classes) or (n_samples,)
+
+    eps : float
+        The epsilon
+
+    Returns
+    -------
+    loss
+        The negative log-likelihood
+    """
+    assert y_true.ndim == 1
+    if y_pred.ndim == 1:
+        # First clip the y_pred which is also used in sklearn
+        y_pred = np.clip(y_pred, eps, 1 - eps)
+        return - (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
+    else:
+        assert y_pred.ndim == 2, 'Only ndim=2 is supported'
+        labels = np.arange(y_pred.shape[1], dtype=np.int32)
+        return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred,
+                                        labels=labels,
+                                        eps=eps)
+
+
 # Score function for probabilistic classification
 log_loss = make_scorer('log_loss',
-                       sklearn.metrics.log_loss,
+                       customized_log_loss,
                        optimum=0,
                        greater_is_better=False,
                        needs_proba=True)
+log_loss.add_alias('nll')
+
 pac_score = make_scorer('pac_score',
                         classification_metrics.pac_score,
                         greater_is_better=True,
                         needs_proba=True)
 
-# Score for soft-classisification (with soft, probalistic labels):
+# Score for soft-classification (with soft, probabilistic labels):
 soft_log_loss = make_scorer('soft_log_loss', softclass_metrics.soft_log_loss,
                             greater_is_better=False, needs_proba=True)
 
-# TODO what about mathews correlation coefficient etc?
+REGRESSION_METRICS = dict()
+for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
+                   median_absolute_error, spearmanr, pearsonr]:
+    if scorer.name in REGRESSION_METRICS:
+        raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
+                         f'Consider to register with a different name.')
+    REGRESSION_METRICS[scorer.name] = scorer
+    for alias in scorer.alias:
+        if alias in REGRESSION_METRICS:
+            raise ValueError(f'Duplicated alias found! scorer={scorer}, alias={alias}. '
+                             f'Consider to use a different alias.')
+        REGRESSION_METRICS[alias] = scorer
 
+CLASSIFICATION_METRICS = dict()
+for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, roc_auc_ovo_macro, average_precision, log_loss, pac_score]:
+    CLASSIFICATION_METRICS[scorer.name] = scorer
+    for alias in scorer.alias:
+        CLASSIFICATION_METRICS[alias] = scorer
 
-REGRESSION_METRICS = {
-    scorer.name: scorer
-    for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error, median_absolute_error]
-}
-
-CLASSIFICATION_METRICS = {
-    scorer.name: scorer
-    for scorer in [accuracy, balanced_accuracy, roc_auc, average_precision, log_loss, pac_score]
-}
 
 for name, metric in [('precision', sklearn.metrics.precision_score),
                      ('recall', sklearn.metrics.recall_score),
@@ -394,9 +492,11 @@ def calculate_score(solution, prediction, task_type, metric,
     return score
 
 
-def get_metric(metric, problem_type, metric_type):
+def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
+    all_available_metric_names = list(CLASSIFICATION_METRICS.keys())\
+                                 + list(REGRESSION_METRICS.keys()) + [soft_log_loss]
     if metric is not None and isinstance(metric, str):
         if metric in CLASSIFICATION_METRICS:
             if problem_type is not None and problem_type not in PROBLEM_TYPES_CLASSIFICATION:
@@ -410,8 +510,9 @@ def get_metric(metric, problem_type, metric_type):
             return soft_log_loss
         else:
             raise ValueError(
-                f"{metric} is an unknown metric, see autogluon/utils/tabular/metrics/ for available options "
-                f"or how to define your own {metric_type} function"
+                f"{metric} is an unknown metric, all available metrics are "
+                f"'{all_available_metric_names}'. You can also refer to "
+                f"autogluon.core.metrics to see how to define your own {metric_type} function"
             )
     else:
         return metric

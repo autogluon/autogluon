@@ -50,6 +50,7 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
     f'autogluon.core=={version}',
+    f'autogluon.features=={version}',
     f'autogluon.tabular=={version}',
     f'autogluon.mxnet=={version}',
     f'autogluon.extra=={version}',

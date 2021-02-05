@@ -7,7 +7,7 @@ This tutorial presents two examples to demonstrate how `TextPrediction` can be u
 - [Sentiment Analysis](https://en.wikipedia.org/wiki/Sentiment_analysis)
 - [Sentence Similarity](https://arxiv.org/abs/1910.03940)
 
-The general usage is similar to AutoGluon's `TabularPrediction` module. We treat NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict. 
+The general usage is similar to AutoGluon's `TabularPredictor`. We treat NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict. 
 Here, the labels can be discrete categories (classification) or numerical values (regression).
 `TextPrediction` fits neural networks to your data via transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
 [ALBERT](https://arxiv.org/pdf/1909.11942.pdf), and [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB).
@@ -38,7 +38,7 @@ train_data.head(10)
 Above the data happen to be stored in a [Parquet](https://databricks.com/glossary/what-is-parquet) table format, but you can also directly `load()` data from a [CSV](https://en.wikipedia.org/wiki/Comma-separated_values) file instead. While here we load files from [AWS S3 cloud storage](https://docs.aws.amazon.com/AmazonS3/latest/dev/Welcome.html), these could instead be local files on your machine. After loading, `train_data` is simply a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), where each row represents a different training example (for machine learning to be appropriate, the rows should be independent and identically distributed).
 
 To ensure this tutorial runs quickly, we simply call `fit()` with a subset of 2000 training examples and limit its runtime to approximately 1 minute. 
-To achieve reasonable performance in your applications, you should set much longer `time_limits` (eg. 1 hour), or do not specify `time_limits` at all. 
+To achieve reasonable performance in your applications, you should set much longer `time_limits` (eg. 1 hour), or do not specify `time_limits` at all.
 
 
 ```{.python .input}
@@ -86,7 +86,7 @@ print('"Sentence":', sentence2, '"Predicted Class-Probabilities":', probs[1])
 
 ## Sentence Similarity
 
-Next, let's use AutoGluon to train a model for evaluating how semantically similar two sentences are. 
+Next, let's use AutoGluon to train a model for evaluating how semantically similar two sentences are. 
 We use the [Semantic Textual Similarity Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark) dataset for illustration.
 
 
@@ -152,7 +152,7 @@ print(score1, score2, score3)
 ```
 
 ## Save and Load
-Finally we demonstrate how to easily save and load a trained TextPrediction model.
+Here, we demonstrate how to easily save and load a trained TextPrediction model.
 
 
 ```{.python .input}
@@ -162,6 +162,19 @@ predictor_sts_new = task.load('saved_dir')
 score3 = predictor_sts_new.predict({'sentence1': [sentences[0]],
                                     'sentence2': [sentences[3]]})
 print(score3)
+```
+
+## Extract Embeddings
+:label:`sec_textprediction_extract_embedding`
+
+After you have trained a predictor, you can also use the predictor to extract embeddings that maps the input data to a real vector. 
+This can be useful for integrating with other AutoGluon modules like TabularPredictor. 
+We can just feed the embeddings to TabularPredictor. 
+
+
+```{.python .input}
+embeddings = predictor_sts_new.extract_embedding(dev_data)
+print(embeddings)
 ```
 
 **Note:** `TextPrediction` depends on the [GluonNLP](https://gluon-nlp.mxnet.io/) package. 

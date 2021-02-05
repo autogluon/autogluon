@@ -10,16 +10,19 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from autogluon.core.constants import MULTICLASS, REGRESSION
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
+from autogluon.core.features.types import R_OBJECT
 
-from ...features.feature_metadata import R_OBJECT
-from ..abstract.model_trial import skip_hpo
-from ..abstract.abstract_model import AbstractModel
-from ...features.generators import LabelEncoderFeatureGenerator
+from autogluon.core.models.abstract.model_trial import skip_hpo
+from autogluon.core.models import AbstractModel
+from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
 
 class RFModel(AbstractModel):
+    """
+    Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._model_type = self._get_model_type()
@@ -69,10 +72,7 @@ class RFModel(AbstractModel):
         n_estimators_final = hyperparams['n_estimators']
 
         n_estimators_minimum = min(40, n_estimators_final)
-        if n_estimators_minimum < 40:
-            n_estimators_test = max(1, math.floor(n_estimators_minimum/5))
-        else:
-            n_estimators_test = 8
+        n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
 
         X_train = self.preprocess(X_train)
         n_estimator_increments = [n_estimators_final]
@@ -113,8 +113,9 @@ class RFModel(AbstractModel):
             self.model = self.model.fit(X_train, y_train)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
-
-                model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
+                model_size_bytes = 0
+                for estimator in self.model.estimators_:  # Uses far less memory than pickling the entire forest at once
+                    model_size_bytes += sys.getsizeof(pickle.dumps(estimator))
                 expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / self.model.n_estimators)
                 available_mem = psutil.virtual_memory().available
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
@@ -145,7 +146,7 @@ class RFModel(AbstractModel):
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
     def get_model_feature_importance(self):

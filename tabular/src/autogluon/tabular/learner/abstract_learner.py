@@ -14,18 +14,17 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.metrics import confusion_matrix, get_metric
+from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
+from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.core.metrics import confusion_matrix
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.utils import get_pred_from_proba, infer_problem_type
+from autogluon.features.generators import PipelineFeatureGenerator
 
 from ..trainer.abstract_trainer import AbstractTrainer
-from ..tuning.ensemble_selection import EnsembleSelection
-from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
-from ..utils import get_pred_from_proba, infer_problem_type
-from ..data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from ..features.generators import PipelineFeatureGenerator
-
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 
 logger = logging.getLogger(__name__)
 
@@ -39,28 +38,33 @@ class AbstractLearner:
     learner_info_name = 'info.pkl'
     learner_info_json_name = 'info.json'
 
-    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: PipelineFeatureGenerator, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
+    def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
+                 problem_type=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
-        self.id_columns = id_columns
+        self.ignored_columns = ignored_columns
+        if self.ignored_columns is None:
+            self.ignored_columns = []
         self.threshold = label_count_threshold
         self.problem_type = problem_type
-        self.eval_metric = eval_metric
-        self.stopping_metric = stopping_metric
+        self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
+        self.cache_data = cache_data
+        if not self.cache_data:
+            logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
         self.is_trainer_present = is_trainer_present
-        if random_seed is None:
-            random_seed = random.randint(0, 1000000)
-        self.random_seed = random_seed
+        if random_state is None:
+            random_state = random.randint(0, 1000000)
+        self.random_state = random_state
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
-        self.feature_generators = [self.feature_generator]
 
         self.trainer: AbstractTrainer = None
         self.trainer_type = None
         self.trainer_path = None
         self.reset_paths = False
+
+        self._positive_class = positive_class
 
         try:
             from ..version import __version__
@@ -69,8 +73,16 @@ class AbstractLearner:
             self.version = None
 
     @property
+    def feature_generators(self):
+        return [self.feature_generator]
+
+    @property
     def class_labels(self):
         return self.label_cleaner.ordered_class_labels
+
+    @property
+    def is_fit(self):
+        return self.trainer_path is not None or self.trainer is not None
 
     def set_contexts(self, path_context):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
@@ -81,6 +93,8 @@ class AbstractLearner:
         return path_context, model_context, save_path
 
     def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):
+        if self.is_fit:
+            raise AssertionError('Learner is already fit.')
         self._validate_fit_input(X=X, X_val=X_val, **kwargs)
         return self._fit(X=X, X_val=X_val, **kwargs)
 
@@ -157,9 +171,14 @@ class AbstractLearner:
     def refit_ensemble_full(self, model='all'):
         return self.load_trainer().refit_ensemble_full(model=model)
 
-    def fit_transform_features(self, X, y=None):
+    def fit_transform_features(self, X, y=None, **kwargs):
+        if self.label in X:
+            X = X.drop(columns=[self.label])
+        if self.ignored_columns:
+            logger.log(20, f'Dropping user-specified ignored columns: {self.ignored_columns}')
+            X = X.drop(columns=self.ignored_columns, errors='ignore')
         for feature_generator in self.feature_generators:
-            X = feature_generator.fit_transform(X, y)
+            X = feature_generator.fit_transform(X, y, **kwargs)
         return X
 
     def transform_features(self, X):
@@ -170,30 +189,27 @@ class AbstractLearner:
     def score(self, X: DataFrame, y=None, model=None):
         if y is None:
             X, y = self.extract_label(X)
-        X = self.transform_features(X)
-        y = self.label_cleaner.transform(y)
-        trainer = self.load_trainer()
-        if self.problem_type == MULTICLASS:
-            y = y.fillna(-1)
-            if (not trainer.eval_metric_expects_y_pred) and (-1 in y.unique()):
-                # log_loss / pac_score
-                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
-        return trainer.score(X=X, y=y, model=model)
+        self._validate_class_labels(y)
+        if self.eval_metric.needs_pred:
+            y_pred = self.predict(X=X, model=model)
+            return self.eval_metric(y, y_pred)
+        else:
+            y_pred_proba = self.predict_proba(X=X, model=model)
+            y = self.label_cleaner.transform(y)
+            return self.eval_metric(y, y_pred_proba)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
         leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
         if y is None:
             X, y = self.extract_label(X)
-        X = self.transform_features(X)
-        y = self.label_cleaner.transform(y)
-        trainer = self.load_trainer()
-        if self.problem_type == MULTICLASS:
-            y = y.fillna(-1)
-            if (not trainer.eval_metric_expects_y_pred) and (-1 in y.unique()):
-                # log_loss / pac_score
-                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
+        self._validate_class_labels(y)
 
+        X = self.transform_features(X)
+        y_internal = self.label_cleaner.transform(y)
+        y_internal = y_internal.fillna(-1)
+
+        trainer = self.load_trainer()
         scores = {}
         all_trained_models = trainer.get_model_names()
         all_trained_models_can_infer = trainer.get_model_names(can_infer=True)
@@ -203,24 +219,23 @@ class AbstractLearner:
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())
             ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric)
-            ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
+            ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None)  # TODO: Only fit non-nan
             oracle_weights = ensemble_selection.weights_
             oracle_pred_time_start = time.time()
             oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
             oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
             oracle_pred_time = time.time() - oracle_pred_time_start
-            model_pred_proba_dict['oracle_ensemble'] = oracle_pred_proba_ensemble
-            pred_time_test_marginal['oracle_ensemble'] = oracle_pred_time
-            all_trained_models.append('oracle_ensemble')
+            model_pred_proba_dict['OracleEnsemble'] = oracle_pred_proba_ensemble
+            pred_time_test_marginal['OracleEnsemble'] = oracle_pred_time
+            all_trained_models.append('OracleEnsemble')
 
-        for model_name, pred_proba in model_pred_proba_dict.items():
-            if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
-                pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)  # FIXME: I think this doesn't work correctly, must use original y as well!
-            if trainer.eval_metric_expects_y_pred:
-                pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
-                scores[model_name] = self.eval_metric(y, pred)
+        for model_name, y_pred_proba_internal in model_pred_proba_dict.items():
+            if self.eval_metric.needs_pred:
+                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+                scores[model_name] = self.eval_metric(y, y_pred)
             else:
-                scores[model_name] = self.eval_metric(y, pred_proba)
+                y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
+                scores[model_name] = self.eval_metric(y_internal, y_pred_proba)
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
@@ -278,21 +293,20 @@ class AbstractLearner:
 
         return df_merged
 
-    def _remove_missing_labels(self, y_true, y_pred):
-        """Removes missing labels and produces warning if any are found."""
-        if self.problem_type == REGRESSION:
-            non_missing_boolean_mask = [y is not None and not pd.isnull(y) for y in y_true]
-        else:
-            non_missing_boolean_mask = [y is not None and not pd.isnull(y) and y != '' for y in y_true]
-
-        n_missing = len(non_missing_boolean_mask) - sum(non_missing_boolean_mask)
-        if n_missing > 0:
-            y_true = y_true[non_missing_boolean_mask]
-            y_pred = y_pred[non_missing_boolean_mask]
-            warnings.warn(f"There are {n_missing} (out of {len(y_true)}) evaluation datapoints for which the label is missing. "
-                          f"AutoGluon removed these points from the evaluation, which thus may not be entirely representative. "
-                          f"You should carefully study why there are missing labels in your evaluation data.")
-        return y_true, y_pred
+    def _validate_class_labels(self, y: Series):
+        null_count = y.isnull().sum()
+        if null_count:
+            raise ValueError(f'Labels cannot contain missing (nan) values. Found {null_count} missing label values.')
+        if self.problem_type == MULTICLASS and not self.eval_metric.needs_pred:
+            y_unique = np.unique(y)
+            valid_class_set = set(self.class_labels)
+            unknown_classes = []
+            for cls in y_unique:
+                if cls not in valid_class_set:
+                    unknown_classes.append(cls)
+            if unknown_classes:
+                # log_loss / pac_score
+                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
 
     # TODO: Refactor to be less brittle.
     # TODO: Instead take y_pred_proba as input, convert to y_pred when necessary. Treat y_pred_proba as y_pred for regression.
@@ -312,14 +326,15 @@ class AbstractLearner:
         assert isinstance(y_true, (np.ndarray, pd.Series))
         assert isinstance(y_pred, (np.ndarray, pd.Series))  # TODO: Enable DataFrame for y_pred_proba
 
-        # TODO: Consider removing _remove_missing_labels, this creates an inconsistency between how .score, .score_debug, and .evaluate compute scores.
-        y_true, y_pred = self._remove_missing_labels(y_true, y_pred)
+        self._validate_class_labels(y_true)
+        if not self.eval_metric.needs_pred:
+            y_true = self.label_cleaner.transform(y_true)  # Get labels in numeric order
         performance = self.eval_metric(y_true, y_pred)
 
         metric = self.eval_metric.name
 
         if not high_always_good:
-            performance = performance * self.eval_metric._sign  # flip negative once again back to positive (so higher is no longer necessarily better)
+            performance = self.eval_metric.convert_score_to_sklearn_val(performance)  # flip negative once again back to positive (so higher is no longer necessarily better)
 
         if not silent:
             logger.log(20, f"Evaluation: {metric} on test data: {performance}")
@@ -471,7 +486,8 @@ class AbstractLearner:
         obj = load_pkl.load(path=load_path)
         if reset_paths:
             obj.set_contexts(path_context)
-            obj.trainer_path = obj.model_context
+            if obj.trainer_path is not None:
+                obj.trainer_path = obj.model_context
             obj.reset_paths = reset_paths
             # TODO: Still have to change paths of models in trainer + trainer object path variables
             return obj
@@ -491,6 +507,8 @@ class AbstractLearner:
         if self.trainer is not None:
             return self.trainer
         else:
+            if self.trainer_path is None:
+                raise AssertionError('Trainer does not exist.')
             return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
 
     # Loads models in memory so that they don't have to be loaded during predictions
@@ -503,7 +521,7 @@ class AbstractLearner:
         else:
             return []
 
-    def distill(self, X=None, y=None, X_val=None, y_val=None, time_limits=None, hyperparameters=None, holdout_frac=None,
+    def distill(self, X=None, y=None, X_val=None, y_val=None, time_limit=None, hyperparameters=None, holdout_frac=None,
                 verbosity=None, models_name_suffix=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
         """ See abstract_trainer.distill() for details. """
@@ -531,7 +549,7 @@ class AbstractLearner:
             augmentation_data = self.transform_features(augmentation_data)
 
         trainer = self.load_trainer()
-        distilled_model_names = trainer.distill(X_train=X, y_train=y, X_val=X_val, y_val=y_val, time_limits=time_limits, hyperparameters=hyperparameters,
+        distilled_model_names = trainer.distill(X_train=X, y_train=y, X_val=X_val, y_val=y_val, time_limit=time_limit, hyperparameters=hyperparameters,
                                                 holdout_frac=holdout_frac, verbosity=verbosity, teacher_preds=teacher_preds, models_name_suffix=models_name_suffix,
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)
@@ -562,7 +580,7 @@ class AbstractLearner:
         learner_info = {
             'path': self.path,
             'label': self.label,
-            'random_seed': self.random_seed,
+            'random_state': self.random_state,
             'version': self.version,
         }
 

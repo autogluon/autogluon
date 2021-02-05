@@ -155,7 +155,8 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
         else:
             train_loss_val = 0.0
         for i in indices_to_check:
-            score = env.evaluation_result_list[i][2]
+            eval_result = env.evaluation_result_list[i]
+            _, eval_metric, score, greater_is_better = eval_result
             if best_score_list[i] is None or cmp_op[i](score, best_score[i]):
                 best_score[i] = score
                 best_iter[i] = env.iteration
@@ -171,7 +172,10 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                              validation_performance=validation_perf,
                              train_loss=best_trainloss[i],
                              best_iter_sofar=best_iter[i] + 1,
-                             best_valperf_sofar=best_score[i])
+                             best_valperf_sofar=best_score[i],
+                             eval_metric=eval_metric,  # eval_metric here is the stopping_metric from LGBModel
+                             greater_is_better=greater_is_better,
+                             )
             if env.iteration - best_iter[i] >= stopping_rounds:
                 if verbose:
                     logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
@@ -190,7 +194,7 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if verbose:
-                logger.debug((env.iteration - best_iter[i], env.evaluation_result_list[i]))
+                logger.debug((env.iteration - best_iter[i], eval_result))
         if manual_stop_file:
             if os.path.exists(manual_stop_file):
                 i = indices_to_check[0]

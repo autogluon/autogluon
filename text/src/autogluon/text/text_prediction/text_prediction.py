@@ -1,6 +1,7 @@
 import logging
 import copy
 import warnings
+import os
 from packaging import version
 
 import numpy as np
@@ -15,16 +16,16 @@ from .dataset import random_split_train_val, TabularDataset, infer_problem_type,
     get_column_properties
 from .models.basic_v1 import BertForTextPredictionBasic
 from autogluon.core.task.base import BaseTask
-from autogluon.core.scheduler import get_cpu_count, get_gpu_count
 from autogluon.core import space
 from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.loaders import load_pd
-from autogluon.core.utils.utils import default_holdout_frac
+from autogluon.core.utils.utils import get_cpu_count, get_gpu_count, default_holdout_frac
 from autogluon.core.utils.miscs import verbosity2loglevel
+
 
 __all__ = ['TextPrediction', 'ag_text_prediction_params']
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return root logger
 
 ag_text_prediction_params = Registry('ag_text_prediction_params')
 
@@ -43,8 +44,10 @@ def default() -> dict:
                 'search_space': {
                     'model.backbone.name': 'google_electra_small',
                     'optimization.batch_size': 32,
+                    'optimization.per_device_batch_size': 16,
                     'optimization.num_train_epochs': 4,
-                    'optimization.lr': space.Real(1E-5, 1E-4)
+                    'optimization.lr': space.Real(1E-5, 1E-4, default=5E-5),
+                    'optimization.layerwise_lr_decay': 0.8
                 }
             },
         },
@@ -54,10 +57,52 @@ def default() -> dict:
             'search_options': None,        # Extra kwargs passed to searcher
             'scheduler_options': None,     # Extra kwargs passed to scheduler
             'time_limits': None,           # The total time limit
-            'num_trials': 4,               # The number of trials
-        }
+            'num_trials': 3,               # The number of trials
+        },
+        'seed': None,                      # The seed value
     }
     return ret
+
+
+@ag_text_prediction_params.register()
+def default_no_hpo() -> dict:
+    """The default hyperparameters without HPO"""
+    cfg = default()
+    cfg['hpo_params']['num_trials'] = 1
+    return cfg
+
+
+@ag_text_prediction_params.register()
+def default_electra_small_no_hpo() -> dict:
+    """The default search space that uses ELECTRA Small as the backbone."""
+    cfg = default_no_hpo()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+        = 'google_electra_small'
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 16
+    return cfg
+
+
+@ag_text_prediction_params.register()
+def default_electra_base_no_hpo() -> dict:
+    """The default search space that uses ELECTRA Base as the backbone"""
+    cfg = default_no_hpo()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+        = 'google_electra_base'
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 8
+    return cfg
+
+
+@ag_text_prediction_params.register()
+def default_electra_large_no_hpo() -> dict:
+    """The default search space that uses ELECTRA Base as the backbone"""
+    cfg = default_no_hpo()
+    cfg['models']['BertForTextPredictionBasic']['search_space']['model.backbone.name'] \
+        = 'google_electra_large'
+    cfg['models']['BertForTextPredictionBasic']['search_space'][
+        'optimization.per_device_batch_size'] = 4
+    return cfg
 
 
 def merge_params(base_params, partial_params=None):
@@ -93,20 +138,23 @@ def merge_params(base_params, partial_params=None):
 
 
 def get_recommended_resource(nthreads_per_trial=None,
-                             ngpus_per_trial=None):
-    """Get the recommended resource.
+                             ngpus_per_trial=None) -> dict:
+    """Get the recommended resources.
+
+    Internally, we will try to use GPU whenever it's possible. That means, we will use
+    a single GPU for finetuning.
 
     Parameters
     ----------
     nthreads_per_trial
-        The number of threads per trial
+        The number of threads per trial provided by the user.
     ngpus_per_trial
-        The number of GPUs per trial
+        The number of GPUs per trial provided by the user.
 
     Returns
     -------
     resource
-        The resource
+        The recommended resource.
     """
     if nthreads_per_trial is None and ngpus_per_trial is None:
         nthreads_per_trial = get_cpu_count()
@@ -162,9 +210,9 @@ def infer_eval_stop_log_metrics(problem_type,
         if eval_metric is None:
             eval_metric = 'acc'
         if label_shape == 2:
-            log_metrics = ['f1', 'mcc', 'auc', 'acc', 'nll']
+            log_metrics = ['f1', 'mcc', 'roc_auc', 'acc', 'log_loss']
         else:
-            log_metrics = ['acc', 'nll']
+            log_metrics = ['acc', 'log_loss']
     elif problem_type == _C.REGRESSION:
         if stopping_metric is None:
             stopping_metric = 'mse'
@@ -208,16 +256,17 @@ class TextPrediction(BaseTask):
             hyperparameters=None,
             plot_results=None,
             seed=None,
+            visualizer=None,
             verbosity=2):
         """Fit models to make predictions based on text inputs.
 
         Parameters
         ----------
-        train_data : :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`
+        train_data : :class:`autogluon.tabular.TabularDataset` or :class:`pd.DataFrame`
             Training dataset where rows = individual training examples, columns = features.
         label : str
             Name of the label column. It can be a stringBy default, we will search for a column named
-        tuning_data : :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
+        tuning_data : :class:`autogluon.tabular.TabularDataset` or :class:`pd.DataFrame`, default = None
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
             If `tuning_data = None`, `fit()` will automatically hold out random examples from `train_data` for validation.
         time_limits : int or str, default = None
@@ -268,7 +317,9 @@ class TextPrediction(BaseTask):
         plot_results : bool, default = None
             Whether or not to plot intermediate training results during `fit()`.
         seed : int, default = None
-            Seed value for random state used inside `fit()`. 
+            Seed value for random state used inside `fit()`.
+        visualizer : str, default = None
+            How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', None].
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed
             during fit().
@@ -308,7 +359,9 @@ class TextPrediction(BaseTask):
         else:
             base_params = ag_text_prediction_params.create('default')
             hyperparameters = merge_params(base_params, hyperparameters)
-        np.random.seed(seed)
+        if seed is not None:
+            hyperparameters['seed'] = seed
+        np.random.seed(hyperparameters['seed'])
         if not isinstance(train_data, pd.DataFrame):
             train_data = load_pd.load(train_data)
         # Inference the label
@@ -338,6 +391,7 @@ class TextPrediction(BaseTask):
                 holdout_frac = default_holdout_frac(len(train_data), True)
             train_data, tuning_data = random_split_train_val(train_data,
                                                              valid_ratio=holdout_frac)
+
         else:
             if not isinstance(tuning_data, pd.DataFrame):
                 tuning_data = load_pd.load(tuning_data)
@@ -349,6 +403,17 @@ class TextPrediction(BaseTask):
             label_columns=label_columns,
             provided_column_properties=None,
             categorical_default_handle_missing_value=True)
+        has_text_column = False
+        for k, v in column_properties.items():
+            if v.type == _C.TEXT:
+                has_text_column = True
+                break
+        if not has_text_column:
+            raise AssertionError('No Text Column is found! This is currently not supported by '
+                                 'the TextPrediction task. You may try to use '
+                                 'autogluon.tabular.TabularPredictor.\n'
+                                 'The inferred column properties of the training data is {}'
+                                 .format(train_data))
         train_data = TabularDataset(train_data,
                                     column_properties=column_properties,
                                     label_columns=label_columns)
@@ -362,17 +427,7 @@ class TextPrediction(BaseTask):
         logger.info(tuning_data)
         logger.debug('Hyperparameters:')
         logger.debug(hyperparameters)
-        has_text_column = False
-        for k, v in column_properties.items():
-            if v.type == _C.TEXT:
-                has_text_column = True
-                break
-        if not has_text_column:
-            raise NotImplementedError('No Text Column is found! This is currently not supported by '
-                                      'the TextPrediction task. You may try to use '
-                                      'TabularPrediction.fit().\n' \
-                                      'The inferred column properties of the training data is {}'
-                                      .format(train_data))
+
         problem_types = []
         label_shapes = []
         for label_col_name in label_columns:
@@ -432,6 +487,7 @@ class TextPrediction(BaseTask):
             scheduler_options = hyperparameters['hpo_params']['scheduler_options']
             if scheduler_options is None:
                 scheduler_options = dict()
+        scheduler_options['visualizer'] = visualizer
         if search_strategy.endswith('hyperband'):
             # Specific defaults for hyperband scheduling
             scheduler_options['reduction_factor'] = scheduler_options.get(
@@ -442,7 +498,22 @@ class TextPrediction(BaseTask):
                 'max_t', 50)
 
         if recommended_resource['num_gpus'] == 0:
-            warnings.warn('Recommend to use GPU to run the TextPrediction task!')
+            if 'AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU' in os.environ:
+                use_warning = int(os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'])
+            else:
+                use_warning = False
+            if use_warning:
+                warnings.warn('No GPU is detected in the machine and we will recommend you to '
+                              'use TextPrediction on a GPU-enabled instance. Currently, '
+                              'training on CPU is slow.')
+            else:
+                raise RuntimeError('No GPU is detected in the machine and we will '
+                                   'not proceed to run TexPrediction because they will train '
+                                   'too slowly with only CPU. You may try to set `ngpus_per_trial` '
+                                   'to a number larger than 0 when calling `.fit()`. '
+                                   'Also, you can set the environment variable '
+                                   '"AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU=1" to force the model to '
+                                   'use CPU for training.')
         model = model_candidates[0]
         if plot_results is None:
             if in_ipynb():
@@ -458,7 +529,7 @@ class TextPrediction(BaseTask):
                     scheduler_options=scheduler_options,
                     num_trials=num_trials,
                     plot_results=plot_results,
-                    console_log=verbosity > 2,
+                    console_log=verbosity >= 2,
                     ignore_warning=verbosity <= 2)
         return model
 

@@ -43,7 +43,7 @@ long_description = open(os.path.join('..', 'README.md')).read()
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
-    'numpy>=1.16.0',
+    'numpy>=1.20',
     'scipy>=1.3.3,<1.5.0',
     'catboost>=0.23.0,<0.25',
     'xgboost>=1.2,<1.3',
@@ -52,12 +52,15 @@ requirements = [
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'scikit-learn>=0.22.0,<0.24',
     'networkx>=2.3,<3.0',
-    'gluoncv==0.9.0',
-    f'autogluon.core=={version}'
+    'gluoncv>=0.9.1,<1.0',  # TODO: v0.1 consider using only minimum required code from gluoncv and drop dependency
+    'torch>=1.0,<2.0',  # TODO: v0.1 make optional
+    'fastai>=1.0,<2.0',  # TODO: v0.1 make optional
+    f'autogluon.core=={version}',
+    f'autogluon.features=={version}',
 ]
 
 test_requirements = [
-    'pytest'
+    'pytest',
 ]
 
 if __name__ == '__main__':

@@ -166,10 +166,10 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
         """
         if not (hasattr(X, 'iloc') and getattr(X, 'ndim', 0) == 2):
             # if not a dataframe, do normal check_array validation
-            X_temp = check_array(X, dtype=None)
+            X_temp = check_array(X, dtype=None, force_all_finite=False)
             if (not hasattr(X, 'dtype')
                     and np.issubdtype(X_temp.dtype, np.str_)):
-                X = check_array(X, dtype=np.object)
+                X = check_array(X, dtype=object)
             else:
                 X = X_temp
             needs_validation = False
@@ -247,8 +247,8 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
     def _transform(self, X, handle_unknown='error'):
         X_list, n_samples, n_features = self._check_X(X)
         
-        X_int = np.zeros((n_samples, n_features), dtype=np.int)
-        X_mask = np.ones((n_samples, n_features), dtype=np.bool)
+        X_int = np.zeros((n_samples, n_features), dtype=int)
+        X_mask = np.ones((n_samples, n_features), dtype=bool)
         
         if n_features != len(self.categories_):
             raise ValueError(
@@ -365,7 +365,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
     sparse : boolean, default=True
         Will return sparse matrix if set True else will return an array.
 
-    dtype : number type, default=np.float
+    dtype : number type, default=float
         Desired dtype of output.
         
     max_levels : int, default=None
@@ -382,7 +382,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         (if any).
 
     drop_idx_ : array of shape (n_features,)
-        ``drop_idx_[i]`` is the index in ``categories_[i]`` of the category to
+        ``drop_idx_[i]`` is the index in ``categories_[i]`` of the category to
         be dropped for each feature. None if all the transformed features will
         be retained.
 
@@ -765,8 +765,13 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
         self
         
         """
-        X = np.array(X).tolist() # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
+        X = np.array(X).tolist()  # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
         self._fit(X, handle_unknown='ignore')
+
+        self.categories_as_sets_ = [set(categories) for categories in self.categories_]
+        # new level introduced to account for unknown categories, always = 1 + total number of categories seen during training
+        self.categories_unknown_level_ = [min(len(categories), self.max_levels) for categories in self.categories_]
+        self.categories_len_ = [len(categories) for categories in self.categories_]
         return self
     
     def transform(self, X):
@@ -783,15 +788,16 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
             Transformed input.
         
         """
-        X = np.array(X).tolist() # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
+        X_og_array = np.array(X)  # original X array before transform
+        X = X_og_array.tolist()  # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
         X_int, _ = self._transform(X, handle_unknown='ignore')  # will contain zeros for 0th category as well as unknown values.
-        X_og_array = np.array(X) # original X array before transform
+
         for i in range(X_int.shape[1]):
-            feature_i_categories = self.categories_[i]
-            feature_i_numlevels = min(len(feature_i_categories), self.max_levels)
-            unknown_level_i = feature_i_numlevels  # new level introduced to account for unknown categories, alway= 1 + total number of categories seen during training
-            unknown_elements = np.logical_not(np.isin(X_og_array[:,i], feature_i_categories))
-            X_int[unknown_elements,i] = unknown_level_i # replace entries with unknown categories with feature_i_numlevels + 1 value. Do NOT modify self.categories_
+            X_col_data = X_og_array[:, i]
+            cat_set = self.categories_as_sets_[i]
+            unknown_elements = np.array([cat not in cat_set for cat in X_col_data.tolist()])
+            X_int[unknown_elements, i] = self.categories_unknown_level_[i]  # replace entries with unknown categories with feature_i_numlevels + 1 value. Do NOT modify self.categories_
+
         return X_int.astype(self.dtype, copy=False)
     
     def inverse_transform(self, X):
@@ -831,5 +837,3 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
             X_tr[:, i] = self.categories_[i][labels]
         
         return X_tr
-
-

@@ -45,7 +45,7 @@ long_description = open(os.path.join('..', 'README.md')).read()
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
-    'numpy>=1.16.0',
+    'numpy>=1.20',
     'scipy>=1.3.3,<1.5.0',
     'tqdm>=4.38.0',
     'pandas>=1.0.0,<2.0',
@@ -55,8 +55,8 @@ requirements = [
 ]
 
 text_requirements = [
-    'pyarrow<=1.0.0',
-    'autogluon-contrib-nlp'
+    'pyarrow>=3.0.0',
+    'autogluon-contrib-nlp==0.0.1b20210112'
 ]
 
 test_requirements = [

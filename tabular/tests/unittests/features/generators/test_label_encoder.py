@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from autogluon.tabular.features import LabelEncoderFeatureGenerator
+from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 
 def test_label_encoder_feature_generator(generator_helper, data_helper):

@@ -250,10 +250,10 @@ class GaussProcSurrogateModel(BaseSurrogateModel):
 
         fit_parameters = fit_parameters and (not state.pending_evaluations)
         if not fit_parameters:
-            logger.info("Recomputing GP state")
+            logger.log(15, "Recomputing GP state")
             self._gpmodel.recompute_states(X_all, Y_all, profiler=profiler)
         else:
-            logger.info("Fitting GP model")
+            logger.log(15, "Fitting GP model")
             self._gpmodel.fit(X_all, Y_all, profiler=profiler)
         if self._debug_log is not None:
             self._debug_log.set_gp_params(self.get_params())

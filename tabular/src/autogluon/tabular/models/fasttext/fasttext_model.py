@@ -11,11 +11,10 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.constants import BINARY, MULTICLASS
+from autogluon.core.features.types import S_TEXT
 
-from ...features.feature_metadata import S_TEXT
-
-from ..abstract.abstract_model import AbstractModel
-from ..abstract.model_trial import skip_hpo
+from autogluon.core.models import AbstractModel
+from autogluon.core.models.abstract.model_trial import skip_hpo
 from .hyperparameters.parameters import get_param_baseline
 
 logger = logging.getLogger(__name__)
@@ -193,5 +192,5 @@ class FastTextModel(AbstractModel):
         return self._model_size_estimate
 
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)

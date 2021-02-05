@@ -1,5 +1,4 @@
 import autograd.numpy as anp
-from autograd.tracer import getval
 
 from .base import KernelFunction
 
@@ -34,22 +33,18 @@ class ProductKernelFunction(KernelFunction):
 
     def forward(self, X1, X2):
         d1 = self.kernel1.dimension
-        X1_shape = getval(X1.shape)
-        X2_shape = getval(X2.shape)
-        X1_1 = anp.take(X1, range(0, d1), axis=1)
-        X1_2 = anp.take(X1, range(d1, X1_shape[1]), axis=1)
-        X2_1 = anp.take(X2, range(0, d1), axis=1)
-        X2_2 = anp.take(X2, range(d1, X2_shape[1]), axis=1)
-        
+        X1_1 = X1[:, :d1]
+        X1_2 = X1[:, d1:]
+        X2_1 = X2[:, :d1]
+        X2_2 = X1[:, d1:]
         kmat1 = self.kernel1(X1_1, X2_1)
         kmat2 = self.kernel2(X1_2, X2_2)
         return kmat1 * kmat2
 
     def diagonal(self, X):
         d1 = self.kernel1.dimension
-        X_shape = getval(X.shape)
-        X1 = anp.take(X, range(0, d1), axis=1)
-        X2 = anp.take(X, range(d1, X_shape[1]), axis=1)
+        X1 = X[:, :d1]
+        X2 = X[:, d1:]
         diag1 = self.kernel1.diagonal(X1)
         diag2 = self.kernel2.diagonal(X2)
         return diag1 * diag2

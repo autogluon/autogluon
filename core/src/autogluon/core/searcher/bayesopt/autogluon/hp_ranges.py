@@ -1,6 +1,6 @@
 import numpy as np
 import ConfigSpace as CS
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from ..datatypes.common import Candidate
 from ..datatypes.hp_ranges import HyperparameterRanges
@@ -82,6 +82,8 @@ class HyperparameterRanges_CS(HyperparameterRanges):
         self.categ_trg = np.array(categ_trg, dtype=np.int64)
         self.categ_card = np.array(categ_card, dtype=np.int64)
         self._ndarray_size = trg_pos
+        self.keys_sorted = sorted(
+            [hp.name for hp in config_space.get_hyperparameters()])
 
     def to_ndarray(self, cand_tuple: Candidate) -> np.ndarray:
         assert isinstance(cand_tuple, CS.Configuration)
@@ -168,6 +170,8 @@ class HyperparameterRanges_CS(HyperparameterRanges):
             self, random_state, num_configs: int) -> List[Candidate]:
         self.config_space.random = random_state  # Not great...
         rnd_configs = self.config_space.sample_configuration(num_configs)
+        if num_configs == 1:
+            rnd_configs = [rnd_configs]
         if self.is_attribute_fixed():
             rnd_configs = [self._transform_config(x) for x in rnd_configs]
         return rnd_configs
@@ -205,3 +209,21 @@ class HyperparameterRanges_CS(HyperparameterRanges):
 
             candidates = list(filter(filter_pred, candidates))
         return candidates
+
+    def config_to_tuple(self, config: Union[CS.Configuration, dict]) -> tuple:
+        """
+        :param config: Configuration (can also be dict)
+        :return: Tuple representation
+        """
+        if isinstance(config, CS.Configuration):
+            config = config.get_dictionary()
+        else:
+            assert isinstance(config, dict)
+        return tuple(config[k] for k in self.keys_sorted)
+
+    def tuple_to_config(self, config_tpl: tuple, as_dict: bool = False) -> \
+            Union[CS.Configuration, dict]:
+        config = dict(zip(self.keys_sorted, config_tpl))
+        if not as_dict:
+            config = CS.Configuration(self.config_space, values=config)
+        return config

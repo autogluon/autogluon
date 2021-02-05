@@ -1,12 +1,12 @@
 import copy
 import os
 import shutil
-
+import uuid
 import pytest
 
 import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.tabular import TabularPrediction as task
+from autogluon.tabular import TabularDataset, TabularPredictor
 
 
 def pytest_addoption(parser):
@@ -36,22 +36,29 @@ class DatasetLoaderHelper:
             'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
             'name': 'AdultIncomeBinaryClassification',
             'problem_type': BINARY,
-            'label_column': 'class',
+            'label': 'class',
         },
         # Multiclass big dataset with 7 classes, all features are numeric. Runs SLOW.
         covertype={
             'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
             'name': 'CoverTypeMulticlassClassification',
             'problem_type': MULTICLASS,
-            'label_column': 'Cover_Type',
+            'label': 'Cover_Type',
         },
         # Regression with mixed feature-types, skewed Y-values.
         ames={
             'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
             'name': 'AmesHousingPriceRegression',
             'problem_type': REGRESSION,
-            'label_column': 'SalePrice',
+            'label': 'SalePrice',
         },
+        # Regression with multiple text field and categorical
+        sts={
+            'url': 'https://autogluon-text.s3.amazonaws.com/glue_sts.zip',
+            'name': 'glue_sts',
+            'problem_type': REGRESSION,
+            'label': 'score',
+        }
     )
 
     @staticmethod
@@ -85,8 +92,8 @@ class DatasetLoaderHelper:
             ag.unzip(zip_name, directory_prefix)
             os.remove(zip_name)
 
-        train_data = task.Dataset(file_path=train_file_path)
-        test_data = task.Dataset(file_path=test_file_path)
+        train_data = TabularDataset(train_file_path)
+        test_data = TabularDataset(test_file_path)
         return train_data, test_data
 
 
@@ -95,14 +102,13 @@ class FitHelper:
     def fit_and_validate_dataset(dataset_name, fit_args, sample_size=1000, refit_full=True, delete_directory=True):
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
-        label_column = dataset_info['label_column']
-        directory = directory_prefix + dataset_name + "/"
-        savedir = directory + 'AutogluonOutput/'
-
-        shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
-        fit_args['label'] = label_column
-        fit_args['output_directory'] = savedir
-        predictor = FitHelper.fit_dataset(train_data=train_data, fit_args=fit_args, sample_size=sample_size)
+        label = dataset_info['label']
+        save_path = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
+        init_args = dict(
+            label=label,
+            path=save_path,
+        )
+        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
@@ -119,16 +125,16 @@ class FitHelper:
             predictor.predict_proba(test_data, model=refit_model_name)
         predictor.info()
         predictor.leaderboard(test_data, extra_info=True)
-        assert savedir == predictor.output_directory
+        assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
         if delete_directory:
-            shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
+            shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
 
     @staticmethod
-    def fit_dataset(train_data, fit_args, sample_size=None):
+    def fit_dataset(train_data, init_args, fit_args, sample_size=None):
         if sample_size is not None and sample_size < len(train_data):
             train_data = train_data.sample(n=sample_size, random_state=0)
-        return task.fit(train_data=train_data, **fit_args)
+        return TabularPredictor(**init_args).fit(train_data, **fit_args)
 
 
 @pytest.fixture

@@ -105,19 +105,20 @@ def construct_custom_catboost_metric(metric, is_higher_better, needs_pred_proba,
         return 'Logloss'
     if (metric.name == 'roc_auc') and (problem_type == BINARY) and needs_pred_proba:
         return 'AUC'
-    if (metric.name == 'f1') and (problem_type == BINARY) and not needs_pred_proba:
-        return 'F1'
+    if (metric.name == 'roc_auc_ovo_macro') and (problem_type == MULTICLASS) and needs_pred_proba:
+        logger.warning(f'Metric {metric.name} is not supported by this model - using AUC:type=Mu instead')
+        return 'AUC:type=Mu'
+    if (metric.name in ['f1', 'f1_macro', 'f1_micro', 'f1_weighted']) and (problem_type == BINARY) and not needs_pred_proba:
+        return 'F1:hints=skip_train~true'
     if (metric.name == 'balanced_accuracy') and (problem_type == BINARY) and not needs_pred_proba:
         return 'BalancedAccuracy'
-    if (metric.name == 'recall') and (problem_type == BINARY) and not needs_pred_proba:
+    if (metric.name in ['recall', 'recall_macro', 'recall_micro', 'recall_weighted']) and (problem_type == BINARY) and not needs_pred_proba:
         return 'Recall'
-    if (metric.name == 'precision') and (problem_type == BINARY) and not needs_pred_proba:
+    if (metric.name in ['precision', 'precision_macro', 'precision_micro', 'precision_weighted']) and (problem_type == BINARY) and not needs_pred_proba:
         return 'Precision'
     if (metric.name == 'mean_absolute_error') and (problem_type == REGRESSION):
         return 'MAE'
-    if (metric.name == 'mean_squared_error') and (problem_type == REGRESSION):
-        return 'RMSE'
-    if (metric.name == 'root_mean_squared_error') and (problem_type == REGRESSION):
+    if (metric.name in ['mean_squared_error', 'root_mean_squared_error']) and (problem_type == REGRESSION):
         return 'RMSE'
     if (metric.name == 'median_absolute_error') and (problem_type == REGRESSION):
         return 'MedianAbsoluteError'

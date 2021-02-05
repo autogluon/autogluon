@@ -7,24 +7,29 @@
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
-import random, json, time, os, logging, warnings
+import json
+import logging
+import os
+import random
+import time
+import warnings
 from collections import OrderedDict
 
+import mxnet as mx
 import numpy as np
 import pandas as pd
-import mxnet as mx
-from mxnet import nd, autograd, gluon
 from gluoncv.utils import LRSequential, LRScheduler
+from mxnet import nd, autograd, gluon
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
 from autogluon.core import Space
-from autogluon.core.utils import try_import_mxboard
-from autogluon.core.metrics import log_loss, roc_auc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-
+from autogluon.core.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.core.utils import try_import_mxboard
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .embednet import EmbedNet
@@ -32,10 +37,8 @@ from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
 from .tabular_nn_dataset import TabularNNDataset
 from .tabular_nn_trial import tabular_nn_trial
-from ..abstract.abstract_model import AbstractNeuralNetworkModel
+from autogluon.core.models.abstract.abstract_model import AbstractNeuralNetworkModel
 from ..utils import fixedvals_from_searchspaces
-from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
@@ -84,7 +87,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self.features if it works with bagging
         self.processor = None  # data processor
         self.summary_writer = None
-        self.ctx = mx.cpu()
+        self.ctx = None
         self.batch_size = None
         self.num_dataloading_workers = None
         self.num_dataloading_workers_inference = 0
@@ -93,9 +96,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self._architecture_desc = None
         self.optimizer = None
         self.verbosity = None
-        if self.stopping_metric is not None and self.eval_metric == roc_auc and self.stopping_metric == log_loss:
-            self.stopping_metric = roc_auc  # NN is overconfident so early stopping with logloss can halt training too quick
-
         self.eval_metric_name = self.stopping_metric.name
 
     def _set_default_params(self):
@@ -164,7 +164,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                                                     params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, reporter=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=1, num_gpus=0, reporter=None, **kwargs):
         """ X_train (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_val (pd.DataFrame): test data features (should have same column names as Xtrain)
             y_train (pd.Series):
@@ -177,8 +177,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         params = fixedvals_from_searchspaces(params)
         if self.feature_metadata is None:
             raise ValueError("Trainer class must set feature_metadata for this model")
-        if 'num_cpus' in kwargs:
-            self.num_dataloading_workers = max(1, int(kwargs['num_cpus']/2.0))
+        if num_cpus is not None:
+            self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         else:
             self.num_dataloading_workers = 1
         if self.num_dataloading_workers == 1:
@@ -191,15 +191,18 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                len(train_dataset.feature_groups['language']) ))
         # self._save_preprocessor()  # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
 
-        if 'num_gpus' in kwargs and kwargs['num_gpus'] >= 1:
+        if num_gpus is not None and num_gpus >= 1:
             self.ctx = mx.gpu()  # Currently cannot use more than 1 GPU
         else:
             self.ctx = mx.cpu()
         self.get_net(train_dataset, params=params)
 
-        if time_limit:
+        if time_limit is not None:
             time_elapsed = time.time() - start_time
+            time_limit_orig = time_limit
             time_limit = time_limit - time_elapsed
+            if time_limit <= time_limit_orig * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
+                raise TimeLimitExceeded
 
         self.train_net(train_dataset=train_dataset, params=params, val_dataset=val_dataset, initialize=True, setup_trainer=True, time_limit=time_limit, reporter=reporter)
         self.params_post_fit = params
@@ -251,7 +254,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             logging.debug("initialized")
         if setup_trainer:
             # Also setup mxboard to monitor training if visualizer has been specified:
-            visualizer = params.get('visualizer', 'none')
+            visualizer = self.params_aux.get('visualizer', 'none')
             if visualizer == 'tensorboard' or visualizer == 'mxboard':
                 try_import_mxboard()
                 from mxboard import SummaryWriter
@@ -315,6 +318,10 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             logger.log(15, "untrained Neural Net saved to file")
             return
 
+        start_fit_time = time.time()
+        if time_limit is not None:
+            time_limit = time_limit - (start_fit_time - start_time)
+
         # Training Loop:
         for e in range(num_epochs):
             if e == 0:  # special actions during first epoch:
@@ -360,14 +367,19 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 # TODO: Ensure reporter/scheduler properly handle None/nan values after refactor
                 if val_dataset is not None and (not np.isnan(val_metric)):  # TODO: This might work without the if statement
                     # epoch must be number of epochs done (starting at 1)
-                    reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
+                    reporter(epoch=e + 1,
+                             validation_performance=val_metric,  # Higher val_metric = better
+                             train_loss=float(train_loss.asscalar()),
+                             eval_metric=self.eval_metric.name,
+                             greater_is_better=self.eval_metric.greater_is_better)
             if e - val_improve_epoch > epochs_wo_improve:
                 break  # early-stop if validation-score hasn't strictly improved in `epochs_wo_improve` consecutive epochs
-            if time_limit:
-                time_elapsed = time.time() - start_time
+            if time_limit is not None:
+                time_elapsed = time.time() - start_fit_time
+                time_epoch_average = time_elapsed / (e+1)
                 time_left = time_limit - time_elapsed
-                if time_left <= 0:
-                    logger.log(20, "\tRan out of time, stopping training early.")
+                if time_left < time_epoch_average:
+                    logger.log(20, f"\tRan out of time, stopping training early. (Stopping on epoch {e})")
                     break
 
         if val_dataset is not None:
@@ -669,7 +681,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             model.summary_writer = None
         return model
 
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         """ Performs HPO and sets self.params to best hyperparameter values """
         time_start = time.time()
         self.verbosity = kwargs.get('verbosity', 2)
@@ -677,12 +689,10 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self._set_default_searchspace()  # changes non-specified default hyperparams from fixed values to search-spaces.
         if self.feature_metadata is None:
             raise ValueError("Trainer class must set feature_metadata for this model")
-        scheduler_func = scheduler_options[0]
-        scheduler_options = scheduler_options[1]
-        if scheduler_func is None or scheduler_options is None:
-            raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
-        num_cpus = scheduler_options['resource']['num_cpus']
-        # num_gpus = scheduler_options['resource']['num_gpus']  # TODO: Currently unused
+        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
+        if scheduler_cls is None or scheduler_params is None:
+            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
+        num_cpus = scheduler_params['resource']['num_cpus']
 
         params_copy = self.params.copy()
 
@@ -707,11 +717,12 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             val_path=val_path,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_options['time_out']
+            time_limit=scheduler_params['time_out'],
+            fit_kwargs=scheduler_params['resource'],
         )
         tabular_nn_trial.register_args(util_args=util_args, **params_copy)
-        scheduler = scheduler_func(tabular_nn_trial, **scheduler_options)
-        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+        scheduler = scheduler_cls(tabular_nn_trial, **scheduler_params)
+        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
             # TODO: Ensure proper working directory setup on remote machines
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading preprocessed data to remote workers...")
@@ -723,9 +734,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         scheduler.run()
         scheduler.join_jobs()
-        scheduler.get_training_curves(plot=False, use_legend=False)
 
-        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
 
     def get_info(self):
         info = super().get_info()
@@ -736,6 +746,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
         if remove_fit and requires_save:
             self.optimizer = None
+
+    def _get_default_stopping_metric(self):
+        return self.eval_metric
 
 
 def convert_df_dtype_to_str(df):

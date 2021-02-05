@@ -3,6 +3,7 @@ import logging
 import math
 import time
 
+import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
@@ -11,8 +12,8 @@ from autogluon.core.utils.utils import augment_rare_classes
 
 from .abstract_learner import AbstractLearner
 from ..trainer.auto_trainer import AutoTrainer
-from ..data.cleaner import Cleaner
-from ..data.label_cleaner import LabelCleaner
+from autogluon.core.data import LabelCleaner
+from autogluon.core.data.cleaner import Cleaner
 
 logger = logging.getLogger(__name__)
 
@@ -33,17 +34,16 @@ class DefaultLearner(AbstractLearner):
         self._time_limit = None
 
     # TODO: v0.1 Document trainer_fit_kwargs
-    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, scheduler_options=None, holdout_frac=0.1,
-             num_bagging_folds=0, num_bagging_sets=1, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2, **trainer_fit_kwargs):
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac=0.1,
+             num_bag_folds=0, num_bag_sets=1, time_limit=None, verbosity=2, **trainer_fit_kwargs):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
                 X_unlabeled (DataFrame): data used for pretraining a model. This is same data format as X, without label-column. This data is used for semi-supervised learning.
-                scheduler_options (tuple: (search_strategy, dict): Options for scheduler
                 holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_val != None, ignored if kfolds != 0)
-                num_bagging_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
-                num_bagging_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
-                    total number of models trained during bagging = num_bagging_folds * num_bagging_sets
+                num_bag_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
+                num_bag_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
+                    total number of models trained during bagging = num_bag_folds * num_bag_sets
         """
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
@@ -51,7 +51,7 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, f'Beginning AutoGluon training ... Time limit = {time_limit}s')
         else:
             logger.log(20, 'Beginning AutoGluon training ...')
-        logger.log(20, f'AutoGluon will save models to {self.path}')
+        logger.log(20, f'AutoGluon will save models to "{self.path}"')
         logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
         logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
@@ -60,7 +60,7 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
-        X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bagging_folds)
+        X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
         time_preprocessing_end = time.time()
         self._time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
         logger.log(20, f'Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ...')
@@ -73,35 +73,30 @@ class DefaultLearner(AbstractLearner):
             path=self.model_context,
             problem_type=self.label_cleaner.problem_type_transform,
             eval_metric=self.eval_metric,
-            stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
             feature_metadata=self.feature_generator.feature_metadata,
             low_memory=True,
-            k_fold=num_bagging_folds,  # TODO: Consider moving to fit call
-            n_repeats=num_bagging_sets,  # TODO: Consider moving to fit call
-            scheduler_options=scheduler_options,
-            save_data=save_data,
-            save_bagged_folds=save_bagged_folds,
-            random_seed=self.random_seed,
+            k_fold=num_bag_folds,  # TODO: Consider moving to fit call
+            n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
+            save_data=self.cache_data,
+            random_state=self.random_state,
             verbosity=verbosity
         )
 
         self.trainer_path = trainer.path
         if self.eval_metric is None:
             self.eval_metric = trainer.eval_metric
-        if self.stopping_metric is None:
-            self.stopping_metric = trainer.stopping_metric
 
         self.save()
-        trainer.train(X, y, X_val, y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
+        trainer.fit(X, y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end
         self._time_fit_total = time_end - time_preprocessing_start
         logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ...')
 
-    # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bagging_folds
-    def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bagging_folds: int):
+    # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bag_folds
+    def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bag_folds: int):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
 
@@ -119,11 +114,8 @@ class DefaultLearner(AbstractLearner):
             self.problem_type = self.infer_problem_type(X[self.label])
 
         if X_val is not None and self.label in X_val.columns:
-            # TODO: This is not an ideal solution, instead check if bagging and X_val exists with label, then merge them prior to entering general data processing.
-            #  This solution should handle virtually all cases correctly, only downside is it might cut more classes than it needs to.
-            self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=1, num_bagging_folds=num_bagging_folds)
-        else:
-            self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
+            holdout_frac = 1
+        self.threshold, holdout_frac, num_bag_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds)
 
         if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
             X = augment_rare_classes(X, self.label, self.threshold)
@@ -135,7 +127,7 @@ class DefaultLearner(AbstractLearner):
         # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
         X, y = self.extract_label(X)
-        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
+        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned, positive_class=self._positive_class)
         y = self.label_cleaner.transform(y)
 
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
@@ -153,12 +145,6 @@ class DefaultLearner(AbstractLearner):
         else:
             y_val = None
 
-        if self.id_columns:
-            logger.log(20, f'Dropping ID columns: {self.id_columns}')
-            X = X.drop(self.id_columns, axis=1, errors='ignore')
-            if X_val is not None:
-                X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
-
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         logger.log(20, f'Using Feature Generators to preprocess the data ...')
         if X_val is not None:
@@ -170,7 +156,12 @@ class DefaultLearner(AbstractLearner):
                 X_super = self.feature_generator.transform(X_super)
                 self.feature_generator.print_feature_metadata_info()
             else:
-                X_super = self.feature_generator.fit_transform(X_super)
+                if X_unlabeled is None:
+                    y_super = pd.concat([y, y_val], ignore_index=True)
+                else:
+                    y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
+                    y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
             X = X_super.head(len(X)).set_index(X.index)
 
             X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)
@@ -185,40 +176,44 @@ class DefaultLearner(AbstractLearner):
                 X_super = self.feature_generator.transform(X_super)
                 self.feature_generator.print_feature_metadata_info()
             else:
-                X_super = self.feature_generator.fit_transform(X_super)
+                if X_unlabeled is None:
+                    y_super = y.reset_index(drop=True)
+                else:
+                    y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
+                    y_super = pd.concat([y, y_unlabeled], ignore_index=True)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
 
             X = X_super.head(len(X)).set_index(X.index)
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
 
+        return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds
 
-        return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bagging_folds
-
-    def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
-        new_threshold, new_holdout_frac, new_num_bagging_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bagging_folds)
+    def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
+        new_threshold, new_holdout_frac, new_num_bag_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bag_folds)
         if new_threshold != threshold:
             if new_threshold < threshold:
                 logger.warning(f'Warning: Updated label_count_threshold from {threshold} to {new_threshold} to avoid cutting too many classes.')
         if new_holdout_frac != holdout_frac:
             if new_holdout_frac > holdout_frac:
                 logger.warning(f'Warning: Updated holdout_frac from {holdout_frac} to {new_holdout_frac} to avoid cutting too many classes.')
-        if new_num_bagging_folds != num_bagging_folds:
-            logger.warning(f'Warning: Updated num_bagging_folds from {num_bagging_folds} to {new_num_bagging_folds} to avoid cutting too many classes.')
-        return new_threshold, new_holdout_frac, new_num_bagging_folds
+        if new_num_bag_folds != num_bag_folds:
+            logger.warning(f'Warning: Updated num_bag_folds from {num_bag_folds} to {new_num_bag_folds} to avoid cutting too many classes.')
+        return new_threshold, new_holdout_frac, new_num_bag_folds
 
-    def _adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
+    def _adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
         new_threshold = threshold
         if self.problem_type == REGRESSION:
             num_rows = len(y)
             holdout_frac = max(holdout_frac, 1 / num_rows + 0.001)
-            num_bagging_folds = min(num_bagging_folds, num_rows)
-            return new_threshold, holdout_frac, num_bagging_folds
+            num_bag_folds = min(num_bag_folds, num_rows)
+            return new_threshold, holdout_frac, num_bag_folds
 
-        if num_bagging_folds < 2:
+        if num_bag_folds < 2:
             minimum_safe_threshold = math.ceil(1 / holdout_frac)
         else:
-            minimum_safe_threshold = num_bagging_folds
+            minimum_safe_threshold = num_bag_folds
 
         if minimum_safe_threshold > new_threshold:
             new_threshold = minimum_safe_threshold
@@ -235,7 +230,7 @@ class DefaultLearner(AbstractLearner):
         num_classes_valid = len(class_counts_valid)
 
         if (num_rows_valid >= minimum_rows_to_keep) and (num_classes_valid >= minimum_class_to_keep):
-            return new_threshold, holdout_frac, num_bagging_folds
+            return new_threshold, holdout_frac, num_bag_folds
 
         num_classes_valid = 0
         num_rows_valid = 0
@@ -252,13 +247,13 @@ class DefaultLearner(AbstractLearner):
         self.threshold = new_threshold
 
         if new_threshold < minimum_safe_threshold:
-            if num_bagging_folds >= 2:
-                if num_bagging_folds > new_threshold:
-                    num_bagging_folds = new_threshold
+            if num_bag_folds >= 2:
+                if num_bag_folds > new_threshold:
+                    num_bag_folds = new_threshold
             elif math.ceil(1 / holdout_frac) > new_threshold:
                 holdout_frac = 1 / new_threshold + 0.001
 
-        return new_threshold, holdout_frac, num_bagging_folds
+        return new_threshold, holdout_frac, num_bag_folds
 
     def get_info(self, include_model_info=False, **kwargs):
         learner_info = super().get_info(**kwargs)

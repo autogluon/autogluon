@@ -5,16 +5,16 @@ import time
 
 import numpy as np
 import pandas as pd
-from autogluon.core.utils.loaders import load_pkl
 from tqdm import tqdm
+
+from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
+from autogluon.core.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.core.utils import try_import_torch
+from autogluon.core.utils.loaders import load_pkl
 
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
-from ..abstract.abstract_model import AbstractNeuralNetworkModel
-from autogluon.core.utils import try_import_torch
-from ...features.feature_metadata import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
-
+from autogluon.core.models.abstract.abstract_model import AbstractNeuralNetworkModel
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     def __init__(self, **kwargs):
         try_import_torch()
         super().__init__(**kwargs)
-        import torch
         self._verbosity = None
         self._temp_file_name = "tab_trans_temp.pth"
         self._period_columns_mapping = None
@@ -460,17 +459,15 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
     # TODO: Consider HPO for pretraining with unlabeled data. (Potential future work)
     # TODO: Does not work correctly when cuda is enabled.
-    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         from .utils import tt_trial
-        import torch
 
         time_start = time.time()
         self._set_default_searchspace()
-        scheduler_func = scheduler_options[0]
-        scheduler_options = scheduler_options[1]
+        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
 
-        if scheduler_func is None or scheduler_options is None:
-            raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
+        if scheduler_cls is None or scheduler_params is None:
+            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
 
         util_args = dict(
             X_train=X_train,
@@ -479,19 +476,18 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             y_val=y_val,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_options['time_out']
+            time_limit=scheduler_params['time_out'],
+            fit_kwargs=scheduler_params['resource'],
         )
 
         params_copy = self.params.copy()
         tt_trial.register_args(util_args=util_args, **params_copy)
 
-        scheduler = scheduler_func(tt_trial, **scheduler_options)
+        scheduler = scheduler_cls(tt_trial, **scheduler_params)
         scheduler.run()
         scheduler.join_jobs()
 
-        scheduler.get_training_curves(plot=False, use_legend=False)
-
-        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
 
     def save(self, path: str = None, verbose=True) -> str:
         import torch

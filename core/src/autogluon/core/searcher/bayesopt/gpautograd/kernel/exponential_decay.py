@@ -1,6 +1,5 @@
 import autograd.numpy as anp
 from autograd.builtins import isinstance
-from autograd.tracer import getval
 
 from .base import KernelFunction
 from ..constants import DEFAULT_ENCODING
@@ -118,9 +117,8 @@ class ExponentialDecayResourcesKernelFunction(KernelFunction):
 
     def _compute_terms(self, X, alpha, mean_lam, gamma, delta, ret_mean=False):
         dim = self.kernel_x.dimension
-        X_shape = getval(X.shape)
-        cfg = anp.take(X, range(0, dim), axis=1)
-        res = anp.take(X, range(dim, X_shape[1]), axis=1)
+        cfg = X[:, :dim]
+        res = X[:, dim:]
         kappa = self._compute_kappa(res, alpha, mean_lam)
         kr_pref = anp.reshape(gamma, (1, 1))
         

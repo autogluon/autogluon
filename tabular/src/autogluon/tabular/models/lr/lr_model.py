@@ -9,13 +9,13 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
 from autogluon.core.constants import BINARY, REGRESSION
+from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
 from .hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
-from ..abstract.model_trial import skip_hpo
-from ...models.abstract.abstract_model import AbstractModel
-from ...features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from autogluon.core.models.abstract.model_trial import skip_hpo
+from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,15 @@ logger = logging.getLogger(__name__)
 # TODO: Can Bagged LinearModels be combined during inference to 1 model by averaging their weights?
 #  What about just always using refit_full model? Should we even bag at all? Do we care that its slightly overfit?
 class LinearModel(AbstractModel):
+    """
+    Linear model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
+
+    Model backend differs depending on problem_type:
+
+        'binary' & 'multiclass': https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
+
+        'regression': https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.model_class, self.penalty, self.handle_text = get_model_params(self.problem_type, self.params)
@@ -140,7 +149,7 @@ class LinearModel(AbstractModel):
         self.model = model.fit(X_train, y_train)
 
     # TODO: Add HPO
-    def hyperparameter_tune(self, **kwargs):
+    def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
     def _select_features_handle_text_include(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):

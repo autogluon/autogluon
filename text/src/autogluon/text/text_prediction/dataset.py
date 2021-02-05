@@ -93,6 +93,8 @@ def is_categorical_column(data: pd.Series,
         Whether the column is a categorical column
     parsed_allow_missing
     """
+    if data.dtype.name == 'category':
+        return True, default_allow_missing
     threshold = min(int(len(data) * ratio), threshold)
     sample_set = set()
     element = data[data.first_valid_index()]
@@ -119,7 +121,7 @@ def is_categorical_column(data: pd.Series,
 
 def get_column_properties(
         df: 'DataFrame',
-        label_columns: Union[str, List[str]],
+        label_columns: Optional[Union[str, List[str]]],
         metadata: Optional[Dict] = None,
         provided_column_properties: Optional[Dict] = None,
         categorical_default_handle_missing_value: bool = True) -> collections.OrderedDict:
@@ -133,11 +135,11 @@ def get_column_properties(
         The chosen column names of the table
     metadata
         The additional metadata object to help specify the column types
-        {'col_name': {'type':
+        {'col_name': {'type': type_string}}
     provided_column_properties
         The column properties provided.
         For example, these can be the column properties of the training set and you provide this
-        to help inference the column properties of the dev/test set.
+        to help infer the column properties of the dev/test set.
     categorical_default_handle_missing_value
         Whether to handle missing values for categorical columns by default
 
@@ -236,13 +238,10 @@ def normalize_df(df, convert_text_to_numerical=True, remove_none=True):
     if len(conversion_cols) == 0:
         return df
     else:
-        series_l = dict()
-        for col_name in df.columns:
-            if col_name in conversion_cols:
-                series_l[col_name] = conversion_cols[col_name]
-            else:
-                series_l[col_name] = df[col_name]
-        return pd.DataFrame(series_l)
+        new_df = df.copy()
+        for col_name in conversion_cols:
+            new_df[col_name] = conversion_cols[col_name]
+        return new_df
 
 
 def infer_problem_type(column_properties, label_col_name):
@@ -317,6 +316,11 @@ class TabularDataset:
             label_columns=label_columns,
             provided_column_properties=column_properties,
             categorical_default_handle_missing_value=categorical_default_handle_missing_value)
+        for col_name, prop in column_properties.items():
+            if prop.type == _C.TEXT:
+                df[col_name] = df[col_name].fillna('').apply(str)
+            elif prop.type == _C.NUMERICAL:
+                df[col_name] = df[col_name].fillna(-1).apply(np.array)
         self._table = df
         self._column_properties = column_properties
 

@@ -9,7 +9,7 @@ from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 __all__ = ['ObjectDetector']
 
 class ObjectDetector(object):
-    """AutoGluon Predictor for for detecting objects in images
+    """AutoGluon Predictor for detecting objects in images
 
     Parameters
     ----------
@@ -31,7 +31,6 @@ class ObjectDetector(object):
             holdout_frac=0.1,
             random_state=None,
             time_limit=12*60*60,
-            epochs=None,
             num_trials=1,
             hyperparameters=None,
             search_strategy='random',
@@ -46,6 +45,8 @@ class ObjectDetector(object):
         ----------
         train_data : pd.DataFrame or str
             Training data, can be a dataframe like image dataset.
+            For more details of how to construct a object detection dataset, please checkout:
+            `http://preview.d2l.ai/d8/main/object_detection/getting_started.html`.
             If a string is provided, will search for k8 datasets.
         val_data : pd.DataFrame or str, default = None
             Training data, can be a dataframe like image dataset.
@@ -59,17 +60,16 @@ class ObjectDetector(object):
         time_limit : int, default = 43200
             Time limit in seconds, default is 12 hours. If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
-        epochs : int, default value based on network
-            The `epochs` for model training, if `None` is provided, then default `epochs` for model
-            will be used.
         num_trials : int, default = 1
             The number of HPO trials. If `None`, will run infinite trials until `time_limit` is met.
         hyperparameters : dict, default = None
             Extra hyperparameters for specific models.
             Accepted args includes(not limited to):
+            epochs : int, default value based on network
+                The `epochs` for model training.
             batch_size : int
                 Mini batch size
-            learning_rate : float
+            lr : float
                 Trainer learning rate for optimization process.
             You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
         search_strategy : str, default = 'random'
@@ -103,13 +103,11 @@ class ObjectDetector(object):
                 'search_strategy': search_strategy,
                 }
         if nthreads_per_trial is not None:
-            config.update({'nthreads_per_trial': nthreads_per_trial})
+            config['nthreads_per_trial'] = nthreads_per_trial
         if ngpus_per_trial is not None:
-            config.update({'ngpus_per_trial': ngpus_per_trial})
+            config['ngpus_per_trial'] = ngpus_per_trial
         if dist_ip_addrs is not None:
-            config.update({'dist_ip_addrs': dist_ip_addrs})
-        if epochs is not None:
-            config.update({'epochs': epochs})
+            config['dist_ip_addrs'] = dist_ip_addrs
         if isinstance(hyperparameters, dict):
             # check if hyperparameters overwriting existing config
             for k, v in hyperparameters.items():

@@ -7,14 +7,14 @@
 See ["Maximizing predictive performance" in the Quick Start Tutorial](tabular-quickstart.html#maximizing-predictive-performance).
 
 
-### Can I run TabularPrediction on Mac/Windows?
+### Can I run AutoGluon Tabular on Mac/Windows?
 
-Yes! The only functionality that may not work is `hyperparameter_tune=True` with the NN model (this should be resolved in the next MXNet update).
+Yes! The only functionality that may not work is hyperparameter tuning with the NN model (this should be resolved in the next MXNet update).
 
 
-### What machine is best for running TabularPrediction?
+### What machine is best for running AutoGluon Tabular?
 
-As an open-source library, AutoGluon can be run on any machine including your laptop. Currently the TabularPrediction module does not benefit much from GPUs, so CPU machines are fine (in contrast, TextPrediction/ImagePrediction/ObjectDetection do greatly benefit from GPUs). Most TabularPrediction issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for TabularPrediction: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
+As an open-source library, AutoGluon can be run on any machine including your laptop. Currently the Tabular module does not benefit much from GPUs, so CPU machines are fine (in contrast, TextPrediction/ImagePrediction/ObjectDetection do greatly benefit from GPUs). Most Tabular issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for Tabular: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
 
 
 ### How to resolve memory issues?
@@ -29,7 +29,7 @@ See ["If you encounter disk space issues" in the In Depth Tutorial](tabular-inde
 
 ### How can I reduce the time required for training?
 
-Specify the `time_limits` argument in `fit()` to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in `fit()`, and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
+Specify the `time_limit` argument in `fit()` to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in `fit()`, and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
 
 Since many of the strategies to reduce memory usage also reduce training times, also check out: ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-memory-issues).
 
@@ -39,7 +39,7 @@ Since many of the strategies to reduce memory usage also reduce training times, 
 See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.html#accelerating-inference).
 
 
-### How does TabularPrediction work internally?
+### How does AutoGluon Tabular work internally?
 
 Details are provided in the following paper:
 
@@ -95,12 +95,12 @@ The Tabular Dataset API works with pandas Dataframes, which supports chunking da
 Here's an example of one such chunk-based inference:
 
 ```{.python .input}
-from autogluon.tabular import TabularPrediction as task
+from autogluon.tabular import TabularDataset, TabularPredictor
 import pandas as pd
 import requests
 
-train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-predictor = task.fit(train_data=train_data.sample(n=100, random_state=0), label='class', hyperparameters={'GBM': {}})
+train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+predictor = TabularPredictor(label='class').fit(train_data.sample(n=100, random_state=0), hyperparameters={'GBM': {}})
 
 # Get the test dataset, if you are working with local data then omit the next two lines
 r = requests.get('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv', allow_redirects=True)
@@ -109,7 +109,7 @@ reader = pd.read_csv('test.csv', chunksize=1024)
 y_pred = []
 y_true = []
 for df_chunk in reader:
-    y_pred.append(predictor.predict(df_chunk, as_pandas=True))
+    y_pred.append(predictor.predict(df_chunk))
     y_true.append(df_chunk['class'])
 y_pred = pd.concat(y_pred, axis=0, ignore_index=True)
 y_true = pd.concat(y_true, axis=0, ignore_index=True)
