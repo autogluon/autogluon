@@ -69,7 +69,8 @@ class TextPredictor:
             problem_type=None,
             eval_metric=None,
             path=None,
-            verbosity=2
+            verbosity=2,
+            warn_if_exist=True
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
@@ -78,7 +79,7 @@ class TextPredictor:
         if not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
         self._eval_metric = eval_metric
-        self._path = setup_outputdir(path)
+        self._path = setup_outputdir(path, warn_if_exist=warn_if_exist)
         self._model = None
         self._fit_called = False
         self._backend = None
@@ -331,7 +332,8 @@ class TextPredictor:
         ret = cls(eval_metric=assets['eval_metric'],
                   label=assets['label'],
                   problem_type=assets['problem_type'],
-                  path=dir_path)
+                  path=dir_path,
+                  warn_if_exist=False)
         ret._backend = assets['backend']
         if ret._backend == 'gluonnlp_v0':
             from ..mx.models import MultiModalTextModel
