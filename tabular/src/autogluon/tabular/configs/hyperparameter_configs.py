@@ -94,7 +94,7 @@ hyperparameter_config_dict = dict(
             {'weights': 'uniform', 'ag_args': {'name_suffix': 'Unif'}},
             {'weights': 'distance', 'ag_args': {'name_suffix': 'Dist'}},
         ],
-        'TEXT_NN_V1': ['ELECTRA_BASE'],
+        'TEXT_NN_V1': ['default'],
         'custom': ['GBM'],
     },
 )

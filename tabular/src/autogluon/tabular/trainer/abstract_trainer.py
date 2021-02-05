@@ -1784,7 +1784,11 @@ class AbstractTrainer:
                 models_expanded = []
                 for i, model in enumerate(hyperparameters[key][subkey]):
                     if isinstance(model, str):
-                        candidate_models = get_preset_custom(name=model, problem_type=self.problem_type, num_classes=self.num_classes)
+                        if subkey == 'TEXT_NN_V1':
+                            from autogluon.text import ag_text_presets
+                            candidate_models = [ag_text_presets.create(model)]
+                        else:
+                            candidate_models = get_preset_custom(name=model, problem_type=self.problem_type, num_classes=self.num_classes)
                     else:
                         candidate_models = [model]
                     valid_models = []
