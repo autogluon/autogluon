@@ -156,7 +156,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
             if isinstance(model_cfg, str):
                 if model_type == 'TEXT_NN_V1':
                     from autogluon.text import ag_text_presets
-                    model_cfgs_to_process += ag_text_presets.create(model_cfg)
+                    model_cfgs_to_process.append(ag_text_presets.create(model_cfg))
                 else:
                     model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type, num_classes=num_classes)
             else:
