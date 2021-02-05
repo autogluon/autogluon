@@ -10,6 +10,7 @@ from collections import OrderedDict
 from time import sleep
 
 import numpy as np
+from autogluon.core.utils.loaders.load_pkl import restricted_loads
 from tqdm.auto import tqdm
 
 from .reporter import DistStatusReporter, FakeReporter
@@ -606,7 +607,7 @@ class FIFOScheduler(TaskScheduler):
         super().load_state_dict(state_dict)
         with self._fifo_lock:
             self.searcher = self.searcher.clone_from_state(
-                pickle.loads(state_dict['searcher']))
+                restricted_loads(state_dict['searcher']))
             self.training_history = json.loads(state_dict['training_history'])
             self.config_history = json.loads(state_dict['config_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':

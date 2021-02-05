@@ -1,6 +1,8 @@
 import pickle
 from collections import OrderedDict
 
+from autogluon.core.utils.loaders.load_pkl import restricted_loads
+
 from .searcher import BaseSearcher
 from ..utils import try_import_mxnet
 
@@ -73,5 +75,5 @@ class RLSearcher(BaseSearcher):
     def load_state_dict(self, state_dict):
         try_import_mxnet()
         from autogluon.mxnet.utils import update_params
-        self._results=pickle.loads(state_dict['results'])
-        update_params(self.controller, pickle.loads(state_dict['controller_params']))
+        self._results=restricted_loads(state_dict['results'])
+        update_params(self.controller, restricted_loads(state_dict['controller_params']))

@@ -6,6 +6,7 @@ from collections import OrderedDict
 from warnings import warn
 
 import distributed
+from autogluon.core.utils.loaders.load_pkl import restricted_loads
 
 from .jobs import DistributedJobRunner
 from .managers import TaskManagers
@@ -160,7 +161,7 @@ class TaskScheduler(object):
         --------
         >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
         """
-        self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
+        self.finished_tasks = restricted_loads(state_dict['finished_tasks'])
         Task.set_id(state_dict['TASK_ID'])
         logger.debug('\nLoading finished_tasks: {} '.format(self.finished_tasks))
 

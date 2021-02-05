@@ -7,6 +7,7 @@ from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm \
     import DEFAULT_METRIC
 from autogluon.core.searcher.bayesopt.utils.comparison_gpy import \
     Ackley, sample_data, assert_equal_candidates, assert_equal_randomstate
+from autogluon.core.utils.loaders.load_pkl import restricted_loads
 
 
 def test_pickle_gp_fifo_searcher():
@@ -34,7 +35,7 @@ def test_pickle_gp_fifo_searcher():
     pkl_state = pickle.dumps(searcher1.get_state())
     # Clone searcher2 from mutable state
     searcher2 = gp_fifo_searcher_factory(**searcher_options)
-    searcher2 = searcher2.clone_from_state(pickle.loads(pkl_state))
+    searcher2 = searcher2.clone_from_state(restricted_loads(pkl_state))
     # At this point, searcher1 and searcher2 should be essentially the same
     # Compare model parameters
     params1 = searcher1.get_params()

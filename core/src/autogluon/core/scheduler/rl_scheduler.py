@@ -7,6 +7,8 @@ import threading
 import multiprocessing as mp
 from collections import OrderedDict
 
+from autogluon.core.utils.loaders.load_pkl import restricted_loads
+
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
 from .resource import DistributedResource
@@ -378,8 +380,8 @@ class RLScheduler(FIFOScheduler):
         --------
         >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
         """
-        self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
-        #self.baseline = pickle.loads(state_dict['baseline'])
+        self.finished_tasks = restricted_loads(state_dict['finished_tasks'])
+        #self.baseline = restricted_loads(state_dict['baseline'])
         Task.set_id(state_dict['TASK_ID'])
         self.searcher.load_state_dict(state_dict['searcher'])
         self.training_history = json.loads(state_dict['training_history'])

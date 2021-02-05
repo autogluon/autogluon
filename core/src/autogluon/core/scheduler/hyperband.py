@@ -6,6 +6,8 @@ import multiprocessing as mp
 import os
 import copy
 
+from autogluon.core.utils.loaders.load_pkl import restricted_loads
+
 from .fifo import FIFOScheduler
 from .hyperband_stopping import StoppingRungSystem
 from .hyperband_promotion import PromotionRungSystem
@@ -665,7 +667,7 @@ class HyperbandScheduler(FIFOScheduler):
             super().load_state_dict(state_dict)
             # Note: _running_tasks is empty from __init__, it is not recreated,
             # since running tasks are not part of the checkpoint
-            self.terminator = pickle.loads(state_dict['terminator'])
+            self.terminator = restricted_loads(state_dict['terminator'])
             logger.info('Loading Terminator State {}'.format(self.terminator))
 
     def _snapshot_tasks(self, bracket_id):

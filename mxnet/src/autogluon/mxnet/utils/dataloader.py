@@ -7,6 +7,8 @@ import sys
 import signal
 import multiprocessing
 import multiprocessing.queues
+
+from autogluon.core.utils.loaders.load_pkl import restricted_loads
 from multiprocessing.reduction import ForkingPickler
 from multiprocessing.pool import ThreadPool
 import threading
@@ -106,7 +108,7 @@ class _MultiWorkerIter(object):
         ret = self._data_buffer.pop(self._rcvd_idx)
         try:
             if self._dataset is None:
-                batch = pickle.loads(ret.get(self._timeout))
+                batch = restricted_loads(ret.get(self._timeout))
             else:
                 batch = ret.get(self._timeout)
             if self._pin_memory:

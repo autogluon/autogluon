@@ -3,6 +3,7 @@ import multiprocessing as mp
 import pickle
 from collections import OrderedDict
 import numpy as np
+from autogluon.core.utils.loaders.load_pkl import restricted_loads
 
 from .bayesopt.autogluon.debug_log import DebugLogPrinter
 from ..utils import DeprecationHelper
@@ -181,7 +182,7 @@ class BaseSearcher(object):
         with self.LOCK:
             if self._results:
                 config_pkl = max(self._results, key=self._results.get)
-                return pickle.loads(config_pkl)
+                return restricted_loads(config_pkl)
             else:
                 return dict()
 
@@ -191,7 +192,7 @@ class BaseSearcher(object):
         with self.LOCK:
             if self._results:
                 config_pkl = max(self._results, key=self._results.get)
-                return pickle.loads(config_pkl), self._results[config_pkl]
+                return restricted_loads(config_pkl), self._results[config_pkl]
             else:
                 return dict(), self._reward_while_pending()
 
