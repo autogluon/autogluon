@@ -61,7 +61,6 @@ class TextPredictionV1Model(AbstractModel):
         """
         super().__init__(**kwargs)
         self._label_column_name = None
-        self._predictor = None
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -135,8 +134,7 @@ class TextPredictionV1Model(AbstractModel):
         num_cpus = kwargs.get('num_cpus', None)
         num_gpus = kwargs.get('num_gpus', None)
 
-        assert self._predictor is None
-        self._predictor = TextPredictor(label=self._label_column_name,
+        self.model = TextPredictor(label=self._label_column_name,
                                         problem_type=self.problem_type,
                                         path=self.path,
                                         eval_metric=self.eval_metric,
@@ -146,7 +144,7 @@ class TextPredictionV1Model(AbstractModel):
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
         assert self.params['hpo_params']['num_trials'] == 1 \
                or self.params['hpo_params']['num_trials'] is None
-        self._predictor.fit(train_data=X_train,
+        self.model.fit(train_data=X_train,
                             tuning_data=X_val,
                             time_limit=time_limit,
                             num_gpus=num_gpus,
@@ -155,14 +153,14 @@ class TextPredictionV1Model(AbstractModel):
                             seed=self.params.get('seed'))
 
     def save(self, path: str = None, verbose=True) -> str:
-        predictor = self._predictor
-        self._predictor = None
+        model = self.model
+        self.model = None
         # save this AbstractModel object without NN weights
         path = super().save(path=path, verbose=verbose)
-        self._predictor = predictor
+        self.model = model
 
         text_nn_path = os.path.join(path, self.nn_model_name)
-        predictor.save(text_nn_path)
+        model.save(text_nn_path)
         logger.log(15, f"\tSaved Text NN weights and model hyperparameters to '{text_nn_path}'.")
 
         return path
