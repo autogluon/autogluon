@@ -173,7 +173,7 @@ class TextPredictionV1Model(AbstractModel):
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        model._predictor = TextPredictor.load(os.path.join(path, cls.nn_model_name))
+        model.model = TextPredictor.load(os.path.join(path, cls.nn_model_name))
         return model
 
     def get_memory_size(self) -> int:
