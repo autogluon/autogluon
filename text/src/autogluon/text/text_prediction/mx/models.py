@@ -1293,13 +1293,17 @@ class MultiModalTextModel:
         # Save preprocessor
         with open(os.path.join(dir_path, 'preprocessor.pkl'), 'wb') as of:
             pickle.dump(self.preprocessor, of)
+        if not isinstance(self._eval_metric, str):
+            eval_metric = self._eval_metric.name
+        else:
+            eval_metric = self._eval_metric
         # Save additional assets about the parsed dataset information
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump(
                 {
                     'problem_type': self._problem_type,
                     'label_columns': self._label_columns,
-                    'eval_metric': self._eval_metric,
+                    'eval_metric': eval_metric,
                     'log_metrics': self._log_metrics,
                     'feature_columns': self._feature_columns,
                     'column_types': self._column_types,
