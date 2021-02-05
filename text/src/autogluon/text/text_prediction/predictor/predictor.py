@@ -75,6 +75,8 @@ class TextPredictor:
         set_logger_verbosity(self.verbosity, logger=logger)
         self._label = label
         self._problem_type = problem_type
+        if not isinstance(eval_metric, str):
+            eval_metric = eval_metric.name
         self._eval_metric = eval_metric
         self._path = setup_outputdir(path)
         self._model = None
