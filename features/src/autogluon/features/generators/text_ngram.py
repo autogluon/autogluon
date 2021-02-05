@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import psutil
 from pandas import DataFrame, Series
-from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
 from autogluon.core.features.types import S_TEXT, S_TEXT_NGRAM
 
@@ -65,14 +65,28 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         self.prefilter_token_count = prefilter_token_count
         self.token_mask = None
 
-    def _fit_transform(self, X: DataFrame, y: Series, **kwargs) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, y: Series = None, problem_type: str = None, **kwargs) -> (DataFrame, dict):
         
         X_out = self._fit_transform_ngrams(X)
+        
+        if (self.prefilter_tokens and self.prefilter_token_count>=X_out.shape[1]):
+            logger.warning('`prefilter_tokens` was enabled but `prefilter_token_count` larger than the vocabulary. Disabling `prefilter_tokens`.')
+            self.prefilter_tokens=False
+
+        if self.prefilter_tokens and problem_type not in ['binary','regression']:
+           logger.warning('`prefilter_tokens` was enabled but invalid `problem_type`. Disabling `prefilter_tokens`.')
+           self.prefilter_tokens = False
+
+        if self.prefilter_tokens and y is None:
+           logger.warning('`prefilter_tokens` was enabled but `y` values were not provided to fit_transform. Disabling `prefilter_tokens`.')
+           self.prefilter_tokens = False
+
         if self.prefilter_tokens:
-            selector = SelectKBest(f_classif, k=self.prefilter_token_count) # hard-code f-score for now
+            scoring_function = f_classif if problem_type=='binary' else f_regression
+            selector = SelectKBest(scoring_function, k=self.prefilter_token_count)
             selector.fit(X_out, y)
-            self.token_mask = selector.get_support() # create token mask
-            X_out = X_out[ X_out.columns[self.token_mask] ] # select the most informative columns
+            self.token_mask = selector.get_support()
+            X_out = X_out[ X_out.columns[self.token_mask] ] # select the columns that are most correlated with y
 
         type_family_groups_special = {
             S_TEXT_NGRAM: list(X_out.columns)
@@ -80,6 +94,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         return X_out, type_family_groups_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
+        # TODO: Optimize for inference
         if not self.features_in:
             return DataFrame(index=X.index)
         try:
