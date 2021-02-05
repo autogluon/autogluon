@@ -45,7 +45,7 @@ long_description = open(os.path.join('..', 'README.md')).read()
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
-    'numpy>=1.16.0,<1.20.0',
+    'numpy>=1.20',
     'gluoncv>=0.9.1,<1.0',
     'scipy>=1.3.3,<1.5.0',
     'graphviz<0.9.0,>=0.8.1',

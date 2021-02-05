@@ -43,7 +43,7 @@ long_description = open(os.path.join('..', 'README.md')).read()
 MIN_PYTHON_VERSION = '>=3.6.*'  # TODO v0.1: Also specify max version? (We don't support 3.8)
 
 requirements = [
-    'numpy>=1.16.0,<1.20.0',
+    'numpy>=1.20',
     'scipy>=1.3.3,<1.5.0',  # TODO v0.1: Upgrade?
     'cython',  # TODO: Do we need cython here?
     'tornado>=5.0.1',
@@ -53,7 +53,7 @@ requirements = [
     'paramiko>=2.4',
     'dask>=2.6.0',
     'distributed>=2.6.0',
-    'ConfigSpace<=0.4.16',  # TODO v0.1: Upgrade?
+    'ConfigSpace==0.4.17',
     'graphviz<0.9.0,>=0.8.1',
     'scikit-optimize',  # TODO v0.1: Remove?
     'boto3',
