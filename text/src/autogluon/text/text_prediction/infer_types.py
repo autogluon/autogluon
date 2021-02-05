@@ -8,7 +8,7 @@ from .constants import NULL, CATEGORICAL, NUMERICAL, TEXT
 
 def is_categorical_column(data: pd.Series,
                           valid_data: pd.Series,
-                          threshold: int = 100,
+                          threshold: int = None,
                           ratio: float = 0.1,
                           oov_ratio_threshold: float = 0.1,
                           is_label: bool = False) -> bool:
@@ -45,6 +45,11 @@ def is_categorical_column(data: pd.Series,
     if data.dtype.name == 'category':
         return True
     else:
+        if threshold is None:
+            if is_label:
+                threshold = 100
+            else:
+                threshold = 25
         threshold = min(int(len(data) * ratio), threshold)
         data_value_counts = data.value_counts(dropna=False)
         key_set = set(data_value_counts.keys())
