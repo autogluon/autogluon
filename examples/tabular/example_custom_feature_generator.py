@@ -40,7 +40,7 @@ print(X)
 # Fitting feature generators #
 ##############################
 
-from autogluon.tabular.features import CategoryFeatureGenerator, IdentityFeatureGenerator
+from autogluon.features.generators import CategoryFeatureGenerator, IdentityFeatureGenerator
 
 # IdentityFeatureGenerator is a 'do-nothing' feature generator if given default arguments. It will simply pass the data along.
 identity_feature_generator = IdentityFeatureGenerator()
@@ -71,7 +71,7 @@ print(X_transform.head(5))  # Note that the int features were automatically filt
 #####################################
 
 from pandas import DataFrame
-from autogluon.tabular.features import AbstractFeatureGenerator
+from autogluon.features.generators import AbstractFeatureGenerator
 
 
 # Feature generator to add k to all values of integer features.
@@ -109,7 +109,7 @@ print(X_transform.head(5))
 # Multi-stage feature generators #
 ##################################
 
-from autogluon.tabular.features import AsTypeFeatureGenerator, BulkFeatureGenerator, DropUniqueFeatureGenerator, FillNaFeatureGenerator, PipelineFeatureGenerator
+from autogluon.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, DropUniqueFeatureGenerator, FillNaFeatureGenerator, PipelineFeatureGenerator
 
 # BulkFeatureGenerator is an implementation of AbstractFeatureGenerator that allows for advanced multi-stage feature generation.
 bulk_feature_generator = BulkFeatureGenerator(
@@ -153,7 +153,7 @@ print(X_test_transform.head(5))
 # Pre-made feature generators #
 ###############################
 
-from autogluon.tabular.features import AutoMLPipelineFeatureGenerator
+from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 
 # This is the default feature generator of AutoGluon, and contains many stages of preprocessing made to handle many types of data.
 # AutoMLPipelineFeatureGenerator is an implementation of PipelineFeatureGenerator

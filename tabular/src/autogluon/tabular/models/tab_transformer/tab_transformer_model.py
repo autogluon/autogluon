@@ -476,7 +476,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             y_val=y_val,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_params['time_out']
+            time_limit=scheduler_params['time_out'],
+            fit_kwargs=scheduler_params['resource'],
         )
 
         params_copy = self.params.copy()

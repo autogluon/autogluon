@@ -50,7 +50,7 @@ We use our trained models to make predictions on the new data and then evaluate 
 predictor = TabularPredictor.load(save_path)  # unnecessary, just demonstrates how to load previously-trained predictor from file
 
 y_pred = predictor.predict(test_data_nolab)
-print("Predictions:  ", y_pred)
+print("Predictions:  \n", y_pred)
 perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
 ```
 
@@ -83,7 +83,8 @@ For tabular problems, `fit()` returns a `Predictor` object. For classification, 
 ```{.python .input}
 pred_probs = predictor.predict_proba(test_data_nolab)
 positive_class = predictor.positive_class  # which label is considered 'positive' class
-print(f"Predicted probabilities of class '{positive_class}': ", pred_probs)
+print(f"Predicted probabilities of class '{positive_class}': ")
+pred_probs.head(5)
 ```
 
 Besides inference, this object can also summarize what happened during fit.

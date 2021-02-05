@@ -3,6 +3,7 @@ import logging
 import math
 import time
 
+import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
@@ -11,8 +12,8 @@ from autogluon.core.utils.utils import augment_rare_classes
 
 from .abstract_learner import AbstractLearner
 from ..trainer.auto_trainer import AutoTrainer
-from ..data.cleaner import Cleaner
-from ..data.label_cleaner import LabelCleaner
+from autogluon.core.data import LabelCleaner
+from autogluon.core.data.cleaner import Cleaner
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ class DefaultLearner(AbstractLearner):
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
             save_data=self.cache_data,
-            random_seed=self.random_seed,
+            random_state=self.random_state,
             verbosity=verbosity
         )
 
@@ -126,7 +127,7 @@ class DefaultLearner(AbstractLearner):
         # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
         X, y = self.extract_label(X)
-        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
+        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned, positive_class=self._positive_class)
         y = self.label_cleaner.transform(y)
 
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
@@ -155,7 +156,12 @@ class DefaultLearner(AbstractLearner):
                 X_super = self.feature_generator.transform(X_super)
                 self.feature_generator.print_feature_metadata_info()
             else:
-                X_super = self.fit_transform_features(X_super)
+                if X_unlabeled is None:
+                    y_super = pd.concat([y, y_val], ignore_index=True)
+                else:
+                    y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
+                    y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
             X = X_super.head(len(X)).set_index(X.index)
 
             X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)
@@ -170,7 +176,12 @@ class DefaultLearner(AbstractLearner):
                 X_super = self.feature_generator.transform(X_super)
                 self.feature_generator.print_feature_metadata_info()
             else:
-                X_super = self.fit_transform_features(X_super)
+                if X_unlabeled is None:
+                    y_super = y.reset_index(drop=True)
+                else:
+                    y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
+                    y_super = pd.concat([y, y_unlabeled], ignore_index=True)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
 
             X = X_super.head(len(X)).set_index(X.index)
             if X_unlabeled is not None:

@@ -26,7 +26,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
+    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
         sklearn CountVectorizer which is used to generate the ngrams given the text data.
     vectorizer_strategy : str, default 'combined'
         If 'combined', all text features are concatenated together to fit the vectorizer. Features generated in this way have their names prepended with '__nlp__.'.
@@ -41,7 +41,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         Note: For vectorizer_strategy values other than 'combined', the resulting ngrams may use more than this value.
         It is recommended to only increase this value above 0.15 if confident that higher values will not result in out-of-memory errors.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
     def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, **kwargs):
         super().__init__(**kwargs)

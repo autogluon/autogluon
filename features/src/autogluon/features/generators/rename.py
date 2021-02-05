@@ -23,7 +23,7 @@ class RenameFeatureGenerator(AbstractFeatureGenerator):
         If True, then the column names are renamed inplace without copying the input data.
         This will alter the input data outside of the scope of this function.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
     def __init__(self, name_prefix=None, name_suffix=None, inplace=False, **kwargs):
         super().__init__(**kwargs)

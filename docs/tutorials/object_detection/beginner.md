@@ -32,7 +32,7 @@ We `fit` a classifier using AutoGluon as follows. In each experiment (one trial 
 ```{.python .input}
 time_limit = 60*60  # 1 hour
 detector = ObjectDetector()
-hyperparameters = {'epochs': 5}
+hyperparameters = {'batch_size': 8, 'epochs': 5}
 detector.fit(dataset_train, time_limit=time_limit, num_trials=2, hyperparameters=hyperparameters)
 ```
 

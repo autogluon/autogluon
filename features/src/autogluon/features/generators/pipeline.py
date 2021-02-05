@@ -49,7 +49,7 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         return X_out
 
     def _fit_transform(self, X: DataFrame, y=None, **kwargs):
-        X_out, type_group_map_special = super()._fit_transform(X=X, y=y)
+        X_out, type_group_map_special = super()._fit_transform(X=X, y=y, **kwargs)
         X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y)
         return X_out, type_group_map_special
 

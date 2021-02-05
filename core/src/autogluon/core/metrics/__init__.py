@@ -41,6 +41,10 @@ class Scorer(object, metaclass=ABCMeta):
         """
         return self._sign > 0
 
+    def convert_score_to_sklearn_val(self, score):
+        """Scores are always greater_is_better, this flips the sign of metrics who were originally lower_is_better."""
+        return self._sign * score
+
     @abstractmethod
     def __call__(self, y_true, y_pred, sample_weight=None):
         pass

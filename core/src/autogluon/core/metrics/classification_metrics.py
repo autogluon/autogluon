@@ -286,7 +286,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
         labels = np.array(labels)
 
     if weights is None:
-        weights = np.ones(solution.size, dtype=np.int)
+        weights = np.ones(solution.size, dtype=int)
     else:
         # Ensure that weights contains only 1-D integer or float array
         weights_type = type_of_target(weights)
@@ -301,7 +301,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
         raise ValueError("Labels cannot have duplicates")
 
     if solution.size == 0 or prediction.size == 0:
-        return np.zeros((n_labels, n_labels), dtype=np.int)
+        return np.zeros((n_labels, n_labels), dtype=int)
 
     label_to_index = {y: x for x, y in enumerate(labels)}
 

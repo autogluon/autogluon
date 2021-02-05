@@ -131,7 +131,7 @@ class ScalarQuantileOrdinalEnc(EncBase):
         data = self.clean_data(data, dtype='float')
         data = np.array(data).reshape(-1, 1)
         if None in data:
-            idxs = np.full(len(data), -1, dtype=np.int)
+            idxs = np.full(len(data), -1, dtype=int)
             null_idxs = np.where(data == None)[0]
             val_idxs = np.where(data != None)[0]
             if len(val_idxs) > 0:

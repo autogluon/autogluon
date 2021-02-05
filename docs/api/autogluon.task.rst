@@ -59,7 +59,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 
 :hidden:`TabularPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.tabular
 
 .. autoclass:: TabularPredictor
@@ -103,7 +103,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 
 :hidden:`TextPrediction`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.text
 
 .. autoclass:: TextPrediction
@@ -118,7 +118,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 
 Additional Tabular APIs
-----------------------------------
+-----------------------
 
 .. automodule:: autogluon.tabular
 
@@ -126,8 +126,7 @@ Additional Tabular APIs
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularDataset
-   :no-members:
-   :no-inherited-members:
+   :members: init
 
 .. automodule:: autogluon.core.features.feature_metadata
 
@@ -145,7 +144,7 @@ Additional Image Prediction APIs
 .. automodule:: autogluon.mxnet
 
 :hidden:`Classifier`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: Classifier
    :members: predict, evaluate, load, save
@@ -201,81 +200,8 @@ Additional Image Prediction APIs
         :attributes:
 
 
-Additional Object Detection APIs
---------------------------------
-
-.. automodule:: autogluon.vision
-
-:hidden:`Detector`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: Detector
-   :members: predict, evaluate
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: Detector
-        :methods:
-
-    .. rubric:: Attributes
-
-    .. autoautosummary:: Detector
-        :attributes:
-
-.. automodule:: autogluon.vision.object_detection.dataset
-
-
-:hidden:`CustomVOCDetection`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: CustomVOCDetection
-   :members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: CustomVOCDetection
-        :methods:
-
-    .. rubric:: Attributes
-
-    .. autoautosummary:: CustomVOCDetection
-        :attributes:
-
-:hidden:`CustomVOCDetectionBase`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: CustomVOCDetectionBase
-   :members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: CustomVOCDetectionBase
-        :methods:
-
-    .. rubric:: Attributes
-
-    .. autoautosummary:: CustomVOCDetectionBase
-        :attributes:
-
-:hidden:`COCO`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: COCO
-   :members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: COCO
-        :methods:
-
-    .. rubric:: Attributes
-
-    .. autoautosummary:: COCO
-        :attributes:
-
-
 Additional Text Prediction APIs
------------------------------------
+-------------------------------
 
 .. automodule:: autogluon.text.text_prediction.models.basic_v1
 

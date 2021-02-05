@@ -12,7 +12,7 @@ from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
 
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
@@ -82,10 +82,9 @@ class NNFastAiTabularModel(AbstractModel):
         self.y_scaler = None
         self._inner_features = None
 
-    def _preprocess_train(self, X_train, y_train, X_val, y_val, **kwargs):
+    def _preprocess_train(self, X_train, y_train, X_val, y_val, num_workers):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
-        from fastai.core import defaults
 
         X_train = self.preprocess(X_train, fit=True)
         if X_val is not None:
@@ -105,9 +104,6 @@ class NNFastAiTabularModel(AbstractModel):
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
         df_train, train_idx, val_idx = self._generate_datasets(X_train, y_train_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
-
-        # additional workers are helping only when fork is enabled; in other mp modes, communication overhead reduces performance
-        num_workers = defaults.cpus if is_fork_enabled() else 0
 
         # Copy cat_columns and cont_columns because TabularList is mutating the list
         data = (TabularList.from_df(df_train, path=self.path,
@@ -151,7 +147,7 @@ class NNFastAiTabularModel(AbstractModel):
             df[c] = df[c].fillna(self.columns_fills[c])
         return df
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=None, num_gpus=0, **kwargs):
         try_import_fastai_v1()
         import torch
         from fastai.layers import LabelSmoothingCrossEntropy
@@ -168,13 +164,21 @@ class NNFastAiTabularModel(AbstractModel):
         if self.y_scaler is not None:
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
-        if 'num_gpus' in kwargs:
-            if kwargs['num_gpus'] == 0:
-                # FIXME: This doesn't appear to change anything in terms of train/inference speed
+        if num_cpus is None:
+            num_cpus = defaults.cpus
+        # additional workers are helping only when fork is enabled; in other mp modes, communication overhead reduces performance
+        num_workers = int(num_cpus / 2)
+        if not is_fork_enabled():
+            num_workers = 0
+        if num_gpus is not None:
+            if num_gpus == 0:
+                # TODO: Does not obviously impact inference speed
                 defaults.device = torch.device('cpu')
+            else:
+                defaults.device = torch.device('cuda')
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
-        data = self._preprocess_train(X_train, y_train, X_val, y_val)
+        data = self._preprocess_train(X_train, y_train, X_val, y_val, num_workers=num_workers)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
@@ -382,7 +386,6 @@ class NNFastAiTabularModel(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
             ignored_type_group_raw=[R_OBJECT],
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params

@@ -21,7 +21,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    generators : List[List[AbstractFeatureGenerator]]
+    generators : List[List[:class:`AbstractFeatureGenerator`]]
         generators is a list of generator groups, where a generator group is a list of generators.
         Feature generators within generators[i] (generator group) are all fit on the same data, and their outputs are then concatenated to form the output of generators[i].
         generators[i+1] are then fit on the output of generators[i].
@@ -40,15 +40,15 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         pre_generators are generators which are sequentially fit prior to generators.
         Functions identically to post_generators argument, but pre_generators are called before generators, while post_generators are called after generators.
         Provided for convenience to classes inheriting from BulkFeatureGenerator.
-        Common pre_generator's include AsTypeFeatureGenerator and FillNaFeatureGenerator, which act to prune and clean the data instead of generating entirely new features.
+        Common pre_generator's include :class:`AsTypeFeatureGenerator` and :class:`FillNaFeatureGenerator`, which act to prune and clean the data instead of generating entirely new features.
     **kwargs :
-        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+        Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
 
     Examples
     --------
     >>> from autogluon.tabular import TabularDataset
-    >>> from autogluon.tabular.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, CategoryFeatureGenerator, DropDuplicatesFeatureGenerator, FillNaFeatureGenerator, IdentityFeatureGenerator
-    >>> from autogluon.core.features.constants import R_INT, R_FLOAT
+    >>> from autogluon.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, CategoryFeatureGenerator, DropDuplicatesFeatureGenerator, FillNaFeatureGenerator, IdentityFeatureGenerator
+    >>> from autogluon.core.features.types import R_INT, R_FLOAT
     >>>
     >>> generators = [
     >>>     [AsTypeFeatureGenerator()],  # Convert all input features to the exact same types as they were during fit.
@@ -61,10 +61,10 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     >>> ]
     >>> feature_generator = BulkFeatureGenerator(generators=generators, verbosity=3)
     >>>
-    >>> label_column = 'class'
+    >>> label = 'class'
     >>> train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-    >>> X_train = train_data.drop(labels=[label_column], axis=1)
-    >>> y_train = train_data[label_column]
+    >>> X_train = train_data.drop(labels=[label], axis=1)
+    >>> y_train = train_data[label]
     >>>
     >>> X_train_transformed = feature_generator.fit_transform(X=X_train, y=y_train)
     >>>

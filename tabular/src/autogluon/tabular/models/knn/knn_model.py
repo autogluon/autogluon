@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 # TODO: Normalize data!
 class KNNModel(AbstractModel):
+    """
+    KNearestNeighbors model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._model_type = self._get_model_type()

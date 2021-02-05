@@ -87,7 +87,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self.features if it works with bagging
         self.processor = None  # data processor
         self.summary_writer = None
-        self.ctx = mx.cpu()
+        self.ctx = None
         self.batch_size = None
         self.num_dataloading_workers = None
         self.num_dataloading_workers_inference = 0
@@ -164,7 +164,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                                                     params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, reporter=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=1, num_gpus=0, reporter=None, **kwargs):
         """ X_train (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_val (pd.DataFrame): test data features (should have same column names as Xtrain)
             y_train (pd.Series):
@@ -177,8 +177,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         params = fixedvals_from_searchspaces(params)
         if self.feature_metadata is None:
             raise ValueError("Trainer class must set feature_metadata for this model")
-        if 'num_cpus' in kwargs:
-            self.num_dataloading_workers = max(1, int(kwargs['num_cpus']/2.0))
+        if num_cpus is not None:
+            self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         else:
             self.num_dataloading_workers = 1
         if self.num_dataloading_workers == 1:
@@ -191,7 +191,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                len(train_dataset.feature_groups['language']) ))
         # self._save_preprocessor()  # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
 
-        if 'num_gpus' in kwargs and kwargs['num_gpus'] >= 1:
+        if num_gpus is not None and num_gpus >= 1:
             self.ctx = mx.gpu()  # Currently cannot use more than 1 GPU
         else:
             self.ctx = mx.cpu()
@@ -693,7 +693,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         num_cpus = scheduler_params['resource']['num_cpus']
-        # num_gpus = scheduler_params['resource']['num_gpus']  # TODO: Currently unused
 
         params_copy = self.params.copy()
 
@@ -718,7 +717,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             val_path=val_path,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_params['time_out']
+            time_limit=scheduler_params['time_out'],
+            fit_kwargs=scheduler_params['resource'],
         )
         tabular_nn_trial.register_args(util_args=util_args, **params_copy)
         scheduler = scheduler_cls(tabular_nn_trial, **scheduler_params)
