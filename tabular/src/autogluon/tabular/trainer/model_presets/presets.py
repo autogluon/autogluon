@@ -162,7 +162,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
             else:
                 model_cfgs_to_process.append(model_cfg)
         for model_cfg in model_cfgs_to_process:
-            print(model_type, model_cfg)
+            logger.log(20, model_type, model_cfg)
             model_cfg = clean_model_cfg(model_cfg=model_cfg, model_type=model_type, ag_args=ag_args, ag_args_ensemble=ag_args_ensemble, ag_args_fit=ag_args_fit)
             model_cfg[AG_ARGS]['priority'] = model_cfg[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             model_priority = model_cfg[AG_ARGS]['priority']
