@@ -50,6 +50,8 @@ class MOHyperbandScheduler(HyperbandScheduler):
         self._scalarization_options = kwargs["scalarization_options"]
         self._objectives = kwargs["objectives"]
         self._sign_vector = _prepare_sign_vector(self._objectives)
+        assert "_SCALARIZATION" not in kwargs["objectives"], "_SCALARIZATION" \
+            "is a protected value. Please refrain from using it."
         kwargs["reward_attr"] = "_SCALARIZATION"
         super().__init__(train_fn, **filter_by_key(kwargs, _ARGUMENT_KEYS))
 
