@@ -279,7 +279,7 @@ class FeatureAggregator(HybridBlock):
     def get_cfg(key=None):
         if key is None:
             cfg = CfgNode()
-            cfg.agg_type = 'attention_token'
+            cfg.agg_type = 'concat'
 
             # Attention Aggregator
             cfg.attention_net = CfgNode()
@@ -536,7 +536,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             cfg.text_net = CfgNode()
             cfg.text_net.use_segment_id = True
             cfg.text_net.pool_type = 'cls'
-            cfg.aggregate_categorical = False  # Whether to use one network to aggregate the categorical columns.
+            cfg.aggregate_categorical = True  # Whether to use one network to aggregate the categorical columns.
             cfg.categorical_agg = CfgNode()
             cfg.categorical_agg.activation = 'leaky'
             cfg.categorical_agg.mid_units = 128
