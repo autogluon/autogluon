@@ -284,6 +284,7 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
                 else:
                     batch_feature = sample
                 batch_feature = move_to_ctx(batch_feature, ctx)
+                print(ctx)
                 if extract_embedding:
                     _, embeddings = net(batch_feature)
                     iter_pred_l.append(embeddings)
