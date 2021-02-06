@@ -84,7 +84,7 @@ def get_trimmed_lengths(lengths: List[int],
             budgets = lengths - trimmed_lengths
             nonzero_idx = (budgets > 0).nonzero()[0]
             nonzero_budgets = budgets[nonzero_idx]
-            if remainder // len(nonzero_idx) == 0:
+            if remainder < len(nonzero_idx):
                 for i in range(remainder):
                     trimmed_lengths[nonzero_idx[i]] += 1
             else:
