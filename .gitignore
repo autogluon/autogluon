@@ -118,6 +118,8 @@ ENV/
 .idea/*
 train/*
 
+!examples/mo_hpo/mo_hyperband_files/mo_hyperband_12_0.png
+
 tutorials/checkpoint/*
 tutorials/train/*
 examples/image_classification/*.csv
