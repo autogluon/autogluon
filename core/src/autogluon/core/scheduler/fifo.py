@@ -10,7 +10,8 @@ from collections import OrderedDict
 from time import sleep
 
 import numpy as np
-from autogluon.core.utils.loaders.load_pkl import restricted_loads
+
+from ..utils.loaders.load_pkl import restricted_loads
 from tqdm.auto import tqdm
 
 from .reporter import DistStatusReporter, FakeReporter

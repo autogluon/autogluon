@@ -7,8 +7,7 @@ import threading
 import multiprocessing as mp
 from collections import OrderedDict
 
-from autogluon.core.utils.loaders.load_pkl import restricted_loads
-
+from ..utils.loaders.load_pkl import restricted_loads
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
 from .resource import DistributedResource

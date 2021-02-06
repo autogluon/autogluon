@@ -3,8 +3,8 @@ import multiprocessing as mp
 import pickle
 from collections import OrderedDict
 import numpy as np
-from autogluon.core.utils.loaders.load_pkl import restricted_loads
 
+from ..utils.loaders.load_pkl import restricted_loads
 from .bayesopt.autogluon.debug_log import DebugLogPrinter
 from ..utils import DeprecationHelper
 

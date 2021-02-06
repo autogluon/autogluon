@@ -6,8 +6,7 @@ import multiprocessing as mp
 import os
 import copy
 
-from autogluon.core.utils.loaders.load_pkl import restricted_loads
-
+from ..utils.loaders.load_pkl import restricted_loads
 from .fifo import FIFOScheduler
 from .hyperband_stopping import StoppingRungSystem
 from .hyperband_promotion import PromotionRungSystem

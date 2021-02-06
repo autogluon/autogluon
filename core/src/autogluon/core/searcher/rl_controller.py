@@ -1,8 +1,7 @@
 import pickle
 from collections import OrderedDict
 
-from autogluon.core.utils.loaders.load_pkl import restricted_loads
-
+from ..utils.loaders.load_pkl import restricted_loads
 from .searcher import BaseSearcher
 from ..utils import try_import_mxnet
 

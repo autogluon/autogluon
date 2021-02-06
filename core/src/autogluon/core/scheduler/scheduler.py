@@ -6,8 +6,8 @@ from collections import OrderedDict
 from warnings import warn
 
 import distributed
-from autogluon.core.utils.loaders.load_pkl import restricted_loads
 
+from ..utils.loaders.load_pkl import restricted_loads
 from .jobs import DistributedJobRunner
 from .managers import TaskManagers
 from .. import Task
