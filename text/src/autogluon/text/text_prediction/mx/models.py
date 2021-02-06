@@ -212,6 +212,7 @@ def base_model_config():
     cfg.test_stochastic_chunk = False    # Whether to use stochastic chunk in testing
     cfg.use_avg_nbest = False            # Whether to average the top performed models and use that as the final model.
                                          # This will usually give us better performance.
+    cfg._disable_update = False          # This is a hack for trying to disable the update. Should not be used usually
     cfg.inference_num_repeat = 1         # Whether to turn on randomness and repeat the inference for multiple times.
     return cfg
 
@@ -601,7 +602,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         # Begin to update
         trainer.allreduce_grads()
         total_norm, ratio, is_finite = clip_grad_global_norm(params, cfg.optimization.max_grad_norm)
-        trainer.update(1.0, ignore_stale_grad=True)
+        if not cfg.model._disable_update:
+            trainer.update(1.0, ignore_stale_grad=True)
 
         # Clear after update
         if num_accumulated > 1:
