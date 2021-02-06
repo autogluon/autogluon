@@ -21,6 +21,7 @@ safe_builtins = {
 
 safe_modules = [
     'numpy',
+    'mxnet',
     'collections',
     'autogluon',
 ]
