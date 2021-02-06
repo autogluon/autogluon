@@ -300,8 +300,7 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
                 for ele in iter_logits_l:
                     logits[i].append(ele.asnumpy())
         predictions[i] = np.concatenate(predictions[i], axis=0)
-        print(predictions[i])
-        if problem_type == REGRESSION:
+        if problem_type == REGRESSION and not extract_embedding:
             predictions[i] = label_scaler.inverse_transform(predictions[i])[:, 0]
         if use_logits:
             logits[i] = np.concatenate(logits[i], axis=0)
