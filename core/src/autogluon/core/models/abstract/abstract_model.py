@@ -5,6 +5,7 @@ import os
 import pickle
 import sys
 import time
+import warnings
 from typing import Union
 
 import numpy as np
@@ -299,12 +300,17 @@ class AbstractModel:
         return kwargs
 
     def fit(self, **kwargs):
-        kwargs = self._preprocess_fit_args(**kwargs)
-        if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
-            self._fit(**kwargs)
-        else:
-            logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
-            raise TimeLimitExceeded
+        with warnings.catch_warnings():
+            # Suppress numpy 1.20 warnings (downstream scipy is not updated yet)
+            # https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+            warnings.filterwarnings('ignore', message='`np.*` is a deprecated alias for the builtin `.*`')
+
+            kwargs = self._preprocess_fit_args(**kwargs)
+            if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
+                self._fit(**kwargs)
+            else:
+                logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
+                raise TimeLimitExceeded
 
     def _fit(self, X_train, y_train, **kwargs):
         # kwargs may contain: num_cpus, num_gpus
@@ -326,23 +332,28 @@ class AbstractModel:
         return y_pred_proba
 
     def _predict_proba(self, X, **kwargs):
-        X = self.preprocess(X, **kwargs)
+        with warnings.catch_warnings():
+            # Suppress numpy 1.20 warnings (downstream scipy is not updated yet)
+            # https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+            warnings.filterwarnings('ignore', message='`np.*` is a deprecated alias for the builtin `.*`')
 
-        if self.problem_type == REGRESSION:
-            return self.model.predict(X)
+            X = self.preprocess(X, **kwargs)
 
-        y_pred_proba = self.model.predict_proba(X)
-        if self.problem_type == BINARY:
-            if len(y_pred_proba.shape) == 1:
+            if self.problem_type == REGRESSION:
+                return self.model.predict(X)
+
+            y_pred_proba = self.model.predict_proba(X)
+            if self.problem_type == BINARY:
+                if len(y_pred_proba.shape) == 1:
+                    return y_pred_proba
+                elif y_pred_proba.shape[1] > 1:
+                    return y_pred_proba[:, 1]
+                else:
+                    return y_pred_proba
+            elif y_pred_proba.shape[1] > 2:
                 return y_pred_proba
-            elif y_pred_proba.shape[1] > 1:
-                return y_pred_proba[:, 1]
             else:
-                return y_pred_proba
-        elif y_pred_proba.shape[1] > 2:
-            return y_pred_proba
-        else:
-            return y_pred_proba[:, 1]
+                return y_pred_proba[:, 1]
 
     def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, **kwargs):
         if eval_metric is None:
