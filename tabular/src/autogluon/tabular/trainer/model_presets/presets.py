@@ -3,7 +3,7 @@ import inspect
 import logging
 from collections import defaultdict
 
-from autogluon.core.metrics import soft_log_loss, mean_squared_error
+from autogluon.core.metrics import mean_squared_error
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel
 
@@ -299,6 +299,8 @@ def model_factory(
 
 # TODO: v0.1 cleanup and avoid hardcoded logic with model names
 def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_classes=None, name_suffix='', ag_args=None, invalid_model_names: list = None):
+    # TODO v0.1: This import depends on mxnet, consider refactoring to avoid mxnet
+    from autogluon.core.metrics.softclass_metrics import soft_log_loss
     model_types_standard = ['GBM', 'NN', 'CAT']
     hyperparameters = copy.deepcopy(hyperparameters)
     hyperparameters_standard = copy.deepcopy(hyperparameters)

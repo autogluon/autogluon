@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from autogluon.core.metrics import soft_log_loss
+from autogluon.core.metrics.softclass_metrics import soft_log_loss
 from autogluon.core.utils import try_import_catboost, try_import_catboostdev
 
 from .catboost_utils import CustomMetric
