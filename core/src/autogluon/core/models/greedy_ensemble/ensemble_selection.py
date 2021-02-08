@@ -5,7 +5,7 @@ from collections import Counter
 import numpy as np
 
 from ...constants import PROBLEM_TYPES
-from ...metrics import calculate_score, _ProbaScorer, _ThresholdScorer
+from ...metrics import log_loss
 from ...utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ class EnsembleSelection:
             metric,
             sorted_initialization: bool = False,
             bagging: bool = False,
+            tie_breaker: str = 'second_metric',
             random_state: np.random.RandomState = None,
     ):
         self.ensemble_size = ensemble_size
@@ -27,16 +28,13 @@ class EnsembleSelection:
         self.sorted_initialization = sorted_initialization
         self.bagging = bagging
         self.use_best = True
+        if tie_breaker not in ['random', 'second_metric']:
+            raise ValueError(f"Unknown tie_breaker value: {tie_breaker}. Must be one of: ['random', 'second_metric']")
+        self.tie_breaker = tie_breaker
         if random_state is not None:
             self.random_state = random_state
         else:
             self.random_state = np.random.RandomState(seed=0)
-        if isinstance(metric, _ProbaScorer):
-            self.eval_metric_expects_y_pred = False
-        elif isinstance(metric, _ThresholdScorer):
-            self.eval_metric_expects_y_pred = False
-        else:
-            self.eval_metric_expects_y_pred = True
 
     def fit(self, predictions, labels, time_limit=None, identifiers=None):
         self.ensemble_size = int(self.ensemble_size)
@@ -87,29 +85,31 @@ class EnsembleSelection:
                     ensemble_prediction += pred
                 ensemble_prediction /= s
 
-                weighted_ensemble_prediction = (s / float(s + 1)) * \
-                                               ensemble_prediction
+                weighted_ensemble_prediction = (s / float(s + 1)) * ensemble_prediction
             fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
             for j, pred in enumerate(predictions):
                 fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1. / float(s + 1)) * pred
-                if self.eval_metric_expects_y_pred:
-                    preds = get_pred_from_proba(y_pred_proba=fant_ensemble_prediction, problem_type=self.problem_type)
-                else:
-                    preds = fant_ensemble_prediction
+                scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric)
 
-                scores[j] = self.metric._optimum - calculate_score(
-                    solution=labels,
-                    prediction=preds,
-                    task_type=self.problem_type,
-                    metric=self.metric,
-                    all_scoring_functions=False)
-
-                # scores[j] = -self.metric(y_true=labels, y_pred=fant_ensemble_prediction)
-            # print('scores:', scores)
             all_best = np.argwhere(scores == np.nanmin(scores)).flatten()
-            best = self.random_state.choice(all_best)
 
-            # TODO: Instead of selecting random, compute additional metric which can be a tie-breaker!
+            if len(all_best) > 1:
+                if self.tie_breaker == 'second_metric':
+                    if self.problem_type in ['binary', 'multiclass']:
+                        # Tiebreak with log_loss
+                        scores_tiebreak = np.zeros((len(all_best)))
+                        secondary_metric = log_loss
+                        fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
+                        index_map = {}
+                        for k, j in enumerate(all_best):
+                            index_map[k] = j
+                            pred = predictions[j]
+                            fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1. / float(s + 1)) * pred
+                            scores_tiebreak[k] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=secondary_metric)
+                        all_best_tiebreak = np.argwhere(scores_tiebreak == np.nanmin(scores_tiebreak)).flatten()
+                        all_best = [index_map[index] for index in all_best_tiebreak]
+
+            best = self.random_state.choice(all_best)
 
             ensemble.append(predictions[best])
             trajectory.append(scores[best])
@@ -129,18 +129,26 @@ class EnsembleSelection:
         min_score = np.min(trajectory)
         first_index_of_best = trajectory.index(min_score)
 
-        self.indices_ = order
-        self.trajectory_ = trajectory
-        self.train_score_ = trajectory[-1]  # TODO: Select best iteration or select final iteration? Earlier iteration could have a better score!
-
         if self.use_best:
             self.indices_ = order[:first_index_of_best+1]
             self.trajectory_ = trajectory[:first_index_of_best+1]
-            self.train_score_ = trajectory[first_index_of_best]  # TODO: Select best iteration or select final iteration? Earlier iteration could have a better score!
+            self.train_score_ = trajectory[first_index_of_best]
             self.ensemble_size = first_index_of_best + 1
             logger.log(15, 'Ensemble size: %s' % self.ensemble_size)
+        else:
+            self.indices_ = order
+            self.trajectory_ = trajectory
+            self.train_score_ = trajectory[-1]
 
         logger.debug("Ensemble indices: "+str(self.indices_))
+
+    def _calculate_regret(self, y_true, y_pred_proba, metric):
+        if metric.needs_pred:
+            preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+        else:
+            preds = y_pred_proba
+
+        return metric._optimum - metric(y_true, preds)
 
     def _calculate_weights(self):
         ensemble_members = Counter(self.indices_).most_common()

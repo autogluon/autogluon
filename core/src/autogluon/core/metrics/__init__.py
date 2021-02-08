@@ -226,15 +226,6 @@ class _ThresholdScorer(Scorer):
         return True
 
 
-def scorer_expects_y_pred(scorer: Scorer):
-    if isinstance(scorer, _ProbaScorer):
-        return False
-    elif isinstance(scorer, _ThresholdScorer):
-        return False
-    else:
-        return True
-
-
 def make_scorer(name, score_func, optimum=1, greater_is_better=True,
                 needs_proba=False, needs_threshold=False, **kwargs) -> Scorer:
     """Make a scorer from a performance metric or loss function.
@@ -435,57 +426,6 @@ for name, metric in [('precision', sklearn.metrics.precision_score),
         globals()[qualified_name] = make_scorer(qualified_name,
                                                 partial(metric, pos_label=None, average=average))
         CLASSIFICATION_METRICS[qualified_name] = globals()[qualified_name]
-
-
-def calculate_score(solution, prediction, task_type, metric,
-                    all_scoring_functions=False):
-    if task_type not in PROBLEM_TYPES:
-        raise NotImplementedError(task_type)
-
-    if all_scoring_functions:
-        score = dict()
-        if task_type in PROBLEM_TYPES_REGRESSION:
-            # TODO put this into the regression metric itself
-            cprediction = sanitize_array(prediction)
-            metric_dict = copy.copy(REGRESSION_METRICS)
-            metric_dict[metric.name] = metric
-            for metric_ in REGRESSION_METRICS:
-                func = REGRESSION_METRICS[metric_]
-                score[func.name] = func(solution, cprediction)
-
-        else:
-            metric_dict = copy.copy(CLASSIFICATION_METRICS)
-            metric_dict[metric.name] = metric
-            for metric_ in metric_dict:
-                func = CLASSIFICATION_METRICS[metric_]
-
-                # TODO maybe annotate metrics to define which cases they can
-                # handle?
-
-                try:
-                    score[func.name] = func(solution, prediction)
-                except ValueError as e:
-                    if e.args[0] == 'multiclass format is not supported':
-                        continue
-                    elif e.args[0] == "Samplewise metrics are not available "\
-                            "outside of multilabel classification.":
-                        continue
-                    elif e.args[0] == "Target is multiclass but "\
-                            "average='binary'. Please choose another average "\
-                            "setting, one of [None, 'micro', 'macro', 'weighted'].":
-                        continue
-                    else:
-                        raise e
-
-    else:
-        if task_type in PROBLEM_TYPES_REGRESSION:
-            # TODO put this into the regression metric itself
-            cprediction = sanitize_array(prediction)
-            score = metric(solution, cprediction)
-        else:
-            score = metric(solution, prediction)
-
-    return score
 
 
 def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
