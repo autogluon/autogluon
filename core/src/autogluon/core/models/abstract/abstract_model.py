@@ -192,6 +192,7 @@ class AbstractModel:
         if self.params is not None:
             self.params.update(def_search_space)
 
+    # TODO: v0.1 Change this to update path_root only, path change to property
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
         self.path_root = self.path.rsplit(self.path_suffix, 1)[0]
@@ -609,7 +610,7 @@ class AbstractModel:
         hpo_model_performances = {}
         for trial in sorted(hpo_results['trial_info'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = "trial_" + str(trial)  # unique identifier to files from this trial
+            file_id = f"T{trial}"  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
             hpo_models[trial_model_name] = trial_model_path

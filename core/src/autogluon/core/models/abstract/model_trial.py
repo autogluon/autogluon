@@ -29,8 +29,16 @@ def model_trial(args, reporter: LocalStatusReporter):
 
         fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **util_args.get('fit_kwargs', dict()))
         predict_proba_args = dict(X=X_val)
-        model = fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
-                                   time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=None)
+        model = fit_and_save_model(
+            model=model,
+            params=args,
+            fit_args=fit_model_args,
+            predict_proba_args=predict_proba_args,
+            y_val=y_val,
+            time_start=util_args.time_start,
+            time_limit=util_args.get('time_limit', None),
+            reporter=None,
+        )
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
@@ -43,7 +51,7 @@ def prepare_inputs(args):
     task_id = args.pop('task_id')
     util_args = args.pop('util_args')
 
-    file_prefix = f"trial_{task_id}"  # append to all file names created during this trial. Do NOT change!
+    file_prefix = f"T{task_id}"  # append to all file names created during this trial. Do NOT change!
     model = util_args.model  # the model object must be passed into model_trial() here
     model.name = model.name + os.path.sep + file_prefix
     model.set_contexts(path_context=model.path_root + model.name + os.path.sep)

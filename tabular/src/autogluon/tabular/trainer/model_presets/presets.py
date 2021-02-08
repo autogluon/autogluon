@@ -264,21 +264,22 @@ def model_factory(
         name_prefix = model[AG_ARGS].get('name_prefix', '')
         name_suff = model[AG_ARGS].get('name_suffix', '')
         name_orig = name_prefix + name_main + name_suff
-    if name_suffix is not None:
-        name_orig = name_orig + name_suffix
-    name = name_orig
     name_stacker = None
     num_increment = 2
+    if name_suffix is None:
+        name_suffix = ''
     if ensemble_kwargs is None:
+        name = f'{name_orig}{name_suffix}'
         while name in invalid_name_set:  # Ensure name is unique
-            name = f'{name_orig}_{num_increment}'
+            name = f'{name_orig}_{num_increment}{name_suffix}'
             num_increment += 1
     else:
+        name = name_orig
         name_bag_suffix = model[AG_ARGS].get('name_bag_suffix', '_BAG')
-        name_stacker = f'{name}{name_bag_suffix}_L{level}'
+        name_stacker = f'{name}{name_bag_suffix}_L{level}{name_suffix}'
         while name_stacker in invalid_name_set:  # Ensure name is unique
             name = f'{name_orig}_{num_increment}'
-            name_stacker = f'{name}{name_bag_suffix}_L{level}'
+            name_stacker = f'{name}{name_bag_suffix}_L{level}{name_suffix}'
             num_increment += 1
     model_params = copy.deepcopy(model)
     model_params.pop(AG_ARGS, None)
