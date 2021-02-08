@@ -1,5 +1,6 @@
 import logging
 import pickle
+import warnings
 from collections import OrderedDict
 from copy import deepcopy
 from functools import partial
@@ -114,10 +115,15 @@ class RayTuneScheduler(object):
             tune_args[tune_arg] = tune_args.pop(ag_arg)
 
     def train_fn_wrapper(self, fn, config, reporter=None, **kwargs):
-        config = EasyDict(config)
-        print(config)
-        config['task_id'] = tune.session.get_session().trial_name
-        return fn(config, reporter=TuneReporter(), **kwargs)
+        with warnings.catch_warnings():
+            # Suppress numpy 1.20 warnings (downstream scipy is not updated yet)
+            # https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+            warnings.filterwarnings('ignore', message='`np.*` is a deprecated alias for the builtin `.*`')
+            warnings.filterwarnings('ignore', message='In accordance with NEP 32, the function .* was removed from NumPy version')
+
+            config = EasyDict(config)
+            config['task_id'] = tune.session.get_session().trial_name
+            return fn(config, reporter=TuneReporter(), **kwargs)
 
     def run(self, **kwargs):
         self.training_history = OrderedDict()
@@ -125,13 +131,18 @@ class RayTuneScheduler(object):
         self.result = None
 
         results_history_callback = ResultsHistoryCallback(self.training_history, self.config_history)
-        result = tune.run(
-            partial(self.train_fn_wrapper, self.task_fn.f),
-            name='AG',
-            callbacks=[results_history_callback],
-            config=self._wrap_space(self.task_fn.kwvars),
-            **self.tune_args
-        )
+        with warnings.catch_warnings():
+            # Suppress numpy 1.20 warnings (downstream scipy is not updated yet)
+            # https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+            warnings.filterwarnings('ignore', message='`np.*` is a deprecated alias for the builtin `.*`')
+            warnings.filterwarnings('ignore', message='In accordance with NEP 32, the function .* was removed from NumPy version')
+            result = tune.run(
+                partial(self.train_fn_wrapper, self.task_fn.f),
+                name='AG',
+                callbacks=[results_history_callback],
+                config=self._wrap_space(self.task_fn.kwvars),
+                **self.tune_args
+            )
         self.result = result
 
     def restore(self, **kwargs):

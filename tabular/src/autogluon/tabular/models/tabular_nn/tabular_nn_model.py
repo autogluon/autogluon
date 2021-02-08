@@ -722,7 +722,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         util_args = dict(
             # using absolute path - child jobs can have different working directory
             # this allow to load datasets consistently
-            directory=get_absolute_path('.') + '/',
+            directory=get_absolute_path('.') + os.path.sep,
             train_path=train_path,
             val_path=val_path,
             model=self,

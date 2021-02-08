@@ -350,7 +350,7 @@ class LGBModel(AbstractModel):
             dataset_val_pkl_filename=dataset_val_pkl_filename,
             # using absolute path - child jobs can have different working directory
             # this allow to load datasets consistently
-            directory=get_absolute_path(directory) + '/',
+            directory=get_absolute_path(directory) + os.path.sep,
             model=self,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],

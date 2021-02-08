@@ -88,7 +88,7 @@ class AbstractLearner:
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
 
     def create_contexts(self, path_context):
-        model_context = get_absolute_path(path_context + 'models' + os.path.sep)
+        model_context = get_absolute_path(path_context + 'models') + os.path.sep
         save_path = get_absolute_path(path_context + self.learner_file_name)
         return path_context, model_context, save_path
 

@@ -306,6 +306,7 @@ class AbstractModel:
             # Suppress numpy 1.20 warnings (downstream scipy is not updated yet)
             # https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
             warnings.filterwarnings('ignore', message='`np.*` is a deprecated alias for the builtin `.*`')
+            warnings.filterwarnings('ignore', message='In accordance with NEP 32, the function .* was removed from NumPy version')
 
             kwargs = self._preprocess_fit_args(**kwargs)
             if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
@@ -338,6 +339,7 @@ class AbstractModel:
             # Suppress numpy 1.20 warnings (downstream scipy is not updated yet)
             # https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
             warnings.filterwarnings('ignore', message='`np.*` is a deprecated alias for the builtin `.*`')
+            warnings.filterwarnings('ignore', message='In accordance with NEP 32, the function .* was removed from NumPy version')
 
             X = self.preprocess(X, **kwargs)
 
@@ -567,7 +569,7 @@ class AbstractModel:
             dataset_val_filename=dataset_val_filename,
             # using absolute path - child jobs can have different working directory
             # this allow to load datasets consistently
-            directory=get_absolute_path(directory) + '/',
+            directory=get_absolute_path(directory) + os.path.sep,
             model=self,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],

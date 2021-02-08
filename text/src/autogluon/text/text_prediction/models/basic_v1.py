@@ -530,7 +530,7 @@ class BertForTextPredictionBasic:
         self._stopping_metric = stopping_metric
         self._log_metrics = log_metrics
         self._logger = logger
-        self._output_directory = get_absolute_path(output_directory)
+        self._output_directory = get_absolute_path(output_directory) + os.path.sep
         self._label_columns = label_columns
         self._feature_columns = feature_columns
         self._label_shapes = label_shapes

@@ -32,6 +32,7 @@ class AutoTrainer(AbstractTrainer):
             # Suppress numpy 1.20 warnings (downstream scipy is not updated yet)
             # https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
             warnings.filterwarnings('ignore', message='`np.*` is a deprecated alias for the builtin `.*`')
+            warnings.filterwarnings('ignore', message='In accordance with NEP 32, the function .* was removed from NumPy version')
 
             for key in kwargs:
                 logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
