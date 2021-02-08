@@ -44,14 +44,14 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, prefilter_tokens=False, prefilter_token_count=10, **kwargs):
+    def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, prefilter_tokens=False, prefilter_token_count=100, **kwargs):
         super().__init__(**kwargs)
-
         self.vectorizers = []
         # TODO: 0.20 causes OOM error with 64 GB ram on NN with several datasets. LightGBM and CatBoost succeed
         # TODO: Finetune this, or find a better way to ensure stability
+        # TODO: adjust max_memory_ratio correspondingly if prefilter_tokens==True
         self.max_memory_ratio = max_memory_ratio  # Ratio of maximum memory the output ngram features are allowed to use in dense int32 form.
-
+        
         if vectorizer is None:
             self.vectorizer_default_raw = vectorizer_auto_ml_default()
         else:
@@ -61,8 +61,8 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             raise ValueError(f"vectorizer_strategy must be one of {['combined', 'separate', 'both']}, but value is: {vectorizer_strategy}")
         self.vectorizer_strategy = vectorizer_strategy
         self.vectorizer_features = None
-        self.prefilter_tokens = prefilter_tokens
-        self.prefilter_token_count = prefilter_token_count
+        self.prefilter_tokens = prefilter_tokens 
+        self.prefilter_token_count = prefilter_token_count 
         self.token_mask = None
 
     def _fit_transform(self, X: DataFrame, y: Series = None, problem_type: str = None, **kwargs) -> (DataFrame, dict):
