@@ -632,7 +632,7 @@ class BaggedEnsembleModel(AbstractModel):
 
             # TODO: Create new Ensemble Here
             bag = copy.deepcopy(self)
-            bag.name = f"{bag.name}{os.path.sep}T{i}"
+            bag.rename(f"{bag.name}{os.path.sep}T{i}")
             bag.set_contexts(self.path_root + bag.name + os.path.sep)
 
             oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X_train, y=y_train)
@@ -640,7 +640,7 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_model_repeats[test_index] += 1
 
             bag.model_base = None
-            child.rename(name='')
+            child.rename('')
             child.set_contexts(bag.path + child.name + os.path.sep)
             bag.save_model_base(child.convert_to_template())
 
@@ -649,7 +649,7 @@ class BaggedEnsembleModel(AbstractModel):
             bag._n_repeats = 1
             bag._oof_pred_proba = oof_pred_proba
             bag._oof_pred_model_repeats = oof_pred_model_repeats
-            child.rename(name='S1F1')
+            child.rename('S1F1')
             child.set_contexts(bag.path + child.name + os.path.sep)
             if not self.params.get('save_bag_folds', True):
                 child.model = None

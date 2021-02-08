@@ -192,6 +192,7 @@ class AbstractModel:
         if self.params is not None:
             self.params.update(def_search_space)
 
+    # TODO: v0.1 Change this to update path_root only, path change to property
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
         self.path_root = self.path.rsplit(self.path_suffix, 1)[0]
