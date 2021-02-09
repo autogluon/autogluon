@@ -43,7 +43,7 @@ long_description = open(os.path.join('..', 'README.md')).read()
 python_requires = '>=3.6, <3.8'
 
 requirements = [
-    'numpy>=1.20',
+    'numpy==1.19',
     'scipy>=1.3.3,<1.5.0',  # TODO v0.1: Upgrade?
     'cython',  # TODO: Do we need cython here?
     'tornado>=5.0.1',

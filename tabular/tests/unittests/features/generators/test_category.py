@@ -36,7 +36,7 @@ def test_category_feature_generator(generator_helper, data_helper):
         [0, 1, 0, 3, 3, 3, 2, np.nan, np.nan],
         [0, np.nan, 0, 1, 1, 1, np.nan, np.nan, np.nan],
         [np.nan, np.nan, np.nan, 0, 0, 0, np.nan, np.nan, np.nan],
-        [2, 0, 2, 3, 3, 3, 1, np.nan, np.nan],
+        [2, 1, 2, 3, 3, 3, 0, np.nan, np.nan],
         [0, 1, 0, 3, 3, 3, 2, 3, 3],
     ]
 
@@ -44,7 +44,7 @@ def test_category_feature_generator(generator_helper, data_helper):
         [0, 1, 0, 3, 3, 3, 2, -1, -1],
         [0, -1, 0, 1, 1, 1, -1, -1, -1],
         [-1, -1, -1, 0, 0, 0, -1, -1, -1],
-        [2, 0, 2, 3, 3, 3, 1, -1, -1],
+        [2, 1, 2, 3, 3, 3, 0, -1, -1],
         [0, 1, 0, 3, 3, 3, 2, 3, 3],
     ]
 

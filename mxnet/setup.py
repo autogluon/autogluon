@@ -43,8 +43,8 @@ long_description = open(os.path.join('..', 'README.md')).read()
 python_requires = '>=3.6, <3.8'
 
 requirements = [
-    'Pillow<=6.2.1',
-    'numpy>=1.20',
+    'Pillow<=8.1',
+    'numpy==1.19',
     'matplotlib',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',
