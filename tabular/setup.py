@@ -43,7 +43,7 @@ long_description = open(os.path.join('..', 'README.md')).read()
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
-    'numpy>=1.20',
+    'numpy<=1.19',
     'scipy>=1.3.3,<1.5.0',
     'catboost>=0.23.0,<0.25',
     'xgboost>=1.2,<1.3',
