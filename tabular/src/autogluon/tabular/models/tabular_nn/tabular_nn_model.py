@@ -761,9 +761,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if remove_fit and requires_save:
             self.optimizer = None
 
-    def _get_default_stopping_metric(self):
-        return self.eval_metric
-
 
 def convert_df_dtype_to_str(df):
     return df.astype(str)

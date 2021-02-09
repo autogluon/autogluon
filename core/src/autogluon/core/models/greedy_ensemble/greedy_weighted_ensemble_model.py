@@ -100,8 +100,5 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
-    def _get_default_stopping_metric(self):
-        return self.eval_metric
-
     def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)

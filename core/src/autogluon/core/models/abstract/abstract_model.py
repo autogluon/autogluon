@@ -722,12 +722,7 @@ class AbstractModel:
         return {}
 
     def _get_default_stopping_metric(self):
-        if self.eval_metric.name == 'roc_auc':
-            stopping_metric = 'log_loss'
-        else:
-            stopping_metric = self.eval_metric
-        stopping_metric = metrics.get_metric(stopping_metric, self.problem_type, 'stopping_metric')
-        return stopping_metric
+        return metrics.get_metric(self.eval_metric, self.problem_type, 'stopping_metric')
 
 
 class AbstractNeuralNetworkModel(AbstractModel):
