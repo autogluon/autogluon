@@ -38,7 +38,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         Appends TextSpecialFeatureGenerator() to the generator group.
     enable_text_ngram_features : bool, default True
         Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
-        Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
+        Appends TextNgramFeatureGenerator(vectorizer=vectorizer, text_ngram_params) to the generator group. See text_ngram.py for valid parameters.
     enable_raw_text_features : bool, default False
         Whether to use the raw text features. The generated raw text features will end up with '_raw_text' suffix.
         For example, 'sentence' --> 'sentence_raw_text'
@@ -102,6 +102,6 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if self.enable_text_special_features:
             generator_group.append(TextSpecialFeatureGenerator())
         if self.enable_text_ngram_features:
-            generator_group.append(TextNgramFeatureGenerator(**self.text_ngram_params))
+            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
         generators = [generator_group]
         return generators
