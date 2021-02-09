@@ -1,4 +1,4 @@
-from autogluon.forecasting.task.forecasting.forecasting import Forecasting as task
+from autogluon.forecasting import Forecasting as task
 
 train_data = task.Dataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
 test_data = task.Dataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")

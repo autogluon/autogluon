@@ -16,7 +16,7 @@ __all__ = ['ForecastingPredictor']
 logger = logging.getLogger()  # return root logger
 
 
-class ForecastingPredictor(BasePredictor):
+class ForecastingPredictor:
 
     predictor_file_name = "predictor.pkl"
 
@@ -70,8 +70,8 @@ class ForecastingPredictor(BasePredictor):
     def load(cls, output_directory, verbosity=2):
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
-
         output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
+        logger.log(30, f"Loading predictor from path {output_directory}")
         learner = Learner.load(output_directory)
         predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
         predictor._learner = learner
@@ -90,9 +90,6 @@ class ForecastingPredictor(BasePredictor):
         save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
         self._trainer = tmp_trainer
-
-    def predict_proba(self, X):
-        pass
 
     def info(self):
         return self._learner.get_info(include_model_info=True)
@@ -182,3 +179,29 @@ class ForecastingPredictor(BasePredictor):
         if verbosity > 0:
             print("*** End of fit() summary ***")
         return results
+
+    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False):
+        if refit_full is True:
+            if keep_only_best is True:
+                if set_best_to_refit_full is True:
+                    refit_full = 'best'
+                else:
+                    logger.warning(f'refit_full was set to {refit_full}, but keep_only_best=True and set_best_to_refit_full=False. Disabling refit_full to avoid training models which would be automatically deleted.')
+                    refit_full = False
+            else:
+                refit_full = 'all'
+
+        if refit_full is not False:
+            trainer_model_best = self._trainer.get_model_best()
+            self.refit_full(models=refit_full)
+            if set_best_to_refit_full:
+                if trainer_model_best in self._trainer.model_full_dict.keys():
+                    self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
+                    # Note: model_best will be overwritten if additional training is done with new models, since model_best will have validation score of None and any new model will have a better validation score.
+                    # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
+                    self._trainer.save()
+                else:
+                    logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
+
+    def refit_full(self, models='all'):
+        return self._learner.refit_full(models=models)

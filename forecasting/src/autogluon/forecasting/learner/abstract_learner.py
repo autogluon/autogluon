@@ -53,6 +53,9 @@ class AbstractLearner:
              hyperparameters=None, **kwargs):
         raise NotImplementedError
 
+    def refit_full(self, models='all'):
+        return self.load_trainer().refit_full(models=models)
+
     def predict(self, data, model=None, for_score=False, **kwargs):
         predict_target = self.load_trainer().predict(data=data, model=model, for_score=for_score, **kwargs)
         return predict_target

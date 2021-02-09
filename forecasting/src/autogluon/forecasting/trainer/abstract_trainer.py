@@ -8,7 +8,7 @@ from collections import defaultdict
 import pandas as pd
 from gluonts.evaluation import Evaluator
 from gluonts.evaluation.backtest import make_evaluation_predictions
-
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +16,20 @@ __all__ = ['AbstractTrainer']
 
 
 class AbstractTrainer:
-
     trainer_file_name = 'trainer.pkl'
     trainer_info_name = 'info.pkl'
     trainer_info_json_name = 'info.json'
 
     def __init__(self, path: str, freq, prediction_length, scheduler_options=None, eval_metric=None,
-                 save_data=False, **kwargs):
+                 save_data=True, **kwargs):
         self.path = path
         self.freq = freq
         self.prediction_length = prediction_length
         self.save_data = save_data
         self.quantiles = kwargs.get("quantiles", ["0.5"])
-
+        self.is_data_saved = False
+        self.model_full_dict = {}  # Dict of normal model -> FULL model. FULL models are produced by self.refit_single_full() and self.refit_ensemble_full().
+        self._model_full_dict_val_score = {}  # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
         self.model_info = {}
         self.models = {}
         self.model_best = None
@@ -52,6 +53,39 @@ class AbstractTrainer:
         self.low_memory = False
 
         self.hyperparameters = {}
+
+    @property
+    def path_root(self) -> str:
+        return self.path.rsplit(os.path.sep, maxsplit=2)[0] + os.path.sep
+
+    @property
+    def path_utils(self) -> str:
+        return self.path_root + 'utils' + os.path.sep
+
+    @property
+    def path_data(self) -> str:
+        return self.path_utils + 'data' + os.path.sep
+
+    def save_train_data(self, data, verbose=True):
+        path = self.path_data + 'train.pkl'
+        save_pkl.save(path=path, object=data, verbose=verbose)
+
+    def save_val_data(self, data, verbose=True):
+        path = self.path_data + 'val.pkl'
+        save_pkl.save(path=path, object=data, verbose=verbose)
+
+    def load_train_data(self):
+        path = self.path_data + 'train.pkl'
+        return load_pkl.load(path=path)
+
+    def load_val_data(self):
+        path = self.path_data + 'val.pkl'
+        return load_pkl.load(path=path)
+
+    def load_data(self):
+        train_data = self.load_train_data()
+        val_data = self.load_val_data()
+        return train_data, val_data
 
     def set_contexts(self, path_context):
         self.path, model_paths = self.create_contexts(path_context)
@@ -80,7 +114,7 @@ class AbstractTrainer:
         except:
             self.models = {}
             save_pkl.save(path=self.path + self.trainer_file_name, object=self)
-        if self.low_memory:
+        if not self.models:
             self.models = models
 
     @classmethod
@@ -120,13 +154,16 @@ class AbstractTrainer:
         model.fit(train_data=train_data, time_limit=time_limit)
         return model
 
-    def _train_single_full(self, train_data, model: AbstractGluonTSModel, val_data=None, hyperparameter_tune=False, time_limit=None):
+    def _train_single_full(self, train_data, model: AbstractGluonTSModel, val_data=None, hyperparameter_tune=False,
+                           time_limit=None):
         if hyperparameter_tune:
             if self._scheduler_func is None or self._scheduler_options is None:
                 raise ValueError('scheduler_options cannot be None when hyperparameter_tune = True')
             hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(train_data=train_data,
                                                                                         val_data=val_data,
-                                                                                        scheduler_options=(self._scheduler_func, self._scheduler_options))
+                                                                                        scheduler_options=(
+                                                                                            self._scheduler_func,
+                                                                                            self._scheduler_options))
             self.hpo_results[model.name] = hpo_results
             model_names_trained = []
             for model_hpo_name, model_path in hpo_models.items():
@@ -134,7 +171,8 @@ class AbstractTrainer:
                 self._add_model(model_hpo)
                 model_names_trained.append(model_hpo.name)
         else:
-            model_names_trained = self._train_and_save(train_data, model=model, val_data=val_data, time_limit=time_limit)
+            model_names_trained = self._train_and_save(train_data, model=model, val_data=val_data,
+                                                       time_limit=time_limit)
 
         return model_names_trained
 
@@ -173,13 +211,23 @@ class AbstractTrainer:
                 del model
         return model_names_trained
 
-    def _train_multi(self, train_data, val_data=None, hyperparameters=None, hyperparameter_tune=False):
+    def _train_multi(self, train_data, val_data=None, models=None, hyperparameters=None, hyperparameter_tune=False):
+        if self.save_data and not self.is_data_saved:
+            self.save_train_data(train_data)
+            if val_data is not None:
+                self.save_val_data(val_data)
+            self.is_data_saved = True
+
         if hyperparameters is not None:
             hyperparameters = copy.deepcopy(hyperparameters)
-        models = self.get_models(hyperparameters)
-
+        if models is None:
+            models = self.get_models(hyperparameters)
+        model_names_trained = []
         for i, model in enumerate(models):
-            self._train_single_full(train_data, model, val_data=val_data, hyperparameter_tune=hyperparameter_tune)
+            model_names_trained += self._train_single_full(train_data, model, val_data=val_data,
+                                                           hyperparameter_tune=hyperparameter_tune)
+
+        return model_names_trained
 
     def get_model_names_all(self):
         return list(self.model_info.keys())
@@ -211,10 +259,11 @@ class AbstractTrainer:
         self.model_info[model][attribute] = val
 
     def leaderboard(self, data=None, extra_info=False):
+        logger.log(30, "Generating leaderboard for all models trained...")
         model_names = self.get_model_names_all()
         score_val = []
         fit_time_marginal = []
-        fit_order = list(range(1,len(model_names)+1))
+        fit_order = list(range(1, len(model_names) + 1))
         score_dict = self.get_models_attribute_dict('score')
         fit_time_marginal_dict = self.get_models_attribute_dict('fit_time')
         for model_name in model_names:
@@ -223,6 +272,7 @@ class AbstractTrainer:
 
         test_score = []
         if data is not None:
+            logger.log(30, "Additional data provided, testing on the additional data...")
             for model_name in model_names:
                 model = self.load_model(model_name)
                 test_score.append(-model.score(data))
@@ -250,6 +300,11 @@ class AbstractTrainer:
         return df_sorted
 
     def predict(self, data, model=None, for_score=True, **kwargs):
+        purpose = "evaluation" if for_score else "prediction"
+        if model is None:
+            logger.log(30, f"Does not specify model, "
+                           f"will by default use the model with the best validation score for {purpose}")
+
         if model is not None:
             return self._predict_model(data, model, for_score, **kwargs)
         elif self.model_best is not None:
@@ -261,7 +316,7 @@ class AbstractTrainer:
 
     def score(self, data, model=None, quantiles=None):
         if self.eval_metric is not None and self.eval_metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
-            raise ValueError(f"metric { self.eval_metric} is not available yet.")
+            raise ValueError(f"metric {self.eval_metric} is not available yet.")
 
         # if quantiles are given, use the given on, otherwise use the default
         if quantiles is not None:
@@ -342,3 +397,58 @@ class AbstractTrainer:
                 model_info_dict[model.name] = model.get_info()
         return model_info_dict
 
+    def refit_single_full(self, train_data=None, val_data=None, models=None):
+        models_trained_full = []
+        model_full_dict = {}
+        # assume val data will contain all train data.
+        if train_data is None:
+            train_data = self.load_val_data()
+
+        if models is None:
+            self.get_model_names_all()
+
+        for model in models:
+            model = self.load_model(model)
+            model_name = model.name
+            model_full = model.convert_to_refit_full_template()
+            models_trained = self._train_multi(train_data=train_data, val_data=None, hyperparameters=None,
+                                               hyperparameter_tune=False, models=[model_full])
+
+            if len(models_trained) == 1:
+                model_full_dict[model_name] = models_trained[0]
+            for model_trained in models_trained:
+                self._model_full_dict_val_score[model_trained] = self.get_model_attribute(model_name, 'score')
+            models_trained_full += models_trained
+
+        self.model_full_dict.update(model_full_dict)
+        self.save()
+        return models_trained_full
+
+    def refit_full(self, models='all'):
+        if isinstance(models, str):
+            if models == 'all':
+                models = self.get_model_names_all()
+            elif models == 'best':
+                models = [self.get_model_best()]
+            else:
+                models = self.load_model(models)
+        existing_models = self.get_model_names_all()
+        valid_model_set = []
+        for model in models:
+            if model in self.model_full_dict and self.model_full_dict[model] in existing_models:
+                logger.log(20,
+                           f"Model '{model}' already has a refit _FULL model: '{self.model_full_dict[model]}', skipping refit...")
+            else:
+                valid_model_set.append(model)
+
+        if valid_model_set:
+            models_trained_full = self.refit_single_full(models=valid_model_set)
+        else:
+            models_trained_full = []
+
+        for model_full in models_trained_full:
+            # TODO: leave space for future ensemble?
+            pass
+
+        self.save()
+        return copy.deepcopy(self.model_full_dict)

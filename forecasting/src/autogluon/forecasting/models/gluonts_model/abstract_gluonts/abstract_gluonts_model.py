@@ -2,7 +2,7 @@ import autogluon.core.utils.savers.save_pkl as save_pkl
 import autogluon.core.utils.loaders.load_pkl as load_pkl
 from ...abstract.abstract_model import AbstractModel
 from gluonts.evaluation.backtest import make_evaluation_predictions
-from gluonts.model.forecast import SampleForecast, QuantileForecast, DistributionForecast
+from gluonts.model.forecast import SampleForecast, QuantileForecast
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -17,6 +17,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.task.base.base_predictor import BasePredictor
 from gluonts.model.predictor import Predictor
 import logging
+from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,7 @@ class AbstractGluonTSModel(AbstractModel):
             raise TimeLimitExceeded
 
     def predict(self, data, quantiles=None):
+        logger.log(30, f"Predicting with model {self.name}")
         if quantiles is None:
             quantiles = [str(q) for q in self.quantiles]
         else:
@@ -183,6 +185,7 @@ class AbstractGluonTSModel(AbstractModel):
 
     def hyperparameter_tune(self, train_data, val_data, scheduler_options, **kwargs):
         time_start = time.time()
+        logger.log(30, f"Start hyperparameter tuning for {self.name}")
         params_copy = self.params.copy()
 
         directory = self.path
@@ -259,4 +262,26 @@ class AbstractGluonTSModel(AbstractModel):
         }
         return info
 
+    def __repr__(self):
+        return self.name
 
+    # After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
+    def convert_to_template(self):
+        model = self.model
+        self.model = None
+        template = copy.deepcopy(self)
+        template.reset_metrics()
+        self.model = model
+        return template
+
+    # After calling this function, model should be able to be fit without test data using the iterations trained by the original model
+    def convert_to_refit_full_template(self):
+        template = self.convert_to_template()
+        template.name = template.name + REFIT_FULL_SUFFIX
+        template.set_contexts(self.path_root + template.name + os.path.sep)
+        return template
+
+    def reset_metrics(self):
+        self.fit_time = None
+        self.predict_time = None
+        self.val_score = None
