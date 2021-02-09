@@ -35,6 +35,7 @@ detector = ObjectDetector()
 hyperparameters = {'epochs': 5, 'batch_size': 8}
 hyperparamter_tune_kwargs={'num_trials': 2}
 detector.fit(dataset_train, time_limit=time_limit, hyperparameters=hyperparameters, hyperparamter_tune_kwargs=hyperparamter_tune_kwargs)
+
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal

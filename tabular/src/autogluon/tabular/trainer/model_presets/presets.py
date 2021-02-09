@@ -3,7 +3,7 @@ import inspect
 import logging
 from collections import defaultdict
 
-from autogluon.core.metrics import soft_log_loss, mean_squared_error
+from autogluon.core.metrics import mean_squared_error
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel
 
@@ -264,21 +264,22 @@ def model_factory(
         name_prefix = model[AG_ARGS].get('name_prefix', '')
         name_suff = model[AG_ARGS].get('name_suffix', '')
         name_orig = name_prefix + name_main + name_suff
-    if name_suffix is not None:
-        name_orig = name_orig + name_suffix
-    name = name_orig
     name_stacker = None
     num_increment = 2
+    if name_suffix is None:
+        name_suffix = ''
     if ensemble_kwargs is None:
+        name = f'{name_orig}{name_suffix}'
         while name in invalid_name_set:  # Ensure name is unique
-            name = f'{name_orig}_{num_increment}'
+            name = f'{name_orig}_{num_increment}{name_suffix}'
             num_increment += 1
     else:
+        name = name_orig
         name_bag_suffix = model[AG_ARGS].get('name_bag_suffix', '_BAG')
-        name_stacker = f'{name}{name_bag_suffix}_L{level}'
+        name_stacker = f'{name}{name_bag_suffix}_L{level}{name_suffix}'
         while name_stacker in invalid_name_set:  # Ensure name is unique
             name = f'{name_orig}_{num_increment}'
-            name_stacker = f'{name}{name_bag_suffix}_L{level}'
+            name_stacker = f'{name}{name_bag_suffix}_L{level}{name_suffix}'
             num_increment += 1
     model_params = copy.deepcopy(model)
     model_params.pop(AG_ARGS, None)
@@ -299,6 +300,8 @@ def model_factory(
 
 # TODO: v0.1 cleanup and avoid hardcoded logic with model names
 def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_classes=None, name_suffix='', ag_args=None, invalid_model_names: list = None):
+    # TODO v0.1: This import depends on mxnet, consider refactoring to avoid mxnet
+    from autogluon.core.metrics.softclass_metrics import soft_log_loss
     model_types_standard = ['GBM', 'NN', 'CAT']
     hyperparameters = copy.deepcopy(hyperparameters)
     hyperparameters_standard = copy.deepcopy(hyperparameters)

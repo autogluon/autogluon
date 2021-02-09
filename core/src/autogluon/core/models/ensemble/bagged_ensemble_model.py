@@ -125,6 +125,7 @@ class BaggedEnsembleModel(AbstractModel):
         time_start = time.time()
 
         model_base = self._get_model_base()
+        model_base.rename(name='')
         if self.features is not None:
             model_base.features = self.features
         model_base.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
@@ -136,6 +137,7 @@ class BaggedEnsembleModel(AbstractModel):
         if k_fold == 1:
             if self._n_repeats != 0:
                 raise ValueError(f'n_repeats must equal 0 when fitting a single model with k_fold < 2, values: ({self._n_repeats}, {k_fold})')
+            model_base.name = f'{model_base.name}S1F1'
             model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
             time_start_fit = time.time()
             model_base.fit(X_train=X_train, y_train=y_train, time_limit=time_limit, **kwargs)
@@ -171,6 +173,7 @@ class BaggedEnsembleModel(AbstractModel):
             fold_end_n_repeat = min(fold_start_n_repeat + k_fold, fold_end)
             # TODO: Consider moving model fit inner for loop to a function to simply this code
             for i in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
+                fold_num_in_repeat = i - (j * k_fold)  # The fold in the current repeat set (first fold in set = 0)
                 folds_finished = i - fold_start
                 folds_left = fold_end - i
                 fold = kfolds[i]
@@ -194,7 +197,7 @@ class BaggedEnsembleModel(AbstractModel):
                 X_train_fold, X_val_fold = X_train.iloc[train_index, :], X_train.iloc[val_index, :]
                 y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
                 fold_model = copy.deepcopy(model_base)
-                fold_model.name = f'{fold_model.name}_F{i+1}'
+                fold_model.name = f'{fold_model.name}S{j+1}F{fold_num_in_repeat+1}'  # S5F3 = 3rd fold of the 5th repeat set
                 fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
                 fold_model.fit(X_train=X_train_fold, y_train=y_train_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs)
                 time_train_end_fold = time.time()
@@ -350,14 +353,8 @@ class BaggedEnsembleModel(AbstractModel):
     def convert_to_refit_full_template(self):
         init_args = self._get_init_args()
         init_args['hyperparameters']['save_bag_folds'] = True  # refit full models must save folds
-        model_base_name_orig = init_args['model_base'].name
         init_args['model_base'] = self.convert_to_refitfull_template_child()
-        model_base_name_new = init_args['model_base'].name
-        if model_base_name_orig in init_args['name'] and model_base_name_orig != model_base_name_new:
-            init_args['name'] = init_args['name'].replace(model_base_name_orig, model_base_name_new, 1)
-        else:
-            init_args['name'] = init_args['name'] + '_FULL'
-
+        init_args['name'] = init_args['name'] + REFIT_FULL_SUFFIX
         model_full_template = self.__class__(**init_args)
         return model_full_template
 
@@ -366,8 +363,6 @@ class BaggedEnsembleModel(AbstractModel):
         child_compressed = copy.deepcopy(self._get_model_base())
         child_compressed.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
         child_compressed.params = compressed_params
-        child_compressed.name = child_compressed.name + REFIT_FULL_SUFFIX
-        child_compressed.set_contexts(self.path_root + child_compressed.name + os.path.sep)
         return child_compressed
 
     def _get_init_args(self):
@@ -637,7 +632,7 @@ class BaggedEnsembleModel(AbstractModel):
 
             # TODO: Create new Ensemble Here
             bag = copy.deepcopy(self)
-            bag.name = bag.name + os.path.sep + str(i)
+            bag.rename(f"{bag.name}{os.path.sep}T{i}")
             bag.set_contexts(self.path_root + bag.name + os.path.sep)
 
             oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X_train, y=y_train)
@@ -645,6 +640,7 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_model_repeats[test_index] += 1
 
             bag.model_base = None
+            child.rename('')
             child.set_contexts(bag.path + child.name + os.path.sep)
             bag.save_model_base(child.convert_to_template())
 
@@ -653,7 +649,7 @@ class BaggedEnsembleModel(AbstractModel):
             bag._n_repeats = 1
             bag._oof_pred_proba = oof_pred_proba
             bag._oof_pred_model_repeats = oof_pred_model_repeats
-            child.name = child.name + '_fold_0'
+            child.rename('S1F1')
             child.set_contexts(bag.path + child.name + os.path.sep)
             if not self.params.get('save_bag_folds', True):
                 child.model = None
