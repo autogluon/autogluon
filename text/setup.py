@@ -45,7 +45,7 @@ long_description = open(os.path.join('..', 'README.md')).read()
 python_requires = '>=3.6, <3.8'
 
 requirements = [
-    'numpy>=1.20',
+    'numpy==1.19',
     'scipy>=1.3.3,<1.5.0',
     'tqdm>=4.38.0',
     'pandas>=1.0.0,<2.0',
