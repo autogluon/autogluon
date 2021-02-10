@@ -38,7 +38,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         Appends TextSpecialFeatureGenerator() to the generator group.
     enable_text_ngram_features : bool, default True
         Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
-        Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
+        Appends TextNgramFeatureGenerator(vectorizer=vectorizer, text_ngram_params) to the generator group. See text_ngram.py for valid parameters.
     enable_raw_text_features : bool, default False
         Whether to use the raw text features. The generated raw text features will end up with '_raw_text' suffix.
         For example, 'sentence' --> 'sentence_raw_text'
@@ -69,7 +69,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     def __init__(self, enable_numeric_features=True, enable_categorical_features=True,
                  enable_datetime_features=True,
                  enable_text_special_features=True, enable_text_ngram_features=True,
-                 enable_raw_text_features=False, vectorizer=None, **kwargs):
+                 enable_raw_text_features=False, vectorizer=None, text_ngram_params=None, **kwargs):
         if 'generators' in kwargs:
             raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
         if 'enable_raw_features' in kwargs:
@@ -82,6 +82,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_text_special_features = enable_text_special_features
         self.enable_text_ngram_features = enable_text_ngram_features
         self.enable_raw_text_features = enable_raw_text_features
+        self.text_ngram_params = text_ngram_params if text_ngram_params else {}
 
         generators = self._get_default_generators(vectorizer=vectorizer)
         super().__init__(generators=generators, **kwargs)
@@ -101,6 +102,6 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         if self.enable_text_special_features:
             generator_group.append(TextSpecialFeatureGenerator())
         if self.enable_text_ngram_features:
-            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer))
+            generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
         generators = [generator_group]
         return generators
