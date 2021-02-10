@@ -46,7 +46,7 @@ python_requires = '>=3.6, <3.8'
 
 requirements = [
     'Pillow<=8.1',
-    'numpy==1.19',
+    'numpy==1.19.5',
     'matplotlib',
     'gluoncv>=0.9.2,<1.0',
     'graphviz<0.9.0,>=0.8.1',

@@ -43,7 +43,7 @@ long_description = open(os.path.join('..', 'README.md')).read()
 python_requires = '>=3.6, <3.8'
 
 requirements = [
-    'numpy==1.19',
+    'numpy==1.19.5',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',
     f'autogluon.core=={version}'
