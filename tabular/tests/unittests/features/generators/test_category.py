@@ -33,19 +33,21 @@ def test_category_feature_generator(generator_helper, data_helper):
     ]
 
     expected_cat_values_lst = [
-        [0, 1, 0, 3, 3, 3, 2, np.nan, np.nan],
-        [0, np.nan, 0, 1, 1, 1, np.nan, np.nan, np.nan],
-        [np.nan, np.nan, np.nan, 0, 0, 0, np.nan, np.nan, np.nan],
-        [2, 1, 2, 3, 3, 3, 0, np.nan, np.nan],
-        [0, 1, 0, 3, 3, 3, 2, 3, 3],
+        [[0, 1, 0, 3, 3, 3, 2, np.nan, np.nan]],
+        [[0, np.nan, 0, 1, 1, 1, np.nan, np.nan, np.nan]],
+        [[np.nan, np.nan, np.nan, 0, 0, 0, np.nan, np.nan, np.nan]],
+        # the outputs order for this case varies between python 3.6 vs 3.7 and numpy versions
+        [[2, 1, 2, 3, 3, 3, 0, np.nan, np.nan], [2, 0, 2, 3, 3, 3, 1, np.nan, np.nan]],
+        [[0, 1, 0, 3, 3, 3, 2, 3, 3]],
     ]
 
     expected_cat_codes_lst = [
-        [0, 1, 0, 3, 3, 3, 2, -1, -1],
-        [0, -1, 0, 1, 1, 1, -1, -1, -1],
-        [-1, -1, -1, 0, 0, 0, -1, -1, -1],
-        [2, 1, 2, 3, 3, 3, 0, -1, -1],
-        [0, 1, 0, 3, 3, 3, 2, 3, 3],
+        [[0, 1, 0, 3, 3, 3, 2, -1, -1]],
+        [[0, -1, 0, 1, 1, 1, -1, -1, -1]],
+        [[-1, -1, -1, 0, 0, 0, -1, -1, -1]],
+        # the outputs order for this case varies between python 3.6 vs 3.7 and numpy versions
+        [[2, 1, 2, 3, 3, 3, 0, -1, -1], [2, 0, 2, 3, 3, 3, 1, -1, -1]],
+        [[0, 1, 0, 3, 3, 3, 2, 3, 3]],
     ]
 
     # When
@@ -68,5 +70,5 @@ def test_category_feature_generator(generator_helper, data_helper):
         for col in ['obj', 'cat']:
             assert output_data[col].dtype.name == 'category'
             assert list(output_data[col].cat.categories) == expected_cat_categories_lst[i]
-            assert list(output_data[col]) == expected_cat_values_lst[i]
-            assert list(output_data[col].cat.codes) == expected_cat_codes_lst[i]
+            assert list(output_data[col]) in expected_cat_values_lst[i]
+            assert list(output_data[col].cat.codes) in expected_cat_codes_lst[i]
