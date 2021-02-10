@@ -36,14 +36,14 @@ cleanup_venv = """
 stage("Unit Test") {
   parallel 'core': {
     node('linux-cpu') {
-      ws('workspace/autogluon-core-py3-v3') {
+      ws('workspace/autogluon-core-py3-v4') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-core-py3-v3 -f docs/build.yml
-          conda activate autogluon-core-py3-v3
+          conda env update -n autogluon-core-py3-v4 -f docs/build.yml
+          conda activate autogluon-core-py3-v4
           conda list
           ${setup_pip_venv}
           python3 -m pip install 'mxnet==1.7.0.*'
@@ -60,14 +60,14 @@ stage("Unit Test") {
   },
   'features': {
     node('linux-gpu') {
-      ws('workspace/autogluon-features-py3-v3') {
+      ws('workspace/autogluon-features-py3-v4') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-features-py3-v3 -f docs/build.yml
-          conda activate autogluon-features-py3-v3
+          conda env update -n autogluon-features-py3-v4 -f docs/build.yml
+          conda activate autogluon-features-py3-v4
           conda list
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
@@ -87,14 +87,14 @@ stage("Unit Test") {
   },
   'tabular': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tabular-py3-v3') {
+      ws('workspace/autogluon-tabular-py3-v4') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-tabular-py3-v3 -f docs/build.yml
-          conda activate autogluon-tabular-py3-v3
+          conda env update -n autogluon-tabular-py3-v4 -f docs/build.yml
+          conda activate autogluon-tabular-py3-v4
           conda list
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
@@ -123,14 +123,14 @@ stage("Unit Test") {
   },
   'mxnet': {
     node('linux-gpu') {
-      ws('workspace/autogluon-mxnet-py3-v3') {
+      ws('workspace/autogluon-mxnet-py3-v4') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-mxnet-py3-v3 -f docs/build.yml
-          conda activate autogluon-mxnet-py3-v3
+          conda env update -n autogluon-mxnet-py3-v4 -f docs/build.yml
+          conda activate autogluon-mxnet-py3-v4
           conda list
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
@@ -152,14 +152,14 @@ stage("Unit Test") {
   },
   'extra': {
     node('linux-gpu') {
-      ws('workspace/autogluon-extra-py3-v3') {
+      ws('workspace/autogluon-extra-py3-v4') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-extra-py3-v3 -f docs/build.yml
-          conda activate autogluon-extra-py3-v3
+          conda env update -n autogluon-extra-py3-v4 -f docs/build.yml
+          conda activate autogluon-extra-py3-v4
           conda list
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
@@ -181,14 +181,14 @@ stage("Unit Test") {
   },
   'text': {
     node('linux-gpu') {
-      ws('workspace/autogluon-text-py3-v3') {
+      ws('workspace/autogluon-text-py3-v4') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-text-py3-v3 -f docs/build.yml
-          conda activate autogluon-text-py3-v3
+          conda env update -n autogluon-text-py3-v4 -f docs/build.yml
+          conda activate autogluon-text-py3-v4
           conda list
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
@@ -251,14 +251,14 @@ stage("Unit Test") {
   },
   'install': {
     node('linux-cpu') {
-      ws('workspace/autogluon-install-py3-v3') {
+      ws('workspace/autogluon-install-py3-v4') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-install-py3-v3 -f docs/build.yml
-          conda activate autogluon-install-py3-v3
+          conda env update -n autogluon-install-py3-v4 -f docs/build.yml
+          conda activate autogluon-install-py3-v4
           conda list
           ${setup_pip_venv}
           python3 -m pip install 'mxnet==1.7.0.*'
@@ -294,13 +294,13 @@ stage("Unit Test") {
 stage("Build Tutorials") {
   parallel 'course': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-course-v3') {
+      ws('workspace/autogluon-tutorial-course-v4') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-course-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-course-v3
+        conda env update -n autogluon-tutorial-course-v4 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-course-v4
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
@@ -324,13 +324,13 @@ stage("Build Tutorials") {
   },
   'image_prediction': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-image-classification-v3') {
+      ws('workspace/autogluon-tutorial-image-classification-v4') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-image-classification-v3
+        conda env update -n autogluon-tutorial-image-classification-v4 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-image-classification-v4
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
@@ -358,13 +358,13 @@ stage("Build Tutorials") {
   },
   'nas': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-nas-v3') {
+      ws('workspace/autogluon-tutorial-nas-v4') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-nas-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-nas-v3
+        conda env update -n autogluon-tutorial-nas-v4 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-nas-v4
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
@@ -387,13 +387,13 @@ stage("Build Tutorials") {
   },
   'object_detection': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-object-detection-v3') {
+      ws('workspace/autogluon-tutorial-object-detection-v4') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-object-detection-v3
+        conda env update -n autogluon-tutorial-object-detection-v4 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-object-detection-v4
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
@@ -417,13 +417,13 @@ stage("Build Tutorials") {
   },
   'tabular_prediction': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-tabular-v3') {
+      ws('workspace/autogluon-tutorial-tabular-v4') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-tabular-v3
+        conda env update -n autogluon-tutorial-tabular-v4 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-tabular-v4
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
@@ -448,13 +448,13 @@ stage("Build Tutorials") {
   },
   'text_prediction': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-text-v3') {
+      ws('workspace/autogluon-tutorial-text-v4') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-text-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-text-v3
+        conda env update -n autogluon-tutorial-text-v4 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-text-v4
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
@@ -477,13 +477,13 @@ stage("Build Tutorials") {
   },
   'torch': {
     node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-torch-v3') {
+      ws('workspace/autogluon-tutorial-torch-v4') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-torch-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-torch-v3
+        conda env update -n autogluon-tutorial-torch-v4 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-torch-v4
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
@@ -507,7 +507,7 @@ stage("Build Tutorials") {
 
 stage("Build Docs") {
   node('linux-gpu') {
-    ws('workspace/autogluon-docs-v3') {
+    ws('workspace/autogluon-docs-v4') {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
