@@ -42,10 +42,10 @@ def create_version_file():
 
 long_description = open(os.path.join('..', 'README.md')).read()
 
-MIN_PYTHON_VERSION = '>=3.6.*'
+python_requires = '>=3.6, <3.8'
 
 requirements = [
-    'numpy<=1.19',
+    'numpy==1.19.5',
     'scipy>=1.3.3,<1.5.0',
     'tqdm>=4.38.0',
     'pandas>=1.0.0,<2.0',
@@ -56,7 +56,7 @@ requirements = [
 
 text_requirements = [
     'pyarrow>=3.0.0',
-    'autogluon-contrib-nlp==0.0.1b20210201'
+    'autogluon-contrib-nlp==0.0.1b20210112'
 ]
 
 test_requirements = [
@@ -71,10 +71,10 @@ if __name__ == '__main__':
         version=version,
         author='AutoGluon Community',
         url='https://github.com/awslabs/autogluon',
-        description='AutoML Toolkit with MXNet Gluon',
+        description='AutoML for Text, Image, and Tabular Data',
         long_description=long_description,
         long_description_content_type='text/markdown',
-        license='Apache',
+        license='Apache-2.0',
 
         # Package info
         packages=find_packages('src'),
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         zip_safe=True,
         include_package_data=True,
         install_requires=requirements + text_requirements + test_requirements,
-        python_requires=MIN_PYTHON_VERSION,
+        python_requires=python_requires,
         package_data={'autogluon': [
             'LICENSE',
         ]},

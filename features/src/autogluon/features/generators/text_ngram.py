@@ -5,7 +5,8 @@ import traceback
 import numpy as np
 import pandas as pd
 import psutil
-from pandas import DataFrame
+from pandas import DataFrame, Series
+from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
 from autogluon.core.features.types import S_TEXT, S_TEXT_NGRAM
 
@@ -43,14 +44,14 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, **kwargs):
+    def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, prefilter_tokens=False, prefilter_token_count=100, **kwargs):
         super().__init__(**kwargs)
-
         self.vectorizers = []
         # TODO: 0.20 causes OOM error with 64 GB ram on NN with several datasets. LightGBM and CatBoost succeed
         # TODO: Finetune this, or find a better way to ensure stability
+        # TODO: adjust max_memory_ratio correspondingly if prefilter_tokens==True
         self.max_memory_ratio = max_memory_ratio  # Ratio of maximum memory the output ngram features are allowed to use in dense int32 form.
-
+        
         if vectorizer is None:
             self.vectorizer_default_raw = vectorizer_auto_ml_default()
         else:
@@ -60,19 +61,46 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             raise ValueError(f"vectorizer_strategy must be one of {['combined', 'separate', 'both']}, but value is: {vectorizer_strategy}")
         self.vectorizer_strategy = vectorizer_strategy
         self.vectorizer_features = None
+        self.prefilter_tokens = prefilter_tokens 
+        self.prefilter_token_count = prefilter_token_count 
+        self.token_mask = None
 
-    def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, y: Series = None, problem_type: str = None, **kwargs) -> (DataFrame, dict):
+        
         X_out = self._fit_transform_ngrams(X)
+        
+        if (self.prefilter_tokens and self.prefilter_token_count>=X_out.shape[1]):
+            logger.warning('`prefilter_tokens` was enabled but `prefilter_token_count` larger than the vocabulary. Disabling `prefilter_tokens`.')
+            self.prefilter_tokens=False
+
+        if self.prefilter_tokens and problem_type not in ['binary','regression']:
+           logger.warning('`prefilter_tokens` was enabled but invalid `problem_type`. Disabling `prefilter_tokens`.')
+           self.prefilter_tokens = False
+
+        if self.prefilter_tokens and y is None:
+           logger.warning('`prefilter_tokens` was enabled but `y` values were not provided to fit_transform. Disabling `prefilter_tokens`.')
+           self.prefilter_tokens = False
+
+        if self.prefilter_tokens:
+            scoring_function = f_classif if problem_type=='binary' else f_regression
+            selector = SelectKBest(scoring_function, k=self.prefilter_token_count)
+            selector.fit(X_out, y)
+            self.token_mask = selector.get_support()
+            X_out = X_out[ X_out.columns[self.token_mask] ] # select the columns that are most correlated with y
+
         type_family_groups_special = {
             S_TEXT_NGRAM: list(X_out.columns)
         }
         return X_out, type_family_groups_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
+        # TODO: Optimize for inference
         if not self.features_in:
             return DataFrame(index=X.index)
         try:
             X_out = self._generate_ngrams(X=X)
+            if self.prefilter_tokens:
+                X_out = X_out[ X_out.columns[self.token_mask] ] # select the columns identified during training
         except Exception:
             self._log(40, '\tError: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
             raise

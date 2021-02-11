@@ -265,7 +265,6 @@ class CatBoostModel(AbstractModel):
                     self.model = init_model
                 else:
                     if (init_model_best_score > self.stopping_metric._optimum) or (final_model_best_score > self.stopping_metric._optimum):
-                        logger.warning(f'Warning: Sign differs between AG metric and CatBoost metric variants: {self.stopping_metric.name}, flipping signs.')
                         init_model_best_score = -init_model_best_score
                         final_model_best_score = -final_model_best_score
 

@@ -75,8 +75,6 @@ class AbstractTrainer:
         self._model_full_dict_val_score = {}  # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
         self.reset_paths = False
 
-        self.hpo_results = {}  # Stores summary of HPO process
-
         self._time_limit = None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.
         self._time_train_start = None  # Internal timestamp of the time training started for a given fit call. Used in logging statements.
 
@@ -1029,7 +1027,8 @@ class AbstractTrainer:
                 del model
                 model_names_trained = []
             else:
-                self.hpo_results[model.name] = hpo_results
+                # Commented out because it takes too much space (>>5 GB if run for an hour on a small-medium sized dataset)
+                # self.hpo_results[model.name] = hpo_results
                 model_names_trained = []
                 for model_hpo_name, model_path in hpo_models.items():
                     model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
@@ -1117,18 +1116,19 @@ class AbstractTrainer:
                     hpo_enabled = True
                     break
 
+        hpo_time_ratio = 0.9
         if hpo_enabled:
             time_split = True
         else:
             time_split = False
         if k_fold == 0:
-            time_ratio = 0.9 if hpo_enabled else 1
+            time_ratio = hpo_time_ratio if hpo_enabled else 1
             models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune, time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
         else:
             k_fold_start = 0
             if hpo_enabled or feature_prune:
                 time_start = time.time()
-                time_ratio = (1 - (1 / k_fold)) * 0.9
+                time_ratio = (1 / k_fold) * hpo_time_ratio
                 models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune,
                                                 k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
                 k_fold_start = 1

@@ -6,7 +6,7 @@ import scipy
 import scipy.stats
 import sklearn.metrics
 
-from . import classification_metrics, softclass_metrics
+from . import classification_metrics
 from .util import sanitize_array
 from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
 from ..utils.miscs import warning_filter
@@ -405,10 +405,6 @@ pac_score = make_scorer('pac_score',
                         greater_is_better=True,
                         needs_proba=True)
 
-# Score for soft-classification (with soft, probabilistic labels):
-soft_log_loss = make_scorer('soft_log_loss', softclass_metrics.soft_log_loss,
-                            greater_is_better=False, needs_proba=True)
-
 REGRESSION_METRICS = dict()
 for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
                    median_absolute_error, spearmanr, pearsonr]:
@@ -495,8 +491,7 @@ def calculate_score(solution, prediction, task_type, metric,
 def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
-    all_available_metric_names = list(CLASSIFICATION_METRICS.keys())\
-                                 + list(REGRESSION_METRICS.keys()) + [soft_log_loss]
+    all_available_metric_names = list(CLASSIFICATION_METRICS.keys()) + list(REGRESSION_METRICS.keys()) + ['soft_log_loss']
     if metric is not None and isinstance(metric, str):
         if metric in CLASSIFICATION_METRICS:
             if problem_type is not None and problem_type not in PROBLEM_TYPES_CLASSIFICATION:
@@ -507,6 +502,8 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
                 raise ValueError(f"{metric_type}={metric} can only be used for regression problems")
             return REGRESSION_METRICS[metric]
         elif metric == 'soft_log_loss':
+            # Requires mxnet
+            from .softclass_metrics import soft_log_loss
             return soft_log_loss
         else:
             raise ValueError(

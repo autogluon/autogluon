@@ -316,7 +316,8 @@ class TabularPredictorV1:
         -------
         Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
         """
-        hpo_used = len(self._trainer.hpo_results) > 0
+        # hpo_used = len(self._trainer.hpo_results) > 0
+        hpo_used = False  # Disabled until a more memory efficient hpo_results object is implemented.
         model_types = self._trainer.get_models_attribute_dict(attribute='type')
         model_inner_types = self._trainer.get_models_attribute_dict(attribute='type_inner')
         model_typenames = {key: model_types[key].__name__ for key in model_types}
@@ -341,13 +342,11 @@ class TabularPredictorV1:
             'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
             'num_bag_folds': self._trainer.k_fold,
             'max_stack_level': self._trainer.get_max_level(),
-            'feature_prune': self._trainer.feature_prune,
-            'hyperparameter_tune': hpo_used,
         }
         if self.problem_type != REGRESSION:
             results['num_classes'] = self._trainer.num_classes
-        if hpo_used:
-            results['hpo_results'] = self._trainer.hpo_results
+        # if hpo_used:
+        #     results['hpo_results'] = self._trainer.hpo_results
         # get dict mapping model name to final hyperparameter values for each model:
         model_hyperparams = {}
         for model_name in self._trainer.get_model_names():
@@ -376,9 +375,9 @@ class TabularPredictorV1:
                 num_stack_str = f" (with {results['max_stack_level']} levels)"
             print("Multi-layer stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
             hpo_str = ""
-            if hpo_used and verbosity <= 2:
-                hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"
-            print("Hyperparameter-tuning used: %s %s" % (hpo_used, hpo_str))
+            # if hpo_used and verbosity <= 2:
+            #     hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"
+            # print("Hyperparameter-tuning used: %s %s" % (hpo_used, hpo_str))
             # TODO: uncomment once feature_prune is functional:  self._summarize('feature_prune', 'feature-selection used', results)
             print("Feature Metadata (Processed):")
             print("(raw dtype, special dtypes):")
