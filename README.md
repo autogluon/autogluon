@@ -11,7 +11,7 @@ DeepInsight. This is not guaranteed to give the same results as the published
 MatLab code and should be considered experimental.
 
 ## Installation
-    python -m pip -q install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
+    python3 -m pip -q install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
     
 [1]: https://doi.org/10.1038/s41598-019-47765-6
 
