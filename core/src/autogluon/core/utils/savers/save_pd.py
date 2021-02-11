@@ -33,7 +33,10 @@ def save(path, df, index=False, verbose=True, type=None, sep=',', compression='g
     column_count = len(list(df.columns.values))
     row_count = df.shape[0]
     if is_local:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        path_abs = os.path.abspath(path)
+        path_abs_dirname = os.path.dirname(path_abs)
+        if path_abs_dirname:
+            os.makedirs(path_abs_dirname, exist_ok=True)
     if type == 'csv':
         if is_local:
             df.to_csv(path, index=index, sep=sep, header=header)
