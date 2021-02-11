@@ -44,7 +44,7 @@ python_requires = '>=3.6, <3.8'
 
 requirements = [
     'Pillow<=8.1',
-    'numpy==1.19',
+    'numpy==1.19.5',
     'matplotlib',
     'pandas>=1.0.0,<2.0',
     'scikit-learn>=0.22.0,<0.24',
