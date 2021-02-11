@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pickle
 import tempfile
 
-from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.defaults import \
     DEFAULT_METRIC
 from autogluon.core.searcher.bayesopt.models.gp_model import \
     GaussProcSurrogateModel

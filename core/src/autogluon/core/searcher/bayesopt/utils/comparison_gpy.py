@@ -9,7 +9,7 @@ from ..autogluon.hp_ranges import HyperparameterRanges_CS
 from ..datatypes.common import CandidateEvaluation
 from ..datatypes.tuning_job_state import TuningJobState
 from ..models.gp_model import get_internal_candidate_evaluations
-from ..tuning_algorithms.default_algorithm import dictionarize_objective, \
+from ..tuning_algorithms.defaults import dictionarize_objective, \
     DEFAULT_METRIC
 
 

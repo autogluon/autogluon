@@ -225,19 +225,22 @@ def cholesky_update(
     pvec = target - mscal
     pvec = anp.divide(pvec - anp.matmul(lvec, pred_mat), lscal)
     pred_mat_new = anp.concatenate([pred_mat, pvec], axis=0)
-    tmpmat = anp.concatenate([chol_fact, lvec], axis=0)
     zerovec = anp.zeros((getval(lvec.size), 1))
-    chol_fact_new = anp.concatenate(
-        [tmpmat, anp.concatenate([zerovec, lscal], axis=0)], axis=1)
-    
+    chol_fact_new = anp.concatenate([
+        anp.concatenate([chol_fact, lvec], axis=0),
+        anp.concatenate([zerovec, lscal], axis=0)], axis=1)
+
     return chol_fact_new, pred_mat_new
 
-# Specialized routine, used in GPPosteriorStateIncrementalUpdater.
+# Specialized routine, used in IncrementalUpdateGPPosteriorState.
 # The idea is to share the computation of lvec between sampling a new target
-# value and incremental Cholesky update
+# value and incremental Cholesky update.
+# If mean_impute_mask is given, it is a boolean vector of size m (number
+# columns of pred_mat). Columns j of target, where mean_impute_ mask[j] is
+# true, are set to the predictive mean (instead of being sampled).
 def sample_and_cholesky_update(
         features, chol_fact, pred_mat, mean, kernel, noise_variance,
-        feature):
+        feature, mean_impute_mask=None):
     # Draw sample target. Also, lvec is reused below
     lvec = _compute_lvec(features, chol_fact, kernel, feature)
     pred_mean = anp.dot(lvec, pred_mat) + anp.reshape(mean(feature), (1, 1))
@@ -246,6 +249,9 @@ def sample_and_cholesky_update(
         kernel.diagonal(feature) - anp.sum(anp.square(lvec)),
         MIN_POSTERIOR_VARIANCE)), (1, 1))
     n01mat = anp.random.normal(size=getval(pred_mean.shape))
+    if mean_impute_mask is not None:
+        assert len(mean_impute_mask) == pred_mat.shape[1]
+        n01mat[0, mean_impute_mask] = 0
     target = pred_mean + anp.multiply(n01mat, pred_std)
     chol_fact_new, pred_mat_new = cholesky_update(
         features, chol_fact, pred_mat, mean, kernel, noise_variance,

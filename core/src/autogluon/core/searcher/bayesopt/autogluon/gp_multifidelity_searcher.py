@@ -7,9 +7,9 @@ import logging
 from .config_ext import ExtendedConfiguration
 from .debug_log import DebugLogPrinter
 from .gp_fifo_searcher import GET_CONFIG_RANDOM_RETRIES, \
-    accumulate_profiling_record, MapReward, check_initial_candidates_scorer, \
+    MapReward, check_initial_candidates_scorer, \
     create_initial_candidates_scorer, encode_state, decode_state
-from .gp_profiling import GPMXNetSimpleProfiler
+from .simple_profiler import SimpleProfiler
 from .hp_ranges import HyperparameterRanges_CS
 from ..datatypes.common import CandidateEvaluation, PendingEvaluation, \
     candidate_for_print
@@ -18,11 +18,12 @@ from ..models.gp_model import GPModel
 from ..models.gpmodel_skipopt import SkipOptimizationPredicate
 from ..models.gpmodel_transformers import \
     GPModelPendingCandidateStateTransformer, GPModelArgs
-from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction
+from ..tuning_algorithms.base_classes import LocalOptimizer, \
+    AcquisitionFunction
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
 from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, \
     compute_blacklisted_candidates
-from ..tuning_algorithms.default_algorithm import dictionarize_objective, \
+from ..tuning_algorithms.defaults import dictionarize_objective, \
     DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, \
     DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
 from ..utils.duplicate_detector import DuplicateDetectorIdentical
@@ -52,7 +53,7 @@ class GPMultiFidelitySearcher(object):
             num_initial_candidates: int = DEFAULT_NUM_INITIAL_CANDIDATES,
             num_initial_random_choices: int = DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS,
             initial_scoring: Optional[str] = None,
-            profiler: Optional[GPMXNetSimpleProfiler] = None,
+            profiler: Optional[SimpleProfiler] = None,
             first_is_default: bool = True,
             debug_log: Optional[DebugLogPrinter] = None,
             cost_metric_name: Optional[str] = None):
@@ -126,7 +127,7 @@ class GPMultiFidelitySearcher(object):
         if debug_log is not None:
             # Configure DebugLogPrinter
             debug_log.set_configspace_ext(self.configspace_ext)
-        self.debug_log = debug_log
+        self.set_debug_log(debug_log)
         # Create state transformer
         # Initial state is empty (note that the state is mutable)
         if init_state is None:
@@ -145,15 +146,12 @@ class GPMultiFidelitySearcher(object):
         self.random_state = np.random.RandomState(random_seed)
         self.random_generator = RandomStatefulCandidateGenerator(
             self.configspace_ext.hp_ranges_ext, random_state=self.random_state)
-        self.profiler = profiler
-        self.do_profile = (profiler is not None)
+        self.set_profiler(profiler)
         self.first_is_default = first_is_default
         if cost_metric_name is not None:
             self.cost_metric_name = cost_metric_name
         else:
             self.cost_metric_name = 'elapsed_time'
-        # Sums up profiling records across all get_config calls
-        self._profile_record = dict()
         if debug_log is not None:
             deb_msg = "[GPMultiFidelitySearcher.__init__]\n"
             deb_msg += ("- acquisition_class = {}\n".format(acquisition_class))
@@ -163,6 +161,13 @@ class GPMultiFidelitySearcher(object):
             deb_msg += ("- initial_scoring = {}\n".format(self.initial_scoring))
             deb_msg += ("- first_is_default = {}".format(first_is_default))
             logger.info(deb_msg)
+
+    def set_debug_log(self, debug_log: Optional[DebugLogPrinter]):
+        self.debug_log = debug_log
+
+    def set_profiler(self, profiler: Optional[SimpleProfiler]):
+        self.profiler = profiler
+        self.do_profile = (profiler is not None)
 
     def update(self, config: CS.Configuration, reward: float, resource: int,
                **kwargs):
@@ -252,9 +257,15 @@ class GPMultiFidelitySearcher(object):
         """
         state = self.state_transformer.state
         if self.do_profile:
-            fit_hyperparams = not self.state_transformer.skip_optimization(
-                state)
-            self.profiler.set_state(state, fit_hyperparams)
+            # Start new profiler block
+            meta = {
+                'fit_hyperparams': not self.state_transformer.skip_optimization(
+                    state),
+                'num_observed': len(state.candidate_evaluations),
+                'num_pending': len(state.pending_evaluations)
+            }
+            self.profiler.begin_block(meta)
+            self.profiler.start('all')
         # Fix resource attribute during the search to the value obtained from
         # self.resource_for_acquisition. Compute blacklisted_candidates.
         if state.candidate_evaluations:
@@ -291,12 +302,13 @@ class GPMultiFidelitySearcher(object):
             # this, the BO algorithm components can be constructed
             state = self.state_transformer.state
             if self.do_profile:
-                self.profiler.start('total_all')
-                self.profiler.start('total_update')
+                self.profiler.push_prefix('getconfig')
+                self.profiler.start('all')
+                self.profiler.start('gpmodel')
             # Note: Asking for the model triggers the posterior computation
             model = self.state_transformer.model()
             if self.do_profile:
-                self.profiler.stop('total_update')
+                self.profiler.stop('gpmodel')
             # BO should only search over configs at resource level
             # target_resource
             self._fix_resource_attribute(target_resource)
@@ -324,8 +336,6 @@ class GPMultiFidelitySearcher(object):
                 sample_unique_candidates=False,
                 debug_log=self.debug_log)
             # Next candidate decision
-            if self.do_profile:
-                self.profiler.start('total_nextcand')
             _config = bo_algorithm.next_candidates()
             assert len(_config) > 0, \
                 ("Failed to find a configuration not already chosen "
@@ -335,18 +345,16 @@ class GPMultiFidelitySearcher(object):
             # Remove resource attribute
             config = self.configspace_ext.remove_resource(next_config)
             if self.do_profile:
-                self.profiler.stop('total_nextcand')
-                self.profiler.stop('total_all')
+                self.profiler.stop('all')
+                self.profiler.pop_prefix()  # getconfig
 
         if self.debug_log is not None:
             self.debug_log.set_final_config(config)
             # All get_config debug log info is only written here
             self.debug_log.write_block()
         if self.do_profile:
+            self.profiler.stop('all')
             self.profiler.clear()
-            # Pull out profiling data from this block, add to _profile_record
-            accumulate_profiling_record(
-                self._profile_record, self.profiler, pick_random)
 
         return config
 
@@ -388,17 +396,6 @@ class GPMultiFidelitySearcher(object):
 
     def dataset_size(self):
         return len(self.state_transformer.state.candidate_evaluations)
-
-    def cumulative_profile_record(self):
-        """
-        If profiling is activated, we sum up the profiling blocks for each
-        call of get_config and return it as dict. See get_config for what
-        is recorded:
-        - num_random: Number of get_config calls with random selection
-        - num_model: Number of get_config calls with model-based selection
-        - total_all: Sum of total times for all get_config calls
-        """
-        return self._profile_record
 
     def get_params(self):
         """

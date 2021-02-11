@@ -264,11 +264,22 @@ class HyperparameterRangeCategorical(HyperparameterRange):
 
 class HyperparameterRanges(ABC):
     @abstractmethod
-    def to_ndarray(self, cand_tuple: Candidate) -> np.ndarray:
+    def to_ndarray(self, cand_tuple: Candidate,
+                   categ_onehot: bool = True) -> np.ndarray:
+        """
+        Categorical values are one-hot encoded if categ_onehot is true,
+        otherwise they are mapped to 0, 1, ...
+
+        :param cand_tuple: HP tuple to encode
+        :param categ_onehot: See above. Def: True
+        :return: Encoded HP vector
+        """
         pass
 
-    def to_ndarray_matrix(self, candidates: Iterable[Candidate]) -> np.ndarray:
-        return np.vstack([self.to_ndarray(cand) for cand in candidates])
+    def to_ndarray_matrix(self, candidates: Iterable[Candidate],
+                          categ_onehot: bool = True) -> np.ndarray:
+        return np.vstack(
+            [self.to_ndarray(cand, categ_onehot) for cand in candidates])
 
     @abstractmethod
     def ndarray_size(self) -> int:
@@ -342,7 +353,10 @@ class HyperparameterRanges_Impl(HyperparameterRanges):
         if len(set(names)) != len(names):
             raise ValueError("duplicate names in {}".format(names))
 
-    def to_ndarray(self, cand_tuple: Candidate) -> np.ndarray:
+    def to_ndarray(self, cand_tuple: Candidate,
+                   categ_onehot: bool = True) -> np.ndarray:
+        if not categ_onehot:
+            raise NotImplementedError("categ_onehot = False not implemented")
         pieces = [hp_range.to_ndarray(hp) for hp_range, hp in zip(self._hp_ranges, cand_tuple)]
         return np.hstack(pieces)
 

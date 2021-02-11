@@ -57,6 +57,10 @@ class GPFIFOSearcher(BaseSearcher):
     first_is_default : bool (default: True)
         If True, the first config to be evaluated is the default one of the
         config space. Otherwise, this first config is drawn at random.
+    elapsed_time_attribute : str
+        Name of elapsed time attribute in data obtained from reporter. Here,
+        elapsed time counts since the start of train_fn, unit is seconds.
+        Equal to `elapsed_time_attr` of scheduler.
     random_seed : int
         Seed for pseudo-random number generator used.
     num_init_random : int
@@ -130,6 +134,7 @@ class GPFIFOSearcher(BaseSearcher):
         # This lock protects gp_searcher. We are not using self.LOCK, this
         # can lead to deadlocks when superclass methods are called
         self._gp_lock = mp.Lock()
+        self._elapsed_time_attribute = kwargs.get('elapsed_time_attribute')
 
     def configure_scheduler(self, scheduler):
         from ..scheduler import FIFOScheduler
@@ -137,6 +142,7 @@ class GPFIFOSearcher(BaseSearcher):
         assert isinstance(scheduler, FIFOScheduler), \
             "This searcher requires FIFOScheduler scheduler"
         super().configure_scheduler(scheduler)
+        self._elapsed_time_attribute = scheduler._elapsed_time_attr
 
     def get_config(self, **kwargs):
         with self._gp_lock:
@@ -147,8 +153,11 @@ class GPFIFOSearcher(BaseSearcher):
         super().update(config, **kwargs)
         with self._gp_lock:
             config_cs = self._to_config_cs(config)
+            _kwargs = dict()
+            if self._elapsed_time_attribute in kwargs:
+                _kwargs['elapsed_time'] = kwargs[self._elapsed_time_attribute]
             self.gp_searcher.update(
-                config_cs, reward=kwargs[self._reward_attribute])
+                config_cs, reward=kwargs[self._reward_attribute], **_kwargs)
 
     def register_pending(self, config, milestone=None):
         with self._gp_lock:
@@ -163,10 +172,6 @@ class GPFIFOSearcher(BaseSearcher):
     def dataset_size(self):
         with self._gp_lock:
             return self.gp_searcher.dataset_size()
-
-    def cumulative_profile_record(self):
-        with self._gp_lock:
-            return self.gp_searcher.cumulative_profile_record()
 
     def model_parameters(self):
         with self._gp_lock:
@@ -241,6 +246,10 @@ class GPMultiFidelitySearcher(BaseSearcher):
     first_is_default : bool (default: True)
         If True, the first config to be evaluated is the default one of the
         config space. Otherwise, this first config is drawn at random.
+    elapsed_time_attribute : str
+        Name of elapsed time attribute in data obtained from reporter. Here,
+        elapsed time counts since the start of train_fn, unit is seconds.
+        Equal to `elapsed_time_attr` of scheduler.
     random_seed : int
         Seed for pseudo-random number generator used.
     num_init_random : int
@@ -330,6 +339,7 @@ class GPMultiFidelitySearcher(BaseSearcher):
         # This lock protects gp_searcher. We are not using self.LOCK, this
         # can lead to deadlocks when superclass methods are called
         self._gp_lock = mp.Lock()
+        self._elapsed_time_attribute = kwargs.get('elapsed_time_attribute')
 
     def configure_scheduler(self, scheduler):
         from ..scheduler import HyperbandScheduler
@@ -338,6 +348,7 @@ class GPMultiFidelitySearcher(BaseSearcher):
             "This searcher requires HyperbandScheduler scheduler"
         super().configure_scheduler(scheduler)
         self._resource_attribute = scheduler._time_attr
+        self._elapsed_time_attribute = scheduler._elapsed_time_attr
 
     def get_config(self, **kwargs):
         with self._gp_lock:
@@ -348,9 +359,12 @@ class GPMultiFidelitySearcher(BaseSearcher):
         super().update(config, **kwargs)
         with self._gp_lock:
             config_cs = self._to_config_cs(config)
+            _kwargs = dict()
+            if self._elapsed_time_attribute in kwargs:
+                _kwargs['elapsed_time'] = kwargs[self._elapsed_time_attribute]
             self.gp_searcher.update(
                 config_cs, reward=kwargs[self._reward_attribute],
-                resource=int(kwargs[self._resource_attribute]))
+                resource=int(kwargs[self._resource_attribute]), **_kwargs)
             # If evaluation task has terminated, cleanup pending evaluations
             # which may have been overlooked
             if kwargs.get('terminated', False):
@@ -377,10 +391,6 @@ class GPMultiFidelitySearcher(BaseSearcher):
     def dataset_size(self):
         with self._gp_lock:
             return self.gp_searcher.dataset_size()
-
-    def cumulative_profile_record(self):
-        with self._gp_lock:
-            return self.gp_searcher.cumulative_profile_record()
 
     def model_parameters(self):
         with self._gp_lock:

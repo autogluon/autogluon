@@ -31,8 +31,9 @@ logger = logging.getLogger(__name__)
 _ARGUMENT_KEYS = {
     'args', 'resource', 'searcher', 'search_options', 'checkpoint', 'resume',
     'num_trials', 'time_out', 'max_reward', 'reward_attr', 'time_attr',
-    'dist_ip_addrs', 'visualizer', 'training_history_callback',
-    'training_history_callback_delta_secs', 'delay_get_config'}
+    'elapsed_time_attr', 'dist_ip_addrs', 'visualizer',
+    'training_history_callback', 'training_history_callback_delta_secs',
+    'training_history_searcher_info', 'delay_get_config'}
 
 _DEFAULT_OPTIONS = {
     'resource': {'num_cpus': 1, 'num_gpus': 0},
@@ -40,8 +41,10 @@ _DEFAULT_OPTIONS = {
     'resume': False,
     'reward_attr': 'accuracy',
     'time_attr': 'epoch',
+    'elapsed_time_attr': 'elapsed_time',
     'visualizer': 'none',
     'training_history_callback_delta_secs': 60,
+    'training_history_searcher_info': False,
     'delay_get_config': True}
 
 _CONSTRAINTS = {
@@ -52,8 +55,10 @@ _CONSTRAINTS = {
     'max_reward': Float(),
     'reward_attr': String(),
     'time_attr': String(),
+    'elapsed_time_attr': String(),
     'visualizer': String(),
     'training_history_callback_delta_secs': Integer(1, None),
+    'training_history_searcher_info': Boolean(),
     'delay_get_config': Boolean()}
 
 
@@ -95,18 +100,27 @@ class FIFOScheduler(TaskScheduler):
         This attribute is optional for FIFO scheduling, but becomes mandatory
         in multi-fidelity scheduling (e.g., Hyperband).
         Note: The type of resource must be int.
+    elapsed_time_attr : str (optional)
+        Needed only with searchers who model train_fn evaluation times. Name
+        of elapsed time attribute in data obtained from reporter. Here,
+        elapsed time counts since the start of train_fn, unit is seconds. Type
+        must be positive float.
     dist_ip_addrs : list of str
         IP addresses of remote machines.
     training_history_callback : callable
-        Callback function func called every time a job finishes, if at least
-        training_history_callback_delta_secs seconds passed since the last
-        recent call. The call has the form:
-            func(self.training_history, self._start_time)
-        Here, self._start_time is time stamp for when experiment started.
+        Callback function func called every time a result is added to
+        training_history, if at least training_history_callback_delta_secs
+        seconds passed since the last recent call.
+        See _add_training_result for the signature of this callback function.
         Use this callback to serialize self.training_history after regular
         intervals.
     training_history_callback_delta_secs : float
         See training_history_callback.
+    training_history_searcher_info : bool
+        If True, information about the current state of the searcher is added
+        to every reported_result before added to training_history. This info
+        includes in particular the current hyperparameters of the surrogate
+        model of the searcher, as well as the dataset size.
     delay_get_config : bool
         If True, the call to searcher.get_config is delayed until a worker
         resource for evaluation is available. Otherwise, get_config is called
@@ -156,6 +170,8 @@ class FIFOScheduler(TaskScheduler):
             _search_options['configspace'] = train_fn.cs
             _search_options['reward_attribute'] = kwargs['reward_attr']
             _search_options['resource_attribute'] = kwargs['time_attr']
+            _search_options['elapsed_time_attribute'] = \
+                kwargs['elapsed_time_attr']
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
             if 'scheduler' not in _search_options:
@@ -191,6 +207,7 @@ class FIFOScheduler(TaskScheduler):
         self._checkpoint = checkpoint
         self._reward_attr = kwargs['reward_attr']
         self._time_attr = kwargs['time_attr']
+        self._elapsed_time_attr = kwargs['elapsed_time_attr']
         self.visualizer = kwargs['visualizer'].lower()
         if self.visualizer == 'tensorboard' or self.visualizer == 'mxboard':
             assert checkpoint is not None, "Need checkpoint to be set"
@@ -213,10 +230,12 @@ class FIFOScheduler(TaskScheduler):
         # training_history_call_delta_secs seconds
         self._start_time = None
         self._training_history_callback_last_block = None
-        self._training_history_callback_last_len = None
+        self._training_history_callback_num_calls = None
         self.training_history_callback = kwargs.get('training_history_callback')
         self.training_history_callback_delta_secs = \
             kwargs['training_history_callback_delta_secs']
+        self.training_history_searcher_info = \
+            kwargs['training_history_searcher_info']
         self._delay_get_config = kwargs['delay_get_config']
         # Resume experiment from checkpoint?
         if kwargs['resume']:
@@ -240,7 +259,7 @@ class FIFOScheduler(TaskScheduler):
         time_out = kwargs.get('time_out', self.time_out)
         # For training_history callback mechanism:
         self._training_history_callback_last_block = -1
-        self._training_history_callback_last_len = len(self.training_history)
+        self._training_history_callback_num_calls = 0
         log_suffix = ''
         if time_out is not None:
             log_suffix = f' (time_out={round(time_out, 2)}s)'
@@ -355,6 +374,13 @@ class FIFOScheduler(TaskScheduler):
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
+        debug_log = self.searcher.debug_log
+        if debug_log is not None:
+            logger.info("Starting job on node = {}".format(
+                task.resources.node.remote_id))
+            # Relay config_id to train_fn (for debug logging)
+            config_id = debug_log.config_id(task.args['config'])
+            task.args['args']['config_id'] = config_id
         job = cls.jobs.start_distributed_job(task, cls.managers)
         # reporter thread
         rp = threading.Thread(
@@ -364,10 +390,8 @@ class FIFOScheduler(TaskScheduler):
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
-        # Checkpoint thread. This is also used for training_history
-        # callback
-        if self._checkpoint is not None or \
-                self.training_history_callback is not None:
+        # Checkpoint thread
+        if self._checkpoint is not None:
             self._add_checkpointing_to_job(job)
         with self.managers.lock:
             self.scheduled_tasks.append(task_dict)
@@ -379,29 +403,31 @@ class FIFOScheduler(TaskScheduler):
         def _save_checkpoint_callback(fut):
             self._cleaning_tasks()
             self.save()
-            # training_history callback
-            with self._fifo_lock:
-                if self._trigger_training_history_callback():
-                    logger.debug("Execute training_history callback")
-                    self.training_history_callback(
-                        self.training_history, self._start_time)
 
         job.add_done_callback(_save_checkpoint_callback)
 
+    def _training_history_callback_current_block(self):
+        return int(np.floor(
+            self._elapsed_time() / self.training_history_callback_delta_secs))
+
     def _trigger_training_history_callback(self):
+        """
+        Decides whether 'training_history_callback' is to be called. This
+        callback is (in general) serializing 'training_history' (or required
+        parts of it). It may also serialize the current scheduler state.
+
+        To this end, we partition time since start of experiment (see
+        `_elapsed_time') into blocks of 'training_history_callback_delta_secs'
+        seconds. The callback is triggered only if the last recent call
+        happened in an earlier block.
+
+        :return: Should callback be executed?
+        """
         if self.training_history_callback is None:
             return False
         assert self._training_history_callback_last_block is not None
-        current_block = int(np.floor(
-            self._elapsed_time() / self.training_history_callback_delta_secs))
-        current_len = len(self.training_history)
-        ret_val = (current_block >
-                   self._training_history_callback_last_block) and \
-            current_len > self._training_history_callback_last_len
-        if ret_val:
-            self._training_history_callback_last_block = current_block
-            self._training_history_callback_last_len = current_len
-        return ret_val
+        current_block = self._training_history_callback_current_block()
+        return (current_block > self._training_history_callback_last_block)
 
     def _run_reporter(self, task, task_job, reporter):
         last_result = None
@@ -421,18 +447,14 @@ class FIFOScheduler(TaskScheduler):
                 # An empty dict should just be skipped
                 logger.warning("Skipping empty dict received from reporter")
                 continue
-            # Time since start of experiment
-            elapsed_time = self._elapsed_time()
-            reported_result['time_since_start'] = elapsed_time
 
             # Extra information from searcher (optional)
-            dataset_size = self.searcher.dataset_size()
-            if dataset_size > 0:
-                reported_result['searcher_data_size'] = dataset_size
-            for k, v in self.searcher.cumulative_profile_record().items():
-                reported_result['searcher_profile_' + k] = v
-            for k, v in self.searcher.model_parameters().items():
-                reported_result['searcher_params_' + k] = v
+            if self.training_history_searcher_info:
+                dataset_size = self.searcher.dataset_size()
+                if dataset_size > 0:
+                    reported_result['searcher_data_size'] = dataset_size
+                for k, v in self.searcher.model_parameters().items():
+                    reported_result['searcher_params_' + k] = v
             self._add_training_result(
                 task.task_id, reported_result, config=task.args['config'])
             reporter.move_on()
@@ -502,9 +524,12 @@ class FIFOScheduler(TaskScheduler):
                 ),
                 global_step=reported_result[self._time_attr]
             )
+        # This locking block includes the (optional) call of
+        # training_history_callback. We need to make sure that it is not called
+        # by two reporter threads at the same time
         with self._fifo_lock:
-            # Note: We store all of reported_result in training_history[task_id],
-            # not just the reward value.
+            # Note: We store all of reported_result in
+            # training_history[task_id], not just the reward value.
             task_key = str(task_id)
             new_entry = copy.copy(reported_result)
             if task_key in self.training_history:
@@ -513,6 +538,21 @@ class FIFOScheduler(TaskScheduler):
                 self.training_history[task_key] = [new_entry]
                 if config:
                     self.config_history[task_key] = config
+            # training_history_callback mechanism
+            if self._trigger_training_history_callback():
+                # Note: no_fifo_lock = True avoids deadlock in 'state_dict',
+                # since we acquired the _fifo_lock already
+                rolling_ind = self._training_history_callback_num_calls % 3
+                self.training_history_callback(
+                    self.training_history,
+                    self._start_time,
+                    config_history=self.config_history,
+                    state_dict=self.state_dict(no_fifo_lock=True),
+                    rolling_ind=rolling_ind)
+                self._training_history_callback_last_block = \
+                    self._training_history_callback_current_block()
+                self._training_history_callback_num_calls += 1
+
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
         """Get Training Curves
@@ -560,7 +600,7 @@ class FIFOScheduler(TaskScheduler):
                 return task_res[0][metric]
         return default
 
-    def state_dict(self, destination=None):
+    def state_dict(self, destination=None, no_fifo_lock=False):
         """
         Returns a dictionary containing a whole state of the Scheduler. This is
         used for checkpointing.
@@ -581,11 +621,16 @@ class FIFOScheduler(TaskScheduler):
         >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
         destination = super().state_dict(destination)
-        with self._fifo_lock:
+        if not no_fifo_lock:
+            self._fifo_lock.acquire()
+        try:
             # The result of searcher.get_state can always be pickled
             destination['searcher'] = pickle.dumps(self.searcher.get_state())
             destination['training_history'] = json.dumps(self.training_history)
             destination['config_history'] = json.dumps(self.config_history)
+        finally:
+            if not no_fifo_lock:
+                self._fifo_lock.release()
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             destination['visualizer'] = json.dumps(self.mxboard._scalar_dict)
         return destination

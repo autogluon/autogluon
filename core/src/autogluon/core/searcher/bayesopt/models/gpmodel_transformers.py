@@ -4,12 +4,12 @@ import copy
 
 from .gp_model import GaussProcSurrogateModel, GPModel
 from .gpmodel_skipopt import SkipOptimizationPredicate, NeverSkipPredicate
-from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
+from ..autogluon.simple_profiler import SimpleProfiler
 from ..autogluon.debug_log import DebugLogPrinter
 from ..datatypes.tuning_job_state import TuningJobState
 from ..datatypes.common import Candidate, PendingEvaluation, CandidateEvaluation
 from ..tuning_algorithms.base_classes import PendingCandidateStateTransformer
-from ..tuning_algorithms.default_algorithm import DEFAULT_METRIC
+from ..tuning_algorithms.defaults import DEFAULT_METRIC
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
             self, gpmodel: GPModel, init_state: TuningJobState,
             model_args: GPModelArgs,
             skip_optimization: SkipOptimizationPredicate = None,
-            profiler: GPMXNetSimpleProfiler = None,
+            profiler: SimpleProfiler = None,
             debug_log: Optional[DebugLogPrinter] = None):
         self._gpmodel = gpmodel
         self._state = copy.copy(init_state)
