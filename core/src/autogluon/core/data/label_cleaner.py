@@ -126,7 +126,7 @@ class LabelCleanerMulticlass(LabelCleaner):
         else:
             y_transformed = y
         if as_pred:
-            y_transformed = get_pred_from_proba(y_pred_proba=y_transformed, problem_type=self.problem_type_transform)
+            y_transformed = get_pred_from_proba(y_pred_proba=y_transformed, problem_type=MULTICLASS)
             y_transformed = self._convert_to_valid_series(y_transformed)
             y_transformed = y_transformed.map(self.cat_mappings_dependent_var_uncleaned)
             if y_index is not None:
