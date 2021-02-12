@@ -8,7 +8,7 @@ logger = logging.getLogger()
 
 
 _scheduler_presets = {
-    'auto': {'searcher': 'random'},
+    'auto': {'searcher': 'local_sequential_auto'},
     # 'grid': {'searcher': 'grid'},  # grid commented out as it isn't compatible with most default model search spaces
     'random': {'searcher': 'random'},
     'bayesopt': {'searcher': 'bayesopt'},
