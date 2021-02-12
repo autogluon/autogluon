@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 class LocalReporter:
     def __init__(self, trial, config, training_history: dict, config_history: dict):
-        self.config = config
         self.trial = trial
 
         self.training_history = training_history
@@ -23,9 +22,6 @@ class LocalReporter:
         self.task_config = EasyDict(deepcopy(config))
 
         self.config_history = config_history
-        if trial not in self.config_history:
-            self.config_history[trial] = []
-        self.config_history[trial] = self.task_config
 
         self.trial_started = time.time()
         self.last_reported_time = self.trial_started
@@ -43,6 +39,12 @@ class LocalReporter:
             self.last_reported_time = now
 
             self.training_history[self.trial].append(result)
+
+            if self.trial not in self.config_history:
+                self.config_history[self.trial] = self.task_config
+                if 'util_args' in self.task_config:
+                    self.task_config.pop('util_args')
+
             self.last_result = result
 
     def terminate(self):
@@ -59,9 +61,13 @@ class LocalSequentialScheduler(object):
         self.time_attr = time_attr
         self.resource = kwargs['resource']
         self.max_reward = kwargs.get('max_reward')
+
+        if searcher is 'local_sequential_auto':
+            searcher = 'auto'
+
         if searcher is 'auto':
             searcher = GPFIFOSearcher
-        self.searcher = searcher(self.train_fn.cs)
+        self.searcher = searcher(self.train_fn.cs, reward_attribute='validation_performance')
 
         self.num_trials = kwargs.get('num_trials', 9999)
         self.time_out = kwargs.get('time_out')
@@ -83,18 +89,22 @@ class LocalSequentialScheduler(object):
 
         time_start = time.time()
         for i in tqdm(range(self.num_trials)):
-            self.run_trial(task_id=i, time_limit=self.time_out, time_start=time_start)
+            self.run_trial(task_id=i)
             time_end = time.time()
             if self.time_out is not None:
                 if time_end - time_start >= self.time_out:
-                    print('time_limit exceeded')
+                    logger.log(20, f'\tTime limit exceeded...')
                     break
 
-    def run_trial(self, task_id=0, **kwargs):
-        config = self.searcher.get_config()
+    def run_trial(self, task_id=0):
+        searcher_config = self.searcher.get_config()
+        config = {**self.train_fn.kwvars, **searcher_config}
         reporter = LocalReporter(task_id, config, self.training_history, self.config_history)
-        self.train_fn(EasyDict(config), reporter=reporter, task_id=task_id, **kwargs)
-        self.searcher.update(config=config, **reporter.last_result)
+        task_config = deepcopy(EasyDict(config))
+        task_config['task_id'] = task_id
+        self.train_fn.f(task_config, reporter=reporter)
+        if reporter.last_result:
+            self.searcher.update(config=searcher_config, **reporter.last_result)
 
     def join_jobs(self, timeout=None):
         # Required by autogluon
