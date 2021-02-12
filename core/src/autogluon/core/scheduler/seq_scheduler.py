@@ -67,7 +67,7 @@ class LocalSequentialScheduler(object):
 
         if searcher is 'auto':
             searcher = GPFIFOSearcher
-        self.searcher = searcher(self.train_fn.cs, reward_attribute='validation_performance')
+        self.searcher = searcher(self.train_fn.cs, reward_attribute=self._reward_attr)
 
         self.num_trials = kwargs.get('num_trials', 9999)
         self.time_out = kwargs.get('time_out')
