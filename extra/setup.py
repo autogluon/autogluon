@@ -47,7 +47,7 @@ python_requires = '>=3.6, <3.8'
 requirements = [
     'numpy==1.19.5',
     'gluoncv>=0.9.2,<1.0',
-    'scipy>=1.3.3,<1.5.0',
+    'scipy==1.5.4',
     'graphviz<0.9.0,>=0.8.1',
     'bokeh',
     'pandas>=1.0.0,<2.0',

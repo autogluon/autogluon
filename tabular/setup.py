@@ -44,7 +44,7 @@ python_requires = '>=3.6, <3.8'
 
 requirements = [
     'numpy==1.19.5',
-    'scipy>=1.3.3,<1.5.0',
+    'scipy==1.5.4',
     'catboost>=0.23.0,<0.25',
     'xgboost>=1.2,<1.3',
     'lightgbm>=3.0,<4.0',
