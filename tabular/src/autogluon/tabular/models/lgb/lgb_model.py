@@ -10,11 +10,12 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils import try_import_lightgbm
 from autogluon.core import Int, Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.features.types import R_OBJECT
+from autogluon.core.models import AbstractModel
+from autogluon.core.utils import try_import_lightgbm
+from autogluon.core.utils.savers import save_pkl
 
 from . import lgb_utils
 from .callbacks import early_stopping_custom
@@ -22,7 +23,6 @@ from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset
-from autogluon.core.models import AbstractModel
 from ..utils import fixedvals_from_searchspaces
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning

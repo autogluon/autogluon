@@ -519,7 +519,15 @@ class AbstractModel:
 
     def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
         scheduler_options = copy.deepcopy(scheduler_options)
-        scheduler_options[1]['resource'] = self._preprocess_fit_resources(silent=True, **scheduler_options[1]['resource'])
+        resource = copy.deepcopy(scheduler_options[1]['resource'])
+        if 'num_cpus' in resource:
+            if resource['num_cpus'] == 'auto':
+                resource.pop('num_cpus')
+        if 'num_gpus' in resource:
+            if resource['num_gpus'] == 'auto':
+                resource.pop('num_gpus')
+
+        scheduler_options[1]['resource'] = self._preprocess_fit_resources(silent=True, **resource)
         if 'time_out' not in scheduler_options[1]:
             scheduler_options[1]['time_out'] = time_limit
         return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)

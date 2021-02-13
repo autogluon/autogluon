@@ -85,6 +85,8 @@ class AbstractTrainer:
 
         self._regress_preds_asprobas = False  # whether to treat regression predictions as class-probabilities (during distillation)
 
+        self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
+
     # path_root is the directory containing learner.pkl
     @property
     def path_root(self) -> str:
@@ -1030,6 +1032,7 @@ class AbstractTrainer:
                 # Commented out because it takes too much space (>>5 GB if run for an hour on a small-medium sized dataset)
                 # self.hpo_results[model.name] = hpo_results
                 model_names_trained = []
+                self._extra_banned_names.add(model.name)
                 for model_hpo_name, model_path in hpo_models.items():
                     model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
                     logging.log(20, f'Fitted model: {model_hpo.name} ...')
@@ -1441,6 +1444,10 @@ class AbstractTrainer:
             model = model.name
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
+
+    def _get_banned_model_names(self) -> list:
+        """Gets all model names which would cause model files to be overwritten if a new model was trained with the name"""
+        return self.get_model_names() + list(self._extra_banned_names)
 
     def leaderboard(self, extra_info=False):
         model_names = self.get_model_names()
