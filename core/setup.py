@@ -42,6 +42,15 @@ long_description = open(os.path.join('..', 'README.md')).read()
 
 python_requires = '>=3.6, <3.8'
 
+setup_requirements = [
+    # ConfigSpace MUST be installed after correct cython and numpy installed
+    # otherwise it will compile against the version in Conda (1.20.x)
+    'numpy==1.19.5',
+    'scipy==1.5.4',  # TODO v0.1: Upgrade?
+    'scikit-learn>=0.22.0,<0.24',  # TODO v0.1: Upgrade
+    'cython',  # TODO: Do we need cython here?
+]
+
 requirements = [
     'numpy==1.19.5',
     'scipy==1.5.4',  # TODO v0.1: Upgrade?
@@ -64,7 +73,8 @@ requirements = [
 ]
 
 test_requirements = [
-    'pytest'
+    'pytest',
+    'flake8',
 ]
 
 if __name__ == '__main__':
@@ -87,6 +97,7 @@ if __name__ == '__main__':
         zip_safe=True,
         include_package_data=True,
         install_requires=requirements + test_requirements,
+        setup_requires=setup_requirements,
         python_requires=python_requires,
         package_data={'autogluon': [
             'LICENSE',
