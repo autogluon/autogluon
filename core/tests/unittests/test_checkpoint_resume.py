@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import time
 
-from autogluon.core.searcher.bayesopt.autogluon.hp_ranges import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges_cs import \
     HyperparameterRanges_CS
 from autogluon.core.searcher.bayesopt.utils.comparison_gpy import Branin
 from autogluon.core.searcher.gp_searcher import _to_config_cs

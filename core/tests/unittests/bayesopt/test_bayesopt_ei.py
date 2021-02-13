@@ -16,7 +16,7 @@ from autogluon.core.searcher.bayesopt.models.gp_model import \
     GaussProcSurrogateModel
 from autogluon.core.searcher.bayesopt.tuning_algorithms.bo_algorithm_components import \
     LBFGSOptimizeAcquisition
-from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.defaults import \
     dictionarize_objective, DEFAULT_METRIC
 from autogluon.core.searcher.bayesopt.utils.test_objects import \
     default_gpmodel, default_gpmodel_mcmc

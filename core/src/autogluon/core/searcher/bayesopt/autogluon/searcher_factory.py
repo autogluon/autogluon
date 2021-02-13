@@ -5,7 +5,6 @@ from .gp_fifo_searcher import GPFIFOSearcher, map_reward, MapReward, \
     DEFAULT_INITIAL_SCORING, SUPPORTED_INITIAL_SCORING
 from .gp_multifidelity_searcher import GPMultiFidelitySearcher, \
     resource_for_acquisition_bohb, resource_for_acquisition_first_milestone
-from .gp_mf_simulation_searcher import GPMFSimulationSearcher
 from .model_factories import resource_kernel_factory
 from ..datatypes.hp_ranges_cs import HyperparameterRanges_CS
 from ..datatypes.hp_ranges import HyperparameterRanges
@@ -14,11 +13,9 @@ from ..gpautograd.debug_gp_regression import DebugGPRegression
 from ..gpautograd.gp_regression import GaussianProcessRegression
 from ..gpautograd.kernel import Matern52
 from ..gpautograd.mean import ScalarMeanFunction
-from ..models.cost_model import CostModel
 from ..models.gpmodel_skipopt import SkipNoMaxResourcePredicate, SkipPeriodicallyPredicate
 from ..models.gpmodel_transformers import GPModelArgs
 from ..models.meanstd_acqfunc import EIAcquisitionFunction
-from ..tuning_algorithms.candidate_configs import RandomCandidateSelector, AcqFuncCandidateSelector
 from ..tuning_algorithms.defaults import DEFAULT_METRIC, \
     DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
 from ..utils.debug_log import DebugLogPrinter
@@ -218,67 +215,6 @@ def gp_multifidelity_searcher_factory(**kwargs) -> GPMultiFidelitySearcher:
     return gp_searcher
 
 
-def gp_mf_simulation_searcher_factory(**kwargs) -> GPMFSimulationSearcher:
-    """
-    Creates GPMFSimulationSearcher object, based on kwargs equal to search_options
-    passed to and extended by scheduler (see HyperbandScheduler).
-
-    :param kwargs: search_options coming from scheduler
-    :return: GPMFSimulationSearcher object
-
-    """
-    supp_schedulers = {'hyperband_stopping'}
-    assert kwargs['scheduler'] in supp_schedulers, \
-        "This factory needs scheduler in {} (instead of '{}')".format(
-            supp_schedulers, kwargs['scheduler'])
-    # Common objects
-    hp_ranges_cs, random_seed, gpmodel, model_args, profiler, _map_reward, \
-    skip_optimization, debug_log = \
-        _create_common_objects(**kwargs)
-
-    resource_for_acquisition = _resource_for_acquisition(kwargs, hp_ranges_cs)
-    epoch_range = (kwargs['min_epochs'], kwargs['max_epochs'])
-    selector_type = kwargs['candidate_selector']
-    if selector_type == 'random':
-        candidate_selector = RandomCandidateSelector()
-    elif selector_type == 'acqfunc_ei':
-        candidate_selector = AcqFuncCandidateSelector(
-            acquisition_class=EIAcquisitionFunction,
-            pool_factor=kwargs['candidate_selector_pool_factor'])
-    else:
-        raise AssertionError("candidate_selector = '{}' not supported".format(
-            selector_type))
-    # Cost model object has to be passed in
-    cost_model = kwargs['cost_model']
-    assert isinstance(cost_model, CostModel), \
-        "cost_model must be a CostModel object"
-    debug_verbose_score = kwargs.get('debug_verbose_score', False)
-    incumbent_extra_random = kwargs.get('incumbent_extra_random', 0)
-    gp_searcher = GPMFSimulationSearcher(
-        hp_ranges=hp_ranges_cs,
-        resource_attr_key=kwargs['resource_attribute'],
-        resource_attr_range=epoch_range,
-        random_seed=random_seed,
-        gpmodel=gpmodel,
-        cost_model=cost_model,
-        model_args=model_args,
-        map_reward=_map_reward,
-        resource_for_acquisition=resource_for_acquisition,
-        candidate_selector=candidate_selector,
-        skip_optimization=skip_optimization,
-        num_initial_random_choices=kwargs['num_init_random'],
-        num_candidates=kwargs['num_scoring_candidates'],
-        num_averages_score=kwargs['num_averages_score'],
-        eps_after_now=kwargs['eps_after_now'],
-        score_time_power=kwargs['score_time_power'],
-        profiler=profiler,
-        first_is_default=kwargs['first_is_default'],
-        debug_log=debug_log,
-        debug_verbose_score=debug_verbose_score,
-        incumbent_extra_random=incumbent_extra_random)
-    return gp_searcher
-
-
 def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
     mandatory = set()
 
@@ -305,13 +241,6 @@ def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
         default_options['gp_resource_kernel'] = 'matern52'
         default_options['resource_acq'] = 'bohb'
         default_options['num_init_random'] = 10
-        default_options['num_scoring_candidates'] = 50
-        default_options['num_averages_score'] = 10
-        default_options['eps_after_now'] = 0.1
-        default_options['candidate_selector'] = 'random'
-        default_options['candidate_selector_pool_factor'] = 10
-        default_options['score_time_power'] = 1.0
-        default_options['incumbent_extra_random'] = 0
 
     constraints = {
         'random_seed': Integer(),
@@ -337,14 +266,6 @@ def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
             'matern52', 'matern52-res-warp'))
         constraints['resource_acq'] = Categorical(
             choices=('bohb', 'first'))
-        constraints['num_scoring_candidates'] = Integer(1, None)
-        constraints['num_averages_score'] = Integer(1, None)
-        constraints['eps_after_now'] = Float(0.0, None)
-        constraints['candidate_selector'] = Categorical(choices=(
-            'random', 'acqfunc_ei'))
-        constraints['candidate_selector_pool_factor'] = Float(1.01, None)
-        constraints['score_time_power'] = Float(0.0, 1.0)
-        constraints['incumbent_extra_random'] = Integer(0, None)
 
     return mandatory, default_options, constraints
 
