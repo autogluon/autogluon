@@ -1,9 +1,13 @@
 import numpy as np
 import ConfigSpace as CS
+import ConfigSpace.hyperparameters as CSH
 from typing import List, Tuple, Union
 
-from ..datatypes.common import Candidate
-from ..datatypes.hp_ranges import HyperparameterRanges
+from .common import Candidate
+from .hp_ranges import HyperparameterRanges, HyperparameterRanges_Impl, \
+    HyperparameterRangeContinuous, HyperparameterRangeInteger, \
+    HyperparameterRangeCategorical
+from .scaling import LogScaling
 
 
 class HyperparameterRanges_CS(HyperparameterRanges):
@@ -85,17 +89,21 @@ class HyperparameterRanges_CS(HyperparameterRanges):
         self.keys_sorted = sorted(
             [hp.name for hp in config_space.get_hyperparameters()])
 
-    def to_ndarray(self, cand_tuple: Candidate) -> np.ndarray:
+    def to_ndarray(self, cand_tuple: Candidate,
+                   categ_onehot: bool = True) -> np.ndarray:
         assert isinstance(cand_tuple, CS.Configuration)
         trgvec = np.zeros((self._ndarray_size,))
         srcvec = cand_tuple.get_array()
-        # https://wesmckinney.com/blog/numpy-indexing-peculiarities/
-        # take, put much faster than []
-        trgvec.put(
-            self.numer_trg, srcvec.take(self.numer_src, mode='clip'),
-            mode='clip')
-        relpos = srcvec.take(self.categ_src, mode='clip').astype(np.int64)
-        trgvec.put(self.categ_trg + relpos, [1.], mode='clip')
+        if categ_onehot:
+            # https://wesmckinney.com/blog/numpy-indexing-peculiarities/
+            # take, put much faster than []
+            trgvec.put(
+                self.numer_trg, srcvec.take(self.numer_src, mode='clip'),
+                mode='clip')
+            relpos = srcvec.take(self.categ_src, mode='clip').astype(np.int64)
+            trgvec.put(self.categ_trg + relpos, [1.], mode='clip')
+        else:
+            trgvec = srcvec.copy()
         return trgvec
 
     def ndarray_size(self) -> int:
@@ -210,20 +218,58 @@ class HyperparameterRanges_CS(HyperparameterRanges):
             candidates = list(filter(filter_pred, candidates))
         return candidates
 
-    def config_to_tuple(self, config: Union[CS.Configuration, dict]) -> tuple:
+    def config_to_tuple(
+            self, config: Union[CS.Configuration, dict], keys=None) -> tuple:
         """
         :param config: Configuration (can also be dict)
         :return: Tuple representation
         """
+        if keys is None:
+            keys = self.keys_sorted
         if isinstance(config, CS.Configuration):
             config = config.get_dictionary()
         else:
             assert isinstance(config, dict)
-        return tuple(config[k] for k in self.keys_sorted)
+        return tuple(config[k] for k in keys)
 
-    def tuple_to_config(self, config_tpl: tuple, as_dict: bool = False) -> \
+    def tuple_to_config(
+            self, config_tpl: tuple, as_dict: bool = False, keys=None) -> \
             Union[CS.Configuration, dict]:
-        config = dict(zip(self.keys_sorted, config_tpl))
+        if keys is None:
+            keys = self.keys_sorted
+        config = dict(zip(keys, config_tpl))
         if not as_dict:
             config = CS.Configuration(self.config_space, values=config)
         return config
+
+
+def convert_hyperparameter_ranges(hp_ranges: HyperparameterRanges_Impl) -> \
+        (HyperparameterRanges_CS, List[str]):
+    names = []
+    hps = []
+    for hp_range in hp_ranges.hp_ranges:
+        name = hp_range.name
+        names.append(name)
+        if isinstance(hp_range, HyperparameterRangeContinuous):
+            hp = CSH.UniformFloatHyperparameter(
+                name=name,
+                lower=hp_range.lower_bound,
+                upper=hp_range.upper_bound,
+                log=isinstance(hp_range.scaling, LogScaling))
+        elif isinstance(hp_range, HyperparameterRangeInteger):
+            hp = CSH.UniformIntegerHyperparameter(
+                name=name,
+                lower=hp_range.lower_bound,
+                upper=hp_range.upper_bound,
+                log=isinstance(hp_range.scaling, LogScaling))
+        elif isinstance(hp_range, HyperparameterRangeCategorical):
+            hp = CSH.CategoricalHyperparameter(
+                name=name,
+                choices=hp_range.choices)
+        else:
+            raise AssertionError("Parameter '{}' has unknown type".format(name))
+        hps.append(hp)
+    cs = CS.ConfigurationSpace()
+    cs.add_hyperparameters(hps)
+
+    return HyperparameterRanges_CS(cs), names

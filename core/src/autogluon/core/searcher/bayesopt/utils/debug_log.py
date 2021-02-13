@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import ConfigSpace as CS
 
-from .config_ext import ExtendedConfiguration
+from ..datatypes.config_ext import ExtendedConfiguration
 from ..datatypes.tuning_job_state import TuningJobState
 
 logger = logging.getLogger(__name__)

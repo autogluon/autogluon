@@ -2,9 +2,9 @@ from typing import List, Optional
 import numpy as np
 import logging
 
-from ..autogluon.debug_log import DebugLogPrinter
 from ..datatypes.tuning_job_state import TuningJobState
 from ..tuning_algorithms.base_classes import SurrogateModel
+from ..utils.debug_log import DebugLogPrinter
 
 logger = logging.getLogger(__name__)
 

@@ -238,8 +238,12 @@ class PromotionRungSystem(object):
             milestone_rungs = self._rungs
         return [x.level for x in milestone_rungs]
 
-    def snapshot_rungs(self):
-        return copy.deepcopy(self._rungs)
+    def snapshot_rungs(self, skip_rungs):
+        if skip_rungs > 0:
+            _rungs = self._rungs[:(-skip_rungs)]
+        else:
+            _rungs = self._rungs
+        return [(x.level, x.data) for x in _rungs]
 
     @staticmethod
     def _num_promotable_config(recorded, prom_quant):

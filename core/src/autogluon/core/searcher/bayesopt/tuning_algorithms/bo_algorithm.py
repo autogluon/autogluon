@@ -3,13 +3,15 @@ import logging
 import numpy as np
 import itertools
 
-from .base_classes import NextCandidatesAlgorithm, CandidateGenerator, ScoringFunction, LocalOptimizer, PendingCandidateStateTransformer, SurrogateModel
+from .base_classes import NextCandidatesAlgorithm, CandidateGenerator, \
+    ScoringFunction, LocalOptimizer, PendingCandidateStateTransformer, \
+    SurrogateModel
 from .bo_algorithm_components import LBFGSOptimizeAcquisition
 from .common import generate_unique_candidates
-from ..autogluon.debug_log import DebugLogPrinter
-from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
-from ..datatypes.common import Candidate, candidate_for_print
+from ..datatypes.common import Candidate
+from ..utils.debug_log import DebugLogPrinter
 from ..utils.duplicate_detector import DuplicateDetector
+from ..utils.simple_profiler import SimpleProfiler
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +78,7 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
     num_requested_candidates: int
     greedy_batch_selection: bool
     duplicate_detector: DuplicateDetector
-    profiler: GPMXNetSimpleProfiler = None
+    profiler: SimpleProfiler = None
     sample_unique_candidates: bool = False
     debug_log: Optional[DebugLogPrinter] = None
 
@@ -122,7 +124,9 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
         # locally optimized
         logger.log(15, "BayesOpt Algorithm: Generating initial candidates.")
         if self.profiler is not None:
-            self.profiler.start('nextcand_genrandom')
+            self.profiler.push_prefix('nextcand')
+            self.profiler.start('all')
+            self.profiler.start('genrandom')
         if self.sample_unique_candidates:
             # This can be expensive, depending on what type Candidate is
             initial_candidates = generate_unique_candidates(
@@ -133,8 +137,8 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
                 self.initial_candidates_generator.generate_candidates_en_bulk(
                     self.num_initial_candidates)
         if self.profiler is not None:
-            self.profiler.stop('nextcand_genrandom')
-            self.profiler.start('nextcand_scoring')
+            self.profiler.stop('genrandom')
+            self.profiler.start('scoring')
         logger.log(15, "BayesOpt Algorithm: Scoring (and reordering) candidates.")
         if self.debug_log is not None:
             candidates_and_scores = _order_candidates(
@@ -149,8 +153,8 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
                 initial_candidates, self.initial_candidates_scorer,
                 model=model)
         if self.profiler is not None:
-            self.profiler.stop('nextcand_scoring')
-            self.profiler.start('nextcand_localsearch')
+            self.profiler.stop('scoring')
+            self.profiler.start('localsearch')
         candidates_with_optimization = _lazily_locally_optimize(
             initial_candidates, self.local_optimizer, model=model)
         logger.log(15, "BayesOpt Algorithm: Selecting final set of candidates.")
@@ -168,7 +172,9 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
             candidates_with_optimization, self.blacklisted_candidates,
             num_candidates, self.duplicate_detector)
         if self.profiler is not None:
-            self.profiler.stop('nextcand_localsearch')
+            self.profiler.stop('localsearch')
+            self.profiler.stop('all')
+            self.profiler.pop_prefix()  # nextcand
         return candidates
 
 

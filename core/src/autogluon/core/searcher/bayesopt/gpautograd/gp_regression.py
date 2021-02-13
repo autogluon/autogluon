@@ -14,7 +14,7 @@ from .optimization_utils import apply_lbfgs_with_multiple_starts, \
     ParamVecDictConverter, make_scipy_objective
 from .posterior_state import GaussProcPosteriorState
 from .utils import param_to_pretty_string
-from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
+from autogluon.core.searcher.bayesopt.utils.simple_profiler import SimpleProfiler
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ class GaussianProcessRegression(GaussianProcessModel):
 
         return make_scipy_objective(executor), param_dict
 
-    def fit(self, X, Y, profiler: GPMXNetSimpleProfiler = None):
+    def fit(self, X, Y, profiler: SimpleProfiler = None):
         """
         Fit the parameters of the GP by optimizing the marginal likelihood,
         and set posterior states.
@@ -140,7 +140,7 @@ class GaussianProcessRegression(GaussianProcessModel):
         if isinstance(mean_function, ScalarMeanFunction):
             mean_function.set_mean_value(np.mean(Y))
         if profiler is not None:
-            profiler.start('fit_hyperpars')
+            profiler.start('fithyperpars')
         n_starts = self.optimization_config.n_starts
         ret_infos = apply_lbfgs_with_multiple_starts(
             *self._create_lbfgs_arguments(X, Y),
@@ -149,7 +149,7 @@ class GaussianProcessRegression(GaussianProcessModel):
             tol=self.optimization_config.lbfgs_tol,
             maxiter=self.optimization_config.lbfgs_maxiter)
         if profiler is not None:
-            profiler.stop('fit_hyperpars')
+            profiler.stop('fithyperpars')
 
         # Logging in response to failures of optimization runs
         n_succeeded = sum(x is None for x in ret_infos)
@@ -184,7 +184,7 @@ class GaussianProcessRegression(GaussianProcessModel):
             if vec is not None:
                 param.set_data(vec)
 
-    def recompute_states(self, X, Y, profiler: GPMXNetSimpleProfiler = None):
+    def recompute_states(self, X, Y, profiler: SimpleProfiler = None):
         """
         We allow Y to be a matrix with m>1 columns, which is useful to support
         batch decisions by fantasizing.
@@ -196,16 +196,16 @@ class GaussianProcessRegression(GaussianProcessModel):
         assert self._states is not None, self._states
         self._recompute_states(X, Y, profiler=profiler)
 
-    def _recompute_states(self, X, Y, profiler: GPMXNetSimpleProfiler = None):
+    def _recompute_states(self, X, Y, profiler: SimpleProfiler = None):
         if profiler is not None:
-            profiler.start('comp_posterstate')
+            profiler.start('posterstate')
         self._states = [GaussProcPosteriorState(
             X, Y, self.likelihood.mean, self.likelihood.kernel,
             self.likelihood.get_noise_variance(as_ndarray=True),
             debug_log=(self._test_intermediates is not None),
             test_intermediates=self._test_intermediates)]
         if profiler is not None:
-            profiler.stop('comp_posterstate')
+            profiler.stop('posterstate')
     
     def get_params(self):
         return self.likelihood.get_params()
