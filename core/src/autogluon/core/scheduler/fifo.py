@@ -230,7 +230,6 @@ class FIFOScheduler(TaskScheduler):
         # training_history_call_delta_secs seconds
         self._start_time = None
         self._training_history_callback_last_block = None
-        self._training_history_callback_num_calls = None
         self.training_history_callback = kwargs.get('training_history_callback')
         self.training_history_callback_delta_secs = \
             kwargs['training_history_callback_delta_secs']
@@ -259,7 +258,6 @@ class FIFOScheduler(TaskScheduler):
         time_out = kwargs.get('time_out', self.time_out)
         # For training_history callback mechanism:
         self._training_history_callback_last_block = -1
-        self._training_history_callback_num_calls = 0
         log_suffix = ''
         if time_out is not None:
             log_suffix = f' (time_out={round(time_out, 2)}s)'
@@ -542,16 +540,13 @@ class FIFOScheduler(TaskScheduler):
             if self._trigger_training_history_callback():
                 # Note: no_fifo_lock = True avoids deadlock in 'state_dict',
                 # since we acquired the _fifo_lock already
-                rolling_ind = self._training_history_callback_num_calls % 3
                 self.training_history_callback(
                     self.training_history,
                     self._start_time,
                     config_history=self.config_history,
-                    state_dict=self.state_dict(no_fifo_lock=True),
-                    rolling_ind=rolling_ind)
+                    state_dict=self.state_dict(no_fifo_lock=True))
                 self._training_history_callback_last_block = \
                     self._training_history_callback_current_block()
-                self._training_history_callback_num_calls += 1
 
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
