@@ -7,6 +7,8 @@ from sklearn import metrics
 import os
 import logging
 import tempfile
+import matplotlib.pyplot as plt
+plt.style.use('seaborn-whitegrid')
 
 from .files import mkdir
 from .serialization import save
@@ -17,6 +19,7 @@ __all__ = ['make_results_path',
            'make_training_history_callback',
            'default_num_init_random',
            'analyze_results',
+           'plot_results',
            'compute_experiment_scores',
            'load_results',
            'load_result']
@@ -433,7 +436,7 @@ def _median_performance_over_time(errors, runtimes, replace_nan=None):
 
 
 def _percentiles_performance_over_time(
-        errors, runtimes, q=[25, 50, 75], replace_nan=None):
+        errors, runtimes, q=(25, 50, 75), replace_nan=None):
     te, time, _ = _prepare_errors_time(
         errors, runtimes, replace_nan=replace_nan)
     percs = np.percentile(te, q=q, axis=1)
@@ -545,3 +548,82 @@ def analyze_results(params, filters=None):
         print(f"{i+1} {name}:\n"
               f"   {m_auc} (+- {s_auc}), {m_err} (+- {s_err}),"
               f" {m_num} (+- {s_num})")
+
+
+def _plot_with_errorbar(
+        x, y, y_low, y_high, label, color):
+    plt.plot(x, y, '-', color=color, label=label)
+    plt.fill_between(x, y_low, y_high, color=color, alpha=0.2)
+
+
+def _plot_curves(
+        curves, ylims=None, label_with_auc=False, ylabel=None, title=None):
+    for name, (result, color) in curves:
+        label = name
+        if label_with_auc:
+            label += ' ({:6.4f})'.format(np.mean(result['auc']))
+        _plot_with_errorbar(
+            result['time'], result['p50'], result['p25'], result['p75'],
+            label=label, color=color)
+    plt.legend(loc='upper right')
+    #plt.legend(loc='lower left')
+    if ylims is not None:
+        plt.ylim(*ylims)
+    plt.xlabel('Time (s)')
+    if ylabel is None:
+        ylabel = 'Error'
+    plt.ylabel(ylabel)
+    if title is not None:
+        plt.title(title)
+
+
+def plot_results(
+        baselines, experiments, base_path, title=None, plot_ylims=None,
+        label_with_auc=False, max_error=None, ylabel=None):
+    """
+    Creates a number of plots, one for each `experiments` entry. Each shows
+    curves for all entries in `baselines` and one in `experiments`. `baselines`
+    and `experiments` are dicts with values (params, color), where `params`
+    specify the setup (see `load_result`), `color` is the color string for the
+    line. The key is what is displayed in the legend. Each curve displays
+    median and 25-to-75 percentile range.
+
+    :param baselines: See above
+    :param experiments: See above
+    :param base_path: See `load_result`
+    :param title: Title for figures
+    :param plot_ylims: ylims for figures
+    :param label_with_auc: If True, the average AUC value is also displayed in
+        the legend
+    """
+    if max_error is None:
+        max_error = 0.5
+    if ylabel is None:
+        ylabel = 'Error'
+    # Load results and compute curves to plot
+    for dct in (baselines, experiments):
+        for name in dct.keys():
+            _params, color = dct[name]
+            result, results_path = load_result(_params, base_path)
+            assert len(result['error']) > 0, \
+                "No results found for {}: path = {}".format(name, results_path)
+            result['time'], percs = _percentiles_performance_over_time(
+                result['error'], result['runtime'], q=[25, 50, 75],
+                replace_nan=max_error)
+            result['p25'] = percs[0]
+            result['p50'] = percs[1]
+            result['p75'] = percs[2]
+            dct[name] = (result, color)
+        compute_experiment_scores(
+            {k: v[0] for k, v in dct.items()}, max_error=max_error)
+
+    # One plot per entry in experiments
+    # Baselines are shown in every plot
+    baselines = list(baselines.items())
+    for name_result in experiments.items():
+        curves = baselines + [name_result]
+        plt.figure()
+        _plot_curves(
+            curves, plot_ylims, label_with_auc=label_with_auc, ylabel=ylabel,
+            title=title)
+    plt.show()
