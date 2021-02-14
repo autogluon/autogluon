@@ -609,6 +609,7 @@ class BaggedEnsembleModel(AbstractModel):
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
         self.model_base.feature_metadata = self.feature_metadata  # TODO: Move this
+        self.model_base.set_contexts(self.path + 'hpo' + os.path.sep)
 
         # TODO: Preprocess data here instead of repeatedly
         if preprocess_kwargs is None:
