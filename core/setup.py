@@ -45,7 +45,7 @@ python_requires = '>=3.6, <3.8'
 requirements = [
     'numpy==1.19.5',
     'scipy==1.5.4',  # TODO v0.1: Upgrade?
-    'scikit-learn>=0.22.0,<0.24',  # TODO v0.1: Upgrade
+    'scikit-learn>=0.22.0,<0.25',
     'cython',  # TODO: Do we need cython here?
     'ConfigSpace==0.4.14',
     'tornado>=5.0.1',
