@@ -19,7 +19,7 @@ class EnsembleSelection:
             metric,
             sorted_initialization: bool = False,
             bagging: bool = False,
-            tie_breaker: str = 'second_metric',
+            tie_breaker: str = 'random',
             random_state: np.random.RandomState = None,
     ):
         self.ensemble_size = ensemble_size
