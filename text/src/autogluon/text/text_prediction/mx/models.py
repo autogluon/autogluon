@@ -1099,7 +1099,6 @@ class MultiModalTextModel:
                                 ctx=ctx_l)
         self._net = net
         mx.npx.waitall()
-        self.save(os.path.join(self._output_directory, 'saved_model'))
 
     def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.

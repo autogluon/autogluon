@@ -100,6 +100,10 @@ class TextPredictor:
     def problem_type(self):
         return self._problem_type
 
+    @property
+    def backend(self):
+        return self._backend
+
     def fit(self,
             train_data,
             tuning_data=None,
@@ -215,7 +219,7 @@ class TextPredictor:
         self._problem_type = problem_type
         model_hparams = hyperparameters['models']['MultimodalTextModel']
         self._backend = model_hparams['backend']
-        if model_hparams['backend'] == 'gluonnlp_v0':
+        if self._backend == 'gluonnlp_v0':
             from ..mx.models import MultiModalTextModel
             self._model = MultiModalTextModel(column_types=column_types,
                                               feature_columns=feature_columns,
@@ -238,9 +242,11 @@ class TextPredictor:
                                       "the autogluon-contrib-nlp and MXNet "
                                       "as the backend of AutoGluon-Text. In the future, "
                                       "we will support other models.")
+        logger.log(25, f'Training completed. Auto-saving to {self._path}.')
+        self._model.save(self._path)
         return self
 
-    def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
+    def evaluate(self, data, metrics=None):
         """ Report the predictive performance evaluated for a given dataset.
 
         Parameters
@@ -251,50 +257,49 @@ class TextPredictor:
         metrics : str or List[str] or None
             Name of metric or a list of names of metrics to report.
             If it is not given, we will return the score of the stored eval_metric.
-        stochastic_chunk
-            Whether to use stochastic chunk
-        num_repeat
-            The number of repeats
-        return_type :
-            Can be list or dict
 
         Returns
         -------
         ret : a single number or a dict of metric --> metric scores
             Output
         """
-        return self._model.evaluate(data, metrics=metrics,
-                                    stochastic_chunk=stochastic_chunk,
-                                    num_repeat=num_repeat)
+        return self._model.evaluate(data, metrics=metrics)
 
-    def predict(self, dataset, stochastic_chunk=None, num_repeat=None,
-                as_pandas=False):
+    def predict(self, dataset, as_pandas=False):
         """Get the prediction from
 
         Returns
         -------
         output
             Array of predictions. One element corresponds to the prediction value of one
+        as_pandas
+            Whether to convert the output to a pandas dataframe
         """
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
-        output = self._model.predict(dataset,
-                                     stochastic_chunk=stochastic_chunk,
-                                     num_repeat=num_repeat)
+        output = self._model.predict(dataset)
         if as_pandas:
             output = pd.DataFrame({self.label: output})
         return output
 
-    def predict_proba(self, dataset, stochastic_chunk=None, num_repeat=None, as_pandas=False):
+    def predict_proba(self, dataset, as_pandas=False):
         """Predict the probability from the input
+
+        Parameters
+        ----------
+        dataset
+            The dataset
+        as_pandas
+            Whether to convert the output to pandas dataframe
 
         Returns
         -------
         output
+            The output matrix
         """
-        assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
-        output = self._model.predict_proba(dataset,
-                                           stochastic_chunk=stochastic_chunk,
-                                           num_repeat=num_repeat)
+        assert self._model is not None,\
+            'Model does not seem to have been constructed. ' \
+            'Have you called fit(), or load()?'
+        output = self._model.predict_proba(dataset)
         if as_pandas:
             output = pd.DataFrame(output)
         return output
@@ -306,7 +311,8 @@ class TextPredictor:
         -------
         output
         """
-        assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
+        assert self._model is not None, 'Model does not seem to have been constructed. ' \
+                                        'Have you called fit(), or load()?'
         output = self._model.extract_embedding(dataset,
                                                stochastic_chunk=stochastic_chunk,
                                                num_repeat=num_repeat)
@@ -315,34 +321,42 @@ class TextPredictor:
         return output
 
     def save(self, dir_path):
-        assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
+        """Save the model to directory path
+
+        The model will be saved to directory path:
+
+
+        Parameters
+        ----------
+        dir_path
+            The directory path to save the model artifacts
+
+        """
+        assert self._model is not None, 'Model does not seem to have been constructed.' \
+                                        ' Have you called fit(), or load()?'
         os.makedirs(dir_path, exist_ok=True)
-        with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
-            if not isinstance(self._eval_metric, str):
-                eval_metric = self._eval_metric.name
-            else:
-                eval_metric = self._eval_metric
-            json.dump({'eval_metric': eval_metric,
-                       'label': self._label,
-                       'problem_type': self._problem_type,
-                       'backend': self._backend}, of)
-        self._model.save(os.path.join(dir_path, 'model'))
+        with open(os.path.join(dir_path, 'text_predictor_assets.json'), 'w') as of:
+            json.dump({'backend': self._backend}, of)
+        self._model.save(os.path.join(dir_path, 'saved_model'))
 
     @classmethod
     def load(cls, dir_path):
-        assert os.path.exists(dir_path), f'"{dir_path}" does not exist. You may check the path again.'
-        with open(os.path.join(dir_path, 'assets.json'), 'r') as in_f:
+        assert os.path.exists(dir_path),\
+            f'"{dir_path}" does not exist. You may check the path again.'
+        with open(os.path.join(dir_path,
+                               'text_predictor_assets.json'), 'r') as in_f:
             assets = json.load(in_f)
-        ret = cls(eval_metric=assets['eval_metric'],
-                  label=assets['label'],
-                  problem_type=assets['problem_type'],
+        backend = assets['backend']
+        if backend == 'gluonnlp_v0':
+            from ..mx.models import MultiModalTextModel
+            model = MultiModalTextModel.load(os.path.join(dir_path, 'saved_model'))
+        else:
+            raise NotImplementedError(f'Backend = "{backend}" is not supported.')
+        ret = cls(eval_metric=model._eval_metric,
+                  label=model._label,
+                  problem_type=model._problem_type,
                   path=dir_path,
                   warn_if_exist=False)
         ret._backend = assets['backend']
-        if ret._backend == 'gluonnlp_v0':
-            from ..mx.models import MultiModalTextModel
-            model = MultiModalTextModel.load(os.path.join(dir_path, 'model'))
-        else:
-            raise NotImplementedError(f'Backend = "{ret._backend}" is not supported.')
         ret._model = model
         return ret
