@@ -19,7 +19,7 @@ class AutoTrainer(AbstractTrainer):
         problem_type = kwargs.pop('problem_type', self.problem_type)
         eval_metric = kwargs.pop('eval_metric', self.eval_metric)
         num_classes = kwargs.pop('num_classes', self.num_classes)
-        invalid_model_names = kwargs.pop('invalid_model_names', self.get_model_names())
+        invalid_model_names = kwargs.pop('invalid_model_names', self._get_banned_model_names())
         feature_metadata = kwargs.pop('feature_metadata', self.feature_metadata)
         silent = kwargs.pop('silent', self.verbosity < 3)
 
@@ -53,7 +53,7 @@ class AutoTrainer(AbstractTrainer):
         problem_type = kwargs.pop('problem_type', self.problem_type)
         eval_metric = kwargs.pop('eval_metric', self.eval_metric)
         num_classes = kwargs.pop('num_classes', self.num_classes)
-        invalid_model_names = kwargs.pop('invalid_model_names', self.get_model_names())
+        invalid_model_names = kwargs.pop('invalid_model_names', self._get_banned_model_names())
         feature_metadata = kwargs.pop('feature_metadata', self.feature_metadata)
 
         return get_preset_models_distillation(
