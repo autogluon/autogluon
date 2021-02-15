@@ -9,7 +9,6 @@ import psutil
 from collections import defaultdict
 
 from autogluon.core.constants import AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
-from autogluon.core.metrics import scorer_expects_y_pred
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance
@@ -50,9 +49,8 @@ class AbstractTrainer:
         else:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
-        self.eval_metric_expects_y_pred = scorer_expects_y_pred(scorer=self.eval_metric)
         logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
-        if not self.eval_metric_expects_y_pred:
+        if not self.eval_metric.needs_pred:
             logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "\tTo change this, specify the eval_metric argument of fit()")
@@ -408,7 +406,7 @@ class AbstractTrainer:
         return X
 
     def score(self, X, y, model=None) -> float:
-        if self.eval_metric_expects_y_pred:
+        if self.eval_metric.needs_pred:
             y_pred_ensemble = self.predict(X=X, model=model)
             return self.eval_metric(y, y_pred_ensemble)
         else:
@@ -416,7 +414,7 @@ class AbstractTrainer:
             return self.eval_metric(y, y_pred_proba_ensemble)
 
     def score_with_y_pred_proba(self, y, y_pred_proba) -> float:
-        if self.eval_metric_expects_y_pred:
+        if self.eval_metric.needs_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
             return self.eval_metric(y, y_pred)
         else:
