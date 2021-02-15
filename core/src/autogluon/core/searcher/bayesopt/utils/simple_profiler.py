@@ -111,8 +111,10 @@ class SimpleProfiler(object):
         # For each tag, we emit the following columns: tag_num, tag_mean,
         # tag_std
         data = {'time_stamp': []}
-        for tag in self.records[0].durations.keys():
-            for suffix in ('_num', '_mean', '_std'):
+        union_tags = self._union_of_tags()
+        suffices = ('_num', '_mean', '_std')
+        for tag in union_tags:
+            for suffix in suffices:
                 data[tag + suffix] = []
         for k in self.meta_keys:
             data[k] = []
@@ -121,8 +123,17 @@ class SimpleProfiler(object):
             data['time_stamp'].append(block.time_stamp)
             for k, v in block.meta.items():
                 data[k].append(v)
+            for tag in union_tags:
+                for suffix in suffices:
+                    data[tag + suffix].append(0)
             for tag, durations in block.durations.items():
-                data[tag + '_num'].append(len(durations))
-                data[tag + '_mean'].append(np.mean(durations))
-                data[tag + '_std'].append(np.std(durations))
+                data[tag + '_num'][-1] = len(durations)
+                data[tag + '_mean'][-1] = np.mean(durations)
+                data[tag + '_std'][-1] = np.std(durations)
         return data
+
+    def _union_of_tags(self):
+        union_tags = set()
+        for block in self.records:
+            union_tags.update(block.durations.keys())
+        return union_tags
