@@ -2,14 +2,13 @@ import ConfigSpace as CS
 import multiprocessing as mp
 
 from .bayesopt.autogluon.searcher_factory import gp_fifo_searcher_factory, \
-    gp_multifidelity_searcher_factory, gp_mf_simulation_searcher_factory, \
-    gp_fifo_searcher_defaults, gp_multifidelity_searcher_defaults
+    gp_multifidelity_searcher_factory, gp_fifo_searcher_defaults, \
+    gp_multifidelity_searcher_defaults
 from .searcher import BaseSearcher
 from ..utils.default_arguments import check_and_merge_defaults
 
 __all__ = ['GPFIFOSearcher',
-           'GPMultiFidelitySearcher',
-           'GPMFSimulationSearcher']
+           'GPMultiFidelitySearcher']
 
 
 def _to_config_cs(config_space: CS.ConfigurationSpace, config: dict) \
@@ -420,158 +419,6 @@ class GPMultiFidelitySearcher(BaseSearcher):
             _gp_searcher = self.gp_searcher.clone_from_state(state)
         # Use copy constructor
         return GPMultiFidelitySearcher(
-            self.configspace, reward_attribute=self._reward_attribute,
-            resource_attribute=self._resource_attribute,
-            _gp_searcher=_gp_searcher)
-
-    def set_profiler(self, profiler):
-        self.gp_searcher.set_profiler(profiler)
-
-    def set_getconfig_callback(self, callback):
-        self.gp_searcher.set_getconfig_callback(callback)
-
-    @property
-    def debug_log(self):
-        with self._gp_lock:
-            return self.gp_searcher.debug_log
-
-    def _to_config_cs(self, config):
-        return _to_config_cs(self.gp_searcher.hp_ranges.config_space, config)
-
-
-class GPMFSimulationSearcher(BaseSearcher):
-    """Simulation-based Bayesian optimization for Hyperband scheduler
-
-    Variant of GPMultiFidelitySearcher, where 'get_config' is using a novel
-    simulation-based score, instead of the heuristic EI acquisition function
-    employed there.
-
-    Parameters (additional ones)
-    ----------
-    num_scoring_candidates : int
-        Number of candidates to be scored by simulation. Scoring time scales
-        linear in this number.
-    num_averages_score : int
-        Number of simulation traces per candidate scored. Some computations
-        scale linearly in this number, but the most expensive ones do not.
-    eps_after_now : float
-        Must be positive, unit is seconds. If time_now is the time when
-        scoring simulation traces start, all events must happen after
-        time_now + eps_after_now. This is to avoid silly situations.
-    candidate_selector : str
-        Selection of num_scoring_candidates candidates to be scored. Values are
-        'random' (random selection) and 'acqfunc_ei'. For the latter, we first
-        sample num_scoring_candidates * candidate_selector_pool_factor configs
-        at random, score them with the EI-BOHB score used in
-        GPMultiFidelitySearcher, and select the num_scoring_candidates best
-        ones. In other words, the simulation-based score is used for
-        re-scoring.
-    candidate_selector_pool_factor : float
-        Must be larger than 1. See candidate_selector.
-    score_time_power : float
-        Denominator in score is time taken to this power. Value must be in
-        [0, 1].
-    incumbent_extra_random : int
-        Must be nonnegative. The score is a difference of expected incumbents
-        (minimizers) before and after simulation. The minimum is computed over
-        the union of blacklisted (i.e. previously chosen) and candidate
-        configs. If positive, the set is extended by this number of extra
-        randomly drawn configs.
-
-    See Also
-    --------
-    GPMultiFidelitySearcher
-    """
-    def __init__(self, configspace, **kwargs):
-        _gp_searcher = kwargs.get('_gp_searcher')
-        if _gp_searcher is None:
-            kwargs['configspace'] = configspace
-            _kwargs = check_and_merge_defaults(
-                kwargs, *gp_multifidelity_searcher_defaults(),
-                dict_name='search_options')
-            _gp_searcher = gp_mf_simulation_searcher_factory(**_kwargs)
-        super().__init__(
-            _gp_searcher.hp_ranges.config_space,
-            reward_attribute=kwargs.get('reward_attribute'))
-        self.gp_searcher = _gp_searcher
-        self._resource_attribute = kwargs.get('resource_attribute')
-        self._elapsed_time_attribute = kwargs.get('elapsed_time_attribute')
-        # This lock protects gp_searcher
-        self._gp_lock = mp.Lock()
-
-    def configure_scheduler(self, scheduler):
-        from ..scheduler import HyperbandScheduler
-
-        assert isinstance(scheduler, HyperbandScheduler), \
-            "This searcher requires HyperbandScheduler scheduler"
-        assert scheduler.scheduler_type == 'stopping', \
-            "This searcher currently required HyperbandScheduler of 'stopping' type"
-        assert scheduler.do_snapshots, \
-            "HyperbandScheduler must have do_snapshots = True"
-        super().configure_scheduler(scheduler)
-        self._resource_attribute = scheduler._time_attr
-        self._elapsed_time_attribute = scheduler._elapsed_time_attr
-
-    def get_config(self, **kwargs):
-        with self._gp_lock:
-            config_cs = self.gp_searcher.get_config(**kwargs)
-        return config_cs.get_dictionary()
-
-    def update(self, config, **kwargs):
-        super().update(config, **kwargs)
-        with self._gp_lock:
-            config_cs = self._to_config_cs(config)
-            assert self._elapsed_time_attribute in kwargs, \
-                "train_fn must provide '{}' to reporter".format(
-                    self._elapsed_time_attribute)
-            self.gp_searcher.update(
-                config_cs, reward=kwargs[self._reward_attribute],
-                resource=int(kwargs[self._resource_attribute]),
-                elapsed_time=kwargs[self._elapsed_time_attribute])
-            # If evaluation task has terminated, cleanup pending evaluations
-            # which may have been overlooked
-            if kwargs.get('terminated', False):
-                self.gp_searcher.cleanup_pending(config_cs)
-
-    def register_pending(self, config, milestone=None):
-        assert milestone is not None, \
-            "This searcher works with a multi-fidelity scheduler only"
-        with self._gp_lock:
-            config_cs = self._to_config_cs(config)
-            self.gp_searcher.register_pending(config_cs, milestone)
-
-    def remove_case(self, config, **kwargs):
-        with self._gp_lock:
-            config_cs = self._to_config_cs(config)
-            self.gp_searcher.remove_case(
-                config_cs, resource=int(kwargs[self._resource_attribute]))
-
-    def evaluation_failed(self, config, **kwargs):
-        with self._gp_lock:
-            config_cs = self._to_config_cs(config)
-            self.gp_searcher.evaluation_failed(config_cs)
-
-    def dataset_size(self):
-        with self._gp_lock:
-            return self.gp_searcher.dataset_size()
-
-    def cumulative_profile_record(self):
-        with self._gp_lock:
-            return self.gp_searcher.cumulative_profile_record()
-
-    def model_parameters(self):
-        with self._gp_lock:
-            return self.gp_searcher.get_params()
-
-    def get_state(self):
-        with self._gp_lock:
-            return self.gp_searcher.get_state()
-
-    def clone_from_state(self, state):
-        with self._gp_lock:
-            _gp_searcher = self.gp_searcher.clone_from_state(state)
-        # Use copy constructor
-        return GPMFSimulationSearcher(
             self.configspace, reward_attribute=self._reward_attribute,
             resource_attribute=self._resource_attribute,
             _gp_searcher=_gp_searcher)
