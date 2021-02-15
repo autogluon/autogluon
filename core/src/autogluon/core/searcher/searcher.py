@@ -4,7 +4,7 @@ import pickle
 from collections import OrderedDict
 import numpy as np
 
-from .bayesopt.autogluon.debug_log import DebugLogPrinter
+from .bayesopt.utils.debug_log import DebugLogPrinter
 from ..utils import DeprecationHelper
 
 __all__ = ['BaseSearcher',
