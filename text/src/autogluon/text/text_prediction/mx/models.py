@@ -378,7 +378,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         start_train_tick = time.time()
         time_left = time_limit - (start_train_tick - time_start)
         if time_left <= 0:
-            if reporter is not None and not is_fake_reporter:
+            if not is_fake_reporter:
                 reporter.terminate()
             return
     if is_fake_reporter:
@@ -573,7 +573,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     if time_limit is not None:
         time_limit -= start_tick - time_start
         if time_limit <= 0:
-            reporter.terminate()
+            if not is_fake_reporter:
+                reporter.terminate()
             return
     best_report_items = None
     report_local_jsonl_f = open(os.path.join(exp_dir, 'results_local.jsonl'), 'w')
