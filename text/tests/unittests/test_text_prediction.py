@@ -111,7 +111,7 @@ def test_no_text_column_raise():
     df = pd.DataFrame(data, columns=['data', 'label'])
     with pytest.raises(AssertionError):
         predictor = TextPredictor(label='label', verbosity=4)
-        predictor.fit(df)
+        predictor.fit(df, hyperparameters=get_test_hyperparameters())
 
 
 def test_emoji():
@@ -126,7 +126,7 @@ def test_emoji():
         data.append(('😉' * (i + 1), 'wink'))
     df = pd.DataFrame(data, columns=['data', 'label'])
     predictor = TextPredictor(label='label', verbosity=3)
-    predictor.fit(df)
+    predictor.fit(df, hyperparameters=get_test_hyperparameters())
     verify_predictor_save_load(predictor, df)
 
 
