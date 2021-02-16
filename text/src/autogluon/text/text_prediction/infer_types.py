@@ -58,6 +58,7 @@ def is_categorical_column(data: pd.Series,
         data_value_counts = data.value_counts(dropna=False)
         key_set = set(data_value_counts.keys())
         print('key_set=', key_set)
+        print('Data_value_counts=', len(data_value_counts))
         if len(data_value_counts) < threshold:
             valid_value_counts = valid_data.value_counts(dropna=False)
             total_valid_num = len(valid_data)
