@@ -5,18 +5,35 @@ import pandas as pd
 import pytest
 import tempfile
 from autogluon.core.utils.loaders import load_pd
-from autogluon.text import TextPredictor
+from autogluon.text import TextPredictor, ag_text_presets
 
-
-test_hyperparameters = {
-    'models': {
-        'BertForTextPredictionBasic': {
-            'search_space': {
-                'optimization.num_train_epochs': 1
-            }
-        }
+DATA_INFO = {
+    'sst': {
+        'train': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet',
+        'dev': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet',
+        'label': 'label',
+        'metric': 'acc'
+    },
+    'mrpc': {
+        'train': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/train.parquet',
+        'dev': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/dev.parquet',
+        'label': 'label',
+        'metric': 'acc'
+    },
+    'sts': {
+        'train': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet',
+        'dev': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet',
+        'label': 'score',
+        'metric': 'rmse'
     }
 }
+
+
+def get_test_hyperparameters():
+    config = ag_text_presets.create('default')
+    search_space = config['models']['MultimodalTextModel']['search_space']
+    search_space['optimization.num_train_epochs'] = 1
+    return config
 
 
 def verify_predictor_save_load(predictor, df, verify_proba=False,
@@ -24,39 +41,43 @@ def verify_predictor_save_load(predictor, df, verify_proba=False,
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
         predictions = predictor.predict(df)
-        loaded_predictor = task.load(root)
+        loaded_predictor = TextPredictor.load(root)
         predictions2 = loaded_predictor.predict(df)
+        predictions2_df = loaded_predictor.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)
+        npt.assert_equal(predictions2, predictions2_df.to_numpy())
         if verify_proba:
             predictions_prob = predictor.predict_proba(df)
             predictions2_prob = loaded_predictor.predict_proba(df)
+            predictions2_prob_df = loaded_predictor.predict_proba(df, as_pandas=True)
             npt.assert_equal(predictions_prob, predictions2_prob)
+            npt.assert_equal(predictions2_prob, predictions2_prob_df.to_numpy())
         if verify_embedding:
             embeddings = predictor.extract_embedding(df)
             assert embeddings.shape[0] == len(df)
 
 
-def test_sst():
-    train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
-                              'glue/sst/train.parquet')
-    dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
-                            'glue/sst/dev.parquet')
+@pytest.mark.parametrize('key', DATA_INFO.keys())
+def test_predictor_fit(key):
+    train_data = load_pd.load(DATA_INFO[key]['train'])
+    dev_data = load_pd.load(DATA_INFO[key]['dev'])
+    label = DATA_INFO[key]['label']
+    eval_metric = DATA_INFO[key]['metric']
+
     rng_state = np.random.RandomState(123)
     train_perm = rng_state.permutation(len(train_data))
     valid_perm = rng_state.permutation(len(dev_data))
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
-    predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                         label='label', num_trials=1,
-                         ngpus_per_trial=1,
-                         verbosity=4,
-                         output_directory='./sst',
-                         plot_results=False)
-    dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
+    predictor = TextPredictor(label=label, eval_metric=eval_metric)
+    predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                  time_limit=30)
+    dev_score = predictor.evaluate(dev_data)
     verify_predictor_save_load(predictor, dev_data, verify_proba=True)
 
 
-def test_cpu_only_raise():
+@pytest.mark.parametrize('set_env_train_without_gpu', [None, False, True])
+def test_cpu_only_raise(set_env_train_without_gpu):
     train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
                               'glue/sst/train.parquet')
     dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
@@ -66,29 +87,21 @@ def test_cpu_only_raise():
     valid_perm = rng_state.permutation(len(dev_data))
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
-    with pytest.raises(RuntimeError):
-        predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                             label='label', num_trials=1,
-                             ngpus_per_trial=0,
-                             verbosity=4,
-                             output_directory='./sst',
-                             plot_results=False)
-    os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'] = '1'
-    predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                         label='label', num_trials=1,
-                         ngpus_per_trial=0,
-                         verbosity=4,
-                         output_directory='./sst',
-                         plot_results=False)
+    predictor = TextPredictor(label='label', eval_metric='acc')
+    if set_env_train_without_gpu is None:
+        with pytest.raises(RuntimeError):
+            predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                          num_gpus=0)
+    elif set_env_train_without_gpu is True:
+        os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'] = '1'
+        predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                      num_gpus=0)
+        verify_predictor_save_load(predictor, dev_data, verify_proba=True)
+    else:
+        with pytest.raises(RuntimeError):
+            predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                          num_gpus=0)
 
-    os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'] = '0'
-    with pytest.raises(RuntimeError):
-        predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                             label='label', num_trials=1,
-                             ngpus_per_trial=0,
-                             verbosity=4,
-                             output_directory='./sst',
-                             plot_results=False)
 
 def test_mrpc():
     train_data = load_pd.load(
