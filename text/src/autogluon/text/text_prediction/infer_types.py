@@ -54,22 +54,16 @@ def is_categorical_column(data: pd.Series,
                 threshold = 20
                 oov_ratio_threshold = 0
                 ratio = 0.01
-        print('data=', data)
-        print('valid_data=', valid_data)
         threshold = min(int(len(data) * ratio), threshold)
         data_value_counts = data.value_counts(dropna=False)
         key_set = set(data_value_counts.keys())
-        print('key_set=', key_set)
-        print('Data_value_counts=', len(data_value_counts))
         if len(data_value_counts) < threshold:
             valid_value_counts = valid_data.value_counts(dropna=False)
             total_valid_num = len(valid_data)
             oov_num = 0
             for k, v in zip(valid_value_counts.keys(), valid_value_counts.values):
                 if k not in key_set:
-                    print('Not in key_set, k={}'.format(k))
                     oov_num += v
-            print('oov_num=', oov_num)
             if is_label and oov_num != 0:
                 return False
             if oov_num / total_valid_num > oov_ratio_threshold:
