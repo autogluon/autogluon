@@ -102,7 +102,7 @@ class LocalSequentialScheduler(object):
         reporter = LocalReporter(task_id, config, self.training_history, self.config_history)
         task_config = deepcopy(EasyDict(config))
         task_config['task_id'] = task_id
-        self.train_fn.f(task_config, reporter=reporter)
+        self.train_fn(task_config, reporter=reporter)
         if reporter.last_result:
             self.searcher.update(config=searcher_config, **reporter.last_result)
 
