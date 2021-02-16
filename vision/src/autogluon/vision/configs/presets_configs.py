@@ -28,8 +28,9 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 1024,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 12*3600,
     },
 
     # Good predictive accuracy with fast inference.
@@ -43,11 +44,12 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 8*3600,
     },
 
-    # Medium predictive accuracy with very fast inference and very fast training time. 
+    # Medium predictive accuracy with very fast inference and very fast training time.
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
     medium_quality_faster_train={
         'hyperparameters': {
@@ -58,8 +60,9 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 8,
-            'search_strategy': 'random'
-        }
+            'search_strategy': 'random',
+        },
+        'time_limit': 1*3600,
     },
 
     # Medium predictive accuracy with very fast inference.
@@ -73,8 +76,9 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 2*3600,
     },
 )
 
@@ -91,8 +95,9 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 128,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 24*3600,
     },
 
     # Good predictive accuracy with fast inference.
@@ -108,11 +113,12 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 12*3600,
     },
 
-    # Medium predictive accuracy with very fast inference and very fast training time. 
+    # Medium predictive accuracy with very fast inference and very fast training time.
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
     medium_quality_faster_train={
         'hyperparameters': {
@@ -123,8 +129,9 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 16,
-            'search_strategy': 'random'
-        }
+            'search_strategy': 'random',
+        },
+        'time_limit': 2*3600,
     },
 
     # Medium predictive accuracy with very fast inference.
@@ -138,14 +145,15 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 4*3600,
     },
 
 )
 
 _PRESET_DICTS = {
-    'image_predictor': preset_image_predictor, 
+    'image_predictor': preset_image_predictor,
     'object_detector': preset_object_detector,
 }
 

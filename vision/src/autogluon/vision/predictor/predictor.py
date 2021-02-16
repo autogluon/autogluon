@@ -32,9 +32,9 @@ class ImagePredictor(object):
         The directory for saving logs or intermediate data. If unspecified, will create a sub-directory under
         current working directory.
     verbosity : int, default = 2
-        Verbosity levels range from 0 to 4 and control how much information is printed. 
-        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings). 
-        If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+        Verbosity levels range from 0 to 4 and control how much information is printed.
+        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+        If using logging, you can alternatively control amount of information printed via logger.setLevel(L),
         where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
@@ -59,7 +59,7 @@ class ImagePredictor(object):
     def fit(self,
             train_data,
             tuning_data=None,
-            time_limit=None,
+            time_limit=7200,
             presets=None,
             hyperparameters=None,
             **kwargs):
@@ -73,18 +73,18 @@ class ImagePredictor(object):
             `image`: raw image paths. `label`: categorical integer id, starting from 0.
             For more details of how to construct a dataset for image predictor, check out:
             `http://preview.d2l.ai/d8/main/image_classification/getting_started.html`.
-            If a string is provided, will search for k8 built-in datasets.
+            If a string is provided, will search for d8 built-in datasets.
         tuning_data : pd.DataFrame or str, default = None
             Another dataset containing validation data reserved for model selection and hyperparameter-tuning,
             can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
             If `None`, the validation dataset will be randomly split from `train_data` according to `holdout_frac`.
-        time_limit : int, default = None
-            Time limit in seconds, if not specified, will run until all tuning and training finished.
+        time_limit : int, default = 7200(2 hours)
+            Time limit in seconds, if `None`, will run until all tuning and training finished.
             If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
         presets : list or str or dict, default = ['medium_quality_faster_train']
-            List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, 
+            List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models,
             and various other properties of the returned `predictor`.
             It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
             As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
@@ -95,8 +95,8 @@ class ImagePredictor(object):
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
             Available Presets: ['best_quality', 'high_quality_fast_inference', 'good_quality_faster_inference', 'medium_quality_faster_train']
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
-            
-            Note that depending on your specific hardware limitation(# gpu, size of gpu memory...) your mileage may vary a lot, you may choose lower quality presets if necessary, and 
+
+            Note that depending on your specific hardware limitation(# gpu, size of gpu memory...) your mileage may vary a lot, you may choose lower quality presets if necessary, and
             try to reduce `batch_size` if OOM("RuntimeError: CUDA error: out of memory") happens frequently during the `fit`.
 
             In-depth Preset Info:
@@ -109,7 +109,8 @@ class ImagePredictor(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 1024,
-                        'search_strategy': 'bayesopt'}}
+                        'search_strategy': 'bayesopt'},
+                    'time_limit': 12*3600,}
                     Best predictive accuracy with little consideration to inference time or model size. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
@@ -122,7 +123,8 @@ class ImagePredictor(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 512,
-                        'search_strategy': 'bayesopt'}}
+                        'search_strategy': 'bayesopt'},
+                    'time_limit': 8*3600,}
                     Good predictive accuracy with fast inference.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
@@ -135,9 +137,10 @@ class ImagePredictor(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 8,
-                        'search_strategy': 'random'}}
+                        'search_strategy': 'random'},
+                    'time_limit': 1*3600,}
 
-                    Medium predictive accuracy with very fast inference and very fast training time. 
+                    Medium predictive accuracy with very fast inference and very fast training time.
                     This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
 
                 medium_quality_faster_inference={
@@ -149,8 +152,9 @@ class ImagePredictor(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 32,
-                        'search_strategy': 'bayesopt'}}
-                    
+                        'search_strategy': 'bayesopt'},
+                        'time_limit': 2*3600,}
+
                     Medium predictive accuracy with very fast inference.
                     Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
         hyperparameters : dict, default = None
@@ -182,7 +186,7 @@ class ImagePredictor(object):
                 Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
             hyperparameter_tune_kwargs: dict, default = None
                 num_trials : int, default = 1
-                    The limit of HPO trials that can be performed within `time_limit`. The HPO process will be terminated 
+                    The limit of HPO trials that can be performed within `time_limit`. The HPO process will be terminated
                     when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first.
                 search_strategy : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
@@ -198,7 +202,7 @@ class ImagePredictor(object):
             # options: multiclass
             self._problem_type = 'multiclass'
         if self._eval_metric is None:
-            # options: accuracy, 
+            # options: accuracy,
             self._eval_metric = 'accuracy'
 
         # init/validate kwargs
@@ -219,15 +223,16 @@ class ImagePredictor(object):
             if not isinstance(presets, list):
                 presets = [presets]
             logger.log(20, f'Presets specified: {presets}')
+
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
-            logging.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +
-                         'please follow the data preparation tutorial in GluonCV.' +
-                         'The following record files(symlinks) will be used: \n' +
-                         'rec_train : ~/.mxnet/datasets/imagenet/rec/train.rec\n' +
-                         'rec_train_idx : ~/.mxnet/datasets/imagenet/rec/train.idx\n' +
-                         'rec_val : ~/.mxnet/datasets/imagenet/rec/val.rec\n' +
-                         'rec_val_idx : ~/.mxnet/datasets/imagenet/rec/val.idx\n')
+            logger.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +
+                        'please follow the data preparation tutorial in GluonCV.' +
+                        'The following record files(symlinks) will be used: \n' +
+                        'rec_train : ~/.mxnet/datasets/imagenet/rec/train.rec\n' +
+                        'rec_train_idx : ~/.mxnet/datasets/imagenet/rec/train.idx\n' +
+                        'rec_val : ~/.mxnet/datasets/imagenet/rec/val.rec\n' +
+                        'rec_val_idx : ~/.mxnet/datasets/imagenet/rec/val.idx\n')
             train_data = pd.DataFrame({'image': [], 'label': []})
             tuning_data = pd.DataFrame({'image': [], 'label': []})
             use_rec = True
@@ -253,6 +258,8 @@ class ImagePredictor(object):
             logging.getLogger("ImageClassificationEstimator").propagate = True
             self._classifier._logger.setLevel(log_level)
             self._fit_summary = self._classifier.fit(train_data, tuning_data, 1 - holdout_frac, random_state, resume=False)
+            if hasattr(self._classifier, 'fit_history'):
+                self._fit_summary['fit_history'] = self._classifier.fit_history()
             return
 
         # new HPO task
@@ -316,6 +323,8 @@ class ImagePredictor(object):
         self._classifier._logger.setLevel(log_level)
         self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
+        if hasattr(task, 'fit_history'):
+            self._fit_summary['fit_history'] = task.fit_history()
         return self
 
     def _validate_kwargs(self, kwargs):
@@ -479,9 +488,9 @@ class ImagePredictor(object):
             The file name for saved pickle file. If `path` is a directory, will try to load the file `image_predictor.ag` in
             this directory.
         verbosity : int, default = 2
-            Verbosity levels range from 0 to 4 and control how much information is printed. 
-            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings). 
-            If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via logger.setLevel(L),
             where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
 
         """

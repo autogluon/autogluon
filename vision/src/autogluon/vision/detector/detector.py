@@ -24,9 +24,9 @@ class ObjectDetector(object):
         The directory for saving logs or intermediate data. If unspecified, will create a sub-directory under
         current working directory.
     verbosity : int, default = 2
-        Verbosity levels range from 0 to 4 and control how much information is printed. 
-        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings). 
-        If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+        Verbosity levels range from 0 to 4 and control how much information is printed.
+        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+        If using logging, you can alternatively control amount of information printed via logger.setLevel(L),
         where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `bbox` columns.
@@ -49,16 +49,16 @@ class ObjectDetector(object):
     def fit(self,
             train_data,
             tuning_data=None,
-            time_limit=None,
+            time_limit=7200,
             presets=None,
             hyperparameters=None,
             **kwargs):
         """Automatic fit process for object detection.
-        Tip: if you observe very slow training speed only happening at the first epoch and your overall time budget 
-        is not large, you may disable `CUDNN_AUTOTUNE` by setting the environment variable 
-        `export MXNET_CUDNN_AUTOTUNE_DEFAULT=0` before running your python script or 
+        Tip: if you observe very slow training speed only happening at the first epoch and your overall time budget
+        is not large, you may disable `CUDNN_AUTOTUNE` by setting the environment variable
+        `export MXNET_CUDNN_AUTOTUNE_DEFAULT=0` before running your python script or
         insert `import os; os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = '0'` before any code block.
-        The tuning is beneficial in terms of training speed in the long run, but may cost your noticeble overhead at 
+        The tuning is beneficial in terms of training speed in the long run, but may cost your noticeble overhead at
         the begining of each trial.
 
         Parameters
@@ -67,18 +67,18 @@ class ObjectDetector(object):
             Training data, can be a dataframe like image dataset.
             For more details of how to construct a object detection dataset, please checkout:
             `http://preview.d2l.ai/d8/main/object_detection/getting_started.html`.
-            If a string is provided, will search for k8 datasets.
+            If a string is provided, will search for d8 datasets.
         tuning_data : pd.DataFrame or str, default = None
             Holdout tuning data for validation, reserved for model selection and hyperparameter-tuning,
             can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
             If `None`, the validation dataset will be randomly split from `train_data` according to `holdout_frac`.
-        time_limit : int, default = None
+        time_limit : int, default = 7200(2 hours)
             Time limit in seconds, if not specified, will run until all tuning and training finished.
             If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
         presets : list or str or dict, default = ['medium_quality_faster_train']
-            List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, 
+            List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models,
             and various other properties of the returned `predictor`.
             It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
             As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
@@ -89,8 +89,8 @@ class ObjectDetector(object):
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
             Available Presets: ['best_quality', 'high_quality_fast_inference', 'good_quality_faster_inference', 'medium_quality_faster_train']
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
-            
-            Note that depending on your specific hardware limitation(# gpu, size of gpu memory...) your mileage may vary a lot, you may choose lower quality presets if necessary, and 
+
+            Note that depending on your specific hardware limitation(# gpu, size of gpu memory...) your mileage may vary a lot, you may choose lower quality presets if necessary, and
             try to reduce `batch_size` if OOM("RuntimeError: CUDA error: out of memory") happens frequently during the `fit`.
 
             In-depth Preset Info:
@@ -103,7 +103,8 @@ class ObjectDetector(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 128,
-                        'search_strategy': 'bayesopt'}}
+                        'search_strategy': 'bayesopt'},
+                    'time_limit': 24*3600,}
                     Best predictive accuracy with little consideration to training/inference time or model size. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy and be prepared with the extremly long training time.
 
@@ -118,7 +119,8 @@ class ObjectDetector(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 512,
-                        'search_strategy': 'bayesopt'}}
+                        'search_strategy': 'bayesopt'},
+                    'time_limit': 12*3600,}
                     Good predictive accuracy with fast inference.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
@@ -131,9 +133,10 @@ class ObjectDetector(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 16,
-                        'search_strategy': 'random'}}
+                        'search_strategy': 'random'},
+                    'time_limit': 2*3600,}
 
-                    Medium predictive accuracy with very fast inference and very fast training time. 
+                    Medium predictive accuracy with very fast inference and very fast training time.
                     This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
 
                 medium_quality_faster_inference={
@@ -145,8 +148,9 @@ class ObjectDetector(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 32,
-                        'search_strategy': 'bayesopt'}}
-                    
+                        'search_strategy': 'bayesopt'},
+                    'time_limit': 4*3600,}
+
                     Medium predictive accuracy with very fast inference.
                     Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
         hyperparameters : dict, default = None
@@ -172,8 +176,8 @@ class ObjectDetector(object):
                 Number of GPUs to use for each trial, if `None`, will detect the # gpus on current instance.
             hyperparameter_tune_kwargs: dict, default = None
                 num_trials : int, default = 1
-                    The limit of HPO trials that can be performed within `time_limit`. The HPO process will be terminated 
-                    when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first. 
+                    The limit of HPO trials that can be performed within `time_limit`. The HPO process will be terminated
+                    when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first.
                 search_strategy : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
                     Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
@@ -207,6 +211,8 @@ class ObjectDetector(object):
             self._detector._logger.setLevel(log_level)
             self._detector._logger.propagate = True
             self._fit_summary = self._detector.fit(train_data, tuning_data, 1 - holdout_frac, random_state, resume=False)
+            if hasattr(self._classifier, 'fit_history'):
+                self._fit_summary['fit_history'] = self._classifier.fit_history()
             return
 
         # new HPO task
@@ -263,6 +269,8 @@ class ObjectDetector(object):
         self._detector._logger.setLevel(log_level)
         self._detector._logger.propagate = True
         self._fit_summary = task.fit_summary()
+        if hasattr(task, 'fit_history'):
+            self._fit_summary['fit_history'] = task.fit_history()
         return self
 
     def _validate_kwargs(self, kwargs):
@@ -365,9 +373,9 @@ class ObjectDetector(object):
             The file name for saved pickle file. If `path` is a directory, will try to load the file `object_detector.ag` in
             this directory.
         verbosity : int, default = 2
-            Verbosity levels range from 0 to 4 and control how much information is printed. 
-            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings). 
-            If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via logger.setLevel(L),
             where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
 
         """
