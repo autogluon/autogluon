@@ -48,7 +48,7 @@ def is_categorical_column(data: pd.Series,
         if threshold is None:
             if is_label:
                 threshold = 100
-                oov_ratio_threshold = 0.1
+                oov_ratio_threshold = 0.2
             else:
                 threshold = 20
                 oov_ratio_threshold = 0
