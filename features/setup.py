@@ -45,7 +45,7 @@ python_requires = '>=3.6, <3.8'
 requirements = [
     'numpy==1.19.5',
     'pandas>=1.0.0,<2.0',
-    'scikit-learn>=0.22.0,<0.24',
+    'scikit-learn>=0.22.0,<0.25',
     f'autogluon.core=={version}'
 ]
 

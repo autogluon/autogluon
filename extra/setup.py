@@ -51,7 +51,7 @@ requirements = [
     'graphviz<0.9.0,>=0.8.1',
     'bokeh',
     'pandas>=1.0.0,<2.0',
-    'scikit-learn>=0.22.0,<0.24',
+    'scikit-learn>=0.22.0,<0.25',
     f'autogluon.core=={version}'
 ]
 

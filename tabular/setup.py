@@ -46,11 +46,11 @@ requirements = [
     'numpy==1.19.5',
     'scipy==1.5.4',
     'catboost>=0.23.0,<0.25',
-    'xgboost>=1.2,<1.3',
+    'xgboost>=1.3.2,<1.4',
     'lightgbm>=3.0,<4.0',
     'pandas>=1.0.0,<2.0',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
-    'scikit-learn>=0.22.0,<0.24',
+    'scikit-learn>=0.22.0,<0.25',
     'networkx>=2.3,<3.0',
     'torch>=1.0,<2.0',  # TODO: v0.1 make optional
     'fastai>=1.0,<2.0',  # TODO: v0.1 make optional
