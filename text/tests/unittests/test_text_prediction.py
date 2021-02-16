@@ -36,7 +36,7 @@ def get_test_hyperparameters():
     config = ag_text_presets.create('default')
     search_space = config['models']['MultimodalTextModel']['search_space']
     search_space['optimization.num_train_epochs'] = 1
-    search_space['model.backbone.name'] = 'google_electra_base'
+    search_space['model.backbone.name'] = 'google_electra_small'
     return config
 
 
