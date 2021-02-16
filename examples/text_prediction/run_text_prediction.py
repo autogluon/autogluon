@@ -1,12 +1,14 @@
 import os
 import json
 import argparse
-from autogluon.text import TextPrediction as task
+from autogluon.text import TextPredictor
+from autogluon.tabular import TabularPredictor
+from autogluon.core.utils.loaders import load_pd
 
 
 TASKS = \
-    {'cola': ('sentence', 'label', 'mcc', ['mcc']),
-     'sst': ('sentence', 'label', 'acc', ['acc']),
+    {'cola': (['sentence'], 'label', 'mcc', ['mcc']),
+     'sst': (['sentence'], 'label', 'acc', ['acc']),
      'mrpc': (['sentence1', 'sentence2'], 'label', 'f1', ['acc', 'f1']),
      'sts': (['sentence1', 'sentence2'], 'score', 'spearmanr', ['pearsonr', 'spearmanr']),
      'qqp': (['sentence1', 'sentence2'], 'label', 'f1', ['acc', 'f1']),
@@ -33,11 +35,12 @@ def get_parser():
                         default=None)
     parser.add_argument('--feature_columns', help='Feature columns', default=None)
     parser.add_argument('--label_columns', help='Label columns', default=None)
-    parser.add_argument('--eval_metrics', type=str,
-                        help='The metrics for evaluating the models.',
+    parser.add_argument('--eval_metric', type=str,
+                        help='The metric used to evaluate the model.',
                         default=None)
-    parser.add_argument('--stop_metric', type=str,
-                        help='The metrics for early stopping',
+    parser.add_argument('--all_metrics', type=str,
+                        help='All metrics that we will report. This will usually '
+                             'include the eval_metric',
                         default=None)
     parser.add_argument('--task', type=str, default=None)
     parser.add_argument('--do_train', action='store_true',
@@ -49,46 +52,56 @@ def get_parser():
     parser.add_argument('--config_file', type=str,
                         help='The configuration of the TextPrediction module',
                         default=None)
+    parser.add_argument('--use_tabular',
+                        action='store_true',
+                        help='Whether to use the stack ensemble '
+                             'enabled in AutoGluon Tabular for this task.')
     return parser
 
 
 def train(args):
     if args.task is not None:
-        feature_columns, label_columns, stop_metric, eval_metrics = TASKS[args.task]
+        feature_columns, label_column, eval_metric, all_metrics = TASKS[args.task]
     else:
         raise NotImplementedError
     if args.exp_dir is None:
-        args.exp_dir = 'autogluon_{}'.format(args.task)
-    model = task.fit(train_data=args.train_file,
-                     label=label_columns,
-                     feature_columns=feature_columns,
-                     output_directory=args.exp_dir,
-                     stopping_metric=stop_metric,
-                     ngpus_per_trial=1,
-                     eval_metric=eval_metrics)
-    dev_metrics_scores = model.evaluate(args.dev_file, metrics=eval_metrics)
-    with open(os.path.join(args.exp_dir, 'final_model_dev_score.json'), 'w') as of:
-        json.dump(dev_metrics_scores, of)
-    dev_prediction = model.predict(args.dev_file)
-    with open(os.path.join(args.exp_dir, 'dev_predictions.txt'), 'w') as of:
-        for ele in dev_prediction:
-            of.write(str(ele) + '\n')
-    model.save(os.path.join(args.exp_dir, 'saved_model'))
-    model = task.load(os.path.join(args.exp_dir, 'saved_model'))
-    test_prediction = model.predict(args.test_file)
-    with open(os.path.join(args.exp_dir, 'test_predictions.txt'), 'w') as of:
-        for ele in test_prediction:
-            of.write(str(ele) + '\n')
+        args.exp_dir = 'autogluon_text_{}'.format(args.task)
+    train_df = load_pd.load(args.train_file)
+    dev_df = load_pd.load(args.dev_file)
+    test_df = load_pd.load(args.test_file)
+    train_df = train_df[feature_columns + [label_column]]
+    dev_df = dev_df[feature_columns + [label_column]]
+    test_df = test_df[feature_columns]
+    if args.use_tabular:
+        predictor = TabularPredictor(label=label_column,
+                                     eval_metric=eval_metric,
+                                     path=args.exp_dir,
+                                     presets='multimodal')
+    else:
+        predictor = TextPredictor(label=label_column,
+                                  eval_metric=eval_metric,
+                                  path=args.exp_dir)
+    predictor.fit(train_data=train_df, tuning_data=dev_df)
+    dev_metric_score = predictor.evaluate(dev_df)
+    test_metric_score = predictor.evaluate(test_df)
+    dev_predictions = predictor.predict(dev_df, as_pandas=True)
+    test_predictions = predictor.predict(test_df, as_pandas=True)
+    dev_predictions.to_csv(os.path.join(args.exp_dir, 'dev_prediction.csv'))
+    test_predictions.to_csv(os.path.join(args.exp_dir, 'test_prediction.csv'))
+    with open(os.path.join(args.exp_dir, 'final_model_scores.json'), 'w') as of:
+        json.dump({f'valid_{eval_metric}': dev_metric_score,
+                   f'test_{eval_metric}': test_metric_score}, of)
 
 
 def predict(args):
-    model = task.load(args.model_dir)
-    test_prediction = model.predict(args.test_file)
+    if args.use_tabular:
+        predictor = TabularPredictor.load(args.model_dir)
+    else:
+        predictor = TextPredictor.load(args.model_dir)
+    test_prediction = predictor.predict(args.test_file, as_pandas=True)
     if args.exp_dir is None:
         args.exp_dir = '.'
-    with open(os.path.join(args.exp_dir, 'test_predictions.txt'), 'w') as of:
-        for ele in test_prediction:
-            of.write(str(ele) + '\n')
+    test_prediction.to_csv(os.path.join(args.exp_dir, 'test_prediction.csv'))
 
 
 if __name__ == '__main__':
