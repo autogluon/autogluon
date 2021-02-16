@@ -31,8 +31,7 @@ DATA_INFO = {
 
 def get_test_hyperparameters():
     config = ag_text_presets.create('default')
-    search_space = config['models']['MultimodalTextModel']['search_space']
-    search_space['optimization.num_train_epochs'] = 1
+    config['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 1
     return config
 
 
@@ -45,7 +44,8 @@ def verify_predictor_save_load(predictor, df, verify_proba=False,
         predictions2 = loaded_predictor.predict(df)
         predictions2_df = loaded_predictor.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)
-        npt.assert_equal(predictions2, predictions2_df.to_numpy())
+        npt.assert_equal(predictions2,
+                         predictions2_df[loaded_predictor.label].to_numpy())
         if verify_proba:
             predictions_prob = predictor.predict_proba(df)
             predictions2_prob = loaded_predictor.predict_proba(df)
