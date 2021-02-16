@@ -2,6 +2,7 @@ __all__ = ['ag_text_presets', 'list_presets']
 
 import copy
 import logging
+import functools
 from autogluon_contrib_nlp.utils.registry import Registry
 from autogluon.core import space
 
@@ -15,8 +16,7 @@ def list_presets():
     return ag_text_presets.list_keys()
 
 
-@ag_text_presets.register()
-def default() -> dict:
+def base() -> dict:
     """The default hyperparameters.
 
     It will have a version key and a list of candidate models.
@@ -54,67 +54,128 @@ def default() -> dict:
     return ret
 
 
-@ag_text_presets.register()
-def no_hpo() -> dict:
-    """The default hyperparameters without HPO"""
-    cfg = default()
-    cfg['hpo_params']['num_trials'] = 1
+def apply_average_nbest(cfg, nbest=3):
+    """Apply the average checkpoint trick to the basic configuration.
+
+    Parameters
+    ----------
+    cfg
+        The basic configuration
+    nbest
+        The number of best checkpoints to average
+
+    Returns
+    -------
+    new_cfg
+        The new configuration
+    """
+    new_cfg = copy.deepcopy(cfg)
+    search_space = new_cfg['models']['MultimodalTextModel']['search_space']
+    search_space['model.use_avg_nbest'] = True
+    search_space['optimization.nbest'] = nbest
+    return new_cfg
+
+
+def apply_fusion_strategy(cfg, strategy='fuse_late'):
+    """Apply the specific fusion strategy to a basic config
+
+    Parameters
+    ----------
+    cfg
+        The basic configuration
+    strategy
+        The type of the fusion strategy, can be
+        - fuse_late:
+            Use separate networks for extracting features of text, numerical and categorical data.
+        - fuse_early:
+            Keep the token embeddings and use an additional transformer to fuse the information.
+        - all_text:
+            Convert all categorical and numerical data to text and then use the text network
+
+    Returns
+    -------
+    new_cfg
+        The new configuration.
+    """
+    new_cfg = copy.deepcopy(cfg)
+    search_space = new_cfg['models']['MultimodalTextModel']['search_space']
+    if strategy == 'fuse_late':
+        search_space['model.network.agg_net.agg_type'] = 'concat'
+        search_space['model.network.aggregate_categorical'] = True
+        search_space['preprocessing.categorical.convert_to_text'] = False
+        search_space['preprocessing.numerical.convert_to_text'] = False
+    elif strategy == 'fuse_early':
+        search_space['model.network.agg_net.agg_type'] = 'attention_token'
+        search_space['model.network.aggregate_categorical'] = False
+        search_space['preprocessing.categorical.convert_to_text'] = False
+        search_space['preprocessing.numerical.convert_to_text'] = False
+    elif strategy == 'all_text':
+        search_space['model.network.agg_net.agg_type'] = 'concat'
+        search_space['model.network.aggregate_categorical'] = False
+        search_space['preprocessing.categorical.convert_to_text'] = True
+        search_space['preprocessing.numerical.convert_to_text'] = True
+    else:
+        raise NotImplementedError
+    return new_cfg
+
+
+def apply_backbone(cfg, backbone_name='electra_base'):
+    new_cfg = copy.deepcopy(cfg)
+    search_space = new_cfg['models']['MultimodalTextModel']['search_space']
+    search_space['model.backbone.name'] = backbone_name
+    if backbone_name == 'electra_small':
+        search_space['optimization.per_device_batch_size'] = 16
+    elif backbone_name == 'electra_base':
+        search_space['optimization.per_device_batch_size'] = 8
+    elif backbone_name == 'electra_large':
+        search_space['optimization.per_device_batch_size'] = 4
+    elif backbone_name == 'roberta_base':
+        search_space['model.backbone.name'] = 'fairseq_roberta_base'
+        search_space['model.network.text_net.use_segment_id'] = False
+        search_space['optimization.per_device_batch_size'] = 8
+    elif backbone_name == 'multi_cased_bert_base':
+        search_space['model.backbone.name'] = 'google_multi_cased_bert_base'
+        search_space['optimization.per_device_batch_size'] = 8
+    else:
+        raise NotImplementedError
+    return new_cfg
+
+
+def gen_config_no_hpo(backbone_name, nbest=3, fusion_strategy='fuse_late'):
+    cfg = base()
+    cfg = apply_backbone(cfg, backbone_name)
+    cfg = apply_average_nbest(cfg, nbest=nbest)
+    cfg = apply_fusion_strategy(cfg, strategy=fusion_strategy)
     return cfg
 
 
-@ag_text_presets.register()
-def electra_small_no_hpo() -> dict:
-    """The default search space that uses ELECTRA Small as the backbone."""
-    cfg = no_hpo()
-    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
-        = 'google_electra_small'
-    cfg['models']['MultimodalTextModel']['search_space'][
-        'optimization.per_device_batch_size'] = 16
-    return cfg
+for backbone_name in ['electra_small', 'electra_base',
+                      'electra_large', 'roberta_base', 'multi_cased_bert_base']:
+    for fusion_strategy in ['fuse_late']:
+        ag_text_presets.register(f'{backbone_name}_{fusion_strategy}',
+                                 functools.partial(gen_config_no_hpo,
+                                                   backbone_name=backbone_name,
+                                                   nbest=3,
+                                                   fusion_strategy=fusion_strategy))
+
+
+for backbone_name in ['electra_base']:
+    for fusion_strategy in ['fuse_early', 'all_text']:
+        ag_text_presets.register(f'{backbone_name}_{fusion_strategy}',
+                                 functools.partial(gen_config_no_hpo,
+                                                   backbone_name=backbone_name,
+                                                   nbest=3,
+                                                   fusion_strategy=fusion_strategy))
 
 
 @ag_text_presets.register()
-def electra_base_no_hpo() -> dict:
-    """The default search space that uses ELECTRA Base as the backbone"""
-    cfg = no_hpo()
-    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
-        = 'google_electra_base'
-    cfg['models']['MultimodalTextModel']['search_space'][
-        'optimization.per_device_batch_size'] = 8
-    return cfg
+def default() -> dict:
+    """The default configuration.
 
+    By default, we use the late-fusion aggregator and the electra-base
 
-@ag_text_presets.register()
-def electra_large_no_hpo() -> dict:
-    """The default search space that uses ELECTRA Base as the backbone."""
-    cfg = no_hpo()
-    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
-        = 'google_electra_large'
-    cfg['models']['MultimodalTextModel']['search_space'][
-        'optimization.per_device_batch_size'] = 4
-    return cfg
-
-
-@ag_text_presets.register()
-def roberta_base_no_hpo() -> dict:
-    """The default search space that use ALBERT Base as the backbone."""
-    cfg = no_hpo()
-    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
-        = 'fairseq_roberta_base'
-    cfg['models']['MultimodalTextModel']['search_space']['optimization.per_device_batch_size'] = 8
-    cfg['models']['MultimodalTextModel']['search_space']['optimization.layerwise_lr_decay'] = 0.8
-    cfg['models']['MultimodalTextModel']['search_space']['model.network.text_net.use_segment_id'] = False
-    return cfg
-
-
-@ag_text_presets.register()
-def multi_cased_bert_base_no_hpo() -> dict:
-    """The default search space that use Multi-lingual BERT-Base as the backbone."""
-    cfg = no_hpo()
-    cfg['models']['MultimodalTextModel']['search_space']['model.backbone.name'] \
-        = 'google_multi_cased_bert_base'
-    cfg['models']['MultimodalTextModel']['search_space'][
-        'optimization.per_device_batch_size'] = 8
+    """
+    cfg = gen_config_no_hpo('electra_base', 3, 'fuse_late')
     return cfg
 
 

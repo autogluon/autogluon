@@ -532,7 +532,6 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         if key is None:
             cfg = CfgNode()
             cfg.base_feature_units = -1  # -1 means not given and we will use the units of BERT
-            # TODO(sxjscience) Use a class to store the TextNet
             cfg.text_net = CfgNode()
             cfg.text_net.use_segment_id = True
             cfg.text_net.pool_type = 'cls'
