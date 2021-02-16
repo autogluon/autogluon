@@ -373,14 +373,15 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     warnings.filterwarnings('ignore', module='mxnet')
     warnings.filterwarnings('ignore', module='sklearn')
     set_seed(seed)
+    is_fake_reporter = isinstance(reporter, FakeReporter)
     if time_limit is not None:
         start_train_tick = time.time()
         time_left = time_limit - (start_train_tick - time_start)
         if time_left <= 0:
-            if reporter is not None:
+            if reporter is not None and not is_fake_reporter:
                 reporter.terminate()
             return
-    if isinstance(reporter, FakeReporter):
+    if is_fake_reporter:
         search_space = args.rand
         task_id = 0
     else:
