@@ -99,7 +99,7 @@ def test_cpu_only_raise(set_env_train_without_gpu):
     elif set_env_train_without_gpu is True:
         os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'] = '1'
         predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                      num_gpus=0, seed=123)
+                      num_gpus=0, time_limit=30, seed=123)
         verify_predictor_save_load(predictor, dev_data, verify_proba=True)
     else:
         with pytest.raises(RuntimeError):
@@ -115,7 +115,9 @@ def test_no_text_column_raise():
     df = pd.DataFrame(data, columns=['data', 'label'])
     with pytest.raises(AssertionError):
         predictor = TextPredictor(label='label', verbosity=4)
-        predictor.fit(df, hyperparameters=get_test_hyperparameters(), seed=123)
+        predictor.fit(df,
+                      hyperparameters=get_test_hyperparameters(),
+                      seed=123)
 
 
 def test_emoji():
@@ -131,7 +133,10 @@ def test_emoji():
     df = pd.DataFrame(data, columns=['data', 'label'])
     print(df)
     predictor = TextPredictor(label='label', verbosity=3)
-    predictor.fit(df, hyperparameters=get_test_hyperparameters(), seed=123)
+    predictor.fit(df,
+                  hyperparameters=get_test_hyperparameters(),
+                  time_limit=30,
+                  seed=123)
     verify_predictor_save_load(predictor, df)
 
 
@@ -175,6 +180,7 @@ def test_mixed_column_type():
     predictor1 = TextPredictor(label='score', verbosity=4)
     predictor1.fit(train_data,
                    hyperparameters=get_test_hyperparameters(),
+                   time_limit=30,
                    seed=123)
 
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
@@ -184,6 +190,7 @@ def test_mixed_column_type():
     predictor2 = TextPredictor(label='genre', verbosity=4)
     predictor2.fit(train_data,
                    hyperparameters=get_test_hyperparameters(),
+                   time_limit=30,
                    seed=123)
 
     dev_rmse = predictor2.evaluate(dev_data, metrics=['acc'])
@@ -193,6 +200,7 @@ def test_mixed_column_type():
     predictor3 = TextPredictor(label='score', verbosity=4)
     predictor3.fit(train_data, hyperparameters=get_test_hyperparameters(),
                    feature_columns=['sentence1', 'sentence3', 'categorical0'],
+                   time_limit=30,
                    seed=123)
     dev_rmse = predictor3.evaluate(dev_data, metrics=['rmse'])
     verify_predictor_save_load(predictor3, dev_data)
@@ -207,4 +215,4 @@ def test_empty_text_item():
     train_data.iat[0, 0] = None
     train_data.iat[10, 0] = None
     predictor = TextPredictor(label='score', verbosity=4)
-    predictor.fit(train_data, hyperparameters=get_test_hyperparameters())
+    predictor.fit(train_data, hyperparameters=get_test_hyperparameters(), time_limit=30)
