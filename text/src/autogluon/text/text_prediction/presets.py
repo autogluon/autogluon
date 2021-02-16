@@ -122,12 +122,14 @@ def apply_fusion_strategy(cfg, strategy='fuse_late'):
 def apply_backbone(cfg, backbone_name='electra_base'):
     new_cfg = copy.deepcopy(cfg)
     search_space = new_cfg['models']['MultimodalTextModel']['search_space']
-    search_space['model.backbone.name'] = backbone_name
     if backbone_name == 'electra_small':
+        search_space['model.backbone.name'] = 'google_electra_small'
         search_space['optimization.per_device_batch_size'] = 16
     elif backbone_name == 'electra_base':
+        search_space['model.backbone.name'] = 'google_electra_base'
         search_space['optimization.per_device_batch_size'] = 8
     elif backbone_name == 'electra_large':
+        search_space['model.backbone.name'] = 'google_electra_large'
         search_space['optimization.per_device_batch_size'] = 4
     elif backbone_name == 'roberta_base':
         search_space['model.backbone.name'] = 'fairseq_roberta_base'
@@ -150,7 +152,8 @@ def gen_config_no_hpo(backbone_name, nbest=3, fusion_strategy='fuse_late'):
 
 
 for backbone_name in ['electra_small', 'electra_base',
-                      'electra_large', 'roberta_base', 'multi_cased_bert_base']:
+                      'electra_large', 'roberta_base',
+                      'multi_cased_bert_base']:
     for fusion_strategy in ['fuse_late']:
         ag_text_presets.register(f'{backbone_name}_{fusion_strategy}',
                                  functools.partial(gen_config_no_hpo,
