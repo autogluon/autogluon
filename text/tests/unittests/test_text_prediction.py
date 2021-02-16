@@ -129,6 +129,7 @@ def test_emoji():
     for i in range(20 * 3):
         data.append(('😉' * (i + 1), 'wink'))
     df = pd.DataFrame(data, columns=['data', 'label'])
+    print(df)
     predictor = TextPredictor(label='label', verbosity=3)
     predictor.fit(df, hyperparameters=get_test_hyperparameters(), seed=123)
     verify_predictor_save_load(predictor, df)
