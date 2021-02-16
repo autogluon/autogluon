@@ -9,7 +9,7 @@ from .constants import NULL, CATEGORICAL, NUMERICAL, TEXT
 def is_categorical_column(data: pd.Series,
                           valid_data: pd.Series,
                           threshold: int = None,
-                          ratio: float = 0.01,
+                          ratio: Optional[float] = None,
                           oov_ratio_threshold: Optional[float] = None,
                           is_label: bool = False) -> bool:
     """Check whether the column is a categorical column.
@@ -49,9 +49,11 @@ def is_categorical_column(data: pd.Series,
             if is_label:
                 threshold = 100
                 oov_ratio_threshold = 0
+                ratio = 0.1
             else:
                 threshold = 20
                 oov_ratio_threshold = 0
+                ratio = 0.01
         print('data=', data)
         print('valid_data=', valid_data)
         threshold = min(int(len(data) * ratio), threshold)
