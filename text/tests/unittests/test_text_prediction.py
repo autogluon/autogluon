@@ -12,19 +12,22 @@ DATA_INFO = {
         'train': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet',
         'dev': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet',
         'label': 'label',
-        'metric': 'acc'
+        'metric': 'acc',
+        'verify_proba': True,
     },
     'mrpc': {
         'train': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/train.parquet',
         'dev': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/dev.parquet',
         'label': 'label',
-        'metric': 'acc'
+        'metric': 'acc',
+        'verify_proba': True,
     },
     'sts': {
         'train': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet',
         'dev': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet',
         'label': 'score',
-        'metric': 'rmse'
+        'metric': 'rmse',
+        'verify_proba': False,
     }
 }
 
@@ -63,6 +66,7 @@ def test_predictor_fit(key):
     dev_data = load_pd.load(DATA_INFO[key]['dev'])
     label = DATA_INFO[key]['label']
     eval_metric = DATA_INFO[key]['metric']
+    verify_proba = DATA_INFO[key]['verify_proba']
 
     rng_state = np.random.RandomState(123)
     train_perm = rng_state.permutation(len(train_data))
@@ -73,7 +77,7 @@ def test_predictor_fit(key):
     predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
                   time_limit=30, seed=123)
     dev_score = predictor.evaluate(dev_data)
-    verify_predictor_save_load(predictor, dev_data, verify_proba=True)
+    verify_predictor_save_load(predictor, dev_data, verify_proba=verify_proba)
 
 
 @pytest.mark.parametrize('set_env_train_without_gpu', [None, False, True])
