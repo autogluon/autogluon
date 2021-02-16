@@ -103,46 +103,6 @@ def test_cpu_only_raise(set_env_train_without_gpu):
                           num_gpus=0)
 
 
-def test_mrpc():
-    train_data = load_pd.load(
-        'https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/train.parquet')
-    dev_data = load_pd.load(
-        'https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/dev.parquet')
-    rng_state = np.random.RandomState(123)
-    train_perm = rng_state.permutation(len(train_data))
-    valid_perm = rng_state.permutation(len(dev_data))
-    train_data = train_data.iloc[train_perm[:100]]
-    dev_data = dev_data.iloc[valid_perm[:10]]
-    predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                         label='label', num_trials=1,
-                         verbosity=4,
-                         ngpus_per_trial=1,
-                         output_directory='./mrpc',
-                         plot_results=False)
-    dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
-    verify_predictor_save_load(predictor, dev_data, verify_proba=True)
-
-
-def test_sts():
-    train_data = load_pd.load(
-        'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')
-    dev_data = load_pd.load(
-        'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')
-    rng_state = np.random.RandomState(123)
-    train_perm = rng_state.permutation(len(train_data))
-    valid_perm = rng_state.permutation(len(dev_data))
-    train_data = train_data.iloc[train_perm[:100]]
-    dev_data = dev_data.iloc[valid_perm[:10]]
-    predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                         label='score', num_trials=1,
-                         verbosity=4,
-                         ngpus_per_trial=1,
-                         output_directory='./sts',
-                         plot_results=False)
-    dev_rmse = predictor.evaluate(dev_data, metrics=['rmse'])
-    verify_predictor_save_load(predictor, dev_data)
-
-
 # Test the case that the model should raise because there are no text columns in the model.
 def test_no_text_column_raise():
     data = [('😁😁😁😁😁😁', 'grin')] * 20 + [('😃😃😃😃😃😃😃😃', 'smile')] * 50 + [
@@ -150,8 +110,8 @@ def test_no_text_column_raise():
 
     df = pd.DataFrame(data, columns=['data', 'label'])
     with pytest.raises(AssertionError):
-        predictor = task.fit(df, label='label',
-                             verbosity=4)
+        predictor = TextPredictor(label='label', verbosity=4)
+        predictor.fit(df)
 
 
 def test_emoji():
@@ -165,9 +125,8 @@ def test_emoji():
     for i in range(20):
         data.append(('😉' * (i + 1), 'wink'))
     df = pd.DataFrame(data, columns=['data', 'label'])
-
-    predictor = task.fit(df, label='label',
-                         verbosity=3)
+    predictor = TextPredictor(label='label', verbosity=3)
+    predictor.fit(df)
     verify_predictor_save_load(predictor, df)
 
 
@@ -176,13 +135,9 @@ def test_no_job_finished_raise():
                               'glue/sst/train.parquet')
     with pytest.raises(RuntimeError):
         # Setting a very small time limits to trigger the bug
-        predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                             label='label', num_trials=1,
-                             ngpus_per_trial=1,
-                             verbosity=4,
-                             time_limits=10,
-                             output_directory='./sst_raise',
-                             plot_results=False)
+        predictor = TextPredictor(label='label')
+        predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                      time_limit=1, num_gpus=1)
 
 
 def test_mixed_column_type():
@@ -212,36 +167,23 @@ def test_mixed_column_type():
                              'genre': dev_data['genre'],
                              'score': dev_data['score']})
     # Train Regression
-    predictor1 = task.fit(train_data,
-                          hyperparameters=test_hyperparameters,
-                          label='score', num_trials=1,
-                          verbosity=4,
-                          ngpus_per_trial=1,
-                          output_directory='./sts_score',
-                          plot_results=False)
+    predictor1 = TextPredictor(label='score', verbosity=4)
+    predictor1.fit(train_data, hyperparameters=get_test_hyperparameters())
+
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
     verify_predictor_save_load(predictor1, dev_data)
 
     # Train Classification
-    predictor2 = task.fit(train_data,
-                          hyperparameters=test_hyperparameters,
-                          label='genre', num_trials=1,
-                          verbosity=4,
-                          ngpus_per_trial=1,
-                          output_directory='./sts_genre',
-                          plot_results=False)
+    predictor2 = TextPredictor(label='genre', verbosity=4)
+    predictor2.fit(train_data, hyperparameters=get_test_hyperparameters())
+
     dev_rmse = predictor2.evaluate(dev_data, metrics=['acc'])
     verify_predictor_save_load(predictor2, dev_data, verify_proba=True)
 
     # Specify the feature column
-    predictor3 = task.fit(train_data,
-                          hyperparameters=test_hyperparameters,
-                          feature_columns=['sentence1', 'sentence3', 'categorical0'],
-                          label='score', num_trials=1,
-                          verbosity=4,
-                          ngpus_per_trial=1,
-                          output_directory='./sts_score',
-                          plot_results=False)
+    predictor3 = TextPredictor(label='score', verbosity=4)
+    predictor3.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                   feature_columns=['sentence1', 'sentence3', 'categorical0'])
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
     verify_predictor_save_load(predictor3, dev_data)
 
@@ -254,9 +196,5 @@ def test_empty_text_item():
     train_data = train_data.iloc[train_perm[:100]]
     train_data.iat[0, 0] = None
     train_data.iat[10, 0] = None
-    predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                         label='score', num_trials=1,
-                         ngpus_per_trial=1,
-                         verbosity=4,
-                         output_directory='./sts_empty_text_item',
-                         plot_results=False)
+    predictor = TextPredictor(label='score', verbosity=4)
+    predictor.fit(train_data, hyperparameters=get_test_hyperparameters())
