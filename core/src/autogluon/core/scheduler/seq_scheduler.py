@@ -3,10 +3,9 @@ import time
 from collections import OrderedDict
 from copy import deepcopy
 
-from tqdm.auto import tqdm
-
 from autogluon.core.searcher import GPFIFOSearcher
 from autogluon.core.utils import EasyDict
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +45,8 @@ class LocalReporter:
                     self.task_config.pop('util_args')
 
             self.last_result = result
+        if 'traceback' in result:
+            self.searcher.evaluation_failed(config=self.task_config, **result)
 
     def terminate(self):
         pass  # compatibility
@@ -102,6 +103,8 @@ class LocalSequentialScheduler(object):
         reporter = LocalReporter(task_id, config, self.training_history, self.config_history)
         task_config = deepcopy(EasyDict(config))
         task_config['task_id'] = task_id
+        self.train_fn.register_args(**task_config)
+        self.searcher.register_pending(task_config)
         self.train_fn(task_config, reporter=reporter)
         if reporter.last_result:
             self.searcher.update(config=searcher_config, **reporter.last_result)
