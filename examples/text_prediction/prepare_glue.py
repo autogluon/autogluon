@@ -40,9 +40,9 @@ SUPERGLUE_TASKS = ["cb", "copa", "multirc", "rte", "wic", "wsc", "boolq", "recor
 
 _CURR_DIR = os.path.realpath(os.path.dirname(os.path.realpath(__file__)))
 _URL_FILE_STATS = load_checksum_stats(os.path.join(
-    _CURR_DIR, '..', 'url_checksums', 'glue.txt'))
+    _CURR_DIR, 'url_checksums', 'glue.txt'))
 _URL_FILE_STATS.update(load_checksum_stats(os.path.join(
-    _CURR_DIR, '..', 'url_checksums', 'superglue.txt')))
+    _CURR_DIR, 'url_checksums', 'superglue.txt')))
 
 
 def read_tsv_glue(tsv_file, num_skip=1, keep_column_names=False):
