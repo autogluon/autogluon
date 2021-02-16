@@ -99,13 +99,11 @@ class LocalSequentialScheduler(object):
 
     def run_trial(self, task_id=0):
         searcher_config = self.searcher.get_config()
-        config = {**self.train_fn.kwvars, **searcher_config}
-        reporter = LocalReporter(task_id, config, self.training_history, self.config_history)
-        task_config = deepcopy(EasyDict(config))
+        reporter = LocalReporter(task_id, self.train_fn.kwvars, self.training_history, self.config_history)
+        task_config = deepcopy(EasyDict(self.train_fn.kwvars))
         task_config['task_id'] = task_id
-        self.train_fn.register_args(**task_config)
-        self.searcher.register_pending(task_config)
-        self.train_fn(task_config, reporter=reporter)
+        self.searcher.register_pending(searcher_config)
+        self.train_fn(task_config, config=searcher_config, reporter=reporter)
         if reporter.last_result:
             self.searcher.update(config=searcher_config, **reporter.last_result)
 
