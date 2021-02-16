@@ -10,7 +10,7 @@ def is_categorical_column(data: pd.Series,
                           valid_data: pd.Series,
                           threshold: int = None,
                           ratio: float = 0.01,
-                          oov_ratio_threshold: float = 0,
+                          oov_ratio_threshold: Optional[float] = None,
                           is_label: bool = False) -> bool:
     """Check whether the column is a categorical column.
 
@@ -48,8 +48,10 @@ def is_categorical_column(data: pd.Series,
         if threshold is None:
             if is_label:
                 threshold = 100
+                oov_ratio_threshold = 0.1
             else:
                 threshold = 20
+                oov_ratio_threshold = 0
         threshold = min(int(len(data) * ratio), threshold)
         data_value_counts = data.value_counts(dropna=False)
         key_set = set(data_value_counts.keys())
