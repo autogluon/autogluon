@@ -336,7 +336,8 @@ class TextPredictor:
                                         ' Have you called fit(), or load()?'
         os.makedirs(dir_path, exist_ok=True)
         with open(os.path.join(dir_path, 'text_predictor_assets.json'), 'w') as of:
-            json.dump({'backend': self._backend}, of)
+            json.dump({'backend': self._backend,
+                       'label': self._label}, of)
         self._model.save(os.path.join(dir_path, 'saved_model'))
 
     @classmethod
@@ -347,13 +348,14 @@ class TextPredictor:
                                'text_predictor_assets.json'), 'r') as in_f:
             assets = json.load(in_f)
         backend = assets['backend']
+        label = assets['label']
         if backend == 'gluonnlp_v0':
             from ..mx.models import MultiModalTextModel
             model = MultiModalTextModel.load(os.path.join(dir_path, 'saved_model'))
         else:
             raise NotImplementedError(f'Backend = "{backend}" is not supported.')
         ret = cls(eval_metric=model._eval_metric,
-                  label=model._label,
+                  label=label,
                   problem_type=model._problem_type,
                   path=dir_path,
                   warn_if_exist=False)
