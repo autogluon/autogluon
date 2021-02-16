@@ -243,7 +243,7 @@ class TextPredictor:
                                       "as the backend of AutoGluon-Text. In the future, "
                                       "we will support other models.")
         logger.log(25, f'Training completed. Auto-saving to {self._path}.')
-        self._model.save(self._path)
+        self.save(self._path)
         return self
 
     def evaluate(self, data, metrics=None):
