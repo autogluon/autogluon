@@ -71,7 +71,7 @@ def test_predictor_fit(key):
     dev_data = dev_data.iloc[valid_perm[:10]]
     predictor = TextPredictor(label=label, eval_metric=eval_metric)
     predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                  time_limit=30)
+                  time_limit=30, seed=123)
     dev_score = predictor.evaluate(dev_data)
     verify_predictor_save_load(predictor, dev_data, verify_proba=True)
 
@@ -91,16 +91,16 @@ def test_cpu_only_raise(set_env_train_without_gpu):
     if set_env_train_without_gpu is None:
         with pytest.raises(RuntimeError):
             predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                          num_gpus=0)
+                          num_gpus=0, seed=123)
     elif set_env_train_without_gpu is True:
         os.environ['AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU'] = '1'
         predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                      num_gpus=0)
+                      num_gpus=0, seed=123)
         verify_predictor_save_load(predictor, dev_data, verify_proba=True)
     else:
         with pytest.raises(RuntimeError):
             predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                          num_gpus=0)
+                          num_gpus=0, seed=123)
 
 
 # Test the case that the model should raise because there are no text columns in the model.
@@ -111,7 +111,7 @@ def test_no_text_column_raise():
     df = pd.DataFrame(data, columns=['data', 'label'])
     with pytest.raises(AssertionError):
         predictor = TextPredictor(label='label', verbosity=4)
-        predictor.fit(df, hyperparameters=get_test_hyperparameters())
+        predictor.fit(df, hyperparameters=get_test_hyperparameters(), seed=123)
 
 
 def test_emoji():
@@ -126,7 +126,7 @@ def test_emoji():
         data.append(('😉' * (i + 1), 'wink'))
     df = pd.DataFrame(data, columns=['data', 'label'])
     predictor = TextPredictor(label='label', verbosity=3)
-    predictor.fit(df, hyperparameters=get_test_hyperparameters())
+    predictor.fit(df, hyperparameters=get_test_hyperparameters(), seed=123)
     verify_predictor_save_load(predictor, df)
 
 
@@ -137,7 +137,7 @@ def test_no_job_finished_raise():
         # Setting a very small time limits to trigger the bug
         predictor = TextPredictor(label='label')
         predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                      time_limit=1, num_gpus=1)
+                      time_limit=1, num_gpus=1, seed=123)
 
 
 def test_mixed_column_type():
@@ -148,7 +148,7 @@ def test_mixed_column_type():
     rng_state = np.random.RandomState(123)
     train_perm = rng_state.permutation(len(train_data))
     valid_perm = rng_state.permutation(len(dev_data))
-    train_data = train_data.iloc[train_perm[:100]]
+    train_data = train_data.iloc[train_perm[:1000]]
     dev_data = dev_data.iloc[valid_perm[:10]]
 
     # Add more columns as feature
@@ -168,14 +168,18 @@ def test_mixed_column_type():
                              'score': dev_data['score']})
     # Train Regression
     predictor1 = TextPredictor(label='score', verbosity=4)
-    predictor1.fit(train_data, hyperparameters=get_test_hyperparameters())
+    predictor1.fit(train_data,
+                   hyperparameters=get_test_hyperparameters(),
+                   seed=123)
 
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
     verify_predictor_save_load(predictor1, dev_data)
 
     # Train Classification
     predictor2 = TextPredictor(label='genre', verbosity=4)
-    predictor2.fit(train_data, hyperparameters=get_test_hyperparameters())
+    predictor2.fit(train_data,
+                   hyperparameters=get_test_hyperparameters(),
+                   seed=123)
 
     dev_rmse = predictor2.evaluate(dev_data, metrics=['acc'])
     verify_predictor_save_load(predictor2, dev_data, verify_proba=True)
@@ -183,8 +187,9 @@ def test_mixed_column_type():
     # Specify the feature column
     predictor3 = TextPredictor(label='score', verbosity=4)
     predictor3.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                   feature_columns=['sentence1', 'sentence3', 'categorical0'])
-    dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
+                   feature_columns=['sentence1', 'sentence3', 'categorical0'],
+                   seed=123)
+    dev_rmse = predictor3.evaluate(dev_data, metrics=['rmse'])
     verify_predictor_save_load(predictor3, dev_data)
 
 
