@@ -64,6 +64,7 @@ def is_categorical_column(data: pd.Series,
             oov_num = 0
             for k, v in zip(valid_value_counts.keys(), valid_value_counts.values):
                 if k not in key_set:
+                    print('Not in key_set, k={}'.format(k))
                     oov_num += v
             if oov_num / total_valid_num > oov_ratio_threshold:
                 return False
