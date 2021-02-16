@@ -120,13 +120,13 @@ def test_no_text_column_raise():
 
 def test_emoji():
     data = []
-    for i in range(50):
+    for i in range(50 * 3):
         data.append(('😁' * (i + 1), 'grin'))
 
-    for i in range(30):
+    for i in range(30 * 3):
         data.append(('😃' * (i + 1), 'smile'))
 
-    for i in range(20):
+    for i in range(20 * 3):
         data.append(('😉' * (i + 1), 'wink'))
     df = pd.DataFrame(data, columns=['data', 'label'])
     predictor = TextPredictor(label='label', verbosity=3)
