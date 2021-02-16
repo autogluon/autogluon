@@ -32,7 +32,7 @@ def get_parser():
                         default=None)
     parser.add_argument('--seed', type=int,
                         help='The seed',
-                        default=None)
+                        default=123)
     parser.add_argument('--feature_columns', help='Feature columns', default=None)
     parser.add_argument('--label_columns', help='Label columns', default=None)
     parser.add_argument('--eval_metric', type=str,
@@ -73,6 +73,7 @@ def train(args):
     dev_df = dev_df[feature_columns + [label_column]]
     test_df = test_df[feature_columns]
     if args.use_tabular:
+
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=eval_metric,
                                      path=args.exp_dir,
@@ -83,14 +84,12 @@ def train(args):
                                   path=args.exp_dir)
     predictor.fit(train_data=train_df, tuning_data=dev_df)
     dev_metric_score = predictor.evaluate(dev_df)
-    test_metric_score = predictor.evaluate(test_df)
     dev_predictions = predictor.predict(dev_df, as_pandas=True)
     test_predictions = predictor.predict(test_df, as_pandas=True)
     dev_predictions.to_csv(os.path.join(args.exp_dir, 'dev_prediction.csv'))
     test_predictions.to_csv(os.path.join(args.exp_dir, 'test_prediction.csv'))
     with open(os.path.join(args.exp_dir, 'final_model_scores.json'), 'w') as of:
-        json.dump({f'valid_{eval_metric}': dev_metric_score,
-                   f'test_{eval_metric}': test_metric_score}, of)
+        json.dump({f'valid_{eval_metric}': dev_metric_score}, of)
 
 
 def predict(args):
