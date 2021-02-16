@@ -59,7 +59,7 @@ class ImagePredictor(object):
     def fit(self,
             train_data,
             tuning_data=None,
-            time_limit=7200,
+            time_limit='auto',
             presets=None,
             hyperparameters=None,
             **kwargs):
@@ -79,7 +79,7 @@ class ImagePredictor(object):
             can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
             If `None`, the validation dataset will be randomly split from `train_data` according to `holdout_frac`.
-        time_limit : int, default = 7200(2 hours)
+        time_limit : int, default = 'auto'(defaults to 2 hours if no presets detected)
             Time limit in seconds, if `None`, will run until all tuning and training finished.
             If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
@@ -224,15 +224,20 @@ class ImagePredictor(object):
                 presets = [presets]
             logger.log(20, f'Presets specified: {presets}')
 
+        if time_limit == 'auto':
+            # no presets, no user specified time_limit
+            time_limit = 7200
+            logger.log(20, f'`time_limit=auto` set to `time_limit={time_limit}`.')
+
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
-            logger.warn('ImageNet is a huge dataset which cannot be downloaded directly, ' +
-                        'please follow the data preparation tutorial in GluonCV.' +
-                        'The following record files(symlinks) will be used: \n' +
-                        'rec_train : ~/.mxnet/datasets/imagenet/rec/train.rec\n' +
-                        'rec_train_idx : ~/.mxnet/datasets/imagenet/rec/train.idx\n' +
-                        'rec_val : ~/.mxnet/datasets/imagenet/rec/val.rec\n' +
-                        'rec_val_idx : ~/.mxnet/datasets/imagenet/rec/val.idx\n')
+            logger.warning('ImageNet is a huge dataset which cannot be downloaded directly, ' +
+                           'please follow the data preparation tutorial in GluonCV.' +
+                           'The following record files(symlinks) will be used: \n' +
+                           'rec_train : ~/.mxnet/datasets/imagenet/rec/train.rec\n' +
+                           'rec_train_idx : ~/.mxnet/datasets/imagenet/rec/train.idx\n' +
+                           'rec_val : ~/.mxnet/datasets/imagenet/rec/val.rec\n' +
+                           'rec_val_idx : ~/.mxnet/datasets/imagenet/rec/val.idx\n')
             train_data = pd.DataFrame({'image': [], 'label': []})
             tuning_data = pd.DataFrame({'image': [], 'label': []})
             use_rec = True

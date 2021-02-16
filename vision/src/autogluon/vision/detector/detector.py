@@ -49,7 +49,7 @@ class ObjectDetector(object):
     def fit(self,
             train_data,
             tuning_data=None,
-            time_limit=7200,
+            time_limit='auto',
             presets=None,
             hyperparameters=None,
             **kwargs):
@@ -73,8 +73,8 @@ class ObjectDetector(object):
             can be a dataframe like image dataset.
             If a string is provided, will search for k8 datasets.
             If `None`, the validation dataset will be randomly split from `train_data` according to `holdout_frac`.
-        time_limit : int, default = 7200(2 hours)
-            Time limit in seconds, if not specified, will run until all tuning and training finished.
+        time_limit : int, default = 'auto'(defaults to 2 hours if no presets detected)
+            Time limit in seconds, if `None`, will run until all tuning and training finished.
             If `time_limit` is hit during `fit`, the
             HPO process will interrupt and return the current best configuration.
         presets : list or str or dict, default = ['medium_quality_faster_train']
@@ -206,6 +206,11 @@ class ObjectDetector(object):
             if not isinstance(presets, list):
                 presets = [presets]
             logger.log(20, f'Presets specified: {presets}')
+
+        if time_limit == 'auto':
+            # no presets, no user specified time_limit
+            time_limit = 7200
+            logger.log(20, f'`time_limit=auto` set to `time_limit={time_limit}`.')
 
         if self._detector is not None:
             self._detector._logger.setLevel(log_level)
