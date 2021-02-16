@@ -1054,6 +1054,7 @@ class MultiModalTextModel:
         # Consider to move this to a separate predictor
         self._config = cfg
         # Average parameters
+        # TODO(sxjscience) Clean up the temporary spaces used to store the intermediate checkpoints.
         if cfg.model.use_avg_nbest:
             nbest_path_l = []
             for best_id in range(cfg.optimization.nbest):
@@ -1091,12 +1092,11 @@ class MultiModalTextModel:
             cfg=cfg.model.network,
             out_shape=out_shape)
         net.hybridize()
-        ctx_l = get_mxnet_available_ctx()
         if cfg.model.use_avg_nbest:
-            net.load_parameters(avg_nbest_path, ctx=ctx_l)
+            net.load_parameters(avg_nbest_path, ctx=mx.cpu())
         else:
             net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
-                                ctx=ctx_l)
+                                ctx=mx.cpu())
         self._net = net
         mx.npx.waitall()
 
@@ -1115,8 +1115,6 @@ class MultiModalTextModel:
             Whether to use stochastic chunk
         num_repeat
             The number of repeats
-        return_type :
-            Can be list or dict
 
         Returns
         -------
@@ -1128,6 +1126,10 @@ class MultiModalTextModel:
         elif metrics is None:
             metrics = [self._eval_metric]
         assert self.net is not None
+        # We will always use all resources that are available for evaluation
+        ctx_l = get_mxnet_available_ctx()
+        self.net.collect_params().reset_ctx(ctx_l)
+
         if not isinstance(data, pd.DataFrame):
             if isinstance(data, (list, dict)):
                 data = pd.DataFrame(data)
@@ -1148,7 +1150,13 @@ class MultiModalTextModel:
             predictions = self.predict(data,
                                        stochastic_chunk=stochastic_chunk,
                                        num_repeat=num_repeat)
-        metric_scores = [calculate_metric(get_metric(metric), ground_truth, predictions, self._problem_type) for metric in metrics]
+        metric_scores = [calculate_metric(get_metric(metric),
+                                          ground_truth, predictions, self._problem_type)
+                         for metric in metrics]
+
+        # Once the inference is completed, we will cache all parameters back
+        # to CPU to avoid memory overflow.
+        self.net.collect_params().reset_ctx(mx.cpu())
         if len(metric_scores) == 1:
             return metric_scores[0]
         else:
@@ -1158,6 +1166,10 @@ class MultiModalTextModel:
                           stochastic_chunk=None, num_repeat=None):
         assert self.net is not None
         assert self.config is not None
+        # We will always use all resources that are available for evaluation
+        ctx_l = get_mxnet_available_ctx()
+        self.net.collect_params().reset_ctx(ctx_l)
+
         if not isinstance(data, pd.DataFrame):
             if isinstance(data, (list, dict)):
                 data = pd.DataFrame(data)
@@ -1194,6 +1206,10 @@ class MultiModalTextModel:
             label_scaler=self.preprocessor.label_scaler,
             has_label=False,
             num_repeat=num_repeat)
+
+        # Once the inference is completed, we will cache all parameters back
+        # to CPU to avoid memory overflow.
+        self.net.collect_params().reset_ctx(mx.cpu())
         if self._problem_type == MULTICLASS or self._problem_type == BINARY:
             if get_probabilities:
                 return test_predictions
@@ -1344,7 +1360,7 @@ class MultiModalTextModel:
         log_metrics = assets['log_metrics']
         problem_type = assets['problem_type']
         column_types = assets['column_types']
-        # TODO(0.2) In general, we will need to support compatible version check
+        # TODO(sxjscience) Post 0.1. In general, we will need to support compatible version check
         version = assets['version']
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
