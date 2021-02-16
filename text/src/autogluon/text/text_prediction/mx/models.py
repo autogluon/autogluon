@@ -753,9 +753,9 @@ def get_recommended_resource(nthreads_per_trial=None,
     """
     if nthreads_per_trial is None and ngpus_per_trial is None:
         nthreads_per_trial = get_cpu_count()
-        ngpus_per_trial = get_gpu_count()
+        ngpus_per_trial = 1
     elif nthreads_per_trial is not None and ngpus_per_trial is None:
-        ngpus_per_trial = get_gpu_count()
+        ngpus_per_trial = 1
     elif nthreads_per_trial is None and ngpus_per_trial is not None:
         if ngpus_per_trial != 0:
             num_parallel_jobs = get_gpu_count() // ngpus_per_trial
