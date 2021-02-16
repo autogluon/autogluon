@@ -42,12 +42,12 @@ class SimpleProfiler(object):
         meta_keys = tuple(sorted(meta.keys()))
         if self.time_stamp_first_block is None:
             self.meta_keys = meta_keys
-            self.time_stamp_first_block = time.process_time()
+            self.time_stamp_first_block = time.time()
         else:
             assert meta_keys == self.meta_keys, \
                 "meta.keys() = {}, but must be the same as for all previous meta dicts ({})".format(
                     meta_keys, self.meta_keys)
-        time_stamp = time.process_time() - self.time_stamp_first_block
+        time_stamp = time.time() - self.time_stamp_first_block
         new_block = ProfilingBlock(
             meta=meta.copy(),
             time_stamp=time_stamp,
@@ -74,7 +74,7 @@ class SimpleProfiler(object):
         tag = self.prefix + tag
         assert tag not in self.start_time, \
             "Timer for '{}' already running".format(tag)
-        self.start_time[tag] = time.process_time()
+        self.start_time[tag] = time.time()
 
     def stop(self, tag: str):
         assert self.records, \
@@ -82,7 +82,7 @@ class SimpleProfiler(object):
         tag = self.prefix + tag
         assert tag in self.start_time, \
             "Timer for '{}' does not exist".format(tag)
-        duration = time.process_time() - self.start_time[tag]
+        duration = time.time() - self.start_time[tag]
         block = self.records[-1]
         if tag in block.durations:
             block.durations[tag].append(duration)
