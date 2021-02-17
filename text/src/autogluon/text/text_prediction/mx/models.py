@@ -993,11 +993,22 @@ class MultiModalTextModel:
                                                       eval_metric=self._eval_metric,
                                                       console_log=console_log,
                                                       verbosity=verbosity))
+        no_job_finished_err_msg =\
+            'No training job has been completed! '\
+            'There are two possibilities: '\
+            '1) The time_limits is too small, '\
+            'or 2) There are some internal errors in AutoGluon. '\
+            'For the first case, you can increase the time_limits or set it to '\
+            'None, e.g., setting "predictor.fit(..., time_limit=None). To '\
+            'further investigate the root cause, you can also try to set the '\
+            '"verbosity=3" and try again, i.e., predictor.set_verbosity(3).'
         if scheduler_options['num_trials'] == 1:
             train_fn(train_fn.args['search_space'],
                      train_fn.args['_default_config'])
             best_model_saved_dir_path = os.path.join(self._output_directory, 'task0')
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
+            if not os.path.exists(cfg_path):
+                raise RuntimeError(no_job_finished_err_msg)
             cfg = self.base_config.clone_merge(cfg_path)
             local_results = pd.read_json(os.path.join(self._output_directory, 'task0',
                                                       'results_local.jsonl'), lines=True)
@@ -1022,14 +1033,7 @@ class MultiModalTextModel:
             scheduler.run()
             scheduler.join_jobs()
             if len(scheduler.config_history) == 0:
-                raise RuntimeError('No training job has been completed! '
-                                   'There are two possibilities: '
-                                   '1) The time_limits is too small, '
-                                   'or 2) There are some internal errors in AutoGluon. '
-                                   'For the first case, you can increase the time_limits or set it to '
-                                   'None, e.g., setting "predictor.fit(..., time_limit=None). To '
-                                   'further investigate the root cause, you can also try to set the '
-                                   '"verbosity=3" and try again, i.e., predictor.set_verbosity(3).')
+                raise RuntimeError(no_job_finished_err_msg)
             best_config = scheduler.get_best_config()
             logger.log(25, 'Results=', scheduler.searcher._results)
             logger.log(25, 'Best_config={}'.format(best_config))
