@@ -1007,7 +1007,9 @@ class MultiModalTextModel:
                      train_fn.args['_default_config'])
             best_model_saved_dir_path = os.path.join(self._output_directory, 'task0')
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
-            if not os.path.exists(cfg_path):
+            if not os.path.exists(cfg_path)\
+                    or not os.path.exists(os.path.join(self._output_directory,
+                                                       'task0', 'best_model.params')):
                 raise RuntimeError(no_job_finished_err_msg)
             cfg = self.base_config.clone_merge(cfg_path)
             local_results = pd.read_json(os.path.join(self._output_directory, 'task0',
