@@ -37,6 +37,7 @@ def get_param_binary_baseline():
     baseline_params = {
         'objective': 'binary:logistic',
         'booster': 'gbtree',
+        'use_label_encoder': False,
     }
     params.update(baseline_params)
     return params
@@ -48,6 +49,7 @@ def get_param_multiclass_baseline(num_classes):
         'objective': 'multi:softmax',
         'booster': 'gbtree',
         'num_class': num_classes,
+        'use_label_encoder': False,
     }
     params.update(baseline_params)
     return params
