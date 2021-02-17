@@ -771,6 +771,7 @@ def get_recommended_resource(nthreads_per_trial=None,
     return nthreads_per_trial, ngpus_per_trial
 
 
+@use_np
 class MultiModalTextModel:
     """Learner of the multimodal text data.
 
