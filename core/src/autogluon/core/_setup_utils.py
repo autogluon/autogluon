@@ -13,19 +13,16 @@ AUTOGLUON_ROOT_PATH = os.path.abspath(
 PYTHON_REQUIRES = '>=3.6, <3.8'
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
-dependent_packages = {
+DEPENDENT_PACKAGES = {
     'numpy': '==1.19.5',
     'pandas': '>=1.0.0,<2.0',
     'scikit-learn': '>=0.22.0,<0.25',
     'scipy': '==1.5.4',
 }
-
-dependent_packages = {package: package + version for package, version in dependent_packages.items()}
-
-
-docs_packages = {}
-
-test_packages = [
+DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
+# TODO: Use DOCS_PACKAGES and TEST_PACKAGES
+DOCS_PACKAGES = []
+TEST_PACKAGES = [
     'openml',
     'flake8',
     'pytest',
@@ -39,10 +36,10 @@ def load_version_file():
 
 
 def get_dependency_version_ranges(packages: list) -> list:
-    return [package if package not in dependent_packages else dependent_packages[package] for package in packages]
+    return [package if package not in DEPENDENT_PACKAGES else DEPENDENT_PACKAGES[package] for package in packages]
 
 
-def update_version(version):
+def update_version(version, use_file_if_exists=True, create_file=False):
     """
     To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish
     a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml .
@@ -52,7 +49,7 @@ def update_version(version):
         if not os.getenv('RELEASE'):
             from datetime import date
             minor_version_file_path = os.path.join(AUTOGLUON_ROOT_PATH, 'VERSION.minor')
-            if os.path.isfile(minor_version_file_path):
+            if use_file_if_exists and os.path.isfile(minor_version_file_path):
                 with open(minor_version_file_path) as f:
                     day = f.read().strip()
             else:
@@ -61,6 +58,9 @@ def update_version(version):
             version += day
     except Exception:
         pass
+    if create_file and not os.getenv('RELEASE'):
+        with open(os.path.join(AUTOGLUON_ROOT_PATH, 'VERSION.minor'), 'w') as f:
+            f.write(day)
     return version
 
 
@@ -75,7 +75,7 @@ def create_version_file(*, version, submodule):
         f.write("__version__ = '{}'\n".format(version))
 
 
-def default_setup_args(*, submodule, version):
+def default_setup_args(*, version, submodule):
     from setuptools import find_packages
     long_description = open(os.path.join(AUTOGLUON_ROOT_PATH, 'README.md')).read()
     if submodule is None:

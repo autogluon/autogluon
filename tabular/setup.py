@@ -1,56 +1,30 @@
 #!/usr/bin/env python
+###########################
+# This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import os
-import shutil
-import subprocess
+from setuptools import setup
+import importlib.util
+filepath = os.path.abspath(os.path.dirname(__file__))
+filepath_import = os.path.join(filepath, '..', 'core', 'src', 'autogluon', 'core', '_setup_utils.py')
+spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
+ag = importlib.util.module_from_spec(spec)
+# Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
+spec.loader.exec_module(ag)
+###########################
 
-from setuptools import setup, find_packages
+version = ag.load_version_file()
+version = ag.update_version(version)
 
-cwd = os.path.dirname(os.path.abspath(__file__))
-
-with open(os.path.join(os.path.dirname(__file__), '..', 'VERSION')) as version_file:
-    version = version_file.read().strip()
-
-"""
-To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish
-a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml .
-You need to increase the version number after stable release, so that the nightly pypi can work properly.
-"""
-try:
-    if not os.getenv('RELEASE'):
-        from datetime import date
-        minor_version_file_path = os.path.join('..', 'VERSION.minor')
-        if os.path.isfile(minor_version_file_path):
-            with open(minor_version_file_path) as f:
-                day = f.read().strip()
-        else:
-            today = date.today()
-            day = today.strftime("b%Y%m%d")
-        version += day
-except Exception:
-    pass
-
-def create_version_file():
-    global version, cwd
-    print('-- Building version ' + version)
-    version_path = os.path.join(cwd, 'src', 'autogluon', 'tabular', 'version.py')
-    with open(version_path, 'w') as f:
-        f.write('"""This is autogluon version file."""\n')
-        f.write("__version__ = '{}'\n".format(version))
-
-
-long_description = open(os.path.join('..', 'README.md')).read()
-
-python_requires = '>=3.6, <3.8'
-
+submodule = 'tabular'
 requirements = [
-    'numpy==1.19.5',
-    'scipy==1.5.4',
+    'numpy',
+    'scipy',
     'catboost>=0.23.0,<0.25',
     'xgboost>=1.3.2,<1.4',
     'lightgbm>=3.0,<4.0',
-    'pandas>=1.0.0,<2.0',
+    'pandas',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
-    'scikit-learn>=0.22.0,<0.25',
+    'scikit-learn',
     'networkx>=2.3,<3.0',
     'torch>=1.0,<2.0',  # TODO: v0.1 make optional
     'fastai>=1.0,<2.0',  # TODO: v0.1 make optional
@@ -62,30 +36,13 @@ test_requirements = [
     'pytest',
 ]
 
-if __name__ == '__main__':
-    create_version_file()
-    setup(
-        # Metadata
-        name='autogluon.tabular',
-        version=version,
-        author='AutoGluon Community',
-        url='https://github.com/awslabs/autogluon',
-        description='AutoML for Text, Image, and Tabular Data',
-        long_description=long_description,
-        long_description_content_type='text/markdown',
-        license='Apache-2.0',
+install_requires = requirements + test_requirements
+install_requires = ag.get_dependency_version_ranges(install_requires)
 
-        # Package info
-        packages=find_packages('src'),
-        package_dir={'': 'src'},
-        namespace_packages=["autogluon"],
-        zip_safe=True,
-        include_package_data=True,
-        install_requires=requirements + test_requirements,
-        python_requires=python_requires,
-        package_data={'autogluon': [
-            'LICENSE',
-        ]},
-        entry_points={
-        },
+if __name__ == '__main__':
+    ag.create_version_file(version=version, submodule=submodule)
+    setup_args = ag.default_setup_args(version=version, submodule=submodule)
+    setup(
+        install_requires=install_requires,
+        **setup_args,
     )
