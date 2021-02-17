@@ -16,11 +16,11 @@ python3 run_text_prediction.py \
      --train_file glue/mnli/train.parquet \
      --dev_file glue/mnli/dev_matched.parquet \
      --test_file glue/mnli/test_matched.parquet \
-     --task mnli
+     --task mnli_m
 
 python3 run_text_prediction.py \
      --do_train \
      --train_file glue/mnli/train.parquet \
      --dev_file glue/mnli/dev_mismatched.parquet \
      --test_file glue/mnli/test_mismatched.parquet \
-     --task mnli
+     --task mnli_mm
