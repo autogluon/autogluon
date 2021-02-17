@@ -109,19 +109,6 @@ def test_cpu_only_raise(set_env_train_without_gpu):
                           num_gpus=0, seed=123)
 
 
-# Test the case that the model should raise because there are no text columns in the model.
-def test_no_text_column_raise():
-    data = [('😁😁😁😁😁😁', 'grin')] * 2000 + [('😃😃😃😃😃😃😃😃', 'smile')] * 1000 + [
-        ('😉😉😉', 'wink')] * 1000
-
-    df = pd.DataFrame(data, columns=['data', 'label'])
-    with pytest.raises(AssertionError):
-        predictor = TextPredictor(label='label', verbosity=4)
-        predictor.fit(df,
-                      hyperparameters=get_test_hyperparameters(),
-                      seed=123)
-
-
 def test_emoji():
     data = []
     for i in range(50 * 3):
