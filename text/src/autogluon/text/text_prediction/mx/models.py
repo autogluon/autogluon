@@ -1007,6 +1007,8 @@ class MultiModalTextModel:
                      train_fn.args['_default_config'])
             best_model_saved_dir_path = os.path.join(self._output_directory, 'task0')
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
+
+            # Check whether the job has finished
             if not os.path.exists(cfg_path)\
                     or not os.path.exists(os.path.join(self._output_directory,
                                                        'task0', 'best_model.params')):
