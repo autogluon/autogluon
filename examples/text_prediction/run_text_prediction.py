@@ -58,7 +58,8 @@ def get_parser():
     parser.add_argument('--use_tabular',
                         action='store_true',
                         help='Whether to use the stack ensemble '
-                             'enabled in AutoGluon Tabular for this task.')
+                             'enabled in AutoGluon Tabular for this task. '
+                             'If it is turned on, we will use 5-fold, 1-layer for stacking.')
     return parser
 
 
@@ -86,11 +87,12 @@ def train(args):
     dev_df = dev_df[feature_columns + [label_column]]
     test_df = test_df[feature_columns]
     if args.use_tabular:
-
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=eval_metric,
                                      path=args.exp_dir,
-                                     presets='multimodal')
+                                     hyperparameters='multimodal',
+                                     num_bag_folds=5,
+                                     num_stack_levels=1)
     else:
         predictor = TextPredictor(label=label_column,
                                   eval_metric=eval_metric,
