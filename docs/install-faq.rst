@@ -47,3 +47,15 @@
 
   You may have the wrong version of MXNet installed for your CUDA version.
   Match the CUDA version carefully when following the installation instructions (`nvcc --version`).
+
+* I see the error "ValueError: numpy.ndarray size changed, may indicate binary incompatibility. Expected 88 from C header, got 80 from PyObject".
+
+  Please apply this fix before installing autogluon. It will do two things:
+  1) force ConfigSpace to ignore toml dependencies (numpy 1.20.x) and use locally installed numpy and cython;
+  2) force re-install of updated ConfigSpace in case it was cached before
+
+   .. code-block::
+     python3 -m pip uninstall -y ConfigSpace
+     python3 -m pip install 'numpy==1.19.5'
+     python3 -m pip install 'Cython>=0.29.21,<3'
+     python3 -m pip install --force 'ConfigSpace==0.4.14' --no-binary :all:

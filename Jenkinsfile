@@ -1,5 +1,18 @@
 max_time = 180
 
+apply_configspace_cache_fix = """
+    # ConfigSpace must be built against correct numpy and scipy; by default build isolation will force versions
+    # specified in https://github.com/automl/ConfigSpace/blob/master/pyproject.toml
+    # This fix does two things:
+    # 1) it forces ConfigSpace to ignore toml dependencies (numpy 1.20.x)
+    # 2) it forces re-install of ConfigSpace in case it was cached before
+
+    python3 -m pip uninstall -y ConfigSpace
+    python3 -m pip install 'numpy==1.19.5'
+    python3 -m pip install 'Cython>=0.29.21,<3'
+    python3 -m pip install --force 'ConfigSpace==0.4.14' --no-binary :all:
+"""
+
 setup_pip_venv = """
     rm -rf venv
     conda list
@@ -9,13 +22,7 @@ setup_pip_venv = """
     python3 -m pip install -U pip
     python3 -m pip install -U setuptools wheel
 
-    python3 -m pip uninstall -y scipy scikit-learn ConfigSpace numpy
-    python3 -m pip install 'numpy==1.19.5'
-    python3 -m pip install 'scipy==1.5.4'
-
-    # ConfigSpace MUST be installed after correct cython and numpy installed
-    # otherwise it will compile against the version in Conda (1.20.x)
-    python3 -m pip install 'ConfigSpace==0.4.14' --no-binary :all:
+    ${apply_configspace_cache_fix}
 
     python3 -m pip install 'graphviz'
     python3 -m pip install 'jupyter-sphinx>=0.2.2'
