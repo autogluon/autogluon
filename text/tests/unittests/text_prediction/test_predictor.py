@@ -111,8 +111,8 @@ def test_cpu_only_raise(set_env_train_without_gpu):
 
 # Test the case that the model should raise because there are no text columns in the model.
 def test_no_text_column_raise():
-    data = [('😁😁😁😁😁😁', 'grin')] * 200 + [('😃😃😃😃😃😃😃😃', 'smile')] * 500 + [
-        ('😉😉😉', 'wink')] * 300
+    data = [('😁😁😁😁😁😁', 'grin')] * 2000 + [('😃😃😃😃😃😃😃😃', 'smile')] * 1000 + [
+        ('😉😉😉', 'wink')] * 1000
 
     df = pd.DataFrame(data, columns=['data', 'label'])
     with pytest.raises(AssertionError):
