@@ -17,13 +17,15 @@ version = ag.update_version(version)
 
 submodule = 'extra'
 requirements = [
+    # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
-    'gluoncv>=0.9.2,<1.0',
     'scipy',
-    'graphviz<0.9.0,>=0.8.1',
-    'bokeh',
     'pandas',
     'scikit-learn',
+    'gluoncv',
+    'graphviz',
+
+    'bokeh',  # TODO: Remove bokeh, it should be purely optional and specific to core, not extra
     f'autogluon.core=={version}',
 ]
 

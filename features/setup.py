@@ -17,9 +17,11 @@ version = ag.update_version(version)
 
 submodule = 'features'
 requirements = [
+    # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'pandas',
     'scikit-learn',
+
     f'autogluon.core=={version}',
 ]
 

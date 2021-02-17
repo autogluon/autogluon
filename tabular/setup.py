@@ -17,14 +17,16 @@ version = ag.update_version(version)
 
 submodule = 'tabular'
 requirements = [
+    # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
+    'pandas',
+    'scikit-learn',
+
     'catboost>=0.23.0,<0.25',
     'xgboost>=1.3.2,<1.4',
     'lightgbm>=3.0,<4.0',
-    'pandas',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
-    'scikit-learn',
     'networkx>=2.3,<3.0',
     'torch>=1.0,<2.0',  # TODO: v0.1 make optional
     'fastai>=1.0,<2.0',  # TODO: v0.1 make optional

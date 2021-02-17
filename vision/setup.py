@@ -17,12 +17,14 @@ version = ag.update_version(version)
 
 submodule = 'vision'
 requirements = [
-    'Pillow<=8.1',
+    # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
-    'matplotlib',
-    'gluoncv>=0.9.2,<1.0',
-    'graphviz<0.9.0,>=0.8.1',
     'pandas',
+    'gluoncv',
+    'Pillow',
+    'graphviz',
+
+    'matplotlib',
     'd8>=0.0.2,<1.0',
     f'autogluon.core=={version}',
     f'autogluon.mxnet=={version}'

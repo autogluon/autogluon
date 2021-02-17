@@ -17,11 +17,13 @@ version = ag.update_version(version)
 
 submodule = 'text'
 requirements = [
+    # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
-    'tqdm>=4.38.0',
     'pandas',
     'scikit-learn',
+    'tqdm',
+
     f'autogluon.core=={version}',
     f'autogluon.mxnet=={version}',
     'pyarrow>=3.0.0',

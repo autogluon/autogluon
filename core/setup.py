@@ -17,22 +17,24 @@ version = ag.update_version(version, use_file_if_exists=False, create_file=True)
 
 submodule = 'core'
 requirements = [
+    # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
     'scikit-learn',
+    'pandas',
+    'tqdm',
+    'graphviz',
+
     'cython',  # TODO: Do we need cython here? Why is cython not version capped / minned?
     'ConfigSpace==0.4.14',
     'tornado>=5.0.1',
     'requests',
     'matplotlib',
-    'tqdm>=4.38.0',
     'paramiko>=2.4',
     'dask>=2.6.0',
     'distributed>=2.6.0',
-    'graphviz<0.9.0,>=0.8.1',
     'scikit-optimize',  # TODO v0.1: Remove?
     'boto3',
-    'pandas',
     'autograd>=1.3',
     'dill==0.3.3',  # TODO v0.1: Loosen version restriction?
 ]

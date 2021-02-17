@@ -17,11 +17,13 @@ version = ag.update_version(version)
 
 submodule = 'mxnet'
 requirements = [
-    'Pillow<=8.1',
+    # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
-    'matplotlib',
     'pandas',
     'scikit-learn',
+    'Pillow',
+
+    'matplotlib',
     f'autogluon.core=={version}',
 ]
 
