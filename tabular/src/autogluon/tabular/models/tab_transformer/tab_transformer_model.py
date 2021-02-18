@@ -215,8 +215,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
                 val_metric = None
                 if loader_val is not None and state != 'pretrain':
-                    val_metric = self.score(X=loader_val, y=y_val, eval_metric=self.stopping_metric,
-                                            metric_needs_y_pred=self.stopping_metric.needs_pred)
+                    val_metric = self.score(X=loader_val, y=y_val, metric=self.stopping_metric)
                     data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(
                         train_test, epoch, epochs, total_loss / total_num, self.stopping_metric.name, val_metric))
 

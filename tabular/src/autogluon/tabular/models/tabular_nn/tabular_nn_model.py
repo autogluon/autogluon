@@ -89,7 +89,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self._architecture_desc = None
         self.optimizer = None
         self.verbosity = None
-        self.eval_metric_name = self.stopping_metric.name
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
@@ -339,23 +338,23 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 cumulative_loss += loss.sum()
             train_loss = cumulative_loss/float(train_dataset.num_examples)  # training loss this epoch
             if val_dataset is not None:
-                val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric.needs_pred)
-            if (val_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
-                if val_dataset is not None:
+                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
+                if (val_metric >= best_val_metric) or (e == 0):
                     if not np.isnan(val_metric):
                         if val_metric > best_val_metric:
                             val_improve_epoch = e
                         best_val_metric = val_metric
+                        best_val_epoch = e
+                        # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
+                        self.model.save_parameters(net_filename)
+            else:
                 best_val_epoch = e
-                # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
-                if val_dataset is not None:
-                    self.model.save_parameters(net_filename)
             if val_dataset is not None:
                 if verbose_eval > 0 and e % verbose_eval == 0:
                     logger.log(15, "Epoch %s.  Train loss: %s, Val %s: %s" %
-                      (e, train_loss.asscalar(), self.eval_metric_name, val_metric))
+                      (e, train_loss.asscalar(), self.stopping_metric.name, val_metric))
                 if self.summary_writer is not None:
-                    self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name,
+                    self.summary_writer.add_scalar(tag='val_'+self.stopping_metric.name,
                                                    value=val_metric, global_step=e)
             else:
                 if verbose_eval > 0 and e % verbose_eval == 0:
@@ -390,11 +389,11 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if val_dataset is None:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:  # evaluate one final time:
-            final_val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric.needs_pred)
+            final_val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
             if np.isnan(final_val_metric):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
-                  (best_val_epoch, self.eval_metric_name, final_val_metric))
+                  (best_val_epoch, self.stopping_metric.name, final_val_metric))
         self.params_trained['num_epochs'] = best_val_epoch + 1
         return
 

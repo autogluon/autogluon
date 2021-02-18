@@ -3,6 +3,7 @@ import logging
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import mean_squared_error
 from .presets import get_preset_models, get_preset_models_softclass
+from ..utils import process_hyperparameters
 
 logger = logging.getLogger(__name__)
 
@@ -16,16 +17,19 @@ DEFAULT_DISTILL_PRIORITY = dict(
 )
 
 
-def get_preset_models_distillation(path, problem_type, eval_metric, feature_metadata, hyperparameters, num_classes=None,
-                                   distill_level=0, name_suffix='_DSTL', invalid_model_names: list = None):
+def get_preset_models_distillation(path, problem_type, eval_metric, hyperparameters,
+                                   level=0, name_suffix='_DSTL', invalid_model_names: list = None, **kwargs):
+    hyperparameters = process_hyperparameters(hyperparameters)
+    level_key = level if level in hyperparameters.keys() else 'default'
+    if level_key not in hyperparameters.keys() and level_key == 'default':
+        hyperparameters = {'default': hyperparameters}
+    hyperparameters = hyperparameters[level_key]
     if problem_type == BINARY:  # convert to regression in distillation
         eval_metric = mean_squared_error
         # Constrain output-range of NN:
         nn_outputrange = {'y_range': (0.0,1.0), 'y_range_extend': 0.0}
         if 'NN' in hyperparameters:
             nn_hyperparameters = hyperparameters['NN']
-        elif 'default' in hyperparameters and 'NN' in hyperparameters['default']:
-            nn_hyperparameters = hyperparameters['default']['NN']
         else:
             nn_hyperparameters = None
         if isinstance(nn_hyperparameters, list):
@@ -35,14 +39,10 @@ def get_preset_models_distillation(path, problem_type, eval_metric, feature_meta
             nn_hyperparameters.update(nn_outputrange)
         if 'NN' in hyperparameters:
             hyperparameters['NN'] = nn_hyperparameters
-        elif 'default' in hyperparameters and 'NN' in hyperparameters['default']:
-            hyperparameters['default']['NN'] = nn_hyperparameters
         # Swap RF criterion for MSE:
         rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
         if 'RF' in hyperparameters:
             rf_hyperparameters = hyperparameters['RF']
-        elif 'default' in hyperparameters and 'RF' in hyperparameters['default']:
-            rf_hyperparameters = hyperparameters['default']['RF']
         else:
             rf_hyperparameters = None
         if isinstance(rf_hyperparameters, list):
@@ -53,15 +53,13 @@ def get_preset_models_distillation(path, problem_type, eval_metric, feature_meta
             rf_hyperparameters.update(rf_newparams)
         if 'RF' in hyperparameters:
             hyperparameters['RF'] = rf_hyperparameters
-        elif 'default' in hyperparameters and 'RF' in hyperparameters['default']:
-            hyperparameters['default']['RF'] = rf_hyperparameters
 
     if problem_type == MULTICLASS:
-        models, model_args_fit = get_preset_models_softclass(path=path, num_classes=num_classes, hyperparameters=hyperparameters, feature_metadata=feature_metadata,
-                                             name_suffix=name_suffix, invalid_model_names=invalid_model_names)
+        models, model_args_fit = get_preset_models_softclass(path=path, hyperparameters=hyperparameters, level=level,
+                                                             name_suffix=name_suffix, invalid_model_names=invalid_model_names, **kwargs)
     else:  # BINARY or REGRESSION
-        models, model_args_fit = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=eval_metric, hyperparameters=hyperparameters, feature_metadata=feature_metadata,
-                                   name_suffix=name_suffix, default_priorities=DEFAULT_DISTILL_PRIORITY, invalid_model_names=invalid_model_names)
+        models, model_args_fit = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=eval_metric, hyperparameters=hyperparameters, level=level,
+                                                   name_suffix=name_suffix, default_priorities=DEFAULT_DISTILL_PRIORITY, invalid_model_names=invalid_model_names, **kwargs)
 
     if problem_type in [MULTICLASS, BINARY]:
         for model in models:

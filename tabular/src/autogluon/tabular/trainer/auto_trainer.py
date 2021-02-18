@@ -55,6 +55,7 @@ class AutoTrainer(AbstractTrainer):
         num_classes = kwargs.pop('num_classes', self.num_classes)
         invalid_model_names = kwargs.pop('invalid_model_names', self._get_banned_model_names())
         feature_metadata = kwargs.pop('feature_metadata', self.feature_metadata)
+        silent = kwargs.pop('silent', self.verbosity < 3)
 
         return get_preset_models_distillation(
             path=path,
@@ -64,5 +65,6 @@ class AutoTrainer(AbstractTrainer):
             num_classes=num_classes,
             hyperparameters=hyperparameters,
             invalid_model_names=invalid_model_names,
+            silent=silent,
             **kwargs,
         )

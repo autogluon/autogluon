@@ -8,7 +8,7 @@ import numpy as np
 import psutil
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from autogluon.core.constants import MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.features.types import R_OBJECT
 
@@ -29,7 +29,7 @@ class RFModel(AbstractModel):
         self._feature_generator = None
 
     def _get_model_type(self):
-        if self.problem_type == REGRESSION:
+        if self.problem_type in [REGRESSION, SOFTCLASS]:
             return RandomForestRegressor
         else:
             return RandomForestClassifier
@@ -78,7 +78,7 @@ class RFModel(AbstractModel):
         n_estimator_increments = [n_estimators_final]
 
         # Very rough guess to size of a single tree before training
-        if self.problem_type == MULTICLASS:
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
             if self.num_classes is None:
                 num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y_train for a better value
             else:
@@ -144,6 +144,28 @@ class RFModel(AbstractModel):
                         n_estimator_increments[j] = n_estimators_ideal
 
         self.params_trained['n_estimators'] = self.model.n_estimators
+
+    # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
+
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X)
+        elif self.problem_type == SOFTCLASS:
+            return self.model.predict(X)
+
+        y_pred_proba = self.model.predict_proba(X)
+        if self.problem_type == BINARY:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            elif y_pred_proba.shape[1] > 1:
+                return y_pred_proba[:, 1]
+            else:
+                return y_pred_proba
+        elif y_pred_proba.shape[1] > 2:
+            return y_pred_proba
+        else:
+            return y_pred_proba[:, 1]
 
     # TODO: Add HPO
     def _hyperparameter_tune(self, **kwargs):

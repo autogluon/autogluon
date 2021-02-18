@@ -346,28 +346,24 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, **kwargs):
-        if eval_metric is None:
-            eval_metric = self.eval_metric
-        if metric_needs_y_pred is None:
-            metric_needs_y_pred = eval_metric.needs_pred
-        if metric_needs_y_pred:
+    def score(self, X, y, metric=None, **kwargs):
+        if metric is None:
+            metric = self.eval_metric
+        if metric.needs_pred:
             y_pred = self.predict(X=X, **kwargs)
-            return eval_metric(y, y_pred)
+            return metric(y, y_pred)
         else:
             y_pred_proba = self.predict_proba(X=X, **kwargs)
-            return eval_metric(y, y_pred_proba)
+            return metric(y, y_pred_proba)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
-        if eval_metric is None:
-            eval_metric = self.eval_metric
-        if metric_needs_y_pred is None:
-            metric_needs_y_pred = eval_metric.needs_pred
-        if metric_needs_y_pred:
+    def score_with_y_pred_proba(self, y, y_pred_proba, metric=None):
+        if metric is None:
+            metric = self.eval_metric
+        if metric.needs_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-            return eval_metric(y, y_pred)
+            return metric(y, y_pred)
         else:
-            return eval_metric(y, y_pred_proba)
+            return metric(y, y_pred_proba)
 
     def save(self, path: str = None, verbose=True) -> str:
         """

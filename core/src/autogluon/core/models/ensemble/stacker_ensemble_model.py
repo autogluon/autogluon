@@ -8,7 +8,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from ...constants import MULTICLASS
+from ...constants import MULTICLASS, SOFTCLASS
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_FLOAT, S_STACK
 
@@ -118,7 +118,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return X
 
     def pred_probas_to_df(self, pred_proba: list, index=None) -> pd.DataFrame:
-        if self.problem_type == MULTICLASS:
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
             pred_proba = np.concatenate(pred_proba, axis=1)
             pred_proba = pd.DataFrame(pred_proba, columns=self.stack_columns)
         else:
@@ -144,7 +144,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self.base_model_paths_dict[model] = self.path_root + model_local_path
 
     def set_stack_columns(self, stack_column_prefix_lst):
-        if self.problem_type == MULTICLASS:
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
             stack_columns = [stack_column_prefix + '_' + str(cls) for stack_column_prefix in stack_column_prefix_lst for cls in range(self.num_classes)]
             num_pred_cols_per_model = self.num_classes
         else:
