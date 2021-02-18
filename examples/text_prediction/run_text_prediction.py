@@ -55,11 +55,11 @@ def get_parser():
     parser.add_argument('--config_file', type=str,
                         help='The configuration of the TextPrediction module',
                         default=None)
-    parser.add_argument('--use_tabular',
-                        action='store_true',
-                        help='Whether to use the stack ensemble '
-                             'enabled in AutoGluon Tabular for this task. '
-                             'If it is turned on, we will use 5-fold, 1-layer for stacking.')
+    parser.add_argument('--mode',
+                        choices=['stacking', 'single'],
+                        default='single',
+                        help='Whether to use a single model or a stack ensemble. '
+                             'If it is "single", If it is turned on, we will use 5-fold, 1-layer for stacking.')
     return parser
 
 
@@ -86,17 +86,19 @@ def train(args):
     train_df = train_df[feature_columns + [label_column]]
     dev_df = dev_df[feature_columns + [label_column]]
     test_df = test_df[feature_columns]
-    if args.use_tabular:
+    if args.mode == 'stacking':
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=eval_metric,
                                      path=args.exp_dir,
                                      hyperparameters='multimodal',
                                      num_bag_folds=5,
                                      num_stack_levels=1)
-    else:
+    elif args.mode == 'single':
         predictor = TextPredictor(label=label_column,
                                   eval_metric=eval_metric,
                                   path=args.exp_dir)
+    else:
+        raise NotImplementedError
     predictor.fit(train_data=train_df, tuning_data=dev_df,
                   seed=args.seed)
     dev_metric_score = predictor.evaluate(dev_df)

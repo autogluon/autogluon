@@ -1,17 +1,17 @@
 # Text Prediction - Quick Start
 :label:`sec_textprediction_beginner`
 
-Here we introduce the `TextPrediction` task, which helps you automatically train and deploy models for various Natural Language Processing (NLP) problems.
-This tutorial presents two examples to demonstrate how `TextPrediction` can be used for different NLP tasks including:
+Here we introduce the `TextPredictor`, which helps you automatically train and deploy models for various Natural Language Processing (NLP) problems.
+This tutorial presents two examples to demonstrate how `TextPredictor` can be used for different NLP tasks including:
 
 - [Sentiment Analysis](https://en.wikipedia.org/wiki/Sentiment_analysis)
 - [Sentence Similarity](https://arxiv.org/abs/1910.03940)
 
 The general usage is similar to AutoGluon's `TabularPredictor`. We treat NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict. 
 Here, the labels can be discrete categories (classification) or numerical values (regression).
-`TextPrediction` fits neural networks to your data via transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
+`TextPredictor` fits neural networks to your data via transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
 [ALBERT](https://arxiv.org/pdf/1909.11942.pdf), and [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB).
-`TextPrediction` also trains multiple models with different hyperparameters and returns the best model, a process called Hyperparameter Optimization (HPO).
+`TextPredictor` also enables training on multi-modal data tables that contain text, numeric and categorical columns, and can be used together with Hyperparameter Optimization (HPO).
 
 
 ```{.python .input}
@@ -38,17 +38,14 @@ train_data.head(10)
 Above the data happen to be stored in a [Parquet](https://databricks.com/glossary/what-is-parquet) table format, but you can also directly `load()` data from a [CSV](https://en.wikipedia.org/wiki/Comma-separated_values) file instead. While here we load files from [AWS S3 cloud storage](https://docs.aws.amazon.com/AmazonS3/latest/dev/Welcome.html), these could instead be local files on your machine. After loading, `train_data` is simply a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), where each row represents a different training example (for machine learning to be appropriate, the rows should be independent and identically distributed).
 
 To ensure this tutorial runs quickly, we simply call `fit()` with a subset of 2000 training examples and limit its runtime to approximately 1 minute. 
-To achieve reasonable performance in your applications, you should set much longer `time_limits` (eg. 1 hour), or do not specify `time_limits` at all.
+To achieve reasonable performance in your applications, you should set much longer `time_limit` (eg. 1 hour), or do not specify `time_limit` at all.
 
 
 ```{.python .input}
-from autogluon.text import TextPrediction as task
+from autogluon.text import TextPredictor
 
-predictor = task.fit(train_data, label='label', 
-                     time_limits=60,
-                     ngpus_per_trial=1,
-                     seed=123,
-                     output_directory='./ag_sst')
+predictor = TextPredictor(label='label', path='./ag_sst')
+predictor.fit(train_data, time_limit=60, seed=123) 
 ```
 
 Above we specify that: the **label** column of our DataFrame contains the label-values to predict, AutoGluon should run for 60 seconds, each training run of an individual model (with particular hyperparameters) should run on 1 GPU, a particular random seed should be used to facilitate reproducibility, and that trained models should be saved in the **ag_sst** folder.
@@ -109,9 +106,8 @@ Once again, you should increase the short `time_limits` below to obtain reasonab
 
 
 ```{.python .input}
-predictor_sts = task.fit(train_data, label='score',
-                         time_limits='1min', ngpus_per_trial=1, seed=123,
-                         output_directory='./ag_sts')
+predictor_sts = TextPredictor(label='score', path='./ag_sts')
+predictor_sts.fit(train_data, time_limit=60, seed=123) 
 ```
 
 We again evaluate our trained model's performance on some separate test data. Below we choose to compute the following metrics: RMSE, Pearson Correlation, and Spearman Correlation.
@@ -177,5 +173,5 @@ embeddings = predictor_sts_new.extract_embedding(dev_data)
 print(embeddings)
 ```
 
-**Note:** `TextPrediction` depends on the [GluonNLP](https://gluon-nlp.mxnet.io/) package. 
+**Note:** `TextPredictor` depends on the [GluonNLP](https://gluon-nlp.mxnet.io/) package. 
 Due to an ongoing upgrade of GluonNLP, we are currently using a custom version of the package: [autogluon-contrib-nlp](https://github.com/sxjscience/autogluon-contrib-nlp.git). In a future release, AutoGluon will switch to using the official GluonNLP, but the APIs demonstrated here will remain the same.
