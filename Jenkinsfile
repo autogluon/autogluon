@@ -52,6 +52,10 @@ install_tabular = """
     python3 -m pip install --upgrade -e tabular/[all]
 """
 
+install_tabular_all = """
+    ${install_tabular}[all]
+"""
+
 install_text = """
     python3 -m pip install --upgrade -e text/
 """
@@ -76,7 +80,7 @@ stage("Unit Test") {
           python3 -m pip install 'mxnet==1.7.0.*'
           env
 
-          ${install_core}
+          ${install_core}[tests]
           cd core/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
@@ -132,7 +136,7 @@ stage("Unit Test") {
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          ${install_tabular}
+          ${install_tabular_all}
           ${install_mxnet}
           ${install_text}
 
@@ -222,7 +226,7 @@ stage("Unit Test") {
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          ${install_tabular}
+          ${install_tabular_all}
           ${install_mxnet}
           ${install_text}
 

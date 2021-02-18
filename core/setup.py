@@ -16,7 +16,7 @@ version = ag.load_version_file()
 version = ag.update_version(version, use_file_if_exists=False, create_file=True)
 
 submodule = 'core'
-requirements = [
+install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
@@ -38,17 +38,20 @@ requirements = [
     'dill==0.3.3',  # TODO v0.1: Loosen version restriction?
 ]
 
-test_requirements = [
-    'pytest'
-]
-
 extras_require = {
     'extra_searchers': [
         'scikit-optimize',  # Optional due to only being rarely used and due to breaking install in the past
     ],
 }
 
-install_requires = requirements + test_requirements
+tests_require = [
+    'pytest',
+]
+for extra_package in ['extra_searchers']:
+    tests_require += extras_require[extra_package]
+tests_require = list(set(tests_require))
+extras_require['tests'] = tests_require
+
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == '__main__':
