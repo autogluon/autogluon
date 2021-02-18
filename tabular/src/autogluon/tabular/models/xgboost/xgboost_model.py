@@ -69,6 +69,7 @@ class XGBoostModel(AbstractModel):
         verbosity = kwargs.get('verbosity', 2)
         if verbosity <= 2:
             verbose = False
+            verbose_eval = None
         elif verbosity == 3:
             verbose = True
             verbose_eval = 50
@@ -97,12 +98,13 @@ class XGBoostModel(AbstractModel):
                 params['gpu_id'] = 0
 
         try_import_xgboost()
-        from .callbacks import print_evaluation, early_stop_custom
+        from .callbacks import EarlyStoppingCustom
+        from xgboost.callback import EvaluationMonitor
         callbacks = []
-        if verbose:
-            callbacks.append(print_evaluation(verbose_eval))
+        if verbose_eval is not None:
+            callbacks.append(EvaluationMonitor(period=verbose_eval))
         # TODO: disable early stopping during refit_full
-        callbacks.append(early_stop_custom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
+        callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
 
         from xgboost import XGBClassifier, XGBRegressor
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
