@@ -33,7 +33,6 @@ requirements = [
     'paramiko>=2.4',
     'dask>=2.6.0',
     'distributed>=2.6.0',
-    'scikit-optimize',  # TODO v0.1: Remove?
     'boto3',
     'autograd>=1.3',
     'dill==0.3.3',  # TODO v0.1: Loosen version restriction?
@@ -43,6 +42,12 @@ test_requirements = [
     'pytest'
 ]
 
+extra_requires = {
+    'extra_searchers': [
+        'scikit-optimize',  # Optional due to only being rarely used and due to breaking install in the past
+    ],
+}
+
 install_requires = requirements + test_requirements
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
@@ -51,6 +56,7 @@ if __name__ == '__main__':
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
         install_requires=install_requires,
+        extra_requires=extra_requires,
         entry_points={
             'console_scripts': [
                 'agremote = autogluon.core.scheduler.remote.cli:main',

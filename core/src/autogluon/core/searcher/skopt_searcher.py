@@ -1,12 +1,9 @@
 import pickle
 import logging
 
-from ..utils import warning_filter
-with warning_filter():
-    from skopt import Optimizer
-    from skopt.space import Integer, Real, Categorical
-
 from .searcher import BaseSearcher
+from ..utils import warning_filter
+from ..utils.try_import import try_import_skopt
 
 __all__ = ['SKoptSearcher']
 
@@ -87,6 +84,10 @@ class SKoptSearcher(BaseSearcher):
             configspace, reward_attribute=kwargs.get('reward_attribute'))
         self.hp_ordering = configspace.get_hyperparameter_names() # fix order of hyperparams in configspace.
         skopt_hpspace = []
+        with warning_filter():
+            try_import_skopt()
+            from skopt import Optimizer
+            from skopt.space import Integer, Real, Categorical
         for hp in self.hp_ordering:
             hp_obj = configspace.get_hyperparameter(hp)
             hp_type = str(type(hp_obj)).lower() # type of hyperparam

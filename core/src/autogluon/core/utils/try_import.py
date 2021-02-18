@@ -9,7 +9,8 @@ __all__ = [
     'try_import_fastai_v1',
     'try_import_cv2',
     'try_import_gluonnlp',
-    'try_import_torch']
+    'try_import_torch',
+    'try_import_skopt']
 
 
 def try_import_mxboard():
@@ -71,15 +72,16 @@ def try_import_xgboost():
     try:
         import xgboost
     except ImportError:
-        raise ImportError("Import xgboost failed."
+        raise ImportError("Import xgboost failed. "
                           "A quick tip is to install via `pip install xgboost`.")
+
 
 def try_import_faiss():
     try:
         import faiss
     except ImportError:
         raise ImportError(
-            "Unable to import dependency faiss"
+            "Unable to import dependency faiss. "
             "A quick tip is to install via `pip install faiss-cpu`. ")
 
 
@@ -128,3 +130,11 @@ def try_import_torch():
         raise ImportError("Unable to import dependency torch\n"
                           "A quick tip is to install via `pip install torch`.\n"
                           "The minimum torch version is currently 1.6.")
+
+
+def try_import_skopt():
+    try:
+        import skopt
+    except ImportError:
+        raise ImportError("`import skopt` failed. skopt is an optional dependency and may not be installed.\n"
+                          "A quick tip is to install via `pip install scikit-optimize`.")
