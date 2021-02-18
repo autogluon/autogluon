@@ -3,7 +3,7 @@ import logging
 from .ensemble_selection import EnsembleSelection
 from ..abstract.abstract_model import AbstractModel
 from ..abstract.model_trial import skip_hpo
-from ...constants import MULTICLASS
+from ...constants import MULTICLASS, SOFTCLASS
 from ...features.types import S_STACK
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
         self.model_base = model_base
-        self.num_pred_cols_per_model = self.num_classes if self.problem_type == MULTICLASS else 1
+        self.num_pred_cols_per_model = self.num_classes if self.problem_type in [MULTICLASS, SOFTCLASS] else 1
         self.base_model_names = base_model_names
         if self.base_model_names is not None:
             self.features = self._set_stack_columns(base_model_names=self.base_model_names)
@@ -67,7 +67,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         return base_models_to_keep, base_model_weights_to_keep
 
     def _set_stack_columns(self, base_model_names):
-        if self.problem_type == MULTICLASS:
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
             stack_columns = [model_name + '_' + str(cls) for model_name in base_model_names for cls in range(self.num_classes)]
         else:
             stack_columns = base_model_names

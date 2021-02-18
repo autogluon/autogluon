@@ -291,7 +291,7 @@ class AbstractTrainer:
 
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=0, base_model_names: List[str] = None, stack_name='core',
-                             ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, **kwargs) -> List[str]:
+                             ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, get_models_func=None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 0, then the models will use base model predictions as additional features.
@@ -299,6 +299,8 @@ class AbstractTrainer:
         If self.bagged_mode, then models will be trained as StackerEnsembleModels.
         The data provided in this method should not contain stack features, as they will be automatically generated if necessary.
         """
+        if get_models_func is None:
+            get_models_func = self.get_models
         if base_model_names is None:
             base_model_names = []
         if not self.bagged_mode and level != 0:
@@ -336,7 +338,7 @@ class AbstractTrainer:
                     ensemble_kwargs=ensemble_kwargs,
                 ))
 
-            models, model_args_fit = self.get_models(hyperparameters=models, **get_models_kwargs)
+            models, model_args_fit = get_models_func(hyperparameters=models, **get_models_kwargs)
             if model_args_fit:
                 hyperparameter_tune_kwargs = {
                     model_name: model_args_fit[model_name]['hyperparameter_tune_kwargs']
@@ -355,32 +357,30 @@ class AbstractTrainer:
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
-    def stack_new_level_aux(self, X, y, base_model_names: List[str], level, fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None) -> List[str]:
+    def stack_new_level_aux(self, X, y, base_model_names: List[str], level, fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
         X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False)
-        return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix)
+        return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
 
     def predict(self, X, model=None):
-        if model is not None:
-            return self._predict_model(X, model)
-        elif self.model_best is not None:
-            return self._predict_model(X, self.model_best)
-        else:
-            model = self.get_model_best()
-            return self._predict_model(X, model)
+        if model is None:
+            model = self._get_best()
+        return self._predict_model(X, model)
 
     def predict_proba(self, X, model=None):
-        if model is not None:
-            return self._predict_proba_model(X, model)
-        elif self.model_best is not None:
-            return self._predict_proba_model(X, self.model_best)
+        if model is None:
+            model = self._get_best()
+        return self._predict_proba_model(X, model)
+
+    def _get_best(self):
+        if self.model_best is not None:
+            return self.model_best
         else:
-            model = self.get_model_best()
-            return self._predict_proba_model(X, model)
+            return self.get_model_best()
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
     def get_inputs_to_model(self, model, X, model_pred_proba_dict=None, fit=False, preprocess_nonadaptive=False):
@@ -804,7 +804,9 @@ class AbstractTrainer:
             logger.log(30, f'No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.')
         return unpersisted_models
 
-    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None) -> List[str]:
+    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None, get_models_func=None) -> List[str]:
+        if get_models_func is None:
+            get_models_func = self.get_models
         if len(base_model_names) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return []
@@ -819,7 +821,7 @@ class AbstractTrainer:
             else:
                 save_bag_folds = True
 
-        weighted_ensemble_model, _ = self.get_models(
+        weighted_ensemble_model, _ = get_models_func(
             hyperparameters={
                 'default': {
                     'ENS_WEIGHTED': [child_hyperparameters],
@@ -937,11 +939,12 @@ class AbstractTrainer:
                 del model
         return model_names_trained
 
-    def _add_model(self, model: AbstractModel, stack_name: str = 'core', level: int = 0):
+    def _add_model(self, model: AbstractModel, stack_name: str = 'core', level: int = 0) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
         If self.low_memory, then the model object will be deleted after this call. Use Trainer directly to leverage the model further.
+
         Parameters
         ----------
         model : AbstractModel
@@ -952,13 +955,22 @@ class AbstractTrainer:
             Stack level of the stack name to assign the model to. This is used for advanced functionality.
             The model's name is appended to self.models_level[stack_name][level]
             The model's base_models (if it has any) must all be a lower level than the model.
+
+        Returns
+        -------
+        boolean, True if model was registered, False if model was found to be invalid and not registered.
         """
-        if model.val_score is not None and stack_name != self.distill_stackname:  # TODO: may want to avoid hard-coding logic into specific stack names
-            logger.log(20, f'\t{round(model.val_score, 4)}\t = Validation {self.eval_metric.name} score')
+        if model.val_score is not None:
+            if model.eval_metric.name != self.eval_metric.name:
+                logger.log(20, f'\tNote: model has different eval_metric than default.')
+            logger.log(20, f'\t{round(model.val_score, 4)}\t = Validation {model.eval_metric.name} score')
         if model.fit_time is not None:
             logger.log(20, f'\t{round(model.fit_time, 2)}s\t = Training runtime')
         if model.predict_time is not None:
             logger.log(20, f'\t{round(model.predict_time, 2)}s\t = Validation runtime')
+        if model.val_score is not None and np.isnan(model.val_score):
+            logger.warning(f'WARNING: {model.name} has a val_score of {model.val_score} (NaN)! This should never happen. The model will not be saved to avoid instability.')
+            return False
         # TODO: Add to HPO
         if isinstance(model, BaggedEnsembleModel):
             type_inner = model._child_type
@@ -989,6 +1001,7 @@ class AbstractTrainer:
                 self.model_graph.add_edge(base_model_name, model.name)
         if self.low_memory:
             del model
+        return True
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self, X_train, y_train, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False,
@@ -1034,8 +1047,8 @@ class AbstractTrainer:
                 for model_hpo_name, model_path in hpo_models.items():
                     model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
                     logging.log(20, f'Fitted model: {model_hpo.name} ...')
-                    self._add_model(model=model_hpo, stack_name=stack_name, level=level)
-                    model_names_trained.append(model_hpo.name)
+                    if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
+                        model_names_trained.append(model_hpo.name)
         else:
             if isinstance(model, BaggedEnsembleModel):
                 model_fit_kwargs.update(dict(
@@ -1778,7 +1791,7 @@ class AbstractTrainer:
 
     def distill(self, X_train=None, y_train=None, X_val=None, y_val=None, X_unlabeled=None,
                 time_limit=None, hyperparameters=None, holdout_frac=None, verbosity=None,
-                models_name_suffix=None, teacher_preds='soft',
+                models_name_suffix=None, teacher=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
         """ Various distillation algorithms.
             Args:
@@ -1787,6 +1800,8 @@ class AbstractTrainer:
                     This data is split into train/validation if X_val, y_val are None.
                 X_val, y_val: pd.DataFrame and pd.Series of validation data.
                 time_limit, hyperparameters, holdout_frac: defined as in predictor.fit()
+                teacher (None or str):
+                    If None, uses the model with the highest validation score as the teacher model, otherwise use the specified model name as the teacher.
                 teacher_preds (None or str): If None, we only train with original labels (no data augmentation, overrides augment_method)
                     If 'hard', labels are hard teacher predictions given by: teacher.predict()
                     If 'soft', labels are soft teacher predictions given by: teacher.predict_proba()
@@ -1804,11 +1819,17 @@ class AbstractTrainer:
         if verbosity is None:
             verbosity = self.verbosity
 
+        if teacher is None:
+            teacher = self._get_best()
+
         hyperparameter_tune = False  # TODO: add as argument with scheduler options.
         if augmentation_data is not None and teacher_preds is None:
             raise ValueError("augmentation_data must be None if teacher_preds is None")
 
-        logger.log(20, f"Distilling with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...")
+        logger.log(20, f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...")
+        if teacher not in self.get_model_names(can_infer=True):
+            raise AssertionError(f"Teacher model '{teacher}' is not a valid teacher model! Either it does not exist or it cannot infer on new data.\n"
+                                 f"Valid teacher models: {self.get_model_names(can_infer=True)}")
         if X_train is None:
             if y_train is not None:
                 raise ValueError("X cannot be None when y specified.")
@@ -1850,7 +1871,7 @@ class AbstractTrainer:
 
         if augment_method is None and augmentation_data is None:
             if teacher_preds == 'hard':
-                y_pred = pd.Series(self.predict(X_train))
+                y_pred = pd.Series(self.predict(X_train, model=teacher))
                 if (self.problem_type != REGRESSION) and (len(y_pred.unique()) < len(y_train.unique())):  # add missing labels
                     logger.log(15, "Adding missing labels to distillation dataset by including some real training examples")
                     indices_to_add = []
@@ -1865,7 +1886,7 @@ class AbstractTrainer:
                     y_pred = pd.concat([y_pred, y_extra])
                 y_train = y_pred
             elif teacher_preds == 'soft':
-                y_train = self.predict_proba(X_train)
+                y_train = self.predict_proba(X_train, model=teacher)
                 if self.problem_type == MULTICLASS:
                     y_train = pd.DataFrame(y_train)
                 else:
@@ -1875,9 +1896,9 @@ class AbstractTrainer:
                                  augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
             if len(X_aug) > 0:
                 if teacher_preds == 'hard':
-                    y_aug = pd.Series(self.predict(X_aug))
+                    y_aug = pd.Series(self.predict(X_aug, model=teacher))
                 elif teacher_preds == 'soft':
-                    y_aug = self.predict_proba(X_aug)
+                    y_aug = self.predict_proba(X_aug, model=teacher)
                     if self.problem_type == MULTICLASS:
                         y_aug = pd.DataFrame(y_aug)
                     else:
@@ -1898,32 +1919,45 @@ class AbstractTrainer:
         if hyperparameters is None:
             hyperparameters = {'GBM': {}, 'CAT': {}, 'NN': {}, 'RF': {}}
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
-        if teacher_preds is None or teacher_preds == 'hard':
-            models_distill, _ = self.get_models(hyperparameters=hyperparameters, name_suffix=name_suffix)
-        else:
-            models_distill, _ = self.get_models_distillation(hyperparameters=hyperparameters, name_suffix=name_suffix)
-            if self.problem_type != REGRESSION:
-                self._regress_preds_asprobas = True
+        if teacher_preds is not None and teacher_preds != 'hard' and self.problem_type != REGRESSION:
+            self._regress_preds_asprobas = True
 
-        time_train_start = time.time()
+        core_kwargs = {
+            'stack_name': self.distill_stackname,
+            'get_models_func': self.get_models_distillation,
+        }
+        aux_kwargs = {
+            'get_models_func': self.get_models_distillation,
+            'check_if_best': False,
+        }
+
+        # self.bagged_mode = True  # TODO: Add options for bagging
+        models = self.train_multi_levels(
+            X_train=X_train,
+            y_train=y_train,
+            X_val=X_val,
+            y_val=y_val,
+            hyperparameters=hyperparameters,
+            time_limit=time_limit,  # FIXME: Also limit augmentation time
+            name_suffix=name_suffix,
+            core_kwargs=core_kwargs,
+            aux_kwargs=aux_kwargs,
+        )
+
         distilled_model_names = []
-        for model in models_distill:
-            time_left = None
-            if time_limit is not None:
-                time_start_model = time.time()
-                time_left = time_limit - (time_start_model - time_train_start)
+        for model_name in models:  # finally measure original metric on validation data and overwrite stored val_scores
+            model_score = self.score(X_val, y_val_og, model=model_name)
+            model_obj = self.load_model(model_name)
+            model_obj.val_score = model_score
+            model_obj.save()  # TODO: consider omitting for sake of efficiency
+            self.model_graph.nodes[model_name]['val_score'] = model_score
+            distilled_model_names.append(model_name)
+        leaderboard = self.leaderboard()
+        logger.log(20, 'Distilled model leaderboard:')
+        leaderboard_distilled = leaderboard[leaderboard['model'].isin(models)].reset_index(drop=True)
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
+            logger.log(20, leaderboard_distilled)
 
-            logger.log(15, f"Distilling student {str(model.name)} with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)}...")
-            models = self._train_single_full(X_train=X_train, y_train=y_train, model=model, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
-                                             hyperparameter_tune_kwargs=None, stack_name=self.distill_stackname, time_limit=time_left)
-            for model_name in models:  # finally measure original metric on validation data and overwrite stored val_scores
-                model_score = self.score(X_val, y_val_og, model=model_name)
-                model_obj = self.load_model(model_name)
-                model_obj.val_score = model_score
-                model_obj.save()  # TODO: consider omitting for sake of efficiency
-                self.model_graph.nodes[model_name]['val_score'] = model_score
-                distilled_model_names.append(model_name)
-                logger.log(20, '\t' + str(round(model_obj.val_score, 4)) + '\t = Validation ' + self.eval_metric.name + ' score')
         # reset trainer to old state before distill() was called:
         self.bagged_mode = og_bagged_mode  # TODO: Confirm if safe to train future models after training models in both bagged and non-bagged modes
         self.verbosity = og_verbosity
