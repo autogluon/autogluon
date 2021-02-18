@@ -9,14 +9,6 @@ setup_pip_venv = """
     python3 -m pip install -U pip
     python3 -m pip install -U setuptools wheel
 
-    python3 -m pip uninstall -y scipy scikit-learn ConfigSpace numpy
-    python3 -m pip install 'numpy==1.19.5'
-    python3 -m pip install 'scipy==1.5.4'
-
-    # ConfigSpace MUST be installed after correct cython and numpy installed
-    # otherwise it will compile against the version in Conda (1.20.x)
-    python3 -m pip install 'ConfigSpace==0.4.14' --no-binary :all:
-
     python3 -m pip install 'graphviz'
     python3 -m pip install 'jupyter-sphinx>=0.2.2'
     python3 -m pip install 'portalocker'

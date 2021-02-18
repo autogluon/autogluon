@@ -26,7 +26,7 @@ requirements = [
     'graphviz',
 
     'cython',  # TODO: Do we need cython here? Why is cython not version capped / minned?
-    'ConfigSpace==0.4.14',
+    'ConfigSpace==0.4.18',
     'tornado>=5.0.1',
     'requests',
     'matplotlib',
