@@ -33,7 +33,7 @@ test_requirements = [
     'pytest',
 ]
 
-extra_requires = {
+extras_require = {
     'lightgbm': [
         'lightgbm>=3.0,<4.0',
     ],
@@ -51,9 +51,9 @@ extra_requires = {
 
 all_requires = []
 for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
-    all_requires += extra_requires[extra_package]
+    all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
-extra_requires['all'] = all_requires
+extras_require['all'] = all_requires
 
 install_requires = requirements + test_requirements
 install_requires = ag.get_dependency_version_ranges(install_requires)
@@ -63,6 +63,6 @@ if __name__ == '__main__':
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
         install_requires=install_requires,
-        extra_requires=extra_requires,
+        extras_require=extras_require,
         **setup_args,
     )

@@ -42,7 +42,7 @@ test_requirements = [
     'pytest'
 ]
 
-extra_requires = {
+extras_require = {
     'extra_searchers': [
         'scikit-optimize',  # Optional due to only being rarely used and due to breaking install in the past
     ],
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
         install_requires=install_requires,
-        extra_requires=extra_requires,
+        extras_require=extras_require,
         entry_points={
             'console_scripts': [
                 'agremote = autogluon.core.scheduler.remote.cli:main',
