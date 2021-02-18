@@ -7,11 +7,11 @@ import os
 
 import pandas as pd
 from autogluon.core import Int, Categorical
-from autogluon.core.utils import verbosity2loglevel, get_gpu_free_memory, get_gpu_count
+from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from autogluon.core.utils import set_logger_verbosity
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
-from ..configs.presets_configs import unpack
+from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 
 __all__ = ['ImagePredictor']
 
@@ -266,7 +266,7 @@ class ImagePredictor(object):
             self._fit_summary = self._classifier.fit(train_data, tuning_data, 1 - holdout_frac, random_state, resume=False)
             if hasattr(self._classifier, 'fit_history'):
                 self._fit_summary['fit_history'] = self._classifier.fit_history()
-            return
+            return self
 
         # new HPO task
         if time_limit is not None and num_trials is None:
@@ -286,27 +286,9 @@ class ImagePredictor(object):
         if ngpus_per_trial is not None:
             config['ngpus_per_trial'] = ngpus_per_trial
         if isinstance(hyperparameters, dict):
-            try:
-                if 'batch_size' in hyperparameters:
-                    bs = hyperparameters['batch_size']
-                    if isinstance(bs, Categorical):
-                        bs = max(bs.data)
-                    if isinstance(bs, (Real, Int)):
-                        bs = bs.upper
-                    if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs > 8:
-                        # using gpus, check batch size vs. available gpu memory
-                        free_gpu_memory = get_gpu_free_memory()
-                        if not free_gpu_memory:
-                            warnings.warn('Unable to detect free GPU memory, we are unable to verify '
-                                          'whether your data mini-batches will fit on the GPU for the specified batch_size.')
-                        elif len(free_gpu_memory) < ngpus_per_trial:
-                            warnings.warn(f'Detected GPU memory for {len(free_gpu_memory)} gpus but {ngpus_per_trial} is requested.')
-                        elif sum(free_gpu_memory[:ngpus_per_trial]) / bs < 128:
-                            warnings.warn(f'batch-size: {bs} is potentially larger than what your gpus can fit ' +
-                                          f'free memory: {free_gpu_memory[:ngpus_per_trial]} ' +
-                                          'Try reducing "batch_size" if you encounter memory issues')
-            except:
-                pass
+            if 'batch_size' in hyperparameters:
+                bs = hyperparameters['batch_size']
+                _check_gpu_memory_presets(bs, ngpus_per_trial, 4, 256)  # 256MB per sample
             net = hyperparameters.pop('net', None)
             if net is not None:
                 config['custom_net'] = net
