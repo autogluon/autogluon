@@ -1,4 +1,5 @@
 import logging
+import pickle
 import time
 from collections import OrderedDict
 from copy import deepcopy
@@ -99,7 +100,7 @@ class LocalSequentialScheduler(object):
 
     def run_trial(self, task_id=0):
         searcher_config = self.searcher.get_config()
-        reporter = LocalReporter(task_id, self.train_fn.kwvars, self.training_history, self.config_history)
+        reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
         task_config = deepcopy(EasyDict(self.train_fn.kwvars))
         task_config['task_id'] = task_id
         self.searcher.register_pending(searcher_config)
@@ -145,3 +146,16 @@ class LocalSequentialScheduler(object):
             if task_res and metric in task_res[0]:
                 return task_res[0][metric]
         return default
+
+
+    def get_best_task_id(self):
+        """Get the task id that results in the best configuration/best reward.
+
+        If there are duplicated configurations, we return the id of the first one.
+        """
+        best_config = self.get_best_config()
+        for task_id, config in self.config_history.items():
+            if best_config == config:
+                return task_id
+        raise RuntimeError('The best config {} is not found in config history = {}. '
+                           'This should never happen!'.format(best_config, self.config_history))
