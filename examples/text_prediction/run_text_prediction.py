@@ -89,10 +89,10 @@ def train(args):
     if args.mode == 'stacking':
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=eval_metric,
-                                     path=args.exp_dir,
-                                     hyperparameters='multimodal')
+                                     path=args.exp_dir)
         predictor.fit(train_data=train_df,
                       tuning_data=dev_df,
+                      hyperparameters='multimodal',
                       num_bag_folds=5,
                       num_stack_levels=1)
     elif args.mode == 'single':
