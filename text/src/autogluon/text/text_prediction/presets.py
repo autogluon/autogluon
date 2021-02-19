@@ -32,8 +32,8 @@ def base() -> dict:
                     'optimization.batch_size': 128,
                     'optimization.per_device_batch_size': 8,
                     'optimization.num_train_epochs': 10,
-                    'optimization.lr': space.Categorical(5E-5),
-                    'optimization.wd': 1E-4,
+                    'optimization.lr': space.Categorical(1E-4),
+                    'optimization.wd': 1E-2,
                     'optimization.layerwise_lr_decay': 0.8
                 }
             },
