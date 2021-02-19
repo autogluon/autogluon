@@ -18,7 +18,7 @@ DEPENDENT_PACKAGES = {
     'pandas': '>=1.0.0,<2.0',
     'scikit-learn': '>=0.22.0,<0.25',
     'scipy': '==1.5.4',
-    'gluoncv': '>=0.9.2,<1.0',
+    'gluoncv': '>=0.9.4,<0.11.0',
     'tqdm': '>=4.38.0',
     'Pillow': '<=8.1',
     'graphviz': '<0.9.0,>=0.8.1',

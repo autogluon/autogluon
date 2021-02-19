@@ -1,5 +1,7 @@
 """Presets for vision predictors"""
 import functools
+import warnings
+from autogluon.core.utils import get_gpu_free_memory, get_gpu_count
 from autogluon.core import Categorical, Real
 
 
@@ -28,8 +30,9 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 1024,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 12*3600,
     },
 
     # Good predictive accuracy with fast inference.
@@ -43,11 +46,12 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 8*3600,
     },
 
-    # Medium predictive accuracy with very fast inference and very fast training time. 
+    # Medium predictive accuracy with very fast inference and very fast training time.
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
     medium_quality_faster_train={
         'hyperparameters': {
@@ -58,8 +62,9 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 8,
-            'search_strategy': 'random'
-        }
+            'search_strategy': 'random',
+        },
+        'time_limit': 1*3600,
     },
 
     # Medium predictive accuracy with very fast inference.
@@ -73,8 +78,9 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 2*3600,
     },
 )
 
@@ -91,8 +97,9 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 128,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 24*3600,
     },
 
     # Good predictive accuracy with fast inference.
@@ -108,11 +115,12 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 12*3600,
     },
 
-    # Medium predictive accuracy with very fast inference and very fast training time. 
+    # Medium predictive accuracy with very fast inference and very fast training time.
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
     medium_quality_faster_train={
         'hyperparameters': {
@@ -123,8 +131,9 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 16,
-            'search_strategy': 'random'
-        }
+            'search_strategy': 'random',
+        },
+        'time_limit': 2*3600,
     },
 
     # Medium predictive accuracy with very fast inference.
@@ -138,14 +147,15 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
-            'search_strategy': 'bayesopt'
-        }
+            'search_strategy': 'bayesopt',
+        },
+        'time_limit': 4*3600,
     },
 
 )
 
 _PRESET_DICTS = {
-    'image_predictor': preset_image_predictor, 
+    'image_predictor': preset_image_predictor,
     'object_detector': preset_object_detector,
 }
 
@@ -178,3 +188,39 @@ def set_presets(preset_name, *args, **kwargs):
                 preset_kwargs[key].update(kwargs[key])
                 kwargs[key] = preset_kwargs[key]
     return args, kwargs
+
+def _check_gpu_memory_presets(bs, ngpus_per_trial, min_batch_size=8, threshold=128):
+    """Check and report warnings based on free gpu memory.
+
+    Parameters
+    ----------
+    bs : int or autogluon.core.Space
+        Batch size.
+    ngpus_per_trial : int
+        # gpus per trial
+    min_batch_size : int, default = 8
+        Minimum batch size to initiate checks, batch size smaller than this will
+        not trigger any warning.
+    threshold : int, default = 128
+        The gpu memory required per sample(unit is MB).
+
+    """
+    try:
+        if isinstance(bs, Categorical):
+            bs = max(bs.data)
+        if isinstance(bs, (Real, Int)):
+            bs = bs.upper
+        if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs > min_batch_size:
+            # using gpus, check batch size vs. available gpu memory
+            free_gpu_memory = get_gpu_free_memory()
+            if not free_gpu_memory:
+                warnings.warn('Unable to detect free GPU memory, we are unable to verify '
+                              'whether your data mini-batches will fit on the GPU for the specified batch_size.')
+            elif len(free_gpu_memory) < ngpus_per_trial:
+                warnings.warn(f'Detected GPU memory for {len(free_gpu_memory)} gpus but {ngpus_per_trial} is requested.')
+            elif sum(free_gpu_memory[:ngpus_per_trial]) / bs < threshold:
+                warnings.warn(f'batch-size: {bs} is potentially larger than what your gpus can fit ' +
+                              f'free memory: {free_gpu_memory[:ngpus_per_trial]} ' +
+                              'Try reducing "batch_size" if you encounter memory issues')
+    except:
+        pass
