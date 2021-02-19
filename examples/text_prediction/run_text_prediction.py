@@ -11,7 +11,7 @@ from autogluon.core.utils.loaders import load_pd
 TASKS = \
     {'cola': (['sentence'], 'label', 'mcc', ['mcc']),
      'sst': (['sentence'], 'label', 'acc', ['acc']),
-     'mrpc': (['sentence1', 'sentence2'], 'label', 'f1', ['acc', 'f1']),
+     'mrpc': (['sentence1', 'sentence2'], 'label', 'acc', ['acc', 'f1']),
      'sts': (['sentence1', 'sentence2'], 'score', 'spearmanr', ['pearsonr', 'spearmanr']),
      'qqp': (['sentence1', 'sentence2'], 'label', 'f1', ['acc', 'f1']),
      'mnli_m': (['sentence1', 'sentence2'], 'label', 'acc', ['acc']),
