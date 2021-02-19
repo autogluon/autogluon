@@ -23,13 +23,8 @@ requirements = [
     'pandas',
     'scikit-learn',
 
-    'catboost>=0.23.0,<0.25',
-    'xgboost>=1.3.2,<1.4',
-    'lightgbm>=3.0,<4.0',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'networkx>=2.3,<3.0',
-    'torch>=1.0,<2.0',  # TODO: v0.1 make optional
-    'fastai>=1.0,<2.0',  # TODO: v0.1 make optional
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
 ]
@@ -37,6 +32,28 @@ requirements = [
 test_requirements = [
     'pytest',
 ]
+
+extras_require = {
+    'lightgbm': [
+        'lightgbm>=3.0,<4.0',
+    ],
+    'catboost': [
+        'catboost>=0.23.0,<0.25',
+    ],
+    'xgboost': [
+        'xgboost>=1.3.2,<1.4',
+    ],
+    'fastai': [
+        'torch>=1.0,<2.0',
+        'fastai>=1.0,<2.0',
+    ],
+}
+
+all_requires = []
+for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
+    all_requires += extras_require[extra_package]
+all_requires = list(set(all_requires))
+extras_require['all'] = all_requires
 
 install_requires = requirements + test_requirements
 install_requires = ag.get_dependency_version_ranges(install_requires)
@@ -46,5 +63,6 @@ if __name__ == '__main__':
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
         install_requires=install_requires,
+        extras_require=extras_require,
         **setup_args,
     )

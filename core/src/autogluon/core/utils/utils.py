@@ -38,6 +38,7 @@ def get_gpu_count():
 
 
 def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_repeats=1):
+    # TODO: Add GroupKFold
     if stratified and (y is not None):
         if n_repeats > 1:
             kf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
