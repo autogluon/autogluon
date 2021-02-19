@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 @args()
 def model_trial(args, reporter: LocalStatusReporter):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
-        
+
         Notes:
             - Model object itself must be passed as kwarg: model
             - All model hyperparameters must be stored in model.params dict that may contain special keys such as:

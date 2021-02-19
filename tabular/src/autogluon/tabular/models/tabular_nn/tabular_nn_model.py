@@ -166,8 +166,12 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         start_time = time.time()
         try_import_mxnet()
         import mxnet as mx
-        params = self.params.copy()
         self.verbosity = kwargs.get('verbosity', 2)
+        weights = kwargs.get('weights', None)
+        if weights is not None:
+            logger.log(15, "Sample weights not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
+
+        params = self.params.copy()
         params = fixedvals_from_searchspaces(params)
         if self.feature_metadata is None:
             raise ValueError("Trainer class must set feature_metadata for this model")

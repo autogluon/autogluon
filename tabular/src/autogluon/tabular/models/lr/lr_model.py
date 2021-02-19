@@ -130,7 +130,7 @@ class LinearModel(AbstractModel):
             y_train = y_train.astype(int).values
 
         X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
-
+        weights = kwargs.get('weights', None)
         params = {k: v for k, v in self.params.items() if k in self.model_params}
 
         # Ridge/Lasso are using alpha instead of C, which is C^-1
@@ -146,7 +146,7 @@ class LinearModel(AbstractModel):
         logger.log(15, f'Training Model with the following hyperparameter settings:')
         logger.log(15, model)
 
-        self.model = model.fit(X_train, y_train)
+        self.model = model.fit(X_train, y_train, sample_weight=weights)
 
     # TODO: Add HPO
     def _hyperparameter_tune(self, **kwargs):

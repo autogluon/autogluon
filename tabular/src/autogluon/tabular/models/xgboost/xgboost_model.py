@@ -76,7 +76,9 @@ class XGBoostModel(AbstractModel):
         else:
             verbose = True
             verbose_eval = 1
-        
+
+        weights = kwargs.get('weights', None)
+        weights_val = kwargs.get('weights_val', None)
         X_train = self.preprocess(X_train, is_train=True, max_category_levels=max_category_levels)
         num_rows_train = X_train.shape[0]
 
@@ -115,7 +117,8 @@ class XGBoostModel(AbstractModel):
             eval_set=eval_set,
             eval_metric=eval_metric,
             verbose=False,
-            callbacks=callbacks
+            callbacks=callbacks,
+            sample_weight=weights
         )
 
         bst = self.model.get_booster()

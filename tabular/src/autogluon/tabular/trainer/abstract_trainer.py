@@ -11,7 +11,7 @@ from collections import defaultdict
 from autogluon.core.constants import AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance
+from autogluon.core.utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
@@ -37,13 +37,15 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, eval_metric=None,
                  num_classes=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
-                 save_data=False, random_state=0, verbosity=2):
+                 weight_column=None, weight_evaluation=False, save_data=False, random_state=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
         self.random_state = random_state  # Integer value added to the stack level to get the random_state for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
+        self.weight_column = weight_column
+        self.weight_evaluation = weight_evaluation
         if eval_metric is not None:
             self.eval_metric = eval_metric
         else:
@@ -405,20 +407,29 @@ class AbstractTrainer:
             X = model.preprocess(X=X, preprocess_stateful=False)
         return X
 
-    def score(self, X, y, model=None) -> float:
+    def score(self, X, y, model=None, weights=None) -> float:
         if self.eval_metric.needs_pred:
-            y_pred_ensemble = self.predict(X=X, model=model)
-            return self.eval_metric(y, y_pred_ensemble)
+            y_pred = self.predict(X=X, model=model)
         else:
-            y_pred_proba_ensemble = self.predict_proba(X=X, model=model)
-            return self.eval_metric(y, y_pred_proba_ensemble)
+            y_pred = self.predict_proba(X=X, model=model)
+        if not self.weight_evaluation:
+            return self.eval_metric(y, y_pred)
+        if weights is None:
+            raise ValueError("Sample weights cannot be None when weight_evaluation is specified.")
+        return compute_weighted_metric(y, y_pred, self.eval_metric, weights)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba) -> float:
+
+    def score_with_y_pred_proba(self, y, y_pred_proba, weights=None) -> float:
         if self.eval_metric.needs_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-            return self.eval_metric(y, y_pred)
         else:
-            return self.eval_metric(y, y_pred_proba)
+            y_pred = y_pred_proba
+        if not self.weight_evaluation:
+            return self.eval_metric(y, y_pred)
+        if weights is None:
+            raise ValueError("Sample weights cannot be None when weight_evaluation is specified.")
+        return compute_weighted_metric(y, y_pred, self.eval_metric, weights)
+
 
     # TODO: Consider adding persist to disk functionality for pred_proba dictionary to lessen memory burden on large multiclass problems.
     #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
@@ -883,25 +894,31 @@ class AbstractTrainer:
         try:
             if time_limit is not None:
                 if time_limit <= 0:
-                    logging.log(15, f'Skipping {model.name} due to lack of time remaining.')
+                    logger.log(15, f'Skipping {model.name} due to lack of time remaining.')
                     return model_names_trained
                 if self._time_limit is not None and self._time_train_start is not None:
                     time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
                 else:
                     time_left_total = time_limit
-                logging.log(20, f'Fitting model: {model.name} ... Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.')
+                logger.log(20, f'Fitting model: {model.name} ... Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.')
             else:
-                logging.log(20, f'Fitting model: {model.name} ...')
+                logger.log(20, f'Fitting model: {model.name} ...')
             model = self._train_single(X_train, y_train, model, X_val, y_val, **model_fit_kwargs)
             fit_end_time = time.time()
+            if self.weight_evaluation:
+                weights = model_fit_kwargs.get('weights', None)
+                weights_val = model_fit_kwargs.get('weights_val', None)
+            else:
+                weights = None
+                weights_val = None
             if isinstance(model, BaggedEnsembleModel):
                 if model.bagged_mode or isinstance(model, WeightedEnsembleModel):
-                    score = model.score_with_oof(y=y_train)
+                    score = model.score_with_oof(y=y_train, weights=weights)
                 else:
                     score = None
             else:
                 if X_val is not None and y_val is not None:
-                    score = model.score(X=X_val, y=y_val)
+                    score = model.score(X=X_val, y=y_val, weights=weights_val)
                 else:
                     score = None
             pred_end_time = time.time()
@@ -1019,6 +1036,16 @@ class AbstractTrainer:
             time_limit=time_limit,
             verbosity=self.verbosity,
         )
+        if self.weight_column is not None:
+            X_train, w_train = extract_column(X_train, self.weight_column)
+            if w_train is not None:  # may be None for ensemble
+                weights_normalized = w_train.values/w_train.sum() * len(w_train)  # normalization can affect gradient algorithms like boosting
+                model_fit_kwargs['weights'] = weights_normalized
+            if X_val is not None:
+                X_val, w_val = extract_column(X_val, self.weight_column)
+                if self.weight_evaluation and w_val is not None:  # ignore validation weights unless weight_evaluation specified
+                    weights_val_normalized = w_val.values / w_val.sum() * len(w_val)
+                    model_fit_kwargs['weights_val'] = weights_val_normalized
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
@@ -1028,7 +1055,7 @@ class AbstractTrainer:
                 num_trials = 1 if time_limit is None else 1000
                 hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
             # hpo_models (dict): keys = model_names, values = model_paths
-            logging.log(20, f'Hyperparameter tuning model: {model.name} ...')
+            logger.log(20, f'Hyperparameter tuning model: {model.name} ...')
             try:
                 if isinstance(model, BaggedEnsembleModel):
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
@@ -1046,7 +1073,7 @@ class AbstractTrainer:
                 self._extra_banned_names.add(model.name)
                 for model_hpo_name, model_path in hpo_models.items():
                     model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
-                    logging.log(20, f'Fitted model: {model_hpo.name} ...')
+                    logger.log(20, f'Fitted model: {model_hpo.name} ...')
                     if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
                         model_names_trained.append(model_hpo.name)
         else:
@@ -1946,7 +1973,7 @@ class AbstractTrainer:
 
         distilled_model_names = []
         for model_name in models:  # finally measure original metric on validation data and overwrite stored val_scores
-            model_score = self.score(X_val, y_val_og, model=model_name)
+            model_score = self.score(X_val, y_val_og, model=model_name)  # TODO: consider if weight_evaluation may be appropriate.
             model_obj = self.load_model(model_name)
             model_obj.val_score = model_score
             model_obj.save()  # TODO: consider omitting for sake of efficiency

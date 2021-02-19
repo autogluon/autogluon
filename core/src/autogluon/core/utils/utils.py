@@ -372,6 +372,23 @@ def infer_eval_metric(problem_type: str) -> Scorer:
         return root_mean_squared_error
 
 
+def extract_column(X, col_name):
+    """Extract specified column from dataframe. """
+    if col_name is None or col_name not in list(X.columns):
+        return X, None
+    w = X[col_name].copy()
+    X = X.drop(col_name, axis=1)
+    return X, w
+
+
+def compute_weighted_metric(y, y_pred, metric, weights):
+    try:
+        weighted_metric = metric(y, y_pred, sample_weight=weights)
+    except (ValueError, TypeError, KeyError):
+        logger.log(30, f"WARNING: eval_metric='{metric.name}' does not support sample weights so they will be ignored in reported metric.")
+        weighted_metric = metric(y, y_pred)
+    return weighted_metric
+
 # Note: Do not send training data as input or the importances will be overfit.
 # TODO: Improve time estimate (Currently pessimistic)
 def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predict_func: Callable[..., np.ndarray], eval_metric: Scorer, features: list = None, subsample_size=None, num_shuffle_sets: int = None,
@@ -664,6 +681,6 @@ def get_gpu_free_memory():
         memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
         memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
     except:
-        # could fail due to 
+        # could fail due to
         memory_free_values = []
     return memory_free_values

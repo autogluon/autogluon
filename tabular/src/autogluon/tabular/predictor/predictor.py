@@ -521,6 +521,12 @@ class TabularPredictor(TabularPredictorV1):
                 data. e.g. 500 hand-labeled samples (perhaps a hard human task), whole data set (unlabeled) is thousands/millions.
                 However, this isn't the only use case. Given enough unlabeled data(millions of rows), you may see improvements
                 to any amount of labeled data.
+            weight_column : str, default = None
+                If specified, indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
+                Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
+            weight_evaluation : bool, defautl = False
+                Only considered when `weight_column` has been specified. Determines whether sample weights should be taken into account when computing evaluation metrics on validation/test data.
+                If True, then weighted metrics will be reported based on the sample weights provided in the specified `weight_column` (in which case `weight_column` must also be present in test data).
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
 
@@ -575,6 +581,8 @@ class TabularPredictor(TabularPredictorV1):
         auto_stack = kwargs['auto_stack']
         feature_generator = kwargs['feature_generator']
         unlabeled_data = kwargs['unlabeled_data']
+        self.weight_column = kwargs['weight_column']
+        self.weight_evaluation = kwargs['weight_evaluation']
 
         ag_args = kwargs['ag_args']
         ag_args_fit = kwargs['ag_args_fit']
@@ -621,6 +629,14 @@ class TabularPredictor(TabularPredictorV1):
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(len(train_data), ag_args.get('hyperparameter_tune_kwargs', None) is not None)
 
+        if self.weight_column is not None:
+            prefix = f"Values in column '{self.weight_column}' used as sample weights instead of predictive features."
+            if self.weight_evaluation:
+                suffix = " Evaluation will report weighted metrics, so ensure same column exists in test data."
+            else:
+                suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation to instead report weighted metrics."
+            logger.log(20, prefix+suffix)
+
         if kwargs['_save_bag_folds'] is not None:
             if ag_args_ensemble is None:
                 ag_args_ensemble = {}
@@ -630,7 +646,7 @@ class TabularPredictor(TabularPredictorV1):
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                          time_limit=time_limit, verbosity=verbosity)
+                          time_limit=time_limit, verbosity=verbosity, weight_column=self.weight_column, weight_evaluation=self.weight_evaluation)
         self._set_post_fit_vars()
 
         self._post_fit(
@@ -900,6 +916,10 @@ class TabularPredictor(TabularPredictorV1):
             unlabeled_data=None,
 
             _feature_generator_kwargs=None,
+
+            # sample weights
+            weight_column=None,
+            weight_evaluation=False
         )
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
@@ -975,13 +995,27 @@ class TabularPredictor(TabularPredictorV1):
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None:
-            train_features = np.array([column for column in train_data.columns if column != self.label])
-            tuning_features = np.array([column for column in tuning_data.columns if column != self.label])
+            train_features = [column for column in train_data.columns if column != self.label]
+            tuning_features = [column for column in tuning_data.columns if column != self.label]
+            if self.weight_column is not None:
+                if self.weight_column in train_features:
+                    train_features.remove(self.weight_column)
+                if self.weight_column in tuning_features:
+                    tuning_features.remove(self.weight_column)
+            train_features = np.array(train_features)
+            tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
-            train_features = sorted(np.array([column for column in train_data.columns if column != self.label]))
-            unlabeled_features = sorted(np.array([column for column in unlabeled_data.columns]))
+            train_features = [column for column in train_data.columns if column != self.label]
+            unlabeled_features = [column for column in unlabeled_data.columns]
+            if self.weight_column is not None:
+                if self.weight_column in train_features:
+                    train_features.remove(self.weight_column)
+                if self.weight_column in unlabeled_features:
+                    unlabeled_features.remove(self.weight_column)
+            train_features = sorted(np.array(train_features))
+            unlabeled_features = sorted(np.array(unlabeled_features))
             if np.any(train_features != unlabeled_features):
                 raise ValueError("Column names must match between training and unlabeled data.\n"
                                  "Unlabeled data must have not the label column specified in it.\n")

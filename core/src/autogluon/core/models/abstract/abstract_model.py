@@ -18,7 +18,7 @@ from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
-from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
+from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
@@ -346,24 +346,30 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, metric=None, **kwargs):
+    def score(self, X, y, metric=None, weights=None, **kwargs):
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
             y_pred = self.predict(X=X, **kwargs)
+        else:
+            y_pred = self.predict_proba(X=X, **kwargs)
+        if weights is None:
             return metric(y, y_pred)
         else:
-            y_pred_proba = self.predict_proba(X=X, **kwargs)
-            return metric(y, y_pred_proba)
+            return compute_weighted_metric(y, y_pred, metric, weights)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba, metric=None):
+
+    def score_with_y_pred_proba(self, y, y_pred_proba, metric=None, weights=None):
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+        else:
+            y_pred = y_pred_proba
+        if weights is None:
             return metric(y, y_pred)
         else:
-            return metric(y, y_pred_proba)
+            return compute_weighted_metric(y, y_pred, metric, weights)
 
     def save(self, path: str = None, verbose=True) -> str:
         """
@@ -555,6 +561,9 @@ class AbstractModel:
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
+        fit_kwargs=scheduler_params['resource'].copy()
+        fit_kwargs['weights'] = kwargs.get('weights', None)
+        fit_kwargs['weights_val'] = kwargs.get('weights_val', None)
         util_args = dict(
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
@@ -562,7 +571,7 @@ class AbstractModel:
             model=self,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],
-            fit_kwargs=scheduler_params['resource'],
+            fit_kwargs=fit_kwargs,
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)

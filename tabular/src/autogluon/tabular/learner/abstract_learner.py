@@ -17,7 +17,7 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
-from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
+from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils import get_pred_from_proba, infer_problem_type
@@ -138,6 +138,21 @@ class AbstractLearner:
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:
             raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
+        self.weight_column = kwargs.get('weight_column', None)
+        self.weight_evaluation = kwargs.get('weight_evaluation', False)
+        X_val = kwargs.get('X_val', None)
+        if self.weight_column is not None:
+            if self.weight_column not in X.columns:
+                raise KeyError(f"Weight column '{self.weight_column}' is missing from training data. Training data columns: {list(X.columns)}")
+            weight_vals = X[self.weight_column]
+            if weight_vals.isna().sum() > 0:
+                raise ValueError(f"Sample weights in column '{self.weight_column}' cannot be nan")
+            if weight_vals.dtype.kind not in 'biuf':
+                raise ValueError(f"Sample weights in column '{self.weight_column}' must be numeric values")
+            if weight_vals.min() < 0:
+                raise ValueError(f"Sample weights in column '{self.weight_column}' must be nonnegative")
+            if self.weight_evaluation and X_val is not None and self.weight_column not in X_val.columns:
+                raise KeyError(f"Weight column '{self.weight_column}' cannot be missing from validation data with weight_evaluation specified.")
 
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:
@@ -190,19 +205,22 @@ class AbstractLearner:
         if y is None:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
+        if self.weight_evaluation:
+            X, weights = extract_column(X, self.weight_column)
         if self.eval_metric.needs_pred:
             y_pred = self.predict(X=X, model=model)
             if self.problem_type == BINARY:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
-                y_pred_internal = self.label_cleaner.transform(y_pred)
-                y_internal = self.label_cleaner.transform(y)
-                return self.eval_metric(y_internal, y_pred_internal)
-            else:
-                return self.eval_metric(y, y_pred)
+                y_pred = self.label_cleaner.transform(y_pred)
+                y = self.label_cleaner.transform(y)
         else:
-            y_pred_proba = self.predict_proba(X=X, model=model)
+            y_pred = self.predict_proba(X=X, model=model)
             y = self.label_cleaner.transform(y)
-            return self.eval_metric(y, y_pred_proba)
+        if not self.weight_evaluation:
+            return self.eval_metric(y, y_pred)
+        if weights is None:
+            raise ValueError("Sample weights cannot be None when weight_evaluation is specified.")
+        return compute_weighted_metric(y, y_pred, self.eval_metric, weights)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
@@ -210,6 +228,8 @@ class AbstractLearner:
         if y is None:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
+        if self.weight_evaluation:
+            X, sample_weights = extract_column(X, self.weight_column)
 
         X = self.transform_features(X)
         y_internal = self.label_cleaner.transform(y)
@@ -239,14 +259,19 @@ class AbstractLearner:
             if self.eval_metric.needs_pred:
                 if self.problem_type == BINARY:
                     # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
-                    y_pred_internal = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
-                    scores[model_name] = self.eval_metric(y_internal, y_pred_internal)
+                    y_pred = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
+                    y = y_internal
                 else:
                     y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
-                    scores[model_name] = self.eval_metric(y, y_pred)
             else:
-                y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
-                scores[model_name] = self.eval_metric(y_internal, y_pred_proba)
+                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
+                y = y_internal
+            if not self.weight_evaluation:
+                scores[model_name] = self.eval_metric(y, y_pred)
+            else:
+                if sample_weights is None:
+                    raise ValueError("Sample weights cannot be None when weight_evaluation is specified.")
+                scores[model_name] = compute_weighted_metric(y, y_pred, self.eval_metric, sample_weights)
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
@@ -324,7 +349,7 @@ class AbstractLearner:
     #  This makes this function behave much nicer, currently confusion matrix is only able to be constructed when y_pred is supplied, and crashes when y_pred_proba is supplied.
     #  Therefore, it is impossible to get confusion matrix when eval_metric is log_loss. This shouldn't be the case.
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
-        """ Evaluate predictions.
+        """ Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
                 auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?

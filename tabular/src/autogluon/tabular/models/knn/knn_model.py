@@ -63,6 +63,9 @@ class KNNModel(AbstractModel):
         time_start = time.time()
         X_train = self.preprocess(X_train)
         self._validate_fit_memory_usage(X_train=X_train)  # TODO: Can incorporate this into samples, can fit on portion of data to satisfy memory instead of raising exception immediately
+        weights = kwargs.get('weights', None)
+        if weights is not None:
+            logger.log(15, "Sample weights not yet supported for KNNModel, this model will ignore them in training.")
 
         num_rows_max = len(X_train)
         # FIXME: v0.1 Must store final num rows for refit_full or else will use everything! Worst case refit_full could train far longer than the original model.
