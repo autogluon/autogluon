@@ -37,7 +37,7 @@ install_core = """
 """
 
 install_core_tests = """
-    ${install_core}[tests]
+    python3 -m pip install --upgrade -e core/[tests]
 """
 
 install_features = """
@@ -57,7 +57,7 @@ install_tabular = """
 """
 
 install_tabular_all = """
-    ${install_tabular}[all]
+    python3 -m pip install --upgrade -e tabular/[all]
 """
 
 install_text = """
