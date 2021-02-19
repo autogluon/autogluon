@@ -998,7 +998,7 @@ class MultiModalTextModel:
                                                       label_column=self._label_columns[0],
                                                       log_metrics=self._log_metrics,
                                                       eval_metric=self._eval_metric,
-                                                      ngpus_per_trial=scheduler_options['ngpus_per_trial'],
+                                                      ngpus_per_trial=scheduler_options['resource']['num_gpus'],
                                                       console_log=console_log,
                                                       verbosity=verbosity))
         no_job_finished_err_msg =\
