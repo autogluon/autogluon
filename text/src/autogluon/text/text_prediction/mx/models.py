@@ -328,7 +328,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    time_limit, time_start, base_config,
                    problem_type, column_types,
                    feature_columns, label_column,
-                   log_metrics, eval_metric,
+                   log_metrics, eval_metric, ngpus_per_trial,
                    console_log, seed=None, verbosity=2):
     """
 
@@ -361,6 +361,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         Metrics for logging
     eval_metric
         The stopping metric
+    ngpus_per_trial
+        The number of GPUs to use per each trial
     console_log
         Whether to log it to console
     seed
@@ -493,6 +495,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         gt_dev_labels = preprocessor.label_scaler.inverse_transform(np.expand_dims(gt_dev_labels,
                                                                                    axis=-1))[:, 0]
     ctx_l = get_mxnet_available_ctx()
+    if ngpus_per_trial == 0:
+        ctx_l = [mx.cpu()]
+    else:
+        ctx_l = ctx_l[:ngpus_per_trial]
     base_batch_size = cfg.optimization.per_device_batch_size
     num_accumulated = int(np.ceil(cfg.optimization.batch_size / (base_batch_size * len(ctx_l))))
     inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
@@ -992,6 +998,7 @@ class MultiModalTextModel:
                                                       label_column=self._label_columns[0],
                                                       log_metrics=self._log_metrics,
                                                       eval_metric=self._eval_metric,
+                                                      ngpus_per_trial=scheduler_options['ngpus_per_trial'],
                                                       console_log=console_log,
                                                       verbosity=verbosity))
         no_job_finished_err_msg =\
