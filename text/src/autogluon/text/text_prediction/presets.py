@@ -29,7 +29,7 @@ def base() -> dict:
                 'backend': 'gluonnlp_v0',
                 'search_space': {
                     'model.backbone.name': 'google_electra_base',
-                    'optimization.batch_size': 128,
+                    'optimization.batch_size': 32,
                     'optimization.per_device_batch_size': 8,
                     'optimization.num_train_epochs': 10,
                     'optimization.lr': space.Categorical(1E-4),
