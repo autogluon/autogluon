@@ -862,6 +862,7 @@ class AbstractTrainer:
             level=level,
         )
         weighted_ensemble_model = weighted_ensemble_model[0]
+        w = None
         if self.weight_evaluation:
             X, w = extract_column(X, self.weight_column)
         models = self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune_kwargs=None, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit, ens_sample_weights=w)
