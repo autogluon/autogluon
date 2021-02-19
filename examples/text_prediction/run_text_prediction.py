@@ -90,17 +90,20 @@ def train(args):
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=eval_metric,
                                      path=args.exp_dir,
-                                     hyperparameters='multimodal',
-                                     num_bag_folds=5,
-                                     num_stack_levels=1)
+                                     hyperparameters='multimodal')
+        predictor.fit(train_data=train_df,
+                      tuning_data=dev_df,
+                      num_bag_folds=5,
+                      num_stack_levels=1)
     elif args.mode == 'single':
         predictor = TextPredictor(label=label_column,
                                   eval_metric=eval_metric,
                                   path=args.exp_dir)
+        predictor.fit(train_data=train_df,
+                      tuning_data=dev_df,
+                      seed=args.seed)
     else:
         raise NotImplementedError
-    predictor.fit(train_data=train_df, tuning_data=dev_df,
-                  seed=args.seed)
     dev_metric_score = predictor.evaluate(dev_df)
     dev_predictions = predictor.predict(dev_df, as_pandas=True)
     test_predictions = predictor.predict(test_df, as_pandas=True)

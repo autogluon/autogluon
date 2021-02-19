@@ -6,13 +6,21 @@ Here, we provide the example that shows how to use AutoGluon to achieve top perf
 [Product Sentiment Classification Hackathon](https://www.machinehack.com/hackathons/product_sentiment_classification_weekend_hackathon_19/leaderboard) 
 
 ```
-
+python3 example_product_sentiment.py
 ```
 
 ## Reach Top-5 Performance in Mercari Price Suggestion
 
-Here, we provide the example that shows how to use AutoGluon to achieve top-5 performance in [Mercari Price Suggestion](https://www.kaggle.com/c/mercari-price-suggestion-challenge/data).
+Here, we provide the example that shows how to use AutoGluon to achieve top-5 performance in
+ [Mercari Price Suggestion](https://www.kaggle.com/c/mercari-price-suggestion-challenge/data).
+To run the example, you will need to configure the Kaggle API which will be documented in 
+https://github.com/Kaggle/kaggle-api . 
 
+```
+kaggle competitions download -c mercari-price-suggestion-challenge
+
+python3 example_mercari_price_suggestion.py
+```
 
 ## Solve GLUE Tasks with AutoGluon Text
 
