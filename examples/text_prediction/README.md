@@ -37,9 +37,9 @@ bash run_glue.sh stacking
 
 ### Results
 
-|                          | CoLA | SST | MRPC | STS       | QQP | MNLI | QNLI | RTE |
-|--------------------------|------|-----|------|-----------|-----|------|------|-----|
-|Metrics                   | mcc  | acc | acc  | spearmanr | acc | acc  | acc  | acc |
-|Text (Single)             |      |     |      |           |     |      |      |     |
-|Tabular (Stacking)        |      |     |      |           |     |      |      |     |
+|                          | CoLA   | SST | MRPC | STS       | QQP | MNLI | QNLI | RTE |
+|--------------------------|--------|-----|------|-----------|-----|------|------|-----|
+|Metrics                   | mcc    | acc | acc  | spearmanr | acc | acc  | acc  | acc |
+|Text (Single)             | 0.6747 |     |      |           |     |      |      |     |
+|Tabular (Stacking)        |        |     |      |           |     |      |      |     |
 
