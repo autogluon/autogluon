@@ -14,15 +14,10 @@ logger = logging.getLogger(__name__)
 class LocalReporter:
     def __init__(self, trial, config, training_history: dict, config_history: dict):
         self.trial = trial
-
         self.training_history = training_history
-        if trial not in self.training_history:
-            self.training_history[trial] = []
-
+        self.training_history[trial] = []
         self.task_config = EasyDict(deepcopy(config))
-
         self.config_history = config_history
-
         self.trial_started = time.time()
         self.last_reported_time = self.trial_started
         self.last_result = None
@@ -97,7 +92,9 @@ class LocalSequentialScheduler(object):
         time_start = time.time()
 
         avg_trial_run_time = None
-        for i in tqdm(range(self.num_trials)):
+
+        r = range(self.num_trials)
+        for i in (tqdm(r) if self.num_trials < 1000 else r):
             trial_start_time = time.time()
             self.run_trial(task_id=i)
             trial_end_time = time.time()
