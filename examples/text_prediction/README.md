@@ -24,12 +24,22 @@ python3 prepare_glue.py --benchmark glue
 ```
 
 ### Run the benchmark
-Run on all datasets
+Run on all datasets with either a single `TextPredictor` model or the `multimodal` configuration 
+in AutoGluon Tabular that will use the `TextPredictor` model in the 5-fold-1-layer stacking.
  
 ```bash
-bash run_glue.sh
+# Run single model
+bash run_glue.sh single
+
+# Run 5-fold stacking
+bash run_glue.sh stacking
 ```
 
 ### Results
 
-TBA
+|                          | CoLA | SST | MRPC | STS       | QQP | MNLI | QNLI | RTE |
+|--------------------------|------|-----|------|-----------|-----|------|------|-----|
+|Metrics                   | mcc  | acc | acc  | spearmanr | acc | acc  | acc  | acc |
+|Text (Single)             |      |     |      |           |     |      |      |     |
+|Tabular (Stacking)        |      |     |      |           |     |      |      |     |
+
