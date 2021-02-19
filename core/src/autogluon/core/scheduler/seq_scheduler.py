@@ -64,6 +64,9 @@ class LocalSequentialScheduler(object):
         self.resource = kwargs['resource']
         self.max_reward = kwargs.get('max_reward')
 
+        if kwargs.get('num_trials') is None:
+            assert kwargs.get('time_out') is not None, "Need stopping criterion: Either num_trials or time_out"
+
         if searcher is 'local_sequential_auto':
             searcher = 'auto'
 
@@ -86,6 +89,8 @@ class LocalSequentialScheduler(object):
             'resources_per_trial': self.resource}
 
     def run(self, **kwargs):
+        self.searcher.configure_scheduler(self)
+
         self.training_history = OrderedDict()
         self.config_history = OrderedDict()
 
@@ -97,6 +102,9 @@ class LocalSequentialScheduler(object):
             self.run_trial(task_id=i)
             trial_end_time = time.time()
 
+            if self.max_reward and self.get_best_reward() >= self.max_reward:
+                logger.log(20, f'\tMax reward is reached')
+                break
 
             if self.time_out is not None:
                 avg_trial_run_time = self.get_average_trial_time_(i, avg_trial_run_time, trial_start_time, trial_end_time)

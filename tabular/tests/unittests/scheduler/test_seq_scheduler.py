@@ -1,3 +1,4 @@
+import pytest
 from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
 
 cls = LocalSequentialScheduler
@@ -40,3 +41,8 @@ def test_has_enough_time_for_trial__avg_time():
 def test_has_enough_time_for_trial__enough_time__avg_time_not_allows_trials_by_fill_factor():
     # Enough time - average time does not allow more trial
     assert not cls.has_enough_time_for_trial_(time_out=10, time_start=100, trial_start_time=105, trial_end_time=106, avg_trial_run_time=1, fill_factor=5)
+
+
+def test_LocalSequentialScheduler_no_criteria():
+    with pytest.raises(AssertionError, match="Need stopping criterion: Either num_trials or time_out"):
+        LocalSequentialScheduler(train_fn={}, reward_attr='reward_attr', resource={})
