@@ -15,6 +15,7 @@ def test_get_validated_path_no_compression_fn():
     multiple_extension_filepath = 'dummy_file.fake-foo.zip.pkl'
     assert(compression_utils.get_validated_path(multiple_extension_filepath) == multiple_extension_filepath)
 
+
 def test_get_validated_path_with_compression_fn():
     compression_fns = ['gzip', 'lzma', 'bz2']
 
@@ -53,6 +54,7 @@ def test_get_validated_path_with_compression_fn():
             == expected_multi_lzma_filepath)
     assert (compression_utils.get_validated_path(multiple_extension_filepath, compression_fns[2])
             == expected_multi_bz2_filepath)
+
 
 def test_get_compression_map():
     expected_compression_fn_map = {

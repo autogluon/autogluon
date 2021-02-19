@@ -22,12 +22,14 @@ compression_fn_map = {
     },
 }
 
+
 def get_validated_path(filename, compression_fn=None):
     if compression_fn is not None:
         validated_path = f"{filename}.{compression_fn_map[compression_fn]['extension']}"
     else:
         validated_path = filename
     return validated_path
+
 
 def get_compression_map():
     return compression_fn_map
