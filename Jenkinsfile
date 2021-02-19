@@ -36,6 +36,10 @@ install_core = """
     python3 -m pip install --upgrade -e core/
 """
 
+install_core_tests = """
+    ${install_core}[tests]
+"""
+
 install_features = """
     python3 -m pip install --upgrade -e features/
 """
@@ -49,7 +53,7 @@ install_extra = """
 """
 
 install_tabular = """
-    python3 -m pip install --upgrade -e tabular/[all]
+    python3 -m pip install --upgrade -e tabular/
 """
 
 install_tabular_all = """
@@ -80,7 +84,7 @@ stage("Unit Test") {
           python3 -m pip install 'mxnet==1.7.0.*'
           env
 
-          ${install_core}[tests]
+          ${install_core_tests}
           cd core/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
