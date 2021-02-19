@@ -90,13 +90,38 @@ class LocalSequentialScheduler(object):
         self.config_history = OrderedDict()
 
         time_start = time.time()
+
+        avg_trial_run_time = None
         for i in tqdm(range(self.num_trials)):
+            trial_start_time = time.time()
             self.run_trial(task_id=i)
-            time_end = time.time()
+            trial_end_time = time.time()
+
+
             if self.time_out is not None:
-                if time_end - time_start >= self.time_out:
+                avg_trial_run_time = self.get_average_trial_time_(i, avg_trial_run_time, trial_start_time, trial_end_time)
+                if not self.has_enough_time_for_trial_(self.time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time):
                     logger.log(20, f'\tTime limit exceeded...')
                     break
+
+    @classmethod
+    def has_enough_time_for_trial_(cls, time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time, fill_factor=0.9):
+        time_spent = trial_end_time - time_start
+        is_timeout_exceeded = time_spent >= time_out
+        time_left = time_start + time_out - trial_end_time
+        is_enough_time_for_another_trial = True
+        if avg_trial_run_time:
+            is_enough_time_for_another_trial = time_left > avg_trial_run_time * fill_factor
+        return is_enough_time_for_another_trial and not is_timeout_exceeded
+
+    @classmethod
+    def get_average_trial_time_(cls, i, avg_trial_run_time, trial_start_time, time_end):
+        trial_time = time_end - trial_start_time
+        if avg_trial_run_time is None:
+            avg_trial_run_time = trial_time
+        else:
+            avg_trial_run_time = ((avg_trial_run_time * i) + trial_time) / (i + 1)
+        return avg_trial_run_time
 
     def run_trial(self, task_id=0):
         searcher_config = self.searcher.get_config()
