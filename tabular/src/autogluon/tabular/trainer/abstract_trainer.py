@@ -285,6 +285,7 @@ class AbstractTrainer:
             aux_kwargs['name_suffix'] = aux_kwargs.get('name_suffix', '') + name_suffix
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
                                                 level=level, base_model_names=base_model_names, feature_prune=feature_prune, **core_kwargs)
+
         if self.bagged_mode:
             aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
         else:
@@ -366,6 +367,12 @@ class AbstractTrainer:
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
         X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False)
+        if self.weight_evaluation:
+            X, w = extract_column(X, self.weight_column)
+            if w is not None:
+                sample_weights = w.values/w.sum() * len(w)
+                X_train_stack_preds[self.weight_column] = sample_weights
+
         return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
 
     def predict(self, X, model=None):
@@ -611,6 +618,7 @@ class AbstractTrainer:
                 if issubclass(stacker_type, WeightedEnsembleModel):
                     # TODO: Technically we don't need to re-train the weighted ensemble, we could just copy the original and re-use the weights.
                     if self.bagged_mode:
+                        # TODO: add sample_weights here
                         X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True, use_orig_features=False)
                         y_input = y
                     else:
@@ -815,7 +823,7 @@ class AbstractTrainer:
             logger.log(30, f'No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.')
         return unpersisted_models
 
-    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None, get_models_func=None) -> List[str]:
+    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None, get_models_func=None, sample_weights=None) -> List[str]:
         if get_models_func is None:
             get_models_func = self.get_models
         if len(base_model_names) == 0:
@@ -854,7 +862,9 @@ class AbstractTrainer:
             level=level,
         )
         weighted_ensemble_model = weighted_ensemble_model[0]
-        models = self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune_kwargs=None, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
+        if self.weight_evaluation:
+            X, w = extract_column(X, self.weight_column)
+        models = self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune_kwargs=None, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit, ens_sample_weights=w)
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
                 if self.model_best is None:
@@ -1021,8 +1031,8 @@ class AbstractTrainer:
         return True
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
-    def _train_single_full(self, X_train, y_train, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False,
-                           hyperparameter_tune_kwargs=None, stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None) -> List[str]:
+    def _train_single_full(self, X_train, y_train, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False, hyperparameter_tune_kwargs=None,
+                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1046,6 +1056,9 @@ class AbstractTrainer:
                 if self.weight_evaluation and w_val is not None:  # ignore validation weights unless weight_evaluation specified
                     weights_val_normalized = w_val.values / w_val.sum() * len(w_val)
                     model_fit_kwargs['weights_val'] = weights_val_normalized
+            ens_sample_weights =  kwargs.get('ens_sample_weights', None)
+            if ens_sample_weights is not None:
+                model_fit_kwargs['weights'] = ens_sample_weights  # sample weights to use for weighted ensemble only
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')

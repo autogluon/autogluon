@@ -524,9 +524,10 @@ class TabularPredictor(TabularPredictorV1):
             weight_column : str, default = None
                 If specified, indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
                 Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
-            weight_evaluation : bool, defautl = False
+            weight_evaluation : bool, default = False
                 Only considered when `weight_column` has been specified. Determines whether sample weights should be taken into account when computing evaluation metrics on validation/test data.
                 If True, then weighted metrics will be reported based on the sample weights provided in the specified `weight_column` (in which case `weight_column` must also be present in test data).
+                In this case, the 'best' model used by default for prediction will also be decided based on a weighted version of evaluation metric.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
 
