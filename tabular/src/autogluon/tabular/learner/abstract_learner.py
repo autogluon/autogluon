@@ -192,7 +192,13 @@ class AbstractLearner:
         self._validate_class_labels(y)
         if self.eval_metric.needs_pred:
             y_pred = self.predict(X=X, model=model)
-            return self.eval_metric(y, y_pred)
+            if self.problem_type == BINARY:
+                # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
+                y_pred_internal = self.label_cleaner.transform(y_pred)
+                y_internal = self.label_cleaner.transform(y)
+                return self.eval_metric(y_internal, y_pred_internal)
+            else:
+                return self.eval_metric(y, y_pred)
         else:
             y_pred_proba = self.predict_proba(X=X, model=model)
             y = self.label_cleaner.transform(y)
@@ -231,8 +237,13 @@ class AbstractLearner:
 
         for model_name, y_pred_proba_internal in model_pred_proba_dict.items():
             if self.eval_metric.needs_pred:
-                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
-                scores[model_name] = self.eval_metric(y, y_pred)
+                if self.problem_type == BINARY:
+                    # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
+                    y_pred_internal = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
+                    scores[model_name] = self.eval_metric(y_internal, y_pred_internal)
+                else:
+                    y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+                    scores[model_name] = self.eval_metric(y, y_pred)
             else:
                 y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
                 scores[model_name] = self.eval_metric(y_internal, y_pred_proba)
@@ -329,7 +340,14 @@ class AbstractLearner:
         self._validate_class_labels(y_true)
         if not self.eval_metric.needs_pred:
             y_true = self.label_cleaner.transform(y_true)  # Get labels in numeric order
-        performance = self.eval_metric(y_true, y_pred)
+            performance = self.eval_metric(y_true, y_pred)
+        elif self.problem_type == BINARY:
+            # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
+            y_true_internal = self.label_cleaner.transform(y_true)
+            y_pred_internal = self.label_cleaner.transform(y_pred)
+            performance = self.eval_metric(y_true_internal, y_pred_internal)
+        else:
+            performance = self.eval_metric(y_true, y_pred)
 
         metric = self.eval_metric.name
 
