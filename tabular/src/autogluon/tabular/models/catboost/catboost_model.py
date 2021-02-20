@@ -200,7 +200,7 @@ class CatBoostModel(AbstractModel):
             )
 
             init_model_tree_count = self.model.tree_count_
-            init_model_best_score = self.model.get_best_score()['validation'][metric_name]
+            init_model_best_score = self._get_best_val_score(self.model, metric_name)
 
             time_left_end = time_limit - (time.time() - start_time)
             time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
@@ -258,7 +258,7 @@ class CatBoostModel(AbstractModel):
             self.model.fit(X_train, **fit_final_kwargs)
 
             if init_model is not None:
-                final_model_best_score = self.model.get_best_score()['validation'][metric_name]
+                final_model_best_score = self._get_best_val_score(self.model, metric_name)
 
                 if self.stopping_metric._optimum == init_model_best_score:
                     # Done, pick init_model
@@ -306,3 +306,14 @@ class CatBoostModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    @staticmethod
+    def _get_best_val_score(model, metric_name):
+        """Necessary to trim extra args off of metric_name, such as 'F1:hints=skip_train~true' -> 'F1'"""
+        model_best_scores = model.get_best_score()['validation']
+        if metric_name in model_best_scores:
+            best_score = model_best_scores[metric_name]
+        else:
+            metric_name_sub = metric_name.split(':')[0]
+            best_score = model_best_scores[metric_name_sub]
+        return best_score
