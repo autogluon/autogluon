@@ -12,6 +12,7 @@ from autogluon.core.utils import set_logger_verbosity
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
+from ..utils import MXNetErrorCatcher
 
 __all__ = ['ImagePredictor']
 
@@ -314,7 +315,10 @@ class ImagePredictor(object):
         task._logger.propagate = True
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            self._classifier = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
+            with MXNetErrorCatcher() as err:
+                self._classifier = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
+            if err.exc_value is not None:
+                raise RuntimeError(err.exc_value)
         self._classifier._logger.setLevel(log_level)
         self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
