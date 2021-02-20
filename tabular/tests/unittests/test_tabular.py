@@ -508,14 +508,13 @@ def test_sample_weights():
     test_data_weighted[sample_weight] = test_weights
     fit_args = {'time_limit': 20}
     predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight).fit(train_data, **fit_args)
-    predictor.distill(time_limit=5)
     ldr = predictor.leaderboard(test_data)
     perf = predictor.evaluate(test_data)
     # Run again with weight_evaluation:
     predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight, weight_evaluation=True).fit(train_data, **fit_args)
-    ldr = predictor.leaderboard(test_data_weighted)
     perf = predictor.evaluate(test_data_weighted)
-    predictor.distill(time_limit=5)
+    predictor.distill(time_limit=10)
+    ldr = predictor.leaderboard(test_data_weighted)
 
 
 
