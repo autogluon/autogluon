@@ -95,14 +95,17 @@ def train(args):
         dev_df_other_part = pd.DataFrame({feature_columns[0]: dev_df[feature_columns[1]],
                                           feature_columns[1]: dev_df[feature_columns[0]],
                                           label_column: dev_df[label_column]})
-        train_df = pd.concat([train_df, train_df_other_part])
-        dev_df = pd.concat([dev_df, dev_df_other_part])
+        real_train_df = pd.concat([train_df, train_df_other_part])
+        real_dev_df = pd.concat([dev_df, dev_df_other_part])
+    else:
+        real_train_df = train_df
+        real_dev_df = dev_df
     if args.mode == 'stacking':
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=eval_metric,
                                      path=args.exp_dir)
-        predictor.fit(train_data=train_df,
-                      tuning_data=dev_df,
+        predictor.fit(train_data=real_train_df,
+                      tuning_data=real_dev_df,
                       hyperparameters='multimodal',
                       num_bag_folds=5,
                       num_stack_levels=1)
@@ -110,8 +113,8 @@ def train(args):
         predictor = TextPredictor(label=label_column,
                                   eval_metric=eval_metric,
                                   path=args.exp_dir)
-        predictor.fit(train_data=train_df,
-                      tuning_data=dev_df,
+        predictor.fit(train_data=real_train_df,
+                      tuning_data=real_dev_df,
                       seed=args.seed)
     else:
         raise NotImplementedError
