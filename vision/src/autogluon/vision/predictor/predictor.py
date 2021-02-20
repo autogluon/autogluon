@@ -318,7 +318,7 @@ class ImagePredictor(object):
             with MXNetErrorCatcher() as err:
                 self._classifier = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
             if err.exc_value is not None:
-                raise RuntimeError(err.exc_value)
+                raise RuntimeError(err.exc_value + err.hint)
         self._classifier._logger.setLevel(log_level)
         self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
