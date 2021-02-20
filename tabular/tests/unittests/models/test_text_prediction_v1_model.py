@@ -1,5 +1,5 @@
 
-# FIXME: v0.1 Add refit_full support to text model
+# FIXME: Post 0.1, refit_full by storing the iteration idx for reaching the best performance.
 def test_text_prediction_v1_sts(fit_helper):
     fit_args = dict(
         hyperparameters={'TEXT_NN_V1': {}},
