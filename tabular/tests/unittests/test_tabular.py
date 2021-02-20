@@ -500,21 +500,22 @@ def test_sample_weights():
     directory = directory_prefix + dataset['name'] + "/"
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    weight_column = 'sample_weights'
+    sample_weight = 'sample_weights'
     weights = np.abs(np.random.rand(len(train_data),))
     test_weights = np.abs(np.random.rand(len(test_data),))
-    train_data[weight_column] = weights
+    train_data[sample_weight] = weights
     test_data_weighted = test_data.copy()
-    test_data_weighted[weight_column] = test_weights
-    fit_args = {'weight_column': weight_column, 'time_limit': 20}
-    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type']).fit(train_data, **fit_args)
+    test_data_weighted[sample_weight] = test_weights
+    fit_args = {'time_limit': 20}
+    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight).fit(train_data, **fit_args)
+    predictor.distill(time_limit=5)
     ldr = predictor.leaderboard(test_data)
     perf = predictor.evaluate(test_data)
     # Run again with weight_evaluation:
-    fit_args['weight_evaluation'] = True
-    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type']).fit(train_data, **fit_args)
+    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight, weight_evaluation=True).fit(train_data, **fit_args)
     ldr = predictor.leaderboard(test_data_weighted)
     perf = predictor.evaluate(test_data_weighted)
+    predictor.distill(time_limit=5)
 
 
 

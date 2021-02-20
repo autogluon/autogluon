@@ -29,8 +29,7 @@ class AutoTrainer(AbstractTrainer):
 
     def fit(self, X_train, y_train, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, **kwargs):
         for key in kwargs:
-            if key not in ['weight_column', 'weight_evaluation']:
-                logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
+            logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
 
         if self.bagged_mode:
             if (y_val is not None) and (X_val is not None):

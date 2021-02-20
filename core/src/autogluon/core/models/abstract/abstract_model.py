@@ -346,30 +346,30 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, metric=None, weights=None, **kwargs):
+    def score(self, X, y, metric=None, sample_weights=None, **kwargs):
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
             y_pred = self.predict(X=X, **kwargs)
         else:
             y_pred = self.predict_proba(X=X, **kwargs)
-        if weights is None:
+        if sample_weights is None:
             return metric(y, y_pred)
         else:
-            return compute_weighted_metric(y, y_pred, metric, weights)
+            return compute_weighted_metric(y, y_pred, metric, sample_weights)
 
 
-    def score_with_y_pred_proba(self, y, y_pred_proba, metric=None, weights=None):
+    def score_with_y_pred_proba(self, y, y_pred_proba, metric=None, sample_weights=None):
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             y_pred = y_pred_proba
-        if weights is None:
+        if sample_weights is None:
             return metric(y, y_pred)
         else:
-            return compute_weighted_metric(y, y_pred, metric, weights)
+            return compute_weighted_metric(y, y_pred, metric, sample_weights)
 
     def save(self, path: str = None, verbose=True) -> str:
         """
@@ -562,8 +562,8 @@ class AbstractModel:
                     logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
         fit_kwargs=scheduler_params['resource'].copy()
-        fit_kwargs['weights'] = kwargs.get('weights', None)
-        fit_kwargs['weights_val'] = kwargs.get('weights_val', None)
+        fit_kwargs['sample_weights'] = kwargs.get('sample_weights', None)
+        fit_kwargs['sample_weights_val'] = kwargs.get('sample_weights_val', None)
         util_args = dict(
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,

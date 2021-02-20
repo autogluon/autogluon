@@ -160,12 +160,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._add_child_times_to_bag(model=model_base)
             return
 
-        weights = kwargs.get('weights', None)
-        if weights is not None:
-            temp_weight_name = '__sample_weights__'
-            while temp_weight_name in X_train.columns:
-                temp_weight_name += '_'
-            X_train[temp_weight_name] = weights
+        sample_weights = kwargs.get('sample_weights', None)
         # TODO: Preprocess data here instead of repeatedly
         kfolds = generate_kfold(X=X_train, y=y_train, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
@@ -205,12 +200,11 @@ class BaggedEnsembleModel(AbstractModel):
                 fold_model = copy.deepcopy(model_base)
                 fold_model.name = f'{fold_model.name}S{j+1}F{fold_num_in_repeat+1}'  # S5F3 = 3rd fold of the 5th repeat set
                 fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
-                if weights is not None:
-                    X_train_fold, weights_train = extract_column(X_train_fold, temp_weight_name)
-                    X_val_fold, weights_val = extract_column(X_val_fold, temp_weight_name)
-                    kwargs['weights'] = weights_train
-                    kwargs['weights_val'] = weights_val
-                fold_model.fit(X_train=X_train_fold, y_train=y_train_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs)
+                kwargs_fold = kwargs.copy()
+                if sample_weights is not None:
+                    kwargs_fold['sample_weights'] = sample_weights[train_index]
+                    kwargs_fold['sample_weights_val'] = sample_weights[val_index]
+                fold_model.fit(X_train=X_train_fold, y_train=y_train_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
                 time_train_end_fold = time.time()
                 if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
                     if i != (fold_end - 1):
@@ -273,16 +267,14 @@ class BaggedEnsembleModel(AbstractModel):
     def _predict_proba(self, X, normalize=False, **kwargs):
         return self.predict_proba(X=X, normalize=normalize, **kwargs)
 
-    def score_with_oof(self, y, weights=None):
+    def score_with_oof(self, y, sample_weights=None):
         self._load_oof()
         valid_indices = self._oof_pred_model_repeats > 0
         y = y[valid_indices]
         y_pred_proba = self.oof_pred_proba[valid_indices]
-        if weights is None:
-            return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba)
-        else:
-            weights = weights[valid_indices]
-            return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, weights=weights)
+        if sample_weights is not None:
+            sample_weights = sample_weights[valid_indices]
+        return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weights=sample_weights)
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: v0.1 Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)

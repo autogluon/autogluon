@@ -75,7 +75,7 @@ class RFModel(AbstractModel):
         n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
 
         X_train = self.preprocess(X_train)
-        weights = kwargs.get('weights', None)
+        sample_weights = kwargs.get('sample_weights', None)
         n_estimator_increments = [n_estimators_final]
 
         # Very rough guess to size of a single tree before training
@@ -111,7 +111,7 @@ class RFModel(AbstractModel):
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
                 self.model.n_estimators = n_estimators
-            self.model = self.model.fit(X_train, y_train, sample_weight=weights)
+            self.model = self.model.fit(X_train, y_train, sample_weight=sample_weights)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
                 model_size_bytes = 0

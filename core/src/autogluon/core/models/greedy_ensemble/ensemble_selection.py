@@ -53,7 +53,7 @@ class EnsembleSelection:
 
     # TODO: Consider having a removal stage, remove each model and see if score is affected, if improves or not effected, remove it.
     def _fit(self, predictions, labels, time_limit=None, **kwargs):
-        sample_weights = kwargs.get('weights', None)
+        sample_weights = kwargs.get('sample_weights', None)
         ensemble_size = self.ensemble_size
         self.num_input_models_ = len(predictions)
         ensemble = []

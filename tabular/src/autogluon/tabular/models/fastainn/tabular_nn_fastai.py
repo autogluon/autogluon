@@ -157,9 +157,9 @@ class NNFastAiTabularModel(AbstractModel):
         from .callbacks import EarlyStoppingCallbackWithTimeLimit, SaveModelCallback
 
         start_time = time.time()
-        weights = kwargs.get('weights', None)
-        if weights is not None:
-            logger.log(15, "Sample weights not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
+        sample_weights = kwargs.get('sample_weights', None)
+        if sample_weights is not None:  # TODO: support
+            logger.log(15, "sample_weights not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
 
         params = self.params.copy()
 

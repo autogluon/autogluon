@@ -39,7 +39,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0):
+                 problem_type=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0, sample_weight=None, weight_evaluation=False):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.ignored_columns = ignored_columns
@@ -65,6 +65,8 @@ class AbstractLearner:
         self.reset_paths = False
 
         self._positive_class = positive_class
+        self.sample_weight = sample_weight
+        self.weight_evaluation = weight_evaluation
 
         try:
             from ..version import __version__
@@ -138,21 +140,23 @@ class AbstractLearner:
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:
             raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
-        self.weight_column = kwargs.get('weight_column', None)
+        self.sample_weight = kwargs.get('sample_weight', None)
         self.weight_evaluation = kwargs.get('weight_evaluation', False)
         X_val = kwargs.get('X_val', None)
-        if self.weight_column is not None:
-            if self.weight_column not in X.columns:
-                raise KeyError(f"Weight column '{self.weight_column}' is missing from training data. Training data columns: {list(X.columns)}")
-            weight_vals = X[self.weight_column]
+        if self.sample_weight is not None:
+            if not isinstance(self.sample_weight, str):
+                raise ValueError("sample_weight must be a string indicating the name of column that contains sample weights. If you have a vector of sample weights, first add these as an extra column to your data.")
+            if self.sample_weight not in X.columns:
+                raise KeyError(f"sample_weight column '{self.sample_weight}' is missing from training data. Training data columns: {list(X.columns)}")
+            weight_vals = X[self.sample_weight]
             if weight_vals.isna().sum() > 0:
-                raise ValueError(f"Sample weights in column '{self.weight_column}' cannot be nan")
+                raise ValueError(f"Sample weights in column '{self.sample_weight}' cannot be nan")
             if weight_vals.dtype.kind not in 'biuf':
-                raise ValueError(f"Sample weights in column '{self.weight_column}' must be numeric values")
+                raise ValueError(f"Sample weights in column '{self.sample_weight}' must be numeric values")
             if weight_vals.min() < 0:
-                raise ValueError(f"Sample weights in column '{self.weight_column}' must be nonnegative")
-            if self.weight_evaluation and X_val is not None and self.weight_column not in X_val.columns:
-                raise KeyError(f"Weight column '{self.weight_column}' cannot be missing from validation data with weight_evaluation specified.")
+                raise ValueError(f"Sample weights in column '{self.sample_weight}' must be nonnegative")
+            if self.weight_evaluation and X_val is not None and self.sample_weight not in X_val.columns:
+                raise KeyError(f"sample_weight column '{self.sample_weight}' cannot be missing from validation data if weight_evaluation=True")
 
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:
@@ -206,7 +210,7 @@ class AbstractLearner:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
         if self.weight_evaluation:
-            X, weights = extract_column(X, self.weight_column)
+            X, weights = extract_column(X, self.sample_weight)
         if self.eval_metric.needs_pred:
             y_pred = self.predict(X=X, model=model)
             if self.problem_type == BINARY:
@@ -229,7 +233,7 @@ class AbstractLearner:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
         if self.weight_evaluation:
-            X, sample_weights = extract_column(X, self.weight_column)
+            X, sample_weights = extract_column(X, self.sample_weight)
 
         X = self.transform_features(X)
         y_internal = self.label_cleaner.transform(y)
@@ -260,18 +264,19 @@ class AbstractLearner:
                 if self.problem_type == BINARY:
                     # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
                     y_pred = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
-                    y = y_internal
+                    y_tmp = y_internal
                 else:
                     y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+                    y_tmp = y
             else:
                 y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
-                y = y_internal
+                y_tmp = y_internal
             if not self.weight_evaluation:
-                scores[model_name] = self.eval_metric(y, y_pred)
+                scores[model_name] = self.eval_metric(y_tmp, y_pred)
             else:
                 if sample_weights is None:
                     raise ValueError("Sample weights cannot be None when weight_evaluation is specified.")
-                scores[model_name] = compute_weighted_metric(y, y_pred, self.eval_metric, sample_weights)
+                scores[model_name] = compute_weighted_metric(y_tmp, y_pred, self.eval_metric, sample_weights)
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.

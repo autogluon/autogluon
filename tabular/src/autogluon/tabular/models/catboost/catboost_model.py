@@ -71,8 +71,8 @@ class CatBoostModel(AbstractModel):
             params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
             params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
 
-        weights = kwargs.get('weights', None)
-        weights_val = kwargs.get('weights_val', None)
+        sample_weights = kwargs.get('sample_weights', None)
+        sample_weights_val = kwargs.get('sample_weights_val', None)
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         if isinstance(params['eval_metric'], str):
             metric_name = params['eval_metric']
@@ -105,11 +105,11 @@ class CatBoostModel(AbstractModel):
         start_time = time.time()
         X_train = self.preprocess(X_train)
         cat_features = list(X_train.select_dtypes(include='category').columns)
-        X_train = Pool(data=X_train, label=y_train, cat_features=cat_features, weight=weights)
+        X_train = Pool(data=X_train, label=y_train, cat_features=cat_features, weight=sample_weights)
 
         if X_val is not None:
             X_val = self.preprocess(X_val)
-            X_val = Pool(data=X_val, label=y_val, cat_features=cat_features, weight=weights_val)
+            X_val = Pool(data=X_val, label=y_val, cat_features=cat_features, weight=sample_weights_val)
             eval_set = X_val
             if num_rows_train <= 10000:
                 modifier = 1

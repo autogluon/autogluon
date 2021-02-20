@@ -681,6 +681,5 @@ def get_gpu_free_memory():
         memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
         memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
     except:
-        # could fail due to
         memory_free_values = []
     return memory_free_values

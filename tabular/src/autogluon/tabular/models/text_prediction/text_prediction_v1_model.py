@@ -205,6 +205,9 @@ class TextPredictionV1Model(AbstractModel):
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus', None)
         num_gpus = kwargs.get('num_gpus', None)
+        sample_weights = kwargs.get('sample_weights', None)
+        if sample_weights is not None:  # TODO: support
+            logger.log(15, "sample_weights not yet supported for TextPredictionV1Model, this model will ignore them in training.")
 
         # Infer resource
         resource = get_recommended_resource(nthreads_per_trial=num_cpus,

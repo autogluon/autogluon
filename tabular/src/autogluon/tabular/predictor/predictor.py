@@ -74,7 +74,14 @@ class TabularPredictor(TabularPredictorV1):
         Verbosity levels range from 0 to 4 and control how much information is printed.
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
-        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+    sample_weight : str, default = None
+        If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
+        Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
+    weight_evaluation : bool, default = False
+        Only considered when `sample_weight` column has been specified. Determines whether sample weights should be taken into account when computing evaluation metrics on validation/test data.
+        If True, then weighted metrics will be reported based on the sample weights provided in the specified `sample_weight` (in which case `sample_weight` column must also be present in test data).
+        In this case, the 'best' model used by default for prediction will also be decided based on a weighted version of evaluation metric.
     **kwargs :
         learner_type : AbstractLearner, default = DefaultLearner
             A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
@@ -158,18 +165,22 @@ class TabularPredictor(TabularPredictorV1):
             eval_metric=None,
             path=None,
             verbosity=2,
+            sample_weight=None,
+            weight_evaluation=False,
             **kwargs
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
+        self.sample_weight = sample_weight  # TODO: add support for sample_weight='auto'
+        self.weight_evaluation = weight_evaluation
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
 
-        self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None,
-                                                      eval_metric=eval_metric, problem_type=problem_type, **learner_kwargs)
+        self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None, eval_metric=eval_metric, problem_type=problem_type,
+                                                      sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
 
@@ -521,13 +532,6 @@ class TabularPredictor(TabularPredictorV1):
                 data. e.g. 500 hand-labeled samples (perhaps a hard human task), whole data set (unlabeled) is thousands/millions.
                 However, this isn't the only use case. Given enough unlabeled data(millions of rows), you may see improvements
                 to any amount of labeled data.
-            weight_column : str, default = None
-                If specified, indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
-                Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
-            weight_evaluation : bool, default = False
-                Only considered when `weight_column` has been specified. Determines whether sample weights should be taken into account when computing evaluation metrics on validation/test data.
-                If True, then weighted metrics will be reported based on the sample weights provided in the specified `weight_column` (in which case `weight_column` must also be present in test data).
-                In this case, the 'best' model used by default for prediction will also be decided based on a weighted version of evaluation metric.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
 
@@ -582,9 +586,6 @@ class TabularPredictor(TabularPredictorV1):
         auto_stack = kwargs['auto_stack']
         feature_generator = kwargs['feature_generator']
         unlabeled_data = kwargs['unlabeled_data']
-        self.weight_column = kwargs['weight_column']
-        self.weight_evaluation = kwargs['weight_evaluation']
-
         ag_args = kwargs['ag_args']
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
@@ -630,12 +631,12 @@ class TabularPredictor(TabularPredictorV1):
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(len(train_data), ag_args.get('hyperparameter_tune_kwargs', None) is not None)
 
-        if self.weight_column is not None:
-            prefix = f"Values in column '{self.weight_column}' used as sample weights instead of predictive features."
+        if self.sample_weight is not None:
+            prefix = f"Values in column '{self.sample_weight}' used as sample weights instead of predictive features."
             if self.weight_evaluation:
                 suffix = " Evaluation will report weighted metrics, so ensure same column exists in test data."
             else:
-                suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation to instead report weighted metrics."
+                suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation=True to instead report weighted metrics."
             logger.log(20, prefix+suffix)
 
         if kwargs['_save_bag_folds'] is not None:
@@ -647,7 +648,7 @@ class TabularPredictor(TabularPredictorV1):
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                          time_limit=time_limit, verbosity=verbosity, weight_column=self.weight_column, weight_evaluation=self.weight_evaluation)
+                          time_limit=time_limit, verbosity=verbosity, sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation)
         self._set_post_fit_vars()
 
         self._post_fit(
@@ -915,12 +916,7 @@ class TabularPredictor(TabularPredictorV1):
             # other
             feature_generator='auto',
             unlabeled_data=None,
-
-            _feature_generator_kwargs=None,
-
-            # sample weights
-            weight_column=None,
-            weight_evaluation=False
+            _feature_generator_kwargs=None
         )
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
@@ -998,11 +994,11 @@ class TabularPredictor(TabularPredictorV1):
         if tuning_data is not None:
             train_features = [column for column in train_data.columns if column != self.label]
             tuning_features = [column for column in tuning_data.columns if column != self.label]
-            if self.weight_column is not None:
-                if self.weight_column in train_features:
-                    train_features.remove(self.weight_column)
-                if self.weight_column in tuning_features:
-                    tuning_features.remove(self.weight_column)
+            if self.sample_weight is not None:
+                if self.sample_weight in train_features:
+                    train_features.remove(self.sample_weight)
+                if self.sample_weight in tuning_features:
+                    tuning_features.remove(self.sample_weight)
             train_features = np.array(train_features)
             tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):
@@ -1010,11 +1006,11 @@ class TabularPredictor(TabularPredictorV1):
         if unlabeled_data is not None:
             train_features = [column for column in train_data.columns if column != self.label]
             unlabeled_features = [column for column in unlabeled_data.columns]
-            if self.weight_column is not None:
-                if self.weight_column in train_features:
-                    train_features.remove(self.weight_column)
-                if self.weight_column in unlabeled_features:
-                    unlabeled_features.remove(self.weight_column)
+            if self.sample_weight is not None:
+                if self.sample_weight in train_features:
+                    train_features.remove(self.sample_weight)
+                if self.sample_weight in unlabeled_features:
+                    unlabeled_features.remove(self.sample_weight)
             train_features = sorted(np.array(train_features))
             unlabeled_features = sorted(np.array(unlabeled_features))
             if np.any(train_features != unlabeled_features):

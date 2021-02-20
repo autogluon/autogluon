@@ -167,9 +167,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         try_import_mxnet()
         import mxnet as mx
         self.verbosity = kwargs.get('verbosity', 2)
-        weights = kwargs.get('weights', None)
-        if weights is not None:
-            logger.log(15, "Sample weights not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
+        sample_weights = kwargs.get('sample_weights', None)
+        if sample_weights is not None:  # TODO: support
+            logger.log(15, "sample_weights not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
 
         params = self.params.copy()
         params = fixedvals_from_searchspaces(params)

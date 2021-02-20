@@ -37,14 +37,14 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, eval_metric=None,
                  num_classes=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
-                 weight_column=None, weight_evaluation=False, save_data=False, random_state=0, verbosity=2):
+                 sample_weight=None, weight_evaluation=False, save_data=False, random_state=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
         self.random_state = random_state  # Integer value added to the stack level to get the random_state for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
-        self.weight_column = weight_column
+        self.sample_weight = sample_weight  # TODO: consider redesign where Trainer doesnt need to weight column name and weights are separate from X
         self.weight_evaluation = weight_evaluation
         if eval_metric is not None:
             self.eval_metric = eval_metric
@@ -368,10 +368,10 @@ class AbstractTrainer:
         """
         X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False)
         if self.weight_evaluation:
-            X, w = extract_column(X, self.weight_column)
+            X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 sample_weights = w.values/w.sum() * len(w)
-                X_train_stack_preds[self.weight_column] = sample_weights
+                X_train_stack_preds[self.sample_weight] = sample_weights
 
         return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
 
@@ -617,13 +617,20 @@ class AbstractTrainer:
                 stacker_type = type(model)
                 if issubclass(stacker_type, WeightedEnsembleModel):
                     # TODO: Technically we don't need to re-train the weighted ensemble, we could just copy the original and re-use the weights.
+                    w = None
                     if self.bagged_mode:
-                        # TODO: add sample_weights here
+                        if self.weight_evaluation:
+                            X, w = extract_column(X, self.sample_weight)
                         X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True, use_orig_features=False)
                         y_input = y
                     else:
+                        if self.weight_evaluation:
+                            X_val, w = extract_column(X_val, self.sample_weight)
                         X_train_stack_preds = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False, use_orig_features=False)  # TODO: May want to cache this during original fit, as we do with OOF preds
                         y_input = y_val
+                    if w is not None:
+                        sample_weights = w.values/w.sum() * len(w)
+                        X_train_stack_preds[self.sample_weight] = sample_weights
 
                     # TODO: Remove child_hyperparameters, make this cleaner
                     #  This fixes the following: Use the original weighted ensemble's iterations: Currently Dionis spends over 1hr training the refit weighted ensemble because it isn't time limited and goes to 100 iterations.
@@ -864,7 +871,7 @@ class AbstractTrainer:
         weighted_ensemble_model = weighted_ensemble_model[0]
         w = None
         if self.weight_evaluation:
-            X, w = extract_column(X, self.weight_column)
+            X, w = extract_column(X, self.sample_weight)
         models = self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune_kwargs=None, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit, ens_sample_weights=w)
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
@@ -917,19 +924,19 @@ class AbstractTrainer:
             model = self._train_single(X_train, y_train, model, X_val, y_val, **model_fit_kwargs)
             fit_end_time = time.time()
             if self.weight_evaluation:
-                weights = model_fit_kwargs.get('weights', None)
-                weights_val = model_fit_kwargs.get('weights_val', None)
+                weights = model_fit_kwargs.get('sample_weights', None)
+                weights_val = model_fit_kwargs.get('sample_weights_val', None)
             else:
                 weights = None
                 weights_val = None
             if isinstance(model, BaggedEnsembleModel):
                 if model.bagged_mode or isinstance(model, WeightedEnsembleModel):
-                    score = model.score_with_oof(y=y_train, weights=weights)
+                    score = model.score_with_oof(y=y_train, sample_weights=weights)
                 else:
                     score = None
             else:
                 if X_val is not None and y_val is not None:
-                    score = model.score(X=X_val, y=y_val, weights=weights_val)
+                    score = model.score(X=X_val, y=y_val, sample_weights=weights_val)
                 else:
                     score = None
             pred_end_time = time.time()
@@ -1047,19 +1054,20 @@ class AbstractTrainer:
             time_limit=time_limit,
             verbosity=self.verbosity,
         )
-        if self.weight_column is not None:
-            X_train, w_train = extract_column(X_train, self.weight_column)
+        if self.sample_weight is not None:
+            X_train, w_train = extract_column(X_train, self.sample_weight)
             if w_train is not None:  # may be None for ensemble
+                # TODO: consider moving weight normalization into AbstractModel.fit()
                 weights_normalized = w_train.values/w_train.sum() * len(w_train)  # normalization can affect gradient algorithms like boosting
-                model_fit_kwargs['weights'] = weights_normalized
+                model_fit_kwargs['sample_weights'] = weights_normalized
             if X_val is not None:
-                X_val, w_val = extract_column(X_val, self.weight_column)
+                X_val, w_val = extract_column(X_val, self.sample_weight)
                 if self.weight_evaluation and w_val is not None:  # ignore validation weights unless weight_evaluation specified
                     weights_val_normalized = w_val.values / w_val.sum() * len(w_val)
-                    model_fit_kwargs['weights_val'] = weights_val_normalized
+                    model_fit_kwargs['sample_weights_val'] = weights_val_normalized
             ens_sample_weights =  kwargs.get('ens_sample_weights', None)
             if ens_sample_weights is not None:
-                model_fit_kwargs['weights'] = ens_sample_weights  # sample weights to use for weighted ensemble only
+                model_fit_kwargs['sample_weights'] = ens_sample_weights  # sample weights to use for weighted ensemble only
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
@@ -1833,7 +1841,8 @@ class AbstractTrainer:
     def distill(self, X_train=None, y_train=None, X_val=None, y_val=None, X_unlabeled=None,
                 time_limit=None, hyperparameters=None, holdout_frac=None, verbosity=None,
                 models_name_suffix=None, teacher=None, teacher_preds='soft',
-                augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
+                augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)},
+                augmented_sample_weight=1.0):
         """ Various distillation algorithms.
             Args:
                 X_train, y_train: pd.DataFrame and pd.Series of training data.
@@ -1856,6 +1865,7 @@ class AbstractTrainer:
                     If None, no augmentation gets applied.
                 }
                 augment_args (dict): args passed into the augmentation function corresponding to augment_method.
+                augmented_sample_weight (float): Nonnegative value indicating how much to weight augmented samples. This is only considered if sample_weight was initially specified in Predictor.
         """
         if verbosity is None:
             verbosity = self.verbosity
@@ -1902,6 +1912,9 @@ class AbstractTrainer:
         self.bagged_mode = False  # turn off bagging
         self.verbosity = verbosity  # change verbosity for distillation
 
+        if self.sample_weight is not None:
+            X_train, sample_weights = extract_column(X_train, self.sample_weight)
+
         if teacher_preds is None or teacher_preds == 'onehot':
             augment_method = None
             logger.log(20, "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher.")
@@ -1925,6 +1938,8 @@ class AbstractTrainer:
                     y_extra = y_train.loc[indices_to_add].copy()  # these are actually real training examples
                     X_train = pd.concat([X_train, X_extra])
                     y_pred = pd.concat([y_pred, y_extra])
+                    if self.sample_weight is not None:
+                        sample_weights = pd.concat([sample_weights, sample_weights[indices_to_add]])
                 y_train = y_pred
             elif teacher_preds == 'soft':
                 y_train = self.predict_proba(X_train, model=teacher)
@@ -1949,9 +1964,14 @@ class AbstractTrainer:
 
                 X_train = pd.concat([X_train, X_aug])
                 y_train = pd.concat([y_train, y_aug])
+                if self.sample_weight is not None:
+                     sample_weights = pd.concat([sample_weights, pd.Series([augmented_sample_weight]*len(X_aug))])
 
         X_train.reset_index(drop=True, inplace=True)
         y_train.reset_index(drop=True, inplace=True)
+        if self.sample_weight is not None:
+            sample_weights.reset_index(drop=True, inplace=True)
+            X_train[self.sample_weight] = sample_weights
 
         name_suffix = '_DSTL'  # all student model names contain this substring
         if models_name_suffix is not None:
@@ -1986,8 +2006,11 @@ class AbstractTrainer:
         )
 
         distilled_model_names = []
+        sample_weights_val = None
+        if self.weight_evaluation and self.sample_weight is not None:
+            X_val, sample_weights_val = extract_column(X_val, self.sample_weight)
         for model_name in models:  # finally measure original metric on validation data and overwrite stored val_scores
-            model_score = self.score(X_val, y_val_og, model=model_name)  # TODO: consider if weight_evaluation may be appropriate.
+            model_score = self.score(X_val, y_val_og, model=model_name, weights=sample_weights_val)
             model_obj = self.load_model(model_name)
             model_obj.val_score = model_score
             model_obj.save()  # TODO: consider omitting for sake of efficiency
