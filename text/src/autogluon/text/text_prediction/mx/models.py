@@ -197,7 +197,7 @@ def base_optimization_config():
     # The validation frequency = validation frequency * num_updates_in_an_epoch
     cfg.valid_frequency = 0.2
     # Logging frequency = log frequency * num_updates_in_an_epoch
-    cfg.log_frequency = 0.1
+    cfg.log_frequency = 0.05
     return cfg
 
 
