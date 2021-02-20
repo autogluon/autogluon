@@ -8,6 +8,7 @@ import pandas as pd
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.miscs import in_ipynb
 
 from ..presets import ag_text_presets, merge_params
 from ..infer_types import infer_column_problem_types, printable_column_type_string
@@ -115,6 +116,7 @@ class TextPredictor:
             num_cpus=None,
             num_gpus=None,
             num_trials=None,
+            plot_results=None,
             seed=None):
         """Fit the predictor
 
@@ -141,6 +143,8 @@ class TextPredictor:
         num_trials
             The number of trials. By default, we will use the provided number of trials in the
             hyperparameters or presets. This will overwrite the provided value.
+        plot_results
+            Whether to plot results.
         seed
             The seed of the experiment
 
@@ -219,6 +223,8 @@ class TextPredictor:
         self._problem_type = problem_type
         model_hparams = hyperparameters['models']['MultimodalTextModel']
         self._backend = model_hparams['backend']
+        if plot_results is None:
+            plot_results = in_ipynb()
         if self._backend == 'gluonnlp_v0':
             from ..mx.models import MultiModalTextModel
             self._model = MultiModalTextModel(column_types=column_types,
@@ -236,6 +242,7 @@ class TextPredictor:
                               hpo_params=hyperparameters['hpo_params'],
                               time_limit=time_limit,
                               seed=seed,
+                              plot_results=plot_results,
                               verbosity=self.verbosity)
         else:
             raise NotImplementedError("Currently, we only support using "

@@ -839,6 +839,10 @@ class MultiModalTextModel:
         self._preprocessor = None
 
     @property
+    def results(self):
+        return self._results
+
+    @property
     def preprocessor(self):
         return self._preprocessor
 
