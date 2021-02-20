@@ -3,6 +3,7 @@ import json
 import argparse
 import numpy as np
 import random
+import pandas as pd
 from autogluon.text import TextPredictor
 from autogluon.tabular import TabularPredictor
 from autogluon.core.utils.loaders import load_pd
@@ -86,6 +87,16 @@ def train(args):
     train_df = train_df[feature_columns + [label_column]]
     dev_df = dev_df[feature_columns + [label_column]]
     test_df = test_df[feature_columns]
+    if args.task == 'mrpc' or args.task == 'sts':
+        # Augmenting the un-ordered set manually.
+        train_df_other_part = pd.DataFrame({feature_columns[0]: train_df[feature_columns[1]],
+                                            feature_columns[1]: train_df[feature_columns[0]],
+                                            label_column: train_df[label_column]})
+        dev_df_other_part = pd.DataFrame({feature_columns[0]: dev_df[feature_columns[1]],
+                                          feature_columns[1]: dev_df[feature_columns[0]],
+                                          label_column: dev_df[label_column]})
+        train_df = pd.concat([train_df, train_df_other_part])
+        dev_df = pd.concat([dev_df, dev_df_other_part])
     if args.mode == 'stacking':
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=eval_metric,
