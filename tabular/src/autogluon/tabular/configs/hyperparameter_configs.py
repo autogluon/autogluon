@@ -79,7 +79,7 @@ hyperparameter_config_dict = dict(
         ],
         'CAT': {},
         'XGB': {},
-        # 'FASTAI': {},  # FIXME: FASTAI is extremely slow if trained alongside TextNN due to forkserver.
+        'FASTAI': {},
         'TEXT_NN_V1': ['default'],
         'custom': ['GBM'],
     },

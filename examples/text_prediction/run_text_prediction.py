@@ -57,7 +57,7 @@ def get_parser():
                         help='The configuration of the TextPrediction module',
                         default=None)
     parser.add_argument('--mode',
-                        choices=['stacking', 'single'],
+                        choices=['stacking', 'weighted', 'single'],
                         default='single',
                         help='Whether to use a single model or a stack ensemble. '
                              'If it is "single", If it is turned on, we will use 5-fold, 1-layer for stacking.')
@@ -109,6 +109,13 @@ def train(args):
                       hyperparameters='multimodal',
                       num_bag_folds=5,
                       num_stack_levels=1)
+    elif args.mode == 'weigted':
+        predictor = TabularPredictor(label=label_column,
+                                     eval_metric=eval_metric,
+                                     path=args.exp_dir)
+        predictor.fit(train_data=real_train_df,
+                      tuning_data=real_dev_df,
+                      hyperparameters='multimodal')
     elif args.mode == 'single':
         predictor = TextPredictor(label=label_column,
                                   eval_metric=eval_metric,
