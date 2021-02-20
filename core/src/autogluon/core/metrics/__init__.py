@@ -294,14 +294,23 @@ median_absolute_error = make_scorer('median_absolute_error',
                                     optimum=0,
                                     greater_is_better=False)
 
+
+def local_spearmanr(predictions, ground_truth):
+    return float(scipy.stats.spearmanr(ground_truth, predictions)[0])
+
+
 spearmanr = make_scorer('spearmanr',
-                        lambda predictions, ground_truth:
-                        float(scipy.stats.spearmanr(ground_truth, predictions)[0]),
+                        local_spearmanr,
                         optimum=1.0,
                         greater_is_better=True)
+
+
+def local_pearsonr(predictions, ground_truth):
+    return float(scipy.stats.pearsonr(ground_truth, predictions)[0])
+
+
 pearsonr = make_scorer('pearsonr',
-                       lambda predictions, ground_truth:
-                       float(scipy.stats.pearsonr(ground_truth, predictions)[0]),
+                       local_pearsonr,
                        optimum=1.0,
                        greater_is_better=True)
 
