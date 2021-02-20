@@ -144,18 +144,16 @@ class TextPredictionV1Model(AbstractModel):
         if X_val is not None:
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
         assert self.params['hpo_params']['num_trials'] == 1 \
-               or self.params['hpo_params']['num_trials'] is None
-        params = copy.deepcopy(self.params)
-        params['models']['MultimodalTextModel']['search_space']['optimization.per_device_batch_size']\
-            = max(1,
-                  params['models']['MultimodalTextModel']['search_space']['optimization.per_device_batch_size'] // 2)
+               or self.params['hpo_params']['num_trials'] is None,\
+            'Currently, you cannot nest the hyperparameter search in text neural network ' \
+            'and the AutoGluon Tabular.'
         self.model.fit(train_data=X_train,
                        tuning_data=X_val,
                        time_limit=time_limit,
                        num_gpus=num_gpus,
                        num_cpus=num_cpus,
-                       hyperparameters=params,
-                       seed=params.get('seed'))
+                       hyperparameters=self.params,
+                       seed=self.params.get('seed'))
 
     def save(self, path: str = None, verbose=True) -> str:
         model = self.model
