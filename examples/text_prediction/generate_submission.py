@@ -29,6 +29,7 @@ def main(args):
     os.makedirs(args.save_dir, exist_ok=True)
 
     for task, (save_name, test_file_path) in tasks.items():
+        print('Load {}'.format(test_file_path))
         test_df = pd.read_csv(test_file_path, sep='\t', header=0)
         if task == 'ax':
             # For AX, we need to load the mnli-m checkpoint and run inference
