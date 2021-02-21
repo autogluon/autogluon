@@ -16,7 +16,7 @@ python3 run_competition.py --train_file machine_hack_product_sentiment/all_train
                            --task product_sentiment \
                            --eval_metric log_loss \
                            --exp_dir ag_product_sentiment \
-                           --mode stacking | tee -a ag_product_sentiment/log.txt
+                           --mode stacking  2>&1  | tee -a ag_product_sentiment/log.txt
 ```
 It will generate a `submission.csv` file and you can try to submit it in 
 
@@ -34,7 +34,7 @@ python3 run_competition.py --train_file price_of_books/Participants_Data/Data_Tr
                            --task price_of_books \
                            --eval_metric r2 \
                            --exp_dir ag_price_of_books \
-                           --mode stacking | tee -a ag_price_of_books/log.txt
+                           --mode stacking 2>&1  | tee -a ag_price_of_books/log.txt
 ```
 
 ## Predict Salary of Data Scientists
@@ -51,7 +51,7 @@ python3 run_competition.py --train_file data_scientist_salary/Data/Final_Train_D
                            --task data_scientist_salary \
                            --eval_metric acc \
                            --exp_dir ag_data_scientist_salary \
-                           --mode stacking | tee -a ag_data_scientist_salary/log.txt
+                           --mode stacking 2>&1  | tee -a ag_data_scientist_salary/log.txt
 ```
 
 
@@ -76,7 +76,7 @@ python3 run_competition.py --train_file mercari_price/train.tsv \
                            --task mercari_price \
                            --eval_metric r2 \
                            --exp_dir ag_mercari_price_single \
-                           --mode single | tee -a ag_mercari_price_single/log.txt
+                           --mode single 2>&1  | tee -a ag_mercari_price_single/log.txt
 ```
 
 In addition, you may run multimodal with weighted ensemble
@@ -88,7 +88,7 @@ python3 run_competition.py --train_file mercari_price/train.tsv \
                            --task mercari_price \
                            --eval_metric r2 \
                            --exp_dir ag_mercari_price_weighted \
-                           --mode weighted | tee -a ag_mercari_price_weighted/log.txt
+                           --mode weighted 2>&1  | tee -a ag_mercari_price_weighted/log.txt
 ```
 Or stacking
 ```
@@ -99,7 +99,7 @@ python3 run_competition.py --train_file mercari_price/train.tsv \
                            --task mercari_price \
                            --eval_metric r2 \
                            --exp_dir ag_mercari_price_stacking \
-                           --mode stacking | tee -a ag_mercari_price_stacking/log.txt
+                           --mode stacking 2>&1  | tee -a ag_mercari_price_stacking/log.txt
 ```
 
 ## Solve GLUE Tasks with AutoGluon Text
