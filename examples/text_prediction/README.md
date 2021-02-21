@@ -18,7 +18,7 @@ python3 run_competition.py --train_file machine_hack_product_sentiment/all_train
                            --exp_dir ag_product_sentiment \
                            --mode stacking  2>&1  | tee -a ag_product_sentiment/log.txt
 ```
-It will generate a `submission.csv` file and you can try to submit it in 
+It will generate a `submission.csv` file and you can try to submit that to the competition leaderboard. 
 
 ## Predict Price of Book
 Here, we provide the example that shows how to use AutoGluon to achieve top performance in [Book Price Prediction](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview).
@@ -36,6 +36,10 @@ python3 run_competition.py --train_file price_of_books/Participants_Data/Data_Tr
                            --exp_dir ag_price_of_books \
                            --mode stacking 2>&1  | tee -a ag_price_of_books/log.txt
 ```
+Once the script is finished, you will see a `submission.xlsx` file generate in the 
+`ag_price_of_books` folder and you can try to submit that to the competition leaderboard.
+
+!IMPORTANT. Try to run the experiment on a p3.2x instance :).
 
 ## Predict Salary of Data Scientists
 Here, we provide the example that shows how to use AutoGluon to achieve top performance in [Data Scientist Salary Prediction](https://www.machinehack.com/hackathons/predict_the_data_scientists_salary_in_india_hackathon/overview).
@@ -54,6 +58,10 @@ python3 run_competition.py --train_file data_scientist_salary/Data/Final_Train_D
                            --mode stacking 2>&1  | tee -a ag_data_scientist_salary/log.txt
 ```
 
+Once the script is finished, you will see a `submission.xlsx` file generate in the 
+`ag_data_scientist_salary` folder and you can try to submit that to the competition leaderboard.
+
+!IMPORTANT. Try to run the experiment on a p3.2x instance :).
 
 ## Reach Top-5 Performance in Mercari Price Suggestion
 
@@ -131,4 +139,4 @@ order of two sentences.
 |---------------------------------------|--------|--------|-------------|------------|----------|--------|---------|--------|--------|--------|
 |Metrics                                | mcc    | acc    | acc         | spearmanr  | f1       | acc    | acc     | acc    | acc    | acc    |
 |Text (Single) - Validation (*)         | 0.6747 | 0.9472 | 0.8799 (*)  | 0.9047 (*) | 0.8870   | 0.8643 | 0.8589  | 0.9158 | 0.7726 | 0.5634 |
-|Text (Single) - Test                   | -      | -      | -           | -          | -        | -      | -       | -      | -      |        |
+|Text (Single) - Test (TBA)             | -      | -      | -           | -          | -        | -      | -       | -      | -      |        |
