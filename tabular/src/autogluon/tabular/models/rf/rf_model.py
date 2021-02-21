@@ -65,7 +65,7 @@ class RFModel(AbstractModel):
         }
         return spaces
 
-    def _fit(self, X_train, y_train, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, time_limit=None, sample_weight=None, **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
@@ -110,7 +110,7 @@ class RFModel(AbstractModel):
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
                 self.model.n_estimators = n_estimators
-            self.model = self.model.fit(X_train, y_train)
+            self.model = self.model.fit(X_train, y_train, sample_weight=sample_weight)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
                 model_size_bytes = 0

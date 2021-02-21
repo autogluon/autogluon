@@ -59,7 +59,7 @@ class FastTextModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
-    def _fit(self, X_train, y_train, **kwargs):
+    def _fit(self, X_train, y_train, sample_weight=None, **kwargs):
         if self.problem_type not in (BINARY, MULTICLASS):
             raise ValueError(
                 "FastText model only supports binary or multiclass classification"
@@ -80,6 +80,9 @@ class FastTextModel(AbstractModel):
             else:
                 params['verbose'] = 2
 
+        if sample_weight is not None:
+            logger.log(15, "sample_weight not yet supported for FastTextModel, this model will ignore them in training.")
+
         X_train = self.preprocess(X_train)
         logger.debug("NLP features %s", self.features)
 
@@ -99,7 +102,7 @@ class FastTextModel(AbstractModel):
             if quantize_model:
                 self.model.quantize(input=f.name, retrain=True)
             gc.collect()
-            mem_curr = psutil.Process().memory_info().rss 
+            mem_curr = psutil.Process().memory_info().rss
             self._model_size_estimate = max(mem_curr - mem_start, 100000000 if quantize_model else 800000000)
             logger.debug("finish training FastText model")
 
@@ -180,8 +183,8 @@ class FastTextModel(AbstractModel):
         # load binary fasttext model
         if obj._model_bin_available:
             fasttext_model_file_name = obj.path + cls.model_bin_file_name
-            # TODO: hack to subpress a deprecation warning from fasttext 
-            # remove it once offcial fasttext is updated beyond 0.9.2 
+            # TODO: hack to subpress a deprecation warning from fasttext
+            # remove it once offcial fasttext is updated beyond 0.9.2
             # https://github.com/facebookresearch/fastText/issues/1067
             with open(os.devnull, 'w') as f, contextlib.redirect_stderr(f):
                 obj.model = fasttext.load_model(fasttext_model_file_name)

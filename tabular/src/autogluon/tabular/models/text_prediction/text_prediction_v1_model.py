@@ -173,7 +173,8 @@ class TextPredictionV1Model(AbstractModel):
     def _fit(self, X_train: pd.DataFrame, y_train: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
              y_val: Optional[pd.Series] = None,
-             time_limit: Optional[int] = None, **kwargs):
+             time_limit: Optional[int] = None,
+             sample_weight=None, **kwargs):
         """The internal fit function
 
         Parameters
@@ -205,6 +206,8 @@ class TextPredictionV1Model(AbstractModel):
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus', None)
         num_gpus = kwargs.get('num_gpus', None)
+        if sample_weight is not None:  # TODO: support
+            logger.log(15, "sample_weight not yet supported for TextPredictionV1Model, this model will ignore them in training.")
 
         # Infer resource
         resource = get_recommended_resource(nthreads_per_trial=num_cpus,

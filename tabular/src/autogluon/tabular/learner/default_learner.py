@@ -8,7 +8,7 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.utils.utils import augment_rare_classes
+from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from .abstract_learner import AbstractLearner
 from ..trainer.auto_trainer import AutoTrainer
@@ -78,6 +78,8 @@ class DefaultLearner(AbstractLearner):
             low_memory=True,
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
+            sample_weight=self.sample_weight,
+            weight_evaluation=self.weight_evaluation,
             save_data=self.cache_data,
             random_state=self.random_state,
             verbosity=verbosity
@@ -129,7 +131,7 @@ class DefaultLearner(AbstractLearner):
         X, y = self.extract_label(X)
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned, positive_class=self._positive_class)
         y = self.label_cleaner.transform(y)
-
+        X, w = extract_column(X, self.sample_weight)
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
 
@@ -139,11 +141,14 @@ class DefaultLearner(AbstractLearner):
                 logger.warning('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
                 X_val = None
                 y_val = None
+                w_val = None
             else:
                 X_val, y_val = self.extract_label(X_val)
                 y_val = self.label_cleaner.transform(y_val)
+                X_val, w_val = extract_column(X_val, self.sample_weight)
         else:
             y_val = None
+            w_val = None
 
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         logger.log(20, f'Using Feature Generators to preprocess the data ...')
@@ -187,6 +192,17 @@ class DefaultLearner(AbstractLearner):
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
+        if w is not None:  # TODO: consider not bundling sample-weights inside X, X_val
+            X[self.sample_weight] = w
+            if X_val is not None:
+                if w_val is not None:
+                    X_val[self.sample_weight] = w_val
+                elif not self.weight_evaluation:
+                    nan_vals = np.empty((len(X_val),))
+                    nan_vals[:] = np.nan
+                    X_val[self.sample_weight] = nan_vals
+                else:
+                    raise ValueError(f"sample_weight column '{self.sample_weight}' cannot be missing from X_val if weight_evaluation=True")
 
         return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds
 

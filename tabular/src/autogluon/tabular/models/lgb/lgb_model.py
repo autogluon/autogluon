@@ -59,7 +59,7 @@ class LGBModel(AbstractModel):
             stopping_metric_name = stopping_metric
         return stopping_metric, stopping_metric_name
 
-    def _fit(self, X_train=None, y_train=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, num_gpus=0, **kwargs):
+    def _fit(self, X_train=None, y_train=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
         start_time = time.time()
         params = self.params.copy()
 
@@ -77,7 +77,8 @@ class LGBModel(AbstractModel):
             verbose_eval = 1
 
         stopping_metric, stopping_metric_name = self._get_stopping_metric_internal()
-        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, y_train=y_train, params=params, X_val=X_val, y_val=y_val, dataset_train=dataset_train, dataset_val=dataset_val)
+        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, y_train=y_train, params=params, X_val=X_val, y_val=y_val,
+                                                            sample_weight=sample_weight, sample_weight_val=sample_weight_val, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
 
         num_boost_round = params.pop('num_boost_round', 1000)
@@ -237,12 +238,10 @@ class LGBModel(AbstractModel):
         else:
             return X
 
-    def generate_datasets(self, X_train: DataFrame, y_train: Series, params, X_val=None, y_val=None, dataset_train=None, dataset_val=None, save=False):
+    def generate_datasets(self, X_train: DataFrame, y_train: Series, params, X_val=None, y_val=None, sample_weight=None, sample_weight_val=None, dataset_train=None, dataset_val=None, save=False):
         lgb_dataset_params_keys = ['objective', 'two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
-        W_train = None  # TODO: Add weight support
-        W_test = None  # TODO: Add weight support
         if X_train is not None:
             X_train = self.preprocess(X_train, is_train=True)
         if X_val is not None:
@@ -261,11 +260,11 @@ class LGBModel(AbstractModel):
 
         if not dataset_train:
             # X_train, W_train = self.convert_to_weight(X=X_train)
-            dataset_train = construct_dataset(x=X_train, y=y_train, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=W_train)
+            dataset_train = construct_dataset(x=X_train, y=y_train, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=sample_weight)
             # dataset_train = construct_dataset_lowest_memory(X=X_train, y=y_train, location=self.path + 'datasets/train', params=data_params)
         if (not dataset_val) and (X_val is not None) and (y_val is not None):
             # X_val, W_val = self.convert_to_weight(X=X_val)
-            dataset_val = construct_dataset(x=X_val, y=y_val, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=W_test)
+            dataset_val = construct_dataset(x=X_val, y=y_val, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=sample_weight_val)
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
         if self.problem_type == SOFTCLASS:
             if y_train_og is not None:

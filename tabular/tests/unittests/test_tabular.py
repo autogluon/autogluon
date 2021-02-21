@@ -486,6 +486,38 @@ def test_tabular_bag():
                            seed_val=seed_val, fit_args=fit_args)
 
 
+def test_sample_weight():
+    dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip',
+               'name': 'toyRegression',
+               'problem_type': REGRESSION,
+               'label': 'y',
+               'performance_val': 0.183}
+    directory_prefix = './datasets/'
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset['name'], url=dataset['url'])
+    print(f"Evaluating Benchmark Dataset {dataset['name']}")
+    directory = directory_prefix + dataset['name'] + "/"
+    savedir = directory + 'AutogluonOutput/'
+    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    sample_weight = 'sample_weights'
+    weights = np.abs(np.random.rand(len(train_data),))
+    test_weights = np.abs(np.random.rand(len(test_data),))
+    train_data[sample_weight] = weights
+    test_data_weighted = test_data.copy()
+    test_data_weighted[sample_weight] = test_weights
+    fit_args = {'time_limit': 20}
+    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight).fit(train_data, **fit_args)
+    ldr = predictor.leaderboard(test_data)
+    perf = predictor.evaluate(test_data)
+    # Run again with weight_evaluation:
+    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight, weight_evaluation=True).fit(train_data, **fit_args)
+    perf = predictor.evaluate(test_data_weighted)
+    predictor.distill(time_limit=10)
+    ldr = predictor.leaderboard(test_data_weighted)
+
+
+
 @pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")
 def test_tabular_stack1():
     ############ Benchmark options you can set: ########################

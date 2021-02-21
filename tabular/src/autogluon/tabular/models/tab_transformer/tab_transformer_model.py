@@ -338,7 +338,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, sample_weight=None, **kwargs):
         import torch
 
         num_gpus = kwargs.get('num_gpus', None)
@@ -355,6 +355,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             if num_gpus > 1:
                 logger.warning("TabTransformer not yet configured to use more than 1 GPU. 'num_gpus' set to >1, but we will be using only 1 GPU.")
 
+        if sample_weight is not None:
+            logger.log(15, "sample_weight not yet supported for TabTransformerModel, this model will ignore them in training.")
 
         if self.problem_type ==REGRESSION:
             self.params['n_classes'] = 1
@@ -521,14 +523,14 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         """
         List of features to add (Updated by Anthony Galczak 11-19-20):
-        
-        1) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
+
+        1) Allow for saving of pretrained model for future use. This will be done in a future PR as the
         "pretrain API change".
-        
+
         2) Investigate options for when the unlabeled schema does not match the training schema. Currently,
         we do not allow such mismatches and the schemas must match exactly. We can investigate ways to use
         less or more columns from the unlabeled data. This will likely require a design meeting.
-        
+
         3) Bug where HPO doesn't work when cuda is enabled.
         "RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method"
         Update: This will likely be fixed in a future change to HPO in AutoGluon.
