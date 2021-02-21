@@ -1,6 +1,6 @@
 # Examples for TextPredictor 
 
-## Top Performance in Product Sentiment Classification
+## Product Sentiment Classification
 
 Here, we provide the example that shows how to use AutoGluon to achieve top performance in 
 [Product Sentiment Classification Hackathon](https://www.machinehack.com/hackathons/product_sentiment_classification_weekend_hackathon_19/leaderboard) 
@@ -17,6 +17,26 @@ python3 run_competition.py --train_file machine_hack_product_sentiment/all_train
                            --eval_metric log_loss \
                            --exp_dir ag_product_sentiment \
                            --mode stacking | tee -a ag_product_sentiment/log.txt
+```
+It will generate a `submission.csv` file and you can try to submit it in 
+
+## Predict Price of Book
+
+```
+mkdir -p price_of_books
+wget https://automl-mm-bench.s3.amazonaws.com/machine_hack_competitions/predict_the_price_of_books/Data.zip -O price_of_books/Data.zip
+cd price_of_books
+unzip Data.zip
+
+
+mkdir -p ag_price_of_books
+python3 run_competition.py --train_file price_of_books/Participants_Data/Data_Train.xlsx \
+                           --test_file price_of_books/Participants_Data/Data_Test.xlsx \
+                           --sample_submission price_of_books/Participants_Data/Sample_Submission.xlsx \
+                           --task price_of_books \
+                           --eval_metric r2 \
+                           --exp_dir ag_price_of_books \
+                           --mode stacking | tee -a ag_price_of_books/log.txt
 ```
 
 ## Reach Top-5 Performance in Mercari Price Suggestion

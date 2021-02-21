@@ -27,7 +27,10 @@ def get_parser():
                         help='The metric used to evaluate the model.',
                         default=None)
     parser.add_argument('--task', type=str,
-                        choices=['product_sentiment', 'mercari_price'],
+                        choices=['product_sentiment',
+                                 'mercari_price',
+                                 'price_of_books',
+                                 'data_scientist_salary'],
                         required=True)
     parser.add_argument('--exp_dir', type=str, default=None,
                         help='The experiment directory where the model params will be written.')
@@ -47,6 +50,33 @@ def load_machine_hack_product_sentiment(train_path, test_path):
     train_df = train_df[feature_columns + [label_column]]
     test_df = test_df[feature_columns]
     return train_df, test_df, label_column
+
+
+def load_price_of_books(train_path, test_path):
+    train_df = pd.read_excel(train_path, engine='openpyxl')
+    test_df = pd.read_excel(test_path, engine='openpyxl')
+    # Convert Reviews
+    train_df.loc[:, 'Reviews'] = pd.to_numeric(train_df['Reviews'].apply(
+        lambda ele: ele[:-len(' out of 5 stars')]))
+    test_df.loc[:, 'Reviews'] = pd.to_numeric(
+        test_df['Reviews'].apply(lambda ele: ele[:-len(' out of 5 stars')]))
+    # Convert Ratings
+    train_df.loc[:, 'Ratings'] = pd.to_numeric(train_df['Ratings'].apply(
+        lambda ele: ele[:-len(' customer reviews')]))
+    test_df.loc[:, 'Ratings'] = pd.to_numeric(
+        test_df['Ratings'].apply(lambda ele: ele[:-len(' customer reviews')]))
+    # Convert Price to log scale
+    train_df.loc[:, 'Price'] = np.log10(train_df['Price'] + 1)
+    test_df.loc[:, 'Price'] = np.log10(test_df['Price'] + 1)
+    return train_df, test_df, 'Price'
+
+
+def load_data_scientist_salary(train_path, test_path):
+    train_df = pd.read_csv(train_path)
+    test_df = pd.read_csv(test_path)
+    train_df.drop('company_name_encoded', axis=1)
+    test_df.drop('company_name_encoded', axis=1)
+    return train_df, test_df, 'salary'
 
 
 def load_mercari_price_prediction(train_path, test_path):
@@ -124,6 +154,10 @@ def run(args):
     elif args.task == 'mercari_price':
         train_df, test_df, label_column = load_mercari_price_prediction(args.train_file,
                                                                         args.test_file)
+    elif args.task == 'price_of_books':
+        train_df, test_df, label_column = load_price_of_books(args.train_file, args.test_file)
+    elif args.task == 'data_scientist_salary':
+        train_df, test_df, label_column = load_data_scientist_salary(args.train_file, args.test_file)
     else:
         raise NotImplementedError
     if args.mode == 'stacking':
@@ -151,10 +185,20 @@ def run(args):
     if args.task == 'product_sentiment':
         test_probabilities = predictor.predict_proba(test_df, as_pandas=True)
         test_probabilities.to_csv(os.path.join(args.exp_dir, 'submission.csv'), index=False)
+    elif args.task == 'data_scientist_salary':
+        predictions = predictor.predict(test_df, as_pandas=True)
+        submission = pd.read_excel(args.sample_submission, engine='openpyxl')
+        submission.loc[:, label_column] = predictions[label_column]
+        submission.to_excel(os.path.join(args.exp_dir, 'submission.xlsx'))
+    elif args.task == 'price_of_books':
+        predictions = predictor.predict(test_df, as_pandas=True)
+        submission = pd.read_excel(args.sample_submission, engine='openpyxl')
+        submission.loc[:, label_column] = np.power(10, predictions[label_column])
+        submission.to_excel(os.path.join(args.exp_dir, 'submission.xlsx'))
     elif args.task == 'mercari_price':
         test_predictions = predictor.predict(test_df, as_pandas=True)
         submission = pd.read_csv(args.sample_submission)
-        submission.loc[:, 'price'] = np.exp(test_predictions['price']) - 1
+        submission.loc[:, label_column] = np.exp(test_predictions[label_column]) - 1
         submission.to_csv(os.path.join(args.exp_dir, 'submission.csv'), index=False)
     else:
         raise NotImplementedError
