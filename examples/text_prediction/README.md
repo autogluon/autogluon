@@ -49,7 +49,7 @@ python3 run_competition.py --train_file data_scientist_salary/Data/Final_Train_D
                            --test_file data_scientist_salary/Data/Final_Test_Dataset.csv \
                            --sample_submission data_scientist_salary/Data/sample_submission.xlsx \
                            --task data_scientist_salary \
-                           --eval_metric r2 \
+                           --eval_metric acc \
                            --exp_dir ag_data_scientist_salary \
                            --mode stacking | tee -a ag_data_scientist_salary/log.txt
 ```
