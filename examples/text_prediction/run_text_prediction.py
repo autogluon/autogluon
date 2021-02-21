@@ -74,25 +74,6 @@ def set_seed(seed):
     random.seed(seed)
 
 
-def reset_agg_layer_proj_num_layers(hparams):
-    """
-
-    Parameters
-    ----------
-    mid_units
-        Number of mid units
-
-    Returns
-    -------
-    hparams
-        The hyper-parameters
-    """
-    new_hparams = copy.deepcopy(hparams)
-    search_space = new_hparams['models']['MultimodalTextModel']['search_space']
-    search_space['model.network.agg_net.out_proj_num_layers'] = -1
-    return new_hparams
-
-
 def train(args):
     set_seed(args.seed)
     if args.task is not None:
@@ -134,14 +115,11 @@ def train(args):
                       tuning_data=real_dev_df,
                       hyperparameters='multimodal')
     elif args.mode == 'single':
-        hparams = ag_text_presets.create('default')
-        hparams = reset_agg_layer_proj_num_layers(hparams)
         predictor = TextPredictor(label=label_column,
                                   eval_metric=eval_metric,
                                   path=args.exp_dir)
         predictor.fit(train_data=real_train_df,
                       tuning_data=real_dev_df,
-                      hyperparameters=hparams,
                       seed=args.seed)
     else:
         raise NotImplementedError
