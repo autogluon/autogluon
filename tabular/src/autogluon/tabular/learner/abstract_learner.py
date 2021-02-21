@@ -160,6 +160,15 @@ class AbstractLearner:
             if self.weight_evaluation and X_val is not None and self.sample_weight not in X_val.columns:
                 raise KeyError(f"sample_weight column '{self.sample_weight}' cannot be missing from validation data if weight_evaluation=True")
 
+            if self.sample_weight is not None:
+                prefix = f"Values in column '{self.sample_weight}' used as sample weights instead of predictive features."
+                if self.weight_evaluation:
+                    suffix = " Evaluation will report weighted metrics, so ensure same column exists in test data."
+                else:
+                    suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation=True to instead report weighted metrics."
+                logger.log(20, prefix+suffix)
+
+
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:
             if model is not None and base_models is not None:

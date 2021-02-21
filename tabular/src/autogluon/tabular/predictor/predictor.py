@@ -173,7 +173,7 @@ class TabularPredictor(TabularPredictorV1):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.sample_weight = sample_weight  # TODO: add support for sample_weight= 'auto', 'balanced'
-        self.weight_evaluation = weight_evaluation
+        self.weight_evaluation = weight_evaluation  # TODO: sample_weight and weight_evaluation can both be properties that link to self._learner.sample_weight, self._learner.weight_evaluation
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
 
@@ -631,14 +631,6 @@ class TabularPredictor(TabularPredictorV1):
 
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(len(train_data), ag_args.get('hyperparameter_tune_kwargs', None) is not None)
-
-        if self.sample_weight is not None:
-            prefix = f"Values in column '{self.sample_weight}' used as sample weights instead of predictive features."
-            if self.weight_evaluation:
-                suffix = " Evaluation will report weighted metrics, so ensure same column exists in test data."
-            else:
-                suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation=True to instead report weighted metrics."
-            logger.log(20, prefix+suffix)
 
         if kwargs['_save_bag_folds'] is not None:
             if ag_args_ensemble is None:
