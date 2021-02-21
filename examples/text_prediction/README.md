@@ -43,6 +43,29 @@ python3 run_competition.py --train_file mercari_price/train.tsv \
                            --mode single | tee -a ag_mercari_price_single/log.txt
 ```
 
+In addition, you may run multimodal with weighted ensemble
+```
+mkdir -p ag_mercari_price_weighted
+python3 run_competition.py --train_file mercari_price/train.tsv \
+                           --test_file mercari_price/test_stg2.tsv \
+                           --sample_submission mercari_price/sample_submission_stg2.csv \
+                           --task mercari_price \
+                           --eval_metric r2 \
+                           --exp_dir ag_mercari_price_weighted \
+                           --mode weighted | tee -a ag_mercari_price_weighted/log.txt
+```
+Or stacking
+```
+mkdir -p ag_mercari_price_stacking
+python3 run_competition.py --train_file mercari_price/train.tsv \
+                           --test_file mercari_price/test_stg2.tsv \
+                           --sample_submission mercari_price/sample_submission_stg2.csv \
+                           --task mercari_price \
+                           --eval_metric r2 \
+                           --exp_dir ag_mercari_price_stacking \
+                           --mode stacking | tee -a ag_mercari_price_stacking/log.txt
+```
+
 ## Solve GLUE Tasks with AutoGluon Text
 
 Here, we show how you may use AutoGluon Text to solve all tasks in the [GLUE benchmark](https://openreview.net/pdf?id=rJ4km2R5t7).
