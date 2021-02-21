@@ -26,6 +26,7 @@ def main(args):
         'ax':      ['AX.tsv', 'glue/rte_diagnostic/diagnostic.tsv']
     }
 
+    os.makedirs(args.save_dir, exist_ok=True)
 
     for task, (save_name, test_file_path) in tasks.items():
         test_df = pd.read_csv(test_file_path, sep='\t', header=0)
