@@ -67,7 +67,6 @@ def load_price_of_books(train_path, test_path):
         test_df['Ratings'].apply(lambda ele: ele.replace(',', '')[:-len(' customer reviews')]))
     # Convert Price to log scale
     train_df.loc[:, 'Price'] = np.log10(train_df['Price'] + 1)
-    test_df.loc[:, 'Price'] = np.log10(test_df['Price'] + 1)
     return train_df, test_df, 'Price'
 
 
@@ -193,7 +192,7 @@ def run(args):
     elif args.task == 'price_of_books':
         predictions = predictor.predict(test_df, as_pandas=True)
         submission = pd.read_excel(args.sample_submission, engine='openpyxl')
-        submission.loc[:, label_column] = np.power(10, predictions[label_column])
+        submission.loc[:, label_column] = np.power(10, predictions[label_column]) - 1
         submission.to_excel(os.path.join(args.exp_dir, 'submission.xlsx'))
     elif args.task == 'mercari_price':
         test_predictions = predictor.predict(test_df, as_pandas=True)
