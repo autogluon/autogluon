@@ -21,14 +21,11 @@ python3 run_competition.py --train_file machine_hack_product_sentiment/all_train
 It will generate a `submission.csv` file and you can try to submit it in 
 
 ## Predict Price of Book
+Here, we provide the example that shows how to use AutoGluon to achieve top performance in [Book Price Prediction](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview).
+Also, you will need to install `openpyxl` to read from xlsx file.
 
 ```
-mkdir -p price_of_books
-wget https://automl-mm-bench.s3.amazonaws.com/machine_hack_competitions/predict_the_price_of_books/Data.zip -O price_of_books/Data.zip
-cd price_of_books
-unzip Data.zip
-
-
+bash prepare_price_of_books.sh
 mkdir -p ag_price_of_books
 python3 run_competition.py --train_file price_of_books/Participants_Data/Data_Train.xlsx \
                            --test_file price_of_books/Participants_Data/Data_Test.xlsx \
@@ -38,6 +35,23 @@ python3 run_competition.py --train_file price_of_books/Participants_Data/Data_Tr
                            --exp_dir ag_price_of_books \
                            --mode stacking | tee -a ag_price_of_books/log.txt
 ```
+
+## Predict Salary of Data Scientists
+Here, we provide the example that shows how to use AutoGluon to achieve top performance in [Data Scientist Salary Prediction](https://www.machinehack.com/hackathons/predict_the_data_scientists_salary_in_india_hackathon/overview).
+Also, you will need to install `openpyxl` to read from xlsx file.
+
+```
+bash prepare_data_scientist_salary.sh
+mkdir -p ag_data_scientist_salary
+python3 run_competition.py --train_file data_scientist_salary/Data/Final_Train_Dataset \
+                           --test_file data_scientist_salary/Data/Final_Test_Dataset.csv \
+                           --sample_submission data_scientist_salary/Data/sample_submission.xlsx \
+                           --task data_scientist_salary \
+                           --eval_metric r2 \
+                           --exp_dir ag_data_scientist_salary \
+                           --mode stacking | tee -a ag_data_scientist_salary/log.txt
+```
+
 
 ## Reach Top-5 Performance in Mercari Price Suggestion
 
