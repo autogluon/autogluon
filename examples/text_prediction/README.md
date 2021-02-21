@@ -10,6 +10,7 @@ mkdir -p machine_hack_product_sentiment
 wget https://automl-mm-bench.s3.amazonaws.com/machine_hack_product_sentiment/all_train.csv -O machine_hack_product_sentiment/all_train.csv
 wget https://automl-mm-bench.s3.amazonaws.com/machine_hack_product_sentiment/test.csv -O machine_hack_product_sentiment/test.csv
 
+mkdir -p ag_product_sentiment
 python3 run_competition.py --train_file machine_hack_product_sentiment/all_train.csv \
                            --test_file machine_hack_product_sentiment/test.csv \
                            --task product_sentiment \
@@ -32,8 +33,10 @@ bash prepare_mercari_kaggle.sh
 
 After you have prepared the dataset, you can use the following command:
 ```
+mkdir -p ag_mercari_price_single
 python3 run_competition.py --train_file mercari_price/train.tsv \
                            --test_file mercari_price/test_stg2.tsv \
+                           --sample_submission mercari_price/sample_submission_stg2.csv \
                            --task mercari_price \
                            --metric r2 \
                            --exp_dir ag_mercari_price_single \

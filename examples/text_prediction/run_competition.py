@@ -158,3 +158,9 @@ def run(args):
         submission.to_csv(os.path.join(args.exp_dir, 'submission.csv'), index=False)
     else:
         raise NotImplementedError
+
+
+if __name__ == '__main__':
+    parser = get_parser()
+    args = parser.parse_args()
+    run(args)
