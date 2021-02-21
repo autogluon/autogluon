@@ -62,9 +62,9 @@ def load_price_of_books(train_path, test_path):
         test_df['Reviews'].apply(lambda ele: ele[:-len(' out of 5 stars')]))
     # Convert Ratings
     train_df.loc[:, 'Ratings'] = pd.to_numeric(train_df['Ratings'].apply(
-        lambda ele: ele[:-len(' customer reviews')]))
+        lambda ele: ele.replace(',', '')[:-len(' customer reviews')]))
     test_df.loc[:, 'Ratings'] = pd.to_numeric(
-        test_df['Ratings'].apply(lambda ele: ele[:-len(' customer reviews')]))
+        test_df['Ratings'].apply(lambda ele: ele.replace(',', '')[:-len(' customer reviews')]))
     # Convert Price to log scale
     train_df.loc[:, 'Price'] = np.log10(train_df['Price'] + 1)
     test_df.loc[:, 'Price'] = np.log10(test_df['Price'] + 1)

@@ -26,6 +26,7 @@ Also, you will need to install `openpyxl` to read from xlsx file.
 
 ```
 bash prepare_price_of_books.sh
+python3 -m pip install openpyxl
 mkdir -p ag_price_of_books
 python3 run_competition.py --train_file price_of_books/Participants_Data/Data_Train.xlsx \
                            --test_file price_of_books/Participants_Data/Data_Test.xlsx \
@@ -42,6 +43,7 @@ Also, you will need to install `openpyxl` to read from xlsx file.
 
 ```
 bash prepare_data_scientist_salary.sh
+python3 -m pip install openpyxl
 mkdir -p ag_data_scientist_salary
 python3 run_competition.py --train_file data_scientist_salary/Data/Final_Train_Dataset \
                            --test_file data_scientist_salary/Data/Final_Test_Dataset.csv \
