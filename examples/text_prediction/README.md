@@ -26,14 +26,8 @@ To run the example, you will need to configure the Kaggle API which will be docu
 https://github.com/Kaggle/kaggle-api and download the dataset.
 
 ```
-kaggle competitions download -c mercari-price-suggestion-challenge
-mkdir -p mercari_price
-mv mercari-price-suggestion-challenge.zip mercari_price/
-cd mercari_price/
-unzip mercari-price-suggestion-challenge.zip
-7za e train.tsv.7z
-unzip e test_stg2.tsv.zip
-cd ..
+sudo apt install -y p7zip-full
+bash prepare_mercari_kaggle.sh
 ```
 
 After you have prepared the dataset, you can use the following command:
