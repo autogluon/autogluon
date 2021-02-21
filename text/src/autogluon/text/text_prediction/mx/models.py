@@ -1411,7 +1411,7 @@ class MultiModalTextModel:
             cfg=cfg.model.network,
             out_shape=out_shape)
         net.hybridize()
-        ctx_l = get_mxnet_available_ctx()
+        ctx_l = mx.cpu()
         net.load_parameters(os.path.join(dir_path, 'net.params'), ctx=ctx_l)
         model = cls(column_types=column_types,
                     label_columns=label_columns,

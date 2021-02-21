@@ -44,10 +44,11 @@ bash run_glue.sh stacking
 ```
 
 ### Results
+For MRPC and STS, we have manually augmented the training and validation data by shuffling the 
+order of two sentences.
 
-|                          | CoLA   | SST | MRPC | STS       | QQP | MNLI | QNLI | RTE |
-|--------------------------|--------|-----|------|-----------|-----|------|------|-----|
-|Metrics                   | mcc    | acc | acc  | spearmanr | acc | acc  | acc  | acc |
-|Text (Single)             | 0.6747 |     |      |           |     |      |      |     |
-|Tabular (Stacking)        |        |     |      |           |     |      |      |     |
-
+|                                       | CoLA   | SST    | MRPC        | STS        | QQP      | MNLI-m | MNLI-mm | QNLI   | RTE    | WNLI   |
+|---------------------------------------|--------|--------|-------------|------------|----------|--------|---------|--------|--------|--------|
+|Metrics                                | mcc    | acc    | acc         | spearmanr  | f1       | acc    | acc     | acc    | acc    | acc    |
+|Text (Single) - Validation (*)         | 0.6747 | 0.9472 | 0.8799 (*)  | 0.9047 (*) | 0.8870   | 0.8643 | 0.8589  | 0.9158 | 0.7726 | 0.5634 |
+|Text (Single) - Test                   | 0.6747 | 0.9472 | 0.8799 (*)  | 0.9047 (*) | 0.8870   |        |         |        |        |
