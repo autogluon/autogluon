@@ -11,6 +11,15 @@ def get_parser():
     return parser
 
 
+def get_test_index(path):
+    with open(path, 'r', encoding='utf-8') as in_f:
+        lines = in_f.readlines()
+    index_l = []
+    for i in range(1, len(lines)):
+        index_l.append(lines[i].split()[0])
+    return index_l
+
+
 def main(args):
     tasks = {
         'cola':    ['CoLA.tsv',  'glue/cola/test.tsv'],
@@ -29,14 +38,15 @@ def main(args):
     os.makedirs(args.save_dir, exist_ok=True)
 
     for task, (save_name, test_file_path) in tasks.items():
-        print('Load {}'.format(test_file_path))
-        test_df = pd.read_csv(test_file_path, sep='\t', header=0)
         if task == 'ax':
             # For AX, we need to load the mnli-m checkpoint and run inference
+            test_df = pd.read_csv(test_file_path, sep='\t', header=0)
+            test_index = test_df['index']
             predictor = TextPredictor.load(f'{args.prefix}_mnli_m')
             label_column = predictor.label
             predictions = predictor.predict(test_df)
         else:
+            test_index = get_test_index(test_file_path)
             prediction_df = pd.read_csv(f'{args.prefix}_{task}/test_prediction.csv',
                                         index_col=0)
             label_column = prediction_df.columns[0]
@@ -44,7 +54,7 @@ def main(args):
         with open(os.path.join(args.save_dir, save_name), 'w') as of:
             of.write('index\t{}\n'.format(label_column))
             for i in range(len(predictions)):
-                of.write('{}\t{}\n'.format(test_df['index'][i],
+                of.write('{}\t{}\n'.format(test_index[i],
                                            predictions[i]))
 
 
