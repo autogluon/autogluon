@@ -78,6 +78,7 @@ class TabularPredictor(TabularPredictorV1):
     sample_weight : str, default = None
         If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
         Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
+        If you want your usage of sample weights to match results obtained outside of this Predictor, then ensure sample weights for your training (or tuning) data sum to the number of rows in the training (or tuning) data.
     weight_evaluation : bool, default = False
         Only considered when `sample_weight` column has been specified. Determines whether sample weights should be taken into account when computing evaluation metrics on validation/test data.
         If True, then weighted metrics will be reported based on the sample weights provided in the specified `sample_weight` (in which case `sample_weight` column must also be present in test data).
@@ -171,7 +172,7 @@ class TabularPredictor(TabularPredictorV1):
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
-        self.sample_weight = sample_weight  # TODO: add support for sample_weight='auto'
+        self.sample_weight = sample_weight  # TODO: add support for sample_weight= 'auto', 'balanced'
         self.weight_evaluation = weight_evaluation
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
@@ -647,8 +648,7 @@ class TabularPredictor(TabularPredictorV1):
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                          time_limit=time_limit, verbosity=verbosity, sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation)
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity)
         self._set_post_fit_vars()
 
         self._post_fit(

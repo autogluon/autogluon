@@ -36,7 +36,7 @@ class EnsembleSelection:
         else:
             self.random_state = np.random.RandomState(seed=0)
 
-    def fit(self, predictions, labels, time_limit=None, identifiers=None, **kwargs):
+    def fit(self, predictions, labels, time_limit=None, identifiers=None, sample_weight=None):
         self.ensemble_size = int(self.ensemble_size)
         if self.ensemble_size < 1:
             raise ValueError('Ensemble size cannot be less than one!')
@@ -45,15 +45,14 @@ class EnsembleSelection:
         # if not isinstance(self.metric, Scorer):
         #     raise ValueError('Metric must be of type scorer')
 
-        self._fit(predictions=predictions, labels=labels, time_limit=time_limit, **kwargs)
+        self._fit(predictions=predictions, labels=labels, time_limit=time_limit, sample_weight=sample_weight)
         self._calculate_weights()
         logger.log(15, 'Ensemble weights: ')
         logger.log(15, self.weights_)
         return self
 
     # TODO: Consider having a removal stage, remove each model and see if score is affected, if improves or not effected, remove it.
-    def _fit(self, predictions, labels, time_limit=None, **kwargs):
-        sample_weights = kwargs.get('sample_weights', None)
+    def _fit(self, predictions, labels, time_limit=None, sample_weight=None):
         ensemble_size = self.ensemble_size
         self.num_input_models_ = len(predictions)
         ensemble = []
@@ -90,7 +89,7 @@ class EnsembleSelection:
             fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
             for j, pred in enumerate(predictions):
                 fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1. / float(s + 1)) * pred
-                scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric, sample_weights=sample_weights)
+                scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric, sample_weight=sample_weight)
 
             all_best = np.argwhere(scores == np.nanmin(scores)).flatten()
 
@@ -143,15 +142,12 @@ class EnsembleSelection:
 
         logger.debug("Ensemble indices: "+str(self.indices_))
 
-    def _calculate_regret(self, y_true, y_pred_proba, metric, sample_weights=None):
+    def _calculate_regret(self, y_true, y_pred_proba, metric, sample_weight=None):
         if metric.needs_pred:
             preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             preds = y_pred_proba
-        if sample_weights is None:
-            score = metric(y_true, preds)
-        else:
-            score = compute_weighted_metric(y_true, preds, metric, sample_weights)
+        score = compute_weighted_metric(y_true, preds, metric, sample_weight)
         return metric._optimum - score
 
     def _calculate_weights(self):

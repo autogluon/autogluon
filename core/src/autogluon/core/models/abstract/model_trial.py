@@ -74,8 +74,8 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
     time_fit_end = time.time()
     y_pred_proba = model.predict_proba(**predict_proba_args)
     time_pred_end = time.time()
-    sample_weights_val = fit_args.get('sample_weights_val', None)
-    model.val_score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba, sample_weights=sample_weights_val)
+    sample_weight_val = fit_args.get('sample_weight_val', None)
+    model.val_score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba, sample_weight=sample_weight_val)
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
     model.save()

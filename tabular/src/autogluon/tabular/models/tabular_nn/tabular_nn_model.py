@@ -156,7 +156,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                                                     params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=1, num_gpus=0, reporter=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=1, num_gpus=0, reporter=None, sample_weight=None, **kwargs):
         """ X_train (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_val (pd.DataFrame): test data features (should have same column names as Xtrain)
             y_train (pd.Series):
@@ -167,9 +167,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         try_import_mxnet()
         import mxnet as mx
         self.verbosity = kwargs.get('verbosity', 2)
-        sample_weights = kwargs.get('sample_weights', None)
-        if sample_weights is not None:  # TODO: support
-            logger.log(15, "sample_weights not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
+        if sample_weight is not None:  # TODO: support
+            logger.log(15, "sample_weight not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
 
         params = self.params.copy()
         params = fixedvals_from_searchspaces(params)

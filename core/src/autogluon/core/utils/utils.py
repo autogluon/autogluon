@@ -381,7 +381,16 @@ def extract_column(X, col_name):
     return X, w
 
 
-def compute_weighted_metric(y, y_pred, metric, weights):
+def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None):
+    """ Report weighted metric if: weights is not None, weight_evaluation=True, and the given metric supports sample weights.
+        If weight_evaluation=None, it will be set to False if weights=None, True otherwise.
+    """
+    if weight_evaluation is None:
+        weight_evaluation = not (weights is None)
+    if weight_evaluation and weights is None:
+        raise ValueError("Sample weights cannot be None when weight_evaluation=True.")
+    if not weight_evaluation:
+        return metric(y, y_pred)
     try:
         weighted_metric = metric(y, y_pred, sample_weight=weights)
     except (ValueError, TypeError, KeyError):

@@ -486,7 +486,7 @@ def test_tabular_bag():
                            seed_val=seed_val, fit_args=fit_args)
 
 
-def test_sample_weights():
+def test_sample_weight():
     dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip',
                'name': 'toyRegression',
                'problem_type': REGRESSION,

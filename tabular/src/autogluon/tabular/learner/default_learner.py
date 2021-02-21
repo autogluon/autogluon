@@ -192,7 +192,7 @@ class DefaultLearner(AbstractLearner):
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
-        if w is not None:
+        if w is not None:  # TODO: consider not bundling sample-weights inside X, X_val
             X[self.sample_weight] = w
             if X_val is not None:
                 if w_val is not None:

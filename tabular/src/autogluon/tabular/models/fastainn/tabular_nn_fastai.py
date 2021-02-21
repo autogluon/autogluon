@@ -147,7 +147,7 @@ class NNFastAiTabularModel(AbstractModel):
             df[c] = df[c].fillna(self.columns_fills[c])
         return df
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=None, num_gpus=0, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=None, num_gpus=0, sample_weight=None, **kwargs):
         try_import_fastai_v1()
         import torch
         from fastai.layers import LabelSmoothingCrossEntropy
@@ -157,9 +157,8 @@ class NNFastAiTabularModel(AbstractModel):
         from .callbacks import EarlyStoppingCallbackWithTimeLimit, SaveModelCallback
 
         start_time = time.time()
-        sample_weights = kwargs.get('sample_weights', None)
-        if sample_weights is not None:  # TODO: support
-            logger.log(15, "sample_weights not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
+        if sample_weight is not None:  # TODO: support
+            logger.log(15, "sample_weight not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
 
         params = self.params.copy()
 

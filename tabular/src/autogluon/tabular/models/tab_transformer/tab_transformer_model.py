@@ -338,7 +338,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, sample_weight=None, **kwargs):
         import torch
 
         num_gpus = kwargs.get('num_gpus', None)
@@ -355,9 +355,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             if num_gpus > 1:
                 logger.warning("TabTransformer not yet configured to use more than 1 GPU. 'num_gpus' set to >1, but we will be using only 1 GPU.")
 
-        sample_weights = kwargs.get('sample_weights', None)
-        if sample_weights is not None:
-            logger.log(15, "sample_weights not yet supported for TabTransformerModel, this model will ignore them in training.")
+        if sample_weight is not None:
+            logger.log(15, "sample_weight not yet supported for TabTransformerModel, this model will ignore them in training.")
 
         if self.problem_type ==REGRESSION:
             self.params['n_classes'] = 1

@@ -59,7 +59,7 @@ class FastTextModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
-    def _fit(self, X_train, y_train, **kwargs):
+    def _fit(self, X_train, y_train, sample_weight=None, **kwargs):
         if self.problem_type not in (BINARY, MULTICLASS):
             raise ValueError(
                 "FastText model only supports binary or multiclass classification"
@@ -80,9 +80,8 @@ class FastTextModel(AbstractModel):
             else:
                 params['verbose'] = 2
 
-        sample_weights = kwargs.get('sample_weights', None)
-        if sample_weights is not None:
-            logger.log(15, "sample_weights not yet supported for FastTextModel, this model will ignore them in training.")
+        if sample_weight is not None:
+            logger.log(15, "sample_weight not yet supported for FastTextModel, this model will ignore them in training.")
 
         X_train = self.preprocess(X_train)
         logger.debug("NLP features %s", self.features)

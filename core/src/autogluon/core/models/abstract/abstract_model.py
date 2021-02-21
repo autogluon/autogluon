@@ -267,6 +267,9 @@ class AbstractModel:
             raise NoValidFeatures
 
     def _preprocess_fit_args(self, **kwargs):
+        sample_weight = kwargs.get('sample_weight', None)
+        if sample_weight is not None and isinstance(sample_weight, str):
+            raise ValueError("In model.fit(), sample_weight should be array of sample weight values, not string.")
         time_limit = kwargs.get('time_limit', None)
         max_time_limit_ratio = self.params_aux.get('max_time_limit_ratio', 1)
         if time_limit is not None:
@@ -346,30 +349,24 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, metric=None, sample_weights=None, **kwargs):
+    def score(self, X, y, metric=None, sample_weight=None, **kwargs):
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
             y_pred = self.predict(X=X, **kwargs)
         else:
             y_pred = self.predict_proba(X=X, **kwargs)
-        if sample_weights is None:
-            return metric(y, y_pred)
-        else:
-            return compute_weighted_metric(y, y_pred, metric, sample_weights)
+        return compute_weighted_metric(y, y_pred, metric, sample_weight)
 
 
-    def score_with_y_pred_proba(self, y, y_pred_proba, metric=None, sample_weights=None):
+    def score_with_y_pred_proba(self, y, y_pred_proba, metric=None, sample_weight=None):
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             y_pred = y_pred_proba
-        if sample_weights is None:
-            return metric(y, y_pred)
-        else:
-            return compute_weighted_metric(y, y_pred, metric, sample_weights)
+        return compute_weighted_metric(y, y_pred, metric, sample_weight)
 
     def save(self, path: str = None, verbose=True) -> str:
         """
@@ -562,8 +559,8 @@ class AbstractModel:
                     logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
         fit_kwargs=scheduler_params['resource'].copy()
-        fit_kwargs['sample_weights'] = kwargs.get('sample_weights', None)
-        fit_kwargs['sample_weights_val'] = kwargs.get('sample_weights_val', None)
+        fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
+        fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
         util_args = dict(
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,

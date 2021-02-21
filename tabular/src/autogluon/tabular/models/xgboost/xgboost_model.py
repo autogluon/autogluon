@@ -60,7 +60,8 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
+        # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
 
         params = self.params.copy()
@@ -77,8 +78,6 @@ class XGBoostModel(AbstractModel):
             verbose = True
             verbose_eval = 1
 
-        sample_weights = kwargs.get('sample_weights', None)
-        sample_weights_val = kwargs.get('sample_weights_val', None)  # TODO: utilize sample_weights_val in early-stopping if provided
         X_train = self.preprocess(X_train, is_train=True, max_category_levels=max_category_levels)
         num_rows_train = X_train.shape[0]
 
@@ -118,7 +117,7 @@ class XGBoostModel(AbstractModel):
             eval_metric=eval_metric,
             verbose=False,
             callbacks=callbacks,
-            sample_weight=sample_weights
+            sample_weight=sample_weight
         )
 
         bst = self.model.get_booster()

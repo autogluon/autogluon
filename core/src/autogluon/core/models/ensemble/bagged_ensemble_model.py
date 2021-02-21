@@ -98,7 +98,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return X
 
-    def _fit(self, X_train, y_train, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, sample_weight=None, **kwargs):
         if k_fold < 1:
             k_fold = 1
         if k_fold_end is None:
@@ -160,7 +160,6 @@ class BaggedEnsembleModel(AbstractModel):
             self._add_child_times_to_bag(model=model_base)
             return
 
-        sample_weights = kwargs.get('sample_weights', None)
         # TODO: Preprocess data here instead of repeatedly
         kfolds = generate_kfold(X=X_train, y=y_train, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
@@ -201,9 +200,9 @@ class BaggedEnsembleModel(AbstractModel):
                 fold_model.name = f'{fold_model.name}S{j+1}F{fold_num_in_repeat+1}'  # S5F3 = 3rd fold of the 5th repeat set
                 fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
                 kwargs_fold = kwargs.copy()
-                if sample_weights is not None:
-                    kwargs_fold['sample_weights'] = sample_weights[train_index]
-                    kwargs_fold['sample_weights_val'] = sample_weights[val_index]
+                if sample_weight is not None:
+                    kwargs_fold['sample_weight'] = sample_weight[train_index]
+                    kwargs_fold['sample_weight_val'] = sample_weight[val_index]
                 fold_model.fit(X_train=X_train_fold, y_train=y_train_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
                 time_train_end_fold = time.time()
                 if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
@@ -267,14 +266,14 @@ class BaggedEnsembleModel(AbstractModel):
     def _predict_proba(self, X, normalize=False, **kwargs):
         return self.predict_proba(X=X, normalize=normalize, **kwargs)
 
-    def score_with_oof(self, y, sample_weights=None):
+    def score_with_oof(self, y, sample_weight=None):
         self._load_oof()
         valid_indices = self._oof_pred_model_repeats > 0
         y = y[valid_indices]
         y_pred_proba = self.oof_pred_proba[valid_indices]
-        if sample_weights is not None:
-            sample_weights = sample_weights[valid_indices]
-        return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weights=sample_weights)
+        if sample_weight is not None:
+            sample_weight = sample_weight[valid_indices]
+        return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weight=sample_weight)
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: v0.1 Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)

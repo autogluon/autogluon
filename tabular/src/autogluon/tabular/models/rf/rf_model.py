@@ -65,7 +65,7 @@ class RFModel(AbstractModel):
         }
         return spaces
 
-    def _fit(self, X_train, y_train, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, time_limit=None, sample_weight=None, **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
@@ -75,7 +75,6 @@ class RFModel(AbstractModel):
         n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
 
         X_train = self.preprocess(X_train)
-        sample_weights = kwargs.get('sample_weights', None)
         n_estimator_increments = [n_estimators_final]
 
         # Very rough guess to size of a single tree before training
@@ -111,7 +110,7 @@ class RFModel(AbstractModel):
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
                 self.model.n_estimators = n_estimators
-            self.model = self.model.fit(X_train, y_train, sample_weight=sample_weights)
+            self.model = self.model.fit(X_train, y_train, sample_weight=sample_weight)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
                 model_size_bytes = 0

@@ -67,7 +67,10 @@ class AbstractLearner:
         self._positive_class = positive_class
         self.sample_weight = sample_weight
         self.weight_evaluation = weight_evaluation
-
+        if sample_weight is not None and not isinstance(sample_weight, str):
+            raise ValueError("sample_weight must be a string indicating the name of column that contains sample weights. If you have a vector of sample weights, first add these as an extra column to your data.")
+        if weight_evaluation and sample_weight is None:
+            raise ValueError("Must specify sample_weight column if you specify weight_evaluation=True")
         try:
             from ..version import __version__
             self.version = __version__
@@ -140,12 +143,11 @@ class AbstractLearner:
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:
             raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
-        self.sample_weight = kwargs.get('sample_weight', None)
-        self.weight_evaluation = kwargs.get('weight_evaluation', False)
         X_val = kwargs.get('X_val', None)
+        self._validate_sample_weight(X, X_val)
+
+    def _validate_sample_weight(self, X, X_val):
         if self.sample_weight is not None:
-            if not isinstance(self.sample_weight, str):
-                raise ValueError("sample_weight must be a string indicating the name of column that contains sample weights. If you have a vector of sample weights, first add these as an extra column to your data.")
             if self.sample_weight not in X.columns:
                 raise KeyError(f"sample_weight column '{self.sample_weight}' is missing from training data. Training data columns: {list(X.columns)}")
             weight_vals = X[self.sample_weight]
@@ -209,8 +211,9 @@ class AbstractLearner:
         if y is None:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
+        w = None
         if self.weight_evaluation:
-            X, weights = extract_column(X, self.sample_weight)
+            X, w = extract_column(X, self.sample_weight)
         if self.eval_metric.needs_pred:
             y_pred = self.predict(X=X, model=model)
             if self.problem_type == BINARY:
@@ -220,11 +223,7 @@ class AbstractLearner:
         else:
             y_pred = self.predict_proba(X=X, model=model)
             y = self.label_cleaner.transform(y)
-        if not self.weight_evaluation:
-            return self.eval_metric(y, y_pred)
-        if weights is None:
-            raise ValueError("Sample weights cannot be None when weight_evaluation is specified.")
-        return compute_weighted_metric(y, y_pred, self.eval_metric, weights)
+        return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
@@ -232,8 +231,9 @@ class AbstractLearner:
         if y is None:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
+        w = None
         if self.weight_evaluation:
-            X, sample_weights = extract_column(X, self.sample_weight)
+            X, w = extract_column(X, self.sample_weight)
 
         X = self.transform_features(X)
         y_internal = self.label_cleaner.transform(y)
@@ -271,12 +271,7 @@ class AbstractLearner:
             else:
                 y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
                 y_tmp = y_internal
-            if not self.weight_evaluation:
-                scores[model_name] = self.eval_metric(y_tmp, y_pred)
-            else:
-                if sample_weights is None:
-                    raise ValueError("Sample weights cannot be None when weight_evaluation is specified.")
-                scores[model_name] = compute_weighted_metric(y_tmp, y_pred, self.eval_metric, sample_weights)
+            scores[model_name] = compute_weighted_metric(y_tmp, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation)
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
