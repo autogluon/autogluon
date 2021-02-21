@@ -72,7 +72,7 @@ def load_price_of_books(train_path, test_path):
 
 def load_data_scientist_salary(train_path, test_path):
     train_df = pd.read_csv(train_path, index_col=0)
-    test_df = pd.read_csv(test_path, index_col=0)
+    test_df = pd.read_csv(test_path, index_col=None)
     train_df.drop('company_name_encoded', axis=1, inplace=True)
     test_df.drop('company_name_encoded', axis=1, inplace=True)
     return train_df, test_df, 'salary'
