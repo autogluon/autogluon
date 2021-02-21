@@ -52,5 +52,5 @@ def save_s3(path: str, obj, pickle_fn, verbose=True):
             config = boto3.s3.transfer.TransferConfig()   # enable multipart uploading for files larger than 8MB
             response = s3_client.upload_fileobj(f, bucket, key, Config=config)
         except:
-            logger.exception('Failed to save object to s3')
+            logger.error('Failed to save object to s3')
             raise

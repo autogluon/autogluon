@@ -87,6 +87,8 @@ class AbstractTrainer:
 
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
+        # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
+
     # path_root is the directory containing learner.pkl
     @property
     def path_root(self) -> str:
@@ -951,9 +953,16 @@ class AbstractTrainer:
         except NoGPUError:
             logger.warning(f'\tNo GPUs available to train {model.name}... Skipping this model.')
             del model
+        except ImportError as err:
+            logger.error(f'\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.')
+            logger.error(f'\t\t{err}')
+            if self.verbosity > 2:
+                logger.exception('Detailed Traceback:')
         except Exception as err:
-            logger.exception(f'\tWarning: Exception caused {model.name} to fail during training... Skipping this model.')
-            logger.warning(err)
+            logger.error(f'\tWarning: Exception caused {model.name} to fail during training... Skipping this model.')
+            logger.error(f'\t\t{err}')
+            if self.verbosity > 0:
+                logger.exception('Detailed Traceback:')
             del model
         else:
             self._add_model(model=model, stack_name=stack_name, level=level)
