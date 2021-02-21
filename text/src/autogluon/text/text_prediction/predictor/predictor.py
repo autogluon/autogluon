@@ -285,7 +285,7 @@ class TextPredictor:
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         output = self._model.predict(dataset)
         if as_pandas:
-            output = pd.DataFrame({self.label: output})
+            output = pd.DataFrame({self.label: output})[self.label]
         return output
 
     def predict_proba(self, dataset, as_pandas=False):

@@ -185,14 +185,14 @@ def run(args):
         test_probabilities = predictor.predict_proba(test_df, as_pandas=True)
         test_probabilities.to_csv(os.path.join(args.exp_dir, 'submission.csv'), index=False)
     elif args.task == 'data_scientist_salary':
-        predictions = predictor.predict(test_df, as_pandas=True)
+        predictions = predictor.predict(test_df, as_pandas=False)
         submission = pd.read_excel(args.sample_submission, engine='openpyxl')
-        submission.loc[:, label_column] = predictions[label_column]
+        submission.loc[:, label_column] = predictions
         submission.to_excel(os.path.join(args.exp_dir, 'submission.xlsx'))
     elif args.task == 'price_of_books':
-        predictions = predictor.predict(test_df, as_pandas=True)
+        predictions = predictor.predict(test_df, as_pandas=False)
         submission = pd.read_excel(args.sample_submission, engine='openpyxl')
-        submission.loc[:, label_column] = np.power(10, predictions[label_column]) - 1
+        submission.loc[:, label_column] = np.power(10, predictions) - 1
         submission.to_excel(os.path.join(args.exp_dir, 'submission.xlsx'))
     elif args.task == 'mercari_price':
         test_predictions = predictor.predict(test_df, as_pandas=True)
