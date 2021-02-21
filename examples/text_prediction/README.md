@@ -14,7 +14,7 @@ mkdir -p ag_product_sentiment
 python3 run_competition.py --train_file machine_hack_product_sentiment/all_train.csv \
                            --test_file machine_hack_product_sentiment/test.csv \
                            --task product_sentiment \
-                           --metric log_loss \
+                           --eval_metric log_loss \
                            --exp_dir ag_product_sentiment \
                            --mode stacking | tee -a ag_product_sentiment/log.txt
 ```
@@ -38,7 +38,7 @@ python3 run_competition.py --train_file mercari_price/train.tsv \
                            --test_file mercari_price/test_stg2.tsv \
                            --sample_submission mercari_price/sample_submission_stg2.csv \
                            --task mercari_price \
-                           --metric r2 \
+                           --eval_metric r2 \
                            --exp_dir ag_mercari_price_single \
                            --mode single | tee -a ag_mercari_price_single/log.txt
 ```
