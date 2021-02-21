@@ -45,7 +45,7 @@ Also, you will need to install `openpyxl` to read from xlsx file.
 bash prepare_data_scientist_salary.sh
 python3 -m pip install openpyxl
 mkdir -p ag_data_scientist_salary
-python3 run_competition.py --train_file data_scientist_salary/Data/Final_Train_Dataset \
+python3 run_competition.py --train_file data_scientist_salary/Data/Final_Train_Dataset.csv \
                            --test_file data_scientist_salary/Data/Final_Test_Dataset.csv \
                            --sample_submission data_scientist_salary/Data/sample_submission.xlsx \
                            --task data_scientist_salary \
