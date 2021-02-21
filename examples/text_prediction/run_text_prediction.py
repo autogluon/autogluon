@@ -54,9 +54,6 @@ def get_parser():
                         help='Whether to evaluate the model')
     parser.add_argument('--exp_dir', type=str, default=None,
                         help='The experiment directory where the model params will be written.')
-    parser.add_argument('--config_file', type=str,
-                        help='The configuration of the TextPrediction module',
-                        default=None)
     parser.add_argument('--mode',
                         choices=['stacking', 'weighted', 'single'],
                         default='single',

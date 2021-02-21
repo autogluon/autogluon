@@ -6,7 +6,16 @@ Here, we provide the example that shows how to use AutoGluon to achieve top perf
 [Product Sentiment Classification Hackathon](https://www.machinehack.com/hackathons/product_sentiment_classification_weekend_hackathon_19/leaderboard) 
 
 ```
-python3 example_product_sentiment.py
+mkdir -p machine_hack_product_sentiment
+wget https://automl-mm-bench.s3.amazonaws.com/machine_hack_product_sentiment/all_train.csv -O machine_hack_product_sentiment/all_train.csv
+wget https://automl-mm-bench.s3.amazonaws.com/machine_hack_product_sentiment/test.csv -O machine_hack_product_sentiment/test.csv
+
+python3 run_competition.py --train_file machine_hack_product_sentiment/all_train.csv \
+                           --test_file machine_hack_product_sentiment/test.csv \
+                           --task product_sentiment \
+                           --metric log_loss \
+                           --exp_dir ag_product_sentiment \
+                           --mode stacking | tee -a ag_product_sentiment/log.txt
 ```
 
 ## Reach Top-5 Performance in Mercari Price Suggestion
@@ -14,12 +23,27 @@ python3 example_product_sentiment.py
 Here, we provide the example that shows how to use AutoGluon to achieve top-5 performance in
  [Mercari Price Suggestion](https://www.kaggle.com/c/mercari-price-suggestion-challenge/data).
 To run the example, you will need to configure the Kaggle API which will be documented in 
-https://github.com/Kaggle/kaggle-api . 
+https://github.com/Kaggle/kaggle-api and download the dataset.
 
 ```
 kaggle competitions download -c mercari-price-suggestion-challenge
+mkdir -p mercari_price
+mv mercari-price-suggestion-challenge.zip mercari_price/
+cd mercari_price/
+unzip mercari-price-suggestion-challenge.zip
+7za e train.tsv.7z
+unzip e test_stg2.tsv.zip
+cd ..
+```
 
-python3 example_mercari_price_suggestion.py
+After you have prepared the dataset, you can use the following command:
+```
+python3 run_competition.py --train_file mercari_price/train.tsv \
+                           --test_file mercari_price/test_stg2.tsv \
+                           --task mercari_price \
+                           --metric r2 \
+                           --exp_dir ag_mercari_price_single \
+                           --mode single | tee -a ag_mercari_price_single/log.txt
 ```
 
 ## Solve GLUE Tasks with AutoGluon Text
@@ -51,4 +75,4 @@ order of two sentences.
 |---------------------------------------|--------|--------|-------------|------------|----------|--------|---------|--------|--------|--------|
 |Metrics                                | mcc    | acc    | acc         | spearmanr  | f1       | acc    | acc     | acc    | acc    | acc    |
 |Text (Single) - Validation (*)         | 0.6747 | 0.9472 | 0.8799 (*)  | 0.9047 (*) | 0.8870   | 0.8643 | 0.8589  | 0.9158 | 0.7726 | 0.5634 |
-|Text (Single) - Test                   | 0.6747 | 0.9472 | 0.8799 (*)  | 0.9047 (*) | 0.8870   |        |         |        |        |
+|Text (Single) - Test                   | -      | -      | -           | -          | -        | -      | -       | -      | -      |        |
