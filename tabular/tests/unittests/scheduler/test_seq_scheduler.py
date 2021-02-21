@@ -1,4 +1,6 @@
 import pytest
+
+from autogluon.core import args, Real
 from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
 
 cls = LocalSequentialScheduler
@@ -44,5 +46,10 @@ def test_has_enough_time_for_trial__enough_time__avg_time_not_allows_trials_by_f
 
 
 def test_LocalSequentialScheduler_no_criteria():
+
+    @args(lr=Real(1e-2, 1e-1, log=True))
+    def _train_fn_():
+        pass
+
     with pytest.raises(AssertionError, match="Need stopping criterion: Either num_trials or time_out"):
-        LocalSequentialScheduler(train_fn={}, reward_attr='reward_attr', resource={})
+        LocalSequentialScheduler(train_fn=_train_fn_, reward_attr='reward_attr', resource={})

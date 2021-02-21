@@ -87,10 +87,10 @@ class LocalSequentialScheduler(object):
         self.training_history = None
         self.config_history = None
         self._reward_attr = kwargs['reward_attr']
-        self.time_attr = kwargs['time_attr']
+        self.time_attr = kwargs.get('time_attr', None)
         self.resource = kwargs['resource']
         self.max_reward = kwargs.get('max_reward')
-        self.searcher = self.get_scheduler_(searcher, train_fn, kwargs)
+        self.searcher: BaseSearcher = self.get_scheduler_(searcher, train_fn, **kwargs)
         self.init_limits_(kwargs)
         self.metadata = {
             'search_space': train_fn.kwspaces,
@@ -112,7 +112,7 @@ class LocalSequentialScheduler(object):
             assert self.time_out is not None, \
                 "Need stopping criterion: Either num_trials or time_out"
 
-    def get_scheduler_(self, searcher, train_fn, kwargs) -> BaseSearcher:
+    def get_scheduler_(self, searcher, train_fn, **kwargs) -> BaseSearcher:
         if searcher is 'local_sequential_auto':
             searcher = 'auto'
         scheduler_opts = {}
@@ -126,7 +126,7 @@ class LocalSequentialScheduler(object):
             _search_options = search_options.copy()
             _search_options['configspace'] = train_fn.cs
             _search_options['reward_attribute'] = kwargs['reward_attr']
-            _search_options['resource_attribute'] = kwargs['time_attr']
+            _search_options['resource_attribute'] = kwargs.get('time_attr', None)
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
             if 'scheduler' not in _search_options:
