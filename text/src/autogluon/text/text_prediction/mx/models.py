@@ -266,6 +266,10 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
     predictions
         The predictions
     """
+    import warnings
+    # Filter mxnet warnings
+    warnings.filterwarnings('ignore', module='mxnet')
+
     predictions = [[] for _ in range(num_repeat)]
     use_logits = num_repeat > 1 and (problem_type == MULTICLASS or problem_type == BINARY)\
                  and not extract_embedding
