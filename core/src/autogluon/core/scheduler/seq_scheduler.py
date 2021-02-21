@@ -1,17 +1,21 @@
 import logging
-import pickle
 import time
 from collections import OrderedDict
 from copy import deepcopy
 
-from autogluon.core.searcher import GPFIFOSearcher
-from autogluon.core.utils import EasyDict
 from tqdm.auto import tqdm
+
+from autogluon.core.searcher import BaseSearcher, searcher_factory
+from autogluon.core.utils import EasyDict
 
 logger = logging.getLogger(__name__)
 
 
 class LocalReporter:
+    """
+    Reporter implementation for LocalSequentialScheduler
+    """
+
     def __init__(self, trial, config, training_history: dict, config_history: dict):
         self.trial = trial
         self.training_history = training_history
@@ -49,41 +53,92 @@ class LocalReporter:
 
 
 class LocalSequentialScheduler(object):
+    """ Simple scheduler which schedules all HPO jobs in sequence without any parallelizm
 
-    def __init__(self, train_fn, reward_attr, time_attr='epoch', searcher='auto', **kwargs):
+    Parameters
+    ----------
+    train_fn : callable
+        A task launch function for training.
+    resource : dict
+        Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
+    searcher : str
+        Searcher (get_config decisions). If str, this is passed to
+        searcher_factory along with search_options.
+    search_options : dict
+        If searcher is str, these arguments are passed to searcher_factory.
+    num_trials : int
+        Maximum number of jobs run in experiment. One of `num_trials`,
+        `time_out` must be given.
+    time_out : float
+        If given, jobs are started only until this time_out (wall clock time).
+        One of `num_trials`, `time_out` must be given.
+    reward_attr : str
+        Name of reward (i.e., metric to maximize) attribute in data obtained
+        from reporter
+    time_attr : str
+        Name of resource (or time) attribute in data obtained from reporter.
+        This attribute is optional for FIFO scheduling, but becomes mandatory
+        in multi-fidelity scheduling (e.g., Hyperband).
+        Note: The type of resource must be int.
+    """
+
+    def __init__(self, train_fn, searcher='auto', **kwargs):
         self.train_fn = train_fn
         self.training_history = None
         self.config_history = None
-        self._reward_attr = reward_attr
-        self.time_attr = time_attr
+        self._reward_attr = kwargs['reward_attr']
+        self.time_attr = kwargs['time_attr']
         self.resource = kwargs['resource']
         self.max_reward = kwargs.get('max_reward')
+        self.searcher = self.get_scheduler_(searcher, train_fn, kwargs)
+        self.init_limits_(kwargs)
+        self.metadata = {
+            'search_space': train_fn.kwspaces,
+            'search_strategy': self.searcher,
+            'stop_criterion': {
+                'time_limits': self.time_out,
+                'max_reward': self.max_reward},
+            'resources_per_trial': self.resource
+        }
 
+        args = kwargs.get('args')
+
+    def init_limits_(self, kwargs):
         if kwargs.get('num_trials') is None:
             assert kwargs.get('time_out') is not None, "Need stopping criterion: Either num_trials or time_out"
-
-        if searcher is 'local_sequential_auto':
-            searcher = 'auto'
-
-        if searcher is 'auto':
-            searcher = GPFIFOSearcher
-        self.searcher = searcher(self.train_fn.cs, reward_attribute=self._reward_attr)
-
         self.num_trials = kwargs.get('num_trials', 9999)
         self.time_out = kwargs.get('time_out')
         if self.num_trials is None:
             assert self.time_out is not None, \
                 "Need stopping criterion: Either num_trials or time_out"
 
-        self.metadata = {
-            'search_space': train_fn.kwspaces,
-            'search_strategy': searcher,
-            'stop_criterion': {
-                'time_limits': self.time_out,
-                'max_reward': self.max_reward},
-            'resources_per_trial': self.resource}
+    def get_scheduler_(self, searcher, train_fn, kwargs) -> BaseSearcher:
+        if searcher is 'local_sequential_auto':
+            searcher = 'auto'
+        scheduler_opts = {}
+        if searcher is 'auto':
+            searcher = 'bayesopt'
+            scheduler_opts = {'scheduler': 'fifo'}
+        search_options = kwargs.get('search_options')
+        if isinstance(searcher, str):
+            if search_options is None:
+                search_options = dict()
+            _search_options = search_options.copy()
+            _search_options['configspace'] = train_fn.cs
+            _search_options['reward_attribute'] = kwargs['reward_attr']
+            _search_options['resource_attribute'] = kwargs['time_attr']
+            # Adjoin scheduler info to search_options, if not already done by
+            # subclass
+            if 'scheduler' not in _search_options:
+                _search_options['scheduler'] = 'fifo'
+            searcher = searcher_factory(searcher, **{**scheduler_opts, **_search_options})
+        else:
+            assert isinstance(searcher, BaseSearcher)
+        return searcher
 
     def run(self, **kwargs):
+        """Run multiple trials given specific time and trial numbers limits.
+        """
         self.searcher.configure_scheduler(self)
 
         self.training_history = OrderedDict()
@@ -110,7 +165,30 @@ class LocalSequentialScheduler(object):
                     break
 
     @classmethod
-    def has_enough_time_for_trial_(cls, time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time, fill_factor=0.9):
+    def has_enough_time_for_trial_(cls, time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time, fill_factor=0.95):
+        """
+        Checks if the remaining time is enough to run another trial.
+
+        Parameters
+        ----------
+        time_out total
+            timeout in m
+        time_start
+            trials start time
+        trial_start_time
+            last trial start time
+        trial_end_time
+            last trial end time
+        avg_trial_run_time
+            running average of all trial runs
+        fill_factor: float
+            discount of `avg_trial_run_time` allowed for a next trial. Default is 0.95 of `avg_trial_run_time`
+
+        Returns
+        -------
+            True if there is enough time to run another trial give runs statistics and remaining time
+
+        """
         time_spent = trial_end_time - time_start
         is_timeout_exceeded = time_spent >= time_out
         time_left = time_start + time_out - trial_end_time
@@ -139,16 +217,21 @@ class LocalSequentialScheduler(object):
             self.searcher.update(config=searcher_config, **reporter.last_result)
 
     def join_jobs(self, timeout=None):
-        # Required by autogluon
-        pass
+        pass  # Compatibility
 
     def get_best_config(self):
+        """Get the best configuration from the finished jobs.
+        """
         return self.searcher.get_best_config()
 
     def get_best_reward(self):
+        """Get the best reward from the finished jobs.
+        """
         return self.searcher.get_best_reward()
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
+        """Get Training Curves
+        """
         if filename is None and not plot:
             logger.warning('Please either provide filename or allow plot in get_training_curves')
         import matplotlib.pyplot as plt
@@ -176,7 +259,6 @@ class LocalSequentialScheduler(object):
             if task_res and metric in task_res[0]:
                 return task_res[0][metric]
         return default
-
 
     def get_best_task_id(self):
         """Get the task id that results in the best configuration/best reward.
