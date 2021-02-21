@@ -112,11 +112,8 @@ def train(args):
         train_df_other_part = pd.DataFrame({feature_columns[0]: train_df[feature_columns[1]],
                                             feature_columns[1]: train_df[feature_columns[0]],
                                             label_column: train_df[label_column]})
-        dev_df_other_part = pd.DataFrame({feature_columns[0]: dev_df[feature_columns[1]],
-                                          feature_columns[1]: dev_df[feature_columns[0]],
-                                          label_column: dev_df[label_column]})
         real_train_df = pd.concat([train_df, train_df_other_part])
-        real_dev_df = pd.concat([dev_df, dev_df_other_part])
+        real_dev_df = dev_df
     else:
         real_train_df = train_df
         real_dev_df = dev_df
