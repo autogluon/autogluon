@@ -153,7 +153,6 @@ class MultiModalTextBatchify:
             token_ids = [self._cls_token_id]
             segment_ids = [seg]
             for i, trim_length in enumerate(trimmed_lengths):
-                seg = (seg + 1) % self._num_segments
                 if self._stochastic_chunk:
                     start_ptr = np.random.randint(0, len(ele[i]) - trim_length + 1)
                 else:
@@ -163,6 +162,7 @@ class MultiModalTextBatchify:
                 if self._insert_sep or i == len(trimmed_lengths) - 1:
                     token_ids.append(self._sep_token_id)
                     segment_ids.append(seg)
+                seg = (seg + 1) % self._num_segments
             text_token_ids.append(np.array(token_ids, dtype=np.int32))
             text_valid_length.append(len(token_ids))
             text_segment_ids.append(np.array(segment_ids, dtype=np.int32))
