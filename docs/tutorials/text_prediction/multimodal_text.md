@@ -1,63 +1,97 @@
-# Text Prediction - Heterogeneous Data Types
-:label:`sec_textprediction_heterogeneous`
+# Text Prediction - Multimodal Table with Text
+:label:`sec_textprediction_multimodal`
 
 In your applications, your text data may be mixed with other common data types like 
-numerical data and categorical data (which are commonly found in tabular data). The `TextPrediction` task in AutoGluon 
-can train a single neural network that jointly operates on multiple feature types, including text, categorical, and numerical columns. 
-Here we'll again use the [Semantic Textual Similarity](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark) dataset to illustrate 
-this functionality.
+numeric and categorical data (which are commonly found in tabular datasets). The `TextPredictor` network in AutoGluon 
+can train a single neural network that jointly operates on multiple feature types, including text, categorical, and numerical columns. The general idea is to embed the text, categorical and numeric fields separately and fuse the features. Here, we will demonstrate the usage and briefly explain about the inner idea.
 
 
 ```{.python .input}
 import numpy as np
+import pandas as pd
+import os
 import warnings
 warnings.filterwarnings('ignore')
 np.random.seed(123)
+!python3 -m pip install openpyxl
 ```
 
-## Load Data and Train Model
+## Book Price Prediction 
+
+To demonstrate the usage, we are going to use the book price prediction dataset used in the [MachineHack Salary Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview), which attempts to predict the price of the book given the other features like the author of the book, the 
 
 
 ```{.python .input}
-from autogluon.core.utils.loaders import load_pd
-
-train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')
-dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')
-train_data.head(10)
-```
-
-Note the STS dataset contains two text fields: `sentence1` and `sentence2`, one categorical field: `genre`, and one numerical field `score`. 
-Let's try to predict the **score** based on the other features: `sentence1`, `sentence2`, `genre`.
-
-
-```{.python .input}
-import autogluon.core as ag
-from autogluon.text import TextPrediction as task
-
-predictor_score = task.fit(train_data, label='score',
-                           time_limits=60, ngpus_per_trial=1, seed=123,
-                           output_directory='./ag_sts_mixed_score')
+!mkdir -p price_of_books
+!wget https://automl-mm-bench.s3.amazonaws.com/machine_hack_competitions/predict_the_price_of_books/Data.zip -O price_of_books/Data.zip
+!cd price_of_books && unzip -o Data.zip
+!ls price_of_books/Participants_Data
 ```
 
 
 ```{.python .input}
-score = predictor_score.evaluate(dev_data, metrics='spearmanr')
-print('Spearman Correlation=', score['spearmanr'])
-```
-
-We can also train a model that predicts the **genre** using the other columns as features.
-
-
-```{.python .input}
-predictor_genre = task.fit(train_data, label='genre',
-                           time_limits=60, ngpus_per_trial=1, seed=123,
-                           output_directory='./ag_sts_mixed_genre')
+train_df = pd.read_excel(os.path.join('price_of_books', 'Participants_Data', 'Data_Train.xlsx'), engine='openpyxl')
 ```
 
 
 ```{.python .input}
-score = predictor_genre.evaluate(dev_data, metrics='acc')
-print('Genre-prediction Accuracy = {}%'.format(score['acc'] * 100))
+train_df.head(3)
+```
+
+We will do a basic preprocessing which will convert the `Reviews` and `Ratings` in the data table to numeric values. Also, we will transform the price to be log scale.
+
+
+```{.python .input}
+def preprocess(df):
+    df = df.copy(deep=True)
+    df.loc[:, 'Reviews'] = pd.to_numeric(df['Reviews'].apply(lambda ele: ele[:-len(' out of 5 stars')]))
+    df.loc[:, 'Ratings'] = pd.to_numeric(df['Ratings'].apply(lambda ele: ele.replace(',', '')[:-len(' customer reviews')]))
+    df.loc[:, 'Price'] = np.log(df['Price'] + 1)
+    return df
+
+train_df = preprocess(train_df)
+
+```
+
+
+```{.python .input}
+train_df.head(3)
+```
+
+## Train Model
+
+As our previous example, we can simply create a TextPredictor and call `predictor.fit()` to train the model. Internally, the network will be automatically generated based on the type of the feature columns, which are inferred based on heuristics.  Also, to save time, we will subsample 2000 rows from the data and only train for three minutes.
+
+
+```{.python .input}
+from autogluon.text import TextPredictor
+!rm -rf ag_text_sbook_price_prediction
+predictor = TextPredictor(label='Price', path='ag_text_sbook_price_prediction')
+sampled_train_df = train_df.sample(2000, random_state=123)
+predictor.fit(sampled_train_df, time_limit=3 * 60, seed=123)
+```
+
+## Get Predictions and Embeddings
+
+Likewise, we can get the predictions and extract embeddings with the same API.
+
+
+```{.python .input}
+test_df = train_df.sample(5, random_state=245)
+predictions = predictor.predict(test_df, as_pandas=True)
+print('Predictions:')
+print('------------')
+print(np.exp(predictions) - 1)
+print()
+print('True Value:')
+print('------------')
+print(np.exp(test_df['Price']) - 1)
+```
+
+
+```{.python .input}
+embeddings = predictor.extract_embedding(test_df)
+print(embeddings)
 ```
 
 ## What's happening inside?
@@ -65,5 +99,20 @@ print('Genre-prediction Accuracy = {}%'.format(score['acc'] * 100))
 
 Internally, we use different networks to encode the text columns, categorical columns, and numerical columns. The features generated by individual networks are aggregated by a late-fusion aggregator. The aggregator can output both the logits or score predictions. The architecture can be illustrated as follows:
 
-![Neural Network Architecture in TextPrediction](https://autogluon-text-data.s3.amazonaws.com/figures/text_nn_architecture_v1.png)
+![Multimodal Network with Late Fusion](https://autogluon-text-data.s3.amazonaws.com/figures/fuse-late.png)
 :width:`600px`
+
+Here, we use the pretrained NLP backbone to extract the text features and then use two other towers to extract the feature from categorical column and the numerical column.
+
+In addition, to deal with multiple text fields, we separate these fields with the `[SEP]` token and alternate 0s and 1s as the segment IDs, which is shown as follos:
+
+![Preprocessing](https://autogluon-text-data.s3.amazonaws.com/figures/preprocess.png)
+:width:`600px`
+
+## How to combine with traditional tabular models?
+
+In real-world applications, we may combine the pretrained NLP model and the classical tabular models like LightGBM or CatBoost. While the model offered in `TextPredictor` is a single model, you can further combine it with other classic tabular models via `TabularPredictor`. For such usage, you can refer to ":ref:`sec_tabularprediction_text_multimodal`"  for more details.
+
+## Other Examples
+
+You may go to https://github.com/awslabs/autogluon/tree/master/examples/text_prediction to check other examples for TextPredictor, including the script to train a model on the complete book price prediction dataset.
