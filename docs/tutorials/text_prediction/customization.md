@@ -1,4 +1,4 @@
-# Text Prediction - Customized Hyperparameter Search
+# Text Prediction - Customization and Hyperparameter Search
 :label:`sec_textprediction_customization`
 
 This tutorial teaches you how to control the hyperparameter tuning process in `TextPrediction` by specifying:
@@ -6,44 +6,96 @@ This tutorial teaches you how to control the hyperparameter tuning process in `T
 - A custom search space of candidate hyperparameter values to consider.
 - Which hyperparameter optimization algorithm should be used to actually search through this space.
 
+
 ```{.python .input}
 import numpy as np
 import warnings
+import autogluon as ag
 warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
 
-## Paraphrase Identification
+## Example Data: Stanford Sentiment Treebank
 
-We consider a Paraphrase Identification task for illustration. Given a pair of sentences, the goal is to predict whether or not one sentence is a restatement of the other (a binary classification task). Here we train models on the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398) dataset.
-For quick demonstration, we will subsample the training data and only use 800 samples.
+To demonstrate how to customize the configuration in `TextPredictor` and conduct HPO, we will use the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset. To reduce the training time, we will subsample 1000 samples for training.
+
 
 ```{.python .input}
-from autogluon.core.utils.loaders import load_pd
-
-train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/train.parquet')
-dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/dev.parquet')
-rand_idx = np.random.permutation(np.arange(len(train_data)))[:800]
+from autogluon.core.utils.loaders.load_pd import load
+train_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
+dev_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
+rand_idx = np.random.permutation(np.arange(len(train_data)))[:1000]
 train_data = train_data.iloc[rand_idx]
-train_data.reset_index(inplace=True, drop=True)
 train_data.head(10)
+```
+
+## Configuration in TextPredictor
+
+### Pre-configured Hyperparameters in TextPredictor
+
+We provided a series of pre-configured hyperparameters. You may list the keys from `ag_text_presets`.
+
+
+```{.python .input}
+from autogluon.text import ag_text_presets
+ag_text_presets.list_keys()
+```
+
+These pre-configured models use different backbones such as ELECTRA, RoBERTa, Multilingual BERT, and different fusion strategies. For example, `electra_small_fuse_late` means to use the ELECTRA-small model as the text backbone and use the late fusion strategy described in ":label:`sec_textprediction_architecture`". By default, we are using `default`, which is the same as `electra_base_fuse_late`. Next, let's try to specify the `presets` in `.fit()` to be `electra_small_fuse_late` and train a model on SSTs.
+
+
+```{.python .input}
+from autogluon.text import TextPredictor
+predictor = TextPredictor(path='ag_text_sst_electra_small', eval_metric='acc', label='label')
+predictor.set_verbosity(0)
+predictor.fit(train_data, presets='electra_small_fuse_late', time_limit=60, seed=123)
 ```
 
 
 ```{.python .input}
-from autogluon_contrib_nlp.data.tokenizers import MosesTokenizer
-tokenizer = MosesTokenizer('en')  # just used to display sentences
-row_index = 2
-print('Paraphrase example:')
-print('Sentence1: ', tokenizer.decode(train_data['sentence1'][row_index].split()))
-print('Sentence2: ', tokenizer.decode(train_data['sentence2'][row_index].split()))
-print('Label: ', train_data['label'][row_index])
+predictor.evaluate(dev_data, metrics=['f1', 'acc'])
+```
 
-row_index = 3
-print('\nNot Paraphrase example:')
-print('Sentence1:', tokenizer.decode(train_data['sentence1'][row_index].split()))
-print('Sentence2:', tokenizer.decode(train_data['sentence2'][row_index].split()))
-print('Label:', train_data['label'][row_index])
+To visualize the pre-registered hyperparameters, you can call `ag_text_presets.create(key_name)`, e.g.,
+
+
+```{.python .input}
+ag_text_presets.create('electra_small_fuse_late')
+```
+
+Another way to specify customized config is to directly specify the `hyperparameters` argument in `predict.fit()`. Following is an example
+
+
+```{.python .input}
+predictor.fit(train_data, hyperparameters=ag_text_presets.create('electra_small_fuse_late'),
+              time_limit=30, seed=123)
+```
+
+### Change Hyperparameter
+
+The pre-registered configurations provide a bunch of good default hyperparameters. A common workflow is to first train a model with one of the presets and then tune part of hyperparameters to see if the performance can be better. The following is an example about how to do this in AutoGluon Text. You can directly add/changes keys in the hyperparameter dictionary. In the example, we change the number of training epochs to 5.
+
+
+```{.python .input}
+hyperparameters = ag_text_presets.create('electra_small_fuse_late')
+hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 5
+
+predictor.fit(train_data, hyperparameters=hyperparameters, time_limit=30, seed=123)
+```
+
+### Register Your Own Configuration
+
+You can also register the hyperparameters to `ag_text_presets`.
+
+
+```{.python .input}
+@ag_text_presets.register()
+def electra_small_fuse_late_train5():
+    hyperparameters = ag_text_presets.create('electra_small_fuse_late')
+    hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 5
+    return hyperparameters
+
+predictor.fit(train_data, presets='electra_small_fuse_late_train5', time_limit=60, seed=123)
 ```
 
 ## Perform HPO over a Customized Search Space with Random Search
@@ -54,77 +106,46 @@ We can also specify which HPO algorithm to use for the search via `search_strate
 In this example, we search for good values of the following hyperparameters:
 
 - warmup
+- number of mid units in the final mlp layer that maps aggregated features to output
 - learning rate
-- dropout before the first task-specific layer
-- layer-wise learning rate decay
-- number of task-specific layers
+
 
 ```{.python .input}
-import autogluon.core as ag
-from autogluon.text import TextPrediction as task
+def electra_small_basic_demo_hpo():
+    hparams = ag_text_presets.create('electra_small_fuse_late')
+    search_space = hparams['models']['MultimodalTextModel']['search_space']
+    search_space['model.network.agg_net.mid_units'] = ag.core.space.Int(32, 128)
+    search_space['optimization.warmup_portion'] = ag.core.space.Categorical(0.1, 0.2)
+    search_space['optimization.lr'] = ag.core.space.Real(1E-5, 2E-4)
+    search_space['optimization.num_train_epochs'] = 5
 
-hyperparameters = {
-    'models': {
-            'BertForTextPredictionBasic': {
-                'search_space': {
-                    'model.network.agg_net.mid_units': ag.space.Int(32, 128),
-                    'model.network.agg_net.data_dropout': ag.space.Categorical(False, True),
-                    'optimization.num_train_epochs': 4,
-                    'optimization.warmup_portion': ag.space.Real(0.1, 0.2),
-                    'optimization.layerwise_lr_decay': ag.space.Real(0.8, 1.0),
-                    'optimization.lr': ag.space.Real(1E-5, 1E-4)
-                }
-            },
-    },
-    'hpo_params': {
-        'search_strategy': 'random'  # perform HPO via simple random search
-    }
-}
+    hparams['hpo_params']['search_strategy'] = 'random'
+    return hparams
 ```
 
 We can now call `fit()` with hyperparameter-tuning over our custom search space. 
-Below `num_trials` controls the maximal number of different hyperparameter configurations for which AutoGluon will train models (5 models are trained under different hyperparameter configurations in this case). To achieve good performance in your applications, you should use larger values of `num_trials`, which may identify superior hyperparameter values but will require longer runtimes.
+Below `num_trials` controls the maximal number of different hyperparameter configurations for which AutoGluon will train models (4 models are trained under different hyperparameter configurations in this case). To achieve good performance in your applications, you should use larger values of `num_trials`, which may identify superior hyperparameter values but will require longer runtimes.
+
 
 ```{.python .input}
-predictor_mrpc = task.fit(train_data,
-                          label='label',
-                          hyperparameters=hyperparameters,
-                          num_trials=2,  # increase this to achieve good performance in your applications
-                          time_limits=60 * 2,
-                          ngpus_per_trial=1,
-                          seed=123,
-                          output_directory='./ag_mrpc_random_search')
+predictor_sst_rs = TextPredictor(path='ag_text_sst_random_search', label='label', eval_metric='acc')
+predictor_sst_rs.set_verbosity(0)
+predictor_sst_rs.fit(train_data,
+                      hyperparameters=electra_small_basic_demo_hpo(),
+                      time_limit=60 * 2,
+                      num_trials=4,
+                      seed=123)
 ```
 
 We can again evaluate our model's performance on separate test data.
 
+
 ```{.python .input}
-dev_score = predictor_mrpc.evaluate(dev_data, metrics=['acc', 'f1'])
-print('Best Config = {}'.format(predictor_mrpc.results['best_config']))
-print('Total Time = {}s'.format(predictor_mrpc.results['total_time']))
+dev_score = predictor_sst_rs.evaluate(dev_data, metrics=['acc', 'f1'])
+print('Best Config = {}'.format(predictor_sst_rs.results['best_config']))
+print('Total Time = {}s'.format(predictor_sst_rs.results['total_time']))
 print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
-```
-
-And also use the model to predict whether new sentence pairs are paraphrases of each other or not.
-
-```{.python .input}
-sentence1 = 'It is simple to solve NLP problems with AutoGluon.'
-sentence2 = 'With AutoGluon, it is easy to solve NLP problems.'
-sentence3 = 'AutoGluon gives you a very bad user experience for solving NLP problems.'
-prediction1 = predictor_mrpc.predict({'sentence1': [sentence1], 'sentence2': [sentence2]})
-prediction1_prob = predictor_mrpc.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence2]})
-print('A = "{}"'.format(sentence1))
-print('B = "{}"'.format(sentence2))
-print('Prediction = "{}"'.format(prediction1[0] == 1))
-print('Prob = "{}"'.format(prediction1_prob[0]))
-print('')
-prediction2 = predictor_mrpc.predict({'sentence1': [sentence1], 'sentence2': [sentence3]})
-prediction2_prob = predictor_mrpc.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence3]})
-print('A = "{}"'.format(sentence1))
-print('B = "{}"'.format(sentence3))
-print('Prediction = "{}"'.format(prediction2[0] == 1))
-print('Prob = "{}"'.format(prediction2_prob[0]))
 ```
 
 ## Use Bayesian Optimization
@@ -134,141 +155,50 @@ Here we specify **bayesopt** as the searcher.
 
 
 ```{.python .input}
-hyperparameters['hpo_params'] = {
-    'search_strategy': 'bayesopt'
-}
-
-predictor_mrpc_bo = task.fit(train_data, label='label',
-                                hyperparameters=hyperparameters,
-                                time_limits=60 * 2,
-                                num_trials=2,  # increase this to get good performance in your applications
-                                ngpus_per_trial=1, seed=123,
-                                output_directory='./ag_mrpc_custom_space_fifo_bo')
+hyperparameters = electra_small_basic_demo_hpo()
+hyperparameters['hpo_params']['search_strategy'] = 'bayesopt'
+predictor_sst_bo = TextPredictor(path='ag_text_sst_bo', label='label', eval_metric='acc')
+predictor_sst_bo.set_verbosity(0)
+predictor_sst_bo.fit(train_data,
+                     hyperparameters=hyperparameters,
+                     time_limit=60 * 2,
+                     num_trials=4,
+                     seed=123)
 ```
 
 
 ```{.python .input}
-dev_score = predictor_mrpc_bo.evaluate(dev_data, metrics=['acc', 'f1'])
-print('Best Config = {}'.format(predictor_mrpc_bo.results['best_config']))
-print('Total Time = {}s'.format(predictor_mrpc_bo.results['total_time']))
+dev_score = predictor_sst_bo.evaluate(dev_data, metrics=['acc', 'f1'])
+print('Best Config = {}'.format(predictor_sst_bo.results['best_config']))
+print('Total Time = {}s'.format(predictor_sst_bo.results['total_time']))
 print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
 
-
-```{.python .input}
-predictions = predictor_mrpc_bo.predict(dev_data)
-prediction1 = predictor_mrpc_bo.predict({'sentence1': [sentence1], 'sentence2': [sentence2]})
-prediction1_prob = predictor_mrpc_bo.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence2]})
-print('A = "{}"'.format(sentence1))
-print('B = "{}"'.format(sentence2))
-print('Prediction = "{}"'.format(prediction1[0] == 1))
-print('Prob = "{}"'.format(prediction1_prob[0]))
-print('')
-prediction2 = predictor_mrpc_bo.predict({'sentence1': [sentence1], 'sentence2': [sentence3]})
-prediction2_prob = predictor_mrpc_bo.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence3]})
-print('A = "{}"'.format(sentence1))
-print('B = "{}"'.format(sentence3))
-print('Prediction = "{}"'.format(prediction2[0] == 1))
-print('Prob = "{}"'.format(prediction2_prob[0]))
-```
-
-
-## Use Hyperband
+## Use Bayesian Optimization + Hyperband
 
 Alternatively, we can instead use the [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf) for HPO.
-Hyperband will try multiple hyperparameter configurations simultaneously and will early stop training under poor configurations to free compute resources for exploring new hyperparameter configurations. It may be able to identify good hyperparameter values more quickly than other search strategies in your applications.
+Hyperband will try multiple hyperparameter configurations simultaneously and will early stop training under poor configurations to free compute resources for exploring new hyperparameter configurations. It may be able to identify good hyperparameter values more quickly than other search strategies in your applications. In the following, we will use a combination of [Hyperband and Bayesian Optimization](https://arxiv.org/abs/2003.10865).
 
 
 ```{.python .input}
-scheduler_options = {'max_t': 40}  # Maximal number of epochs for training the neural network
-hyperparameters['hpo_params'] = {
-    'search_strategy': 'hyperband',
-    'scheduler_options': scheduler_options
-}
+hyperparameters = electra_small_basic_demo_hpo()
+hyperparameters['hpo_params']['search_strategy'] = 'bayesopt_hyperband'
+hyperparameters['hpo_params']['scheduler_options'] = {'max_t': 15} # Maximal number of epochs for training the neural network
+predictor_sst_hb = TextPredictor(path='ag_text_sst_hb', label='label', eval_metric='acc')
+predictor_sst_hb.set_verbosity(0)
+predictor_sst_hb.fit(train_data,
+                     hyperparameters=hyperparameters,
+                     time_limit=60 * 2,
+                     num_trials=8,
+                     seed=123)
 ```
 
 
 ```{.python .input}
-predictor_mrpc_hyperband = task.fit(train_data, label='label',
-                                    hyperparameters=hyperparameters,
-                                    time_limits=60 * 2, ngpus_per_trial=1, seed=123,
-                                    output_directory='./ag_mrpc_custom_space_hyperband')
-```
-
-
-```{.python .input}
-dev_score = predictor_mrpc_hyperband.evaluate(dev_data, metrics=['acc', 'f1'])
-print('Best Config = {}'.format(predictor_mrpc_hyperband.results['best_config']))
-print('Total Time = {}s'.format(predictor_mrpc_hyperband.results['total_time']))
+dev_score = predictor_sst_hb.evaluate(dev_data, metrics=['acc', 'f1'])
+print('Best Config = {}'.format(predictor_sst_hb.results['best_config']))
+print('Total Time = {}s'.format(predictor_sst_hb.results['total_time']))
 print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
-```
-
-
-```{.python .input}
-predictions = predictor_mrpc_hyperband.predict(dev_data)
-prediction1 = predictor_mrpc_hyperband.predict({'sentence1': [sentence1], 'sentence2': [sentence2]})
-prediction1_prob = predictor_mrpc_hyperband.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence2]})
-print('A = "{}"'.format(sentence1))
-print('B = "{}"'.format(sentence2))
-print('Prediction = "{}"'.format(prediction1[0] == 1))
-print('Prob = "{}"'.format(prediction1_prob[0]))
-print('')
-prediction2 = predictor_mrpc_hyperband.predict({'sentence1': [sentence1], 'sentence2': [sentence3]})
-prediction2_prob = predictor_mrpc_hyperband.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence3]})
-print('A = "{}"'.format(sentence1))
-print('B = "{}"'.format(sentence3))
-print('Prediction = "{}"'.format(prediction2[0] == 1))
-print('Prob = "{}"'.format(prediction2_prob[0]))
-```
-
-
-## Use Hyperband together with Bayesian Optimization
-
-Finally, we can use a combination of [Hyperband and Bayesian Optimization](https://arxiv.org/abs/2003.10865).
-
-
-```{.python .input}
-scheduler_options = {'max_t': 40}
-hyperparameters['hpo_params'] = {
-    'search_strategy': 'bayesopt_hyperband',
-    'scheduler_options': scheduler_options
-}
-```
-
-
-```{.python .input}
-predictor_mrpc_bohb = task.fit(
-    train_data, label='label',
-    hyperparameters=hyperparameters,
-    time_limits=60 * 2, ngpus_per_trial=1, seed=123,
-    output_directory='./ag_mrpc_custom_space_bohb')
-```
-
-
-```{.python .input}
-dev_score = predictor_mrpc_bohb.evaluate(dev_data, metrics=['acc', 'f1'])
-print('Best Config = {}'.format(predictor_mrpc_bohb.results['best_config']))
-print('Total Time = {}s'.format(predictor_mrpc_bohb.results['total_time']))
-print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
-print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
-```
-
-
-```{.python .input}
-predictions = predictor_mrpc_bohb.predict(dev_data)
-prediction1 = predictor_mrpc_bohb.predict({'sentence1': [sentence1], 'sentence2': [sentence2]})
-prediction1_prob = predictor_mrpc_bohb.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence2]})
-print('A = "{}"'.format(sentence1))
-print('B = "{}"'.format(sentence2))
-print('Prediction = "{}"'.format(prediction1[0] == 1))
-print('Prob = "{}"'.format(prediction1_prob[0]))
-print('')
-prediction2 = predictor_mrpc_bohb.predict({'sentence1': [sentence1], 'sentence2': [sentence3]})
-prediction2_prob = predictor_mrpc_bohb.predict_proba({'sentence1': [sentence1], 'sentence2': [sentence3]})
-print('A = "{}"'.format(sentence1))
-print('B = "{}"'.format(sentence3))
-print('Prediction = "{}"'.format(prediction2[0] == 1))
-print('Prob = "{}"'.format(prediction2_prob[0]))
 ```
