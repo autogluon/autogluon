@@ -1,7 +1,6 @@
 from autogluon.forecasting import Forecasting as task
-from autogluon.forecasting import ForecastingPredictor
+from autogluon.forecasting import ForecastingPredictorV1
 import autogluon.core as ag
-from gluonts.nursery.autogluon_tabular.estimator import TabularEstimator
 
 train_data = task.Dataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
 test_data = task.Dataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
@@ -24,7 +23,7 @@ predictor = task.fit(train_data=train_data,
                      hyperparameters={
                          "MQCNN": {'context_length': ag.Int(70, 90, default=prediction_length * 4),
                                    "num_batches_per_epoch": 10,
-                                   "epochs": 50},
+                                   "epochs": 5},
                          # "DeepAR": {'context_length': ag.Int(70, 90),
                          #            "num_batches_per_epoch": 10,
                          #            "epochs": 50},
@@ -35,10 +34,10 @@ predictor = task.fit(train_data=train_data,
                      },
                      search_strategy=searcher_type,
                      eval_metric=eval_metric,
-                     num_trials=3, )
+                     num_trials=5, )
 # Int: [min(max(10, 2*prediction_length), 250), min(500,12*prediction_length)]
 predictor = None
-predictor = ForecastingPredictor.load(path)
+predictor = ForecastingPredictorV1.load(path)
 models = predictor._trainer.get_model_names_all()
 for model in models:
     print(predictor._trainer.load_model(model).get_info())

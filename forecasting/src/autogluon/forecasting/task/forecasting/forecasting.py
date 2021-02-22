@@ -3,7 +3,7 @@ from .dataset import TimeSeriesDataset
 from autogluon.core.dataset import TabularDataset
 from ...utils.dataset_utils import rebuild_tabular, train_test_split_dataframe, train_test_split_gluonts
 from ...learner import DefaultLearner as Learner
-from .predictor import ForecastingPredictor
+from .predictor_legacy import ForecastingPredictorV1
 from ...trainer import AutoTrainer
 import pandas as pd
 from gluonts.dataset.common import Dataset, ListDataset, FileDataset
@@ -17,13 +17,12 @@ logger = logging.getLogger()
 
 
 class Forecasting(BaseTask):
-
     Dataset = TabularDataset
-    Predictor = ForecastingPredictor
+    Predictor = ForecastingPredictorV1
 
     @staticmethod
     def load(output_directory, verbosity=2):
-        return ForecastingPredictor.load(output_directory=output_directory, verbosity=verbosity)
+        return ForecastingPredictorV1.load(output_directory=output_directory, verbosity=verbosity)
 
     @staticmethod
     def fit(train_data,
@@ -76,13 +75,16 @@ class Forecasting(BaseTask):
         refit_full = kwargs.get('refit_full', False)
         save_data = kwargs.get('save_data', True)
         if not save_data:
-            logger.log(30, 'Warning: `save_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
+            logger.log(30,
+                       'Warning: `save_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
             if refit_full:
-                raise ValueError('`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
+                raise ValueError(
+                    '`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
 
-        set_best_to_refit_full = kwargs.get('set_best_to_refit_full', False)
+        set_best_to_refit_full = kwargs.get('set_best_to_refit_full', True)
         if set_best_to_refit_full and not refit_full:
-            raise ValueError('`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
+            raise ValueError(
+                '`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
 
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         random_seed = kwargs.get('random_seed', 0)
@@ -102,7 +104,7 @@ class Forecasting(BaseTask):
         learner = Learner(path_context=output_directory,
                           eval_metric=eval_metric,
                           trainer_type=trainer_type,
-                          random_seed=random_seed,)
+                          random_seed=random_seed, )
 
         learner.fit(train_data=train_data,
                     freq=freq,
@@ -114,12 +116,12 @@ class Forecasting(BaseTask):
                     quantiles=quantiles)
 
         # TODO: refit full
-        predictor = ForecastingPredictor(learner,
-                                         index_column=index_column,
-                                         target_column=target_column,
-                                         time_column=time_column)
+        predictor = ForecastingPredictorV1(learner,
+                                           index_column=index_column,
+                                           target_column=target_column,
+                                           time_column=time_column)
 
-        keep_only_best = kwargs.get('keep_only_best', False)
+        keep_only_best = kwargs.get('keep_only_best', True)
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -146,12 +148,6 @@ class Forecasting(BaseTask):
                     logger.warning(
                         f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
             logger.log(30, "End of refit_full")
-        predictor.save(output_directory)
+        predictor.save()
 
         return predictor
-
-
-
-
-
-

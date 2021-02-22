@@ -11,12 +11,12 @@ from ...trainer import AbstractTrainer  # TODO: Keep track of true type of train
 from autogluon.core.utils.utils import setup_outputdir
 from ...utils.dataset_utils import time_series_dataset
 
-__all__ = ['ForecastingPredictor']
+__all__ = ['ForecastingPredictorV1']
 
 logger = logging.getLogger()  # return root logger
 
 
-class ForecastingPredictor:
+class ForecastingPredictorV1:
 
     predictor_file_name = "predictor.pkl"
 
@@ -78,7 +78,7 @@ class ForecastingPredictor:
         predictor._trainer = learner.load_trainer()
         return predictor
 
-    def save(self, output_directory):
+    def save(self):
         """ Save this predictor to file in directory specified by this Predictor's `output_directory`.
             Note that `fit()` already saves the predictor object automatically
             (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
@@ -180,7 +180,7 @@ class ForecastingPredictor:
             print("*** End of fit() summary ***")
         return results
 
-    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False):
+    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:

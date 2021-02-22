@@ -1,3 +1,3 @@
 from .forecasting import Forecasting
-from .predictor import ForecastingPredictor
+from .predictor_legacy import ForecastingPredictorV1
 
