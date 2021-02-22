@@ -53,7 +53,7 @@ def is_categorical_column(data: pd.Series,
             else:
                 threshold = 20
                 oov_ratio_threshold = 0
-                ratio = 0.01
+                ratio = 0.1
         threshold = min(int(len(data) * ratio), threshold)
         data_value_counts = data.value_counts(dropna=False)
         key_set = set(data_value_counts.keys())
