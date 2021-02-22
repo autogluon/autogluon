@@ -90,7 +90,7 @@ class LocalSequentialScheduler(object):
         self.time_attr = kwargs.get('time_attr', None)
         self.resource = kwargs['resource']
         self.max_reward = kwargs.get('max_reward')
-        self.searcher: BaseSearcher = self.get_scheduler_(searcher, train_fn, **kwargs)
+        self.searcher: BaseSearcher = self.get_searcher_(searcher, train_fn, **kwargs)
         self.init_limits_(kwargs)
         self.metadata = {
             'search_space': train_fn.kwspaces,
@@ -104,15 +104,15 @@ class LocalSequentialScheduler(object):
         args = kwargs.get('args')
 
     def init_limits_(self, kwargs):
-        if kwargs.get('num_trials') is None:
+        if kwargs.get('num_trials', None) is None:
             assert kwargs.get('time_out') is not None, "Need stopping criterion: Either num_trials or time_out"
         self.num_trials = kwargs.get('num_trials', 9999)
-        self.time_out = kwargs.get('time_out')
+        self.time_out = kwargs.get('time_out', None)
         if self.num_trials is None:
             assert self.time_out is not None, \
                 "Need stopping criterion: Either num_trials or time_out"
 
-    def get_scheduler_(self, searcher, train_fn, **kwargs) -> BaseSearcher:
+    def get_searcher_(self, searcher, train_fn, **kwargs) -> BaseSearcher:
         if searcher is 'local_sequential_auto':
             searcher = 'auto'
         scheduler_opts = {}
