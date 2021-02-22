@@ -98,7 +98,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return X
 
-    def _fit(self, X_train, y_train, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, sample_weight=None, **kwargs):
         if k_fold < 1:
             k_fold = 1
         if k_fold_end is None:
@@ -140,11 +140,11 @@ class BaggedEnsembleModel(AbstractModel):
             model_base.name = f'{model_base.name}S1F1'
             model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
             time_start_fit = time.time()
-            model_base.fit(X_train=X_train, y_train=y_train, time_limit=time_limit, **kwargs)
+            model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
             model_base.fit_time = time.time() - time_start_fit
             model_base.predict_time = None
-            self._oof_pred_proba = model_base.predict_proba(X=X_train)  # TODO: Cheater value, will be overfit to valid set
-            self._oof_pred_model_repeats = np.ones(shape=len(X_train), dtype=np.uint8)
+            self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
+            self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
             self._n_repeats = 1
             self._n_repeats_finished = 1
             self._k_per_n_repeat = [1]
@@ -161,9 +161,9 @@ class BaggedEnsembleModel(AbstractModel):
             return
 
         # TODO: Preprocess data here instead of repeatedly
-        kfolds = generate_kfold(X=X_train, y=y_train, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
+        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
-        oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X_train, y=y_train)
+        oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
 
         models = []
         folds_to_fit = fold_end - fold_start
@@ -194,8 +194,8 @@ class BaggedEnsembleModel(AbstractModel):
 
                 time_start_fold = time.time()
                 train_index, val_index = fold
-                X_train_fold, X_val_fold = X_train.iloc[train_index, :], X_train.iloc[val_index, :]
-                y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
+                X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
+                y_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
                 fold_model = copy.deepcopy(model_base)
                 fold_model.name = f'{fold_model.name}S{j+1}F{fold_num_in_repeat+1}'  # S5F3 = 3rd fold of the 5th repeat set
                 fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
@@ -203,7 +203,7 @@ class BaggedEnsembleModel(AbstractModel):
                 if sample_weight is not None:
                     kwargs_fold['sample_weight'] = sample_weight[train_index]
                     kwargs_fold['sample_weight_val'] = sample_weight[val_index]
-                fold_model.fit(X_train=X_train_fold, y_train=y_train_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
+                fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
                 time_train_end_fold = time.time()
                 if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
                     if i != (fold_end - 1):
@@ -609,7 +609,7 @@ class BaggedEnsembleModel(AbstractModel):
         return kwargs
 
     # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
-    def _hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options, preprocess_kwargs=None, **kwargs):
+    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, preprocess_kwargs=None, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
@@ -619,15 +619,15 @@ class BaggedEnsembleModel(AbstractModel):
         # TODO: Preprocess data here instead of repeatedly
         if preprocess_kwargs is None:
             preprocess_kwargs = dict()
-        X_train = self.preprocess(X=X_train, preprocess=False, fit=True, **preprocess_kwargs)
-        kfolds = generate_kfold(X=X_train, y=y_train, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=1)
+        X = self.preprocess(X=X, preprocess=False, fit=True, **preprocess_kwargs)
+        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=1)
 
         train_index, test_index = kfolds[0]
-        X_train_fold, X_val_fold = X_train.iloc[train_index, :], X_train.iloc[test_index, :]
-        y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[test_index]
+        X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[test_index, :]
+        y_fold, y_val_fold = y.iloc[train_index], y.iloc[test_index]
         orig_time = scheduler_options[1]['time_out']
         scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
-        hpo_models, hpo_model_performances, hpo_results = self.model_base.hyperparameter_tune(X_train=X_train_fold, y_train=y_train_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
+        hpo_models, hpo_model_performances, hpo_results = self.model_base.hyperparameter_tune(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
         scheduler_options[1]['time_out'] = orig_time
 
         bags = {}
@@ -641,7 +641,7 @@ class BaggedEnsembleModel(AbstractModel):
             bag.rename(f"{bag.name}{os.path.sep}T{i}")
             bag.set_contexts(self.path_root + bag.name + os.path.sep)
 
-            oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X_train, y=y_train)
+            oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
             oof_pred_proba[test_index] += y_pred_proba
             oof_pred_model_repeats[test_index] += 1
 

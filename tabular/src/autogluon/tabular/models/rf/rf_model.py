@@ -65,7 +65,7 @@ class RFModel(AbstractModel):
         }
         return spaces
 
-    def _fit(self, X_train, y_train, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self, X, y, time_limit=None, sample_weight=None, **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
@@ -74,18 +74,18 @@ class RFModel(AbstractModel):
         n_estimators_minimum = min(40, n_estimators_final)
         n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
 
-        X_train = self.preprocess(X_train)
+        X = self.preprocess(X)
         n_estimator_increments = [n_estimators_final]
 
         # Very rough guess to size of a single tree before training
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
             if self.num_classes is None:
-                num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y_train for a better value
+                num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y for a better value
             else:
                 num_trees_per_estimator = self.num_classes
         else:
             num_trees_per_estimator = 1
-        bytes_per_estimator = num_trees_per_estimator * len(X_train) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
+        bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
         available_mem = psutil.virtual_memory().available
         expected_memory_usage = bytes_per_estimator * n_estimators_final / available_mem
         expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum / available_mem
@@ -110,7 +110,7 @@ class RFModel(AbstractModel):
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
                 self.model.n_estimators = n_estimators
-            self.model = self.model.fit(X_train, y_train, sample_weight=sample_weight)
+            self.model = self.model.fit(X, y, sample_weight=sample_weight)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
                 model_size_bytes = 0

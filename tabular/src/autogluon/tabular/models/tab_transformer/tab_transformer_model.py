@@ -338,7 +338,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, sample_weight=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, sample_weight=None, **kwargs):
         import torch
 
         num_gpus = kwargs.get('num_gpus', None)
@@ -360,12 +360,12 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         if self.problem_type ==REGRESSION:
             self.params['n_classes'] = 1
-        elif self.problem_type ==BINARY:
+        elif self.problem_type == BINARY:
             self.params['n_classes'] = 2
-        elif self.problem_type ==MULTICLASS:
-            self.params['n_classes'] = y_train.nunique()
+        elif self.problem_type == MULTICLASS:
+            self.params['n_classes'] = y.nunique()
 
-        train, val, unlab = self._preprocess_train(X_train, X_val, X_unlabeled)
+        train, val, unlab = self._preprocess_train(X, X_val, X_unlabeled)
 
         num_cols = len(train.columns)
         if num_cols > self.params['max_columns']:
@@ -375,10 +375,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 f"If you are confident you will have enough memory, set the 'max_columns' hyperparameter higher and try again.\n")
 
         if self.problem_type == REGRESSION:
-            train.targets = torch.FloatTensor(list(y_train))
+            train.targets = torch.FloatTensor(list(y))
             val.targets = torch.FloatTensor(list(y_val))
         else:
-            train.targets = torch.LongTensor(list(y_train))
+            train.targets = torch.LongTensor(list(y))
             val.targets = torch.LongTensor(list(y_val))
 
         batch_size = self.params['batch_size']
@@ -460,7 +460,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
     # TODO: Consider HPO for pretraining with unlabeled data. (Potential future work)
     # TODO: Does not work correctly when cuda is enabled.
-    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
         from .utils import tt_trial
 
         time_start = time.time()
@@ -471,8 +471,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
 
         util_args = dict(
-            X_train=X_train,
-            y_train=y_train,
+            X=X,
+            y=y,
             X_val=X_val,
             y_val=y_val,
             model=self,

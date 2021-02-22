@@ -59,23 +59,23 @@ class KNNModel(AbstractModel):
         spaces = {}
         return spaces
 
-    def _fit(self, X_train, y_train, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self, X, y, time_limit=None, sample_weight=None, **kwargs):
         time_start = time.time()
-        X_train = self.preprocess(X_train)
-        self._validate_fit_memory_usage(X_train=X_train)  # TODO: Can incorporate this into samples, can fit on portion of data to satisfy memory instead of raising exception immediately
+        X = self.preprocess(X)
+        self._validate_fit_memory_usage(X=X)  # TODO: Can incorporate this into samples, can fit on portion of data to satisfy memory instead of raising exception immediately
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for KNNModel, this model will ignore them in training.")
 
-        num_rows_max = len(X_train)
+        num_rows_max = len(X)
         # FIXME: v0.1 Must store final num rows for refit_full or else will use everything! Worst case refit_full could train far longer than the original model.
         if time_limit is None or num_rows_max <= 10000:
-            self.model = self._model_type(**self.params).fit(X_train, y_train)
+            self.model = self._model_type(**self.params).fit(X, y)
         else:
-            self.model = self._fit_with_samples(X_train=X_train, y_train=y_train, time_limit=time_limit - (time.time() - time_start))
+            self.model = self._fit_with_samples(X=X, y=y, time_limit=time_limit - (time.time() - time_start))
 
-    def _validate_fit_memory_usage(self, X_train):
+    def _validate_fit_memory_usage(self, X):
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        model_size_bytes = 4 * X_train.shape[0] * X_train.shape[1]  # Assuming float32 types
+        model_size_bytes = 4 * X.shape[0] * X.shape[1]  # Assuming float32 types
         expected_final_model_size_bytes = model_size_bytes * 3.6  # Roughly what can be expected of the final KNN model in memory size
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
             available_mem = psutil.virtual_memory().available
@@ -86,11 +86,11 @@ class KNNModel(AbstractModel):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
     # TODO: Consider making this fully generic and available to all models
-    def _fit_with_samples(self, X_train, y_train, time_limit):
+    def _fit_with_samples(self, X, y, time_limit):
         """
         Fit model with samples of the data repeatedly, gradually increasing the amount of data until time_limit is reached or all data is used.
 
-        X_train and y_train must already be preprocessed
+        X and y must already be preprocessed
         """
         time_start = time.time()
 
@@ -98,7 +98,7 @@ class KNNModel(AbstractModel):
         sample_time_growth_factor = 8  # Assume next sample will take 8x longer than previous (Somewhat safe but there are datasets where it is even >8x.
 
         num_rows_samples = []
-        num_rows_max = len(X_train)
+        num_rows_max = len(X)
         num_rows_cur = 10000
         while True:
             num_rows_cur = min(num_rows_cur, num_rows_max)
@@ -116,9 +116,9 @@ class KNNModel(AbstractModel):
             return chunk.sample(n=n, replace=False, random_state=0)
 
         if self.problem_type != REGRESSION:
-            y_train_df = y_train.to_frame(name='label').reset_index(drop=True)
+            y_df = y.to_frame(name='label').reset_index(drop=True)
         else:
-            y_train_df = None
+            y_df = None
 
         time_start_sample_loop = time.time()
         time_limit_left = time_limit - (time_start_sample_loop - time_start)
@@ -127,13 +127,13 @@ class KNNModel(AbstractModel):
                 if self.problem_type == REGRESSION:
                     idx = np.random.choice(num_rows_max, size=samples, replace=False)
                 else:
-                    idx = y_train_df.groupby('label', group_keys=False).apply(sample_func, frac=samples/num_rows_max).index
-                X_train_samp = X_train[idx, :]
-                y_train_samp = y_train.iloc[idx]
+                    idx = y_df.groupby('label', group_keys=False).apply(sample_func, frac=samples/num_rows_max).index
+                X_samp = X[idx, :]
+                y_samp = y.iloc[idx]
             else:
-                X_train_samp = X_train
-                y_train_samp = y_train
-            self.model = self._model_type(**self.params).fit(X_train_samp, y_train_samp)
+                X_samp = X
+                y_samp = y
+            self.model = self._model_type(**self.params).fit(X_samp, y_samp)
             time_limit_left_prior = time_limit_left
             time_fit_end_sample = time.time()
             time_limit_left = time_limit - (time_fit_end_sample - time_start)

@@ -24,10 +24,10 @@ def model_trial(args, reporter: LocalStatusReporter):
     try:
         model, args, util_args = prepare_inputs(args=args)
 
-        X_train, y_train = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
+        X, y = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
         X_val, y_val = load_pkl.load(util_args.directory + util_args.dataset_val_filename)
 
-        fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **util_args.get('fit_kwargs', dict()))
+        fit_model_args = dict(X=X, y=y, X_val=X_val, y_val=y_val, **util_args.get('fit_kwargs', dict()))
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(
             model=model,
@@ -82,9 +82,9 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
     return model
 
 
-def skip_hpo(model, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
+def skip_hpo(model, X, y, X_val, y_val, scheduler_options=None, **kwargs):
     """Skips HPO and simply trains the model once with the provided HPO time budget. Returns model artifacts as if from HPO."""
-    fit_model_args = dict(X_train=X_train, y_train=y_train, **kwargs)
+    fit_model_args = dict(X=X, y=y, **kwargs)
     predict_proba_args = dict(X=X_val)
     time_limit = scheduler_options[1].get('time_out', None)
     fit_and_save_model(model=model, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=time_limit)

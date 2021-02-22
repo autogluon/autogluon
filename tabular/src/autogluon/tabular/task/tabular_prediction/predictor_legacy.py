@@ -802,8 +802,8 @@ class TabularPredictorV1:
         trainer = self._learner.load_trainer()
 
         if trainer.bagged_mode:
-            X = trainer.load_X_train()
-            y = trainer.load_y_train()
+            X = trainer.load_X()
+            y = trainer.load_y()
             fit = True
         else:
             X = trainer.load_X_val()
@@ -814,7 +814,7 @@ class TabularPredictorV1:
         if base_models is None:
             base_models = trainer.get_model_names(stack_name='core')
 
-        X_train_stack_preds = trainer.get_inputs_to_stacker(X=X, base_models=base_models, fit=fit, use_orig_features=False)
+        X_stack_preds = trainer.get_inputs_to_stacker(X=X, base_models=base_models, fit=fit, use_orig_features=False)
 
         models = []
 
@@ -827,11 +827,11 @@ class TabularPredictorV1:
                 models_to_check_now = models_to_check[:i+1]
                 max_base_model_level = max([trainer.get_model_level(base_model) for base_model in models_to_check_now])
                 weighted_ensemble_level = max_base_model_level + 1
-                models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=models_to_check_now, name_suffix=name_suffix + '_pareto' + str(i), time_limit=time_limit)
+                models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=models_to_check_now, name_suffix=name_suffix + '_pareto' + str(i), time_limit=time_limit)
 
         max_base_model_level = max([trainer.get_model_level(base_model) for base_model in base_models])
         weighted_ensemble_level = max_base_model_level + 1
-        models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=base_models, name_suffix=name_suffix, time_limit=time_limit)
+        models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=base_models, name_suffix=name_suffix, time_limit=time_limit)
 
         return models
 
@@ -1038,8 +1038,8 @@ class TabularPredictorV1:
 
         """
         if data == 'train':
-            load_X = self._trainer.load_X_train
-            load_y = self._trainer.load_y_train
+            load_X = self._trainer.load_X
+            load_y = self._trainer.load_y
         elif data == 'val':
             load_X = self._trainer.load_X_val
             load_y = self._trainer.load_y_val
