@@ -67,7 +67,14 @@ Text Prediction
       :title: Quick Start Tutorial
       :link: text_prediction/beginner.html
 
-      10 min tutorial on fitting prediction models with text in the dataset.
+      5 min tutorial on fitting prediction models with text in the dataset.
+
+   .. card::
+      :title: Text Prediction for Multimodal Tables with Text
+      :link: text_prediction/multimodal_text.html
+
+      Learning how AutoGluon Text can be used to train model for multimodal data table with text.
+
 
    .. card::
       :title: Customize Search Space and HPO
@@ -75,12 +82,6 @@ Text Prediction
 
       In-depth tutorial on learning how to customize the search space and try different
       HPO algorithms.
-
-   .. card::
-      :title: Dealing with Mixed Data Types
-      :link: text_prediction/heterogeneous.html
-
-      Learning how to use AutoGluon to handle datasets with mixed data types.
 
 
 Tune Custom Models
@@ -142,7 +143,6 @@ Neural Architecture Search
    course/index
    image_prediction/index
    object_detection/index
-   text_classification/index
    text_prediction/index
    tabular_prediction/index
    customize/index

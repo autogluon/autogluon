@@ -21,7 +21,7 @@ pretrained BERT/ALBERT/ELECTRA model (transfer learning) and hyper-parameter opt
 
    .. card::
       :title: Multimodal Data Tables with Text
-      :link: heterogeneous.html
+      :link: multimodal_text.html
 
       Introduction on how TextPredictor can be used on multimodal data tables with
       a mix of text, numeric, and categorical features.
