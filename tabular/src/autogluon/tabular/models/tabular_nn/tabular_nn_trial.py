@@ -18,7 +18,7 @@ def tabular_nn_trial(args, reporter):
         val_dataset = TabularNNDataset.load(util_args.val_path)
         y_val = val_dataset.get_labels()
 
-        fit_model_args = dict(X_train=train_dataset, y_train=None, X_val=val_dataset, **util_args.get('fit_kwargs', dict()))
+        fit_model_args = dict(X=train_dataset, y_train=None, X_val=val_dataset, **util_args.get('fit_kwargs', dict()))
         predict_proba_args = dict(X=val_dataset)
         model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)

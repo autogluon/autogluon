@@ -177,7 +177,7 @@ class AbstractLearner:
         trainer = self.load_trainer()
         if dataset is None:
             if trainer.bagged_mode:
-                dataset_preprocessed = trainer.load_X_train()
+                dataset_preprocessed = trainer.load_X()
                 fit = True
             else:
                 dataset_preprocessed = trainer.load_X_val()
@@ -601,7 +601,7 @@ class AbstractLearner:
             augmentation_data = self.transform_features(augmentation_data)
 
         trainer = self.load_trainer()
-        distilled_model_names = trainer.distill(X_train=X, y_train=y, X_val=X_val, y_val=y_val, time_limit=time_limit, hyperparameters=hyperparameters,
+        distilled_model_names = trainer.distill(X=X, y_train=y, X_val=X_val, y_val=y_val, time_limit=time_limit, hyperparameters=hyperparameters,
                                                 holdout_frac=holdout_frac, verbosity=verbosity, teacher_preds=teacher_preds, models_name_suffix=models_name_suffix,
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)

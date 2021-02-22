@@ -755,9 +755,9 @@ class TabularPredictor(TabularPredictorV1):
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
 
         # TODO: Add special error message if called and training/val data was not cached.
-        X_train, y_train, X_val, y_val = self._trainer.load_data()
+        X, y_train, X_val, y_val = self._trainer.load_data()
         fit_models = self._trainer.train_multi_levels(
-            X_train=X_train, y_train=y_train, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
+            X=X, y_train=y_train, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
             base_model_names=base_model_names, time_limit=time_limit, relative_stack=True, level_end=num_stack_levels,
             core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
         )

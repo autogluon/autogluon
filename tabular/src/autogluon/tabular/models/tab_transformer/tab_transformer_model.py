@@ -338,7 +338,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, sample_weight=None, **kwargs):
+    def _fit(self, X, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, sample_weight=None, **kwargs):
         import torch
 
         num_gpus = kwargs.get('num_gpus', None)
@@ -365,7 +365,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         elif self.problem_type ==MULTICLASS:
             self.params['n_classes'] = y_train.nunique()
 
-        train, val, unlab = self._preprocess_train(X_train, X_val, X_unlabeled)
+        train, val, unlab = self._preprocess_train(X, X_val, X_unlabeled)
 
         num_cols = len(train.columns)
         if num_cols > self.params['max_columns']:
@@ -460,7 +460,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
     # TODO: Consider HPO for pretraining with unlabeled data. (Potential future work)
     # TODO: Does not work correctly when cuda is enabled.
-    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y_train, X_val, y_val, scheduler_options, **kwargs):
         from .utils import tt_trial
 
         time_start = time.time()
@@ -471,7 +471,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
 
         util_args = dict(
-            X_train=X_train,
+            X=X,
             y_train=y_train,
             X_val=X_val,
             y_val=y_val,

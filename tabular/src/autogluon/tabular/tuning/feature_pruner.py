@@ -45,12 +45,12 @@ class FeaturePruner:
 
     # TODO: CV5 instead of holdout? Should be better
     # TODO: Add holdout here, it is overfitting with Logistic Regression
-    def tune(self, X_train, y_train, X_val, y_val, X_holdout, y_holdout, total_runs=999):
+    def tune(self, X, y_train, X_val, y_val, X_holdout, y_holdout, total_runs=999):
         objective_goal_is_negative = False  # Fixed to false if using sklearn scorers # self.model_base.problem_type == REGRESSION  # TODO: if objective function goal = lower (logloss, MAE, etc.)
         logger.log(15, 'Feature-pruning '+str(self.model_base.name)+' for '+str(total_runs)+' runs...')
 
         if len(self.features_in_iter) == 0:
-            valid_features = X_train.columns.values
+            valid_features = X.columns.values
         else:
             valid_features = self.features_in_iter[-1]
 
@@ -59,7 +59,7 @@ class FeaturePruner:
         for iteration in range(self.cur_iteration, total_runs):
             self.cur_iteration = iteration
             logger.debug('iteration: %s ' % iteration)
-            X_train_subset = X_train[valid_features].copy()
+            X_subset = X[valid_features].copy()
             X_val_subset = X_val[valid_features].copy()
             self.thresholds.append(self.threshold)
             self.valid_feature_counts.append(len(valid_features))
@@ -69,7 +69,7 @@ class FeaturePruner:
                 model_iter = self.model_base
             else:
                 model_iter = copy.deepcopy(self.model_base)
-                model_iter.fit(X_train=X_train_subset, y_train=y_train, X_val=X_val_subset, y_val=y_val)
+                model_iter.fit(X=X_subset, y_train=y_train, X_val=X_val_subset, y_val=y_val)
 
             banned_features = []
 
@@ -80,7 +80,7 @@ class FeaturePruner:
                 feature_importance = model_iter.model.feature_importance()
 
             if feature_importance is not None:
-                a = pd.Series(data=feature_importance, index=X_train_subset.columns)
+                a = pd.Series(data=feature_importance, index=X_subset.columns)
                 unused_features = a[a == 0]
 
                 logger.log(15, 'Unused features after pruning: '+ str(list(unused_features.index)))

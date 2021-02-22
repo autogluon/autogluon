@@ -16,7 +16,7 @@ def tt_trial(args, reporter):
     try:
         model, args, util_args = model_trial.prepare_inputs(args=args)
 
-        fit_model_args = dict(X_train=util_args.X_train, y_train=util_args.y_train, X_val=util_args.X_val, y_val=util_args.y_val, **util_args.get('fit_kwargs', dict()))
+        fit_model_args = dict(X=util_args.X, y_train=util_args.y_train, X_val=util_args.X_val, y_val=util_args.y_val, **util_args.get('fit_kwargs', dict()))
         predict_proba_args = dict(X=util_args.X_val)
         model = model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=util_args.y_val,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)

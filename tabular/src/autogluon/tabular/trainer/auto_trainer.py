@@ -27,24 +27,24 @@ class AutoTrainer(AbstractTrainer):
                                  num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names,
                                  feature_metadata=feature_metadata, silent=silent, **kwargs)
 
-    def fit(self, X_train, y_train, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, **kwargs):
+    def fit(self, X, y_train, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, **kwargs):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
 
         if self.bagged_mode:
             if (y_val is not None) and (X_val is not None):
                 # TODO: User could be intending to blend instead. Perhaps switch from OOF preds to X_val preds while still bagging? Doubt a user would want this.
-                logger.warning('Warning: Training AutoGluon in Bagged Mode but X_val is specified, concatenating X_train and X_val for cross-validation')
-                X_train = pd.concat([X_train, X_val], ignore_index=True)
+                logger.warning('Warning: Training AutoGluon in Bagged Mode but X_val is specified, concatenating X and X_val for cross-validation')
+                X = pd.concat([X, X_val], ignore_index=True)
                 y_train = pd.concat([y_train, y_val], ignore_index=True)
             X_val = None
             y_val = None
         else:
             if (y_val is None) or (X_val is None):
-                X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_state)
-                logger.log(20, f'Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X_train)}, Val Rows: {len(X_val)}')
+                X, X_val, y_train, y_val = generate_train_test_split(X, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_state)
+                logger.log(20, f'Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}')
 
-        self._train_multi_and_ensemble(X_train, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters,
+        self._train_multi_and_ensemble(X, y_train, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters,
                                        feature_prune=feature_prune,
                                        num_stack_levels=num_stack_levels, time_limit=time_limit, core_kwargs=core_kwargs)
 
