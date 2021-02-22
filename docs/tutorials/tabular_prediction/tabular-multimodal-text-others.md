@@ -2,15 +2,7 @@
 
 :label:`sec_tabularprediction_text_multimodal`
 
-We will introduce how to use AutoGluon to deal with tabular data that involves text and categorical features.
-This type of data, i.e., data which contains text and other features, is prevalent in real world applications.
-For example, when building a sentiment analysis model of users' tweets, we can not only use the raw text in the 
-tweets but also other features such as the topic of the tweet and the user profile. In the following, 
-we will investigate different ways to ensemble the state-of-the-art (pretrained) language models in AutoGluon TextPrediction 
-with all the other models used in AutoGluon's TabularPredictor. 
-For more details about the inner-working of the neural network architecture used in AutoGluon TextPrediction, 
-you may refer to Section ":ref:`sec_textprediction_architecture`" in :ref:`sec_textprediction_heterogeneous`.
-
+We will introduce how to use AutoGluon Tabular to deal with multimodal tabular data that involves text, numeric, and categorical features. This type of data is prevalent in real world applications. In AutoGluon, **raw text data** is considered as a first-class citizen of data tables. AutoGluon Tabular can help you train and combine a diverse set of models including the classical ones like LightGBM/CatBoost and the more recent Pretrained Language Model (PLM) based multimodal network that is introduced in Section ":ref:`sec_textprediction_architecture`" of :ref:`sec_textprediction_multimodal`.
 
 
 ```{.python .input}
@@ -45,7 +37,7 @@ In the following, we will use the product sentiment analysis dataset from this [
 feature_columns = ['Product_Description', 'Product_Type']
 label = 'Sentiment'
 
-train_df = pd.read_csv('product_sentiment_machine_hack/train.csv', index_col=0)
+train_df = pd.read_csv('product_sentiment_machine_hack/train.csv', index_col=0).sample(2000, random_state=123)
 dev_df = pd.read_csv('product_sentiment_machine_hack/dev.csv', index_col=0)
 test_df = pd.read_csv('product_sentiment_machine_hack/test.csv', index_col=0)
 
@@ -74,3 +66,23 @@ dev_df.head(3)
 ```{.python .input}
 test_df.head(3)
 ```
+
+## AutoGluon Tabular with Multimodal Support
+
+We can directly specify the modeling hyperparameters as `multimodal` in AutoGluon Tabular. Internally, it will train multiple models and combine them via either weighted ensemble, or the stack ensembling, which is explained in [AutoGluon Tabular Paper](https://arxiv.org/pdf/2003.06505.pdf).
+
+
+```{.python .input}
+from autogluon.tabular import TabularPredictor
+predictor = TabularPredictor(label='Sentiment', path='ag_tabular_product_sentiment_multimodal')
+predictor.fit(train_df, hyperparameters='multimodal')
+```
+
+
+```{.python .input}
+predictor.leaderboard(dev_df)
+```
+
+## Improve the Performance with Stack Ensemble
+
+You can improve the performance by using stack ensembling. One way to turn it on is to call `predictor.fit(train_df, hyperparameters='multimodal', num_bag_folds=5, num_stack_levels=1)`. Due to the time constraint of tutorials, we won't run with this configuration and you may check more examples in https://github.com/awslabs/autogluon/tree/master/examples/text_prediction, where you can achieve top performance in competitions with the stack ensembling based solution.
