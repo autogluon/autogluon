@@ -1040,7 +1040,7 @@ class MultiModalTextModel:
                 plt.xlabel('report_idx')
                 plt.title("Performance vs Training-Time")
                 plt.plot(local_results['report_idx'].iloc[:-1],
-                         local_results['eval_metric'].iloc[:-1], label=f'task0')
+                         local_results[self._eval_metric].iloc[:-1], label=f'task0')
                 plt.legend(loc='best')
                 plt.savefig(plot_training_curves)
                 plt.show()

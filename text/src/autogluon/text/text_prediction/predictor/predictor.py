@@ -90,6 +90,13 @@ class TextPredictor:
         set_logger_verbosity(self.verbosity, logger=logger)
 
     @property
+    def results(self):
+        if self._model is not None:
+            return self._model.results
+        else:
+            return None
+
+    @property
     def path(self):
         return self._path
 
