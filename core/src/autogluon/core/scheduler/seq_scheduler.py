@@ -2,7 +2,9 @@ import logging
 import time
 from collections import OrderedDict
 from copy import deepcopy
+from typing import Tuple
 
+import numpy as np
 from tqdm.auto import tqdm
 
 from autogluon.core.searcher import BaseSearcher, searcher_factory
@@ -28,7 +30,6 @@ class LocalReporter:
 
     def __call__(self, *args, **kwargs):
         result = deepcopy(kwargs)
-
         if 'done' not in result:
             result['trial'] = self.trial
 
@@ -45,15 +46,16 @@ class LocalReporter:
                     self.task_config.pop('util_args')
 
             self.last_result = result
-        if 'traceback' in result:
-            self.searcher.evaluation_failed(config=self.task_config, **result)
 
     def terminate(self):
         pass  # compatibility
 
 
 class LocalSequentialScheduler(object):
-    """ Simple scheduler which schedules all HPO jobs in sequence without any parallelizm
+    """ Simple scheduler which schedules all HPO jobs in sequence without any parallelism.
+    The next trial scheduling will be decided based on the available time left withing `time_out` setting
+    and average time required for a trial to complete multiplied by the fill_factor (0.95) by default to
+    accommodate variance in runtimes per HPO run.
 
     Parameters
     ----------
@@ -144,24 +146,25 @@ class LocalSequentialScheduler(object):
         self.training_history = OrderedDict()
         self.config_history = OrderedDict()
 
+        trial_run_times = []
         time_start = time.time()
-
-        avg_trial_run_time = None
 
         r = range(self.num_trials)
         for i in (tqdm(r) if self.num_trials < 1000 else r):
             trial_start_time = time.time()
-            self.run_trial(task_id=i)
+            is_failed = self.run_trial(task_id=i)
             trial_end_time = time.time()
+            trial_run_times.append(np.NaN if is_failed else (trial_end_time - trial_start_time))
 
             if self.max_reward and self.get_best_reward() >= self.max_reward:
                 logger.log(20, f'\tMax reward is reached')
                 break
 
             if self.time_out is not None:
-                avg_trial_run_time = self.get_average_trial_time_(i, avg_trial_run_time, trial_start_time, trial_end_time)
+                avg_trial_run_time = np.nanmean(trial_run_times)
+                avg_trial_run_time = 0 if np.isnan(avg_trial_run_time) else avg_trial_run_time
                 if not self.has_enough_time_for_trial_(self.time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time):
-                    logger.log(20, f'\tTime limit exceeded...')
+                    logger.log(20, f'\tTime limit exceeded')
                     break
 
     @classmethod
@@ -206,15 +209,41 @@ class LocalSequentialScheduler(object):
             avg_trial_run_time = ((avg_trial_run_time * i) + trial_time) / (i + 1)
         return avg_trial_run_time
 
-    def run_trial(self, task_id=0):
+    def run_trial(self, task_id=0) -> Tuple[bool, float, float]:
+        """
+        Start a trial with a given task_id
+
+        Parameters
+        ----------
+        task_id
+            task
+
+        Returns
+        -------
+        is_failed: bool
+            True if task completed successfully
+        trial_start_time
+            Trial start time
+        trial_end_time
+            Trial end time
+
+        """
         searcher_config = self.searcher.get_config()
         reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
         task_config = deepcopy(EasyDict(self.train_fn.kwvars))
         task_config['task_id'] = task_id
         self.searcher.register_pending(searcher_config)
-        self.train_fn(task_config, config=searcher_config, reporter=reporter)
-        if reporter.last_result:
-            self.searcher.update(config=searcher_config, **reporter.last_result)
+        is_failed = False
+        try:
+            self.train_fn(task_config, config=searcher_config, reporter=reporter)
+            if reporter.last_result:
+                self.searcher.update(config=searcher_config, **reporter.last_result)
+        except Exception as e:
+            logger.error(f'Exception during a trial: {e}')
+            self.searcher.evaluation_failed(config=searcher_config)
+            reporter(traceback=e)
+            is_failed = True
+        return is_failed
 
     def join_jobs(self, timeout=None):
         pass  # Compatibility
