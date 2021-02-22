@@ -233,6 +233,8 @@ class TextPredictor:
         if plot_results is None:
             plot_results = in_ipynb()
         if self._backend == 'gluonnlp_v0':
+            import warnings
+            warnings.filterwarnings('ignore', module='mxnet')
             from ..mx.models import MultiModalTextModel
             self._model = MultiModalTextModel(column_types=column_types,
                                               feature_columns=feature_columns,
