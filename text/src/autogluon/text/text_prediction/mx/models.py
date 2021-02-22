@@ -1489,8 +1489,11 @@ class MultiModalTextModel:
                 prefix='embed_net_')
             embed_net.hybridize()
             self._embed_net = embed_net
+
         if num_repeat is None:
             num_repeat = self.config.model.inference_num_repeat
+        ctx_l = get_mxnet_available_ctx()
+        self._embed_net.collect_params().reset_ctx(ctx_l)
         embeddings = _classification_regression_predict(self._embed_net,
                                                         dataloader=dataloader,
                                                         problem_type=self._problem_type,
@@ -1498,4 +1501,5 @@ class MultiModalTextModel:
                                                         has_label=False,
                                                         extract_embedding=True,
                                                         num_repeat=num_repeat)
+        self._embed_net.collect_params().reset_ctx(mx.cpu())
         return embeddings
