@@ -143,7 +143,7 @@ class TextPredictionV1Model(AbstractModel):
                                    path=self.path,
                                    eval_metric=self.eval_metric,
                                    verbosity=verbosity)
-        X_train.insert(len(X_train.columns), self._label_column_name, y_train)
+        X_train.insert(len(X_train.columns), self._label_column_name, y)
         if X_val is not None:
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
         assert self.params['hpo_params']['num_trials'] == 1 \
