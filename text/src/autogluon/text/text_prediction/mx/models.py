@@ -1047,7 +1047,7 @@ class MultiModalTextModel:
             self._results = local_results
         else:
             force_forkserver()
-            scheduler_cls = schedulers[scheduler_options['searcher']]
+            scheduler_cls = schedulers[hpo_params['search_strategy']]
             # Create scheduler, run HPO experiment
             scheduler = scheduler_cls(train_fn, **scheduler_options)
             scheduler.run()
