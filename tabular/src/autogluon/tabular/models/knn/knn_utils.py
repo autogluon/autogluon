@@ -64,7 +64,7 @@ class FAISSNeighborsRegressor:
             # global config, affects all faiss indexes
             faiss.omp_set_num_threads(n_jobs)
 
-    def fit(self, X, y_train):
+    def fit(self, X, y):
         if isinstance(X, DataFrame):
             X = X.to_numpy(dtype=np.float32)
         else:
@@ -73,7 +73,7 @@ class FAISSNeighborsRegressor:
             X = np.ascontiguousarray(X)
         d = X.shape[1]
         self.index = self.faiss.index_factory(d, self.index_factory_string)
-        self.y = np.array(y_train)
+        self.y = np.array(y)
         self.index.train(X)
         self.index.add(X)
         return self
@@ -141,7 +141,7 @@ class FAISSNeighborsClassifier:
             # global config, affects all faiss indexes
             faiss.omp_set_num_threads(n_jobs)
 
-    def fit(self, X, y_train):
+    def fit(self, X, y):
         if isinstance(X, DataFrame):
             X = X.to_numpy(dtype=np.float32)
         else:
@@ -150,10 +150,10 @@ class FAISSNeighborsClassifier:
             X = np.ascontiguousarray(X)
         d = X.shape[1]
         self.index = self.faiss.index_factory(d, self.index_factory_string)
-        self.labels = np.array(y_train)
+        self.labels = np.array(y)
         self.index.train(X)
         self.index.add(X)
-        self.classes = np.unique(y_train)
+        self.classes = np.unique(y)
         return self
 
     def predict(self, X):

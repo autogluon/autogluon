@@ -60,7 +60,7 @@ class CatBoostModel(AbstractModel):
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
-    def _fit(self, X, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
         params = self.params.copy()
@@ -82,9 +82,9 @@ class CatBoostModel(AbstractModel):
             if self.num_classes is not None:
                 num_classes = self.num_classes
             else:
-                num_classes = 10  # Guess if not given, can do better by looking at y_train
+                num_classes = 10  # Guess if not given, can do better by looking at y
         elif self.problem_type == SOFTCLASS:  # TODO: delete this elif if it's unnecessary.
-            num_classes = y_train.shape[1]
+            num_classes = y.shape[1]
         else:
             num_classes = 1
 
@@ -103,7 +103,7 @@ class CatBoostModel(AbstractModel):
         start_time = time.time()
         X = self.preprocess(X)
         cat_features = list(X.select_dtypes(include='category').columns)
-        X = Pool(data=X, label=y_train, cat_features=cat_features, weight=sample_weight)
+        X = Pool(data=X, label=y, cat_features=cat_features, weight=sample_weight)
 
         if X_val is not None:
             X_val = self.preprocess(X_val)

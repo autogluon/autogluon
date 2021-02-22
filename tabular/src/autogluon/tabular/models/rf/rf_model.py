@@ -65,7 +65,7 @@ class RFModel(AbstractModel):
         }
         return spaces
 
-    def _fit(self, X, y_train, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self, X, y, time_limit=None, sample_weight=None, **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
@@ -80,7 +80,7 @@ class RFModel(AbstractModel):
         # Very rough guess to size of a single tree before training
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
             if self.num_classes is None:
-                num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y_train for a better value
+                num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y for a better value
             else:
                 num_trees_per_estimator = self.num_classes
         else:
@@ -110,7 +110,7 @@ class RFModel(AbstractModel):
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
                 self.model.n_estimators = n_estimators
-            self.model = self.model.fit(X, y_train, sample_weight=sample_weight)
+            self.model = self.model.fit(X, y, sample_weight=sample_weight)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
                 model_size_bytes = 0

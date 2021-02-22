@@ -156,10 +156,10 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                                                     params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
 
-    def _fit(self, X, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=1, num_gpus=0, reporter=None, sample_weight=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_cpus=1, num_gpus=0, reporter=None, sample_weight=None, **kwargs):
         """ X (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_val (pd.DataFrame): test data features (should have same column names as Xtrain)
-            y_train (pd.Series):
+            y (pd.Series):
             y_val (pd.Series): are pandas Series
             kwargs: Can specify amount of compute resources to utilize (num_cpus, num_gpus).
         """
@@ -181,7 +181,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if self.num_dataloading_workers == 1:
             self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
         self.batch_size = params['batch_size']
-        train_dataset, val_dataset = self.generate_datasets(X=X, y_train=y_train, params=params, X_val=X_val, y_val=y_val)
+        train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params, X_val=X_val, y_val=y_val)
         logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding, %d language)" %
               (train_dataset.num_examples, train_dataset.num_features,
                len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed']),
@@ -454,7 +454,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         return preds.asnumpy()  # return 2D numpy array
 
-    def generate_datasets(self, X, y_train, params, X_val=None, y_val=None):
+    def generate_datasets(self, X, y, params, X_val=None, y_val=None):
         impute_strategy = params['proc.impute_strategy']
         max_category_levels = params['proc.max_category_levels']
         skew_threshold = params['proc.skew_threshold']
@@ -469,7 +469,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             if self.features is None:
                 self.features = list(X.columns)
             train_dataset = self.process_train_data(
-                df=X, labels=y_train, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers,
+                df=X, labels=y, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers,
                 impute_strategy=impute_strategy, max_category_levels=max_category_levels, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features,
             )
         if X_val is not None:
@@ -691,7 +691,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             model.summary_writer = None
         return model
 
-    def _hyperparameter_tune(self, X, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
         """ Performs HPO and sets self.params to best hyperparameter values """
         try_import_mxnet()
         from .tabular_nn_trial import tabular_nn_trial
@@ -712,7 +712,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         self.batch_size = params_copy['batch_size']
-        train_dataset, val_dataset = self.generate_datasets(X=X, y_train=y_train, params=params_copy, X_val=X_val, y_val=y_val)
+        train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params_copy, X_val=X_val, y_val=y_val)
         train_path = self.path + "train"
         val_path = self.path + "validation"
         train_dataset.save(file_prefix=train_path)

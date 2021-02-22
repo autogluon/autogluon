@@ -59,7 +59,7 @@ class FastTextModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
-    def _fit(self, X, y_train, sample_weight=None, **kwargs):
+    def _fit(self, X, y, sample_weight=None, **kwargs):
         if self.problem_type not in (BINARY, MULTICLASS):
             raise ValueError(
                 "FastText model only supports binary or multiclass classification"
@@ -86,14 +86,14 @@ class FastTextModel(AbstractModel):
         X = self.preprocess(X)
         logger.debug("NLP features %s", self.features)
 
-        self._label_dtype = y_train.dtype
-        self._label_map = {label: f"__label__{i}" for i, label in enumerate(y_train.unique())}
+        self._label_dtype = y.dtype
+        self._label_map = {label: f"__label__{i}" for i, label in enumerate(y.unique())}
         self._label_inv_map = {v: k for k, v in self._label_map.items()}
         np.random.seed(0)
         idxs = np.random.permutation(list(range(len(X))))
         with tempfile.NamedTemporaryFile(mode="w+t") as f:
             logger.debug("generate training data")
-            for label, text in zip(y_train.iloc[idxs], (X[i] for i in idxs)):
+            for label, text in zip(y.iloc[idxs], (X[i] for i in idxs)):
                 f.write(f"{self._label_map[label]} {text}\n")
             f.flush()
             mem_start = psutil.Process().memory_info().rss

@@ -80,7 +80,7 @@ class TextPredictionV1Model(AbstractModel):
             self._feature_generator.fit(X)
         return self._feature_generator.transform(X)
 
-    def _build_model(self, X, y_train, X_val, y_val, hyperparameters):
+    def _build_model(self, X, y, X_val, y_val, hyperparameters):
         try:
             from autogluon.text.text_prediction.text_prediction \
                 import ag_text_prediction_params, merge_params, get_column_properties, \
@@ -102,11 +102,11 @@ class TextPredictionV1Model(AbstractModel):
         if X_val is not None:
             concat_feature_df = pd.concat([X, X_val])
             concat_feature_df.reset_index(drop=True, inplace=True)
-            concat_label_df = pd.DataFrame({self._label_column_name: pd.concat([y_train, y_val])})
+            concat_label_df = pd.DataFrame({self._label_column_name: pd.concat([y, y_val])})
             concat_label_df.reset_index(drop=True, inplace=True)
         else:
             concat_feature_df = X
-            concat_label_df = pd.DataFrame({self._label_column_name: y_train})
+            concat_label_df = pd.DataFrame({self._label_column_name: y})
         feature_column_properties = get_column_properties(
             df=concat_feature_df,
             metadata=None,
@@ -170,7 +170,7 @@ class TextPredictionV1Model(AbstractModel):
         super()._set_default_params()
         self.params = ag_text_prediction_params.create('default_no_hpo')
 
-    def _fit(self, X: pd.DataFrame, y_train: pd.Series,
+    def _fit(self, X: pd.DataFrame, y: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
              y_val: Optional[pd.Series] = None,
              time_limit: Optional[int] = None,
@@ -181,7 +181,7 @@ class TextPredictionV1Model(AbstractModel):
         ----------
         X
             Features of the training dataset
-        y_train
+        y
             Labels of the training dataset
         X_val
             Features of the validation dataset
@@ -231,12 +231,12 @@ class TextPredictionV1Model(AbstractModel):
             raise NoValidFeatures(f'No text features to train {self.name}.')
 
         column_properties = self._build_model(X=X,
-                                              y_train=y_train,
+                                              y=y,
                                               X_val=X_val,
                                               y_val=y_val,
                                               hyperparameters=self.params)
         # Insert the label column
-        X.insert(len(X.columns), self._label_column_name, y_train)
+        X.insert(len(X.columns), self._label_column_name, y)
         if X_val is not None:
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
         scheduler_options = self.params['hpo_params']['scheduler_options']

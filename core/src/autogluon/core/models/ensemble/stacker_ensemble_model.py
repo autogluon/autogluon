@@ -127,14 +127,14 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             pred_proba.set_index(index, inplace=True)
         return pred_proba
 
-    def _fit(self, X, y_train, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
+    def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
         start_time = time.time()
         # TODO: This could be preprocess=True in general, just have preprocess=False for child models
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
         self._add_stack_to_feature_metadata()
-        super()._fit(X=X, y_train=y_train, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
+        super()._fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
 
     def set_contexts(self, path_context):
         path_root_orig = self.path_root
@@ -152,13 +152,13 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             num_pred_cols_per_model = 1
         return stack_columns, num_pred_cols_per_model
 
-    def _hyperparameter_tune(self, X, y_train, k_fold, scheduler_options, compute_base_preds=True, **kwargs):
+    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, compute_base_preds=True, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
         self._add_stack_to_feature_metadata()
 
         preprocess_kwargs = {'compute_base_preds': compute_base_preds}
-        return super()._hyperparameter_tune(X=X, y_train=y_train, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
+        return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
 
     def _get_init_args(self):
         init_args = dict(

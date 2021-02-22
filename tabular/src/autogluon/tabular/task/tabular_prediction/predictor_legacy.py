@@ -803,7 +803,7 @@ class TabularPredictorV1:
 
         if trainer.bagged_mode:
             X = trainer.load_X()
-            y = trainer.load_y_train()
+            y = trainer.load_y()
             fit = True
         else:
             X = trainer.load_X_val()
@@ -1039,7 +1039,7 @@ class TabularPredictorV1:
         """
         if data == 'train':
             load_X = self._trainer.load_X
-            load_y = self._trainer.load_y_train
+            load_y = self._trainer.load_y
         elif data == 'val':
             load_X = self._trainer.load_X_val
             load_y = self._trainer.load_y_val

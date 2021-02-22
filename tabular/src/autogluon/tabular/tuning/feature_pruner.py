@@ -45,7 +45,7 @@ class FeaturePruner:
 
     # TODO: CV5 instead of holdout? Should be better
     # TODO: Add holdout here, it is overfitting with Logistic Regression
-    def tune(self, X, y_train, X_val, y_val, X_holdout, y_holdout, total_runs=999):
+    def tune(self, X, y, X_val, y_val, X_holdout, y_holdout, total_runs=999):
         objective_goal_is_negative = False  # Fixed to false if using sklearn scorers # self.model_base.problem_type == REGRESSION  # TODO: if objective function goal = lower (logloss, MAE, etc.)
         logger.log(15, 'Feature-pruning '+str(self.model_base.name)+' for '+str(total_runs)+' runs...')
 
@@ -69,7 +69,7 @@ class FeaturePruner:
                 model_iter = self.model_base
             else:
                 model_iter = copy.deepcopy(self.model_base)
-                model_iter.fit(X=X_subset, y_train=y_train, X_val=X_val_subset, y_val=y_val)
+                model_iter.fit(X=X_subset, y=y, X_val=X_val_subset, y_val=y_val)
 
             banned_features = []
 

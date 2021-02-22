@@ -123,11 +123,11 @@ class LinearModel(AbstractModel):
 
     # TODO: It could be possible to adaptively set max_iter [1] to approximately respect time_limit based on sample-size, feature-dimensionality, and the solver used.
     #  [1] https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html#examples-using-sklearn-linear-model-logisticregression
-    def _fit(self, X, y_train, X_val=None, y_val=None, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, sample_weight=None, **kwargs):
         hyperparams = self.params.copy()
 
         if self.problem_type == BINARY:
-            y_train = y_train.astype(int).values
+            y = y.astype(int).values
 
         X = self.preprocess(X, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
         params = {k: v for k, v in self.params.items() if k in self.model_params}
@@ -145,7 +145,7 @@ class LinearModel(AbstractModel):
         logger.log(15, f'Training Model with the following hyperparameter settings:')
         logger.log(15, model)
 
-        self.model = model.fit(X, y_train, sample_weight=sample_weight)
+        self.model = model.fit(X, y, sample_weight=sample_weight)
 
     # TODO: Add HPO
     def _hyperparameter_tune(self, **kwargs):

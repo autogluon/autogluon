@@ -311,10 +311,10 @@ class AbstractModel:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
 
-    def _fit(self, X, y_train, **kwargs):
+    def _fit(self, X, y, **kwargs):
         # kwargs may contain: num_cpus, num_gpus
         X = self.preprocess(X)
-        self.model = self.model.fit(X, y_train)
+        self.model = self.model.fit(X, y)
 
     def predict(self, X, **kwargs):
         y_pred_proba = self.predict_proba(X, **kwargs)
@@ -531,7 +531,7 @@ class AbstractModel:
             scheduler_options[1]['time_out'] = time_limit
         return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
 
-    def _hyperparameter_tune(self, X, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
@@ -544,7 +544,7 @@ class AbstractModel:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         dataset_train_filename = 'dataset_train.p'
         train_path = directory + dataset_train_filename
-        save_pkl.save(path=train_path, object=(X, y_train))
+        save_pkl.save(path=train_path, object=(X, y))
 
         dataset_val_filename = 'dataset_val.p'
         val_path = directory + dataset_val_filename

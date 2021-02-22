@@ -82,7 +82,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.y_scaler = None
         self._inner_features = None
 
-    def _preprocess_train(self, X, y_train, X_val, y_val, num_workers):
+    def _preprocess_train(self, X, y, X_val, y_val, num_workers):
         from fastai.data_block import FloatList
         from fastai.tabular import TabularList
 
@@ -94,15 +94,15 @@ class NNFastAiTabularModel(AbstractModel):
         self.procs = [FillMissing, Categorify, Normalize]
 
         if self.problem_type == REGRESSION and self.y_scaler is not None:
-            y_train_norm = pd.Series(self.y_scaler.fit_transform(y_train.values.reshape(-1, 1)).reshape(-1))
+            y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
             y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
             logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
         else:
-            y_train_norm = y_train
+            y_norm = y
             y_val_norm = y_val
 
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
-        df_train, train_idx, val_idx = self._generate_datasets(X, y_train_norm, X_val, y_val_norm)
+        df_train, train_idx, val_idx = self._generate_datasets(X, y_norm, X_val, y_val_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
 
         # Copy cat_columns and cont_columns because TabularList is mutating the list
@@ -147,7 +147,7 @@ class NNFastAiTabularModel(AbstractModel):
             df[c] = df[c].fillna(self.columns_fills[c])
         return df
 
-    def _fit(self, X, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=None, num_gpus=0, sample_weight=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_cpus=None, num_gpus=0, sample_weight=None, **kwargs):
         try_import_fastai_v1()
         import torch
         from fastai.layers import LabelSmoothingCrossEntropy
@@ -180,7 +180,7 @@ class NNFastAiTabularModel(AbstractModel):
                 defaults.device = torch.device('cuda')
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
-        data = self._preprocess_train(X, y_train, X_val, y_val, num_workers=num_workers)
+        data = self._preprocess_train(X, y, X_val, y_val, num_workers=num_workers)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
@@ -242,9 +242,9 @@ class NNFastAiTabularModel(AbstractModel):
                 model.path = original_path
             self.params_trained['best_epoch'] = save_callback.best_epoch
 
-    def _generate_datasets(self, X, y_train, X_val, y_val):
+    def _generate_datasets(self, X, y, X_val, y_val):
         df_train = pd.concat([X, X_val], ignore_index=True)
-        df_train[LABEL] = pd.concat([y_train, y_val], ignore_index=True)
+        df_train[LABEL] = pd.concat([y, y_val], ignore_index=True)
         train_idx = np.arange(len(X))
         if X_val is None:
             val_idx = train_idx  # use validation set for refit_full case - it's not going to be used for early stopping

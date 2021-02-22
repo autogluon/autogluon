@@ -60,7 +60,7 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _fit(self, X, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
 
@@ -86,7 +86,7 @@ class XGBoostModel(AbstractModel):
 
         if X_val is None:
             early_stopping_rounds = 150
-            eval_set.append((X, y_train))  # TODO: if the train dataset is large, use sample of train dataset for validation
+            eval_set.append((X, y))  # TODO: if the train dataset is large, use sample of train dataset for validation
         else:
             modifier = 1 if num_rows_train <= 10000 else 10000 / num_rows_train
             early_stopping_rounds = max(round(modifier * 150), 10)
@@ -112,7 +112,7 @@ class XGBoostModel(AbstractModel):
         self.model = model_type(**params)
         self.model.fit(
             X=X,
-            y=y_train,
+            y=y,
             eval_set=eval_set,
             eval_metric=eval_metric,
             verbose=False,
