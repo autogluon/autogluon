@@ -16,7 +16,7 @@ version = ag.load_version_file()
 version = ag.update_version(version, use_file_if_exists=False, create_file=True)
 
 submodule = 'core'
-requirements = [
+install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
@@ -26,24 +26,32 @@ requirements = [
     'graphviz',
 
     'cython',  # TODO: Do we need cython here? Why is cython not version capped / minned?
-    'ConfigSpace==0.4.14',
+    'ConfigSpace==0.4.18',
     'tornado>=5.0.1',
     'requests',
     'matplotlib',
     'paramiko>=2.4',
     'dask>=2.6.0',
     'distributed>=2.6.0',
-    'scikit-optimize',  # TODO v0.1: Remove?
     'boto3',
     'autograd>=1.3',
     'dill==0.3.3',  # TODO v0.1: Loosen version restriction?
 ]
 
-test_requirements = [
-    'pytest'
-]
+extras_require = {
+    'extra_searchers': [
+        'scikit-optimize',  # Optional due to only being rarely used and due to breaking install in the past
+    ],
+}
 
-install_requires = requirements + test_requirements
+tests_require = [
+    'pytest',
+]
+for extra_package in ['extra_searchers']:
+    tests_require += extras_require[extra_package]
+tests_require = list(set(tests_require))
+extras_require['tests'] = tests_require
+
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == '__main__':
@@ -51,6 +59,7 @@ if __name__ == '__main__':
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
         install_requires=install_requires,
+        extras_require=extras_require,
         entry_points={
             'console_scripts': [
                 'agremote = autogluon.core.scheduler.remote.cli:main',

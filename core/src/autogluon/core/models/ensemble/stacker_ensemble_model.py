@@ -8,7 +8,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from ...constants import MULTICLASS
+from ...constants import MULTICLASS, SOFTCLASS
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_FLOAT, S_STACK
 
@@ -118,7 +118,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return X
 
     def pred_probas_to_df(self, pred_proba: list, index=None) -> pd.DataFrame:
-        if self.problem_type == MULTICLASS:
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
             pred_proba = np.concatenate(pred_proba, axis=1)
             pred_proba = pd.DataFrame(pred_proba, columns=self.stack_columns)
         else:
@@ -127,14 +127,14 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             pred_proba.set_index(index, inplace=True)
         return pred_proba
 
-    def _fit(self, X_train, y_train, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
+    def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
         start_time = time.time()
         # TODO: This could be preprocess=True in general, just have preprocess=False for child models
-        X_train = self.preprocess(X=X_train, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
+        X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
         self._add_stack_to_feature_metadata()
-        super()._fit(X_train=X_train, y_train=y_train, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
+        super()._fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
 
     def set_contexts(self, path_context):
         path_root_orig = self.path_root
@@ -144,7 +144,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self.base_model_paths_dict[model] = self.path_root + model_local_path
 
     def set_stack_columns(self, stack_column_prefix_lst):
-        if self.problem_type == MULTICLASS:
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
             stack_columns = [stack_column_prefix + '_' + str(cls) for stack_column_prefix in stack_column_prefix_lst for cls in range(self.num_classes)]
             num_pred_cols_per_model = self.num_classes
         else:
@@ -152,13 +152,13 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             num_pred_cols_per_model = 1
         return stack_columns, num_pred_cols_per_model
 
-    def _hyperparameter_tune(self, X_train, y_train, k_fold, scheduler_options, compute_base_preds=True, **kwargs):
+    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, compute_base_preds=True, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
         self._add_stack_to_feature_metadata()
 
         preprocess_kwargs = {'compute_base_preds': compute_base_preds}
-        return super()._hyperparameter_tune(X_train=X_train, y_train=y_train, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
+        return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
 
     def _get_init_args(self):
         init_args = dict(

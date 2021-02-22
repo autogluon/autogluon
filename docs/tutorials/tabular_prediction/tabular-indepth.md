@@ -62,7 +62,7 @@ hyperparameters = {  # hyperparameters of each model type
 
 time_limit = 2*60  # train various models for ~2 min
 num_trials = 5  # try at most 3 different hyperparameter configurations for each type of model
-search_strategy = 'skopt'  # to tune hyperparameters using SKopt Bayesian optimization routine
+search_strategy = 'bayesopt'  # to tune hyperparameters using Bayesian optimization routine
 
 hyperparameter_tune_kwargs = {  # HPO is not performed unless hyperparameter_tune_kwargs is specified
     'num_trials': num_trials,

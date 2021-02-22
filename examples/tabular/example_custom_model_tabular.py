@@ -23,12 +23,12 @@ class NaiveBayesModel(AbstractModel):
         return super()._preprocess(X, **kwargs).fillna(0)
 
     # The `_fit` method takes the input training data (and optionally the validation data) and trains the model.
-    def _fit(self, X_train, y_train, **kwargs):
+    def _fit(self, X, y, **kwargs):
         from sklearn.naive_bayes import GaussianNB
-        # It is important to call `preprocess(X_train)` in `_fit` to replicate what will occur during inference.
-        X_train = self.preprocess(X_train)
+        # It is important to call `preprocess(X)` in `_fit` to replicate what will occur during inference.
+        X = self.preprocess(X)
         self.model = GaussianNB(**self.params)
-        self.model.fit(X_train, y_train)
+        self.model.fit(X, y)
 
 
 # Example of a more optimized implementation that drops the invalid features earlier on to avoid having to make repeated checks.
@@ -37,11 +37,11 @@ class AdvancedNaiveBayesModel(AbstractModel):
         # Add a fillna call to handle missing values.
         return super()._preprocess(X, **kwargs).fillna(0)
 
-    def _fit(self, X_train, y_train, **kwargs):
+    def _fit(self, X, y, **kwargs):
         from sklearn.naive_bayes import GaussianNB
-        X_train = self.preprocess(X_train)
+        X = self.preprocess(X)
         self.model = GaussianNB(**self.params)
-        self.model.fit(X_train, y_train)
+        self.model.fit(X, y)
 
     # The `_get_default_auxiliary_params` method defines various model-agnostic parameters such as maximum memory usage and valid input column dtypes.
     # For most users who build custom models, they will only need to specify the valid/invalid dtypes to the model here.
@@ -68,17 +68,17 @@ train_data = train_data.head(1000)  # subsample for faster demo
 #####################################################
 
 # Separate features and labels
-X_train = train_data.drop(columns=[label])
-y_train = train_data[label]
+X = train_data.drop(columns=[label])
+y = train_data[label]
 
-problem_type = infer_problem_type(y=y_train)  # Infer problem type (or else specify directly)
+problem_type = infer_problem_type(y=y)  # Infer problem type (or else specify directly)
 naive_bayes_model = NaiveBayesModel(path='AutogluonModels/', name='CustomNaiveBayes', problem_type=problem_type)
 
 # Construct a LabelCleaner to neatly convert labels to float/integers during model training/inference, can also use to inverse_transform back to original.
-label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y_train)
-y_train_clean = label_cleaner.transform(y_train)
+label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
+y_clean = label_cleaner.transform(y)
 
-naive_bayes_model.fit(X_train=X_train, y_train=y_train_clean)  # Fit custom model
+naive_bayes_model.fit(X=X, y=y_clean)  # Fit custom model
 
 # To save to disk and load the model, do the following:
 # load_path = naive_bayes_model.path

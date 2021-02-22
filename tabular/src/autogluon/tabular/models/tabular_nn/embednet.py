@@ -127,8 +127,8 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
             self.y_lower = nd.array(params['y_range'][0]).reshape(1,)
             self.y_upper = nd.array(params['y_range'][1]).reshape(1,)
             if ctx is not None:
-                self.y_lower.as_in_context(ctx)
-                self.y_upper.as_in_context(ctx)
+                self.y_lower = self.y_lower.as_in_context(ctx)
+                self.y_upper = self.y_upper.as_in_context(ctx)
             self.y_span = self.y_upper - self.y_lower
         
         if architecture_desc is None: # Save Architecture description

@@ -60,7 +60,7 @@ class CatBoostModel(AbstractModel):
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
         params = self.params.copy()
@@ -76,15 +76,15 @@ class CatBoostModel(AbstractModel):
             metric_name = params['eval_metric']
         else:
             metric_name = type(params['eval_metric']).__name__
-        num_rows_train = len(X_train)
-        num_cols_train = len(X_train.columns)
+        num_rows_train = len(X)
+        num_cols_train = len(X.columns)
         if self.problem_type == MULTICLASS:
             if self.num_classes is not None:
                 num_classes = self.num_classes
             else:
-                num_classes = 10  # Guess if not given, can do better by looking at y_train
+                num_classes = 10  # Guess if not given, can do better by looking at y
         elif self.problem_type == SOFTCLASS:  # TODO: delete this elif if it's unnecessary.
-            num_classes = y_train.shape[1]
+            num_classes = y.shape[1]
         else:
             num_classes = 1
 
@@ -101,13 +101,13 @@ class CatBoostModel(AbstractModel):
                 logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
         start_time = time.time()
-        X_train = self.preprocess(X_train)
-        cat_features = list(X_train.select_dtypes(include='category').columns)
-        X_train = Pool(data=X_train, label=y_train, cat_features=cat_features)
+        X = self.preprocess(X)
+        cat_features = list(X.select_dtypes(include='category').columns)
+        X = Pool(data=X, label=y, cat_features=cat_features, weight=sample_weight)
 
         if X_val is not None:
             X_val = self.preprocess(X_val)
-            X_val = Pool(data=X_val, label=y_val, cat_features=cat_features)
+            X_val = Pool(data=X_val, label=y_val, cat_features=cat_features, weight=sample_weight_val)
             eval_set = X_val
             if num_rows_train <= 10000:
                 modifier = 1
@@ -192,7 +192,7 @@ class CatBoostModel(AbstractModel):
                 **params_init,
             )
             self.model.fit(
-                X_train,
+                X,
                 eval_set=eval_set,
                 use_best_model=True,
                 verbose=verbose,
@@ -200,7 +200,7 @@ class CatBoostModel(AbstractModel):
             )
 
             init_model_tree_count = self.model.tree_count_
-            init_model_best_score = self.model.get_best_score()['validation'][metric_name]
+            init_model_best_score = self._get_best_val_score(self.model, metric_name)
 
             time_left_end = time_limit - (time.time() - start_time)
             time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
@@ -255,10 +255,10 @@ class CatBoostModel(AbstractModel):
             elif init_model is not None:
                 fit_final_kwargs['init_model'] = init_model
                 warm_start = True
-            self.model.fit(X_train, **fit_final_kwargs)
+            self.model.fit(X, **fit_final_kwargs)
 
             if init_model is not None:
-                final_model_best_score = self.model.get_best_score()['validation'][metric_name]
+                final_model_best_score = self._get_best_val_score(self.model, metric_name)
 
                 if self.stopping_metric._optimum == init_model_best_score:
                     # Done, pick init_model
@@ -306,3 +306,14 @@ class CatBoostModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    @staticmethod
+    def _get_best_val_score(model, metric_name):
+        """Necessary to trim extra args off of metric_name, such as 'F1:hints=skip_train~true' -> 'F1'"""
+        model_best_scores = model.get_best_score()['validation']
+        if metric_name in model_best_scores:
+            best_score = model_best_scores[metric_name]
+        else:
+            metric_name_sub = metric_name.split(':')[0]
+            best_score = model_best_scores[metric_name_sub]
+        return best_score

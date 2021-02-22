@@ -60,7 +60,8 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
+        # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
 
         params = self.params.copy()
@@ -76,16 +77,16 @@ class XGBoostModel(AbstractModel):
         else:
             verbose = True
             verbose_eval = 1
-        
-        X_train = self.preprocess(X_train, is_train=True, max_category_levels=max_category_levels)
-        num_rows_train = X_train.shape[0]
+
+        X = self.preprocess(X, is_train=True, max_category_levels=max_category_levels)
+        num_rows_train = X.shape[0]
 
         eval_set = []
         eval_metric = self.get_eval_metric()
 
         if X_val is None:
             early_stopping_rounds = 150
-            eval_set.append((X_train, y_train))  # TODO: if the train dataset is large, use sample of train dataset for validation
+            eval_set.append((X, y))  # TODO: if the train dataset is large, use sample of train dataset for validation
         else:
             modifier = 1 if num_rows_train <= 10000 else 10000 / num_rows_train
             early_stopping_rounds = max(round(modifier * 150), 10)
@@ -110,12 +111,13 @@ class XGBoostModel(AbstractModel):
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
         self.model = model_type(**params)
         self.model.fit(
-            X=X_train,
-            y=y_train,
+            X=X,
+            y=y,
             eval_set=eval_set,
             eval_metric=eval_metric,
             verbose=False,
-            callbacks=callbacks
+            callbacks=callbacks,
+            sample_weight=sample_weight
         )
 
         bst = self.model.get_booster()

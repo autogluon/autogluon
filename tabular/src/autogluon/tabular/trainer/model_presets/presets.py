@@ -303,59 +303,31 @@ def model_factory(
 
 
 # TODO: v0.1 cleanup and avoid hardcoded logic with model names
-def get_preset_models_softclass(path, hyperparameters, feature_metadata, num_classes=None, name_suffix='', ag_args=None, invalid_model_names: list = None):
+def get_preset_models_softclass(hyperparameters, invalid_model_names: list = None, **kwargs):
     # TODO v0.1: This import depends on mxnet, consider refactoring to avoid mxnet
     from autogluon.core.metrics.softclass_metrics import soft_log_loss
-    model_types_standard = ['GBM', 'NN', 'CAT']
+    model_types_standard = ['GBM', 'NN', 'CAT', 'ENS_WEIGHTED']
     hyperparameters = copy.deepcopy(hyperparameters)
-    hyperparameters_standard = copy.deepcopy(hyperparameters)
-    hyperparameters_rf = copy.deepcopy(hyperparameters)
-    default_level_key = 'default'
-    if default_level_key in hyperparameters:
-        hyperparameters_standard[default_level_key] = {key: hyperparameters_standard[default_level_key][key] for key in hyperparameters_standard[default_level_key] if key in model_types_standard}
-        hyperparameters_rf[default_level_key] = {key: hyperparameters_rf[default_level_key][key] for key in hyperparameters_rf[default_level_key] if key == 'RF'}
-    else:
-        hyperparameters_standard = {key: hyperparameters_standard[key] for key in hyperparameters_standard if key in model_types_standard}
-        hyperparameters_rf = {key: hyperparameters_rf[key] for key in hyperparameters_rf if key == 'RF'}
-        # TODO: add support for per-stack level hyperparameters
-    models, model_args_fit = get_preset_models(path=path, problem_type=SOFTCLASS, feature_metadata=feature_metadata, eval_metric=soft_log_loss, ag_args_fit={'stopping_metric': soft_log_loss},
-                               hyperparameters=hyperparameters_standard, num_classes=num_classes,
-                               ag_args=ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
-    if invalid_model_names is None:
-        invalid_model_names = []
-    invalid_model_names = invalid_model_names + [model.name for model in models]
+
+    hyperparameters_standard = {key: hyperparameters[key] for key in hyperparameters if key in model_types_standard}
+    hyperparameters_rf = {key: hyperparameters[key] for key in hyperparameters if key == 'RF'}
+
     # Swap RF criterion for MSE:
-    rf_models = []
-    if len(hyperparameters_rf) > 0:
+    if 'RF' in hyperparameters_rf:
+        rf_params = hyperparameters_rf['RF']
         rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
-        if 'RF' in hyperparameters_rf:
-            rf_params = hyperparameters_rf['RF']
-        elif 'default' in hyperparameters_rf and 'RF' in hyperparameters_rf['default']:
-            rf_params = hyperparameters_rf['default']['RF']
-        else:
-            rf_params = None
-        if isinstance(rf_params, list):
-            for i in range(len(rf_params)):
-                rf_params[i].update(rf_newparams)
-            rf_params = [j for n, j in enumerate(rf_params) if j not in rf_params[(n+1):]]  # Remove duplicates which may arise after overwriting criterion
-        elif rf_params is not None:
-            rf_params.update(rf_newparams)
-        if 'RF' in hyperparameters_rf:
-            hyperparameters_rf['RF'] = rf_params
-        elif 'default' in hyperparameters_rf and 'RF' in hyperparameters_rf['default']:
-            hyperparameters_rf['default']['RF'] = rf_params
-        rf_models, model_args_fit_rf = get_preset_models(path=path, problem_type=REGRESSION, feature_metadata=feature_metadata, eval_metric=mean_squared_error,
-                                      hyperparameters=hyperparameters_rf,
-                                      ag_args=ag_args, name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names)
-        model_args_fit.update(model_args_fit_rf)
-    models_cat = [model for model in models if isinstance(model, CatBoostModel)]
-    models_noncat = [model for model in models if not isinstance(model, CatBoostModel)]
-    models = models_noncat + rf_models + models_cat
+        for i in range(len(rf_params)):
+            rf_params[i].update(rf_newparams)
+        rf_params = [j for n, j in enumerate(rf_params) if j not in rf_params[(n+1):]]  # Remove duplicates which may arise after overwriting criterion
+        hyperparameters_standard['RF'] = rf_params
+    models, model_args_fit = get_preset_models(problem_type=SOFTCLASS, eval_metric=soft_log_loss,
+                                               hyperparameters=hyperparameters_standard,
+                                               default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names, **kwargs)
     if len(models) == 0:
         raise ValueError("At least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN','RF'], "
                          "These are the only supported models for softclass prediction problems. "
                          "Softclass problems are also not yet supported for fit() with per-stack level hyperparameters.")
     for model in models:
-        model.normalize_pred_probas = True
+        model.normalize_pred_probas = True  # FIXME: Do we need to do this for child models too?
 
     return models, model_args_fit

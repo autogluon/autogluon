@@ -89,7 +89,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self._architecture_desc = None
         self.optimizer = None
         self.verbosity = None
-        self.eval_metric_name = self.stopping_metric.name
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
@@ -157,18 +156,21 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                                                     params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_cpus=1, num_gpus=0, reporter=None, **kwargs):
-        """ X_train (pd.DataFrame): training data features (not necessarily preprocessed yet)
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_cpus=1, num_gpus=0, reporter=None, sample_weight=None, **kwargs):
+        """ X (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_val (pd.DataFrame): test data features (should have same column names as Xtrain)
-            y_train (pd.Series):
+            y (pd.Series):
             y_val (pd.Series): are pandas Series
             kwargs: Can specify amount of compute resources to utilize (num_cpus, num_gpus).
         """
         start_time = time.time()
         try_import_mxnet()
         import mxnet as mx
-        params = self.params.copy()
         self.verbosity = kwargs.get('verbosity', 2)
+        if sample_weight is not None:  # TODO: support
+            logger.log(15, "sample_weight not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
+
+        params = self.params.copy()
         params = fixedvals_from_searchspaces(params)
         if self.feature_metadata is None:
             raise ValueError("Trainer class must set feature_metadata for this model")
@@ -179,7 +181,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if self.num_dataloading_workers == 1:
             self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
         self.batch_size = params['batch_size']
-        train_dataset, val_dataset = self.generate_datasets(X_train=X_train, y_train=y_train, params=params, X_val=X_val, y_val=y_val)
+        train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params, X_val=X_val, y_val=y_val)
         logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding, %d language)" %
               (train_dataset.num_examples, train_dataset.num_features,
                len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed']),
@@ -339,23 +341,23 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 cumulative_loss += loss.sum()
             train_loss = cumulative_loss/float(train_dataset.num_examples)  # training loss this epoch
             if val_dataset is not None:
-                val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric.needs_pred)
-            if (val_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
-                if val_dataset is not None:
+                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
+                if (val_metric >= best_val_metric) or (e == 0):
                     if not np.isnan(val_metric):
                         if val_metric > best_val_metric:
                             val_improve_epoch = e
                         best_val_metric = val_metric
+                        best_val_epoch = e
+                        # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
+                        self.model.save_parameters(net_filename)
+            else:
                 best_val_epoch = e
-                # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
-                if val_dataset is not None:
-                    self.model.save_parameters(net_filename)
             if val_dataset is not None:
                 if verbose_eval > 0 and e % verbose_eval == 0:
                     logger.log(15, "Epoch %s.  Train loss: %s, Val %s: %s" %
-                      (e, train_loss.asscalar(), self.eval_metric_name, val_metric))
+                      (e, train_loss.asscalar(), self.stopping_metric.name, val_metric))
                 if self.summary_writer is not None:
-                    self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name,
+                    self.summary_writer.add_scalar(tag='val_'+self.stopping_metric.name,
                                                    value=val_metric, global_step=e)
             else:
                 if verbose_eval > 0 and e % verbose_eval == 0:
@@ -390,11 +392,11 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if val_dataset is None:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:  # evaluate one final time:
-            final_val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric.needs_pred)
+            final_val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
             if np.isnan(final_val_metric):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
-                  (best_val_epoch, self.eval_metric_name, final_val_metric))
+                  (best_val_epoch, self.stopping_metric.name, final_val_metric))
         self.params_trained['num_epochs'] = best_val_epoch + 1
         return
 
@@ -452,7 +454,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         return preds.asnumpy()  # return 2D numpy array
 
-    def generate_datasets(self, X_train, y_train, params, X_val=None, y_val=None):
+    def generate_datasets(self, X, y, params, X_val=None, y_val=None):
         impute_strategy = params['proc.impute_strategy']
         max_category_levels = params['proc.max_category_levels']
         skew_threshold = params['proc.skew_threshold']
@@ -460,14 +462,14 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         use_ngram_features = params['use_ngram_features']
 
         from .tabular_nn_dataset import TabularNNDataset
-        if isinstance(X_train, TabularNNDataset):
-            train_dataset = X_train
+        if isinstance(X, TabularNNDataset):
+            train_dataset = X
         else:
-            X_train = self.preprocess(X_train)
+            X = self.preprocess(X)
             if self.features is None:
-                self.features = list(X_train.columns)
+                self.features = list(X.columns)
             train_dataset = self.process_train_data(
-                df=X_train, labels=y_train, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers,
+                df=X, labels=y, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers,
                 impute_strategy=impute_strategy, max_category_levels=max_category_levels, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features,
             )
         if X_val is not None:
@@ -689,7 +691,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             model.summary_writer = None
         return model
 
-    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
         """ Performs HPO and sets self.params to best hyperparameter values """
         try_import_mxnet()
         from .tabular_nn_trial import tabular_nn_trial
@@ -710,7 +712,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         self.batch_size = params_copy['batch_size']
-        train_dataset, val_dataset = self.generate_datasets(X_train=X_train, y_train=y_train, params=params_copy, X_val=X_val, y_val=y_val)
+        train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params_copy, X_val=X_val, y_val=y_val)
         train_path = self.path + "train"
         val_path = self.path + "validation"
         train_dataset.save(file_prefix=train_path)

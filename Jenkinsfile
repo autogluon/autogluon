@@ -9,14 +9,6 @@ setup_pip_venv = """
     python3 -m pip install -U pip
     python3 -m pip install -U setuptools wheel
 
-    python3 -m pip uninstall -y scipy scikit-learn ConfigSpace numpy
-    python3 -m pip install 'numpy==1.19.5'
-    python3 -m pip install 'scipy==1.5.4'
-
-    # ConfigSpace MUST be installed after correct cython and numpy installed
-    # otherwise it will compile against the version in Conda (1.20.x)
-    python3 -m pip install 'ConfigSpace==0.4.14' --no-binary :all:
-
     python3 -m pip install 'graphviz'
     python3 -m pip install 'jupyter-sphinx>=0.2.2'
     python3 -m pip install 'portalocker'
@@ -40,6 +32,42 @@ cleanup_venv = """
     rm -rf venv
 """
 
+install_core = """
+    python3 -m pip install --upgrade -e core/
+"""
+
+install_core_tests = """
+    python3 -m pip install --upgrade -e core/[tests]
+"""
+
+install_features = """
+    python3 -m pip install --upgrade -e features/
+"""
+
+install_mxnet = """
+    python3 -m pip install --upgrade -e mxnet/
+"""
+
+install_extra = """
+    python3 -m pip install --upgrade -e extra/
+"""
+
+install_tabular = """
+    python3 -m pip install --upgrade -e tabular/
+"""
+
+install_tabular_all = """
+    python3 -m pip install --upgrade -e tabular/[all]
+"""
+
+install_text = """
+    python3 -m pip install --upgrade -e text/
+"""
+
+install_vision = """
+    python3 -m pip install --upgrade -e vision/
+"""
+
 stage("Unit Test") {
   parallel 'core': {
     node('linux-cpu') {
@@ -56,8 +84,8 @@ stage("Unit Test") {
           python3 -m pip install 'mxnet==1.7.0.*'
           env
 
+          ${install_core_tests}
           cd core/
-          python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -108,19 +136,15 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../features/
-          python3 -m pip install --upgrade -e .
-          cd ../tabular/
+          ${install_core}
+          ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          python3 -m pip install --upgrade -e .
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          cd ../text/
-          python3 -m pip install --upgrade -e .
-          cd ../tabular/
+          ${install_tabular_all}
+          ${install_mxnet}
+          ${install_text}
+
+          cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -202,18 +226,15 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../features/
-          python3 -m pip install --upgrade -e .
-          cd ../tabular/
+          ${install_core}
+          ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          python3 -m pip install --upgrade -e .
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          cd ../text/
-          python3 -m pip install --upgrade -e .
+          ${install_tabular_all}
+          ${install_mxnet}
+          ${install_text}
+
+          cd text/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -278,7 +299,7 @@ stage("Unit Test") {
           cd ../tabular/
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          python3 -m pip install --upgrade -e .
+          python3 -m pip install --upgrade -e .[all]
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
           cd ../text/
@@ -596,7 +617,7 @@ stage("Build Docs") {
         cd ..
 
         cd tabular/
-        python3 -m pip install --upgrade -e .
+        python3 -m pip install --upgrade -e .[all]
         cd ..
 
         cd mxnet/

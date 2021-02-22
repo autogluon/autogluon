@@ -289,48 +289,48 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                               (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
             if predictor._trainer.bagged_mode:
                 # TODO: Test index alignment with original training data (first handle duplicated rows / dropped rows edge cases)
-                y_train_pred_oof = predictor.get_oof_pred()
-                y_train_pred_proba_oof = predictor.get_oof_pred_proba()
-                y_train_pred_oof_transformed = predictor.get_oof_pred(transformed=True)
-                y_train_pred_proba_oof_transformed = predictor.get_oof_pred_proba(transformed=True)
+                y_pred_oof = predictor.get_oof_pred()
+                y_pred_proba_oof = predictor.get_oof_pred_proba()
+                y_pred_oof_transformed = predictor.get_oof_pred(transformed=True)
+                y_pred_proba_oof_transformed = predictor.get_oof_pred_proba(transformed=True)
 
                 # Assert expected type output
-                assert isinstance(y_train_pred_oof, pd.Series)
-                assert isinstance(y_train_pred_oof_transformed, pd.Series)
+                assert isinstance(y_pred_oof, pd.Series)
+                assert isinstance(y_pred_oof_transformed, pd.Series)
                 if predictor.problem_type == MULTICLASS:
-                    assert isinstance(y_train_pred_proba_oof, pd.DataFrame)
-                    assert isinstance(y_train_pred_proba_oof_transformed, pd.DataFrame)
+                    assert isinstance(y_pred_proba_oof, pd.DataFrame)
+                    assert isinstance(y_pred_proba_oof_transformed, pd.DataFrame)
                 else:
                     if predictor.problem_type == BINARY:
                         assert isinstance(predictor.get_oof_pred_proba(as_multiclass=True), pd.DataFrame)
-                    assert isinstance(y_train_pred_proba_oof, pd.Series)
-                    assert isinstance(y_train_pred_proba_oof_transformed, pd.Series)
+                    assert isinstance(y_pred_proba_oof, pd.Series)
+                    assert isinstance(y_pred_proba_oof_transformed, pd.Series)
 
-                assert y_train_pred_oof_transformed.equals(predictor.transform_labels(y_train_pred_oof, proba=False))
+                assert y_pred_oof_transformed.equals(predictor.transform_labels(y_pred_oof, proba=False))
 
                 # Test that the transform_labels method is capable of reproducing the same output when converting back and forth, and test that oof 'transform' parameter works properly.
-                y_train_pred_proba_oof_inverse = predictor.transform_labels(y_train_pred_proba_oof, proba=True)
-                y_train_pred_proba_oof_inverse_inverse = predictor.transform_labels(y_train_pred_proba_oof_inverse, proba=True, inverse=True)
-                y_train_pred_oof_inverse = predictor.transform_labels(y_train_pred_oof)
-                y_train_pred_oof_inverse_inverse = predictor.transform_labels(y_train_pred_oof_inverse, inverse=True)
+                y_pred_proba_oof_inverse = predictor.transform_labels(y_pred_proba_oof, proba=True)
+                y_pred_proba_oof_inverse_inverse = predictor.transform_labels(y_pred_proba_oof_inverse, proba=True, inverse=True)
+                y_pred_oof_inverse = predictor.transform_labels(y_pred_oof)
+                y_pred_oof_inverse_inverse = predictor.transform_labels(y_pred_oof_inverse, inverse=True)
 
-                if isinstance(y_train_pred_proba_oof_transformed, pd.DataFrame):
-                    pd.testing.assert_frame_equal(y_train_pred_proba_oof_transformed, y_train_pred_proba_oof_inverse)
-                    pd.testing.assert_frame_equal(y_train_pred_proba_oof, y_train_pred_proba_oof_inverse_inverse)
+                if isinstance(y_pred_proba_oof_transformed, pd.DataFrame):
+                    pd.testing.assert_frame_equal(y_pred_proba_oof_transformed, y_pred_proba_oof_inverse)
+                    pd.testing.assert_frame_equal(y_pred_proba_oof, y_pred_proba_oof_inverse_inverse)
                 else:
-                    pd.testing.assert_series_equal(y_train_pred_proba_oof_transformed, y_train_pred_proba_oof_inverse)
-                    pd.testing.assert_series_equal(y_train_pred_proba_oof, y_train_pred_proba_oof_inverse_inverse)
-                pd.testing.assert_series_equal(y_train_pred_oof_transformed, y_train_pred_oof_inverse)
-                pd.testing.assert_series_equal(y_train_pred_oof, y_train_pred_oof_inverse_inverse)
+                    pd.testing.assert_series_equal(y_pred_proba_oof_transformed, y_pred_proba_oof_inverse)
+                    pd.testing.assert_series_equal(y_pred_proba_oof, y_pred_proba_oof_inverse_inverse)
+                pd.testing.assert_series_equal(y_pred_oof_transformed, y_pred_oof_inverse)
+                pd.testing.assert_series_equal(y_pred_oof, y_pred_oof_inverse_inverse)
 
                 # Test that index of both the internal training data and the oof outputs are consistent in their index values.
                 X_internal, y_internal = predictor.load_data_internal()
                 y_internal_index = list(y_internal.index)
                 assert list(X_internal.index) == y_internal_index
-                assert list(y_train_pred_oof.index) == y_internal_index
-                assert list(y_train_pred_proba_oof.index) == y_internal_index
-                assert list(y_train_pred_oof_transformed.index) == y_internal_index
-                assert list(y_train_pred_proba_oof_transformed.index) == y_internal_index
+                assert list(y_pred_oof.index) == y_internal_index
+                assert list(y_pred_proba_oof.index) == y_internal_index
+                assert list(y_pred_oof_transformed.index) == y_internal_index
+                assert list(y_pred_proba_oof_transformed.index) == y_internal_index
             else:
                 # Raise exception
                 with pytest.raises(AssertionError):
@@ -484,6 +484,38 @@ def test_tabular_bag():
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)
+
+
+def test_sample_weight():
+    dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip',
+               'name': 'toyRegression',
+               'problem_type': REGRESSION,
+               'label': 'y',
+               'performance_val': 0.183}
+    directory_prefix = './datasets/'
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset['name'], url=dataset['url'])
+    print(f"Evaluating Benchmark Dataset {dataset['name']}")
+    directory = directory_prefix + dataset['name'] + "/"
+    savedir = directory + 'AutogluonOutput/'
+    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    sample_weight = 'sample_weights'
+    weights = np.abs(np.random.rand(len(train_data),))
+    test_weights = np.abs(np.random.rand(len(test_data),))
+    train_data[sample_weight] = weights
+    test_data_weighted = test_data.copy()
+    test_data_weighted[sample_weight] = test_weights
+    fit_args = {'time_limit': 20}
+    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight).fit(train_data, **fit_args)
+    ldr = predictor.leaderboard(test_data)
+    perf = predictor.evaluate(test_data)
+    # Run again with weight_evaluation:
+    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight, weight_evaluation=True).fit(train_data, **fit_args)
+    perf = predictor.evaluate(test_data_weighted)
+    predictor.distill(time_limit=10)
+    ldr = predictor.leaderboard(test_data_weighted)
+
 
 
 @pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")

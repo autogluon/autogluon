@@ -89,17 +89,18 @@ class TextPredictionV1Model(AbstractModel):
         super()._set_default_params()
         self.params = ag_text_presets.create('default')
 
-    def _fit(self, X_train: pd.DataFrame, y_train: pd.Series,
+    def _fit(self, X: pd.DataFrame, y: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
              y_val: Optional[pd.Series] = None,
-             time_limit: Optional[int] = None, **kwargs):
+             time_limit: Optional[int] = None,
+             sample_weight=None, **kwargs):
         """The internal fit function
 
         Parameters
         ----------
-        X_train
+        X
             Features of the training dataset
-        y_train
+        y
             Labels of the training dataset
         X_val
             Features of the validation dataset
@@ -118,22 +119,24 @@ class TextPredictionV1Model(AbstractModel):
             raise ImportError(AG_TEXT_IMPORT_ERROR)
 
         # Decide name of the label column
-        if 'label' in X_train.columns:
+        if 'label' in X.columns:
             label_col_id = 0
             while True:
                 self._label_column_name = 'label{}'.format(label_col_id)
-                if self._label_column_name not in X_train.columns:
+                if self._label_column_name not in X.columns:
                     break
                 label_col_id += 1
         else:
             self._label_column_name = 'label'
-        X_train = self.preprocess(X_train, fit=True)
+        X_train = self.preprocess(X, fit=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
         # Get arguments from kwargs
         verbosity = kwargs.get('verbosity', 2)
         num_cpus = kwargs.get('num_cpus', None)
         num_gpus = kwargs.get('num_gpus', None)
+        if sample_weight is not None:  # TODO: support
+            logger.log(15, "sample_weight not yet supported for TextPredictionV1Model, this model will ignore them in training.")
 
         self.model = TextPredictor(label=self._label_column_name,
                                    problem_type=self.problem_type,

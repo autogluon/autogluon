@@ -18,7 +18,7 @@ from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
-from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance
+from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
@@ -267,6 +267,9 @@ class AbstractModel:
             raise NoValidFeatures
 
     def _preprocess_fit_args(self, **kwargs):
+        sample_weight = kwargs.get('sample_weight', None)
+        if sample_weight is not None and isinstance(sample_weight, str):
+            raise ValueError("In model.fit(), sample_weight should be array of sample weight values, not string.")
         time_limit = kwargs.get('time_limit', None)
         max_time_limit_ratio = self.params_aux.get('max_time_limit_ratio', 1)
         if time_limit is not None:
@@ -308,10 +311,10 @@ class AbstractModel:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
 
-    def _fit(self, X_train, y_train, **kwargs):
+    def _fit(self, X, y, **kwargs):
         # kwargs may contain: num_cpus, num_gpus
-        X_train = self.preprocess(X_train)
-        self.model = self.model.fit(X_train, y_train)
+        X = self.preprocess(X)
+        self.model = self.model.fit(X, y)
 
     def predict(self, X, **kwargs):
         y_pred_proba = self.predict_proba(X, **kwargs)
@@ -346,28 +349,24 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, **kwargs):
-        if eval_metric is None:
-            eval_metric = self.eval_metric
-        if metric_needs_y_pred is None:
-            metric_needs_y_pred = eval_metric.needs_pred
-        if metric_needs_y_pred:
+    def score(self, X, y, metric=None, sample_weight=None, **kwargs):
+        if metric is None:
+            metric = self.eval_metric
+        if metric.needs_pred:
             y_pred = self.predict(X=X, **kwargs)
-            return eval_metric(y, y_pred)
         else:
-            y_pred_proba = self.predict_proba(X=X, **kwargs)
-            return eval_metric(y, y_pred_proba)
+            y_pred = self.predict_proba(X=X, **kwargs)
+        return compute_weighted_metric(y, y_pred, metric, sample_weight)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
-        if eval_metric is None:
-            eval_metric = self.eval_metric
-        if metric_needs_y_pred is None:
-            metric_needs_y_pred = eval_metric.needs_pred
-        if metric_needs_y_pred:
+
+    def score_with_y_pred_proba(self, y, y_pred_proba, metric=None, sample_weight=None):
+        if metric is None:
+            metric = self.eval_metric
+        if metric.needs_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-            return eval_metric(y, y_pred)
         else:
-            return eval_metric(y, y_pred_proba)
+            y_pred = y_pred_proba
+        return compute_weighted_metric(y, y_pred, metric, sample_weight)
 
     def save(self, path: str = None, verbose=True) -> str:
         """
@@ -532,7 +531,7 @@ class AbstractModel:
             scheduler_options[1]['time_out'] = time_limit
         return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
 
-    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
@@ -545,7 +544,7 @@ class AbstractModel:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         dataset_train_filename = 'dataset_train.p'
         train_path = directory + dataset_train_filename
-        save_pkl.save(path=train_path, object=(X_train, y_train))
+        save_pkl.save(path=train_path, object=(X, y))
 
         dataset_val_filename = 'dataset_val.p'
         val_path = directory + dataset_val_filename
@@ -559,6 +558,9 @@ class AbstractModel:
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
+        fit_kwargs=scheduler_params['resource'].copy()
+        fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
+        fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
         util_args = dict(
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
@@ -566,7 +568,7 @@ class AbstractModel:
             model=self,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],
-            fit_kwargs=scheduler_params['resource'],
+            fit_kwargs=fit_kwargs,
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)

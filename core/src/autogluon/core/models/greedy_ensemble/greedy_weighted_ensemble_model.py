@@ -3,7 +3,7 @@ import logging
 from .ensemble_selection import EnsembleSelection
 from ..abstract.abstract_model import AbstractModel
 from ..abstract.model_trial import skip_hpo
-from ...constants import MULTICLASS
+from ...constants import MULTICLASS, SOFTCLASS
 from ...features.types import S_STACK
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
         self.model_base = model_base
-        self.num_pred_cols_per_model = self.num_classes if self.problem_type == MULTICLASS else 1
+        self.num_pred_cols_per_model = self.num_classes if self.problem_type in [MULTICLASS, SOFTCLASS] else 1
         self.base_model_names = base_model_names
         if self.base_model_names is not None:
             self.features = self._set_stack_columns(base_model_names=self.base_model_names)
@@ -31,14 +31,14 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         return X
 
     # TODO: Check memory after loading best model predictions, only load top X model predictions that fit in memory
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, sample_weight=None, **kwargs):
         if self.base_model_names is None:
             self.base_model_names = self._infer_base_model_names()
             self.features = self._set_stack_columns(base_model_names=self.base_model_names)
-        X_train = self.preprocess(X_train)
+        X = self.preprocess(X)
 
         self.model = self.model_base(ensemble_size=self.params['ensemble_size'], problem_type=self.problem_type, metric=self.stopping_metric)
-        self.model = self.model.fit(X_train, y_train, time_limit=time_limit)
+        self.model = self.model.fit(X, y, time_limit=time_limit, sample_weight=sample_weight)
         self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
         self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.params_trained['ensemble_size'] = self.model.ensemble_size
@@ -67,7 +67,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         return base_models_to_keep, base_model_weights_to_keep
 
     def _set_stack_columns(self, base_model_names):
-        if self.problem_type == MULTICLASS:
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
             stack_columns = [model_name + '_' + str(cls) for model_name in base_model_names for cls in range(self.num_classes)]
         else:
             stack_columns = base_model_names

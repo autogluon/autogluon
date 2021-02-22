@@ -74,7 +74,15 @@ class TabularPredictor(TabularPredictorV1):
         Verbosity levels range from 0 to 4 and control how much information is printed.
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
-        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+    sample_weight : str, default = None
+        If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
+        Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
+        If you want your usage of sample weights to match results obtained outside of this Predictor, then ensure sample weights for your training (or tuning) data sum to the number of rows in the training (or tuning) data.
+    weight_evaluation : bool, default = False
+        Only considered when `sample_weight` column has been specified. Determines whether sample weights should be taken into account when computing evaluation metrics on validation/test data.
+        If True, then weighted metrics will be reported based on the sample weights provided in the specified `sample_weight` (in which case `sample_weight` column must also be present in test data).
+        In this case, the 'best' model used by default for prediction will also be decided based on a weighted version of evaluation metric.
     **kwargs :
         learner_type : AbstractLearner, default = DefaultLearner
             A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
@@ -158,18 +166,22 @@ class TabularPredictor(TabularPredictorV1):
             eval_metric=None,
             path=None,
             verbosity=2,
+            sample_weight=None,
+            weight_evaluation=False,
             **kwargs
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
+        self.sample_weight = sample_weight  # TODO: add support for sample_weight= 'auto', 'balanced'
+        self.weight_evaluation = weight_evaluation  # TODO: sample_weight and weight_evaluation can both be properties that link to self._learner.sample_weight, self._learner.weight_evaluation
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
 
-        self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None,
-                                                      eval_metric=eval_metric, problem_type=problem_type, **learner_kwargs)
+        self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None, eval_metric=eval_metric, problem_type=problem_type,
+                                                      sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
 
@@ -575,7 +587,6 @@ class TabularPredictor(TabularPredictorV1):
         auto_stack = kwargs['auto_stack']
         feature_generator = kwargs['feature_generator']
         unlabeled_data = kwargs['unlabeled_data']
-
         ag_args = kwargs['ag_args']
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
@@ -629,8 +640,7 @@ class TabularPredictor(TabularPredictorV1):
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs,
-                          time_limit=time_limit, verbosity=verbosity)
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity)
         self._set_post_fit_vars()
 
         self._post_fit(
@@ -745,9 +755,9 @@ class TabularPredictor(TabularPredictorV1):
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
 
         # TODO: Add special error message if called and training/val data was not cached.
-        X_train, y_train, X_val, y_val = self._trainer.load_data()
+        X, y, X_val, y_val = self._trainer.load_data()
         fit_models = self._trainer.train_multi_levels(
-            X_train=X_train, y_train=y_train, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
+            X=X, y=y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
             base_model_names=base_model_names, time_limit=time_limit, relative_stack=True, level_end=num_stack_levels,
             core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
         )
@@ -898,8 +908,7 @@ class TabularPredictor(TabularPredictorV1):
             # other
             feature_generator='auto',
             unlabeled_data=None,
-
-            _feature_generator_kwargs=None,
+            _feature_generator_kwargs=None
         )
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
@@ -975,13 +984,27 @@ class TabularPredictor(TabularPredictorV1):
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None:
-            train_features = np.array([column for column in train_data.columns if column != self.label])
-            tuning_features = np.array([column for column in tuning_data.columns if column != self.label])
+            train_features = [column for column in train_data.columns if column != self.label]
+            tuning_features = [column for column in tuning_data.columns if column != self.label]
+            if self.sample_weight is not None:
+                if self.sample_weight in train_features:
+                    train_features.remove(self.sample_weight)
+                if self.sample_weight in tuning_features:
+                    tuning_features.remove(self.sample_weight)
+            train_features = np.array(train_features)
+            tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
-            train_features = sorted(np.array([column for column in train_data.columns if column != self.label]))
-            unlabeled_features = sorted(np.array([column for column in unlabeled_data.columns]))
+            train_features = [column for column in train_data.columns if column != self.label]
+            unlabeled_features = [column for column in unlabeled_data.columns]
+            if self.sample_weight is not None:
+                if self.sample_weight in train_features:
+                    train_features.remove(self.sample_weight)
+                if self.sample_weight in unlabeled_features:
+                    unlabeled_features.remove(self.sample_weight)
+            train_features = sorted(np.array(train_features))
+            unlabeled_features = sorted(np.array(unlabeled_features))
             if np.any(train_features != unlabeled_features):
                 raise ValueError("Column names must match between training and unlabeled data.\n"
                                  "Unlabeled data must have not the label column specified in it.\n")

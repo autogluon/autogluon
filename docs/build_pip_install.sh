@@ -14,35 +14,35 @@ python3 -m pip uninstall -y autogluon.core
 python3 -m pip uninstall -y autogluon-contrib-nlp
 
 cd core/
-python3 -m pip install --upgrade -e .
+python3 -m pip install -e .
 cd ..
 
 cd features/
-python3 -m pip install --upgrade -e .
+python3 -m pip install -e .
 cd ..
 
 cd tabular/
 # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
 python3 -m pip uninstall -y typing
-python3 -m pip install --upgrade -e .
+python3 -m pip install -e .[all]
 cd ..
 
 cd mxnet/
-python3 -m pip install --upgrade -e .
+python3 -m pip install -e .
 cd ..
 
 cd extra/
-python3 -m pip install --upgrade -e .
+python3 -m pip install -e .
 cd ..
 
 cd text/
-python3 -m pip install --upgrade -e .
+python3 -m pip install -e .
 cd ..
 
 cd vision/
-python3 -m pip install --upgrade -e .
+python3 -m pip install -e .
 cd ..
 
 cd autogluon/
-python3 -m pip install --upgrade -e .
+python3 -m pip install -e .
 cd ..

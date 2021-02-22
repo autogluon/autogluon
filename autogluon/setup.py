@@ -19,7 +19,7 @@ submodule = None  # None since this module is special (it isn't a real submodule
 install_requires = [
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
-    f'autogluon.tabular=={version}',
+    f'autogluon.tabular[all]=={version}',
     f'autogluon.mxnet=={version}',
     f'autogluon.extra=={version}',
     f'autogluon.text=={version}',

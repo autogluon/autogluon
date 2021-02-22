@@ -17,7 +17,7 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
-from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
+from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils import get_pred_from_proba, infer_problem_type
@@ -39,7 +39,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0):
+                 problem_type=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0, sample_weight=None, weight_evaluation=False):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.ignored_columns = ignored_columns
@@ -65,7 +65,12 @@ class AbstractLearner:
         self.reset_paths = False
 
         self._positive_class = positive_class
-
+        self.sample_weight = sample_weight
+        self.weight_evaluation = weight_evaluation
+        if sample_weight is not None and not isinstance(sample_weight, str):
+            raise ValueError("sample_weight must be a string indicating the name of column that contains sample weights. If you have a vector of sample weights, first add these as an extra column to your data.")
+        if weight_evaluation and sample_weight is None:
+            raise ValueError("Must specify sample_weight column if you specify weight_evaluation=True")
         try:
             from ..version import __version__
             self.version = __version__
@@ -138,6 +143,31 @@ class AbstractLearner:
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:
             raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
+        X_val = kwargs.get('X_val', None)
+        self._validate_sample_weight(X, X_val)
+
+    def _validate_sample_weight(self, X, X_val):
+        if self.sample_weight is not None:
+            if self.sample_weight not in X.columns:
+                raise KeyError(f"sample_weight column '{self.sample_weight}' is missing from training data. Training data columns: {list(X.columns)}")
+            weight_vals = X[self.sample_weight]
+            if weight_vals.isna().sum() > 0:
+                raise ValueError(f"Sample weights in column '{self.sample_weight}' cannot be nan")
+            if weight_vals.dtype.kind not in 'biuf':
+                raise ValueError(f"Sample weights in column '{self.sample_weight}' must be numeric values")
+            if weight_vals.min() < 0:
+                raise ValueError(f"Sample weights in column '{self.sample_weight}' must be nonnegative")
+            if self.weight_evaluation and X_val is not None and self.sample_weight not in X_val.columns:
+                raise KeyError(f"sample_weight column '{self.sample_weight}' cannot be missing from validation data if weight_evaluation=True")
+
+            if self.sample_weight is not None:
+                prefix = f"Values in column '{self.sample_weight}' used as sample weights instead of predictive features."
+                if self.weight_evaluation:
+                    suffix = " Evaluation will report weighted metrics, so ensure same column exists in test data."
+                else:
+                    suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation=True to instead report weighted metrics."
+                logger.log(20, prefix+suffix)
+
 
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:
@@ -147,7 +177,7 @@ class AbstractLearner:
         trainer = self.load_trainer()
         if dataset is None:
             if trainer.bagged_mode:
-                dataset_preprocessed = trainer.load_X_train()
+                dataset_preprocessed = trainer.load_X()
                 fit = True
             else:
                 dataset_preprocessed = trainer.load_X_val()
@@ -190,13 +220,19 @@ class AbstractLearner:
         if y is None:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
+        w = None
+        if self.weight_evaluation:
+            X, w = extract_column(X, self.sample_weight)
         if self.eval_metric.needs_pred:
             y_pred = self.predict(X=X, model=model)
-            return self.eval_metric(y, y_pred)
+            if self.problem_type == BINARY:
+                # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
+                y_pred = self.label_cleaner.transform(y_pred)
+                y = self.label_cleaner.transform(y)
         else:
-            y_pred_proba = self.predict_proba(X=X, model=model)
+            y_pred = self.predict_proba(X=X, model=model)
             y = self.label_cleaner.transform(y)
-            return self.eval_metric(y, y_pred_proba)
+        return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
@@ -204,6 +240,9 @@ class AbstractLearner:
         if y is None:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
+        w = None
+        if self.weight_evaluation:
+            X, w = extract_column(X, self.sample_weight)
 
         X = self.transform_features(X)
         y_internal = self.label_cleaner.transform(y)
@@ -231,11 +270,17 @@ class AbstractLearner:
 
         for model_name, y_pred_proba_internal in model_pred_proba_dict.items():
             if self.eval_metric.needs_pred:
-                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
-                scores[model_name] = self.eval_metric(y, y_pred)
+                if self.problem_type == BINARY:
+                    # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
+                    y_pred = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
+                    y_tmp = y_internal
+                else:
+                    y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+                    y_tmp = y
             else:
-                y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
-                scores[model_name] = self.eval_metric(y_internal, y_pred_proba)
+                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
+                y_tmp = y_internal
+            scores[model_name] = compute_weighted_metric(y_tmp, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation)
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
@@ -313,7 +358,7 @@ class AbstractLearner:
     #  This makes this function behave much nicer, currently confusion matrix is only able to be constructed when y_pred is supplied, and crashes when y_pred_proba is supplied.
     #  Therefore, it is impossible to get confusion matrix when eval_metric is log_loss. This shouldn't be the case.
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
-        """ Evaluate predictions.
+        """ Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
                 auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
@@ -329,7 +374,14 @@ class AbstractLearner:
         self._validate_class_labels(y_true)
         if not self.eval_metric.needs_pred:
             y_true = self.label_cleaner.transform(y_true)  # Get labels in numeric order
-        performance = self.eval_metric(y_true, y_pred)
+            performance = self.eval_metric(y_true, y_pred)
+        elif self.problem_type == BINARY:
+            # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
+            y_true_internal = self.label_cleaner.transform(y_true)
+            y_pred_internal = self.label_cleaner.transform(y_pred)
+            performance = self.eval_metric(y_true_internal, y_pred_internal)
+        else:
+            performance = self.eval_metric(y_true, y_pred)
 
         metric = self.eval_metric.name
 
@@ -549,7 +601,7 @@ class AbstractLearner:
             augmentation_data = self.transform_features(augmentation_data)
 
         trainer = self.load_trainer()
-        distilled_model_names = trainer.distill(X_train=X, y_train=y, X_val=X_val, y_val=y_val, time_limit=time_limit, hyperparameters=hyperparameters,
+        distilled_model_names = trainer.distill(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_limit, hyperparameters=hyperparameters,
                                                 holdout_frac=holdout_frac, verbosity=verbosity, teacher_preds=teacher_preds, models_name_suffix=models_name_suffix,
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)

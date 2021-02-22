@@ -215,8 +215,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
                 val_metric = None
                 if loader_val is not None and state != 'pretrain':
-                    val_metric = self.score(X=loader_val, y=y_val, eval_metric=self.stopping_metric,
-                                            metric_needs_y_pred=self.stopping_metric.needs_pred)
+                    val_metric = self.score(X=loader_val, y=y_val, metric=self.stopping_metric)
                     data_bar.set_description('{} Epoch: [{}/{}] Train Loss: {:.4f} Validation {}: {:.2f}'.format(
                         train_test, epoch, epochs, total_loss / total_num, self.stopping_metric.name, val_metric))
 
@@ -339,7 +338,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, sample_weight=None, **kwargs):
         import torch
 
         num_gpus = kwargs.get('num_gpus', None)
@@ -356,15 +355,17 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             if num_gpus > 1:
                 logger.warning("TabTransformer not yet configured to use more than 1 GPU. 'num_gpus' set to >1, but we will be using only 1 GPU.")
 
+        if sample_weight is not None:
+            logger.log(15, "sample_weight not yet supported for TabTransformerModel, this model will ignore them in training.")
 
         if self.problem_type ==REGRESSION:
             self.params['n_classes'] = 1
-        elif self.problem_type ==BINARY:
+        elif self.problem_type == BINARY:
             self.params['n_classes'] = 2
-        elif self.problem_type ==MULTICLASS:
-            self.params['n_classes'] = y_train.nunique()
+        elif self.problem_type == MULTICLASS:
+            self.params['n_classes'] = y.nunique()
 
-        train, val, unlab = self._preprocess_train(X_train, X_val, X_unlabeled)
+        train, val, unlab = self._preprocess_train(X, X_val, X_unlabeled)
 
         num_cols = len(train.columns)
         if num_cols > self.params['max_columns']:
@@ -374,10 +375,10 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 f"If you are confident you will have enough memory, set the 'max_columns' hyperparameter higher and try again.\n")
 
         if self.problem_type == REGRESSION:
-            train.targets = torch.FloatTensor(list(y_train))
+            train.targets = torch.FloatTensor(list(y))
             val.targets = torch.FloatTensor(list(y_val))
         else:
-            train.targets = torch.LongTensor(list(y_train))
+            train.targets = torch.LongTensor(list(y))
             val.targets = torch.LongTensor(list(y_val))
 
         batch_size = self.params['batch_size']
@@ -459,7 +460,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
     # TODO: Consider HPO for pretraining with unlabeled data. (Potential future work)
     # TODO: Does not work correctly when cuda is enabled.
-    def _hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
         from .utils import tt_trial
 
         time_start = time.time()
@@ -470,8 +471,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
 
         util_args = dict(
-            X_train=X_train,
-            y_train=y_train,
+            X=X,
+            y=y,
             X_val=X_val,
             y_val=y_val,
             model=self,
@@ -522,14 +523,14 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         """
         List of features to add (Updated by Anthony Galczak 11-19-20):
-        
-        1) Allow for saving of pretrained model for future use. This will be done in a future PR as the 
+
+        1) Allow for saving of pretrained model for future use. This will be done in a future PR as the
         "pretrain API change".
-        
+
         2) Investigate options for when the unlabeled schema does not match the training schema. Currently,
         we do not allow such mismatches and the schemas must match exactly. We can investigate ways to use
         less or more columns from the unlabeled data. This will likely require a design meeting.
-        
+
         3) Bug where HPO doesn't work when cuda is enabled.
         "RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method"
         Update: This will likely be fixed in a future change to HPO in AutoGluon.

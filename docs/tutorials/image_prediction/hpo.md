@@ -75,7 +75,8 @@ parallel evaluations.
 ```{.python .input}
 hyperparameters={'model': model, 'batch_size': batch_size, 'lr': lr, 'epochs': 2}
 predictor = ImagePredictor()
-predictor.fit(train_data, search_strategy='bayesopt', num_trials=2, time_limit=60*10, hyperparameters=hyperparameters)
+predictor.fit(train_data, search_strategy='bayesopt', time_limit=60*10, hyperparameters=hyperparameters,
+              hyperparameter_tune_kwargs={'num_trials': 2})
 print('Top-1 val acc: %.3f' % predictor.fit_summary()['valid_acc'])
 ```
 
@@ -88,7 +89,7 @@ print('Test acc on hold-out data:', top1)
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal
-practice, it is common to only use `time_limits` and drop `num_trials`.
+practice, it is common to only use `time_limit` and drop `num_trials`.
 
 ### Hyperband Early Stopping
 

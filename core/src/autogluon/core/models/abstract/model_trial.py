@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 @args()
 def model_trial(args, reporter: LocalStatusReporter):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
-        
+
         Notes:
             - Model object itself must be passed as kwarg: model
             - All model hyperparameters must be stored in model.params dict that may contain special keys such as:
@@ -24,10 +24,10 @@ def model_trial(args, reporter: LocalStatusReporter):
     try:
         model, args, util_args = prepare_inputs(args=args)
 
-        X_train, y_train = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
+        X, y = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
         X_val, y_val = load_pkl.load(util_args.directory + util_args.dataset_val_filename)
 
-        fit_model_args = dict(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **util_args.get('fit_kwargs', dict()))
+        fit_model_args = dict(X=X, y=y, X_val=X_val, y_val=y_val, **util_args.get('fit_kwargs', dict()))
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(
             model=model,
@@ -74,16 +74,17 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
     time_fit_end = time.time()
     y_pred_proba = model.predict_proba(**predict_proba_args)
     time_pred_end = time.time()
-    model.val_score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba)
+    sample_weight_val = fit_args.get('sample_weight_val', None)
+    model.val_score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba, sample_weight=sample_weight_val)
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
     model.save()
     return model
 
 
-def skip_hpo(model, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
+def skip_hpo(model, X, y, X_val, y_val, scheduler_options=None, **kwargs):
     """Skips HPO and simply trains the model once with the provided HPO time budget. Returns model artifacts as if from HPO."""
-    fit_model_args = dict(X_train=X_train, y_train=y_train, **kwargs)
+    fit_model_args = dict(X=X, y=y, **kwargs)
     predict_proba_args = dict(X=X_val)
     time_limit = scheduler_options[1].get('time_out', None)
     fit_and_save_model(model=model, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=time_limit)
