@@ -15,23 +15,24 @@ pretrained BERT/ALBERT/ELECTRA model (transfer learning) and hyperparameter opti
       Quickly get started with text prediction problems.
 
    .. card::
+      :title: Multimodal Data Tables with Text
+      :link: heterogeneous.html
+
+      Introduction on how TextPredictor can be used on multimodal data tables with
+      a mix of text, numeric, and categorical features.
+
+   .. card::
       :title: Customized Hyperparameter Search
       :link: customization.html
 
-      How to control the hyperparameter-tuning process.
-
-   .. card::
-      :title: Heterogeneous data types
-      :link: heterogeneous.html
-
-      Train neural networks that jointly operate on 
-      a mix of text, numerical, or categorical features.
+      How to do basic customization of the configuration of the network inside TextPredictor,
+      and how we can use HPO.
 
 .. toctree::
    :maxdepth: 1
    :hidden:
 
    beginner
+   multimodal_text
    customization
-   heterogeneous
 
