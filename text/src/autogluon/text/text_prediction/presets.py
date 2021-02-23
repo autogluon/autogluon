@@ -172,13 +172,33 @@ for backbone_name in ['electra_base']:
 
 
 @ag_text_presets.register()
-def default() -> dict:
-    """The default configuration.
+def fast_train() -> dict:
+    """Configuration that supports fast training and inference.
+
+    By default, we use the late-fusion aggregator with electra-small
+    """
+    cfg = ag_text_presets.create('electra_small_fuse_late')
+    return cfg
+
+
+@ag_text_presets.register()
+def medium_quality() -> dict:
+    """The medium quality configuration. This is used by default.
 
     By default, we use the late-fusion aggregator and the electra-base
+    """
+    cfg = ag_text_presets.create('electra_base_fuse_late')
+    return cfg
+
+
+@ag_text_presets.register()
+def best_quality() -> dict:
+    """The best quality configuration.
+
+    We will use the ELECTRA-large model with late fusion.
 
     """
-    cfg = gen_config_no_hpo('electra_base', 3, 'fuse_late')
+    cfg = ag_text_presets.create('electra_large_fuse_late')
     return cfg
 
 

@@ -148,8 +148,14 @@ class TextPredictor:
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until the model has completed training.
         presets : str or None, optional, default is None
-            Presets defines the pre-registered configurations. You may try to list the presets via
-            `autogluon.text.ag_text_presets.list_keys()`.
+            Presets defines the pre-registered configurations. By default,
+            we will use the "medium_quality".
+            There are some other options like
+                - best_quality: Model with the best quality but will be slower
+                                for training and inference
+                - medium_quality: Model with the medium quality
+                - fast_train: Model that can be trained and inferenced very fast compared to the other two options.
+            You may try to list all presets via `autogluon.text.ag_text_presets.list_keys()`.
         hyperparameters
             The hyper-parameters of the fit function. This can be used to specify the
             search space and the configuration of the network.
@@ -179,7 +185,7 @@ class TextPredictor:
         if presets is not None:
             preset_hparams = ag_text_presets.create(presets)
         else:
-            preset_hparams = ag_text_presets.create('default')
+            preset_hparams = ag_text_presets.create('medium_quality')
         hyperparameters = merge_params(preset_hparams, hyperparameters)
         if seed is not None:
             hyperparameters['seed'] = seed
