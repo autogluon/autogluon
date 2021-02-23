@@ -61,7 +61,7 @@ class MultilabelPredictor():
         eval_metric = None
         for i in range(len(labels)):
             label = labels[i]
-            path_i = self.path + "/Predictor_" + label + "/"
+            path_i = self.path + "Predictor_" + label + "/"
             if problem_types is not None:
                 problem_type = problem_types[i]
             if eval_metrics is not None:
@@ -152,13 +152,13 @@ class MultilabelPredictor():
         for label in self.labels:
             if not isinstance(self.predictors[label], str):
                 self.predictors[label] = self.predictors[label].path
-        save_pkl.save(path=self.path+"/"+self.multi_predictor_file, object=self)
-        print(f"MultilabelPredictor saved to disk. Load with: MultilabelPredictor.load({self.path})")
+        save_pkl.save(path=self.path+self.multi_predictor_file, object=self)
+        print(f"MultilabelPredictor saved to disk. Load with: MultilabelPredictor.load('{self.path}')")
 
     @classmethod
     def load(cls, path):
         """ Load MultilabelPredictor from disk `path` previously specified when creating this MultilabelPredictor. """
-        return load_pkl.load(path=path+"/"+cls.multi_predictor_file)
+        return load_pkl.load(path=path+cls.multi_predictor_file)
 
     def get_predictor(self, label):
         """ Returns TabularPredictor which is used to predict this label. """
