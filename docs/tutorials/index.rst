@@ -60,19 +60,19 @@ Tabular Prediction
 
    .. card::
       :title: Data Tables Containing Text
-      :link: tabular-multimodal-text-others.html
+      :link: tabular_prediction/tabular-multimodal-text-others.html
 
       Modeling data tables with text and numeric/categorical features.
 
    .. card::
       :title: Multi-Label Prediction
-      :link: tabular-multilabel.html
+      :link: tabular_prediction/tabular-multilabel.html
 
       How to predict multiple columns in a data table.
 
    .. card::
       :title: FAQ
-      :link: tabular-faq.html
+      :link: tabular_prediction/tabular-faq.html
 
       Frequently asked questions about AutoGluon-Tabular.
 
