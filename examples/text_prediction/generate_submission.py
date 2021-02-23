@@ -2,6 +2,7 @@ import pandas as pd
 from autogluon.text import TextPredictor
 import argparse
 import os
+import numpy as np
 
 
 def get_parser():
@@ -51,6 +52,8 @@ def main(args):
                                         index_col=0)
             label_column = prediction_df.columns[0]
             predictions = prediction_df[label_column]
+        if task == 'sts':
+            predictions = np.clip(predictions, 0, 5)
         with open(os.path.join(args.save_dir, save_name), 'w') as of:
             of.write('index\t{}\n'.format(label_column))
             for i in range(len(predictions)):

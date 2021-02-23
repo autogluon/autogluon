@@ -131,6 +131,8 @@ bash run_glue.sh single
 bash run_glue.sh stacking
 ```
 
+To generate the submission file, use `python3 generate_submission.py --prefix autogluon_text --save_dir submission`
+
 ### Results
 For MRPC and STS, we have manually augmented the training and validation data by shuffling the 
 order of two sentences.
@@ -138,5 +140,5 @@ order of two sentences.
 |                                       | CoLA   | SST    | MRPC        | STS        | QQP      | MNLI-m | MNLI-mm | QNLI   | RTE    | WNLI   |
 |---------------------------------------|--------|--------|-------------|------------|----------|--------|---------|--------|--------|--------|
 |Metrics                                | mcc    | acc    | acc         | spearmanr  | f1       | acc    | acc     | acc    | acc    | acc    |
-|Text (Single) - Validation (*)         | 0.6747 | 0.9472 | 0.8799 (*)  | 0.9047 (*) | 0.8870   | 0.8643 | 0.8589  | 0.9158 | 0.7726 | 0.5634 |
+|Text (Single) - Validation (*)         | 0.6782 | 0.9507 | 0.8725 (*)  | 0.9047 (*) | 0.8866   | 0.8671 | 0.8696  | 0.9235 | 0.7798 | 0.5634 |
 |Text (Single) - Test (TBA)             | -      | -      | -           | -          | -        | -      | -       | -      | -      |        |
