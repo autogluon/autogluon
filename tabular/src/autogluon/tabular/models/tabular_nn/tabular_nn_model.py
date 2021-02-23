@@ -345,7 +345,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                 if (val_metric >= best_val_metric) or (e == 0):
                     if np.isnan(val_metric):
                         if e == 0:
-                            raise RuntimeError("NaNs encountered during TabularNeuralNetModel training. Features/labels may be improperly formatted or NN weights may have diverged.")
+                            raise RuntimeError("NaNs encountered in TabularNeuralNetModel training. Features/labels may be improperly formatted or NN weights may have diverged.")
                         else:
                             break
                     else:
