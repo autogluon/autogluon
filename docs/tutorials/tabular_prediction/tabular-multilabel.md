@@ -12,9 +12,7 @@ from autogluon.tabular import TabularDataset, TabularPredictor
 from autogluon.core.utils.utils import setup_outputdir
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-
-import numpy as np
-import pandas as pd
+import os.path
 
 class MultilabelPredictor():
     """ Tabular Predictor for predicting multiple columns in table.
@@ -158,6 +156,9 @@ class MultilabelPredictor():
     @classmethod
     def load(cls, path):
         """ Load MultilabelPredictor from disk `path` previously specified when creating this MultilabelPredictor. """
+        path = os.path.expanduser(path)
+        if path[-1] != os.path.sep:
+            path = path + os.path.sep
         return load_pkl.load(path=path+cls.multi_predictor_file)
 
     def get_predictor(self, label):
