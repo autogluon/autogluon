@@ -38,7 +38,7 @@ def infer_eval_log_metrics(problem_type, eval_metric=None):
     elif problem_type == REGRESSION:
         if eval_metric is None:
             eval_metric = 'rmse'
-        log_metrics = ['mse', 'rmse', 'mae']
+        log_metrics = ['r2', 'rmse', 'mae']
     else:
         raise NotImplementedError('The problem type is not supported yet!')
     if eval_metric not in log_metrics:

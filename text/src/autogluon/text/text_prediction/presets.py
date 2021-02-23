@@ -23,7 +23,6 @@ def base() -> dict:
     Each model has its own search space inside.
     """
     ret = {
-        'version': 1,                     # Version of TextPrediction Model
         'models': {
             'MultimodalTextModel': {
                 'backend': 'gluonnlp_v0',
