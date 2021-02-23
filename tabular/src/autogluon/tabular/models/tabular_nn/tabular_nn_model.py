@@ -343,7 +343,12 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             if val_dataset is not None:
                 val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
                 if (val_metric >= best_val_metric) or (e == 0):
-                    if not np.isnan(val_metric):
+                    if np.isnan(val_metric):
+                        if e == 0:
+                            raise RuntimeError("NaNs encountered during TabularNeuralNetModel training. Features/labels may be improperly formatted or NN weights may have diverged.")
+                        else:
+                            break
+                    else:
                         if val_metric > best_val_metric:
                             val_improve_epoch = e
                         best_val_metric = val_metric
