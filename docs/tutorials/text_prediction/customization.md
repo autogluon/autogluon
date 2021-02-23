@@ -51,6 +51,8 @@ predictor.set_verbosity(0)
 predictor.fit(train_data, presets='electra_small_fuse_late', time_limit=60, seed=123)
 ```
 
+Here, we try to report the performance of both `f1` and `acc`. However, if you really want to obtain the best F1 score, you should better set 
+`eval_metric='f1'` when constructing the predictor.
 
 ```{.python .input}
 predictor.evaluate(dev_data, metrics=['f1', 'acc'])
