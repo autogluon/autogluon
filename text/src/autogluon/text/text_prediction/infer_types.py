@@ -5,6 +5,8 @@ from typing import Union, Optional, List, Dict, Tuple
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from .constants import NULL, CATEGORICAL, NUMERICAL, TEXT
 
+#TODO, This file may later be merged with the infer type logic in tabular.
+
 
 def is_categorical_column(data: pd.Series,
                           valid_data: pd.Series,

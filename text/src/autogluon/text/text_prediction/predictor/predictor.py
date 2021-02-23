@@ -37,7 +37,7 @@ class TextPredictor:
         in order to improve this metric on validation data.
 
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-        Defaults to 'accuracy' for binary and multiclass classification and
+        Defaults to 'roc_auc' for binary, 'accuracy' for multiclass classification, and
         'root_mean_squared_error' for regression.
 
         Otherwise, options for classification:
@@ -142,7 +142,8 @@ class TextPredictor:
         feature_columns
             Specify which columns in the data
         column_types
-            The provided type of the columns
+            The provided type of the columns. It will be a dictionary that maps the column name
+            to the type of the data.
         num_cpus
             The number of CPUs to use for each trial
         num_gpus
