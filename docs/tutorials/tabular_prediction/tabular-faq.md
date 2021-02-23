@@ -139,6 +139,10 @@ Note that the `TabularDataset` object is essentially a [pandas DataFrame](https:
 
 To solely use custom data preprocessing and automatically apply your custom transformations to both the train data and all future data encountered during inference, you should instead create a custom FeatureGenerator. Follow this example in the source code: [examples/tabular/example_custom_feature_generator.py](https://github.com/awslabs/autogluon/blob/master/examples/tabular/example_custom_feature_generator.py)
 
+### How can I differently weight the importance of training examples?
+
+You can specify the `sample_weight` and `weight_evaluation` arguments when initializing a [`autogluon.tabularTabularPredictor`](../../api/autogluon.task.html).
+
 ### I'm receiving C++ warning spam during training or inference
 
 Warning message: [W ParallelNative.cpp:206] Warning: Cannot set number of intraop threads after parallel work has started or after set_num_threads call when using native parallel backend (function set_num_threads)
@@ -152,5 +156,4 @@ export OMP_NUM_THREADS=1
 
 ### Issues not addressed here
 
-First search to see if your issue is addressed in the other [tutorials](index.html)/[documentation](../../api/autogluon.task.html), or the [Github issues](https://github.com/awslabs/autogluon/issues). If it is not there,
-please open a [new Github Issue](https://github.com/awslabs/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).
+First search to see if your issue is addressed in our [tutorials](index.html)/[examples](https://github.com/awslabs/autogluon/tree/master/examples/tabular)/[documentation](../../api/autogluon.task.html), or the [Github issues](https://github.com/awslabs/autogluon/issues). If it is not there, please open a [new Github Issue](https://github.com/awslabs/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).
