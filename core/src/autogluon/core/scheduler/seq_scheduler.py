@@ -18,11 +18,11 @@ class LocalReporter:
     Reporter implementation for LocalSequentialScheduler
     """
 
-    def __init__(self, trial, config, training_history: dict, config_history: dict):
+    def __init__(self, trial, searcher_config, training_history: dict, config_history: dict):
         self.trial = trial
         self.training_history = training_history
         self.training_history[trial] = []
-        self.task_config = EasyDict(deepcopy(config))
+        self.searcher_config = EasyDict(deepcopy(searcher_config))
         self.config_history = config_history
         self.trial_started = time.time()
         self.last_reported_time = self.trial_started
@@ -41,9 +41,9 @@ class LocalReporter:
             self.training_history[self.trial].append(result)
 
             if self.trial not in self.config_history:
-                self.config_history[self.trial] = self.task_config
-                if 'util_args' in self.task_config:
-                    self.task_config.pop('util_args')
+                self.config_history[self.trial] = self.searcher_config
+                if 'util_args' in self.searcher_config:
+                    self.searcher_config.pop('util_args')
 
             self.last_result = result
 
@@ -230,12 +230,12 @@ class LocalSequentialScheduler(object):
         """
         searcher_config = self.searcher.get_config()
         reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
-        task_config = deepcopy(EasyDict(self.train_fn.kwvars))
-        task_config['task_id'] = task_id
+        args = deepcopy(EasyDict(self.train_fn.kwvars))
+        args['task_id'] = task_id
         self.searcher.register_pending(searcher_config)
         is_failed = False
         try:
-            self.train_fn(task_config, config=searcher_config, reporter=reporter)
+            self.train_fn(args, config=searcher_config, reporter=reporter)
             if reporter.last_result:
                 self.searcher.update(config=searcher_config, **reporter.last_result)
         except Exception as e:
