@@ -937,11 +937,11 @@ class MultiModalTextModel:
         os.makedirs(self._output_directory, exist_ok=True)
         if search_space is None:
             search_space = \
-                ag_text_presets.create('default')['models']['MultimodalTextModel']['search_space']
+                ag_text_presets.create('medium_quality')['models']['MultimodalTextModel']['search_space']
         search_space_reg = args(search_space=space.Dict(**search_space))
         # Scheduler and searcher for HPO
         if hpo_params is None:
-            hpo_params = ag_text_presets.create('default')['hpo_params']
+            hpo_params = ag_text_presets.create('medium_quality')['hpo_params']
         scheduler_options = hpo_params['scheduler_options']
         num_cpus, num_gpus = get_recommended_resource(num_cpus, num_gpus)
         if num_gpus == 0:
