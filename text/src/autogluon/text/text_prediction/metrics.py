@@ -33,7 +33,7 @@ def infer_eval_log_metrics(problem_type, eval_metric=None):
         log_metrics = ['acc', 'log_loss']
     elif problem_type == BINARY:
         if eval_metric is None:
-            eval_metric = 'roc_auc'
+            eval_metric = 'acc'
         log_metrics = ['f1', 'mcc', 'roc_auc', 'acc', 'log_loss']
     elif problem_type == REGRESSION:
         if eval_metric is None:

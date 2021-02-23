@@ -38,7 +38,7 @@ class TextPredictor:
         in order to improve this metric on validation data.
 
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-        Defaults to 'roc_auc' for binary, 'accuracy' for multiclass classification, and
+        Defaults to 'accuracy' for binary, 'accuracy' for multiclass classification, and
         'root_mean_squared_error' for regression.
 
         Otherwise, options for classification:
