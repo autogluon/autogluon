@@ -1,6 +1,7 @@
 import logging
 import os
 from sklearn.model_selection import train_test_split
+from typing import Optional
 import numpy as np
 import json
 import pandas as pd
@@ -124,26 +125,39 @@ class TextPredictor:
             num_gpus=None,
             num_trials=None,
             plot_results=None,
-            seed=None):
+            seed=0):
         """Fit the predictor
 
         Parameters
         ----------
         train_data
-            The training data
+            Table of the training data. It can be a pandas dataframe.
+            If str is passed, `train_data` will be loaded using the str value as the file path.
         tuning_data
-            The tuning data
+            Another dataset containing validation data reserved for tuning processes such as early
+            stopping and hyperparameter tuning.
+            This dataset should be in the same format as `train_data`.
+            If str is passed, `tuning_data` will be loaded using the str value as the file path.
+            Note: final model returned may be fit on `tuning_data` as well as `train_data`.
+            Do not provide your evaluation test data here!
+            In particular, when `num_bag_folds` > 0 or `num_stack_levels` > 0, models will be
+            trained on both `tuning_data` and `train_data`.
+            If `tuning_data = None`, `fit()` will automatically hold out some random validation
+            examples from `train_data`.
         time_limit
-            The time limits
-        presets
-            The user can specify the presets of the hyper-parameters.
+            Approximately how long `fit()` should run for (wallclock time in seconds).
+            If not specified, `fit()` will run until the model has completed training.
+        presets : str or None, optional, default is None
+            Presets defines the pre-registered configurations. You may try to list the presets via
+            `autogluon.text.ag_text_presets.list_keys()`.
         hyperparameters
-            The hyper-parameters
+            The hyper-parameters of the fit function. This can be used to specify the
+            search space and the configuration of the network.
         feature_columns
-            Specify which columns in the data
+            Specify which columns in the data are feature columns.
         column_types
             The provided type of the columns. It will be a dictionary that maps the column name
-            to the type of the data.
+            to the type of the column.
         num_cpus
             The number of CPUs to use for each trial
         num_gpus
@@ -154,7 +168,8 @@ class TextPredictor:
         plot_results
             Whether to plot results.
         seed
-            The seed of the experiment
+            The seed of the experiment. If it is None, no seed will be specified and
+            each run will be random. By default, the seed will be 0.
 
         Returns
         -------
@@ -225,7 +240,7 @@ class TextPredictor:
                                  'the TextPrediction task. You may try to use '
                                  'autogluon.tabular.TabularPredictor.\n'
                                  'The inferred column properties of the training data is {}'
-                                 .format(train_data))
+                                 .format(column_types))
         logger.log(25, 'Problem Type="{}"'.format(problem_type))
         logger.log(25, printable_column_type_string(column_types))
         self._problem_type = problem_type
