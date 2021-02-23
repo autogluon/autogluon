@@ -38,7 +38,7 @@ def scheduler_factory(
             'auto': Uses the 'local_sequential_auto' preset.
             'random': Performs HPO via random search.
             'bayesopt': Performs HPO via bayesian optimization.
-            'local_sequential_auto': Performs sequential local search
+            'local_sequential_auto': Performs sequential local search via bayesopt
         For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
             The 'searcher' key is required when providing a dict.
             Some schedulers may have different valid keys.

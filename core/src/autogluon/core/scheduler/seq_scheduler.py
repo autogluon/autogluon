@@ -91,7 +91,7 @@ class LocalSequentialScheduler(object):
         self._reward_attr = kwargs['reward_attr']
         self.time_attr = kwargs.get('time_attr', None)
         self.resource = kwargs['resource']
-        self.max_reward = kwargs.get('max_reward')
+        self.max_reward = kwargs.get('max_reward', None)
         self.searcher: BaseSearcher = self.get_searcher_(searcher, train_fn, **kwargs)
         self.init_limits_(kwargs)
         self.metadata = {
@@ -103,11 +103,9 @@ class LocalSequentialScheduler(object):
             'resources_per_trial': self.resource
         }
 
-        args = kwargs.get('args')
-
     def init_limits_(self, kwargs):
         if kwargs.get('num_trials', None) is None:
-            assert kwargs.get('time_out') is not None, "Need stopping criterion: Either num_trials or time_out"
+            assert kwargs.get('time_out', None) is not None, "Need stopping criterion: Either num_trials or time_out"
         self.num_trials = kwargs.get('num_trials', 9999)
         self.time_out = kwargs.get('time_out', None)
         if self.num_trials is None:
@@ -121,7 +119,7 @@ class LocalSequentialScheduler(object):
         if searcher is 'auto':
             searcher = 'bayesopt'
             scheduler_opts = {'scheduler': 'fifo'}
-        search_options = kwargs.get('search_options')
+        search_options = kwargs.get('search_options', None)
         if isinstance(searcher, str):
             if search_options is None:
                 search_options = dict()
