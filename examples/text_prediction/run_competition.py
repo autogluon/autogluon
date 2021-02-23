@@ -115,12 +115,12 @@ def load_mercari_price_prediction(train_path, test_path):
 
     # Convert to log(1 + x)
     train_df.loc[:, 'price'] = np.log(train_df['price'] + 1)
-    train_df = train_df.drop('category_name', axis=1)
+    # train_df = train_df.drop('category_name', axis=1)
     train_df['cat1'] = train_cat1
     train_df['cat2'] = train_cat2
     train_df['cat3'] = train_cat3
 
-    test_df = test_df.drop('category_name', axis=1)
+    # test_df = test_df.drop('category_name', axis=1)
     test_df['cat1'] = test_cat1
     test_df['cat2'] = test_cat2
     test_df['cat3'] = test_cat3
