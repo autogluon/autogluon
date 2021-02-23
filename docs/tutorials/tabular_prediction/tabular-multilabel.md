@@ -61,7 +61,7 @@ class MultilabelPredictor():
         eval_metric = None
         for i in range(len(labels)):
             label = labels[i]
-            path_i = self.path + "Predictor_" + label + "/"
+            path_i = self.path + "Predictor_" + label
             if problem_types is not None:
                 problem_type = problem_types[i]
             if eval_metrics is not None:
