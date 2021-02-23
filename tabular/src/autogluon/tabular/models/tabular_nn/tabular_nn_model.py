@@ -342,14 +342,19 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             train_loss = cumulative_loss/float(train_dataset.num_examples)  # training loss this epoch
             if val_dataset is not None:
                 val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
+                if np.isnan(val_metric):
+                    if e == 0:
+                        raise RuntimeError("NaNs encountered in TabularNeuralNetModel training. Features/labels may be improperly formatted or NN weights may have diverged.")
+                    else:
+                        logger.warning("Warning: NaNs encountered in TabularNeuralNetModel training. Reverting model to last checkpoint without NaNs.")
+                        break
                 if (val_metric >= best_val_metric) or (e == 0):
-                    if not np.isnan(val_metric):
-                        if val_metric > best_val_metric:
-                            val_improve_epoch = e
-                        best_val_metric = val_metric
-                        best_val_epoch = e
-                        # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
-                        self.model.save_parameters(net_filename)
+                    if val_metric > best_val_metric:
+                        val_improve_epoch = e
+                    best_val_metric = val_metric
+                    best_val_epoch = e
+                    # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
+                    self.model.save_parameters(net_filename)
             else:
                 best_val_epoch = e
             if val_dataset is not None:
