@@ -90,7 +90,9 @@ predictor.fit(train_data, hyperparameters=hyperparameters, time_limit=30, seed=1
 
 ### Register Your Own Configuration
 
-You can also register the hyperparameters to `ag_text_presets`.
+You can also register the hyperparameters to `ag_text_presets`. In the following example, 
+the `electra_small_fuse_late_train5` preset will use ELECTRA-small as the backbone, 
+and will be trained for 5 epochs with weight-decay set to 1E-2. 
 
 
 ```{.python .input}
@@ -98,6 +100,7 @@ You can also register the hyperparameters to `ag_text_presets`.
 def electra_small_fuse_late_train5():
     hyperparameters = ag_text_presets.create('electra_small_fuse_late')
     hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 5
+    hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.wd'] = 1E-2
     return hyperparameters
 
 predictor.fit(train_data, presets='electra_small_fuse_late_train5', time_limit=60, seed=123)
@@ -113,6 +116,7 @@ In this example, we search for good values of the following hyperparameters:
 - warmup
 - number of mid units in the final mlp layer that maps aggregated features to output
 - learning rate
+- weight decay
 
 
 ```{.python .input}
@@ -122,6 +126,7 @@ def electra_small_basic_demo_hpo():
     search_space['model.network.agg_net.mid_units'] = ag.core.space.Int(32, 128)
     search_space['optimization.warmup_portion'] = ag.core.space.Categorical(0.1, 0.2)
     search_space['optimization.lr'] = ag.core.space.Real(1E-5, 2E-4)
+    search_space['optimization.wd'] = ag.core.space.Categorical(1E-4, 1E-3, 1E-2)
     search_space['optimization.num_train_epochs'] = 5
 
     hparams['hpo_params']['search_strategy'] = 'random'
