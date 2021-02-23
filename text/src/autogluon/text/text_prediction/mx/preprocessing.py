@@ -39,6 +39,8 @@ def base_preprocess_cfg():
     cfg.numerical = CfgNode()
     cfg.numerical.convert_to_text = False     # Whether to convert the feature to text
     cfg.numerical.impute_strategy = 'mean'    # Whether to use mean to fill in the missing values.
+                                              # We use the imputer in sklearn: https://scikit-learn.org/stable/modules/generated/sklearn.impute.SimpleImputer.html
+                                              # The strategies can thus be "mean", "median", "most_frequent".
     cfg.numerical.scaler_with_mean = True     # Whether to normalize with mean
     cfg.numerical.scaler_with_std = True      # Whether to normalize with std
     cfg.freeze()

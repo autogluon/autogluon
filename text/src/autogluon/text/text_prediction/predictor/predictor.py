@@ -119,7 +119,6 @@ class TextPredictor:
             time_limit=None,
             presets=None,
             hyperparameters=None,
-            feature_columns=None,
             column_types=None,
             num_cpus=None,
             num_gpus=None,
@@ -159,8 +158,6 @@ class TextPredictor:
         hyperparameters
             The hyper-parameters of the fit function. This can be used to specify the
             search space and the configuration of the network.
-        feature_columns
-            Specify which columns in the data are feature columns.
         column_types
             The provided type of the columns. It will be a dictionary that maps the column name
             to the type of the column.
@@ -199,18 +196,8 @@ class TextPredictor:
         # Get the training and tuning data as pandas dataframe
         if not isinstance(train_data, pd.DataFrame):
             train_data = load_pd.load(train_data)
-        if feature_columns is None:
-            all_columns = list(train_data.columns)
-            feature_columns = [ele for ele in all_columns if ele not in label_columns]
-        else:
-            if isinstance(feature_columns, str):
-                feature_columns = [feature_columns]
-            for col in feature_columns:
-                assert col not in label_columns, 'Feature columns and label columns cannot overlap.'
-                assert col in train_data.columns,\
-                    'Feature columns must be in the pandas dataframe! Received col = "{}", ' \
-                    'all columns = "{}"'.format(col, train_data.columns)
-            all_columns = feature_columns + label_columns
+        all_columns = list(train_data.columns)
+        feature_columns = [ele for ele in all_columns if ele not in label_columns]
         train_data = train_data[all_columns]
         # Get tuning data
         if tuning_data is not None:
@@ -344,20 +331,22 @@ class TextPredictor:
             output = pd.DataFrame(output)
         return output
 
-    def extract_embedding(self, dataset, stochastic_chunk=None, num_repeat=None, as_pandas=False):
+    def extract_embedding(self, dataset):
         """Extract the feature from the neural network
+
+        Parameters
+        ----------
+        dataset
+            The dataset to extract the embedding. It
 
         Returns
         -------
-        output
+        embeddings
+            The output will have shape (#sample, #embedding dimension)
         """
         assert self._model is not None, 'Model does not seem to have been constructed. ' \
                                         'Have you called fit(), or load()?'
-        output = self._model.extract_embedding(dataset,
-                                               stochastic_chunk=stochastic_chunk,
-                                               num_repeat=num_repeat)
-        if as_pandas:
-            output = pd.DataFrame({self.label: output})
+        output = self._model.extract_embedding(dataset)
         return output
 
     def save(self, dir_path):
