@@ -172,6 +172,11 @@ for backbone_name in ['electra_base']:
 
 
 @ag_text_presets.register()
+def default() -> dict:
+    return ag_text_presets.create('electra_base_fuse_late')
+
+
+@ag_text_presets.register()
 def fast_train() -> dict:
     """Configuration that supports fast training and inference.
 
