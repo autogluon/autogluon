@@ -3,6 +3,8 @@
 
 In multi-label prediction, we wish to predict multiple columns of a table (i.e. labels) based on the values in the remaining columns. Here we present a simple strategy to do this with AutoGluon, which simply maintains a separate `TabularPredictor` object for each column being predicted. Correlations between labels can be accounted for in predictions by imposing an order on the labels and allowing the `TabularPredictor` for each label to condition on the predicted values for labels that appeared earlier in the order.
 
+### MultilabelPredictor Class
+
 We start by defining a custom `MultilabelPredictor` class to manage a collection of `TabularPredictor` objects, one for each label. You can use the `MultilabelPredictor` similarly to an individual `TabularPredictor`, except it operates on multiple labels rather than one.
 
 ```{.python .input}
@@ -186,7 +188,9 @@ class MultilabelPredictor():
             return predproba_dict
 ```
 
-Let's now apply our multi-label predictor to predict multiple columns in a data table:
+### Training
+
+Let's now apply our multi-label predictor to predict multiple columns in a data table. We first train models to predict each of the labels.
 
 
 ```{.python .input}
@@ -209,7 +213,9 @@ multi_predictor = MultilabelPredictor(labels=labels, problem_types=problem_types
 multi_predictor.fit(train_data, time_limit=time_limit)
 ```
 
-You can easily use the MultilabelPredictor to predict all labels in new data:
+### Inference and Evaluation
+
+After training, you can easily use the `MultilabelPredictor` to predict all labels in new data:
 
 ```{.python .input}
 test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
@@ -233,7 +239,10 @@ print(evaluations)
 print("Evaluated using metrics:", multi_predictor.eval_metrics)
 ```
 
-We can also directly work with the `TabularPredictor` for any one of the labels. However we recommend you set `consider_labels_correlation=False` if you later plan to use an individual `TabularPredictor` to predict just one label rather than all of the labels predicted by the `MultilabelPredictor`.
+
+### Accessing the TabularPredictor for One Label
+
+We can also directly work with the `TabularPredictor` for any one of the labels as follows. However we recommend you set `consider_labels_correlation=False` before training if you later plan to use an individual `TabularPredictor` to predict just one label rather than all of the labels predicted by the `MultilabelPredictor`.
 
 ```{.python .input}
 predictor_class = multi_predictor.get_predictor('class')

@@ -141,7 +141,7 @@ To solely use custom data preprocessing and automatically apply your custom tran
 
 ### How can I differently weight the importance of training examples?
 
-You can specify the `sample_weight` and `weight_evaluation` arguments when initializing a [`autogluon.tabularTabularPredictor`](../../api/autogluon.task.html).
+You can specify the `sample_weight` and `weight_evaluation` [arguments](../../api/autogluon.task.html) when initializing a `TabularPredictor`.
 
 ### I'm receiving C++ warning spam during training or inference
 
