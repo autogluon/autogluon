@@ -112,6 +112,8 @@ def train(args):
                       tuning_data=real_dev_df,
                       hyperparameters='multimodal')
     elif args.mode == 'single':
+        # When no embedding is used,
+        # we will just use TextPredictor that will train a single model internally.
         predictor = TextPredictor(label=label_column,
                                   eval_metric=eval_metric,
                                   path=args.exp_dir)
