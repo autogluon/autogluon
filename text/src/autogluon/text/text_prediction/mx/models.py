@@ -955,7 +955,7 @@ class MultiModalTextModel:
                               'training on CPU is slow.')
             else:
                 raise RuntimeError('No GPU is detected in the machine and we will '
-                                   'not proceed to run TexPrediction because they will train '
+                                   'not proceed to run TextPredictor because they will train '
                                    'too slowly with only CPU. You may try to set `ngpus_per_trial` '
                                    'to a number larger than 0 when calling `.fit()`. '
                                    'Also, you can set the environment variable '
