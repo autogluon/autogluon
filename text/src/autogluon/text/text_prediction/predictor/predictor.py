@@ -305,7 +305,7 @@ class TextPredictor:
         """
         return self._model.evaluate(data, metrics=metrics)
 
-    def predict(self, dataset, as_pandas=False):
+    def predict(self, dataset, as_pandas=True):
         """Get the prediction from
 
         Returns
@@ -321,7 +321,7 @@ class TextPredictor:
             output = pd.DataFrame({self.label: output})[self.label]
         return output
 
-    def predict_proba(self, dataset, as_pandas=False):
+    def predict_proba(self, dataset, as_pandas=True):
         """Predict the probability from the input
 
         Parameters

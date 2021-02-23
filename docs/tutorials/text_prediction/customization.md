@@ -73,13 +73,16 @@ predictor.fit(train_data, hyperparameters=ag_text_presets.create('electra_small_
 
 ### Change Hyperparameter
 
-The pre-registered configurations provide a bunch of good default hyperparameters. A common workflow is to first train a model with one of the presets and then tune part of hyperparameters to see if the performance can be better. The following is an example about how to do this in AutoGluon Text. You can directly add/changes keys in the hyperparameter dictionary. In the example, we change the number of training epochs to 5.
+The pre-registered configurations provide a bunch of good default hyperparameters. 
+A common workflow is to first train a model with one of the presets and then tune part of hyperparameters to see if the performance can be better. The following is an example about how to do this in AutoGluon Text. 
+You can directly add/changes keys in the hyperparameter dictionary. 
+In the example, we change the number of training epochs to 5 and the learning rate to 5E-5.
 
 
 ```{.python .input}
 hyperparameters = ag_text_presets.create('electra_small_fuse_late')
 hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 5
-
+hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.lr'] = ag.core.space.Categorical(5E-5)
 predictor.fit(train_data, hyperparameters=hyperparameters, time_limit=30, seed=123)
 ```
 
