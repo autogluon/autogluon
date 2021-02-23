@@ -295,8 +295,8 @@ median_absolute_error = make_scorer('median_absolute_error',
                                     greater_is_better=False)
 
 
-def local_spearmanr(predictions, ground_truth):
-    return float(scipy.stats.spearmanr(ground_truth, predictions)[0])
+def local_spearmanr(y_true, y_pred):
+    return float(scipy.stats.spearmanr(y_true, y_pred)[0])
 
 
 spearmanr = make_scorer('spearmanr',
@@ -305,8 +305,8 @@ spearmanr = make_scorer('spearmanr',
                         greater_is_better=True)
 
 
-def local_pearsonr(predictions, ground_truth):
-    return float(scipy.stats.pearsonr(ground_truth, predictions)[0])
+def local_pearsonr(y_true, y_pred):
+    return float(scipy.stats.pearsonr(y_true, y_pred)[0])
 
 
 pearsonr = make_scorer('pearsonr',
@@ -315,8 +315,8 @@ pearsonr = make_scorer('pearsonr',
                        greater_is_better=True)
 
 
-def rmse_func(predictions, targets):
-    return np.sqrt(((predictions - targets) ** 2).mean())
+def rmse_func(y_true, y_pred):
+    return np.sqrt(((y_true - y_pred) ** 2).mean())
 
 
 root_mean_squared_error = make_scorer('root_mean_squared_error',

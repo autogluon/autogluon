@@ -8,6 +8,7 @@ from autogluon.core import space
 
 logger = logging.getLogger(__name__)  # return root logger
 
+# TODO, Consider to move the registry to core
 ag_text_presets = Registry('ag_text_presets')
 
 
