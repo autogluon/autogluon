@@ -7,6 +7,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from autogluon.core.constants import REGRESSION, BINARY
 
 from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
@@ -199,3 +200,22 @@ class TextPredictionV1Model(AbstractModel):
         num_cpus = get_cpu_count()
         num_gpus = get_gpu_count()
         return num_cpus, num_gpus
+
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
+
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X, as_pandas=False)
+
+        y_pred_proba = self.model.predict_proba(X, as_pandas=False)
+        if self.problem_type == BINARY:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            elif y_pred_proba.shape[1] > 1:
+                return y_pred_proba[:, 1]
+            else:
+                return y_pred_proba
+        elif y_pred_proba.shape[1] > 2:
+            return y_pred_proba
+        else:
+            return y_pred_proba[:, 1]
