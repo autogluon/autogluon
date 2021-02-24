@@ -133,8 +133,9 @@ class GPFIFOSearcher(BaseSearcher):
 
     def configure_scheduler(self, scheduler):
         from ..scheduler import FIFOScheduler
+        from ..scheduler.seq_scheduler import LocalSequentialScheduler
 
-        assert isinstance(scheduler, FIFOScheduler), \
+        assert isinstance(scheduler, FIFOScheduler) or isinstance(scheduler, LocalSequentialScheduler), \
             "This searcher requires FIFOScheduler scheduler"
         super().configure_scheduler(scheduler)
 
