@@ -278,7 +278,7 @@ class TextPredictor:
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or `pandas.DataFrame`
+        data : str or `pandas.DataFrame`
             This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
             If str is passed, `valid_data` will be loaded using the str value as the file path.
         metrics : str or List[str] or None
@@ -293,7 +293,14 @@ class TextPredictor:
         return self._model.evaluate(data, metrics=metrics)
 
     def predict(self, dataset, as_pandas=True):
-        """Get the prediction from
+        """
+
+        Parameters
+        ----------
+        dataset
+            The input dataset.
+        as_pandas
+            Whether the output will be converted to a pandas dataframe
 
         Returns
         -------
@@ -301,6 +308,7 @@ class TextPredictor:
             Array of predictions. One element corresponds to the prediction value of one
         as_pandas
             Whether to convert the output to a pandas dataframe
+
         """
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         output = self._model.predict(dataset)
@@ -314,14 +322,14 @@ class TextPredictor:
         Parameters
         ----------
         dataset
-            The dataset
+            The dataset to use. It can either be a pandas dataframe or the path to the pandas dataframe.
         as_pandas
-            Whether to convert the output to pandas dataframe
+            Whether to convert the output to pandas dataframe.
 
         Returns
         -------
         output
-            The output matrix
+            The output matrix contains the probability. It will have shape (#samples, #choices).
         """
         assert self._model is not None,\
             'Model does not seem to have been constructed. ' \
@@ -337,7 +345,8 @@ class TextPredictor:
         Parameters
         ----------
         dataset
-            The dataset to extract the embedding. It
+            The dataset to extract the embedding. It can either be a pandas dataframe or
+            the path to the pandas dataframe.
 
         Returns
         -------
@@ -352,7 +361,12 @@ class TextPredictor:
     def save(self, dir_path):
         """Save the model to directory path
 
-        The model will be saved to directory path:
+        It will contains two parts:
+
+        - DIR_PATH/text_predictor_assets.json
+            Contains the general assets about the configuration of the predictor.
+        - DIR_PATH/saved_model
+            Contains the model weights and other features
 
 
         Parameters
