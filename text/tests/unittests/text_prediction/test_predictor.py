@@ -199,8 +199,8 @@ def test_mixed_column_type():
 
     # Specify the feature column
     predictor3 = TextPredictor(label='score', verbosity=4)
-    predictor3.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                   feature_columns=['sentence1', 'sentence3', 'categorical0'],
+    predictor3.fit(train_data['sentence1', 'sentence3', 'categorical0', 'score'],
+                   hyperparameters=get_test_hyperparameters(),
                    time_limit=30,
                    seed=123)
     dev_rmse = predictor3.evaluate(dev_data, metrics=['rmse'])
