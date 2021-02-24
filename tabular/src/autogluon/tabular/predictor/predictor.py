@@ -279,7 +279,7 @@ class TabularPredictor(TabularPredictorV1):
                     'FASTAI' (neural network with FastAI backend)
                 Experimental model options include:
                     'FASTTEXT' (FastText)
-                    'TEXT_NN_V1' (Multimodal Text+Tabular model, GPU is required)
+                    'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required)
                     'TRANSF' (Tabular Transformer, GPU is recommended)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
                 For example, set `hyperparameters = { 'NN':{...} }` if say you only want to train neural networks and no other types of models.
@@ -610,12 +610,12 @@ class TabularPredictor(TabularPredictorV1):
         ###################################
         # FIXME: v0.1 This section is a hack
         if 'enable_raw_text_features' not in feature_generator_init_kwargs:
-            if 'TEXT_NN_V1' in hyperparameters:
+            if 'AG_TEXT_NN' in hyperparameters:
                 feature_generator_init_kwargs['enable_raw_text_features'] = True
             else:
                 for key in hyperparameters:
                     if isinstance(key, int) or key == 'default':
-                        if 'TEXT_NN_V1' in hyperparameters[key]:
+                        if 'AG_TEXT_NN' in hyperparameters[key]:
                             feature_generator_init_kwargs['enable_raw_text_features'] = True
                             break
         ###################################

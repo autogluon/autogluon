@@ -27,7 +27,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     FASTAI=45,
     LR=40,
     FASTTEXT=0,
-    TEXT_NN_V1=0,
+    AG_TEXT_NN=0,
     TRANSF=0,
     custom=0,
 )
@@ -62,7 +62,7 @@ MODEL_TYPES = dict(
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
-    TEXT_NN_V1=TextPredictionV1Model,
+    AG_TEXT_NN=TextPredictionV1Model,
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
 )
@@ -154,7 +154,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
                 continue  # Don't include excluded models
             if isinstance(model_cfg, str):
-                if model_type == 'TEXT_NN_V1':
+                if model_type == 'AG_TEXT_NN':
                     AG_TEXT_IMPORT_ERROR = 'autogluon.text has not been installed. ' \
                                            'You may try to install "autogluon.text" ' \
                                            'first by running. ' \

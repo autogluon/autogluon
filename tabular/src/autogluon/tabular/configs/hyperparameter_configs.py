@@ -81,7 +81,7 @@ hyperparameter_config_dict = dict(
         'XGB': {},
         # 'FASTAI': {}, FastAI gets killed if the dataset is large (400K rows).
         'custom': ['GBM'],
-        'TEXT_NN_V1': ['medium_quality'],
+        'AG_TEXT_NN': ['medium_quality'],
     },
 )
 
