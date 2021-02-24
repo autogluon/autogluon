@@ -152,8 +152,8 @@ class TextPredictor:
             There are some other options like
                 - best_quality: Model with the best quality but will be slower
                                 for training and inference
-                - medium_quality: Model with the medium quality
-                - fast_train: Model that can be trained and inferenced very fast compared to the other two options.
+                - medium_quality_faster_train: Model with the medium quality
+                - lower_quality_fast_train: Model that can be trained and inferenced very fast compared to the other two options.
             You may try to list all presets via `autogluon.text.ag_text_presets.list_keys()`.
         hyperparameters
             The hyper-parameters of the fit function. This can be used to specify the
@@ -230,7 +230,7 @@ class TextPredictor:
                 break
         if not has_text_column:
             raise AssertionError('No Text Column is found! This is currently not supported by '
-                                 'the TextPrediction task. You may try to use '
+                                 'the TextPredictor. You may try to use '
                                  'autogluon.tabular.TabularPredictor.\n'
                                  'The inferred column properties of the training data is {}'
                                  .format(column_types))
@@ -267,10 +267,10 @@ class TextPredictor:
                                       "the autogluon-contrib-nlp and MXNet "
                                       "as the backend of AutoGluon-Text. In the future, "
                                       "we will support other models.")
-        logger.log(25, f'Training completed. Auto-saving to {self._path}. '
+        logger.log(25, f'Training completed. Auto-saving to "{self.path}". '
                        f'For loading the model, you can use'
-                       f' `predictor = TextPredictor.load({self._path})`')
-        self.save(self._path)
+                       f' `predictor = TextPredictor.load("{self.path}")`')
+        self.save(self.path)
         return self
 
     def evaluate(self, data, metrics=None):
@@ -288,7 +288,8 @@ class TextPredictor:
         Returns
         -------
         ret : a single number or a dict of metric --> metric scores
-            Output
+            The output metrics. It will be a single value if there is only one metric and
+            will be a dictionary of {metric_name --> value} if there are multiple metrics to report.
         """
         return self._model.evaluate(data, metrics=metrics)
 

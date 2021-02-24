@@ -172,12 +172,7 @@ for backbone_name in ['electra_base']:
 
 
 @ag_text_presets.register()
-def default() -> dict:
-    return ag_text_presets.create('electra_base_fuse_late')
-
-
-@ag_text_presets.register()
-def fast_train() -> dict:
+def lower_quality_fast_train() -> dict:
     """Configuration that supports fast training and inference.
 
     By default, we use the late-fusion aggregator with electra-small
@@ -187,7 +182,7 @@ def fast_train() -> dict:
 
 
 @ag_text_presets.register()
-def medium_quality() -> dict:
+def medium_quality_faster_train() -> dict:
     """The medium quality configuration. This is used by default.
 
     By default, we use the late-fusion aggregator and the electra-base
@@ -205,6 +200,11 @@ def best_quality() -> dict:
     """
     cfg = ag_text_presets.create('electra_large_fuse_late')
     return cfg
+
+
+@ag_text_presets.register()
+def default() -> dict:
+    return ag_text_presets.create('medium_quality_faster_train')
 
 
 def merge_params(base_params, partial_params=None):

@@ -121,7 +121,8 @@ python3 prepare_glue.py --benchmark glue
 
 ### Run the benchmark
 Run on all datasets with either a single `TextPredictor` model or the `multimodal` configuration 
-in AutoGluon Tabular that will use the `TextPredictor` model in the 5-fold-1-layer stacking.
+in AutoGluon Tabular that will combine the `TextPredictor` model with tabular models from 
+AutoGluon-Tabular via a single layer of stack ensembling with 5-fold bagging.
  
 ```bash
 # Run single model

@@ -1,4 +1,4 @@
-"""Text Prediction Model based on Pretrained Language Model. Version 1"""
+"""Wrapper of the Text Prediction in AutoGluon Text."""
 from typing import Optional
 import logging
 import time
@@ -25,7 +25,7 @@ class TextPredictionV1Model(AbstractModel):
     nn_model_name = 'text_nn'
 
     def __init__(self, **kwargs):
-        """The TextPredictionV1Model.
+        """Wrapper of the Text Prediction model in AutoGluon Text.
 
         The features can be a mix of
         - text column
