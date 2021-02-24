@@ -197,9 +197,9 @@ def run(args):
         submission.loc[:, label_column] = np.power(10, predictions) - 1
         submission.to_excel(os.path.join(args.exp_dir, 'submission.xlsx'))
     elif args.task == 'mercari_price':
-        test_predictions = predictor.predict(test_df, as_pandas=True)
+        test_predictions = predictor.predict(test_df, as_pandas=False)
         submission = pd.read_csv(args.sample_submission)
-        submission.loc[:, label_column] = np.exp(test_predictions[label_column]) - 1
+        submission.loc[:, label_column] = np.exp(test_predictions) - 1
         submission.to_csv(os.path.join(args.exp_dir, 'submission.csv'), index=False)
     else:
         raise NotImplementedError
