@@ -1046,7 +1046,9 @@ class MultiModalTextModel:
                 plt.show()
             self._results = local_results
         else:
-            force_forkserver()
+            if hpo_params['search_strategy'] != 'local_sequential_auto':
+                # Force forkserver if it's not using the local sequential HPO
+                force_forkserver()
             scheduler_cls = schedulers[hpo_params['search_strategy']]
             # Create scheduler, run HPO experiment
             scheduler = scheduler_cls(train_fn, **scheduler_options)
