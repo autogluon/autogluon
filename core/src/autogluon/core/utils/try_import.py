@@ -6,7 +6,7 @@ __all__ = [
     'try_import_lightgbm',
     'try_import_xgboost',
     'try_import_faiss',
-    'try_import_fastai_v1',
+    'try_import_fastai',
     'try_import_cv2',
     'try_import_gluonnlp',
     'try_import_torch',
@@ -94,14 +94,14 @@ def try_import_faiss():
             "A quick tip is to install via `pip install faiss-cpu`. ")
 
 
-def try_import_fastai_v1():
+def try_import_fastai():
     try:
         from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
         import fastai
         fastai_version = parse_version(fastai.__version__)
-        assert parse_version('1.0.61') <= fastai_version < parse_version('2.0.0'), 'Currently, we only support 1.0.61<=fastai<2.0.0'
+        assert parse_version('2.0.0') <= fastai_version < parse_version('3.0.0'), 'Currently, we only support 2.0.0<=fastai<3.0.0'
     except ModuleNotFoundError as e:
-        raise ImportError("Import fastai failed. A quick tip is to install via `pip install fastai==1.*`. "
+        raise ImportError("Import fastai failed. A quick tip is to install via `pip install fastai==2.*`. "
                           "If you are using Mac OSX, please use this torch version to avoid compatibility issues: `pip install torch==1.6.0`.")
 
 
