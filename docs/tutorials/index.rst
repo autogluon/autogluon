@@ -50,7 +50,7 @@ Tabular Prediction
       :title: In-depth FIT Tutorial
       :link: tabular_prediction/tabular-indepth.html
 
-      In-depth tutorial on boosting accuracy and controlling model fitting.
+      In-depth tutorial on controlling various aspects of model fitting.
 
    .. card::
       :title: Kaggle Tutorial
@@ -58,6 +58,23 @@ Tabular Prediction
 
       Using AutoGluon for Kaggle competitions with tabular data.
 
+   .. card::
+      :title: Data Tables Containing Text
+      :link: tabular_prediction/tabular-multimodal-text-others.html
+
+      Modeling data tables with text and numeric/categorical features.
+
+   .. card::
+      :title: Multi-Label Prediction
+      :link: tabular_prediction/tabular-multilabel.html
+
+      How to predict multiple columns in a data table.
+
+   .. card::
+      :title: FAQ
+      :link: tabular_prediction/tabular-faq.html
+
+      Frequently asked questions about AutoGluon-Tabular.
 
 Text Prediction
 ---------------
