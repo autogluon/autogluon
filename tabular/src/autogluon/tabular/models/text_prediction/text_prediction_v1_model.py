@@ -25,7 +25,7 @@ class TextPredictionV1Model(AbstractModel):
     nn_model_name = 'text_nn'
 
     def __init__(self, **kwargs):
-        """Wrapper of the Text Prediction model in AutoGluon Text.
+        """Wrapper of autogluon.text.TextPredictor.
 
         The features can be a mix of
         - text column
