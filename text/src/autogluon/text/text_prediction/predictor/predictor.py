@@ -148,7 +148,7 @@ class TextPredictor:
             If not specified, `fit()` will run until the model has completed training.
         presets : str or None, optional, default is None
             Presets defines the pre-registered configurations. By default,
-            we will use the "medium_quality".
+            we will use the "medium_quality_faster_train".
             There are some other options like
                 - best_quality: Model with the best quality but will be slower
                                 for training and inference
@@ -293,12 +293,12 @@ class TextPredictor:
         """
         return self._model.evaluate(data, metrics=metrics)
 
-    def predict(self, dataset, as_pandas=True):
+    def predict(self, data, as_pandas=True):
         """
 
         Parameters
         ----------
-        dataset
+        data
             The input dataset.
         as_pandas
             Whether the output will be converted to a pandas dataframe
@@ -312,12 +312,12 @@ class TextPredictor:
 
         """
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
-        output = self._model.predict(dataset)
+        output = self._model.predict(data)
         if as_pandas:
             output = pd.DataFrame({self.label: output})[self.label]
         return output
 
-    def predict_proba(self, dataset, as_pandas=True):
+    def predict_proba(self, data, as_pandas=True):
         """Predict the probability from the input
 
         Parameters
@@ -335,17 +335,17 @@ class TextPredictor:
         assert self._model is not None,\
             'Model does not seem to have been constructed. ' \
             'Have you called fit(), or load()?'
-        output = self._model.predict_proba(dataset)
+        output = self._model.predict_proba(data)
         if as_pandas:
             output = pd.DataFrame(output)
         return output
 
-    def extract_embedding(self, dataset):
+    def extract_embedding(self, data):
         """Extract the feature from the neural network
 
         Parameters
         ----------
-        dataset
+        data
             The dataset to extract the embedding. It can either be a pandas dataframe or
             the path to the pandas dataframe.
 
@@ -356,7 +356,7 @@ class TextPredictor:
         """
         assert self._model is not None, 'Model does not seem to have been constructed. ' \
                                         'Have you called fit(), or load()?'
-        output = self._model.extract_embedding(dataset)
+        output = self._model.extract_embedding(data)
         return output
 
     def save(self, dir_path):

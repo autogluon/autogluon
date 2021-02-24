@@ -60,14 +60,16 @@ train_df.head(3)
 
 ## Train Model
 
-As our previous example, we can simply create a TextPredictor and call `predictor.fit()` to train the model. Internally, the network will be automatically generated based on the type of the feature columns, which are inferred based on heuristics.  Also, to save time, we will subsample 2000 rows from the data and only train for three minutes.
+As our previous example, we can simply create a TextPredictor and call `predictor.fit()` to train the model. 
+Internally, the network will be automatically generated based on the type of the feature columns, which are inferred based on heuristics.  
+Also, to save time, we will subsample 1500 rows from the data and only train for three minutes.
 
 
 ```{.python .input}
 from autogluon.text import TextPredictor
-!rm -rf ag_text_sbook_price_prediction
-predictor = TextPredictor(label='Price', path='ag_text_sbook_price_prediction')
-sampled_train_df = train_df.sample(2000, random_state=123)
+!rm -rf ag_text_book_price_prediction
+predictor = TextPredictor(label='Price', path='ag_text_book_price_prediction')
+sampled_train_df = train_df.sample(1500, random_state=123)
 predictor.fit(sampled_train_df, time_limit=3 * 60, seed=123)
 ```
 
