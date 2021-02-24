@@ -5,6 +5,7 @@ import time
 from abc import abstractmethod
 
 from ...scheduler import *
+from ...scheduler.seq_scheduler import LocalSequentialScheduler
 from ...utils import in_ipynb, try_import_mxnet
 from ...utils.utils import setup_compute
 
@@ -17,6 +18,7 @@ __all__ = [
 Results = collections.namedtuple('Results', 'model reward config time metadata')
 
 schedulers = {
+    'local_sequential_auto': LocalSequentialScheduler,
     'grid': FIFOScheduler,
     'random': FIFOScheduler,
     'skopt': FIFOScheduler,

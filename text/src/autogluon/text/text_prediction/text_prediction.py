@@ -52,8 +52,8 @@ def default() -> dict:
             },
         },
         'hpo_params': {
-            'search_strategy': 'random',   # Can be 'random', 'bayesopt', 'skopt',
-                                           # 'hyperband', 'bayesopt_hyperband'
+            'search_strategy': 'local_sequential_auto',   # Can be 'random', 'bayesopt', 'skopt',
+                                           # 'hyperband', 'bayesopt_hyperband', local_sequential_auto
             'search_options': None,        # Extra kwargs passed to searcher
             'scheduler_options': None,     # Extra kwargs passed to scheduler
             'time_limits': None,           # The total time limit
@@ -305,8 +305,8 @@ class TextPrediction(BaseTask):
             'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization),
             'skopt' (SKopt Bayesian optimization), 'grid' (grid search),
             'hyperband' (Hyperband scheduling with random search), 'bayesopt-hyperband'
-            (Hyperband scheduling with GP-BO search).
-            If unspecified, the default is 'random'.
+            (Hyperband scheduling with GP-BO search), 'local_sequential_auto' (sequential local search)
+            If unspecified, the default is 'local_sequential_auto'.
         search_options : dict, default = None
             Options passed to searcher.
         scheduler_options : dict, default = None

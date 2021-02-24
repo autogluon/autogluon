@@ -53,8 +53,9 @@ class BaseSearcher(object):
 
         """
         from ..scheduler import FIFOScheduler
+        from ..scheduler.seq_scheduler import LocalSequentialScheduler
 
-        if isinstance(scheduler, FIFOScheduler):
+        if isinstance(scheduler, FIFOScheduler) or isinstance(scheduler, LocalSequentialScheduler):
             self._reward_attribute = scheduler._reward_attr
 
     @staticmethod

@@ -598,7 +598,8 @@ class BertForTextPredictionBasic:
               console_log=True,
               ignore_warning=True,
               verbosity=2):
-        force_forkserver()
+        if search_strategy != 'local_sequential_auto':
+            force_forkserver()
         start_tick = time.time()
         logging_config(folder=self._output_directory, name='main',
                        console=console_log,

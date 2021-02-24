@@ -166,7 +166,7 @@ def test_no_job_finished_raise():
                              label='label', num_trials=1,
                              ngpus_per_trial=1,
                              verbosity=4,
-                             time_limits=10,
+                             time_limits=1,
                              output_directory='./sst_raise',
                              plot_results=False)
 
