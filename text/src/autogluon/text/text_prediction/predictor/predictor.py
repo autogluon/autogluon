@@ -182,7 +182,7 @@ class TextPredictor:
         if presets is not None:
             preset_hparams = ag_text_presets.create(presets)
         else:
-            preset_hparams = ag_text_presets.create('medium_quality')
+            preset_hparams = ag_text_presets.create('default')
         hyperparameters = merge_params(preset_hparams, hyperparameters)
         if seed is not None:
             hyperparameters['seed'] = seed
