@@ -1004,7 +1004,7 @@ class TabularPredictor:
                     In these cases, the provided hyperparameter in 'hyperparameters' is used as a maximum for the model, but the model is still able to early stop at a smaller value during training to achieve a better validation score or to satisfy time constraints.
                     For example, if a NN model was given `epochs=500` as a hyperparameter, but found during training that `epochs=60` resulted in optimal validation score, it would use `epoch=60` and `hyperparameters_fit={'epoch': 60}` would be set.
                 'ag_args_fit': Special AutoGluon arguments that influence model fit.
-                    See the documentation of the `hyperparameters` argument in `TabularPrediction.fit()` for more information.
+                    See the documentation of the `hyperparameters` argument in `TabularPredictor.fit()` for more information.
                 'features': List of feature names used by the model.
 
                 'child_hyperparameters': Equivalent to 'hyperparameters', but for the model's children.
