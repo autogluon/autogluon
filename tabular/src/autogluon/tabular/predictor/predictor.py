@@ -334,8 +334,8 @@ class TabularPredictor:
             Advanced functionality: Custom stack levels
                 By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
-                    Example: `hyperparameters = {0: {'RF': rf_params1}, 1: {'CAT': [cat_params1, cat_params2], 'NN': {}}}`
-                    This will result in a stack ensemble that has one custom random forest in level 0 followed by two CatBoost models with custom hyperparameters and a default neural network in level 1, for a total of 4 models.
+                    Example: `hyperparameters = {1: {'RF': rf_params1}, 2: {'CAT': [cat_params1, cat_params2], 'NN': {}}}`
+                    This will result in a stack ensemble that has one custom random forest in level 1 followed by two CatBoost models with custom hyperparameters and a default neural network in level 2, for a total of 4 models.
                 If a level is not specified in `hyperparameters`, it will default to using the highest specified level to train models. This can also be explicitly controlled by adding a 'default' key.
 
             Default:
@@ -397,8 +397,8 @@ class TabularPredictor:
                             priority: (int) Determines the order in which the model is trained. Larger values result in the model being trained earlier. Default values range from 100 (RF) to 0 (custom), dictated by model type. If you want this model to be trained first, set priority = 999.
                             problem_types: (list) List of valid problem types for the model. `problem_types=['binary']` will result in the model only being trained if `problem_type` is 'binary'.
                             disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune_kwargs=None`.
-                            valid_stacker: (bool) If False, the model will not be trained as a level 1 or higher stacker model.
-                            valid_base: (bool) If False, the model will not be trained as a level 0 (base) model.
+                            valid_stacker: (bool) If False, the model will not be trained as a level 2 or higher stacker model.
+                            valid_base: (bool) If False, the model will not be trained as a level 1 (base) model.
                             hyperparameter_tune_kwargs: (dict) Refer to :meth:`TabularPredictor.fit` hyperparameter_tune_kwargs argument. If specified here, will override global HPO settings for this model.
                         Reference the default hyperparameters for example usage of these options.
                     ag_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
@@ -731,7 +731,7 @@ class TabularPredictor:
         hyperparameters : str or dict
             Refer to argument documentation in :meth:`TabularPredictor.fit`.
             If `base_model_names` is specified and hyperparameters is using the level-based key notation,
-            the key of the level which directly uses the base models should be 0. The level in the hyperparameters
+            the key of the level which directly uses the base models should be 1. The level in the hyperparameters
             dictionary is relative, not absolute.
         time_limit : int, default = None
             Refer to argument documentation in :meth:`TabularPredictor.fit`.
@@ -785,7 +785,7 @@ class TabularPredictor:
 
         if num_stack_levels is None:
             hyperparameter_keys = list(hyperparameters.keys())
-            highest_level = 0
+            highest_level = 1
             for key in hyperparameter_keys:
                 if isinstance(key, int):
                     highest_level = max(key, highest_level)
@@ -948,7 +948,7 @@ class TabularPredictor:
                 Note that this ignores the time required to load the model into memory when bagging is disabled.
             'fit_time_marginal': The fit time required to train the model (Ignoring base models).
             'stack_level': The stack level of the model.
-                A model with stack level N can take any set of models with stack level less than N as input, with stack level 0 models having no model inputs.
+                A model with stack level N can take any set of models with stack level less than N as input, with stack level 1 models having no model inputs.
             'can_infer': If model is able to perform inference on new data. If False, then the model either was not saved, was deleted, or an ancestor of the model cannot infer.
                 `can_infer` is often False when `save_bag_folds=False` was specified in initial `task.fit`.
             'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth model fit has `fit_order=N`. The order corresponds to the first child model fit in the case of bagged ensembles.
@@ -1017,7 +1017,7 @@ class TabularPredictor:
                     If A is an ancestor of B, then B is a descendant of A.
                     If a model's ancestor is deleted, the model is no longer able to infer on new data, and its 'can_infer' value will be False.
                     A model can only have ancestor models whose 'stack_level' are lower than itself.
-                    'stack_level'=0 models have no ancestors.
+                    'stack_level'=1 models have no ancestors.
                 'descendants': The model's descendants. Descendant models are the models which require this model to make predictions during the construction of their input features.
                     If A is a descendant of B, then B is an ancestor of A.
                     If this model is deleted, then all descendant models will no longer be able to infer on new data, and their 'can_infer' values will be False.
@@ -1108,7 +1108,7 @@ class TabularPredictor:
                 num_fold_str = f" (with {results['num_bag_folds']} folds)"
             print("Bagging used: %s %s" % (bagging_used, num_fold_str))
             num_stack_str = ""
-            stacking_used = results['max_stack_level'] > 1  # TODO: v0.1 increment by 1 when refactoring level names
+            stacking_used = results['max_stack_level'] > 2
             if stacking_used:
                 num_stack_str = f" (with {results['max_stack_level']} levels)"
             print("Multi-layer stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
@@ -1565,7 +1565,7 @@ class TabularPredictor:
                 models_to_check_now = models_to_check[:i + 1]
                 max_base_model_level = max([trainer.get_model_level(base_model) for base_model in models_to_check_now])
                 weighted_ensemble_level = max_base_model_level + 1
-                models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=models_to_check_now, name_suffix=name_suffix + '_pareto' + str(i), time_limit=time_limit)
+                models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=models_to_check_now, name_suffix=name_suffix + '_Pareto' + str(i), time_limit=time_limit)
 
         max_base_model_level = max([trainer.get_model_level(base_model) for base_model in base_models])
         weighted_ensemble_level = max_base_model_level + 1

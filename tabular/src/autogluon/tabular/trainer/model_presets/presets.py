@@ -117,7 +117,7 @@ VALID_AG_ARGS_KEYS = {
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
 def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_metadata=None, num_classes=None,
-                      level: int = 0, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, ag_args_fit=None, ag_args=None, ag_args_ensemble=None,
+                      level: int = 1, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, ag_args_fit=None, ag_args=None, ag_args_ensemble=None,
                       name_suffix: str = None, default_priorities=None, invalid_model_names: list = None, excluded_model_types: list = None,
                       hyperparameter_preprocess_func=None, hyperparameter_preprocess_kwargs=None, silent=True):
     hyperparameters = process_hyperparameters(hyperparameters)
@@ -228,7 +228,7 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
 
 
 # Check if model is valid
-def is_model_cfg_valid(model_cfg, level=0, problem_type=None):
+def is_model_cfg_valid(model_cfg, level=1, problem_type=None):
     is_valid = True
     for key in model_cfg.get(AG_ARGS, {}):
         if key not in VALID_AG_ARGS_KEYS:
@@ -239,9 +239,9 @@ def is_model_cfg_valid(model_cfg, level=0, problem_type=None):
         is_valid = False  # model_type is required
     elif model_cfg[AG_ARGS].get('hyperparameter_tune_kwargs', None) and model_cfg[AG_ARGS].get('disable_in_hpo', False):
         is_valid = False
-    elif not model_cfg[AG_ARGS].get('valid_stacker', True) and level > 0:
+    elif not model_cfg[AG_ARGS].get('valid_stacker', True) and level > 1:
         is_valid = False  # Not valid as a stacker model
-    elif not model_cfg[AG_ARGS].get('valid_base', True) and level == 0:
+    elif not model_cfg[AG_ARGS].get('valid_base', True) and level == 1:
         is_valid = False  # Not valid as a base model
     elif problem_type is not None and problem_type not in model_cfg[AG_ARGS].get('problem_types', [problem_type]):
         is_valid = False  # Not valid for this problem_type
@@ -251,7 +251,7 @@ def is_model_cfg_valid(model_cfg, level=0, problem_type=None):
 def model_factory(
         model, path, problem_type, eval_metric, num_classes=None,
         name_suffix=None, ensemble_type=StackerEnsembleModel, ensemble_kwargs=None,
-        invalid_name_set=None, level=0, feature_metadata=None,
+        invalid_name_set=None, level=1, feature_metadata=None,
 ):
     if invalid_name_set is None:
         invalid_name_set = set()

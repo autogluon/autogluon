@@ -200,53 +200,49 @@ class AbstractTrainer:
 
         return path, model_paths
 
-    # TODO: Consider having AbstractTrainer inherit from AbstractModel in v0.1
     def fit(self, X, y, hyperparameters: dict, X_val=None, y_val=None, **kwargs):
         raise NotImplementedError
 
-    # TODO: v0.1 add invalid_model_names argument
-    # TODO: make models accept dictionary of level -> list of models for more control of future fit calls.
-    # TODO: Enable HPO on levels > 0
-    # TODO: Enable feature prune on levels > 0
     # TODO: Enable easier re-mapping of trained models -> hyperparameters input (They don't share a key since name can change)
     def train_multi_levels(self, X, y, hyperparameters: dict, X_val=None, y_val=None, X_unlabeled=None, base_model_names: List[str] = None,
-                           feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, level_start=0, level_end=0, time_limit=None, name_suffix: str = None, relative_stack=True) -> List[str]:
+                           feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, level_start=1, level_end=1, time_limit=None, name_suffix: str = None, relative_stack=True) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
             hyperparameters is used to determine the models used in each stack layer.
-        If continuing a stack ensemble with level_start>0, ensure that base_model_names is set to the appropriate base models that will be used by the level_start level models.
+        If continuing a stack ensemble with level_start>1, ensure that base_model_names is set to the appropriate base models that will be used by the level_start level models.
         Trains both core and aux models.
-            core models are standard models which are fit on the data features. Core models will also use model predictions if base_model_names was specified or if level != 0.
+            core models are standard models which are fit on the data features. Core models will also use model predictions if base_model_names was specified or if level != 1.
             aux models are ensemble models which only use the predictions of core models as features. These models never use the original features.
         Returns a list of the model names that were trained from this method call, in order of fit.
         """
         self._time_limit = time_limit
         self._time_train_start = time.time()
         time_train_start = self._time_train_start
-        if relative_stack:
-            if level_start != 0:
-                raise AssertionError(f'level_start must be 0 when `relative_stack=True`. (level_start = {level_start})')
-            if base_model_names:
-                max_base_model_level = self.get_max_level(models=base_model_names)
-                level_start = max_base_model_level + 1
-                level_end += level_start
 
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
 
-        if relative_stack and level_start != 0:
-            hyperparameters_relative = {}
-            for key in hyperparameters:
-                if isinstance(key, int):
-                    hyperparameters_relative[key+level_start] = hyperparameters[key]
-                else:
-                    hyperparameters_relative[key] = hyperparameters[key]
-            hyperparameters = hyperparameters_relative
+        if relative_stack:
+            if level_start != 1:
+                raise AssertionError(f'level_start must be 1 when `relative_stack=True`. (level_start = {level_start})')
+            if base_model_names:
+                max_base_model_level = self.get_max_level(models=base_model_names)
+                level_start = max_base_model_level + 1
+                level_add = level_start - 1
+                level_end += level_add
+            if level_start != 1:
+                hyperparameters_relative = {}
+                for key in hyperparameters:
+                    if isinstance(key, int):
+                        hyperparameters_relative[key+level_add] = hyperparameters[key]
+                    else:
+                        hyperparameters_relative[key] = hyperparameters[key]
+                hyperparameters = hyperparameters_relative
 
         core_kwargs = {} if core_kwargs is None else core_kwargs.copy()
         aux_kwargs = {} if aux_kwargs is None else aux_kwargs.copy()
 
         model_names_fit = []
-        for level in range(max(0, level_start), level_end + 1):
+        for level in range(level_start, level_end + 1):
             core_kwargs_level = core_kwargs.copy()
             aux_kwargs_level = aux_kwargs.copy()
             if time_limit is not None:
@@ -256,8 +252,8 @@ class AbstractTrainer:
                 time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
                 core_kwargs_level['time_limit'] = core_kwargs_level.get('time_limit', time_limit_core)
                 aux_kwargs_level['time_limit'] = aux_kwargs_level.get('time_limit', time_limit_aux)
-            if level != 0:
-                feature_prune = False  # TODO: Enable feature prune on levels > 0
+            if level != 1:
+                feature_prune = False  # TODO: Enable feature prune on levels > 1
             base_model_names, aux_models = self.stack_new_level(
                 X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
                 models=hyperparameters, level=level, base_model_names=base_model_names,
@@ -269,17 +265,19 @@ class AbstractTrainer:
         self.save()
         return model_names_fit
 
-    def stack_new_level(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None, level=0, base_model_names: List[str] = None,
+    def stack_new_level(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None, level=1, base_model_names: List[str] = None,
                         feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, name_suffix: str = None) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
         """
         if base_model_names is None:
             base_model_names = []
-        if not base_model_names and level > 0:
+        if level < 1:
+            raise AssertionError(f'Stack level must be >= 1, but level={level}.')
+        elif not base_model_names and level > 1:
             logger.log(30, f'Warning: Training models at stack level {level}, but no base models were specified.')
-        elif base_model_names and level == 0:
-            raise AssertionError(f'Stack level 0 models cannot have base models, but base_model_names={base_model_names}.')
+        elif base_model_names and level == 1:
+            raise AssertionError(f'Stack level 1 models cannot have base models, but base_model_names={base_model_names}.')
         core_kwargs = {} if core_kwargs is None else core_kwargs.copy()
         aux_kwargs = {} if aux_kwargs is None else aux_kwargs.copy()
         if name_suffix:
@@ -295,11 +293,11 @@ class AbstractTrainer:
         return core_models, aux_models
 
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
-                             level=0, base_model_names: List[str] = None, stack_name='core',
+                             level=1, base_model_names: List[str] = None, stack_name='core',
                              ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel, name_suffix: str = None, get_models_func=None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
-        If level > 0, then the models will use base model predictions as additional features.
+        If level > 1, then the models will use base model predictions as additional features.
             The base models used can be specified via base_model_names.
         If self.bagged_mode, then models will be trained as StackerEnsembleModels.
         The data provided in this method should not contain stack features, as they will be automatically generated if necessary.
@@ -308,7 +306,7 @@ class AbstractTrainer:
             get_models_func = self.get_models
         if base_model_names is None:
             base_model_names = []
-        if not self.bagged_mode and level != 0:
+        if not self.bagged_mode and level != 1:
             raise ValueError('Stack Ensembling is not valid for non-bagged mode.')
 
         if isinstance(models, dict):
@@ -321,15 +319,15 @@ class AbstractTrainer:
             )
 
             if self.bagged_mode:
-                if level == 0:
+                if level == 1:
                     (base_model_names, base_model_paths, base_model_types) = (None, None, None)
-                elif level > 0:
+                elif level > 1:
                     base_model_names, base_model_paths, base_model_types = self._get_models_load_info(model_names=base_model_names)
                     if len(base_model_names) == 0:
                         logger.log(20, 'No base models to train on, skipping stack level...')
                         return []
                 else:
-                    raise AssertionError(f'Stack level cannot be negative! level = {level}')
+                    raise AssertionError(f'Stack level cannot be less than 1! level = {level}')
 
                 ensemble_kwargs = {
                     'base_model_names': base_model_names,
@@ -403,7 +401,7 @@ class AbstractTrainer:
             # TODO: Remove unnecessary load when no stacking
             model = self.load_model(model)
         model_level = self.get_model_level(model.name)
-        if model_level >= 1 and isinstance(model, StackerEnsembleModel):
+        if model_level > 1 and isinstance(model, StackerEnsembleModel):
             if fit:
                 model_pred_proba_dict = None
             else:
@@ -510,7 +508,7 @@ class AbstractTrainer:
             # TODO: After _get_inputs_to_stacker_legacy is removed, this if/else is not necessary, instead pass fit param to get_model_pred_proba_dict()
             model_pred_proba_list = None
 
-        X_stacker_input = self._get_inputs_to_stacker_legacy(X=X, level_start=0, level_end=1, model_levels={0: base_models}, y_pred_probas=model_pred_proba_list, fit=fit)
+        X_stacker_input = self._get_inputs_to_stacker_legacy(X=X, level_start=1, level_end=2, model_levels={1: base_models}, y_pred_probas=model_pred_proba_list, fit=fit)
         if not use_orig_features:
             X_stacker_input = X_stacker_input.drop(columns=X.columns)
         return X_stacker_input
@@ -520,10 +518,10 @@ class AbstractTrainer:
     def _get_inputs_to_stacker_legacy(self, X, level_start, level_end, model_levels, y_pred_probas=None, fit=False):
         if level_start > level_end:
             raise AssertionError(f'level_start cannot be greater than level end: ({level_start}, {level_end})')
-        if (level_start == 0) and (level_end == 0):
+        if (level_start == 1) and (level_end == 1):
             return X
         if fit:
-            if level_start >= 1:
+            if level_start > 1:
                 dummy_stacker_start = self._get_dummy_stacker(level=level_start, model_levels=model_levels, use_orig_features=True)
                 cols_to_drop = dummy_stacker_start.stack_columns
                 X = X.drop(cols_to_drop, axis=1)
@@ -535,7 +533,7 @@ class AbstractTrainer:
             dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
             X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas, index=X.index)
             if dummy_stacker.params['use_orig_features']:
-                if level_start >= 1:
+                if level_start > 1:
                     dummy_stacker_start = self._get_dummy_stacker(level=level_start, model_levels=model_levels, use_orig_features=True)
                     cols_to_drop = dummy_stacker_start.stack_columns
                     X = X.drop(cols_to_drop, axis=1)
@@ -545,10 +543,10 @@ class AbstractTrainer:
         else:
             dummy_stackers = {}
             for level in range(level_start, level_end+1):
-                if level >= 1:
+                if level > 1:
                     dummy_stackers[level] = self._get_dummy_stacker(level=level, model_levels=model_levels, use_orig_features=True)
             for level in range(level_start, level_end):
-                if level >= 1:
+                if level > 1:
                     cols_to_drop = dummy_stackers[level].stack_columns
                 else:
                     cols_to_drop = []
@@ -886,7 +884,7 @@ class AbstractTrainer:
             model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
 
-    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=0, **model_fit_kwargs) -> List[str]:
+    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, **model_fit_kwargs) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -971,7 +969,7 @@ class AbstractTrainer:
                 del model
         return model_names_trained
 
-    def _add_model(self, model: AbstractModel, stack_name: str = 'core', level: int = 0) -> bool:
+    def _add_model(self, model: AbstractModel, stack_name: str = 'core', level: int = 1) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -983,7 +981,7 @@ class AbstractTrainer:
             Model which has been fit. This model will be registered to the Trainer.
         stack_name : str, default 'core'
             Stack name to assign the model to. This is used for advanced functionality.
-        level : int, default 0
+        level : int, default 1
             Stack level of the stack name to assign the model to. This is used for advanced functionality.
             The model's name is appended to self.models_level[stack_name][level]
             The model's base_models (if it has any) must all be a lower level than the model.
@@ -1023,7 +1021,7 @@ class AbstractTrainer:
         )
         if isinstance(model, StackerEnsembleModel):
             prior_models = self.get_model_names()
-            # TODO: raise exception if no base models and level != 0?
+            # TODO: raise exception if no base models and level != 1?
             for stack_column_prefix in model.stack_column_prefix_lst:
                 base_model_name = model.stack_column_prefix_to_model_map[stack_column_prefix]
                 if base_model_name not in prior_models:
@@ -1037,7 +1035,7 @@ class AbstractTrainer:
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False, hyperparameter_tune_kwargs=None,
-                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None, **kwargs) -> List[str]:
+                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1292,7 +1290,7 @@ class AbstractTrainer:
             self._num_rows_train += len(X_val)
         self._num_cols_train = len(list(X.columns))
         model_names_fit = self.train_multi_levels(X, y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
-                                                  X_unlabeled=X_unlabeled, level_start=0, level_end=num_stack_levels, time_limit=time_limit, **kwargs)
+                                                  X_unlabeled=X_unlabeled, level_start=1, level_end=num_stack_levels+1, time_limit=time_limit, **kwargs)
         if len(self.get_model_names()) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
         return model_names_fit
@@ -1397,7 +1395,7 @@ class AbstractTrainer:
     #  This is because for non-raw, we do an optimization where each fold model calls .compute_feature_importance(), and then the feature importances are averaged across the folds.
     #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
     #  Consider aligning these methods so they produce the same result.
-    # The output of this function is identical to non-raw when model is level 0 and non-bagged
+    # The output of this function is identical to non-raw when model is level 1 and non-bagged
     def _get_feature_importance_raw(self, X, y, model, eval_metric=None, **kwargs) -> pd.DataFrame:
         if eval_metric is None:
             eval_metric = self.eval_metric
