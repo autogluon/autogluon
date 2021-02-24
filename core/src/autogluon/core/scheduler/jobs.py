@@ -129,6 +129,6 @@ class DistributedJobRunner(object):
     def __print(cls, tempdir, task_id, out):
         with open(os.path.join(tempdir, f'{task_id}.{out}')) as f:
             out = f.read()
-            file = sys.stderr if out is 'err' else sys.stdout
+            file = sys.stderr if out == 'err' else sys.stdout
             if out:
                 print(f'(task:{task_id})\t{out}', file=file, end='')
