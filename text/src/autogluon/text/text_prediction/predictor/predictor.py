@@ -161,7 +161,15 @@ class TextPredictor:
             search space and the configuration of the network.
         column_types
             The provided type of the columns. It will be a dictionary that maps the column name
-            to the type of the column.
+            to the type of the column. For example, it can be
+            {"item_name": "text", "brand": "text", "product_description": "text", "height": "numerical"}
+            If there are "item_name", "brand", "product_description", and "height" as column names.
+            The current supported types are:
+
+            - "text": Text Column
+            - "numerical" Numerical Column
+            - "categorical" Categorical Column
+
         num_cpus
             The number of CPUs to use for each trial
         num_gpus
