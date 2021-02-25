@@ -2,8 +2,12 @@
 
 ## Product Sentiment Classification
 
-Here, we provide the example that shows how to use AutoGluon to achieve top performance in 
-[Product Sentiment Classification Hackathon](https://www.machinehack.com/hackathons/product_sentiment_classification_weekend_hackathon_19/leaderboard) 
+Here, we provide the example that shows how to use AutoGluon to achieve top performance in MachineHack Product Sentiment Classification Competition. 
+To join the hackathon, you can first go to [MachineHack Website](https://www.machinehack.com/hackathon) and switch to "Late Submission" and 
+then go to "Product Sentiment Classification".
+This will bring you to the link: [link](https://www.machinehack.com/hackathons/product_sentiment_classification_weekend_hackathon_19/leaderboard)
+
+!IMPORTANT, you can not directly access the link and will have to follow the previous steps.
 
 ```
 mkdir -p machine_hack_product_sentiment
@@ -21,7 +25,13 @@ python3 run_competition.py --train_file machine_hack_product_sentiment/all_train
 It will generate a `submission.csv` file and you can try to submit that to the competition leaderboard. 
 
 ## Predict Price of Book
-Here, we provide the example that shows how to use AutoGluon to achieve top performance in [Book Price Prediction](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview).
+Here, we provide the example that shows how to use AutoGluon to achieve top performance in MachineHack Book Price Prediction Hackathon.
+To join the hackathon, you can first go to [MachineHack Website](https://www.machinehack.com/hackathon) and switch to "Active" and 
+go to "Predict The Price Of Books".
+This will bring you to the [link](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview)
+
+!IMPORTANT, you can not directly access the link and will have to follow the previous steps.
+
 Also, you will need to install `openpyxl` to read from xlsx file.
 
 ```
@@ -42,7 +52,13 @@ Once the script is finished, you will see a `submission.xlsx` file generate in t
 !IMPORTANT. Try to run the experiment on a p3.2x instance :).
 
 ## Predict Salary of Data Scientists
-Here, we provide the example that shows how to use AutoGluon to achieve top performance in [Data Scientist Salary Prediction](https://www.machinehack.com/hackathons/predict_the_data_scientists_salary_in_india_hackathon/overview).
+Here, we provide the example that shows how to use AutoGluon to achieve top performance in MachineHack Data Scientist Salary Prediction Hackathon. 
+To join the hackathon, you can first go to [MachineHack Website](https://www.machinehack.com/hackathon) and switch to "Active" and 
+go to ""
+This will bring you to the link: [link](https://www.machinehack.com/hackathons/predict_the_data_scientists_salary_in_india_hackathon/overview)
+
+!IMPORTANT, you can not directly access the link and will have to follow the previous steps.
+
 Also, you will need to install `openpyxl` to read from xlsx file.
 
 ```
