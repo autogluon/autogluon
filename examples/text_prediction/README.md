@@ -54,7 +54,7 @@ Once the script is finished, you will see a `submission.xlsx` file generate in t
 ## Predict Salary of Data Scientists
 Here, we provide the example that shows how to use AutoGluon to achieve top performance in MachineHack Data Scientist Salary Prediction Hackathon. 
 To join the hackathon, you can first go to [MachineHack Website](https://www.machinehack.com/hackathon) and switch to "Active" and 
-go to ""
+go to "Predict The Data Scientists Salary In India Hackathon".
 This will bring you to the link: [link](https://www.machinehack.com/hackathons/predict_the_data_scientists_salary_in_india_hackathon/overview)
 
 !IMPORTANT, you can not directly access the link and will have to follow the previous steps.
