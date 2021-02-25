@@ -386,6 +386,14 @@ class TextPredictor:
 
     @classmethod
     def load(cls, path):
+        """Load from the corresponding path
+
+        Parameters
+        ----------
+        path
+            The path to load the data
+
+        """
         assert os.path.exists(path),\
             f'"{path}" does not exist. You may check the path again.'
         with open(os.path.join(path,
