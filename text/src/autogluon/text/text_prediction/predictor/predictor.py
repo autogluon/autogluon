@@ -245,6 +245,10 @@ class TextPredictor:
         logger.log(25, 'Problem Type="{}"'.format(problem_type))
         logger.log(25, printable_column_type_string(column_types))
         self._problem_type = problem_type
+        if 'models' not in hyperparameters or 'MultimodalTextModel' not in hyperparameters['models']:
+            raise ValueError('The current TextPredictor only supports "MultimodalTextModel" '
+                             'and you must ensure that '
+                             'hyperparameters["models"]["MultimodalTextModel"] can be accessed.')
         model_hparams = hyperparameters['models']['MultimodalTextModel']
         self._backend = model_hparams['backend']
         if plot_results is None:
