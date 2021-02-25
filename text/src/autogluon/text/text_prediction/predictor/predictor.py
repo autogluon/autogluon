@@ -366,7 +366,8 @@ class TextPredictor:
         Returns
         -------
         embeddings
-            The output will have shape (#sample, #embedding dimension)
+            The output will be numpy array of shape (len(dataset), D), where the embedding
+            dimension D is determined by the neural network's architecture.
         """
         assert self._model is not None, 'Model does not seem to have been constructed. ' \
                                         'Have you called fit(), or load()?'
