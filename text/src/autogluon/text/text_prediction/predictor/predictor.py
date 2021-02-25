@@ -189,7 +189,7 @@ class TextPredictor:
             preset_hparams = ag_text_presets.create('default')
         hyperparameters = merge_params(preset_hparams, hyperparameters)
         if num_trials is not None:
-            hyperparameters['hpo_params']['num_trials'] = num_trials
+            hyperparameters['tune_kwargs']['num_trials'] = num_trials
         if isinstance(self._label, str):
             label_columns = [self._label]
         else:
@@ -207,7 +207,7 @@ class TextPredictor:
             tuning_data = tuning_data[all_columns]
         else:
             if holdout_frac is None:
-                num_trials = hyperparameters['hpo_params']['num_trials']
+                num_trials = hyperparameters['tune_kwargs']['num_trials']
                 if num_trials == 1:
                     holdout_frac = default_holdout_frac(len(train_data), False)
                 else:
@@ -256,7 +256,7 @@ class TextPredictor:
                               num_cpus=num_cpus,
                               num_gpus=num_gpus,
                               search_space=model_hparams['search_space'],
-                              hpo_params=hyperparameters['hpo_params'],
+                              tune_kwargs=hyperparameters['tune_kwargs'],
                               time_limit=time_limit,
                               seed=seed,
                               plot_results=plot_results,

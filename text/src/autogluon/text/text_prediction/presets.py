@@ -38,12 +38,11 @@ def base() -> dict:
                 }
             },
         },
-        'hpo_params': {
+        'tune_kwargs': {                   # Same as the hyperparameter_tune_kwargs in AutoGluon Tabular.
             'search_strategy': 'random',   # Can be 'random', 'bayesopt', 'skopt',
                                            # 'hyperband', 'bayesopt_hyperband'
             'search_options': None,        # Extra kwargs passed to searcher
             'scheduler_options': None,     # Extra kwargs passed to scheduler
-            'time_limits': None,           # The total time limit
             'num_trials': 1,               # The number of trials
         },
     }

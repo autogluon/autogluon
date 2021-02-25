@@ -895,7 +895,7 @@ class MultiModalTextModel:
               num_cpus=None,
               num_gpus=None,
               time_limit=None,
-              hpo_params=None,
+              tune_kwargs=None,
               search_space=None,
               plot_results=False,
               console_log=True,
@@ -915,7 +915,7 @@ class MultiModalTextModel:
             Number of GPUs for each trial
         time_limit
             The time limits
-        hpo_params
+        tune_kwargs
             Parameters of the HPO algorithms. For example, the scheduling
             algorithm, scheduling backend, HPO algorithm.
         search_space
@@ -940,9 +940,9 @@ class MultiModalTextModel:
                 ag_text_presets.create('default')['models']['MultimodalTextModel']['search_space']
         search_space_reg = args(search_space=space.Dict(**search_space))
         # Scheduler and searcher for HPO
-        if hpo_params is None:
-            hpo_params = ag_text_presets.create('default')['hpo_params']
-        scheduler_options = hpo_params['scheduler_options']
+        if tune_kwargs is None:
+            tune_kwargs = ag_text_presets.create('default')['tune_kwargs']
+        scheduler_options = tune_kwargs['scheduler_options']
         num_cpus, num_gpus = get_recommended_resource(num_cpus, num_gpus)
         if num_gpus == 0:
             if 'AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU' in os.environ:
@@ -973,12 +973,12 @@ class MultiModalTextModel:
                 plot_results = False
         scheduler_options = compile_scheduler_options_v2(
             scheduler_options=scheduler_options,
-            search_strategy=hpo_params['search_strategy'],
-            search_options=hpo_params['search_options'],
+            search_strategy=tune_kwargs['search_strategy'],
+            search_options=tune_kwargs['search_options'],
             nthreads_per_trial=num_cpus,
             ngpus_per_trial=num_gpus,
             checkpoint=os.path.join(self._output_directory, 'checkpoint.ag'),
-            num_trials=hpo_params['num_trials'],
+            num_trials=tune_kwargs['num_trials'],
             time_out=time_limit,
             resume=False,
             visualizer=scheduler_options.get('visualizer'),
@@ -1012,9 +1012,9 @@ class MultiModalTextModel:
         no_job_finished_err_msg =\
             'No training job has been completed! '\
             'There are two possibilities: '\
-            '1) The time_limits is too small, '\
+            '1) The time_limit is too small, '\
             'or 2) There are some internal errors in AutoGluon. '\
-            'For the first case, you can increase the time_limits or set it to '\
+            'For the first case, you can increase the time_limit or set it to '\
             'None, e.g., setting "predictor.fit(..., time_limit=None). To '\
             'further investigate the root cause, you can also try to set the '\
             '"verbosity=3" and try again, i.e., predictor.set_verbosity(3).'
@@ -1046,10 +1046,10 @@ class MultiModalTextModel:
                 plt.show()
             self._results = local_results
         else:
-            if hpo_params['search_strategy'] != 'local_sequential_auto':
+            if tune_kwargs['search_strategy'] != 'local_sequential_auto':
                 # Force forkserver if it's not using the local sequential HPO
                 force_forkserver()
-            scheduler_cls = schedulers[hpo_params['search_strategy']]
+            scheduler_cls = schedulers[tune_kwargs['search_strategy']]
             # Create scheduler, run HPO experiment
             scheduler = scheduler_cls(train_fn, **scheduler_options)
             scheduler.run()
