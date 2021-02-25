@@ -18,7 +18,7 @@ DEFAULT_DISTILL_PRIORITY = dict(
 
 
 def get_preset_models_distillation(path, problem_type, eval_metric, hyperparameters,
-                                   level=0, name_suffix='_DSTL', invalid_model_names: list = None, **kwargs):
+                                   level=1, name_suffix='_DSTL', invalid_model_names: list = None, **kwargs):
     hyperparameters = process_hyperparameters(hyperparameters)
     level_key = level if level in hyperparameters.keys() else 'default'
     if level_key not in hyperparameters.keys() and level_key == 'default':
