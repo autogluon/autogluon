@@ -21,7 +21,7 @@ from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
-from .callbacks import AgSaveModelCallback
+from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -193,9 +193,9 @@ class NNFastAiTabularModel(AbstractModel):
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
-        objective_optim_mode = 'min' if objective_func_name in [
+        objective_optim_mode = np.less if objective_func_name in [
             'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'r2'  # Regression objectives
-        ] else 'auto'
+        ] else np.greater
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
         if params.get('layers', None) is not None:
@@ -224,6 +224,15 @@ class NNFastAiTabularModel(AbstractModel):
         #                             min_delta=params['early.stopping.min_delta'], patience=params['early.stopping.patience'],
         #                             time_limit=time_left, best_epoch_stop=best_epoch_stop)
 
+        early_stopping = EarlyStoppingCallbackWithTimeLimit(
+            monitor=objective_func_name_to_monitor,
+            comp=objective_optim_mode,
+            min_delta=params['early.stopping.min_delta'],
+            patience=params['early.stopping.patience'],
+            time_limit=time_left, best_epoch_stop=best_epoch_stop
+        )
+
+
         config = dict(
             ps=ps,
             embed_p=params['emb_drop'],
@@ -231,8 +240,7 @@ class NNFastAiTabularModel(AbstractModel):
         dls = data.dataloaders()
         self.model = tabular_learner(
             dls, layers=layers, metrics=nn_metric,
-            # config=config, loss_func=loss_func,
-            # callback_fns=[early_stopping_fn], # FIXME
+            config=config, loss_func=loss_func,
         )
         logger.log(15, self.model.model)
 
@@ -248,6 +256,7 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.path = Path(temp_dir)
                     self.model.fit_one_cycle(
                         params['epochs'], params['lr'],
+                        cbs=[early_stopping],  # FIXME
                         # cbs=save_callback,
                     )
                     self.model.save(self.name)

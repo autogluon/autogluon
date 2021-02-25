@@ -12,16 +12,17 @@ logger = logging.getLogger(__name__)
 
 class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
 
-    def __init__(self, learn: Learner, time_limit=None, best_epoch_stop=None, **kwargs):
-        super().__init__(learn, **kwargs)
+    def __init__(self, time_limit=None, best_epoch_stop=None, **kwargs):
+        super().__init__(**kwargs)
         self.time_limit = time_limit
         self.start_time = time.time()
         self.best_epoch_stop = best_epoch_stop
 
-    def on_epoch_end(self, epoch, **kwargs):
+
+    def after_epoch(self):
         if self.best_epoch_stop is not None:
-            if epoch >= self.best_epoch_stop:
-                logger.log(20, f'\tStopping at the best epoch learned earlier - {epoch}.')
+            if self.epoch >= self.best_epoch_stop:
+                logger.log(20, f'\tStopping at the best epoch learned earlier - {self.epoch}.')
                 return {'stop_training': True}
         if self.time_limit:
             time_elapsed = time.time() - self.start_time
@@ -29,7 +30,7 @@ class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
             if time_left <= 0:
                 logger.log(20, '\tRan out of time, stopping training early.')
                 return {'stop_training': True}
-        return super().on_epoch_end(epoch, **kwargs)
+        super().after_epoch()
 
 
 class AgSaveModelCallback(TrackerCallback):
