@@ -146,7 +146,7 @@ class DefaultLearner(AbstractLearner):
             else:
                 X_val, y_val = self.extract_label(X_val)
                 y_val = self.label_cleaner.transform(y_val)
-                X_val = self.set_predefined_weights(X, y_val)
+                X_val = self.set_predefined_weights(X_val, y_val)
                 X_val, w_val = extract_column(X_val, self.sample_weight)
         else:
             y_val = None
