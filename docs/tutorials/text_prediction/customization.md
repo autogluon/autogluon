@@ -123,6 +123,7 @@ In this example, we search for good values of the following hyperparameters:
 def electra_small_basic_demo_hpo():
     hparams = ag_text_presets.create('electra_small_fuse_late')
     search_space = hparams['models']['MultimodalTextModel']['search_space']
+    search_space['optimization.per_device_batch_size'] = 8
     search_space['model.network.agg_net.mid_units'] = ag.core.space.Int(32, 128)
     search_space['optimization.warmup_portion'] = ag.core.space.Categorical(0.1, 0.2)
     search_space['optimization.lr'] = ag.core.space.Real(1E-5, 2E-4)
