@@ -340,7 +340,7 @@ class TextPredictor:
             output = pd.DataFrame(output)
         return output
 
-    def extract_embedding(self, data):
+    def extract_embedding(self, data, as_pandas=False):
         """Extract the feature from the neural network
 
         Parameters
@@ -348,6 +348,8 @@ class TextPredictor:
         data
             The dataset to extract the embedding. It can either be a pandas dataframe or
             the path to the pandas dataframe.
+        as_pandas
+            Whether to return a pandas dataframe
 
         Returns
         -------
@@ -357,6 +359,8 @@ class TextPredictor:
         assert self._model is not None, 'Model does not seem to have been constructed. ' \
                                         'Have you called fit(), or load()?'
         output = self._model.extract_embedding(data)
+        if as_pandas:
+            output = pd.DataFrame(output)
         return output
 
     def save(self, path):
