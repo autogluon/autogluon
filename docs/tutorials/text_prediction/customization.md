@@ -1,7 +1,7 @@
 # Text Prediction - Customization and Hyperparameter Search
 :label:`sec_textprediction_customization`
 
-This tutorial teaches you how to control the hyperparameter tuning process in `TextPrediction` by specifying:
+This tutorial teaches you how to control the hyperparameter tuning process in `TextPredictor` by specifying:
 
 - A custom search space of candidate hyperparameter values to consider.
 - Which hyperparameter optimization algorithm should be used to actually search through this space.
@@ -33,14 +33,16 @@ train_data.head(10)
 
 ### Pre-configured Hyperparameters in TextPredictor
 
-We provided a series of pre-configured hyperparameters. You may list the keys from `ag_text_presets`.
+We provided a series of pre-configured hyperparameters. You may list the keys from `ag_text_presets` via `list_presets`.
 
 
 ```{.python .input}
-from autogluon.text import ag_text_presets
-ag_text_presets.list_keys()
+from autogluon.text import ag_text_presets, list_presets
+list_presets()
 ```
 
+There are two kinds of presets. The `simple_presets` are pre-defined configurations managed by AutoGluon team. We pre-selected the appropriate model 
+configurations for different scenarios like `medium_quality_faster_train` or `lower_quality_fast_train`. We also list all the additional presets for advanced users. 
 These pre-configured models use different backbones such as ELECTRA, RoBERTa, Multilingual BERT, and different fusion strategies. For example, `electra_small_fuse_late` means to use the ELECTRA-small model as the text backbone and use the late fusion strategy described in ":label:`sec_textprediction_architecture`". By default, we are using `default`, which is the same as `electra_base_fuse_late`. Next, let's try to specify the `presets` in `.fit()` to be `electra_small_fuse_late` and train a model on SSTs.
 
 
@@ -62,7 +64,8 @@ To visualize the pre-registered hyperparameters, you can call `ag_text_presets.c
 
 
 ```{.python .input}
-ag_text_presets.create('electra_small_fuse_late')
+import pprint
+pprint.pprint(ag_text_presets.create('electra_small_fuse_late'))
 ```
 
 Another way to specify customized config is to directly specify the `hyperparameters` argument in `predict.fit()`. Following is an example
