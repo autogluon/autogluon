@@ -30,7 +30,7 @@ def base() -> dict:
                 'search_space': {
                     'model.backbone.name': 'google_electra_base',
                     'optimization.batch_size': 128,
-                    'optimization.per_device_batch_size': 8,
+                    'optimization.per_device_batch_size': 4,
                     'optimization.num_train_epochs': 10,
                     'optimization.lr': space.Categorical(1E-4),
                     'optimization.wd': 1E-4,
@@ -119,20 +119,20 @@ def apply_backbone(cfg, backbone_name='electra_base'):
     search_space = new_cfg['models']['MultimodalTextModel']['search_space']
     if backbone_name == 'electra_small':
         search_space['model.backbone.name'] = 'google_electra_small'
-        search_space['optimization.per_device_batch_size'] = 16
+        search_space['optimization.per_device_batch_size'] = 8
     elif backbone_name == 'electra_base':
         search_space['model.backbone.name'] = 'google_electra_base'
-        search_space['optimization.per_device_batch_size'] = 8
+        search_space['optimization.per_device_batch_size'] = 4
     elif backbone_name == 'electra_large':
         search_space['model.backbone.name'] = 'google_electra_large'
-        search_space['optimization.per_device_batch_size'] = 4
+        search_space['optimization.per_device_batch_size'] = 2
     elif backbone_name == 'roberta_base':
         search_space['model.backbone.name'] = 'fairseq_roberta_base'
         search_space['model.network.text_net.use_segment_id'] = False
-        search_space['optimization.per_device_batch_size'] = 8
+        search_space['optimization.per_device_batch_size'] = 4
     elif backbone_name == 'multi_cased_bert_base':
         search_space['model.backbone.name'] = 'google_multi_cased_bert_base'
-        search_space['optimization.per_device_batch_size'] = 8
+        search_space['optimization.per_device_batch_size'] = 4
     else:
         raise NotImplementedError
     return new_cfg
