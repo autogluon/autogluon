@@ -14,7 +14,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
@@ -148,25 +148,28 @@ class AbstractLearner:
 
     def _validate_sample_weight(self, X, X_val):
         if self.sample_weight is not None:
-            if self.sample_weight not in X.columns:
-                raise KeyError(f"sample_weight column '{self.sample_weight}' is missing from training data. Training data columns: {list(X.columns)}")
-            weight_vals = X[self.sample_weight]
-            if weight_vals.isna().sum() > 0:
-                raise ValueError(f"Sample weights in column '{self.sample_weight}' cannot be nan")
-            if weight_vals.dtype.kind not in 'biuf':
-                raise ValueError(f"Sample weights in column '{self.sample_weight}' must be numeric values")
-            if weight_vals.min() < 0:
-                raise ValueError(f"Sample weights in column '{self.sample_weight}' must be nonnegative")
-            if self.weight_evaluation and X_val is not None and self.sample_weight not in X_val.columns:
-                raise KeyError(f"sample_weight column '{self.sample_weight}' cannot be missing from validation data if weight_evaluation=True")
-
-            if self.sample_weight is not None:
-                prefix = f"Values in column '{self.sample_weight}' used as sample weights instead of predictive features."
+            if self.sample_weight in [AUTO_WEIGHT, BALANCE_WEIGHT]:
+                prefix = f"Using predefined sample weighting strategy: {self.sample_weight}."
                 if self.weight_evaluation:
-                    suffix = " Evaluation will report weighted metrics, so ensure same column exists in test data."
-                else:
-                    suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation=True to instead report weighted metrics."
-                logger.log(20, prefix+suffix)
+                    prefix += " Warning: We do not recommend weight_evaluation=True with predefined sample weighting."
+            else:
+                if self.sample_weight not in X.columns:
+                    raise KeyError(f"sample_weight column '{self.sample_weight}' is missing from training data. Training data columns: {list(X.columns)}")
+                weight_vals = X[self.sample_weight]
+                if weight_vals.isna().sum() > 0:
+                    raise ValueError(f"Sample weights in column '{self.sample_weight}' cannot be nan")
+                if weight_vals.dtype.kind not in 'biuf':
+                    raise ValueError(f"Sample weights in column '{self.sample_weight}' must be numeric values")
+                if weight_vals.min() < 0:
+                    raise ValueError(f"Sample weights in column '{self.sample_weight}' must be nonnegative")
+                if self.weight_evaluation and X_val is not None and self.sample_weight not in X_val.columns:
+                    raise KeyError(f"sample_weight column '{self.sample_weight}' cannot be missing from validation data if weight_evaluation=True")
+                prefix = f"Values in column '{self.sample_weight}' used as sample weights instead of predictive features."
+            if self.weight_evaluation:
+                suffix = " Evaluation will report weighted metrics, so ensure same column exists in test data."
+            else:
+                suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation=True to instead report weighted metrics."
+            logger.log(20, prefix+suffix)
 
 
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
