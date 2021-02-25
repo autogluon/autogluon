@@ -326,7 +326,7 @@ class TextPredictor:
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         output = self._model.predict(data)
         if as_pandas:
-            output = pd.DataFrame({self.label: output})[self.label]
+            output = pd.DataFrame({self.label: output}, index=data.index)[self.label]
         return output
 
     def predict_proba(self, data, as_pandas=True):
@@ -349,7 +349,7 @@ class TextPredictor:
             'Have you called fit(), or load()?'
         output = self._model.predict_proba(data)
         if as_pandas:
-            output = pd.DataFrame(output)
+            output = pd.DataFrame(output, index=data.index)
         return output
 
     def extract_embedding(self, data, as_pandas=False):
@@ -372,7 +372,7 @@ class TextPredictor:
                                         'Have you called fit(), or load()?'
         output = self._model.extract_embedding(data)
         if as_pandas:
-            output = pd.DataFrame(output)
+            output = pd.DataFrame(output, index=data.index)
         return output
 
     def save(self, path):
