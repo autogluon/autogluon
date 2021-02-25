@@ -177,7 +177,8 @@ class TextPredictor:
         num_trials
             The number of trials in HPO if HPO is to be used.
             By default, we will use the provided number of trials in the
-            hyperparameters or presets. This will overwrite the provided value.
+            hyperparameters or presets. This will overwrite the provided value in
+            hyperparameters['tune_kwargs']['num_trials'].
         plot_results
             Whether to plot results. During the fit function.
         holdout_frac
