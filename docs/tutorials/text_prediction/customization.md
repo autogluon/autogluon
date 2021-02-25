@@ -48,7 +48,7 @@ These pre-configured models use different backbones such as ELECTRA, RoBERTa, Mu
 from autogluon.text import TextPredictor
 predictor = TextPredictor(path='ag_text_sst_electra_small', eval_metric='acc', label='label')
 predictor.set_verbosity(0)
-predictor.fit(train_data, presets='electra_small_fuse_late', time_limit=60, seed=123)
+predictor.fit(train_data, presets='electra_small_fuse_late', plot_results=True, time_limit=60, seed=123)
 ```
 
 Here, we try to report the performance of both `f1` and `acc`. However, if you really want to obtain the best F1 score, you should better set 
@@ -70,7 +70,7 @@ Another way to specify customized config is to directly specify the `hyperparame
 
 ```{.python .input}
 predictor.fit(train_data, hyperparameters=ag_text_presets.create('electra_small_fuse_late'),
-              time_limit=30, seed=123)
+              time_limit=30, plot_results=True, seed=123)
 ```
 
 ### Change Hyperparameter
@@ -85,7 +85,7 @@ In the example, we change the number of training epochs to 5 and the learning ra
 hyperparameters = ag_text_presets.create('electra_small_fuse_late')
 hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 5
 hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.lr'] = ag.core.space.Categorical(5E-5)
-predictor.fit(train_data, hyperparameters=hyperparameters, time_limit=30, seed=123)
+predictor.fit(train_data, hyperparameters=hyperparameters, time_limit=30, plot_results=True, seed=123)
 ```
 
 ### Register Your Own Configuration
@@ -103,7 +103,7 @@ def electra_small_fuse_late_train5():
     hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.wd'] = 1E-2
     return hyperparameters
 
-predictor.fit(train_data, presets='electra_small_fuse_late_train5', time_limit=60, seed=123)
+predictor.fit(train_data, presets='electra_small_fuse_late_train5', plot_results=True, time_limit=60, seed=123)
 ```
 
 ## Perform HPO over a Customized Search Space with Random Search
@@ -145,6 +145,7 @@ predictor_sst_rs.fit(train_data,
                       hyperparameters=electra_small_basic_demo_hpo(),
                       time_limit=60 * 2,
                       num_trials=4,
+                      plot_results=True,
                       seed=123)
 ```
 
@@ -174,6 +175,7 @@ predictor_sst_bo.fit(train_data,
                      hyperparameters=hyperparameters,
                      time_limit=60 * 2,
                      num_trials=4,
+                     plot_results=True,
                      seed=123)
 ```
 
@@ -202,6 +204,7 @@ predictor_sst_hb.fit(train_data,
                      hyperparameters=hyperparameters,
                      time_limit=60 * 2,
                      num_trials=8,
+                     plot_results=True,
                      seed=123)
 ```
 
