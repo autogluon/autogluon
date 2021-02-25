@@ -1,13 +1,49 @@
+__all__ = ['calculate_metric_by_expr', 'infer_eval_log_metrics']
+
 import ast
 import operator as op
-
-__all__ = ['calculate_metric_by_expr']
-
+from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 
 # supported operators
 operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
              ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
              ast.USub: op.neg}
+
+
+def infer_eval_log_metrics(problem_type, eval_metric=None):
+    """Decide default evaluation, stopping, and logging metrics (based on type of prediction problem).
+
+    Parameters
+    ----------
+    problem_type
+        Type of the problem. Either regression, multiclass, or binary
+    eval_metric
+        The eval metric provided by the user
+
+    Returns
+    -------
+    eval_metric
+        The updated evaluation metric
+    log_metrics
+        The updated logging metric
+    """
+    if problem_type == MULTICLASS:
+        if eval_metric is None:
+            eval_metric = 'acc'
+        log_metrics = ['acc', 'log_loss']
+    elif problem_type == BINARY:
+        if eval_metric is None:
+            eval_metric = 'acc'
+        log_metrics = ['f1', 'mcc', 'roc_auc', 'acc', 'log_loss']
+    elif problem_type == REGRESSION:
+        if eval_metric is None:
+            eval_metric = 'rmse'
+        log_metrics = ['r2', 'rmse', 'mae']
+    else:
+        raise NotImplementedError('The problem type is not supported yet!')
+    if eval_metric not in log_metrics:
+        log_metrics.append(eval_metric)
+    return eval_metric, log_metrics
 
 
 def eval_math_expr(expr):

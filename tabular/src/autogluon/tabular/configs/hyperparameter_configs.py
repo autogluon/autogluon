@@ -79,23 +79,9 @@ hyperparameter_config_dict = dict(
         ],
         'CAT': {},
         'XGB': {},
-        # 'FASTAI': {},  # FIXME: FASTAI is extremely slow if trained alongside TextNN due to forkserver.
-        'RF': [
-            {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
-            {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-            {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
-        ],
-        'XT': [
-            {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
-            {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-            {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
-        ],
-        'KNN': [
-            {'weights': 'uniform', 'ag_args': {'name_suffix': 'Unif'}},
-            {'weights': 'distance', 'ag_args': {'name_suffix': 'Dist'}},
-        ],
-        'TEXT_NN_V1': ['ELECTRA_BASE'],
+        # 'FASTAI': {}, FastAI gets killed if the dataset is large (400K rows).
         'custom': ['GBM'],
+        'AG_TEXT_NN': ['medium_quality_faster_train'],  # TODO, Support changing the config w.r.t the preset option.
     },
 )
 

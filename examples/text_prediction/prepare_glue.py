@@ -3,19 +3,15 @@
 # and
 # https://github.com/nyu-mll/jiant/blob/master/scripts/download_superglue_data.py
 import os
-import sys
 import shutil
-import tempfile
 import argparse
 import zipfile
 import json
-import pathlib
 import pandas as pd
 import pyarrow
 import pyarrow.json
 from autogluon_contrib_nlp.utils.misc import download, load_checksum_stats
 from autogluon_contrib_nlp.base import get_data_home_dir
-from autogluon_contrib_nlp.registry import DATA_MAIN_REGISTRY, DATA_PARSER_REGISTRY
 from autogluon_contrib_nlp.data.tokenizers import WhitespaceTokenizer
 
 
@@ -55,7 +51,7 @@ def read_tsv_glue(tsv_file, num_skip=1, keep_column_names=False):
     if keep_column_names:
         assert num_skip == 1
     column_names = None
-    with open(tsv_file, 'r') as f:
+    with open(tsv_file, 'r', encoding="utf8") as f:
         for i, line in enumerate(f):
             line = line.strip()
             if i < num_skip:
@@ -471,20 +467,20 @@ def read_broadcoverage_diagnostic(dir_path):
 
 
 GLUE_TASK2PATH = {
-    "cola": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FCoLA.zip?alt=media&token=46d5e637-3411-4188-bc44-5809b5bfb5f4",  # noqa
-    "sst": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FSST-2.zip?alt=media&token=aabc5f6b-e466-44a2-b9b4-cf6337f84ac8",  # noqa
+    "cola": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/cola.zip",  # noqa
+    "sst": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/sst.zip",  # noqa
     "mrpc": {
         'train': "https://dl.fbaipublicfiles.com/senteval/senteval_data/msr_paraphrase_train.txt",
         'dev':  "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2Fmrpc_dev_ids.tsv?alt=media&token=ec5c0836-31d5-48f4-b431-7480817f1adc",
         'test': "https://dl.fbaipublicfiles.com/senteval/senteval_data/msr_paraphrase_test.txt"
     },
-    "qqp": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FQQP-clean.zip?alt=media&token=11a647cb-ecd3-49c9-9d31-79f8ca8fe277",  # noqa
-    "sts": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FSTS-B.zip?alt=media&token=bddb94a7-8706-4e0d-a694-1109e12273b5",  # noqa
-    "mnli": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FMNLI.zip?alt=media&token=50329ea1-e339-40e2-809c-10c40afff3ce",  # noqa
-    "snli": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FSNLI.zip?alt=media&token=4afcfbb2-ff0c-4b2d-a09a-dbf07926f4df",  # noqa
-    "qnli": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FQNLIv2.zip?alt=media&token=6fdcf570-0fc5-4631-8456-9505272d1601",  # noqa
-    "rte": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FRTE.zip?alt=media&token=5efa7e85-a0bb-4f19-8ea2-9e1840f077fb",  # noqa
-    "wnli": "https://firebasestorage.googleapis.com/v0/b/mtl-sentence-representations.appspot.com/o/data%2FWNLI.zip?alt=media&token=068ad0a0-ded7-4bd7-99a5-5e00222e0faf",  # noqa
+    "qqp": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/qqp.zip",  # noqa
+    "sts": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/sts.zip",  # noqa
+    "mnli": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/mnli.zip",  # noqa
+    "snli": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/snli.zip",  # noqa
+    "qnli": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/qnli.zip",  # noqa
+    "rte": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/rte.zip",  # noqa
+    "wnli": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/glue/wnli.zip",  # noqa
     "diagnostic": [
         "https://storage.googleapis.com/mtl-sentence-representations.appspot.com/tsvsWithoutLabels%2FAX.tsv?GoogleAccessId=firebase-adminsdk-0khhl@mtl-sentence-representations.iam.gserviceaccount.com&Expires=2498860800&Signature=DuQ2CSPt2Yfre0C%2BiISrVYrIFaZH1Lc7hBVZDD4ZyR7fZYOMNOUGpi8QxBmTNOrNPjR3z1cggo7WXFfrgECP6FBJSsURv8Ybrue8Ypt%2FTPxbuJ0Xc2FhDi%2BarnecCBFO77RSbfuz%2Bs95hRrYhTnByqu3U%2FYZPaj3tZt5QdfpH2IUROY8LiBXoXS46LE%2FgOQc%2FKN%2BA9SoscRDYsnxHfG0IjXGwHN%2Bf88q6hOmAxeNPx6moDulUF6XMUAaXCSFU%2BnRO2RDL9CapWxj%2BDl7syNyHhB7987hZ80B%2FwFkQ3MEs8auvt5XW1%2Bd4aCU7ytgM69r8JDCwibfhZxpaa4gd50QXQ%3D%3D",  # noqa
         "https://www.dropbox.com/s/ju7d95ifb072q9f/diagnostic-full.tsv?dl=1",
@@ -507,16 +503,16 @@ GLUE_READERS = {
 
 
 SUPERGLUE_TASK2PATH = {
-    "cb": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/CB.zip",
-    "copa": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/COPA.zip",
-    "multirc": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/MultiRC.zip",
-    "rte": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/RTE.zip",
-    "wic": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/WiC.zip",
-    "wsc": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/WSC.zip",
+    "cb": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/superglue/cb.zip",
+    "copa": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/superglue/copa.zip",
+    "multirc": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/superglue/multirc.zip",
+    "rte": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/superglue/rte.zip",
+    "wic": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/superglue/wic.zip",
+    "wsc": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/superglue/wsc.zip",
     "broadcoverage-diagnostic": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/AX-b.zip",
     "winogender-diagnostic": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/AX-g.zip",
-    "boolq": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/BoolQ.zip",
-    "record": "https://dl.fbaipublicfiles.com/glue/superglue/data/v2/ReCoRD.zip",
+    "boolq": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/superglue/boolq.zip",
+    "record": "https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/glue_superglue/superglue/record.zip",
 }
 
 SUPERGLUE_READER = {
@@ -596,7 +592,6 @@ def get_tasks(benchmark, task_names):
     return tasks
 
 
-@DATA_PARSER_REGISTRY.register('prepare_glue')
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", choices=['glue', 'superglue'],
@@ -616,13 +611,13 @@ def get_parser():
     return parser
 
 
-@DATA_MAIN_REGISTRY.register('prepare_glue')
 def main(args):
     if args.data_dir is None:
         args.data_dir = args.benchmark
     args.cache_path = os.path.join(args.cache_path, args.benchmark)
-    print('Downloading {} to {}. Selected tasks = {}'.format(args.benchmark,
-                                                             args.data_dir, args.tasks))
+    print('Downloading {} to "{}". Selected tasks = {}'.format(args.benchmark,
+                                                               args.data_dir,
+                                                               args.tasks))
     os.makedirs(args.cache_path, exist_ok=True)
     os.makedirs(args.data_dir, exist_ok=True)
     tasks = get_tasks(args.benchmark, args.tasks)

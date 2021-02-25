@@ -27,7 +27,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     FASTAI=45,
     LR=40,
     FASTTEXT=0,
-    TEXT_NN_V1=0,
+    AG_TEXT_NN=0,
     TRANSF=0,
     custom=0,
 )
@@ -62,7 +62,7 @@ MODEL_TYPES = dict(
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
-    TEXT_NN_V1=TextPredictionV1Model,
+    AG_TEXT_NN=TextPredictionV1Model,
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
 )
@@ -78,7 +78,7 @@ DEFAULT_MODEL_NAMES = {
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
-    TextPredictionV1Model: 'TextNeuralNetV1',
+    TextPredictionV1Model: 'AGTextNeuralNetwork',
     FastTextModel: 'FastText',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
 }
@@ -154,7 +154,18 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
                 continue  # Don't include excluded models
             if isinstance(model_cfg, str):
-                model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type, num_classes=num_classes)
+                if model_type == 'AG_TEXT_NN':
+                    AG_TEXT_IMPORT_ERROR = 'autogluon.text has not been installed. ' \
+                                           'You may try to install "autogluon.text" ' \
+                                           'first by running. ' \
+                                           '`python3 -m pip install autogluon.text`'
+                    try:
+                        from autogluon.text import ag_text_presets
+                    except ImportError:
+                        raise ImportError(AG_TEXT_IMPORT_ERROR)
+                    model_cfgs_to_process.append(ag_text_presets.create(model_cfg))
+                else:
+                    model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type, num_classes=num_classes)
             else:
                 model_cfgs_to_process.append(model_cfg)
         for model_cfg in model_cfgs_to_process:

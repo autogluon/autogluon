@@ -101,14 +101,13 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 ~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.text
 
-.. autoclass:: TextPrediction
+.. autoclass:: TextPredictor
    :members:
    :inherited-members:
-   :exclude-members: run_fit
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TextPrediction
+    .. autoautosummary:: TextPredictor
         :methods:
 
 

@@ -32,7 +32,7 @@ def load(path, delimiter=None, encoding='utf-8', columns_to_keep=None, dtype=Non
         format = 'multipart_s3'
     elif path[-1] == '/' and not s3_utils.is_s3_url(path):  # and path[:2] != 's3'
         format = 'multipart_local'
-    elif '.parquet' in path or path[-1] == '/':
+    elif '.parquet' in path or '.pq' in path or path[-1] == '/':
         format = 'parquet'
     else:
         format = 'csv'
