@@ -162,37 +162,11 @@ print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
 
-## Use Bayesian Optimization
-
-Instead of random search, we can perform HPO via [Bayesian Optimization](https://distill.pub/2020/bayesian-optimization/).
-Here we specify **bayesopt** as the searcher.
-
-
-```{.python .input}
-hyperparameters = electra_small_basic_demo_hpo()
-hyperparameters['tune_kwargs']['search_strategy'] = 'bayesopt'
-predictor_sst_bo = TextPredictor(path='ag_text_sst_bo', label='label', eval_metric='acc')
-predictor_sst_bo.set_verbosity(0)
-predictor_sst_bo.fit(train_data,
-                     hyperparameters=hyperparameters,
-                     time_limit=60 * 2,
-                     num_trials=4,
-                     seed=123)
-```
-
-
-```{.python .input}
-dev_score = predictor_sst_bo.evaluate(dev_data, metrics=['acc', 'f1'])
-print('Best Config = {}'.format(predictor_sst_bo.results['best_config']))
-print('Total Time = {}s'.format(predictor_sst_bo.results['total_time']))
-print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
-print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
-```
-
 ## Use Bayesian Optimization + Hyperband
 
-Alternatively, we can instead use the [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf) for HPO.
-Hyperband will try multiple hyperparameter configurations simultaneously and will early stop training under poor configurations to free compute resources for exploring new hyperparameter configurations. It may be able to identify good hyperparameter values more quickly than other search strategies in your applications. In the following, we will use a combination of [Hyperband and Bayesian Optimization](https://arxiv.org/abs/2003.10865).
+Alternatively, we can use more advanced searchers like the combination of [Bayesian Optimization](https://distill.pub/2020/bayesian-optimization/) and [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf) for HPO.
+Hyperband will try multiple hyperparameter configurations simultaneously and will early stop training under poor configurations to free compute resources for exploring new hyperparameter configurations. 
+It may be able to identify good hyperparameter values more quickly than other search strategies in your applications. You may refer to [Hyperband and Bayesian Optimization](https://arxiv.org/abs/2003.10865) for more details.
 
 
 ```{.python .input}
