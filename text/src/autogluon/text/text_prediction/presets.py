@@ -194,6 +194,7 @@ def best_quality() -> dict:
 
     """
     cfg = ag_text_presets.create('electra_large_fuse_late')
+    cfg['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 20
     return cfg
 
 
