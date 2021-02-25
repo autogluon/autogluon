@@ -124,6 +124,7 @@ class TextPredictor:
             num_gpus=None,
             num_trials=None,
             plot_results=None,
+            holdout_frac=None,
             seed=0):
         """Fit the predictor
 
@@ -169,7 +170,10 @@ class TextPredictor:
             The number of trials. By default, we will use the provided number of trials in the
             hyperparameters or presets. This will overwrite the provided value.
         plot_results
-            Whether to plot results.
+            Whether to plot results. During the fit function.
+        holdout_frac
+            The holdout frac of the validation set. We will set it automatically
+            if it is not specified based on whether we are using hyperparameter search or not.
         seed
             The seed of the experiment. If it is None, no seed will be specified and
             each run will be random. By default, the seed will be 0.
@@ -205,9 +209,7 @@ class TextPredictor:
                 tuning_data = load_pd.load(tuning_data)
             tuning_data = tuning_data[all_columns]
         else:
-            if hyperparameters['misc']['holdout_frac'] is not None:
-                holdout_frac = hyperparameters['misc']['holdout_frac']
-            else:
+            if holdout_frac is None:
                 num_trials = hyperparameters['hpo_params']['num_trials']
                 if num_trials == 1:
                     holdout_frac = default_holdout_frac(len(train_data), False)

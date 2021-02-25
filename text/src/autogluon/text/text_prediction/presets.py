@@ -38,9 +38,6 @@ def base() -> dict:
                 }
             },
         },
-        'misc': {
-            'holdout_frac': None,  # If it is not provided, we will use the default strategy.
-        },
         'hpo_params': {
             'search_strategy': 'random',   # Can be 'random', 'bayesopt', 'skopt',
                                            # 'hyperband', 'bayesopt_hyperband'
