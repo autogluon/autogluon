@@ -46,7 +46,6 @@ def base() -> dict:
             'time_limits': None,           # The total time limit
             'num_trials': 1,               # The number of trials
         },
-        'seed': None,                      # The seed value
     }
     return ret
 
