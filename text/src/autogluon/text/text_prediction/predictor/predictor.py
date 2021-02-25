@@ -359,7 +359,7 @@ class TextPredictor:
         output = self._model.extract_embedding(data)
         return output
 
-    def save(self, dir_path):
+    def save(self, path):
         """Save the model to directory path
 
         It will contains two parts:
@@ -372,36 +372,36 @@ class TextPredictor:
 
         Parameters
         ----------
-        dir_path
+        path
             The directory path to save the model artifacts
 
         """
         assert self._model is not None, 'Model does not seem to have been constructed.' \
                                         ' Have you called fit(), or load()?'
-        os.makedirs(dir_path, exist_ok=True)
-        with open(os.path.join(dir_path, 'text_predictor_assets.json'), 'w') as of:
+        os.makedirs(path, exist_ok=True)
+        with open(os.path.join(path, 'text_predictor_assets.json'), 'w') as of:
             json.dump({'backend': self._backend,
                        'label': self._label}, of)
-        self._model.save(os.path.join(dir_path, 'saved_model'))
+        self._model.save(os.path.join(path, 'saved_model'))
 
     @classmethod
-    def load(cls, dir_path):
-        assert os.path.exists(dir_path),\
-            f'"{dir_path}" does not exist. You may check the path again.'
-        with open(os.path.join(dir_path,
+    def load(cls, path):
+        assert os.path.exists(path),\
+            f'"{path}" does not exist. You may check the path again.'
+        with open(os.path.join(path,
                                'text_predictor_assets.json'), 'r') as in_f:
             assets = json.load(in_f)
         backend = assets['backend']
         label = assets['label']
         if backend == 'gluonnlp_v0':
             from ..mx.models import MultiModalTextModel
-            model = MultiModalTextModel.load(os.path.join(dir_path, 'saved_model'))
+            model = MultiModalTextModel.load(os.path.join(path, 'saved_model'))
         else:
             raise NotImplementedError(f'Backend = "{backend}" is not supported.')
         ret = cls(eval_metric=model._eval_metric,
                   label=label,
                   problem_type=model._problem_type,
-                  path=dir_path,
+                  path=path,
                   warn_if_exist=False)
         ret._backend = assets['backend']
         ret._model = model
