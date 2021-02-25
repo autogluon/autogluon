@@ -130,7 +130,7 @@ def electra_small_basic_demo_hpo():
     search_space['optimization.wd'] = ag.core.space.Categorical(1E-4, 1E-3, 1E-2)
     search_space['optimization.num_train_epochs'] = 5
 
-    hparams['hpo_params']['search_strategy'] = 'random'
+    hparams['tune_kwargs']['search_strategy'] = 'random'
     return hparams
 ```
 
@@ -167,7 +167,7 @@ Here we specify **bayesopt** as the searcher.
 
 ```{.python .input}
 hyperparameters = electra_small_basic_demo_hpo()
-hyperparameters['hpo_params']['search_strategy'] = 'bayesopt'
+hyperparameters['tune_kwargs']['search_strategy'] = 'bayesopt'
 predictor_sst_bo = TextPredictor(path='ag_text_sst_bo', label='label', eval_metric='acc')
 predictor_sst_bo.set_verbosity(0)
 predictor_sst_bo.fit(train_data,
@@ -194,8 +194,8 @@ Hyperband will try multiple hyperparameter configurations simultaneously and wil
 
 ```{.python .input}
 hyperparameters = electra_small_basic_demo_hpo()
-hyperparameters['hpo_params']['search_strategy'] = 'bayesopt_hyperband'
-hyperparameters['hpo_params']['scheduler_options'] = {'max_t': 15} # Maximal number of epochs for training the neural network
+hyperparameters['tune_kwargs']['search_strategy'] = 'bayesopt_hyperband'
+hyperparameters['tune_kwargs']['scheduler_options'] = {'max_t': 15} # Maximal number of epochs for training the neural network
 predictor_sst_hb = TextPredictor(path='ag_text_sst_hb', label='label', eval_metric='acc')
 predictor_sst_hb.set_verbosity(0)
 predictor_sst_hb.fit(train_data,
