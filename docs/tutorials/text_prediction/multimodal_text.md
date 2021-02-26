@@ -102,7 +102,7 @@ Internally, we use different networks to encode the text columns, categorical co
 
 Here, we use the pretrained NLP backbone to extract the text features and then use two other towers to extract the feature from categorical column and the numerical column.
 
-In addition, to deal with multiple text fields, we separate these fields with the `[SEP]` token and alternate 0s and 1s as the segment IDs, which is shown as follos:
+In addition, to deal with multiple text fields, we separate these fields with the `[SEP]` token and alternate 0s and 1s as the segment IDs, which is shown as follows:
 
 ![Preprocessing](https://autogluon-text-data.s3.amazonaws.com/figures/preprocess.png)
 :width:`600px`

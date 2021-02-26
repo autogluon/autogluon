@@ -111,6 +111,51 @@ class TextPredictor:
     def backend(self):
         return self._backend
 
+    @property
+    def class_labels(self):
+        """The original name of the class labels.
+
+        For example, the tabular data may contain classes equal to
+        "entailment", "contradiction", "neutral". Internally, these will be converted to
+        0, 1, 2, ...
+
+        This function returns the original names of these raw labels.
+
+        Returns
+        -------
+        ret
+            List that contain the class names
+        """
+        return self._model.class_labels
+
+    @property
+    def class_labels_internal(self):
+        """The internal integer labels.
+
+        For example, if the possible labels are ["entailment", "contradiction", "neutral"],
+        the internal labels can be [0, 1, 2]
+
+        Returns
+        -------
+        ret
+            List that contains the internal integer labels.
+        """
+        return list(range(len(self.class_labels)))
+
+    @property
+    def class_labels_internal_map(self):
+        """The map that projects label names to the internal ids. For example,
+        if the internal labels are ["entailment", "contradiction", "neutral"] and the
+        internal ids are [0, 1, 2], the label mapping will be
+        {"entailment": 0, "contradiction": 1, "neutral": 2}
+
+        Returns
+        -------
+        ret
+            The label mapping dictionary
+        """
+        return {k: v for k, v in zip(self.class_labels, self.class_labels_internal)}
+
     def fit(self,
             train_data,
             tuning_data=None,

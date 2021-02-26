@@ -138,6 +138,8 @@ def test_emoji():
                   hyperparameters=get_test_hyperparameters(),
                   time_limit=30,
                   seed=123)
+    assert set(predictor.class_labels) == {'grin', 'smile', 'wink'}
+    assert predictor.class_labels_internal == [0, 1, 2]
     verify_predictor_save_load(predictor, df)
 
 
