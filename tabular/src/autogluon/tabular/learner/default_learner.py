@@ -219,12 +219,15 @@ class DefaultLearner(AbstractLearner):
         if self.sample_weight == BALANCE_WEIGHT:
             if self.class_weights is None:
                 class_counts = y.value_counts()
-                self.class_weights = {c : len(y)/(class_counts[c]*len(class_counts)) for c in class_counts.index}
+                n = len(y)
+                k = len(class_counts)
+                self.class_weights = {c : n/(class_counts[c]*k) for c in class_counts.index}
+                logger.log(20, "Assigning sample weights to balance differences in frequency of classes.")
                 logger.log(15, f"Balancing classes via the following weights: {self.class_weights}")
             w = y.map(self.class_weights)
         elif self.sample_weight == AUTO_WEIGHT:  # TODO: support more sophisticated auto_weight strategy
             raise NotImplementedError(f"{AUTO_WEIGHT} strategy not yet supported.")
-        X[self.sample_weight] = w
+        X[self.sample_weight] = w  # TODO: consider not bundling sample weights inside X
         return X
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
