@@ -952,7 +952,7 @@ class TabularPredictor:
             'stack_level': The stack level of the model.
                 A model with stack level N can take any set of models with stack level less than N as input, with stack level 1 models having no model inputs.
             'can_infer': If model is able to perform inference on new data. If False, then the model either was not saved, was deleted, or an ancestor of the model cannot infer.
-                `can_infer` is often False when `save_bag_folds=False` was specified in initial `task.fit`.
+                `can_infer` is often False when `save_bag_folds=False` was specified in initial `fit()`.
             'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth model fit has `fit_order=N`. The order corresponds to the first child model fit in the case of bagged ensembles.
 
         Parameters
@@ -1509,7 +1509,7 @@ class TabularPredictor:
     # TODO: Add data argument
     # TODO: Add option to disable OOF generation of newly fitted models
     # TODO: Move code logic to learner/trainer
-    # TODO: Add task.fit arg to perform this automatically at end of training
+    # TODO: Add fit() arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
     def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False, time_limit=None):
         """
@@ -1667,7 +1667,7 @@ class TabularPredictor:
             return self.transform_labels(labels=y_pred_proba_oof_transformed, inverse=True, proba=True)
 
     # TODO: v0.1 Properly error/return None if label_cleaner hasn't been fit yet. (After API refactor)
-    # TODO: v0.1 Add positive_class parameter to task.fit
+    # TODO: v0.1 Add positive_class parameter to fit()
     @property
     def positive_class(self):
         """
@@ -1703,11 +1703,11 @@ class TabularPredictor:
             Valid values are:
                 'train':
                     Load the training data used during model training.
-                    This is a transformed and augmented version of the `train_data` passed in `task.fit()`.
+                    This is a transformed and augmented version of the `train_data` passed in `fit()`.
                 'val':
                     Load the validation data used during model training.
-                    This is a transformed and augmented version of the `tuning_data` passed in `task.fit()`.
-                    If `tuning_data=None` was set in `task.fit()`, then `tuning_data` is an automatically generated validation set created by splitting `train_data`.
+                    This is a transformed and augmented version of the `tuning_data` passed in `fit()`.
+                    If `tuning_data=None` was set in `fit()`, then `tuning_data` is an automatically generated validation set created by splitting `train_data`.
                     Warning: Will raise an exception if called by a bagged predictor, as bagged predictors have no validation data.
         return_X : bool, default = True
             Whether to return the internal data features
@@ -1822,7 +1822,7 @@ class TabularPredictor:
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
         Distillation can produce a model that is more accurate than the same model fit directly on the original training data.
         After calling `distill()`, there will be more models available in this Predictor, which can be evaluated using `predictor.leaderboard(test_data)` and deployed with: `predictor.predict(test_data, model=MODEL_NAME)`.
-        This will raise an exception if `cache_data=False` was previously set in `task.fit()`.
+        This will raise an exception if `cache_data=False` was previously set in `fit()`.
 
         NOTE: Until catboost v0.24 is released, `distill()` with CatBoost students in multiclass classification requires you to first install catboost-dev: `pip install catboost-dev`
 

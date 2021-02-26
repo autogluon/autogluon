@@ -103,7 +103,7 @@ Finally, we have the desired directory structure under `./data/XXXX/train/`, whi
 
 ## Step 2: Use AutoGluon fit to generate a classification model
 
-Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.predictor.html#autogluon.vision.ImagePredictor.fit) function.
+Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.vision.ImagePredictor.fit) function.
 
 Run `benchmark.py` script with different dataset:
 
