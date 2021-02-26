@@ -1,11 +1,8 @@
 import logging
-import os
 import time
-from typing import Any
 
 from fastai.callback.tracker import EarlyStoppingCallback, TrackerCallback
-from fastai.learner import Learner
-from torch import Tensor
+from fastcore.basics import store_attr
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +14,6 @@ class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
         self.time_limit = time_limit
         self.start_time = time.time()
         self.best_epoch_stop = best_epoch_stop
-
 
     def after_epoch(self):
         if self.best_epoch_stop is not None:
@@ -34,42 +30,36 @@ class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
 
 
 class AgSaveModelCallback(TrackerCallback):
-    """A `TrackerCallback` that saves the model when monitored quantity is best."""
+    "A `TrackerCallback` that saves the model's best during training and loads it at the end."
+    _only_train_loop = True
 
-    def __init__(self, learn: Learner, monitor: str = 'valid_loss', mode: str = 'auto', every: str = 'improvement', name: str = 'bestmodel',
-                 best_epoch_stop=None):
-        super().__init__(monitor=monitor)
-        self.every, self.model_name, self.best, self.best_epoch = every, name, None, None
+    def __init__(self, monitor='valid_loss', comp=None, min_delta=0., fname='model', every_epoch=False,
+                 with_opt=False, reset_on_fit=True, best_epoch_stop=None):
+        super().__init__(monitor=monitor, comp=comp, min_delta=min_delta, reset_on_fit=reset_on_fit)
+        # keep track of file path for loggers
+        self.last_saved_path = None
         self.best_epoch_stop = best_epoch_stop
-        if self.every not in ['improvement', 'epoch']:
-            logger.warning(f'SaveModel every {self.every} is invalid, falling back to "improvement".')
-            self.every = 'improvement'
+        store_attr('fname,every_epoch,with_opt')
 
-    def jump_to_epoch(self, epoch: int) -> None:
-        try:
-            self.learn.load(f'{self.model_name}_{epoch - 1}', purge=False)
-            logger.info(15, f"Loaded {self.model_name}_{epoch - 1}")
-        except:
-            logger.info(15, f'Model {self.model_name}_{epoch - 1} not found.')
+    def _save(self, name):
+        self.last_saved_path = self.learn.save(name, with_opt=self.with_opt)
 
-    def on_epoch_end(self, epoch: int, **kwargs: Any) -> None:
-        """Compare the value monitored to its best score and maybe save the model."""
+    def after_epoch(self):
+        "Compare the value monitored to its best score and save if best."
         if self.best_epoch_stop is not None:  # use epoch learned earlier
-            if epoch >= self.best_epoch_stop:
-                logger.log(15, f'Saving model model at the best epoch learned earlier - {epoch}.')
-                self.best_epoch = epoch
+            if self.epoch >= self.best_epoch_stop:
+                logger.log(15, f'Saving model model at the best epoch learned earlier - {self.epoch}.')
+                self.best_epoch = self.epoch
                 self.learn.save(f'{self.model_name}')
-        elif self.every == "epoch":
-            self.learn.save(f'{self.model_name}_{epoch}')
-        else:  # every="improvement"
-            current = self.get_monitor_value()
-            if isinstance(current, Tensor): current = current.cpu()
-            if current is not None and self.operator(current, self.best):
-                logger.log(15, f'Better model found at epoch {epoch} with {self.monitor} value: {current}.')
-                self.best = current
-                self.best_epoch = epoch
-                self.learn.save(f'{self.model_name}')
+        if self.every_epoch:
+            self._save(f'{self.fname}_{self.epoch}')
+        else:  # every improvement
+            super().after_epoch()
+            if self.new_best:
+                print(f'Better model found at epoch {self.epoch} with {self.monitor} value: {self.best}.')
+                self.best_epoch = self.epoch
+                self._save(f'{self.fname}')
 
-    def on_train_end(self, **kwargs):
-        if self.every == "improvement" and os.path.isfile(self.path / self.model_dir / f'{self.model_name}.pth'):
-            self.learn.load(f'{self.model_name}', purge=False)
+    def after_fit(self, **kwargs):
+        if not self.every_epoch:
+            self.learn.load(f'{self.fname}', with_opt=self.with_opt)

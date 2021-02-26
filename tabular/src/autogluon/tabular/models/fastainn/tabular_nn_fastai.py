@@ -219,10 +219,19 @@ class NNFastAiTabularModel(AbstractModel):
             time_left = None
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-        # FIXME
-        # early_stopping_fn = partial(EarlyStoppingCallbackWithTimeLimit, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
-        #                             min_delta=params['early.stopping.min_delta'], patience=params['early.stopping.patience'],
-        #                             time_limit=time_left, best_epoch_stop=best_epoch_stop)
+
+        config = dict(ps=ps, embed_p=params['emb_drop'])
+        dls = data.dataloaders()
+        self.model = tabular_learner(
+            dls, layers=layers, metrics=nn_metric,
+            config=config, loss_func=loss_func,
+        )
+        logger.log(15, self.model.model)
+
+        save_callback = AgSaveModelCallback(
+            monitor=objective_func_name_to_monitor, comp=objective_optim_mode, fname=self.name,
+            best_epoch_stop=best_epoch_stop
+        )
 
         early_stopping = EarlyStoppingCallbackWithTimeLimit(
             monitor=objective_func_name_to_monitor,
@@ -232,34 +241,15 @@ class NNFastAiTabularModel(AbstractModel):
             time_limit=time_left, best_epoch_stop=best_epoch_stop
         )
 
-
-        config = dict(
-            ps=ps,
-            embed_p=params['emb_drop'],
-        )
-        dls = data.dataloaders()
-        self.model = tabular_learner(
-            dls, layers=layers, metrics=nn_metric,
-            config=config, loss_func=loss_func,
-        )
-        logger.log(15, self.model.model)
+        callbacks = [save_callback, early_stopping]
 
         with make_temp_directory() as temp_dir:
-            save_callback = SaveModelCallback(monitor=objective_func_name_to_monitor, every_epoch=True)
-            # FIXME
-            # save_callback = AgSaveModelCallback(
-            #     self.model, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, name=self.name,
-            #     best_epoch_stop=best_epoch_stop)
             with self.model.no_bar():
                 with self.model.no_logging():
                     original_path = self.model.path
                     self.model.path = Path(temp_dir)
-                    self.model.fit_one_cycle(
-                        params['epochs'], params['lr'],
-                        cbs=[early_stopping],  # FIXME
-                        # cbs=save_callback,
-                    )
-                    self.model.save(self.name)
+                    self.model.fit_one_cycle(params['epochs'], params['lr'], cbs=callbacks)
+                    # self.model.save(self.name)
 
                     # Load the best one and export it
                     self.model = self.model.load(self.name)
@@ -272,7 +262,7 @@ class NNFastAiTabularModel(AbstractModel):
                     logger.log(15, f'Model validation metrics: {eval_result}')
                     self.model.path = original_path
 
-            # self.params_trained['best_epoch'] = save_callback.best_epoch
+            self.params_trained['best_epoch'] = save_callback.best_epoch
 
     def _generate_datasets(self, X, y, X_val, y_val):
         df_train = pd.concat([X, X_val], ignore_index=True)
