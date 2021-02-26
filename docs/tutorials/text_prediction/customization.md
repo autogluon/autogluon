@@ -190,3 +190,5 @@ print('Total Time = {}s'.format(predictor_sst_hb.results['total_time']))
 print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
+
+You can also try setting `hyperparameters['tune_kwargs']['search_strategy']` to be `'bayesopt'` or `'local_sequential_auto'`.
