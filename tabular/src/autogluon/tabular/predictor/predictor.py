@@ -465,7 +465,7 @@ class TabularPredictor:
                 Default value is doubled if `hyperparameter_tune_kwargs` is set, up to a maximum of 0.2.
                 Disabled if `num_bag_folds >= 2`.
             hyperparameter_tune_kwargs : str or dict, default = None
-                Hyperparameter tuning strategy and kwargs.
+                Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                 Valid preset values:
                     'auto': Uses the 'local_sequential_auto' preset.

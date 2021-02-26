@@ -12,7 +12,7 @@ The advanced functionalities of AutoGluon enable you to use your external knowle
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` to learn the basics of the AutoGluon API.
 
-Since our task is to classify images, we will use AutoGluon to produce an [ImagePredictor](/api/autogluon.task.html#autogluon.vision.ImagePredictor):
+Since our task is to classify images, we will use AutoGluon to produce an [ImagePredictor](/api/autogluon.predictor.html#autogluon.vision.ImagePredictor):
 
 ```{.python .input}
 import autogluon.core as ag

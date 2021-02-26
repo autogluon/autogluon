@@ -3,9 +3,9 @@
 
 In this quick start, we'll use the task of image classification to illustrate how to use AutoGluon’s APIs.
 
-In this tutorial, we load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to AutoGluon's [fit](/api/autogluon.task.html#autogluon.vision.ImagePredictor.fit) function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the model that achieved the highest level of accuracy.
+In this tutorial, we load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to AutoGluon's [fit](/api/autogluon.predictor.html#autogluon.vision.ImagePredictor.fit) function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the model that achieved the highest level of accuracy.
 
-We begin by specifying [ImagePredictor](/api/autogluon.task.html#autogluon.vision.ImagePredictor) as our task of interest as follows:
+We begin by specifying [ImagePredictor](/api/autogluon.predictor.html#autogluon.vision.ImagePredictor) as our task of interest as follows:
 
 ```{.python .input}
 import autogluon.core as ag
