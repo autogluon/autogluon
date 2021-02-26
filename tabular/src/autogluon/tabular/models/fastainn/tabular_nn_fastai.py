@@ -221,7 +221,8 @@ class NNFastAiTabularModel(AbstractModel):
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
 
         config = dict(ps=ps, embed_p=params['emb_drop'])
-        dls = data.dataloaders()
+        dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
+
         self.model = tabular_learner(
             dls, layers=layers, metrics=nn_metric,
             config=config, loss_func=loss_func,
@@ -269,7 +270,8 @@ class NNFastAiTabularModel(AbstractModel):
         df_train[LABEL] = pd.concat([y, y_val], ignore_index=True)
         train_idx = np.arange(len(X))
         if X_val is None:
-            val_idx = train_idx  # use validation set for refit_full case - it's not going to be used for early stopping
+            val_idx = train_idx + len(train_idx)  # use validation set for refit_full case - it's not going to be used for early stopping
+            df_train = pd.concat([df_train, df_train], ignore_index=True)
         else:
             val_idx = np.arange(len(X_val)) + len(X)
         return df_train, train_idx, val_idx

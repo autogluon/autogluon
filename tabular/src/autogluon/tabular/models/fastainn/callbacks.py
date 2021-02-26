@@ -50,13 +50,13 @@ class AgSaveModelCallback(TrackerCallback):
             if self.epoch >= self.best_epoch_stop:
                 logger.log(15, f'Saving model model at the best epoch learned earlier - {self.epoch}.')
                 self.best_epoch = self.epoch
-                self.learn.save(f'{self.model_name}')
+                self.learn.save(f'{self.fname}')
         if self.every_epoch:
             self._save(f'{self.fname}_{self.epoch}')
         else:  # every improvement
             super().after_epoch()
             if self.new_best:
-                print(f'Better model found at epoch {self.epoch} with {self.monitor} value: {self.best}.')
+                logger.log(20, f'Better model found at epoch {self.epoch} with {self.monitor} value: {self.best}.')
                 self.best_epoch = self.epoch
                 self._save(f'{self.fname}')
 
