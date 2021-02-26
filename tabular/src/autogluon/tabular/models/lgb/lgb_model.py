@@ -59,12 +59,23 @@ class LGBModel(AbstractModel):
             stopping_metric_name = stopping_metric
         return stopping_metric, stopping_metric_name
 
-    def _fit(self, X=None, y=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
+    def _fit(self,
+             X=None,
+             y=None,
+             X_val=None,
+             y_val=None,
+             dataset_train=None,
+             dataset_val=None,
+             time_limit=None,
+             num_gpus=0,
+             sample_weight=None,
+             sample_weight_val=None,
+             verbosity=2,
+             **kwargs):
         start_time = time.time()
         params = self.params.copy()
 
         # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
-        verbosity = kwargs.get('verbosity', 2)
         params = fixedvals_from_searchspaces(params)
 
         if verbosity <= 1:

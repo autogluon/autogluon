@@ -25,7 +25,6 @@ class RFModel(AbstractModel):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._model_type = self._get_model_type()
         self._feature_generator = None
 
     def _get_model_type(self):
@@ -65,7 +64,12 @@ class RFModel(AbstractModel):
         }
         return spaces
 
-    def _fit(self, X, y, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             time_limit=None,
+             sample_weight=None,
+             **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
@@ -104,7 +108,7 @@ class RFModel(AbstractModel):
                     hyperparams['warm_start'] = True
 
         hyperparams['n_estimators'] = n_estimator_increments[0]
-        self.model = self._model_type(**hyperparams)
+        self.model = self._get_model_type()(**hyperparams)
 
         time_train_start = time.time()
         for i, n_estimators in enumerate(n_estimator_increments):

@@ -127,14 +127,19 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             pred_proba.set_index(index, inplace=True)
         return pred_proba
 
-    def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             compute_base_preds=True,
+             time_limit=None,
+             **kwargs):
         start_time = time.time()
         # TODO: This could be preprocess=True in general, just have preprocess=False for child models
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
         self._add_stack_to_feature_metadata()
-        super()._fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
+        super()._fit(X=X, y=y, time_limit=time_limit, **kwargs)
 
     def set_contexts(self, path_context):
         path_root_orig = self.path_root

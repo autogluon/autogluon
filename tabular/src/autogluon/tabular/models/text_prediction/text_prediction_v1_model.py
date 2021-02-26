@@ -11,15 +11,10 @@ from autogluon.core.constants import REGRESSION, BINARY
 
 from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
-from autogluon.core.utils import get_cpu_count, get_gpu_count
+from autogluon.core.utils import get_cpu_count, get_gpu_count, try_import_mxnet, try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
-
-
-AG_TEXT_IMPORT_ERROR = 'autogluon.text has not been installed. ' \
-                       'You may try to install "autogluon.text" first by running. ' \
-                       '`python3 -m pip install autogluon.text`'
 
 
 class TextPredictionV1Model(AbstractModel):
@@ -58,8 +53,6 @@ class TextPredictionV1Model(AbstractModel):
             Names of the features.
         feature_metadata
             The feature metadata.
-        debug
-            Whether to turn on debug mode
         """
         super().__init__(**kwargs)
         self._label_column_name = None
@@ -83,18 +76,19 @@ class TextPredictionV1Model(AbstractModel):
         return default_ag_args
 
     def _set_default_params(self):
-        try:
-            from autogluon.text import ag_text_presets
-        except ImportError:
-            raise ImportError(AG_TEXT_IMPORT_ERROR)
         super()._set_default_params()
+        try_import_autogluon_text()
+        from autogluon.text import ag_text_presets
         self.params = ag_text_presets.create('default')
 
-    def _fit(self, X: pd.DataFrame, y: pd.Series,
+    def _fit(self,
+             X: pd.DataFrame,
+             y: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
              y_val: Optional[pd.Series] = None,
              time_limit: Optional[int] = None,
-             sample_weight=None, **kwargs):
+             sample_weight=None,
+             **kwargs):
         """The internal fit function
 
         Parameters
@@ -113,11 +107,9 @@ class TextPredictionV1Model(AbstractModel):
             Other keyword arguments
 
         """
-        try:
-            import mxnet as mx
-            from autogluon.text import TextPredictor
-        except ImportError:
-            raise ImportError(AG_TEXT_IMPORT_ERROR)
+        try_import_mxnet()
+        try_import_autogluon_text()
+        from autogluon.text import TextPredictor
 
         # Decide name of the label column
         if 'label' in X.columns:
@@ -139,11 +131,6 @@ class TextPredictionV1Model(AbstractModel):
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for TextPredictionV1Model, this model will ignore them in training.")
 
-        self.model = TextPredictor(label=self._label_column_name,
-                                   problem_type=self.problem_type,
-                                   path=self.path,
-                                   eval_metric=self.eval_metric,
-                                   verbosity=verbosity)
         X_train.insert(len(X_train.columns), self._label_column_name, y)
         if X_val is not None:
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
@@ -151,13 +138,27 @@ class TextPredictionV1Model(AbstractModel):
                or self.params['tune_kwargs']['num_trials'] is None,\
             'Currently, you cannot nest the hyperparameter search in text neural network ' \
             'and the AutoGluon Tabular.'
+
+        if verbosity == 2:
+            verbosity_text = 1
+        else:
+            verbosity_text = verbosity
+        root_logger = logging.getLogger()
+        root_log_level = root_logger.level
+        self.model = TextPredictor(label=self._label_column_name,
+                                   problem_type=self.problem_type,
+                                   path=self.path,
+                                   eval_metric=self.eval_metric,
+                                   verbosity=verbosity_text)
         self.model.fit(train_data=X_train,
                        tuning_data=X_val,
                        time_limit=time_limit,
                        num_gpus=num_gpus,
                        num_cpus=num_cpus,
                        hyperparameters=self.params,
-                       seed=self.params.get('seed'))
+                       seed=self.params.get('seed', 0))
+        self.model.set_verbosity(verbosity)  # FIXME: TextPredictor will reset root logger every time it is loaded, not ideal.
+        root_logger.setLevel(root_log_level)  # Reset log level
 
     def save(self, path: str = None, verbose=True) -> str:
         model = self.model
@@ -174,10 +175,8 @@ class TextPredictionV1Model(AbstractModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
-        try:
-            from autogluon.text import TextPredictor
-        except ImportError:
-            raise ImportError(AG_TEXT_IMPORT_ERROR)
+        try_import_autogluon_text()
+        from autogluon.text import TextPredictor
 
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         model.model = TextPredictor.load(os.path.join(path, cls.nn_model_name))

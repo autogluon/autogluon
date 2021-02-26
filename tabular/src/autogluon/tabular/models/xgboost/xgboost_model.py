@@ -60,7 +60,16 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, sample_weight=None, sample_weight_val=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             X_val=None,
+             y_val=None,
+             time_limit=None,
+             num_gpus=0,
+             sample_weight=None,
+             sample_weight_val=None,
+             **kwargs):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
 
