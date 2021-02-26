@@ -10,6 +10,7 @@ hyperparameter_config_dict = dict(
         'GBM': [
             {},
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+            'GBMLarge',
         ],
         'CAT': {},
         'XGB': {},
@@ -28,7 +29,6 @@ hyperparameter_config_dict = dict(
             {'weights': 'uniform', 'ag_args': {'name_suffix': 'Unif'}},
             {'weights': 'distance', 'ag_args': {'name_suffix': 'Dist'}},
         ],
-        'custom': ['GBM'],
     },
     # Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
     light={
@@ -36,6 +36,7 @@ hyperparameter_config_dict = dict(
         'GBM': [
             {},
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+            'GBMLarge',
         ],
         'CAT': {},
         'XGB': {},
@@ -50,7 +51,6 @@ hyperparameter_config_dict = dict(
             {'criterion': 'entropy', 'max_depth': 15, 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
             {'criterion': 'mse', 'max_depth': 15, 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
         ],
-        'custom': ['GBM'],
     },
     # Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
     very_light={
@@ -76,11 +76,11 @@ hyperparameter_config_dict = dict(
         'GBM': [
             {},
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+            'GBMLarge',
         ],
         'CAT': {},
         'XGB': {},
         # 'FASTAI': {}, FastAI gets killed if the dataset is large (400K rows).
-        'custom': ['GBM'],
         'AG_TEXT_NN': ['medium_quality_faster_train'],  # TODO, Support changing the config w.r.t the preset option.
     },
 )

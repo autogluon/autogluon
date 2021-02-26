@@ -1,5 +1,6 @@
 import copy
 import logging
+import os
 import math
 import pprint
 import time
@@ -302,11 +303,13 @@ class TabularPredictor:
         hyperparameters : str or dict, default = 'default'
             Determines the hyperparameters used by the models.
             If `str` is passed, will use a preset hyperparameter configuration.
-                Valid `str` options: ['default', 'light', 'very_light', 'toy']
+                Valid `str` options: ['default', 'light', 'very_light', 'toy', 'multimodal']
                     'default': Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
                     'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
+                    'multimodal': [EXPERIMENTAL] Trains a multimodal transformer model alongside tabular models. Requires text columns, a GPU, and CUDA-enabled MXNet.
+                        When combined with 'best_quality' `presets` option, this can achieve extremely strong results in multimodal datasets.
                 Reference `autogluon/tabular/configs/hyperparameter_configs.py` for information on the hyperparameters associated with each preset.
             Keys are strings that indicate which model types to train.
                 Stable model options include:
@@ -332,8 +335,8 @@ class TabularPredictor:
                 To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
                     For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
             Advanced functionality: Custom models
-                `hyperparameters` can also take a special key 'custom', which maps to a list of model names (currently supported options = 'GBM').
-                    If `hyperparameter_tune_kwargs = None`, then these additional models will also be trained using custom pre-specified hyperparameter settings that are known to work well.
+                `hyperparameters` can also take special string values instead of a dictionary of model parameters which maps to a pre-configured model configuration (currently supported options = ['GBMLarge']).
+                    These additional models will be trained using custom pre-specified hyperparameter settings that are known to work well.
             Advanced functionality: Custom stack levels
                 By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
@@ -347,6 +350,7 @@ class TabularPredictor:
                     'GBM': [
                         {},
                         {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+                        'GBMLarge',
                     ],
                     'CAT': {},
                     'XGB': {},
@@ -365,7 +369,6 @@ class TabularPredictor:
                         {'weights': 'uniform', 'ag_args': {'name_suffix': 'Unif'}},
                         {'weights': 'distance', 'ag_args': {'name_suffix': 'Dist'}},
                     ],
-                    'custom': ['GBM']
                 }
 
             Details regarding the hyperparameters you can specify for each model are provided in the following files:
@@ -1505,7 +1508,6 @@ class TabularPredictor:
         """
         return self._learner.get_info(include_model_info=True)
 
-    # TODO: Handle cases where name is same as a previously fit model, currently overwrites old model.
     # TODO: Add data argument
     # TODO: Add option to disable OOF generation of newly fitted models
     # TODO: Move code logic to learner/trainer
@@ -1666,8 +1668,6 @@ class TabularPredictor:
         else:
             return self.transform_labels(labels=y_pred_proba_oof_transformed, inverse=True, proba=True)
 
-    # TODO: v0.1 Properly error/return None if label_cleaner hasn't been fit yet. (After API refactor)
-    # TODO: v0.1 Add positive_class parameter to fit()
     @property
     def positive_class(self):
         """
@@ -1679,6 +1679,8 @@ class TabularPredictor:
         -------
         The positive class name in binary classification or None if the problem is not binary classification.
         """
+        if not self._learner.is_fit():
+            raise AssertionError('Predictor must be fit to return positive_class.')
         if self.problem_type != BINARY:
             logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
             return None
