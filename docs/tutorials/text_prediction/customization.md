@@ -1,7 +1,7 @@
 # Text Prediction - Customization and Hyperparameter Search
 :label:`sec_textprediction_customization`
 
-This tutorial teaches you how to control the hyperparameter tuning process in `TextPrediction` by specifying:
+This tutorial teaches you how to control the hyperparameter tuning process in `TextPredictor` by specifying:
 
 - A custom search space of candidate hyperparameter values to consider.
 - Which hyperparameter optimization algorithm should be used to actually search through this space.
@@ -33,14 +33,16 @@ train_data.head(10)
 
 ### Pre-configured Hyperparameters in TextPredictor
 
-We provided a series of pre-configured hyperparameters. You may list the keys from `ag_text_presets`.
+We provided a series of pre-configured hyperparameters. You may list the keys from `ag_text_presets` via `list_presets`.
 
 
 ```{.python .input}
-from autogluon.text import ag_text_presets
-ag_text_presets.list_keys()
+from autogluon.text import ag_text_presets, list_presets
+list_presets()
 ```
 
+There are two kinds of presets. The `simple_presets` are pre-defined configurations managed by AutoGluon team. We pre-selected the appropriate model 
+configurations for different scenarios like `medium_quality_faster_train` or `lower_quality_fast_train`. We also list all the additional presets for advanced users. 
 These pre-configured models use different backbones such as ELECTRA, RoBERTa, Multilingual BERT, and different fusion strategies. For example, `electra_small_fuse_late` means to use the ELECTRA-small model as the text backbone and use the late fusion strategy described in ":label:`sec_textprediction_architecture`". By default, we are using `default`, which is the same as `electra_base_fuse_late`. Next, let's try to specify the `presets` in `.fit()` to be `electra_small_fuse_late` and train a model on SSTs.
 
 
@@ -62,7 +64,8 @@ To visualize the pre-registered hyperparameters, you can call `ag_text_presets.c
 
 
 ```{.python .input}
-ag_text_presets.create('electra_small_fuse_late')
+import pprint
+pprint.pprint(ag_text_presets.create('electra_small_fuse_late'))
 ```
 
 Another way to specify customized config is to directly specify the `hyperparameters` argument in `predict.fit()`. Following is an example
@@ -159,37 +162,11 @@ print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
 
-## Use Bayesian Optimization
-
-Instead of random search, we can perform HPO via [Bayesian Optimization](https://distill.pub/2020/bayesian-optimization/).
-Here we specify **bayesopt** as the searcher.
-
-
-```{.python .input}
-hyperparameters = electra_small_basic_demo_hpo()
-hyperparameters['tune_kwargs']['search_strategy'] = 'bayesopt'
-predictor_sst_bo = TextPredictor(path='ag_text_sst_bo', label='label', eval_metric='acc')
-predictor_sst_bo.set_verbosity(0)
-predictor_sst_bo.fit(train_data,
-                     hyperparameters=hyperparameters,
-                     time_limit=60 * 2,
-                     num_trials=4,
-                     seed=123)
-```
-
-
-```{.python .input}
-dev_score = predictor_sst_bo.evaluate(dev_data, metrics=['acc', 'f1'])
-print('Best Config = {}'.format(predictor_sst_bo.results['best_config']))
-print('Total Time = {}s'.format(predictor_sst_bo.results['total_time']))
-print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
-print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
-```
-
 ## Use Bayesian Optimization + Hyperband
 
-Alternatively, we can instead use the [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf) for HPO.
-Hyperband will try multiple hyperparameter configurations simultaneously and will early stop training under poor configurations to free compute resources for exploring new hyperparameter configurations. It may be able to identify good hyperparameter values more quickly than other search strategies in your applications. In the following, we will use a combination of [Hyperband and Bayesian Optimization](https://arxiv.org/abs/2003.10865).
+Alternatively, we can use more advanced searchers like the combination of [Bayesian Optimization](https://distill.pub/2020/bayesian-optimization/) and [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf) for HPO.
+Hyperband will try multiple hyperparameter configurations simultaneously and will early stop training under poor configurations to free compute resources for exploring new hyperparameter configurations. 
+It may be able to identify good hyperparameter values more quickly than other search strategies in your applications. You may refer to [Hyperband and Bayesian Optimization](https://arxiv.org/abs/2003.10865) for more details.
 
 
 ```{.python .input}
@@ -213,3 +190,5 @@ print('Total Time = {}s'.format(predictor_sst_hb.results['total_time']))
 print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
+
+You can also try setting `hyperparameters['tune_kwargs']['search_strategy']` to be `'bayesopt'` or `'local_sequential_auto'`.

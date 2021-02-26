@@ -14,7 +14,11 @@ ag_text_presets = Registry('ag_text_presets')
 
 def list_presets():
     """List the presets available in AutoGluon-Text"""
-    return ag_text_presets.list_keys()
+    simple_presets = ['default', 'lower_quality_fast_train',
+                      'medium_quality_faster_train', 'best_quality']
+    return {'simple_presets': simple_presets,
+            'advanced_presets': [key for key in ag_text_presets.list_keys()
+                        if key not in simple_presets]}
 
 
 def base() -> dict:

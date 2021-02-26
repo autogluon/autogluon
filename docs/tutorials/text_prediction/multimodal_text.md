@@ -13,12 +13,16 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 np.random.seed(123)
+```
+
+```{.python .input}
 !python3 -m pip install openpyxl
 ```
 
 ## Book Price Prediction 
 
-To demonstrate the usage, we are going to use the book price prediction dataset used in the [MachineHack Salary Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview), which attempts to predict the price of the book given the other features like the author of the book, the 
+To demonstrate the usage, we are going to use the book price prediction dataset used in the [MachineHack Salary Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview), 
+which attempts to predict the price of the book given the other features like the author of the book, the abstract, the rating of the book and other features.
 
 
 ```{.python .input}
@@ -67,9 +71,8 @@ Also, to save time, we will subsample 1500 rows from the data and only train for
 
 ```{.python .input}
 from autogluon.text import TextPredictor
-!rm -rf ag_text_book_price_prediction
 predictor = TextPredictor(label='Price', path='ag_text_book_price_prediction')
-sampled_train_df = train_df.sample(1500, random_state=123)
+sampled_train_df = train_df.iloc[100:].sample(1500, random_state=123)
 predictor.fit(sampled_train_df, time_limit=3 * 60, seed=123)
 ```
 
@@ -79,7 +82,7 @@ Likewise, we can get the predictions and extract embeddings with the same API.
 
 
 ```{.python .input}
-test_df = train_df.sample(5, random_state=245)
+test_df = train_df.iloc[:100].sample(5, random_state=245)
 predictions = predictor.predict(test_df, as_pandas=True)
 print('Predictions:')
 print('------------')
