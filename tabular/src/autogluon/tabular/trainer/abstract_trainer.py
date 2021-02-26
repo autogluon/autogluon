@@ -555,7 +555,6 @@ class AbstractTrainer:
                     X = X.drop(cols_to_drop, axis=1)
         return X
 
-    # TODO: v0.1 this does not ensure unique model names (although the models they are refitting from should be unique, making this produce unique names as well)
     # You must have previously called fit() with cache_data=True
     # Fits _FULL versions of specified models, but does NOT link them (_FULL stackers will still use normal models as input)
     def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, X_unlabeled=None, models=None) -> List[str]:

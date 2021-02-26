@@ -621,8 +621,8 @@ def test_tabular_bagstack():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {'num_epochs': 2}
-        gbm_options = {'num_boost_round': 40}
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options, 'custom': ['GBM']}
+        gbm_options = [{'num_boost_round': 40}, 'GBMLarge']
+        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
         time_limit = 60
 
     fit_args = {

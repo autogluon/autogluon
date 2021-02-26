@@ -316,7 +316,7 @@ class TextPredictor:
                 index = data.index
             else:
                 index = None
-            output = pd.DataFrame({self.label: output}, index=index)[self.label]
+            output = pd.Series(data=output, index=index, name=self.label)
         return output
 
     def predict_proba(self, data, as_pandas=True):
