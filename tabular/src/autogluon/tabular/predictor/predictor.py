@@ -44,7 +44,7 @@ logger = logging.getLogger()  # return root logger
 
 class TabularPredictor:
     """
-    AutoGluon Predictor predicts values in a column of a tabular dataset (classification or regression).
+    AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
 
     Parameters
     ----------
@@ -59,6 +59,7 @@ class TabularPredictor:
 
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
         Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
+
         Otherwise, options for classification:
             ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
             'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision', 'precision_macro', 'precision_micro',
@@ -135,11 +136,6 @@ class TabularPredictor:
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
         In binary classification, :meth:`TabularPredictor.predict_proba` returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
-
-        Returns
-        -------
-        The positive class name in binary classification or None if the problem is not binary classification.
-
     class_labels : list
         For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
         For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
@@ -469,7 +465,7 @@ class TabularPredictor:
                 Default value is doubled if `hyperparameter_tune_kwargs` is set, up to a maximum of 0.2.
                 Disabled if `num_bag_folds >= 2`.
             hyperparameter_tune_kwargs : str or dict, default = None
-                Hyperparameter tuning strategy and kwargs.
+                Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                 Valid preset values:
                     'auto': Uses the 'local_sequential_auto' preset.
@@ -830,7 +826,7 @@ class TabularPredictor:
 
     def predict(self, data, model=None, as_pandas=True):
         """
-        Use trained models to produce predicted labels (in classification) or response values (in regression).
+        Use trained models to produce predictions of `label` column values for new data.
 
         Parameters
         ----------
@@ -842,12 +838,11 @@ class TabularPredictor:
             The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
         as_pandas : bool, default = True
-            Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False)
+            Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False).
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
-
         """
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
@@ -860,7 +855,7 @@ class TabularPredictor:
         Parameters
         ----------
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            The data to make predictions for. Should contain same column names as training Dataset and follow same format
+            The data to make predictions for. Should contain same column names as training dataset and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
@@ -887,14 +882,14 @@ class TabularPredictor:
 
     def evaluate(self, data, silent=False):
         """
-        Report the predictive performance evaluated for a given Dataset.
+        Report the predictive performance evaluated over a given dataset.
         This is basically a shortcut for: `pred = predict(data); evaluate_predictions(data[label], preds, auxiliary_metrics=False)`
         that automatically uses `predict_proba()` instead of `predict()` when appropriate.
 
         Parameters
         ----------
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
+            This dataset must also contain the `label` with the same column-name as previously specified.
             If str is passed, `data` will be loaded using the str value as the file path.
 
         silent : bool (optional)
@@ -957,7 +952,7 @@ class TabularPredictor:
             'stack_level': The stack level of the model.
                 A model with stack level N can take any set of models with stack level less than N as input, with stack level 1 models having no model inputs.
             'can_infer': If model is able to perform inference on new data. If False, then the model either was not saved, was deleted, or an ancestor of the model cannot infer.
-                `can_infer` is often False when `save_bag_folds=False` was specified in initial `task.fit`.
+                `can_infer` is often False when `save_bag_folds=False` was specified in initial `fit()`.
             'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth model fit has `fit_order=N`. The order corresponds to the first child model fit in the case of bagged ensembles.
 
         Parameters
@@ -1514,7 +1509,7 @@ class TabularPredictor:
     # TODO: Add data argument
     # TODO: Add option to disable OOF generation of newly fitted models
     # TODO: Move code logic to learner/trainer
-    # TODO: Add task.fit arg to perform this automatically at end of training
+    # TODO: Add fit() arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
     def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False, time_limit=None):
         """
@@ -1672,7 +1667,7 @@ class TabularPredictor:
             return self.transform_labels(labels=y_pred_proba_oof_transformed, inverse=True, proba=True)
 
     # TODO: v0.1 Properly error/return None if label_cleaner hasn't been fit yet. (After API refactor)
-    # TODO: v0.1 Add positive_class parameter to task.fit
+    # TODO: v0.1 Add positive_class parameter to fit()
     @property
     def positive_class(self):
         """
@@ -1708,11 +1703,11 @@ class TabularPredictor:
             Valid values are:
                 'train':
                     Load the training data used during model training.
-                    This is a transformed and augmented version of the `train_data` passed in `task.fit()`.
+                    This is a transformed and augmented version of the `train_data` passed in `fit()`.
                 'val':
                     Load the validation data used during model training.
-                    This is a transformed and augmented version of the `tuning_data` passed in `task.fit()`.
-                    If `tuning_data=None` was set in `task.fit()`, then `tuning_data` is an automatically generated validation set created by splitting `train_data`.
+                    This is a transformed and augmented version of the `tuning_data` passed in `fit()`.
+                    If `tuning_data=None` was set in `fit()`, then `tuning_data` is an automatically generated validation set created by splitting `train_data`.
                     Warning: Will raise an exception if called by a bagged predictor, as bagged predictors have no validation data.
         return_X : bool, default = True
             Whether to return the internal data features
@@ -1827,7 +1822,7 @@ class TabularPredictor:
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
         Distillation can produce a model that is more accurate than the same model fit directly on the original training data.
         After calling `distill()`, there will be more models available in this Predictor, which can be evaluated using `predictor.leaderboard(test_data)` and deployed with: `predictor.predict(test_data, model=MODEL_NAME)`.
-        This will raise an exception if `cache_data=False` was previously set in `task.fit()`.
+        This will raise an exception if `cache_data=False` was previously set in `fit()`.
 
         NOTE: Until catboost v0.24 is released, `distill()` with CatBoost students in multiclass classification requires you to first install catboost-dev: `pip install catboost-dev`
 
@@ -2036,7 +2031,7 @@ class TabularPredictor:
     # TODO: Update and correct the logging message on loading directions
     def save(self):
         """
-        Save this predictor to file in directory specified by this Predictor's `path`.
+        Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
@@ -2052,6 +2047,16 @@ class TabularPredictor:
 
     @classmethod
     def load(cls, path, verbosity=2):
+        """
+        Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
+
+        Parameters
+        ----------
+        path : str
+            The path to directory in which this Predictor was previously saved.
+        verbosity : int, default = 2
+            Sets the verbosity level of this Predictor after it is loaded. Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
+        """
         set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")

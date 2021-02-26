@@ -162,7 +162,7 @@ The leaderboard shows each model's predictive performance on the test data (`sco
 predictor.leaderboard(extra_info=True, silent=True)
 ```
 
-The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`), and how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [leaderboard documentation](../../api/autogluon.task.html#autogluon.tabular.TabularPredictor.leaderboard) for full details.
+The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`), and how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [leaderboard documentation](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.leaderboard) for full details.
 
 Here's how to specify a particular model to use for prediction instead of AutoGluon's default model-choice:
 

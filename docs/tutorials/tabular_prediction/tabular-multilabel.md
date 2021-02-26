@@ -1,7 +1,7 @@
 # Predicting Multiple Columns in a Table (Multi-Label Prediction)
 :label:`sec_tabularmultilabel`
 
-In multi-label prediction, we wish to predict multiple columns of a table (i.e. labels) based on the values in the remaining columns. Here we present a simple strategy to do this with AutoGluon, which simply maintains a separate `TabularPredictor` object for each column being predicted. Correlations between labels can be accounted for in predictions by imposing an order on the labels and allowing the `TabularPredictor` for each label to condition on the predicted values for labels that appeared earlier in the order.
+In multi-label prediction, we wish to predict multiple columns of a table (i.e. labels) based on the values in the remaining columns. Here we present a simple strategy to do this with AutoGluon, which simply maintains a separate [TabularPredictor](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.fit) object for each column being predicted. Correlations between labels can be accounted for in predictions by imposing an order on the labels and allowing the `TabularPredictor` for each label to condition on the predicted values for labels that appeared earlier in the order.
 
 ### MultilabelPredictor Class
 

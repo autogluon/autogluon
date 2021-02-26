@@ -1,10 +1,10 @@
 .. role:: hidden
     :class: hidden-section
 
-AutoGluon Tasks
-===============
+AutoGluon Predictors
+====================
 
-.. admonition:: Example (Tabular Prediction Task):
+.. admonition:: Example (Predictor for tabular data):
 
    Import TabularDataset and TabularPredictor:
 
@@ -28,10 +28,10 @@ AutoGluon Tasks
 
 
 
-Tasks
------
+Predictors
+----------
 
-Prediction tasks built into AutoGluon such that a single call to `fit()` can produce high-quality trained models. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
+Predictors built into AutoGluon such that a single call to `fit()` can produce high-quality trained models for tabular, image, or text data. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
 
 .. automodule:: autogluon.tabular
 .. autosummary::
@@ -50,7 +50,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 .. autosummary::
    :nosignatures:
 
-   TextPrediction
+   TextPredictor
 
 
 :hidden:`TabularPredictor`
@@ -60,6 +60,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 .. autoclass:: TabularPredictor
    :members:
    :inherited-members:
+   :exclude-members: from_learner
 
     .. rubric:: Methods
 
@@ -67,7 +68,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-:hidden:`ImagePrediction`
+:hidden:`ImagePredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.vision
 
@@ -97,7 +98,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-:hidden:`TextPrediction`
+:hidden:`TextPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.text
 
@@ -131,24 +132,3 @@ Additional Tabular APIs
    :members:
    :inherited-members:
 
-
-Additional Text Prediction APIs
--------------------------------
-
-.. automodule:: autogluon.text.text_prediction.models.basic_v1
-
-:hidden:`BertForTextPredictionBasic`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: BertForTextPredictionBasic
-   :members: predict, predict_proba, evaluate, save, load
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: BertForTextPredictionBasic
-        :methods:
-
-    .. rubric:: Attributes
-
-    .. autoautosummary:: BertForTextPredictionBasic
-        :attributes:

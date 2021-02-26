@@ -7,16 +7,16 @@ describing what they are and what they do. The APIs are grouped into the followi
 .. container:: cards
 
    .. card::
-      :title: Prediction Tasks
-      :link: autogluon.task.html
+      :title: Predictors
+      :link: autogluon.predictor.html
 
-      Automatically train/deploy models with 1 line of code for these prediction tasks.
+      Automatically train/deploy predictors with 1 line of code for text, image, or tabular data.
 
    .. card::
       :title: Core APIs
       :link: autogluon.core.html
 
-      Enable easy tuning of any custom models / Python code. 
+      Enable easy tuning of any custom models / Python code.
 
    .. card::
       :title: Search Space
@@ -40,7 +40,7 @@ describing what they are and what they do. The APIs are grouped into the followi
    :maxdepth: 2
    :hidden:
 
-   autogluon.task
+   autogluon.predictor
    autogluon.core
    autogluon.core.space
    autogluon.core.scheduler

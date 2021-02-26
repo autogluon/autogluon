@@ -1,4 +1,4 @@
-# Kaggle Benchmark by Autogluon 
+# Kaggle Benchmark by Autogluon
 | Datset | GluonCV Baseline/Autogluon/1st/Rank | Search Space(net.choice/learning_rate/momentum/wd) | Configuration(epochs/trials/batchsize/gpus_per_trial) | Training Log/Training Command |
 |:-------:|:-----:|:-------:|:-------:|:-------:|
 | [Dogs vs. Cats](https://www.kaggle.com/c/dogs-vs-cats-redux-kernels-edition/data) | 0.17131/0.07326/0.03302/15%(196/1314) | ('resnet34_v1b', 'resnet34_v1', 'resnet34_v2')/(1e-4, 1e-2, log=True)/(0.86, 0.99)/(1e-6, 1e-3, log=True) | 180/30/384/4 | [log](https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/docs/benchmark/log/dogs-vs-cats-redux-kernels-edition/summary.log )/[Shell script](https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/docs/benchmark/shell/dogs.sh) |
@@ -23,7 +23,7 @@ After completing this step, you will have the following directory structure on y
     ├── ...
 ```
 
-Here `XXXX` is a folder containing the raw images categorized into classes. For example, subfolder `class1` contains all images that belong to the first class, `class2` contains all images belonging to the second class, etc. 
+Here `XXXX` is a folder containing the raw images categorized into classes. For example, subfolder `class1` contains all images that belong to the first class, `class2` contains all images belonging to the second class, etc.
 We generally recommend at least 100 training images per class for reasonable classification performance, but this might depend on the type of images in your specific use-case.
 
 Under each class, the following image formats are supported when training your model:
@@ -41,19 +41,19 @@ Below, we demonstrate how to construct this organization for a Kaggle dataset.
 
 Kaggle is a popular machine learning competition platform and contains lots of
 datasets for different machine learning tasks including image classification.
-If you don't have Kaggle account, please register one at [Kaggle](https://www.kaggle.com/). 
+If you don't have Kaggle account, please register one at [Kaggle](https://www.kaggle.com/).
 Then, please follow the [Kaggle installation](https://github.com/Kaggle/kaggle-api/) to obtain access to Kaggle's data downloading API.
 ```
 pip install kaggle
 ```
-To find image classification datasets in Kaggle, let's go to [Kaggle](https://www.kaggle.com/) 
+To find image classification datasets in Kaggle, let's go to [Kaggle](https://www.kaggle.com/)
 and search using keyword `image classification` either under `Datasets` or `Competitions`.
 
 For example, we propose six datasets end to end training process in `Competitions` as follow:
 [1: Dogs vs Cats](https://www.kaggle.com/c/dogs-vs-cats-redux-kernels-edition),
 [2: Aerial Cactus](https://www.kaggle.com/c/aerial-cactus-identification),
 [3: Plant Seedlings](https://www.kaggle.com/c/plant-seedlings-classification),
-[4: Fisheries Monitoring](https://www.kaggle.com/c/the-nature-conservancy-fisheries-monitoring), 
+[4: Fisheries Monitoring](https://www.kaggle.com/c/the-nature-conservancy-fisheries-monitoring),
 [5: Dog Breed](https://www.kaggle.com/c/dog-breed-identification),
 [6: Shopee-IET](https://www.kaggle.com/c/shopee-iet-machine-learning-competition)
 
@@ -103,7 +103,7 @@ Finally, we have the desired directory structure under `./data/XXXX/train/`, whi
 
 ## Step 2: Use AutoGluon fit to generate a classification model
 
-Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.task.html#autogluon.task.ImageClassification.fit) function.
+Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.vision.ImagePredictor.fit) function.
 
 Run `benchmark.py` script with different dataset:
 
@@ -114,7 +114,7 @@ Run `benchmark.py` script with different dataset:
 
 `XXXX` can be any one of the options below：
 
-``` 
+```
 dogs-vs-cats-redux-kernels-edition
 aerial-cactus-identification
 plant-seedlings-classification
@@ -161,11 +161,11 @@ This produces a submission file located at: `./data/XXXX/submission.csv`.
 
 To see an example submission, check out `sample submission.csv` at this link: https://www.kaggle.com/c/XXXX/data.
 
-To make your own submission, 
+To make your own submission,
 
 Run the command `kaggle competitions submit -c <XXX> -f submission.csv -m "Message"` or
 click [Submission](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/submit)
 and then follow the steps in the submission page (upload submission file, describe the submission,
 and click the `Make Submission` button). Let's see how your model fares in this competition!
 
- 
+
