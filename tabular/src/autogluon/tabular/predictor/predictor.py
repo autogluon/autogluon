@@ -12,8 +12,8 @@ import networkx as nx
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.utils import BINARY, MULTICLASS, REGRESSION, get_pred_from_proba
-from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, set_logger_verbosity
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, set_logger_verbosity, get_pred_from_proba
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
@@ -82,10 +82,12 @@ class TabularPredictor:
         If specified, this column-name indicates which column of the data should be treated as sample weights. This column will NOT be considered as a predictive feature.
         Sample weights should be non-negative (and cannot be nan), with larger values indicating which rows are more important than others.
         If you want your usage of sample weights to match results obtained outside of this Predictor, then ensure sample weights for your training (or tuning) data sum to the number of rows in the training (or tuning) data.
+        You may also specify two special strings: 'auto_weight' (automatically choose a weighting strategy based on the data) or 'balance_weight' (equally weight classes in classification, no effect in regression). If specifying your own sample_weight column, make sure its name does not match these special strings.
     weight_evaluation : bool, default = False
-        Only considered when `sample_weight` column has been specified. Determines whether sample weights should be taken into account when computing evaluation metrics on validation/test data.
+        Only considered when `sample_weight` column is not None. Determines whether sample weights should be taken into account when computing evaluation metrics on validation/test data.
         If True, then weighted metrics will be reported based on the sample weights provided in the specified `sample_weight` (in which case `sample_weight` column must also be present in test data).
         In this case, the 'best' model used by default for prediction will also be decided based on a weighted version of evaluation metric.
+        Note: we do not recommend specifying `weight_evaluation` when `sample_weight` is 'auto_weight' or 'balance_weight', instead specify appropriate `eval_metric`.
     **kwargs :
         learner_type : AbstractLearner, default = DefaultLearner
             A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
@@ -175,8 +177,13 @@ class TabularPredictor:
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
-        self.sample_weight = sample_weight  # TODO: add support for sample_weight= 'auto', 'balanced'
+        if sample_weight == AUTO_WEIGHT:  # TODO: update auto_weight strategy and make it the default
+            sample_weight = None
+            logger.log(15, f"{AUTO_WEIGHT} currently does not use any sample weights.")
+        self.sample_weight = sample_weight
         self.weight_evaluation = weight_evaluation  # TODO: sample_weight and weight_evaluation can both be properties that link to self._learner.sample_weight, self._learner.weight_evaluation
+        if self.sample_weight in [AUTO_WEIGHT, BALANCE_WEIGHT] and self.weight_evaluation:
+            logger.warning(f"We do not recommend specifying weight_evaluation when sample_weight='{self.sample_weight}', instead specify appropriate eval_metric.")
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
 

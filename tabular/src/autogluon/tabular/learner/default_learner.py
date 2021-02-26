@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from .abstract_learner import AbstractLearner
@@ -27,7 +27,7 @@ class DefaultLearner(AbstractLearner):
     def __init__(self, trainer_type=AutoTrainer, **kwargs):
         super().__init__(**kwargs)
         self.trainer_type = trainer_type
-
+        self.class_weights = None
         self._time_fit_total = None
         self._time_fit_preprocessing = None
         self._time_fit_training = None
@@ -131,6 +131,7 @@ class DefaultLearner(AbstractLearner):
         X, y = self.extract_label(X)
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned, positive_class=self._positive_class)
         y = self.label_cleaner.transform(y)
+        X = self.set_predefined_weights(X, y)
         X, w = extract_column(X, self.sample_weight)
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
@@ -145,6 +146,7 @@ class DefaultLearner(AbstractLearner):
             else:
                 X_val, y_val = self.extract_label(X_val)
                 y_val = self.label_cleaner.transform(y_val)
+                X_val = self.set_predefined_weights(X_val, y_val)
                 X_val, w_val = extract_column(X_val, self.sample_weight)
         else:
             y_val = None
@@ -192,7 +194,11 @@ class DefaultLearner(AbstractLearner):
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
-        if w is not None:  # TODO: consider not bundling sample-weights inside X, X_val
+        X, X_val = self.bundle_weights(X, w, X_val, w_val)  # TODO: consider not bundling sample-weights inside X, X_val
+        return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds
+
+    def bundle_weights(self, X, w, X_val, w_val):
+        if w is not None:
             X[self.sample_weight] = w
             if X_val is not None:
                 if w_val is not None:
@@ -203,8 +209,26 @@ class DefaultLearner(AbstractLearner):
                     X_val[self.sample_weight] = nan_vals
                 else:
                     raise ValueError(f"sample_weight column '{self.sample_weight}' cannot be missing from X_val if weight_evaluation=True")
+        return X, X_val
 
-        return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds
+    def set_predefined_weights(self, X, y):
+        if self.sample_weight not in [AUTO_WEIGHT,BALANCE_WEIGHT] or self.problem_type not in [BINARY,MULTICLASS]:
+            return X
+        if self.sample_weight in X.columns:
+            raise ValueError(f"Column name '{self.sample_weight}' cannot appear in your dataset with predefined weighting strategy. Please change it and try again.")
+        if self.sample_weight == BALANCE_WEIGHT:
+            if self.class_weights is None:
+                class_counts = y.value_counts()
+                n = len(y)
+                k = len(class_counts)
+                self.class_weights = {c : n/(class_counts[c]*k) for c in class_counts.index}
+                logger.log(20, "Assigning sample weights to balance differences in frequency of classes.")
+                logger.log(15, f"Balancing classes via the following weights: {self.class_weights}")
+            w = y.map(self.class_weights)
+        elif self.sample_weight == AUTO_WEIGHT:  # TODO: support more sophisticated auto_weight strategy
+            raise NotImplementedError(f"{AUTO_WEIGHT} strategy not yet supported.")
+        X[self.sample_weight] = w  # TODO: consider not bundling sample weights inside X
+        return X
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
         new_threshold, new_holdout_frac, new_num_bag_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bag_folds)

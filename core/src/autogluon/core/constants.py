@@ -19,6 +19,9 @@ AG_ARGS_ENSEMBLE = 'ag_args_ensemble'  # Contains arguments that impact model en
 
 OBJECTIVES_TO_NORMALIZE = ['log_loss', 'pac_score', 'soft_log_loss']  # do not like predicted probabilities = 0
 
+AUTO_WEIGHT = 'auto_weight'
+BALANCE_WEIGHT = 'balance_weight'
+
 # TODO: Add docs to dedicated page, or should it live in AbstractModel?
 # TODO: How to reference correct version of docs?
 # TODO: Add error in AG_ARGS if unknown key present
