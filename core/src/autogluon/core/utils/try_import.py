@@ -10,7 +10,8 @@ __all__ = [
     'try_import_cv2',
     'try_import_gluonnlp',
     'try_import_torch',
-    'try_import_skopt']
+    'try_import_skopt',
+    'try_import_autogluon_text']
 
 
 def try_import_mxboard():
@@ -145,3 +146,12 @@ def try_import_skopt():
     except ImportError:
         raise ImportError("`import skopt` failed. skopt is an optional dependency and may not be installed.\n"
                           "A quick tip is to install via `pip install scikit-optimize`.")
+
+
+def try_import_autogluon_text():
+    try:
+        import autogluon.text
+    except ImportError:
+        raise ImportError("`import autogluon.text` failed.\n"
+                          "A quick tip is to install via `pip install autogluon.text`.\n"
+                          "Ensure that the version installed is the same as the version of the other autogluon modules seen in `pip freeze`.")

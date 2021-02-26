@@ -25,6 +25,15 @@ from ...utils.savers import save_json, save_pkl
 
 logger = logging.getLogger(__name__)
 
+# TODO: Consider removing num_classes from init, inferring during fit instead.
+# TODO: Consider adding option for problem_type = None, and infer during fit.
+# TODO: Consider name = None as default, name only matters when saving model.
+# TODO: Consider path = None as default, use similar logic to TabularPredictor to set path automatically.
+# TODO: Consider removing stopping_metric from init, only use ag_args_fit to specify stopping_metric.
+# TODO: Consider removing features from init, only use feature_metadata.
+# TODO: Consider removing feature_metadata from init, have feature_metadata be fit argument?
+# TODO: Remove **kwargs from init?
+
 
 class AbstractModel:
     """
@@ -32,12 +41,34 @@ class AbstractModel:
 
     Parameters
     ----------
-    path (str): directory where to store all outputs.
-    name (str): name of subdirectory inside path where model will be saved.
-    problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-    eval_metric (str or autogluon.core.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
-    hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-    feature_metadata (autogluon.core.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
+    path : str
+        Directory location to store all outputs.
+    name : str
+        Name of the subdirectory inside path where model will be saved.
+        The final model directory will be path+name+os.path.sep()
+    problem_type : str
+        Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
+    eval_metric : :class:`autogluon.core.metrics.Scorer` or str, default = None
+        Metric by which predictions will be ultimately evaluated on test data.
+        This only impacts `model.score()`, as eval_metric is not used during training.
+
+        If `eval_metric = None`, it is automatically chosen based on `problem_type`.
+        Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
+        Otherwise, options for classification:
+            ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
+            'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision', 'precision_macro', 'precision_micro',
+            'precision_weighted', 'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score']
+        Options for regression:
+            ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2']
+        For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
+
+        You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
+    hyperparameters : dict, default = None
+        Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
+        If None, model defaults are used. This is identical to passing an empty dictionary.
+    feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`, default = None
+        Contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical.
+        If None, feature_metadata is inferred during fit.
     """
 
     model_file_name = 'model.pkl'
@@ -112,16 +143,19 @@ class AbstractModel:
     def path_suffix(self):
         return self.name + os.path.sep
 
-    # Checks if model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
     def is_valid(self) -> bool:
+        """
+        Returns True if the model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
+        This indicates whether the model can be used as a base model to fit a stack ensemble model.
+        """
         return self.is_fit()
 
-    # Checks if model is capable of inference on new data
     def can_infer(self) -> bool:
+        """Returns True if the model is capable of inference on new data."""
         return self.is_valid()
 
-    # Checks if a model has been fit
     def is_fit(self) -> bool:
+        """Returns True if the model has been fit."""
         return self.model is not None
 
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
@@ -208,6 +242,10 @@ class AbstractModel:
         self.name = name
 
     def preprocess(self, X, preprocess_nonadaptive=True, preprocess_stateful=True, **kwargs):
+        """
+        Preprocesses the input data into internal form ready for fitting or inference.
+        It is not recommended to override this method, as it is closely tied to multi-layer stacking logic. Instead, override `_preprocess`.
+        """
         if preprocess_nonadaptive:
             X = self._preprocess_nonadaptive(X, **kwargs)
         if preprocess_stateful:
@@ -242,6 +280,11 @@ class AbstractModel:
         return X
 
     def _preprocess_set_features(self, X: pd.DataFrame):
+        """
+        Infers self.features and self.feature_metadata from X.
+
+        If no valid features were found, a NoValidFeatures exception is raised.
+        """
         self.features = list(X.columns)
         # TODO: Consider changing how this works or where it is done
         if self.feature_metadata is None:
@@ -304,6 +347,46 @@ class AbstractModel:
         return kwargs
 
     def fit(self, **kwargs):
+        """
+        Fit model to predict values in y based on X.
+
+        Models should not override the `fit` method, but instead override the `_fit` method which has the same arguments.
+
+        Parameters
+        ----------
+        X : DataFrame
+            The training data features.
+        y : Series
+            The training data ground truth labels.
+        X_val : DataFrame, default = None
+            The validation data features.
+            If None, early stopping via validation score will be disabled.
+        y_val : Series, default = None
+            The validation data ground truth labels.
+            If None, early stopping via validation score will be disabled.
+        X_unlabeled : DataFrame, default = None
+            Unlabeled data features.
+            Models may optionally implement logic which leverages unlabeled data to improve model accuracy.
+        time_limit : float, default = None
+            Time limit in seconds to adhere to when fitting model.
+            Ideally, model should early stop during fit to avoid going over the time limit if specified.
+        sample_weight : Series, default = None
+            The training data sample weights.
+            Models may optionally leverage sample weights during fit.
+            If None, model decides. Typically, models assume uniform sample weight.
+        sample_weights_val : Series, default = None
+            The validation data sample weights.
+            If None, model decides. Typically, models assume uniform sample weight.
+        num_cpus : int, default = 'auto'
+            How many CPUs to use during fit.
+            This is counted in virtual cores, not in physical cores.
+            If 'auto', model decides.
+        num_gpus : int, default = 'auto'
+            How many GPUs to use during fit.
+            If 'auto', model decides.
+        **kwargs :
+            Any additional fit arguments a model supports.
+        """
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
             self._fit(**kwargs)
@@ -311,17 +394,47 @@ class AbstractModel:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
 
-    def _fit(self, X, y, **kwargs):
-        # kwargs may contain: num_cpus, num_gpus
+    def _fit(self,
+             X,
+             y,
+             X_val=None,
+             y_val=None,
+             X_unlabeled=None,
+             time_limit=None,
+             sample_weight=None,
+             sample_weight_val=None,
+             num_cpus=None,
+             num_gpus=None,
+             **kwargs):
+        """
+        Fit model to predict values in y based on X.
+
+        Models should override this method with their custom model fit logic.
+        It is very important that `X = self.preprocess(X)` is called within `_fit`, or else `predict` and `predict_proba` may not work as intended.
+
+        Refer to `fit` method for documentation.
+        """
+
         X = self.preprocess(X)
         self.model = self.model.fit(X, y)
 
     def predict(self, X, **kwargs):
+        """
+        Returns class predictions of X.
+        For binary and multiclass problems, this returns the predicted class labels as a Series.
+        For regression problems, this returns the predicted values as a Series.
+        """
         y_pred_proba = self.predict_proba(X, **kwargs)
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
     def predict_proba(self, X, normalize=None, **kwargs):
+        """
+        Returns class prediction probabilities of X.
+        For binary problems, this returns the positive class label probability as a Series.
+        For multiclass problems, this returns the class label probabilities of each class as a DataFrame.
+        For regression problems, this returns the predicted values as a Series.
+        """
         if normalize is None:
             normalize = self.normalize_pred_probas
         y_pred_proba = self._predict_proba(X=X, **kwargs)
@@ -358,7 +471,6 @@ class AbstractModel:
             y_pred = self.predict_proba(X=X, **kwargs)
         return compute_weighted_metric(y, y_pred, metric, sample_weight)
 
-
     def score_with_y_pred_proba(self, y, y_pred_proba, metric=None, sample_weight=None):
         if metric is None:
             metric = self.eval_metric
@@ -371,6 +483,7 @@ class AbstractModel:
     def save(self, path: str = None, verbose=True) -> str:
         """
         Saves the model to disk.
+
         Parameters
         ----------
         path : str, default None
@@ -380,6 +493,7 @@ class AbstractModel:
             The final model file is typically saved to path + self.model_file_name.
         verbose : bool, default True
             Whether to log the location of the saved file.
+
         Returns
         -------
         path : str
@@ -396,6 +510,7 @@ class AbstractModel:
     def load(cls, path: str, reset_paths=True, verbose=True):
         """
         Loads the model from disk to memory.
+
         Parameters
         ----------
         path : str
@@ -408,6 +523,7 @@ class AbstractModel:
             If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
         verbose : bool, default True
             Whether to log the location of the loaded file.
+
         Returns
         -------
         model : cls
@@ -435,7 +551,7 @@ class AbstractModel:
         banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         features_to_check = [feature for feature in features if feature not in banned_features]
 
-        fi_df = self.compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
+        fi_df = self._compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
         n = fi_df.iloc[0]['n'] if len(fi_df) > 0 else 1
         if importance_as_list:
             banned_importance = [0] * n
@@ -455,7 +571,7 @@ class AbstractModel:
     # Compute feature importance via permutation importance
     # Note: Expensive to compute
     #  Time to compute is O(predict_time*num_features)
-    def compute_permutation_importance(self, X, y, features: list, eval_metric=None, silent=False, **kwargs) -> pd.DataFrame:
+    def _compute_permutation_importance(self, X, y, features: list, eval_metric=None, silent=False, **kwargs) -> pd.DataFrame:
         if eval_metric is None:
             eval_metric = self.eval_metric
         transform_func = self.preprocess
@@ -471,18 +587,26 @@ class AbstractModel:
             transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
         )
 
-    # Custom feature importance values for a model (such as those calculated from training)
     def get_model_feature_importance(self) -> dict:
+        """
+        Custom feature importance values for a model (such as those calculated from training)
+
+        This is purely optional to implement, as it is only used to slightly speed up permutation importance by identifying features that were never used.
+        """
         return dict()
 
-    # Hyperparameters of trained model
     def get_trained_params(self) -> dict:
+        """
+        Returns the hyperparameters of the trained model.
+        If the model early stopped, this will contain the epoch/iteration the model uses during inference, instead of the epoch/iteration specified during fit.
+        This is used for generating a model template to refit on all of the data (no validation set).
+        """
         trained_params = self.params.copy()
         trained_params.update(self.params_trained)
         return trained_params
 
-    # After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
     def convert_to_template(self):
+        """After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied."""
         model = self.model
         self.model = None
         template = copy.deepcopy(self)
@@ -490,8 +614,8 @@ class AbstractModel:
         self.model = model
         return template
 
-    # After calling this function, model should be able to be fit without test data using the iterations trained by the original model
     def convert_to_refit_full_template(self):
+        """After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model."""
         params_trained = self.params_trained.copy()
         template = self.convert_to_template()
         template.params.update(params_trained)
@@ -532,6 +656,11 @@ class AbstractModel:
         return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
 
     def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
+        """
+        Hyperparameter tune the model.
+
+        This usually does not need to be overwritten by models.
+        """
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
@@ -652,12 +781,23 @@ class AbstractModel:
     # If `remove_info=True`, enables the removal of variables which are used during model.get_info(). The values will be None when calling model.get_info().
     # If `requires_save=True`, enables the removal of variables which are part of the model.pkl object, requiring an overwrite of the model to disk if it was previously persisted.
     def reduce_memory_size(self, remove_fit=True, remove_info=False, requires_save=True, **kwargs):
+        """
+        Removes non-essential objects from the model to reduce memory and disk footprint.
+        If `remove_fit=True`, enables the removal of variables which are required for fitting the model. If the model is already fully trained, then it is safe to remove these.
+        If `remove_info=True`, enables the removal of variables which are used during model.get_info(). The values will be None when calling model.get_info().
+        If `requires_save=True`, enables the removal of variables which are part of the model.pkl object, requiring an overwrite of the model to disk if it was previously persisted.
+
+        It is not necessary for models to implement this.
+        """
         pass
 
-    # Deletes the model from disk.
-    # WARNING: This will DELETE ALL FILES in the self.path directory, regardless if they were created by AutoGluon or not.
-    #  DO NOT STORE FILES INSIDE OF THE MODEL DIRECTORY THAT ARE UNRELATED TO AUTOGLUON.
     def delete_from_disk(self):
+        """
+        Deletes the model from disk.
+
+        WARNING: This will DELETE ALL FILES in the self.path directory, regardless if they were created by AutoGluon or not.
+        DO NOT STORE FILES INSIDE OF THE MODEL DIRECTORY THAT ARE UNRELATED TO AUTOGLUON.
+        """
         logger.log(30, f'Deleting model {self.name}. All files under {self.path} will be removed.')
         from pathlib import Path
         import shutil
@@ -666,6 +806,9 @@ class AbstractModel:
         shutil.rmtree(path=model_path, ignore_errors=True)
 
     def get_info(self) -> dict:
+        """
+        Returns a dictionary of numerous fields describing the model.
+        """
         info = {
             'name': self.name,
             'model_type': type(self).__name__,
@@ -709,6 +852,11 @@ class AbstractModel:
         return info
 
     def _get_default_resources(self):
+        """
+        Determines the default resource usage of the model during fit.
+
+        Models may want to override this if they depend heavily on GPUs, as the default sets num_gpus to 0.
+        """
         num_cpus = get_cpu_count()
         num_gpus = 0
         return num_cpus, num_gpus
@@ -722,6 +870,11 @@ class AbstractModel:
         return {}
 
     def _get_default_stopping_metric(self):
+        """
+        Returns the default stopping metric to use for early stopping.
+        This is used if stopping_metric was not explicitly specified.
+        Models may wish to override this in case a more suitable stopping_metric exists for a given eval_metric.
+        """
         if self.eval_metric.name == 'roc_auc':
             stopping_metric = 'log_loss'
         else:

@@ -405,8 +405,9 @@ class TabularPredictor:
                             hyperparameter_tune_kwargs: (dict) Refer to :meth:`TabularPredictor.fit` hyperparameter_tune_kwargs argument. If specified here, will override global HPO settings for this model.
                         Reference the default hyperparameters for example usage of these options.
                     ag_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
-                        Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limit` argument given during `fit()` but is not the same.
+                        Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limit` argument given during `predictor.fit()` but is not the same.
                         Valid keys:
+                            stopping_metric: (str or :class:`autogluon.core.metrics.Scorer`, default=None) The metric to use for early stopping of the model. If None, model will decide.
                             max_memory_usage_ratio: (float, default=1.0) The ratio of memory usage relative to the default to allow before early stopping or killing the model. Values greater than 1.0 will be increasingly prone to out-of-memory errors.
                             max_time_limit_ratio: (float, default=1.0) The ratio of the provided time_limit to use during model `fit()`. If `time_limit=10` and `max_time_limit_ratio=0.3`, time_limit would be changed to 3. Does not alter max_time_limit or min_time_limit values.
                             max_time_limit: (float, default=None) Maximum amount of time to allow this model to train for (in sec). If the provided time_limit is greater than this value, it will be replaced by max_time_limit.
