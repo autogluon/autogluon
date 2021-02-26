@@ -34,7 +34,7 @@ class FastTextModel(AbstractModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._model_bin_available = False
+        self._load_model = None  # Whether to load inner model when loading.
 
     def _set_default_params(self):
         default_params = get_param_baseline()
@@ -149,51 +149,39 @@ class FastTextModel(AbstractModel):
             )
 
         y_pred_proba: np.ndarray = pd.DataFrame(recs).sort_index(axis=1).values
-
-        if self.problem_type == BINARY:
-            if len(y_pred_proba.shape) == 1:
-                return y_pred_proba
-            elif y_pred_proba.shape[1] > 1:
-                return y_pred_proba[:, 1]
-            else:
-                return y_pred_proba
-        elif y_pred_proba.shape[1] > 2:
-            return y_pred_proba
-        else:
-            return y_pred_proba[:, 1]
+        return self._convert_proba_to_unified_form(y_pred_proba)
 
     def save(self, path: str = None, verbose=True) -> str:
+        self._load_model = self.model is not None
         # pickle model parts
-        model = self.model
+        __model = self.model
         self.model = None
-        self._model_bin_available = model is not None
-        path_final = super().save(path=path, verbose=verbose)
-
-        # save fasttext model: fasttext model cannot be pickled; saved it seperately
+        path = super().save(path=path, verbose=verbose)
+        self.model = __model
+        # save fasttext model: fasttext model cannot be pickled; saved it separately
         # TODO: s3 support
-        if self._model_bin_available:
-            fasttext_model_file_name = path_final + self.model_bin_file_name
-            model.save_model(fasttext_model_file_name)
-        self.model = model
-        return path_final
+        if self._load_model:
+            fasttext_model_file_name = path + self.model_bin_file_name
+            self.model.save_model(fasttext_model_file_name)
+        self._load_model = None
+        return path
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
-        try_import_fasttext()
-        import fasttext
-
-        obj: FastTextModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model: FastTextModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
         # load binary fasttext model
-        if obj._model_bin_available:
-            fasttext_model_file_name = obj.path + cls.model_bin_file_name
+        if model._load_model:
+            try_import_fasttext()
+            import fasttext
+            fasttext_model_file_name = model.path + cls.model_bin_file_name
             # TODO: hack to subpress a deprecation warning from fasttext
             # remove it once offcial fasttext is updated beyond 0.9.2
             # https://github.com/facebookresearch/fastText/issues/1067
             with open(os.devnull, 'w') as f, contextlib.redirect_stderr(f):
-                obj.model = fasttext.load_model(fasttext_model_file_name)
-
-        return obj
+                model.model = fasttext.load_model(fasttext_model_file_name)
+        model._load_model = None
+        return model
 
     def get_memory_size(self) -> int:
         return self._model_size_estimate

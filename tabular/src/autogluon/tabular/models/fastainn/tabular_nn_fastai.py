@@ -81,6 +81,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.procs = None
         self.y_scaler = None
         self._inner_features = None
+        self._load_model = None  # Whether to load inner model when loading.
 
     def _preprocess_train(self, X, y, X_val, y_val, num_workers):
         from fastai.data_block import FloatList
@@ -363,20 +364,24 @@ class NNFastAiTabularModel(AbstractModel):
             return preds.numpy()
 
     def save(self, path: str = None, verbose=True) -> str:
+        self._load_model = self.model is not None
         __model = self.model
         self.model = None
-        path_final = super().save(path=path, verbose=verbose)
+        path = super().save(path=path, verbose=verbose)
         self.model = __model
-
         # Export model
-        save_pkl.save_with_fn(f'{path_final}{self.model_internals_file_name}', self.model, lambda m, buffer: m.export(buffer), verbose=verbose)
-        return path_final
+        if self._load_model:
+            save_pkl.save_with_fn(f'{path}{self.model_internals_file_name}', self.model, lambda m, buffer: m.export(buffer), verbose=verbose)
+        self._load_model = None
+        return path
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
-        from fastai.basic_train import load_learner
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
-        model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(model.path, p), verbose=verbose)
+        if model._load_model:
+            from fastai.basic_train import load_learner
+            model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(model.path, p), verbose=verbose)
+        model._load_model = None
         return model
 
     def _set_default_params(self):

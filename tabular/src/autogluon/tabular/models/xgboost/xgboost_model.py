@@ -143,14 +143,4 @@ class XGBoostModel(AbstractModel):
             return self.model.predict(X, ntree_limit=self._best_ntree_limit)
 
         y_pred_proba = self.model.predict_proba(X, ntree_limit=self._best_ntree_limit)
-        if self.problem_type == BINARY:
-            if len(y_pred_proba.shape) == 1:
-                return y_pred_proba
-            elif y_pred_proba.shape[1] > 1:
-                return y_pred_proba[:, 1]
-            else:
-                return y_pred_proba
-        elif y_pred_proba.shape[1] > 2:
-            return y_pred_proba
-        else:
-            return y_pred_proba[:, 1]
+        return self._convert_proba_to_unified_form(y_pred_proba)
