@@ -1679,7 +1679,7 @@ class TabularPredictor:
         -------
         The positive class name in binary classification or None if the problem is not binary classification.
         """
-        if not self._learner.is_fit():
+        if not self._learner.is_fit:
             raise AssertionError('Predictor must be fit to return positive_class.')
         if self.problem_type != BINARY:
             logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
