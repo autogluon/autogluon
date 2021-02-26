@@ -31,7 +31,7 @@ AutoGluon Tasks
 Tasks
 -----
 
-Prediction tasks built into AutoGluon such that a single call to `fit()` can produce high-quality trained models. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
+Prediction tasks built into AutoGluon such that a single call to `fit()` can produce high-quality trained models for tabular, image, or text data. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
 
 .. automodule:: autogluon.tabular
 .. autosummary::
@@ -50,7 +50,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 .. autosummary::
    :nosignatures:
 
-   TextPrediction
+   TextPredictor
 
 
 :hidden:`TabularPredictor`
@@ -67,7 +67,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-:hidden:`ImagePrediction`
+:hidden:`ImagePredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.vision
 
@@ -97,7 +97,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-:hidden:`TextPrediction`
+:hidden:`TextPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.text
 
@@ -132,8 +132,8 @@ Additional Tabular APIs
    :inherited-members:
 
 
-Additional Text Prediction APIs
--------------------------------
+Additional Text APIs
+--------------------
 
 .. automodule:: autogluon.text.text_prediction.models.basic_v1
 

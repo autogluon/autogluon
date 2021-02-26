@@ -44,7 +44,7 @@ logger = logging.getLogger()  # return root logger
 
 class TabularPredictor:
     """
-    AutoGluon Predictor predicts values in a column of a tabular dataset (classification or regression).
+    AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
 
     Parameters
     ----------
@@ -59,6 +59,7 @@ class TabularPredictor:
 
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
         Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
+
         Otherwise, options for classification:
             ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
             'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision', 'precision_macro', 'precision_micro',
@@ -135,11 +136,6 @@ class TabularPredictor:
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
         In binary classification, :meth:`TabularPredictor.predict_proba` returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
-
-        Returns
-        -------
-        The positive class name in binary classification or None if the problem is not binary classification.
-
     class_labels : list
         For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
         For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.

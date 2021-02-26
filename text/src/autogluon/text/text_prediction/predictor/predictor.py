@@ -20,22 +20,22 @@ logger = logging.getLogger()  # return root logger
 
 
 class TextPredictor:
-    """AutoGluon TextPredictor predicts values in a column of a tabular dataset that contains texts
-    (classification or regression).
+    """AutoGluon TextPredictor predicts values in a column of a tabular dataset that contains text fields
+    (classification or regression). TabularPredictor can also do this but it uses an ensemble of many types of models and may featurize text.
+    TextPredictor instead directly fits individual Transformer neural network models directly to the raw text (which are also capable of handling additional numeric/categorical columns).
+    We generally recommend TabularPredictor if your table contains numeric/categorical columns and TextPredictor if your table contains only text columns, but you may easily try both.
+    In fact, `TabularPredictor.fit(..., hyperparameters='multimodal')` will train a TextPredictor along with many tabular models and ensemble them together.
 
     Parameters
     ----------
     label : str
         Name of the column that contains the target variable to predict.
     problem_type : str, default = None
-        Type of prediction problem, i.e. is this a binary/multiclass classification or regression
-        problem (options: 'binary', 'multiclass', 'regression').
-        If `problem_type = None`, the prediction problem type is inferred based on the
-        label-values in provided dataset.
+        Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
+        If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
     eval_metric : function or str, default = None
         Metric by which predictions will be ultimately evaluated on test data.
-        AutoGluon tunes factors such as hyper-parameters, early-stopping, ensemble-weights, etc.
-        in order to improve this metric on validation data.
+        AutoGluon tunes factors such as hyper-parameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data.
 
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
         Defaults to 'accuracy' for binary, 'accuracy' for multiclass classification, and
@@ -63,8 +63,8 @@ class TextPredictor:
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
-    warn_if_exist
-        Whether to raise warning if the path exists
+    warn_if_exist : bool, default = True
+        Whether to raise warning if the path already exists.
     """
 
     def __init__(
