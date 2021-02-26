@@ -11,13 +11,13 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
       :title: Quick Start Using FIT
       :link: beginner.html
 
-      Train high-quality text prediction models in under 5 minutes.
+      How to train high-quality text prediction models in under 5 minutes.
 
    .. card::
       :title: Multimodal Data Tables with Text
       :link: multimodal_text.html
 
-      Learn how TextPredictor can be applied to multimodal data tables with
+      How TextPredictor can be applied to multimodal data tables with
       a mix of text, numeric, and categorical columns.
 
    .. card::

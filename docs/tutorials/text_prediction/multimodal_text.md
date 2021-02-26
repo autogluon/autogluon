@@ -1,9 +1,7 @@
 # Text Prediction - Multimodal Table with Text
 :label:`sec_textprediction_multimodal`
 
-In your applications, your text data may be mixed with other common data types like 
-numeric and categorical data (which are commonly found in tabular datasets). The `TextPredictor` network in AutoGluon 
-can train a single neural network that jointly operates on multiple feature types, including text, categorical, and numerical columns. The general idea is to embed the text, categorical and numeric fields separately and fuse the features. Here, we will demonstrate the usage and briefly explain about the inner idea.
+In many applications, text data may be mixed with numeric/categorical data. AutoGluon's `TextPredictor` can train a single neural network that jointly operates on multiple feature types, including text, categorical, and numerical columns. The general idea is to embed the text, categorical and numeric fields separately and fuse these features across modalities. This tutorial demonstrates such an application.
 
 
 ```{.python .input}
@@ -19,11 +17,9 @@ np.random.seed(123)
 !python3 -m pip install openpyxl
 ```
 
-## Book Price Prediction 
+## Book Price Prediction Data
 
-To demonstrate the usage, we are going to use the book price prediction dataset used in the [MachineHack Salary Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview), 
-which attempts to predict the price of the book given the other features like the author of the book, the abstract, the rating of the book and other features.
-
+For demonstration, we use the book price prediction dataset from the [MachineHack Salary Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview). Our goal is to predict a book's price given various features like its author, the abstract, the book's rating, etc.
 
 ```{.python .input}
 !mkdir -p price_of_books
@@ -32,18 +28,12 @@ which attempts to predict the price of the book given the other features like th
 !ls price_of_books/Participants_Data
 ```
 
-
 ```{.python .input}
 train_df = pd.read_excel(os.path.join('price_of_books', 'Participants_Data', 'Data_Train.xlsx'), engine='openpyxl')
+train_df.head()
 ```
 
-
-```{.python .input}
-train_df.head(3)
-```
-
-We will do a basic preprocessing which will convert the `Reviews` and `Ratings` in the data table to numeric values. Also, we will transform the price to be log scale.
-
+We do some basic preprocessing to convert `Reviews` and `Ratings` in the data table to numeric values, and we transform prices to a log-scale.
 
 ```{.python .input}
 def preprocess(df):
@@ -52,50 +42,53 @@ def preprocess(df):
     df.loc[:, 'Ratings'] = pd.to_numeric(df['Ratings'].apply(lambda ele: ele.replace(',', '')[:-len(' customer reviews')]))
     df.loc[:, 'Price'] = np.log(df['Price'] + 1)
     return df
-
-train_df = preprocess(train_df)
-
 ```
-
 
 ```{.python .input}
-train_df.head(3)
+train_subsample_size = 1500  # subsample for faster demo, you can try setting to larger values
+test_subsample_size = 5
+train_df = preprocess(train_df)
+train_data = train_df.iloc[100:].sample(train_subsample_size, random_state=123)
+test_data = train_df.iloc[:100].sample(test_subsample_size, random_state=245)
+train_data.head()
 ```
 
-## Train Model
+## Training
 
-As our previous example, we can simply create a TextPredictor and call `predictor.fit()` to train the model. 
-Internally, the network will be automatically generated based on the type of the feature columns, which are inferred based on heuristics.  
-Also, to save time, we will subsample 1500 rows from the data and only train for three minutes.
+We can simply create a TextPredictor and call `predictor.fit()` to train a model that operates on across all types of features. Internally, the neural network will be automatically generated based on the inferred data type of each feature column. To save time, we subsample the data and only train for three minutes.
 
 
 ```{.python .input}
 from autogluon.text import TextPredictor
+time_limit = 3 * 60  # set to larger value in your applications
 predictor = TextPredictor(label='Price', path='ag_text_book_price_prediction')
-sampled_train_df = train_df.iloc[100:].sample(1500, random_state=123)
-predictor.fit(sampled_train_df, time_limit=3 * 60, seed=123)
+predictor.fit(train_data, time_limit=time_limit)
 ```
 
-## Get Predictions and Embeddings
+## Prediction
 
-Likewise, we can get the predictions and extract embeddings with the same API.
+We can easily obtain predictions and extract data embeddings using the TextPredictor.
 
 
 ```{.python .input}
-test_df = train_df.iloc[:100].sample(5, random_state=245)
-predictions = predictor.predict(test_df, as_pandas=True)
+predictions = predictor.predict(test_data)
 print('Predictions:')
 print('------------')
 print(np.exp(predictions) - 1)
 print()
 print('True Value:')
 print('------------')
-print(np.exp(test_df['Price']) - 1)
+print(np.exp(test_data['Price']) - 1)
+
 ```
 
+```{.python .input}
+performance = predictor.evaluate(test_data)
+print(performance)
+```
 
 ```{.python .input}
-embeddings = predictor.extract_embedding(test_df)
+embeddings = predictor.extract_embedding(test_data)
 print(embeddings)
 ```
 
@@ -114,10 +107,10 @@ In addition, to deal with multiple text fields, we separate these fields with th
 ![Preprocessing](https://autogluon-text-data.s3.amazonaws.com/figures/preprocess.png)
 :width:`600px`
 
-## How to combine with traditional tabular models?
+## How does this compare with TabularPredictor?
 
-In real-world applications, we may combine the pretrained NLP model and the classical tabular models like LightGBM or CatBoost. While the model offered in `TextPredictor` is a single model, you can further combine it with other classic tabular models via `TabularPredictor`. For such usage, you can refer to ":ref:`sec_tabularprediction_text_multimodal`"  for more details.
+Note that `TabularPredictor` can also handle data tables with text, numeric, and categorical columns, but it uses an ensemble of many types of models and may featurize text. `TextPredictor` instead directly fits individual Transformer neural network models directly to the raw text (which are also capable of handling additional numeric/categorical columns). We generally recommend TabularPredictor if your table contains mainly numeric/categorical columns and TextPredictor if your table contains mainly text columns, but you may easily try both and we encourage this. In fact, `TabularPredictor.fit(..., hyperparameters='multimodal')` will train a TextPredictor along with many tabular models and ensemble them together. Refer to the tutorial ":ref:`sec_tabularprediction_text_multimodal`"  for more details.
 
 ## Other Examples
 
-You may go to https://github.com/awslabs/autogluon/tree/master/examples/text_prediction to check other examples for TextPredictor, including the script to train a model on the complete book price prediction dataset.
+You may go to https://github.com/awslabs/autogluon/tree/master/examples/text_prediction to explore other TextPredictor examples, including scripts to train a TextPredictor on the complete book price prediction dataset.
