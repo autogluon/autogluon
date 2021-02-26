@@ -35,11 +35,10 @@ class TextPredictor:
         If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
     eval_metric : function or str, default = None
         Metric by which predictions will be ultimately evaluated on test data.
-        AutoGluon tunes factors such as hyper-parameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data.
+        AutoGluon tunes factors such as hyperparameters, early-stopping, etc. in order to improve this metric on validation data.
 
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-        Defaults to 'accuracy' for binary, 'accuracy' for multiclass classification, and
-        'root_mean_squared_error' for regression.
+        Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
 
         Otherwise, options for classification:
             ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
@@ -51,7 +50,6 @@ class TextPredictor:
             ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error',
              'median_absolute_error', 'r2', 'spearmanr', 'pearsonr']
         For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
-
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
     path : str, default = None
         Path to directory where models and intermediate outputs should be saved.
@@ -64,7 +62,7 @@ class TextPredictor:
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
     warn_if_exist : bool, default = True
-        Whether to raise warning if the path already exists.
+        Whether to raise warning if the specified path already exists.
     """
 
     def __init__(
@@ -126,71 +124,61 @@ class TextPredictor:
             plot_results=None,
             holdout_frac=None,
             seed=0):
-        """Fit the predictor
+        """
+        Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
 
         Parameters
         ----------
-        train_data
-            Table of the training data. It can be a pandas dataframe.
+        train_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            Table of the training data, which is similar to a pandas DataFrame.
             If str is passed, `train_data` will be loaded using the str value as the file path.
-        tuning_data
-            Another dataset containing validation data reserved for tuning processes such as early
-            stopping and hyperparameter tuning.
+        tuning_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+            Another dataset containing validation data reserved for tuning processes such as early stopping and hyperparameter tuning.
             This dataset should be in the same format as `train_data`.
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
-            Note: final model returned may be fit on `tuning_data` as well as `train_data`.
-            Do not provide your evaluation test data here!
-            In particular, when `num_bag_folds` > 0 or `num_stack_levels` > 0, models will be
-            trained on both `tuning_data` and `train_data`.
-            If `tuning_data = None`, `fit()` will automatically hold out some random validation
-            examples from `train_data`.
-        time_limit
+            Note: final model returned may be fit on `tuning_data` as well as `train_data`. Do not provide your evaluation test data here!
+            If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
+        time_limit : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until the model has completed training.
-        presets : str or None, optional, default is None
-            Presets defines the pre-registered configurations. By default,
-            we will use the "medium_quality_faster_train".
-            There are some other options like
-                - best_quality: Model with the best quality but will be slower
-                                for training and inference
-                - medium_quality_faster_train: Model with the medium quality
-                - lower_quality_fast_train: Model that can be trained and inferenced very fast compared to the other two options.
-            You may try to list all presets via `autogluon.text.ag_text_presets.list_keys()`.
-        hyperparameters
-            The hyper-parameters of the fit function. This can be used to specify the
-            search space and the configuration of the network.
-        column_types
-            The provided type of the columns. It will be a dictionary that maps the column name
-            to the type of the column. For example, it can be
-            {"item_name": "text", "brand": "text", "product_description": "text", "height": "numerical"}
-            If there are "item_name", "brand", "product_description", and "height" as column names.
+        presets : str, default = None
+            Presets are pre-registered configurations that control training (hyperparameters and other aspects).
+            It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
+            Print all available presets via `autogluon.text.list_presets()`.
+            Some notable presets include:
+                - "best_quality": produce the most accurate overall predictor (regardless of its efficiency).
+                - "medium_quality_faster_train": produce an accurate predictor but take efficiency into account (this is the default preset).
+                - "lower_quality_fast_train": produce a predict that is quick to train and make predictions with, even if its accuracy is worse.
+        hyperparameters : dict, default = None
+            The hyperparameters of the `fit()` function, which affect the resulting accuracy of the trained predictor.
+            Experienced AutoGluon users can use this argument to specify neural network hyperparameter values/search-spaces as well as which hyperparameter-tuning strategy should be employed. See the "Text Prediction" tutorials for examples.
+        column_types : dict, default = None
+            The type of data in each table column can be specified via a dictionary that maps the column name to its data type.
+            For example: `column_types = {"item_name": "text", "brand": "text", "product_description": "text", "height": "numerical"}` may be used for a table with columns: "item_name", "brand", "product_description", and "height".
+            If None, column_types will be automatically inferred from the data.
             The current supported types are:
-
-            - "text": Text Column
-            - "numerical" Numerical Column
-            - "categorical" Categorical Column
-
-        num_cpus
-            The number of CPUs to use for each trial
-        num_gpus
-            The number of GPUs to use for each trial
-        num_trials
-            The number of trials in HPO if HPO is to be used.
-            By default, we will use the provided number of trials in the
-            hyperparameters or presets. This will overwrite the provided value in
-            hyperparameters['tune_kwargs']['num_trials'].
-        plot_results
-            Whether to plot results. During the fit function.
-        holdout_frac
-            The holdout frac of the validation set. We will set it automatically
-            if it is not specified based on whether we are using hyperparameter search or not.
-        seed
-            The seed of the experiment. If it is None, no seed will be specified and
-            each run will be random. By default, the seed will be 0.
+            - "text": each row in this column contains text (sentence, paragraph, etc.).
+            - "numerical": each row in this column contains a number.
+            - "categorical": each row in this column belongs to one of K categories.
+        num_cpus : int, default = None
+            The number of CPUs to use for each training run (i.e. one hyperparameter-tuning trial).
+        num_gpus : int, default = None
+            The number of GPUs to use to use for each training run (i.e. one hyperparameter-tuning trial). We recommend at least 1 GPU for TextPredictor as its neural network models are computationally intensive.
+        num_trials : int, default = None
+            If hyperparameter-tuning is used, specifies how many HPO trials should be run (assuming `time_limit` has not been exceeded).
+            By default, this is the provided number of trials in the `hyperparameters` or `presets`.
+            If specified here, this value will overwrite the value in `hyperparameters['tune_kwargs']['num_trials']`.
+        plot_results : bool, default = None
+            Whether to plot intermediate results from training. If None, will be decided based on the environment in which `fit()` is run.
+        holdout_frac : float, default = None
+            Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`).
+            Default value (if None) is selected based on the number of rows in the training data and whether hyperparameter-tuning is utilized.
+        seed : int, default = 0
+            The random seed to use for this training run. If None, no seed will be specified and repeated runs will produce different results.
 
         Returns
         -------
-        self
+        :class:`TextPredictor` object. Returns self.
         """
         assert self._fit_called is False
         if presets is not None:
@@ -287,42 +275,39 @@ class TextPredictor:
         return self
 
     def evaluate(self, data, metrics=None):
-        """ Report the predictive performance evaluated for a given dataset.
+        """ Report the predictive performance evaluated over a given dataset.
 
         Parameters
         ----------
-        data : str or `pandas.DataFrame`
-            This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
-            If str is passed, `valid_data` will be loaded using the str value as the file path.
-        metrics : str or List[str] or None
-            Name of metric or a list of names of metrics to report.
-            If it is not given, we will return the score of the stored eval_metric.
+        data : str or :class:`TabularDataset` or `pandas.DataFrame`
+            This dataset must also contain the `label` with the same column-name as previously specified.
+            If str is passed, `data` will be loaded using the str value as the file path.
+        metrics : str or List[str], default = None
+            Name of metric or a list of multiple metric names to report (options are the same as for `eval_metric`).
+            If None, we only return the score for the stored `eval_metric`.
 
         Returns
         -------
-        ret : a single number or a dict of metric --> metric scores
-            The output metrics. It will be a single value if there is only one metric and
-            will be a dictionary of {metric_name --> value} if there are multiple metrics to report.
+        metrics_values : float or dict
+            The metrics computed on the data. This is a single value if there is only one metric and is a dictionary of {metric_name --> value} if there are multiple metrics.
         """
         return self._model.evaluate(data, metrics=metrics)
 
     def predict(self, data, as_pandas=True):
         """
+        Use trained model to produce predictions of `label` column values for new data.
 
         Parameters
         ----------
-        data
-            The input dataset.
-        as_pandas
-            Whether the output will be converted to a pandas dataframe
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            The data to make predictions for. Should contain same column names as training Dataset and follow same format (except for the `label` column).
+            If str is passed, `data` will be loaded using the str value as the file path.
+        as_pandas : bool, default = True
+            Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False).
 
         Returns
         -------
-        output
-            Array of predictions. One element corresponds to the prediction value of one
-        as_pandas
-            Whether to convert the output to a pandas dataframe
-
+        Array of predictions, one corresponding to each row in given dataset.
         """
         assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         output = self._model.predict(data)
@@ -335,19 +320,21 @@ class TextPredictor:
         return output
 
     def predict_proba(self, data, as_pandas=True):
-        """Predict the probability from the input
+        """
+        Use trained model to produce predicted class probabilities rather than class-labels (if task is classification).
+        If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
 
         Parameters
         ----------
-        dataset
-            The dataset to use. It can either be a pandas dataframe or the path to the pandas dataframe.
-        as_pandas
-            Whether to convert the output to pandas dataframe.
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            The data to make predictions for. Should contain same column names as training dataset and follow same format (except for the `label` column).
+            If str is passed, `data` will be loaded using the str value as the file path.
+        as_pandas : bool, default = True
+            Whether to return the output as a pandas DataFrame (True) or numpy array (False).
 
         Returns
         -------
-        output
-            The output matrix contains the probability. It will have shape (#samples, #choices).
+        Array of predicted class-probabilities, corresponding to each row in the given data. It will have shape (#samples, #classes).
         """
         assert self._model is not None,\
             'Model does not seem to have been constructed. ' \
@@ -362,21 +349,21 @@ class TextPredictor:
         return output
 
     def extract_embedding(self, data, as_pandas=False):
-        """Extract the feature from the neural network
+        """
+        Extract intermediate feature representations of a row from the trained neural network.
 
         Parameters
         ----------
-        data
-            The dataset to extract the embedding. It can either be a pandas dataframe or
-            the path to the pandas dataframe.
-        as_pandas
-            Whether to return a pandas dataframe
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            The data to extract embeddings for. Should contain same column names as training dataset and follow same format (except for the `label` column).
+            If str is passed, `data` will be loaded using the str value as the file path.
+        as_pandas : bool, default = False
+            Whether to return the output as a pandas DataFrame (True) or numpy array (False).
 
         Returns
         -------
-        embeddings
-            The output will be numpy array of shape (len(dataset), D), where the embedding
-            dimension D is determined by the neural network's architecture.
+        Array of embeddings, corresponding to each row in the given data.
+        It will have shape (#samples, D) where the embedding dimension D is determined by the neural network's architecture.
         """
         assert self._model is not None, 'Model does not seem to have been constructed. ' \
                                         'Have you called fit(), or load()?'
@@ -390,21 +377,21 @@ class TextPredictor:
         return output
 
     def save(self, path):
-        """Save the model to directory path
+        """
+        Save this Predictor to file in directory specified by `path`.
+        The relevant files will be saved in two parts:
 
-        It will contains two parts:
-
-        - DIR_PATH/text_predictor_assets.json
-            Contains the general assets about the configuration of the predictor.
-        - DIR_PATH/saved_model
+        - PATH/text_predictor_assets.json
+            Contains the configuration information of this Predictor.
+        - PATH/saved_model
             Contains the model weights and other features
 
+        Note that :meth:`TextPredictor.fit` already saves the predictor object automatically (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
 
         Parameters
         ----------
-        path
-            The directory path to save the model artifacts
-
+        path, str
+            The path to directory in which to save this Predictor.
         """
         assert self._model is not None, 'Model does not seem to have been constructed.' \
                                         ' Have you called fit(), or load()?'
@@ -416,13 +403,13 @@ class TextPredictor:
 
     @classmethod
     def load(cls, path):
-        """Load from the corresponding path
+        """
+        Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
         Parameters
         ----------
-        path
-            The path to load the data
-
+        path : str
+            The path to directory in which this Predictor was previously saved.
         """
         assert os.path.exists(path),\
             f'"{path}" does not exist. You may check the path again.'

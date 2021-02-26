@@ -826,7 +826,7 @@ class TabularPredictor:
 
     def predict(self, data, model=None, as_pandas=True):
         """
-        Use trained models to produce predicted labels (in classification) or response values (in regression).
+        Use trained models to produce predictions of `label` column values for new data.
 
         Parameters
         ----------
@@ -838,12 +838,11 @@ class TabularPredictor:
             The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
         as_pandas : bool, default = True
-            Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False)
+            Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False).
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
-
         """
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
@@ -856,7 +855,7 @@ class TabularPredictor:
         Parameters
         ----------
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            The data to make predictions for. Should contain same column names as training Dataset and follow same format
+            The data to make predictions for. Should contain same column names as training dataset and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
@@ -883,14 +882,14 @@ class TabularPredictor:
 
     def evaluate(self, data, silent=False):
         """
-        Report the predictive performance evaluated for a given Dataset.
+        Report the predictive performance evaluated over a given dataset.
         This is basically a shortcut for: `pred = predict(data); evaluate_predictions(data[label], preds, auxiliary_metrics=False)`
         that automatically uses `predict_proba()` instead of `predict()` when appropriate.
 
         Parameters
         ----------
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
+            This dataset must also contain the `label` with the same column-name as previously specified.
             If str is passed, `data` will be loaded using the str value as the file path.
 
         silent : bool (optional)
@@ -2032,7 +2031,7 @@ class TabularPredictor:
     # TODO: Update and correct the logging message on loading directions
     def save(self):
         """
-        Save this predictor to file in directory specified by this Predictor's `path`.
+        Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
@@ -2048,6 +2047,16 @@ class TabularPredictor:
 
     @classmethod
     def load(cls, path, verbosity=2):
+        """
+        Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
+
+        Parameters
+        ----------
+        path : str
+            The path to directory in which this Predictor was previously saved.
+        verbosity : int, default = 2
+            Sets the verbosity level of this Predictor after it is loaded. Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
+        """
         set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")
