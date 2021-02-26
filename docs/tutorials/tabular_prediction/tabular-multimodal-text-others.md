@@ -2,7 +2,7 @@
 
 :label:`sec_tabularprediction_text_multimodal`
 
-Here we introduce how to use AutoGluon Tabular to deal with multimodal tabular data that contains text, numeric, and categorical columns. In AutoGluon, **raw text data** is considered as a first-class citizen of data tables. AutoGluon Tabular can help you train and combine a diverse set of models including classical tabular models like LightGBM/RF/CatBoost as well as our pretrained MLP model based multimodal network that is introduced in Section ":ref:`sec_textprediction_architecture`" of :ref:`sec_textprediction_multimodal` (used by AutoGluon's `TextPredictor`).
+Here we introduce how to use AutoGluon Tabular to deal with multimodal tabular data that contains text, numeric, and categorical columns. In AutoGluon, **raw text data** is considered as a first-class citizen of data tables. AutoGluon Tabular can help you train and combine a diverse set of models including classical tabular models like LightGBM/RF/CatBoost as well as our pretrained NLP model based multimodal network that is introduced in Section ":ref:`sec_textprediction_architecture`" of :ref:`sec_textprediction_multimodal` (used by AutoGluon's `TextPredictor`).
 
 
 ```{.python .input}
