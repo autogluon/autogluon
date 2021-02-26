@@ -61,7 +61,7 @@ class Remote(Client):
     LOCK = mp.Lock()
     REMOTE_ID = mp.Value('i', 0)
     def __init__(self, remote_ip=None, port=None, local=False, ssh_username=None,
-            ssh_port=22, ssh_private_key=None, remote_python=None, timeout=30):
+            ssh_port=22, ssh_private_key=None, remote_python=None, timeout=60):
         self.service = None
         if local:
             super().__init__(processes=False)

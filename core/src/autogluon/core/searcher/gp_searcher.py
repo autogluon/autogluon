@@ -8,7 +8,8 @@ from .searcher import BaseSearcher
 from ..utils.default_arguments import check_and_merge_defaults
 
 __all__ = ['GPFIFOSearcher',
-           'GPMultiFidelitySearcher']
+           'GPMultiFidelitySearcher',
+           'GPMFSimulationSearcher']
 
 
 def _to_config_cs(config_space: CS.ConfigurationSpace, config: dict) \
@@ -57,6 +58,9 @@ class GPFIFOSearcher(BaseSearcher):
     first_is_default : bool (default: True)
         If True, the first config to be evaluated is the default one of the
         config space. Otherwise, this first config is drawn at random.
+    elapsed_time_attribute : str (optional)
+        Name of elapsed time attribute in data obtained from reporter. Here,
+        elapsed time counts since the start of train_fn, unit is seconds.
     random_seed : int
         Seed for pseudo-random number generator used.
     num_init_random : int
@@ -130,6 +134,7 @@ class GPFIFOSearcher(BaseSearcher):
         # This lock protects gp_searcher. We are not using self.LOCK, this
         # can lead to deadlocks when superclass methods are called
         self._gp_lock = mp.Lock()
+        self._elapsed_time_attribute = kwargs.get('elapsed_time_attribute')
 
     def configure_scheduler(self, scheduler):
         from ..scheduler import FIFOScheduler
@@ -148,8 +153,12 @@ class GPFIFOSearcher(BaseSearcher):
         super().update(config, **kwargs)
         with self._gp_lock:
             config_cs = self._to_config_cs(config)
+            _kwargs = dict()
+            attr = self._elapsed_time_attribute
+            if attr is not None and attr in kwargs:
+                _kwargs['elapsed_time'] = kwargs[attr]
             self.gp_searcher.update(
-                config_cs, reward=kwargs[self._reward_attribute])
+                config_cs, reward=kwargs[self._reward_attribute], **_kwargs)
 
     def register_pending(self, config, milestone=None):
         with self._gp_lock:
@@ -184,6 +193,12 @@ class GPFIFOSearcher(BaseSearcher):
         return GPFIFOSearcher(
             self.configspace, reward_attribute=self._reward_attribute,
             _gp_searcher=_gp_searcher)
+
+    def set_profiler(self, profiler):
+        self.gp_searcher.set_profiler(profiler)
+
+    def set_getconfig_callback(self, callback):
+        self.gp_searcher.set_getconfig_callback(callback)
 
     @property
     def debug_log(self):
@@ -242,6 +257,9 @@ class GPMultiFidelitySearcher(BaseSearcher):
     first_is_default : bool (default: True)
         If True, the first config to be evaluated is the default one of the
         config space. Otherwise, this first config is drawn at random.
+    elapsed_time_attribute : str (optional)
+        Name of elapsed time attribute in data obtained from reporter. Here,
+        elapsed time counts since the start of train_fn, unit is seconds.
     random_seed : int
         Seed for pseudo-random number generator used.
     num_init_random : int
@@ -331,6 +349,7 @@ class GPMultiFidelitySearcher(BaseSearcher):
         # This lock protects gp_searcher. We are not using self.LOCK, this
         # can lead to deadlocks when superclass methods are called
         self._gp_lock = mp.Lock()
+        self._elapsed_time_attribute = kwargs.get('elapsed_time_attribute')
 
     def configure_scheduler(self, scheduler):
         from ..scheduler import HyperbandScheduler
@@ -349,9 +368,13 @@ class GPMultiFidelitySearcher(BaseSearcher):
         super().update(config, **kwargs)
         with self._gp_lock:
             config_cs = self._to_config_cs(config)
+            _kwargs = dict()
+            attr = self._elapsed_time_attribute
+            if attr is not None and attr in kwargs:
+                _kwargs['elapsed_time'] = kwargs[attr]
             self.gp_searcher.update(
                 config_cs, reward=kwargs[self._reward_attribute],
-                resource=int(kwargs[self._resource_attribute]))
+                resource=int(kwargs[self._resource_attribute]), **_kwargs)
             # If evaluation task has terminated, cleanup pending evaluations
             # which may have been overlooked
             if kwargs.get('terminated', False):
@@ -399,6 +422,12 @@ class GPMultiFidelitySearcher(BaseSearcher):
             self.configspace, reward_attribute=self._reward_attribute,
             resource_attribute=self._resource_attribute,
             _gp_searcher=_gp_searcher)
+
+    def set_profiler(self, profiler):
+        self.gp_searcher.set_profiler(profiler)
+
+    def set_getconfig_callback(self, callback):
+        self.gp_searcher.set_getconfig_callback(callback)
 
     @property
     def debug_log(self):

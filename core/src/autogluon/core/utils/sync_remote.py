@@ -20,7 +20,7 @@ def sagemaker_setup():
     else:
         sync_training_processes('dask-scheduler', current_host)
 
-def _wait_for_worker_nodes_to_start_sshd(hosts, interval=1, timeout_in_seconds=180):
+def _wait_for_worker_nodes_to_start_sshd(hosts, interval=1, timeout_in_seconds=360):
     with timeout(seconds=timeout_in_seconds):
         while hosts:
             print("hosts that aren't SSHable yet: %s", str(hosts))
