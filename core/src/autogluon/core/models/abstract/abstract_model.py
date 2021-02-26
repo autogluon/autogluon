@@ -256,6 +256,11 @@ class AbstractModel:
     def _preprocess(self, X: pd.DataFrame, **kwargs):
         """
         Data transformation logic should be added here.
+
+        Input data should not be trusted to be in a clean and ideal form, while the output should be in an ideal form for training/inference.
+        Examples of logic that should be added here include missing value handling, rescaling of features (if neural network), etc.
+        If implementing a new model, it is recommended to refer to existing model implementations and experiment using toy datasets.
+
         In bagged ensembles, preprocessing code that lives in `_preprocess` will be executed on each child model once per inference call.
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
@@ -384,6 +389,14 @@ class AbstractModel:
         num_gpus : int, default = 'auto'
             How many GPUs to use during fit.
             If 'auto', model decides.
+        verbosity : int, default = 2
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            verbosity 4: logs every training iteration, and logs the most detailed information.
+            verbosity 3: logs training iterations periodically, and logs more detailed information.
+            verbosity 2: logs only important information.
+            verbosity 1: logs only warnings and exceptions.
+            verbosity 0: logs only exceptions.
         **kwargs :
             Any additional fit arguments a model supports.
         """
@@ -405,12 +418,17 @@ class AbstractModel:
              sample_weight_val=None,
              num_cpus=None,
              num_gpus=None,
+             verbosity=2,
              **kwargs):
         """
         Fit model to predict values in y based on X.
 
         Models should override this method with their custom model fit logic.
+        X should not be assumed to be in a state ready for fitting to the inner model, and models may require special preprocessing in this method.
         It is very important that `X = self.preprocess(X)` is called within `_fit`, or else `predict` and `predict_proba` may not work as intended.
+        It is also important that `_preprocess` is overwritten to properly clean the data.
+        Examples of logic that should be handled by a model include missing value handling, rescaling of features (if neural network), etc.
+        If implementing a new model, it is recommended to refer to existing model implementations and experiment using toy datasets.
 
         Refer to `fit` method for documentation.
         """

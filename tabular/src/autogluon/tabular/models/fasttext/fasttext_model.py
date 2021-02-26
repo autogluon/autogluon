@@ -59,7 +59,11 @@ class FastTextModel(AbstractModel):
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
-    def _fit(self, X, y, sample_weight=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             sample_weight=None,
+             **kwargs):
         if self.problem_type not in (BINARY, MULTICLASS):
             raise ValueError(
                 "FastText model only supports binary or multiclass classification"

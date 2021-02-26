@@ -81,11 +81,14 @@ class TextPredictionV1Model(AbstractModel):
         from autogluon.text import ag_text_presets
         self.params = ag_text_presets.create('default')
 
-    def _fit(self, X: pd.DataFrame, y: pd.Series,
+    def _fit(self,
+             X: pd.DataFrame,
+             y: pd.Series,
              X_val: Optional[pd.DataFrame] = None,
              y_val: Optional[pd.Series] = None,
              time_limit: Optional[int] = None,
-             sample_weight=None, **kwargs):
+             sample_weight=None,
+             **kwargs):
         """The internal fit function
 
         Parameters

@@ -59,7 +59,12 @@ class KNNModel(AbstractModel):
         spaces = {}
         return spaces
 
-    def _fit(self, X, y, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             time_limit=None,
+             sample_weight=None,
+             **kwargs):
         time_start = time.time()
         X = self.preprocess(X)
         self._validate_fit_memory_usage(X=X)  # TODO: Can incorporate this into samples, can fit on portion of data to satisfy memory instead of raising exception immediately

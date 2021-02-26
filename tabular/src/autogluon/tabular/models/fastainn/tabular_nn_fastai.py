@@ -147,7 +147,16 @@ class NNFastAiTabularModel(AbstractModel):
             df[c] = df[c].fillna(self.columns_fills[c])
         return df
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_cpus=None, num_gpus=0, sample_weight=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             X_val=None,
+             y_val=None,
+             time_limit=None,
+             num_cpus=None,
+             num_gpus=0,
+             sample_weight=None,
+             **kwargs):
         try_import_fastai_v1()
         import torch
         from fastai.layers import LabelSmoothingCrossEntropy

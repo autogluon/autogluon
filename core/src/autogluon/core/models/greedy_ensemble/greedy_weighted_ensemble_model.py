@@ -31,7 +31,14 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         return X
 
     # TODO: Check memory after loading best model predictions, only load top X model predictions that fit in memory
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             X_val=None,
+             y_val=None,
+             time_limit=None,
+             sample_weight=None,
+             **kwargs):
         if self.base_model_names is None:
             self.base_model_names = self._infer_base_model_names()
             self.features = self._set_stack_columns(base_model_names=self.base_model_names)

@@ -338,7 +338,16 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
 
-    def _fit(self, X, y, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, reporter=None, sample_weight=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             X_val=None,
+             y_val=None,
+             X_unlabeled=None,
+             time_limit=None,
+             sample_weight=None,
+             reporter=None,
+             **kwargs):
         import torch
 
         num_gpus = kwargs.get('num_gpus', None)

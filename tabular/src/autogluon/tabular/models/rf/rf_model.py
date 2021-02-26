@@ -64,7 +64,12 @@ class RFModel(AbstractModel):
         }
         return spaces
 
-    def _fit(self, X, y, time_limit=None, sample_weight=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             time_limit=None,
+             sample_weight=None,
+             **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
