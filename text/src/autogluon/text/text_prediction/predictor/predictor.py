@@ -124,7 +124,7 @@ class TextPredictor:
         Returns
         -------
         ret
-            List that contain the class names
+            List that contain the class names. It will be None if the predictor is not solving a classification problem.
         """
         return self._model.class_labels
 
@@ -138,8 +138,10 @@ class TextPredictor:
         Returns
         -------
         ret
-            List that contains the internal integer labels.
+            List that contains the internal integer labels. It will be None if the predictor is not solving a classification problem.
         """
+        if self.class_labels is None:
+            return None
         return list(range(len(self.class_labels)))
 
     @property
@@ -152,8 +154,10 @@ class TextPredictor:
         Returns
         -------
         ret
-            The label mapping dictionary
+            The label mapping dictionary. It will be None if the predictor is not solving a classification problem.
         """
+        if self.class_labels is None:
+            return None
         return {k: v for k, v in zip(self.class_labels, self.class_labels_internal)}
 
     def fit(self,

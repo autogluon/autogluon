@@ -1261,7 +1261,7 @@ class MultiModalTextModel:
         Returns
         -------
         ret
-            List that contain the class names
+            List that contain the class names. It will be None if it's not a classification problem.
         """
         if self.problem_type != MULTICLASS or self.problem_type != BINARY:
             warnings.warn('Accessing class names for a non-classification problem. Return None.')
