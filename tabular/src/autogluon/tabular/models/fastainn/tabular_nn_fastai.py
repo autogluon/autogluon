@@ -250,7 +250,6 @@ class NNFastAiTabularModel(AbstractModel):
                     original_path = self.model.path
                     self.model.path = Path(temp_dir)
                     self.model.fit_one_cycle(params['epochs'], params['lr'], cbs=callbacks)
-                    # self.model.save(self.name)
 
                     # Load the best one and export it
                     self.model = self.model.load(self.name)
@@ -277,11 +276,11 @@ class NNFastAiTabularModel(AbstractModel):
         return df_train, train_idx, val_idx
 
     def __get_objective_func_name(self):
-        from fastai.metrics import _rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
+        from fastai.metrics import rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
 
         metrics_map = {
             # Regression
-            'root_mean_squared_error': _rmse,
+            'root_mean_squared_error': rmse,
             'mean_squared_error': mse,
             'mean_absolute_error': mae,
             'r2': R2Score(),
