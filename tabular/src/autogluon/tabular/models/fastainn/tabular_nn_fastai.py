@@ -164,6 +164,7 @@ class NNFastAiTabularModel(AbstractModel):
              sample_weight=None,
              **kwargs):
         try_import_fastai()
+        from fastai.tabular.model import tabular_config
         from fastai.tabular.learner import tabular_learner
         from fastcore.basics import defaults
         from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
@@ -212,10 +213,6 @@ class NNFastAiTabularModel(AbstractModel):
 
         loss_func = None
 
-        ps = params['ps']
-        if type(ps) != list:
-            ps = [ps]
-
         if time_limit:
             time_elapsed = time.time() - start_time
             time_left = time_limit - time_elapsed
@@ -223,13 +220,12 @@ class NNFastAiTabularModel(AbstractModel):
             time_left = None
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-
-        config = dict(ps=ps, embed_p=params['emb_drop'])
         dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
 
         self.model = tabular_learner(
             dls, layers=layers, metrics=nn_metric,
-            config=config, loss_func=loss_func,
+            config=tabular_config(ps=params['ps'], embed_p=params['emb_drop']),
+            loss_func=loss_func,
         )
         logger.log(15, self.model.model)
 

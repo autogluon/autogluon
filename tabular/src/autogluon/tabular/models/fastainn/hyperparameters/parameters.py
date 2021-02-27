@@ -20,7 +20,7 @@ def get_param_multiclass_baseline():
         # See docs: https://docs.fast.ai/tabular.models.html
         'layers': None,  # layers configuration; None - use model's heuristics
         'emb_drop': 0.1,  # embedding layers dropout
-        'ps': [0.1],  # linear layers dropout
+        'ps': 0.1,  # linear layers dropout
         'bs': 256,  # batch size
 
         # maximum learning rate for one cycle policy https://docs.fast.ai/train.html#fit_one_cycle
