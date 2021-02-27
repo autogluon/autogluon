@@ -194,9 +194,10 @@ class NNFastAiTabularModel(AbstractModel):
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
         data = self._preprocess_train(X, y, X_val, y_val)
 
-        nn_metric, objective_func_name = self.__get_objective_func_name()
+        nn_metric, objective_func_name = self.__get_objective_func_name(self.stopping_metric)
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
         objective_optim_mode = np.less if objective_func_name in [
+            'log_loss',
             'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'  # Regression objectives
         ] else np.greater
 
@@ -273,22 +274,20 @@ class NNFastAiTabularModel(AbstractModel):
             val_idx = np.arange(len(X_val)) + len(X)
         return df_train, train_idx, val_idx
 
-    def __get_objective_func_name(self):
+    def __get_objective_func_name(self, stopping_metric):
         metrics_map = self.__get_metrics_map()
 
         # Unsupported metrics will be replaced by defaults for a given problem type
-        objective_func_name = self.stopping_metric.name
+        objective_func_name = stopping_metric.name
         if objective_func_name not in metrics_map.keys():
             if self.problem_type == REGRESSION:
                 objective_func_name = 'mean_squared_error'
             else:
                 objective_func_name = 'log_loss'
-            logger.warning(f'Metric {self.stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
+            logger.warning(f'Metric {stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
 
-        if objective_func_name in metrics_map.keys():
-            nn_metric = metrics_map[objective_func_name]
-        else:
-            nn_metric = None
+        nn_metric = metrics_map.get(objective_func_name, None)
+
         return nn_metric, objective_func_name
 
     def __get_objective_func_to_monitor(self, objective_func_name):
