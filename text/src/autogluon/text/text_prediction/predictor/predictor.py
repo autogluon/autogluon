@@ -422,7 +422,10 @@ class TextPredictor:
                 index = data.index
             else:
                 index = None
-            output = pd.DataFrame(output, index=index)
+            if output.ndim == 1:
+                output = pd.Series(output, index=index)
+            else:
+                output = pd.DataFrame(output, index=index)
         return output
 
     def extract_embedding(self, data, as_pandas=False):
