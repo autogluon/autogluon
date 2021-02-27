@@ -159,17 +159,7 @@ class RFModel(AbstractModel):
             return self.model.predict(X)
 
         y_pred_proba = self.model.predict_proba(X)
-        if self.problem_type == BINARY:
-            if len(y_pred_proba.shape) == 1:
-                return y_pred_proba
-            elif y_pred_proba.shape[1] > 1:
-                return y_pred_proba[:, 1]
-            else:
-                return y_pred_proba
-        elif y_pred_proba.shape[1] > 2:
-            return y_pred_proba
-        else:
-            return y_pred_proba[:, 1]
+        return self._convert_proba_to_unified_form(y_pred_proba)
 
     # TODO: Add HPO
     def _hyperparameter_tune(self, **kwargs):

@@ -56,6 +56,7 @@ class TextPredictionV1Model(AbstractModel):
         """
         super().__init__(**kwargs)
         self._label_column_name = None
+        self._load_model = None  # Whether to load inner model when loading.
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -161,25 +162,28 @@ class TextPredictionV1Model(AbstractModel):
         root_logger.setLevel(root_log_level)  # Reset log level
 
     def save(self, path: str = None, verbose=True) -> str:
-        model = self.model
+        self._load_model = self.model is not None
+        __model = self.model
         self.model = None
         # save this AbstractModel object without NN weights
         path = super().save(path=path, verbose=verbose)
-        self.model = model
+        self.model = __model
 
-        text_nn_path = os.path.join(path, self.nn_model_name)
-        model.save(text_nn_path)
-        logger.log(15, f"\tSaved Text NN weights and model hyperparameters to '{text_nn_path}'.")
-
+        if self._load_model:
+            text_nn_path = os.path.join(path, self.nn_model_name)
+            self.model.save(text_nn_path)
+            logger.log(15, f"\tSaved Text NN weights and model hyperparameters to '{text_nn_path}'.")
+        self._load_model = None
         return path
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
-        try_import_autogluon_text()
-        from autogluon.text import TextPredictor
-
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        model.model = TextPredictor.load(os.path.join(path, cls.nn_model_name))
+        if model._load_model:
+            try_import_autogluon_text()
+            from autogluon.text import TextPredictor
+            model.model = TextPredictor.load(os.path.join(path, cls.nn_model_name))
+        model._load_model = None
         return model
 
     def get_memory_size(self) -> int:
@@ -207,14 +211,4 @@ class TextPredictionV1Model(AbstractModel):
             return self.model.predict(X, as_pandas=False)
 
         y_pred_proba = self.model.predict_proba(X, as_pandas=False)
-        if self.problem_type == BINARY:
-            if len(y_pred_proba.shape) == 1:
-                return y_pred_proba
-            elif y_pred_proba.shape[1] > 1:
-                return y_pred_proba[:, 1]
-            else:
-                return y_pred_proba
-        elif y_pred_proba.shape[1] > 2:
-            return y_pred_proba
-        else:
-            return y_pred_proba[:, 1]
+        return self._convert_proba_to_unified_form(y_pred_proba)
