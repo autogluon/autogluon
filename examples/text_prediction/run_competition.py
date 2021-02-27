@@ -184,7 +184,7 @@ def run(args):
     else:
         raise NotImplementedError
     if args.task == 'product_sentiment':
-        test_probabilities = predictor.predict_proba(test_df, as_pandas=True)
+        test_probabilities = predictor.predict_proba(test_df, as_pandas=True, as_multiclass=True)
         test_probabilities.to_csv(os.path.join(args.exp_dir, 'submission.csv'), index=False)
     elif args.task == 'data_scientist_salary':
         predictions = predictor.predict(test_df, as_pandas=False)
