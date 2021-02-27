@@ -58,11 +58,12 @@ class NNFastAiTabularModel(AbstractModel):
             'bs': batch size; default is 256
 
             'lr': maximum learning rate for one cycle policy; default is 1e-2;
-            see also https://fastai1.fast.ai/train.html#fit_one_cycle, One-cycle policy paper: https://arxiv.org/abs/1803.09820
+            see also https://docs.fast.ai/callback.schedule.html#Learner.fit_one_cycle,
+            One-cycle policy paper: https://arxiv.org/abs/1803.09820
 
             'epochs': number of epochs; default is 30
 
-            # Early stopping settings. See more details here: https://fastai1.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
+            # Early stopping settings. See more details here: https://docs.fast.ai/callback.tracker.html#EarlyStoppingCallback
             'early.stopping.min_delta': 0.0001,
             'early.stopping.patience': 10,
     """
@@ -79,7 +80,7 @@ class NNFastAiTabularModel(AbstractModel):
         self._inner_features = None
         self._load_model = None  # Whether to load inner model when loading.
 
-    def _preprocess_train(self, X, y, X_val, y_val, num_workers):
+    def _preprocess_train(self, X, y, X_val, y_val):
         from fastai.tabular.core import TabularPandas
         from fastai.data.block import RegressionBlock, CategoryBlock
         from fastai.data.transforms import IndexSplitter
@@ -191,7 +192,7 @@ class NNFastAiTabularModel(AbstractModel):
                 defaults.device = torch.device('cuda')
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
-        data = self._preprocess_train(X, y, X_val, y_val, num_workers=num_workers)
+        data = self._preprocess_train(X, y, X_val, y_val)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
@@ -384,7 +385,6 @@ class NNFastAiTabularModel(AbstractModel):
             'mean_squared_error': mse,
             'mean_absolute_error': mae,
             'r2': R2Score(),
-            # Not supported: median_absolute_error
             'median_absolute_error': medae,
 
             # Classification
