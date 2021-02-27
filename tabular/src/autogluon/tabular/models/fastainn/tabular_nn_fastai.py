@@ -1,11 +1,8 @@
 import copy
 import logging
-import pickle
 import time
-import warnings
 from builtins import classmethod
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -199,7 +196,7 @@ class NNFastAiTabularModel(AbstractModel):
         nn_metric, objective_func_name = self.__get_objective_func_name()
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
         objective_optim_mode = np.less if objective_func_name in [
-            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'r2'  # Regression objectives
+            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'  # Regression objectives
         ] else np.greater
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
@@ -329,6 +326,7 @@ class NNFastAiTabularModel(AbstractModel):
             return preds.numpy()
 
     def save(self, path: str = None, verbose=True) -> str:
+        from .fastai_helpers import export
         self._load_model = self.model is not None
         __model = self.model
         self.model = None
@@ -339,36 +337,12 @@ class NNFastAiTabularModel(AbstractModel):
             save_pkl.save_with_fn(
                 f'{path}{self.model_internals_file_name}',
                 self.model,
-                pickle_fn=lambda m, buffer: self.export(m, buffer),
+                pickle_fn=lambda m, buffer: export(m, buffer),
                 verbose=verbose
             )
         self._load_model = None
         return path
 
-    @classmethod
-    def export(cls, model, filename_or_stream='export.pkl', pickle_module=pickle, pickle_protocol=2):
-        from fastai.torch_core import rank_distrib
-        import torch
-        "Export the content of `self` without the items and the optimizer state for inference"
-        if rank_distrib(): return  # don't export if child proc
-        model._end_cleanup()
-        old_dbunch = model.dls
-        model.dls = model.dls.new_empty()
-        state = model.opt.state_dict() if model.opt is not None else None
-        model.opt = None
-        target = open(model.path / filename_or_stream, 'wb') if cls.is_pathlike(filename_or_stream) else filename_or_stream
-        with warnings.catch_warnings():
-            # To avoid the warning that come from PyTorch about model not being checked
-            warnings.simplefilter("ignore")
-            torch.save(model, target, pickle_module=pickle_module, pickle_protocol=pickle_protocol)
-        model.create_opt()
-        if state is not None:
-            model.opt.load_state_dict(state)
-        model.dls = old_dbunch
-
-    @classmethod
-    def is_pathlike(cls, x: Any) -> bool:
-        return isinstance(x, (str, Path))
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
@@ -403,6 +377,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     def __get_metrics_map(self):
         from fastai.metrics import rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
+        from .fastai_helpers import medae
         metrics_map = {
             # Regression
             'root_mean_squared_error': rmse,
@@ -410,6 +385,7 @@ class NNFastAiTabularModel(AbstractModel):
             'mean_absolute_error': mae,
             'r2': R2Score(),
             # Not supported: median_absolute_error
+            'median_absolute_error': medae,
 
             # Classification
             'accuracy': accuracy,
@@ -434,3 +410,4 @@ class NNFastAiTabularModel(AbstractModel):
             # Not supported: pac_score
         }
         return metrics_map
+
