@@ -168,7 +168,7 @@ def compile_scheduler_options(
     return scheduler_options
 
 
-# TODO: Migrate TextPrediction to use this version, delete old version
+# TODO: Migrate TextPredictor to use this version, delete old version
 def compile_scheduler_options_v2(
         scheduler_options, nthreads_per_trial,
         ngpus_per_trial, num_trials, time_out, search_strategy=None, search_options=None, checkpoint=None, resume=False, visualizer=None,
