@@ -8,8 +8,7 @@ from .searcher import BaseSearcher
 from ..utils.default_arguments import check_and_merge_defaults
 
 __all__ = ['GPFIFOSearcher',
-           'GPMultiFidelitySearcher',
-           'GPMFSimulationSearcher']
+           'GPMultiFidelitySearcher']
 
 
 def _to_config_cs(config_space: CS.ConfigurationSpace, config: dict) \
