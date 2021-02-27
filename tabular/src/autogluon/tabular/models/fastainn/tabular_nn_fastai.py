@@ -105,7 +105,7 @@ class NNFastAiTabularModel(AbstractModel):
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
         df_train, train_idx, val_idx = self._generate_datasets(X, y_norm, X_val, y_val_norm)
 
-        y_block = RegressionBlock(1) if self.problem_type == REGRESSION else CategoryBlock()
+        y_block = RegressionBlock() if self.problem_type == REGRESSION else CategoryBlock()
 
         # Copy cat_columns and cont_columns because TabularList is mutating the list
         data = TabularPandas(
@@ -276,38 +276,7 @@ class NNFastAiTabularModel(AbstractModel):
         return df_train, train_idx, val_idx
 
     def __get_objective_func_name(self):
-        from fastai.metrics import rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
-
-        metrics_map = {
-            # Regression
-            'root_mean_squared_error': rmse,
-            'mean_squared_error': mse,
-            'mean_absolute_error': mae,
-            'r2': R2Score(),
-            # Not supported: median_absolute_error
-
-            # Classification
-            'accuracy': accuracy,
-
-            'f1': FBeta(beta=1),
-            'f1_macro': FBeta(beta=1, average='macro'),
-            'f1_micro': FBeta(beta=1, average='micro'),
-            'f1_weighted': FBeta(beta=1, average='weighted'),  # this one has some issues
-
-            'roc_auc': RocAucBinary(),
-
-            'precision': Precision(),
-            'precision_macro': Precision(average='macro'),
-            'precision_micro': Precision(average='micro'),
-            'precision_weighted': Precision(average='weighted'),
-
-            'recall': Recall(),
-            'recall_macro': Recall(average='macro'),
-            'recall_micro': Recall(average='micro'),
-            'recall_weighted': Recall(average='weighted'),
-            'log_loss': None,
-            # Not supported: pac_score
-        }
+        metrics_map = self.__get_metrics_map()
 
         # Unsupported metrics will be replaced by defaults for a given problem type
         objective_func_name = self.stopping_metric.name
@@ -326,21 +295,8 @@ class NNFastAiTabularModel(AbstractModel):
 
     def __get_objective_func_to_monitor(self, objective_func_name):
         monitor_obj_func = {
-            'roc_auc': 'auroc',
-
-            'f1': 'f_beta',
-            'f1_macro': 'f_beta',
-            'f1_micro': 'f_beta',
-            'f1_weighted': 'f_beta',
-
-            'precision_macro': 'precision',
-            'precision_micro': 'precision',
-            'precision_weighted': 'precision',
-
-            'recall_macro': 'recall',
-            'recall_micro': 'recall',
-            'recall_weighted': 'recall',
-            'log_loss': 'valid_loss',
+            **{k: m.name if hasattr(m, 'name') else m.__name__ for k, m in self.__get_metrics_map().items() if m is not None},
+            'log_loss': 'valid_loss'
         }
         objective_func_name_to_monitor = objective_func_name
         if objective_func_name in monitor_obj_func:
@@ -446,3 +402,36 @@ class NNFastAiTabularModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
+    def __get_metrics_map(self):
+        from fastai.metrics import rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
+        metrics_map = {
+            # Regression
+            'root_mean_squared_error': rmse,
+            'mean_squared_error': mse,
+            'mean_absolute_error': mae,
+            'r2': R2Score(),
+            # Not supported: median_absolute_error
+
+            # Classification
+            'accuracy': accuracy,
+
+            'f1': FBeta(beta=1),
+            'f1_macro': FBeta(beta=1, average='macro'),
+            'f1_micro': FBeta(beta=1, average='micro'),
+            'f1_weighted': FBeta(beta=1, average='weighted'),  # this one has some issues
+
+            'roc_auc': RocAucBinary(),
+
+            'precision': Precision(),
+            'precision_macro': Precision(average='macro'),
+            'precision_micro': Precision(average='micro'),
+            'precision_weighted': Precision(average='weighted'),
+
+            'recall': Recall(),
+            'recall_macro': Recall(average='macro'),
+            'recall_micro': Recall(average='micro'),
+            'recall_weighted': Recall(average='weighted'),
+            'log_loss': None,
+            # Not supported: pac_score
+        }
+        return metrics_map
