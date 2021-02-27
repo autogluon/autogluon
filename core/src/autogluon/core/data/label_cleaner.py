@@ -157,6 +157,7 @@ class LabelCleanerBinary(LabelCleaner):
             # Contains both str and int
             self.unique_values = list(y.unique())
         # TODO: Clean this code, for loop
+        pos_class_warning = None
         if positive_class is not None:
             if positive_class not in self.unique_values:
                 raise ValueError(f'positive_class is not a valid class: {self.unique_values} (positive_class={positive_class})')
@@ -171,10 +172,14 @@ class LabelCleanerBinary(LabelCleaner):
             self.inv_map: dict = {0: 0, 1: 1}
         else:
             self.inv_map: dict = {self.unique_values[0]: 0, self.unique_values[1]: 1}
-            logger.log(15, 'Note: For your binary classification, AutoGluon arbitrarily selects which label-value represents positive vs negative class')
+            pos_class_warning = f'\tNote: For your binary classification, AutoGluon arbitrarily selected which label-value' \
+                                f'represents positive ({self.unique_values[1]}) vs negative ({self.unique_values[0]}) class.\n'\
+                                '\tTo explicitly set the positive_class, either rename classes to 1 and 0, or specify positive_class in Predictor init.'
         poslabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 1][0]
         neglabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 0][0]
         logger.log(20, 'Selected class <--> label mapping:  class 1 = %s, class 0 = %s' % (poslabel, neglabel))
+        if pos_class_warning is not None:
+            logger.log(20, pos_class_warning)
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
         self.ordered_class_labels_transformed = [0, 1]
         self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]\

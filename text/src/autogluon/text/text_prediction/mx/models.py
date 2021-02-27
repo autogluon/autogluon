@@ -785,7 +785,7 @@ def get_recommended_resource(nthreads_per_trial=None,
 class MultiModalTextModel:
     """Learner of the multimodal text data.
 
-    It will be called if the user call `fit()` in TextPrediction tasks.
+    It will be called if the user call `fit()` in TextPredictor.
 
     It is used for making predictions on new data and viewing information about
     models trained during `fit()`.
@@ -951,7 +951,7 @@ class MultiModalTextModel:
                 use_warning = False
             if use_warning:
                 warnings.warn('No GPU is detected in the machine and we will recommend you to '
-                              'use TextPrediction on a GPU-enabled instance. Currently, '
+                              'use TextPredictor on a GPU-enabled instance. Currently, '
                               'training on CPU is slow.')
             else:
                 raise RuntimeError('No GPU is detected in the machine and we will '
