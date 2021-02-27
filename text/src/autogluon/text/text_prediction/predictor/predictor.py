@@ -6,6 +6,7 @@ import numpy as np
 import json
 import pandas as pd
 
+from autogluon.core.constants import BINARY
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
@@ -110,6 +111,26 @@ class TextPredictor:
     @property
     def backend(self):
         return self._backend
+
+    @property
+    def positive_class(self):
+        """Name of the class label that will be mapped to 1. This is only meaningful for binary classification problems.
+
+        It is useful for computing metrics such as F1 which require a positive and negative class.
+        You may refer to https://en.wikipedia.org/wiki/F-score for more details.
+        In binary classification, :class:`TextPredictor.predict_proba(as_multiclass=False)`
+        returns the estimated probability that each row belongs to the positive class.
+        Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
+
+        Returns
+        -------
+        The positive class name in binary classification or None if the problem is not binary classification.
+        """
+        if self.problem_type != BINARY:
+            logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
+            return None
+        else:
+            return self.class_labels[1]
 
     @property
     def class_labels(self):
@@ -368,7 +389,7 @@ class TextPredictor:
             output = pd.Series(data=output, index=index, name=self.label)
         return output
 
-    def predict_proba(self, data, as_pandas=True):
+    def predict_proba(self, data, as_pandas=True, as_multiclass=True):
         """
         Use trained model to produce predicted class probabilities rather than class-labels (if task is classification).
         If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
@@ -380,15 +401,22 @@ class TextPredictor:
             If str is passed, `data` will be loaded using the str value as the file path.
         as_pandas : bool, default = True
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
+        as_multiclass : bool, default = True
+            Whether to return the probability of all labels or just return the probability of the positive class for binary classification problems.
 
         Returns
         -------
-        Array of predicted class-probabilities, corresponding to each row in the given data. It will have shape (#samples, #classes).
+        Array of predicted class-probabilities, corresponding to each row in the given data.
+        When as_multiclass is True, the output will always have shape (#samples, #classes).
+        Otherwise, the output will have shape (#samples,)
         """
         assert self._model is not None,\
             'Model does not seem to have been constructed. ' \
             'Have you called fit(), or load()?'
         output = self._model.predict_proba(data)
+        if not as_multiclass:
+            if self.problem_type == BINARY:
+                output = output[:, 1]
         if as_pandas:
             if isinstance(data, pd.DataFrame):
                 index = data.index
