@@ -1261,13 +1261,13 @@ class MultiModalTextModel:
         Returns
         -------
         ret
-            List that contain the class names
+            List that contain the class names. It will be None if it's not a classification problem.
         """
-        if self.problem_type != MULTICLASS or self.problem_type != BINARY:
+        if self.problem_type == MULTICLASS or self.problem_type == BINARY:
+            return self._preprocessor.label_generator.classes_
+        else:
             warnings.warn('Accessing class names for a non-classification problem. Return None.')
             return None
-        else:
-            return self._preprocessor.label_generator.classes_
 
     def predict_proba(self, test_data, stochastic_chunk=None, num_repeat=None):
         """Predict class probabilities instead of class labels (for classification tasks).
