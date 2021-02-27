@@ -18,6 +18,7 @@ __all__ = [
 Results = collections.namedtuple('Results', 'model reward config time metadata')
 
 schedulers = {
+    'auto': LocalSequentialScheduler,
     'local_sequential_auto': LocalSequentialScheduler,
     'grid': FIFOScheduler,
     'random': FIFOScheduler,
