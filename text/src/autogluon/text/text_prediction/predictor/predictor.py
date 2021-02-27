@@ -400,7 +400,7 @@ class TextPredictor:
             The data to make predictions for. Should contain same column names as training dataset and follow same format (except for the `label` column).
             If str is passed, `data` will be loaded using the str value as the file path.
         as_pandas : bool, default = True
-            Whether to return the output as a pandas DataFrame (True) or numpy array (False).
+            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_multiclass : bool, default = True
             Whether to return the probability of all labels or just return the probability of the positive class for binary classification problems.
 
@@ -423,9 +423,9 @@ class TextPredictor:
             else:
                 index = None
             if output.ndim == 1:
-                output = pd.Series(output, index=index)
+                output = pd.Series(output, index=index, name=self.label)
             else:
-                output = pd.DataFrame(output, index=index)
+                output = pd.DataFrame(output, index=index, columns=self.class_labels)
         return output
 
     def extract_embedding(self, data, as_pandas=False):
