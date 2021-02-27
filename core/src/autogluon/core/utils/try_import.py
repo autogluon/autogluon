@@ -100,6 +100,11 @@ def try_import_fastai():
         import fastai
         fastai_version = parse_version(fastai.__version__)
         assert parse_version('2.0.0') <= fastai_version < parse_version('3.0.0'), 'Currently, we only support 2.0.0<=fastai<3.0.0'
+
+        # fastai is doing library setup during star imports. These are required for correct library functioning.
+        # Local star imports are not possible in-place, so separate helper packages is created
+        import autogluon.tabular.models.fastainn.imports_helper
+
     except ModuleNotFoundError as e:
         raise ImportError("Import fastai failed. A quick tip is to install via `pip install fastai==2.*`. "
                           "If you are using Mac OSX, please use this torch version to avoid compatibility issues: `pip install torch==1.6.0`.")

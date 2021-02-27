@@ -1,16 +1,14 @@
 import copy
 import logging
+import pickle
 import time
+import warnings
+from builtins import classmethod
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from fastai.data.block import RegressionBlock, CategoryBlock
-from fastai.data.transforms import IndexSplitter
-from fastcore.basics import range_of
-
-import torch
-from fastai.tabular.all import *
 
 from autogluon.core.constants import REGRESSION, BINARY
 from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
@@ -21,7 +19,6 @@ from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
-from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -87,6 +84,9 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _preprocess_train(self, X, y, X_val, y_val, num_workers):
         from fastai.tabular.core import TabularPandas
+        from fastai.data.block import RegressionBlock, CategoryBlock
+        from fastai.data.transforms import IndexSplitter
+        from fastcore.basics import range_of
         X = self.preprocess(X, fit=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
@@ -164,6 +164,10 @@ class NNFastAiTabularModel(AbstractModel):
              sample_weight=None,
              **kwargs):
         try_import_fastai()
+        from fastai.tabular.learner import tabular_learner
+        from fastcore.basics import defaults
+        from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
+        import torch
 
         start_time = time.time()
         if sample_weight is not None:  # TODO: support
@@ -381,9 +385,39 @@ class NNFastAiTabularModel(AbstractModel):
         self.model = __model
         # Export model
         if self._load_model:
-            save_pkl.save_with_fn(f'{path}{self.model_internals_file_name}', self.model, lambda m, buffer: m.export(buffer), verbose=verbose)
+            save_pkl.save_with_fn(
+                f'{path_final}{self.model_internals_file_name}',
+                self.model,
+                pickle_fn=lambda m, buffer: self.export(m, buffer),
+                verbose=verbose
+            )
         self._load_model = None
         return path
+
+    @classmethod
+    def export(cls, model, filename_or_stream='export.pkl', pickle_module=pickle, pickle_protocol=2):
+        from fastai.torch_core import rank_distrib
+        import torch
+        "Export the content of `self` without the items and the optimizer state for inference"
+        if rank_distrib(): return  # don't export if child proc
+        model._end_cleanup()
+        old_dbunch = model.dls
+        model.dls = model.dls.new_empty()
+        state = model.opt.state_dict() if model.opt is not None else None
+        model.opt = None
+        target = open(model.path / filename_or_stream, 'wb') if cls.is_pathlike(filename_or_stream) else filename_or_stream
+        with warnings.catch_warnings():
+            # To avoid the warning that come from PyTorch about model not being checked
+            warnings.simplefilter("ignore")
+            torch.save(model, target, pickle_module=pickle_module, pickle_protocol=pickle_protocol)
+        model.create_opt()
+        if state is not None:
+            model.opt.load_state_dict(state)
+        model.dls = old_dbunch
+
+    @classmethod
+    def is_pathlike(cls, x: Any) -> bool:
+        return isinstance(x, (str, Path))
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
@@ -416,3 +450,4 @@ class NNFastAiTabularModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
