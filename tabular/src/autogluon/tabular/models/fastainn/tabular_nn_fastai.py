@@ -337,7 +337,7 @@ class NNFastAiTabularModel(AbstractModel):
         # Export model
         if self._load_model:
             save_pkl.save_with_fn(
-                f'{path_final}{self.model_internals_file_name}',
+                f'{path}{self.model_internals_file_name}',
                 self.model,
                 pickle_fn=lambda m, buffer: self.export(m, buffer),
                 verbose=verbose
@@ -375,7 +375,6 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.learner import load_learner
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
         if model._load_model:
-            from fastai.basic_train import load_learner
             model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(p), verbose=verbose)
         model._load_model = None
         return model
