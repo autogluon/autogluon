@@ -20,7 +20,7 @@ from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSel
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.core.utils import get_pred_from_proba, infer_problem_type
+from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df, infer_problem_type
 from autogluon.features.generators import PipelineFeatureGenerator
 
 from ..trainer.abstract_trainer import AbstractTrainer
@@ -89,6 +89,26 @@ class AbstractLearner:
     def is_fit(self):
         return self.trainer_path is not None or self.trainer is not None
 
+    @property
+    def positive_class(self):
+        """
+        Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
+        In binary classification, :class:`TabularPredictor.predict_proba()` returns the estimated probability that each row belongs to the positive class.
+        Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
+
+        Returns
+        -------
+        The positive class name in binary classification or None if the problem is not binary classification.
+        """
+        if not self.is_fit:
+            if self._positive_class is not None:
+                return self._positive_class
+            raise AssertionError('Predictor must be fit to return positive_class.')
+        if self.problem_type != BINARY:
+            logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
+            return None
+        return self.label_cleaner.cat_mappings_dependent_var[1]
+
     def set_contexts(self, path_context):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
 
@@ -107,7 +127,7 @@ class AbstractLearner:
             feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
-    def predict_proba(self, X: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True):
+    def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True):
         if as_pandas:
             X_index = copy.deepcopy(X.index)
         else:
@@ -124,12 +144,12 @@ class AbstractLearner:
                 y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=X_index)
         return y_pred_proba
 
-    def predict(self, X: DataFrame, model=None, as_pandas=False):
+    def predict(self, X: DataFrame, model=None, as_pandas=True):
         if as_pandas:
             X_index = copy.deepcopy(X.index)
         else:
             X_index = None
-        y_pred_proba = self.predict_proba(X=X, model=model, inverse_transform=False)
+        y_pred_proba = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False, inverse_transform=False)
         problem_type = self.label_cleaner.problem_type_transform or self.problem_type
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
         y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
@@ -227,13 +247,13 @@ class AbstractLearner:
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)
         if self.eval_metric.needs_pred:
-            y_pred = self.predict(X=X, model=model)
+            y_pred = self.predict(X=X, model=model, as_pandas=False)
             if self.problem_type == BINARY:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
                 y_pred = self.label_cleaner.transform(y_pred)
                 y = self.label_cleaner.transform(y)
         else:
-            y_pred = self.predict_proba(X=X, model=model)
+            y_pred = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False)
             y = self.label_cleaner.transform(y)
         return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation)
 
@@ -356,11 +376,7 @@ class AbstractLearner:
                 # log_loss / pac_score
                 raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
 
-    # TODO: Refactor to be less brittle.
-    # TODO: Instead take y_pred_proba as input, convert to y_pred when necessary. Treat y_pred_proba as y_pred for regression.
-    #  This makes this function behave much nicer, currently confusion matrix is only able to be constructed when y_pred is supplied, and crashes when y_pred_proba is supplied.
-    #  Therefore, it is impossible to get confusion matrix when eval_metric is log_loss. This shouldn't be the case.
-    def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
+    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
         """ Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
@@ -371,10 +387,33 @@ class AbstractLearner:
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
+        is_proba = False
         assert isinstance(y_true, (np.ndarray, pd.Series))
-        assert isinstance(y_pred, (np.ndarray, pd.Series))  # TODO: Enable DataFrame for y_pred_proba
-
+        assert isinstance(y_pred, (np.ndarray, pd.Series, pd.DataFrame))
         self._validate_class_labels(y_true)
+        if isinstance(y_pred, np.ndarray):
+            if len(y_pred.shape) > 1:
+                y_pred = pd.DataFrame(data=y_pred, columns=self.class_labels)
+        if self.problem_type == BINARY:
+            if isinstance(y_pred, pd.DataFrame):
+                # roc_auc crashes if this isn't done
+                y_pred = y_pred[self.positive_class]
+                is_proba = True
+            elif not self.eval_metric.needs_pred:
+                raise AssertionError(f'`evaluate_predictions` requires y_pred_proba input for binary classification '
+                                     f'when evaluating "{self.eval_metric.name}"... Please generate valid input via `predictor.predict_proba(data)`.\n'
+                                     f'This may have occurred if you passed in predict input instead of predict_proba input, '
+                                     f'or if you specified `as_multiclass=False` to `predictor.predict_proba(data, as_multiclass=False)`, '
+                                     f'which is not supported by `evaluate_predictions`.')
+        elif self.problem_type == MULTICLASS:
+            if isinstance(y_pred, pd.DataFrame):
+                is_proba = True
+        if is_proba and self.eval_metric.needs_pred:
+            if self.problem_type == BINARY:
+                y_pred = get_pred_from_proba(y_pred_proba=y_pred, problem_type=self.problem_type)
+                y_pred = self.label_cleaner.inverse_transform(y_pred)
+            else:
+                y_pred = get_pred_from_proba_df(y_pred_proba=y_pred, problem_type=self.problem_type)
         if not self.eval_metric.needs_pred:
             y_true = self.label_cleaner.transform(y_true)  # Get labels in numeric order
             performance = self.eval_metric(y_true, y_pred)
