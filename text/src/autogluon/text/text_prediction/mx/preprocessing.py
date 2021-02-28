@@ -375,7 +375,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         numerical_features = []
         for col_name in sorted(X.columns):
             col_type = self._column_types[col_name]
-            logger.log(15, f'Process col "{col_name}" with type "{col_type}"')
+            logger.log(10, f'Process col "{col_name}" with type "{col_type}"')
             col_value = X[col_name]
             if col_type == _C.NULL:
                 self._ignore_columns_set.add(col_name)
