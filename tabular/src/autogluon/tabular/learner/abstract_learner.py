@@ -64,6 +64,8 @@ class AbstractLearner:
         self.trainer_path = None
         self.reset_paths = False
 
+        self._pre_X_rows = None
+        self._post_X_rows = None
         self._positive_class = positive_class
         self.sample_weight = sample_weight
         self.weight_evaluation = weight_evaluation

@@ -60,7 +60,9 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
+        self._pre_X_rows = len(X)
         X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
+        self._post_X_rows = len(X)
         time_preprocessing_end = time.time()
         self._time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
         logger.log(20, f'Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ...')

@@ -182,7 +182,7 @@ class LabelCleanerBinary(LabelCleaner):
             logger.log(20, pos_class_warning)
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
         self.ordered_class_labels_transformed = [0, 1]
-        self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]\
+        self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]
 
     def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
         if isinstance(y, DataFrame):
@@ -233,7 +233,8 @@ class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
         return y
 
     def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
-        y = self.convert_binary_proba_to_multiclass_proba(y=y, as_pandas=as_pandas)
+        if not isinstance(y, DataFrame):
+            y = self.convert_binary_proba_to_multiclass_proba(y=y, as_pandas=as_pandas)
         return super().inverse_transform_proba(y, as_pandas=as_pandas, as_pred=as_pred)
 
     @staticmethod
