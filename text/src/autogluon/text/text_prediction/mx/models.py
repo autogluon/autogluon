@@ -419,7 +419,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     logging_config(folder=exp_dir, name='training', logger=logger, console=console_log,
                    level=logging.DEBUG,
                    console_level=verbosity2loglevel(verbosity))
-    logger.log(15, cfg)
+    logger.log(10, cfg)
 
     # Load backbone model
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
@@ -440,18 +440,18 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                                                   tokenizer_name=cfg.model.backbone.name,
                                                   label_generator=label_generator,
                                                   cfg=cfg.preprocessing)
-    logger.log(25, 'Fitting and transforming the train data...')
+    logger.info('Fitting and transforming the train data...')
     train_dataset = preprocessor.fit_transform(train_data[feature_columns],
                                                train_data[label_column])
     with open(os.path.join(exp_dir, 'preprocessor.pkl'), 'wb') as of:
         pickle.dump(preprocessor, of)
-    logger.log(25, f'Done! Preprocessor saved to {os.path.join(exp_dir, "preprocessor.pkl")}')
-    logger.log(15, 'Train Data')
-    logger.log(15, get_stats_string(preprocessor, train_dataset, is_train=True))
-    logger.log(25, 'Process dev set...')
+    logger.info(f'Done! Preprocessor saved to {os.path.join(exp_dir, "preprocessor.pkl")}')
+    logger.log(10, 'Train Data')
+    logger.log(10, get_stats_string(preprocessor, train_dataset, is_train=True))
+    logger.info('Process dev set...')
     tuning_dataset = preprocessor.transform(tuning_data[feature_columns],
                                             tuning_data[label_column])
-    logger.log(25, 'Done!')
+    logger.info('Done!')
     # Auto Max Length
     if cfg.preprocessing.text.auto_max_length:
         max_length = auto_shrink_max_length(
@@ -474,7 +474,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.freeze()
     with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
         f.write(str(cfg))
-    logger.log(25, f'Max length for chunking text: {max_length}, '
+    logger.info(f'Max length for chunking text: {max_length}, '
                    f'Stochastic chunk: Train-{train_stochastic_chunk}/Test-{test_stochastic_chunk}, '
                    f'Test #repeat: {inference_num_repeat}.')
     cls_id, sep_id = get_cls_sep_id(tokenizer)
@@ -536,7 +536,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
-    logger.log(25, '#Total Params/Fixed Params={}/{}'.format(num_total_params,
+    logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
                                                              num_total_fixed_params))
     # Initialize the optimizer
     updates_per_epoch = int(np.ceil(len(train_dataloader) / (num_accumulated * len(ctx_l))))
@@ -563,7 +563,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                                update_on_kvstore=False)
     # Set grad_req if gradient accumulation is required
     if num_accumulated > 1:
-        logger.info('Using gradient accumulation.'
+        logger.log(15, 'Using gradient accumulation.'
                     ' Global batch size = {}'.format(cfg.optimization.batch_size))
         for p in params:
             p.grad_req = 'add'
@@ -588,7 +588,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             return
     best_report_items = None
     report_local_jsonl_f = open(os.path.join(exp_dir, 'results_local.jsonl'), 'w')
-    logger.log(25, f'Local training results will be saved to '
+    logger.info(f'Local training results will be saved to '
                    f'{os.path.join(exp_dir, "results_local.jsonl")}.')
     for update_idx in range(max_update):
         for accum_idx in range(num_accumulated):
@@ -623,7 +623,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         if (update_idx + 1) % train_log_interval == 0:
             log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
             log_num_samples = sum(log_num_samples_l)
-            logger.log(25,
+            logger.log(15,
                 '[Iter {}/{}, Epoch {}] train loss={:0.2e}, gnorm={:0.2e}, lr={:0.2e}, #samples processed={},'
                 ' #sample per second={:.2f}. ETA={:.2f}min'
                     .format(update_idx + 1, max_update,
@@ -701,7 +701,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             mx.npx.waitall()
             loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
-            logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
+            logger.log(25, '[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
                         ' total time spent={:.2f}min. Find new best={}, Find new top-{}={}'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60,
@@ -961,7 +961,7 @@ class MultiModalTextModel:
                                    'Also, you can set the environment variable '
                                    '"AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU=1" to force the model to '
                                    'use CPU for training.')
-        logger.log(25, f"The GluonNLP V0 backend is used. "
+        logger.info(f"The GluonNLP V0 backend is used. "
                        f"We will use {num_cpus} cpus and "
                        f"{num_gpus} gpus to train each trial.")
         if scheduler_options is None:
@@ -1057,8 +1057,8 @@ class MultiModalTextModel:
             if len(scheduler.config_history) == 0:
                 raise RuntimeError(no_job_finished_err_msg)
             best_config = scheduler.get_best_config()
-            logger.log(25, 'Results=', scheduler.searcher._results)
-            logger.log(25, 'Best_config={}'.format(best_config))
+            logger.info('Results=', scheduler.searcher._results)
+            logger.info('Best_config={}'.format(best_config))
             best_task_id = scheduler.get_best_task_id()
             best_model_saved_dir_path = os.path.join(self._output_directory,
                                                      'task{}'.format(best_task_id))

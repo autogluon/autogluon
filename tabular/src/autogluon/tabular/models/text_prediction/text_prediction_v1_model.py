@@ -140,10 +140,7 @@ class TextPredictorModel(AbstractModel):
             'Currently, you cannot nest the hyperparameter search in text neural network ' \
             'and the AutoGluon Tabular.'
 
-        if verbosity == 2:
-            verbosity_text = 1
-        else:
-            verbosity_text = verbosity
+        verbosity_text = max(0, verbosity - 1)
         root_logger = logging.getLogger()
         root_log_level = root_logger.level
         self.model = TextPredictor(label=self._label_column_name,

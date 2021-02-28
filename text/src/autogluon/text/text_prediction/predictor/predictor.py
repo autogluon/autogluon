@@ -57,7 +57,7 @@ class TextPredictor:
         If unspecified, a time-stamped folder called "AutogluonTextModel/ag-[TIMESTAMP]" will be created in the working directory to store all models.
         Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
         Otherwise files from first `fit()` will be overwritten by second `fit()`.
-    verbosity : int, default = 2
+    verbosity : int, default = 3
         Verbosity levels range from 0 to 4 and control how much information is printed.
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
@@ -72,7 +72,7 @@ class TextPredictor:
             problem_type=None,
             eval_metric=None,
             path=None,
-            verbosity=2,
+            verbosity=3,
             warn_if_exist=True
     ):
         self.verbosity = verbosity
@@ -301,8 +301,8 @@ class TextPredictor:
                                  'autogluon.tabular.TabularPredictor.\n'
                                  'The inferred column properties of the training data is {}'
                                  .format(column_types))
-        logger.log(25, 'Problem Type="{}"'.format(problem_type))
-        logger.log(25, printable_column_type_string(column_types))
+        logger.info('Problem Type="{}"'.format(problem_type))
+        logger.info(printable_column_type_string(column_types))
         self._problem_type = problem_type
         if 'models' not in hyperparameters or 'MultimodalTextModel' not in hyperparameters['models']:
             raise ValueError('The current TextPredictor only supports "MultimodalTextModel" '
@@ -338,7 +338,7 @@ class TextPredictor:
                                       "the autogluon-contrib-nlp and MXNet "
                                       "as the backend of AutoGluon-Text. In the future, "
                                       "we will support other models.")
-        logger.log(25, f'Training completed. Auto-saving to "{self.path}". '
+        logger.info(f'Training completed. Auto-saving to "{self.path}". '
                        f'For loading the model, you can use'
                        f' `predictor = TextPredictor.load("{self.path}")`')
         self.save(self.path)
