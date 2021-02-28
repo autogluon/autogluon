@@ -17,7 +17,7 @@ from autogluon.core.models import AbstractModel
 logger = logging.getLogger(__name__)
 
 
-class TextPredictionV1Model(AbstractModel):
+class TextPredictorModel(AbstractModel):
     nn_model_name = 'text_nn'
 
     def __init__(self, **kwargs):
@@ -130,7 +130,7 @@ class TextPredictionV1Model(AbstractModel):
         num_cpus = kwargs.get('num_cpus', None)
         num_gpus = kwargs.get('num_gpus', None)
         if sample_weight is not None:  # TODO: support
-            logger.log(15, "sample_weight not yet supported for TextPredictionV1Model, this model will ignore them in training.")
+            logger.log(15, "sample_weight not yet supported for TextPredictorModel, this model will ignore them in training.")
 
         X_train.insert(len(X_train.columns), self._label_column_name, y)
         if X_val is not None:

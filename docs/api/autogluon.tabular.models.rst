@@ -171,7 +171,7 @@ Experimental Models
    :nosignatures:
 
    FastTextModel
-   TextPredictionV1Model
+   TextPredictorModel
 
 :hidden:`FastTextModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -179,8 +179,8 @@ Experimental Models
 .. autoclass:: FastTextModel
    :members: init
 
-:hidden:`TextPredictionV1Model`
+:hidden:`TextPredictorModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TextPredictionV1Model
+.. autoclass:: TextPredictorModel
    :members: init

@@ -10,7 +10,7 @@ from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, St
 from .presets_custom import get_preset_custom
 from ..utils import process_hyperparameters
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
-    TabularNeuralNetModel, NNFastAiTabularModel, FastTextModel, TextPredictionV1Model
+    TabularNeuralNetModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ MODEL_TYPES = dict(
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
-    AG_TEXT_NN=TextPredictionV1Model,
+    AG_TEXT_NN=TextPredictorModel,
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
 )
@@ -78,7 +78,7 @@ DEFAULT_MODEL_NAMES = {
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
-    TextPredictionV1Model: 'AGTextNeuralNetwork',
+    TextPredictorModel: 'TextNeuralNetwork',
     FastTextModel: 'FastText',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
 }
