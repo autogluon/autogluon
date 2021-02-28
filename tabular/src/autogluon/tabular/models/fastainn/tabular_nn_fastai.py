@@ -230,7 +230,7 @@ class NNFastAiTabularModel(AbstractModel):
 
         save_callback = AgSaveModelCallback(
             monitor=objective_func_name_to_monitor, comp=objective_optim_mode, fname=self.name,
-            best_epoch_stop=best_epoch_stop
+            best_epoch_stop=best_epoch_stop, with_opt=True
         )
 
         early_stopping = EarlyStoppingCallbackWithTimeLimit(

@@ -1,32 +1,48 @@
 import logging
 import time
 
-from fastai.callback.tracker import EarlyStoppingCallback, TrackerCallback
+from fastai.callback.core import CancelFitException
+from fastai.callback.tracker import TrackerCallback
 from fastcore.basics import store_attr
 
 logger = logging.getLogger(__name__)
 
 
-class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
+class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
 
-    def __init__(self, time_limit=None, best_epoch_stop=None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, monitor='valid_loss', comp=None, min_delta=0., patience=1, reset_on_fit=True, time_limit=None, best_epoch_stop=None):
+        super().__init__(monitor=monitor, comp=comp, min_delta=min_delta, reset_on_fit=reset_on_fit)
+        self.patience = patience
         self.time_limit = time_limit
         self.start_time = time.time()
         self.best_epoch_stop = best_epoch_stop
+        self.wait = None
+
+    def before_fit(self):
+        self.wait = 0
+        super().before_fit()
 
     def after_epoch(self):
         if self.best_epoch_stop is not None:
             if self.epoch >= self.best_epoch_stop:
                 logger.log(20, f'\tStopping at the best epoch learned earlier - {self.epoch}.')
-                return {'stop_training': True}
+                raise CancelFitException()
         if self.time_limit:
             time_elapsed = time.time() - self.start_time
             time_left = self.time_limit - time_elapsed
             if time_left <= 0:
                 logger.log(20, '\tRan out of time, stopping training early.')
-                return {'stop_training': True}
+                raise CancelFitException()
+
         super().after_epoch()
+
+        if self.new_best:
+            self.wait = 0
+        else:
+            self.wait += 1
+            if self.wait >= self.patience:
+                logger.log(20, f'No improvement since epoch {self.epoch - self.wait}: early stopping')
+                raise CancelFitException()
 
 
 class AgSaveModelCallback(TrackerCallback):
@@ -56,7 +72,7 @@ class AgSaveModelCallback(TrackerCallback):
         else:  # every improvement
             super().after_epoch()
             if self.new_best:
-                logger.log(20, f'Better model found at epoch {self.epoch} with {self.monitor} value: {self.best}.')
+                logger.log(15, f'Better model found at epoch {self.epoch} with {self.monitor} value: {self.best}.')
                 self.best_epoch = self.epoch
                 self._save(f'{self.fname}')
 
