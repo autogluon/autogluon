@@ -14,7 +14,8 @@ from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, AUTO_WEIGHT, BALANCE_WEIGHT
-from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, set_logger_verbosity, get_pred_from_proba
+from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
+from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
@@ -851,7 +852,7 @@ class TabularPredictor:
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
 
-    def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=False):
+    def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
         If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
@@ -869,17 +870,18 @@ class TabularPredictor:
             Whether to return the output as a pandas object (True) or numpy array (False).
             Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
             If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
-        as_multiclass : bool, default = False
+        as_multiclass : bool, default = True
             Whether to return binary classification probabilities as if they were for multiclass classification.
                 Output will contain two columns, and if `as_pandas=True`, the column names will correspond to the binary class labels.
                 The columns will be the same order as `predictor.class_labels`.
+            If False, output will contain only 1 column for the positive class (get positive_class name via `predictor.positive_class`).
             Only impacts output for binary classification problems.
 
         Returns
         -------
         Array of predicted class-probabilities, corresponding to each row in the given data.
-        May be a :class:`np.ndarray` or :class:`pd.Series` / :class:`pd.DataFrame` depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
-        For binary classification problems, the output contains for each datapoint only the predicted probability of the positive class, unless you specify `as_multiclass=True`.
+        May be a :class:`np.ndarray` or :class:`pd.DataFrame` / :class:`pd.Series` depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
+        For binary classification problems, the output contains for each datapoint the predicted probabilities of the negative and positive classes, unless you specify `as_multiclass=False`.
         """
         data = self.__get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
@@ -934,8 +936,8 @@ class TabularPredictor:
         Scalar performance value if `auxiliary_metrics = False`.
         If `auxiliary_metrics = True`, returns dict where keys = metrics, values = performance along each metric.
         """
-        return self._learner.evaluate(y_true=y_true, y_pred=y_pred, silent=silent,
-                                      auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
+        return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, silent=silent,
+                                                  auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
     def leaderboard(self, data=None, extra_info=False, only_pareto_frontier=False, silent=False):
         """
@@ -1179,7 +1181,7 @@ class TabularPredictor:
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
             The data to apply feature transformation to.
             This data does not require the label column.
-            If str is passed, `dat` will be loaded using the str value as the file path.
+            If str is passed, `data` will be loaded using the str value as the file path.
             If not specified, the original data used during fit() will be used if fit() was previously called with `cache_data=True`. Otherwise, an exception will be raised.
                 For non-bagged mode predictors:
                     The data used when not specified is the validation set.
@@ -1224,7 +1226,7 @@ class TabularPredictor:
         --------
         >>> from autogluon.tabular import TabularPredictor
         >>> predictor = TabularPredictor(label='class').fit('train.csv', label='class', auto_stack=True)  # predictor is in bagged mode.
-        >>> model = 'WeightedEnsemble_L1'
+        >>> model = 'WeightedEnsemble_L2'
         >>> train_data_transformed = predictor.transform_features(model=model)  # Internal training DataFrame used as input to `model.fit()` for each model trained in predictor.fit()`
         >>> test_data_transformed = predictor.transform_features('test.csv', model=model)  # Internal test DataFrame used as input to `model.predict_proba()` during `predictor.predict_proba(test_data, model=model)`
 
@@ -1244,7 +1246,7 @@ class TabularPredictor:
         labels : :class:`np.ndarray` or :class:`pd.Series`
             Labels to transform.
             If `proba=False`, an example input would be the output of `predictor.predict(test_data)`.
-            If `proba=True`, an example input would be the output of `predictor.predict_proba(test_data)`.
+            If `proba=True`, an example input would be the output of `predictor.predict_proba(test_data, as_multiclass=False)`.
         inverse : boolean, default = False
             When `True`, the input labels are treated as being in the internal representation and the original representation is outputted.
         proba : boolean, default = False
@@ -1578,10 +1580,7 @@ class TabularPredictor:
 
         return models
 
-    # TODO: v0.1 This can cause very strange issues related to index mismatches with original training data on extreme edge cases (multiclass where autogluon duplicated rows in data due to rare classes and eval_metric was log_loss)
-    #  This is a very rare case but needs to be fixed by v0.1 release
-    #  It might be good enough to do an inner join on training data, but it needs to be tested
-    def get_oof_pred(self, model: str = None, transformed=False) -> pd.Series:
+    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False) -> pd.Series:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -1595,26 +1594,26 @@ class TabularPredictor:
             Refer to `get_oof_pred_proba()` documentation.
         transformed : bool, default = False
             Refer to `get_oof_pred_proba()` documentation.
+        train_data : pd.DataFrame, default = None
+            Refer to `get_oof_pred_proba()` documentation.
+        internal_oof : bool, default = False
+            Refer to `get_oof_pred_proba()` documentation.
 
         Returns
         -------
         :class:`pd.Series` object of the out-of-fold training predictions of the model.
         """
-        y_pred_proba_oof_transformed = self.get_oof_pred_proba(model=model, transformed=True)
-        y_index = y_pred_proba_oof_transformed.index
-        y_pred_oof_transformed = get_pred_from_proba(y_pred_proba=y_pred_proba_oof_transformed.to_numpy(), problem_type=self._trainer.problem_type)
-        y_pred_oof_transformed = pd.Series(data=y_pred_oof_transformed, index=y_index, name=self.label)
-        if transformed:
-            return y_pred_oof_transformed
-        else:
-            return self.transform_labels(labels=y_pred_oof_transformed, inverse=True, proba=False)
+        y_pred_proba_oof = self.get_oof_pred_proba(model=model,
+                                                   transformed=transformed,
+                                                   as_multiclass=True,
+                                                   train_data=train_data,
+                                                   internal_oof=internal_oof)
+        return get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type)
 
     # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.
-    # TODO: v0.1 This can cause very strange issues related to index mismatches with original training data on extreme edge cases (multiclass where autogluon duplicated rows in data due to rare classes and eval_metric was logloss)
-    #  This is a very rare case but needs to be fixed by v0.1 release
-    #  It might be good enough to do an inner join on training data, but it needs to be tested
-    def get_oof_pred_proba(self, model: str = None, transformed=False, as_multiclass=False) -> Union[pd.DataFrame, pd.Series]:
+    # TODO: Remove train_data argument once we start caching the raw original data: Can just load that instead.
+    def get_oof_pred_proba(self, model: str = None, transformed=False, as_multiclass=True, train_data=None, internal_oof=False) -> Union[pd.DataFrame, pd.Series]:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -1640,11 +1639,19 @@ class TabularPredictor:
             Whether the output values should be of the original label representation (False) or the internal label representation (True).
             The internal representation for binary and multiclass classification are integers numbering the k possible classes from 0 to k-1, while the original representation is identical to the label classes provided during fit.
             Generally, most users will want the original representation and keep `transformed=False`.
-        as_multiclass : bool, default = False
+        as_multiclass : bool, default = True
             Whether to return binary classification probabilities as if they were for multiclass classification.
                 Output will contain two columns, and if `transformed=False`, the column names will correspond to the binary class labels.
                 The columns will be the same order as `predictor.class_labels`.
+            If False, output will contain only 1 column for the positive class (get positive_class name via `predictor.positive_class`).
             Only impacts output for binary classification problems.
+        train_data : pd.DataFrame, default = None
+            Specify the original `train_data` to ensure that any training rows that were originally dropped internally are properly handled.
+            If None, then output will not contain all rows if training rows were dropped internally during fit.
+        internal_oof : bool, default = False
+            [Advanced Option] Return the internal OOF preds rather than the externally facing OOF preds.
+            Internal OOF preds may have more/fewer rows than was provided in train_data, and are incompatible with external data.
+            If you don't know what this does, keep it as False.
 
         Returns
         -------
@@ -1655,15 +1662,40 @@ class TabularPredictor:
         if model is None:
             model = self.get_model_best()
         y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
-        if self.problem_type == MULTICLASS:
+        if not internal_oof:
+            is_duplicate_index = y_pred_proba_oof_transformed.index.duplicated(keep='first')
+            if is_duplicate_index.any():
+                logger.log(20, 'Detected duplicate indices... This means that data rows may have been duplicated during training. '
+                               'Removing all duplicates except for the first instance.')
+                y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[is_duplicate_index == False]
+            if self._learner._pre_X_rows is not None and len(y_pred_proba_oof_transformed) < self._learner._pre_X_rows:
+                len_diff = self._learner._pre_X_rows - len(y_pred_proba_oof_transformed)
+                if train_data is None:
+                    logger.warning(f'WARNING: {len_diff} rows of training data were dropped internally during fit. '
+                                   f'The output will not contain all original training rows.\n'
+                                   f'If attempting to get `oof_pred_proba`, DO NOT pass `train_data` into `predictor.predict_proba` or `predictor.transform_features`!\n'
+                                   f'Instead this can be done by the following '
+                                   f'(Ensure `train_data` is identical to when it was used in fit):\n'
+                                   f'oof_pred_proba = predictor.get_oof_pred_proba(train_data=train_data)\n'
+                                   f'oof_pred = predictor.get_oof_pred(train_data=train_data)\n')
+                else:
+                    missing_idx = list(train_data.index.difference(y_pred_proba_oof_transformed.index))
+                    missing_idx_data = train_data.loc[missing_idx]
+                    missing_pred_proba = self.transform_features(data=missing_idx_data, base_models=[model], return_original_features=False)
+                    y_pred_proba_oof_transformed = pd.concat([y_pred_proba_oof_transformed, missing_pred_proba])
+                    y_pred_proba_oof_transformed = y_pred_proba_oof_transformed.reindex(list(train_data.index))
+
+        if self.problem_type == MULTICLASS and self._learner.label_cleaner.problem_type_transform == MULTICLASS:
             y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
         else:
             y_pred_proba_oof_transformed.columns = [self.label]
             y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label]
             if as_multiclass and self.problem_type == BINARY:
                 y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba_oof_transformed, as_pandas=True)
-                if not transformed:
-                    y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels)
+            elif self.problem_type == MULTICLASS:
+                if transformed:
+                    y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba_oof_transformed, as_pandas=True)
+                    y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
         if transformed:
             return y_pred_proba_oof_transformed
         else:
@@ -1673,19 +1705,14 @@ class TabularPredictor:
     def positive_class(self):
         """
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
-        In binary classification, :class:`TabularPredictor.predict_proba()` returns the estimated probability that each row belongs to the positive class.
+        In binary classification, :class:`TabularPredictor.predict_proba(as_multiclass=False)` returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
 
         Returns
         -------
         The positive class name in binary classification or None if the problem is not binary classification.
         """
-        if not self._learner.is_fit:
-            raise AssertionError('Predictor must be fit to return positive_class.')
-        if self.problem_type != BINARY:
-            logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
-            return None
-        return self._learner.label_cleaner.cat_mappings_dependent_var[1]
+        return self._learner.positive_class
 
     def load_data_internal(self, data='train', return_X=True, return_y=True):
         """
@@ -2031,22 +2058,22 @@ class TabularPredictor:
             self._learner.persist_trainer(low_memory=True)
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
-    # TODO: Update and correct the logging message on loading directions
     def save(self):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
+        path = self.path
         tmp_learner = self._learner
         tmp_trainer = self._trainer
         self._learner.save()
         self._learner = None
         self._trainer = None
-        save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
+        save_pkl.save(path=path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
         self._trainer = tmp_trainer
-        logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(\"%s\")" % self.path)
+        logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
     def load(cls, path, verbosity=2):
@@ -2088,12 +2115,6 @@ class TabularPredictor:
             logger.warning('############################## WARNING ##############################')
             logger.warning('')
 
-        return predictor
-
-    @classmethod
-    def from_learner(cls, learner: AbstractLearner):
-        predictor = cls(label=learner.label, path=learner.path)
-        predictor._set_post_fit_vars(learner=learner)
         return predictor
 
     @staticmethod
@@ -2319,3 +2340,9 @@ class _TabularPredictorExperimental(TabularPredictor):
         else:
             logger.log(20, 'No further advice found.')
         logger.log(20, '================================================================')
+
+    @classmethod
+    def from_learner(cls, learner: AbstractLearner):
+        predictor = cls(label=learner.label, path=learner.path)
+        predictor._set_post_fit_vars(learner=learner)
+        return predictor

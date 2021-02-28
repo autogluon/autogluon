@@ -234,6 +234,16 @@ def augment_rare_classes(X, label, threshold):
     logger.log(15, "Replicated some data from rare classes in training set because eval_metric requires all classes")
     return X
 
+
+def get_pred_from_proba_df(y_pred_proba, problem_type=BINARY):
+    """From input DataFrame of pred_proba, return Series of pred"""
+    if problem_type == REGRESSION:
+        y_pred = y_pred_proba
+    else:
+        y_pred = y_pred_proba.idxmax(axis=1)
+    return y_pred
+
+
 def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     if problem_type == BINARY:
         y_pred = [1 if pred >= 0.5 else 0 for pred in y_pred_proba]

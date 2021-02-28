@@ -290,9 +290,9 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if predictor._trainer.bagged_mode:
                 # TODO: Test index alignment with original training data (first handle duplicated rows / dropped rows edge cases)
                 y_pred_oof = predictor.get_oof_pred()
-                y_pred_proba_oof = predictor.get_oof_pred_proba()
+                y_pred_proba_oof = predictor.get_oof_pred_proba(as_multiclass=False)
                 y_pred_oof_transformed = predictor.get_oof_pred(transformed=True)
-                y_pred_proba_oof_transformed = predictor.get_oof_pred_proba(transformed=True)
+                y_pred_proba_oof_transformed = predictor.get_oof_pred_proba(as_multiclass=False, transformed=True)
 
                 # Assert expected type output
                 assert isinstance(y_pred_oof, pd.Series)
@@ -302,7 +302,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     assert isinstance(y_pred_proba_oof_transformed, pd.DataFrame)
                 else:
                     if predictor.problem_type == BINARY:
-                        assert isinstance(predictor.get_oof_pred_proba(as_multiclass=True), pd.DataFrame)
+                        assert isinstance(predictor.get_oof_pred_proba(), pd.DataFrame)
                     assert isinstance(y_pred_proba_oof, pd.Series)
                     assert isinstance(y_pred_proba_oof_transformed, pd.Series)
 

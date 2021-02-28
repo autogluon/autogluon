@@ -58,7 +58,7 @@ See ["Prediction options" in the In Depth Tutorial](tabular-indepth.html#predict
 
 ### Which classes do predicted probabilities correspond to?
 
-This should become obvious if you specify the `as_pandas` argument like this:
+This should become obvious if you look at the pandas DataFrame column names after specifying the `as_pandas` argument like this:
 
 ```
 predictor.predict_proba(test_data, as_pandas=True)
@@ -78,7 +78,7 @@ You can see which class AutoGluon treats as the positive class in binary classif
 predictor.positive_class
 ```
 
-The positive class can also be retrieved via `predictor.class_labels[-1]`. The output of `predict_proba()` for binary classification is the probability of the positive class.
+The positive class can also be retrieved via `predictor.class_labels[-1]`. The output of `predict_proba(as_multiclass=False)` for binary classification is the probability of the positive class.
 
 ### How can I use AutoGluon for interpretability?
 

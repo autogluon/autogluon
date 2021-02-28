@@ -32,11 +32,14 @@ class AutoTrainer(AbstractTrainer):
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
 
         if self.bagged_mode:
-            if (y_val is not None) and (X_val is not None):
-                # TODO: User could be intending to blend instead. Perhaps switch from OOF preds to X_val preds while still bagging? Doubt a user would want this.
-                logger.warning('Warning: Training AutoGluon in Bagged Mode but X_val is specified, concatenating X and X_val for cross-validation')
-                X = pd.concat([X, X_val], ignore_index=True)
-                y = pd.concat([y, y_val], ignore_index=True)
+            if (y_val is not None) or (X_val is not None):
+                # TODO: User could be intending to blend instead. Add support for blend stacking.
+                #  This error message is necessary because when calculating out-of-fold predictions for user, we want to return them in the form given in train_data,
+                #  but if we merge train and val here, it becomes very confusing from a users perspective, especially because we reset index, making it impossible to match
+                #  the original train_data to the out-of-fold predictions from `predictor.get_oof_pred_proba()`.
+                raise AssertionError('X_val, y_val is not None, but bagged mode was specified. If calling from `TabularPredictor.fit()`, `tuning_data` must be None.\n'
+                                     'Bagged mode does not use tuning data / validation data. Instead, all data (`train_data` and `tuning_data`) should be combined and specified as `train_data`.\n'
+                                     'Bagging/Stacking with a held-out validation set (blend stacking) is not yet supported.')
             X_val = None
             y_val = None
         else:

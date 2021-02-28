@@ -7,7 +7,7 @@ from pandas import DataFrame, Series
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
-from autogluon.core.utils import get_pred_from_proba
+from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +172,7 @@ class LabelCleanerBinary(LabelCleaner):
             self.inv_map: dict = {0: 0, 1: 1}
         else:
             self.inv_map: dict = {self.unique_values[0]: 0, self.unique_values[1]: 1}
-            pos_class_warning = f'\tNote: For your binary classification, AutoGluon arbitrarily selected which label-value' \
+            pos_class_warning = f'\tNote: For your binary classification, AutoGluon arbitrarily selected which label-value ' \
                                 f'represents positive ({self.unique_values[1]}) vs negative ({self.unique_values[0]}) class.\n'\
                                 '\tTo explicitly set the positive_class, either rename classes to 1 and 0, or specify positive_class in Predictor init.'
         poslabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 1][0]
@@ -182,22 +182,27 @@ class LabelCleanerBinary(LabelCleaner):
             logger.log(20, pos_class_warning)
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
         self.ordered_class_labels_transformed = [0, 1]
-        self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]\
+        self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]
 
     def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
-        if not as_pred:
-            return y
-        y_index = None
-        if isinstance(y, Series):
-            y_index = y.index
-            y = y.to_numpy()
-        if as_pred:
+        if isinstance(y, DataFrame):
+            y = copy.deepcopy(y)
+            y.columns = copy.deepcopy(self.ordered_class_labels)
+            if as_pred:
+                y = get_pred_from_proba_df(y, problem_type=self.problem_type_transform)
+            if not as_pandas:
+                y = y.to_numpy()
+        elif as_pred:
+            y_index = None
+            if isinstance(y, Series):
+                y_index = y.index
+                y = y.to_numpy()
             y = get_pred_from_proba(y_pred_proba=y, problem_type=self.problem_type_transform)
             y = self._convert_to_valid_series(y)
             y = y.map(self.cat_mappings_dependent_var)
             y = y.to_numpy()
-        if as_pandas:
-            y = Series(data=y, index=y_index)
+            if as_pandas:
+                y = Series(data=y, index=y_index)
         return y
 
     def _transform(self, y: Series) -> Series:
@@ -206,6 +211,14 @@ class LabelCleanerBinary(LabelCleaner):
 
     def _inverse_transform(self, y: Series) -> Series:
         return y.map(self.cat_mappings_dependent_var)
+
+    def transform_proba(self, y: Union[DataFrame, Series, np.ndarray], as_pandas=False):
+        if not as_pandas and isinstance(y, (Series, DataFrame)):
+            y = y.to_numpy()
+        elif isinstance(y, DataFrame):
+            y = copy.deepcopy(y)
+            y.columns = copy.deepcopy(self.ordered_class_labels_transformed)
+        return y
 
 
 class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
@@ -220,7 +233,8 @@ class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
         return y
 
     def inverse_transform_proba(self, y, as_pandas=False, as_pred=False):
-        y = self.convert_binary_proba_to_multiclass_proba(y=y, as_pandas=as_pandas)
+        if not isinstance(y, DataFrame):
+            y = self.convert_binary_proba_to_multiclass_proba(y=y, as_pandas=as_pandas)
         return super().inverse_transform_proba(y, as_pandas=as_pandas, as_pred=as_pred)
 
     @staticmethod
