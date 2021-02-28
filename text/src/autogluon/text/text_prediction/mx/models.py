@@ -623,7 +623,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         if (update_idx + 1) % train_log_interval == 0:
             log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
             log_num_samples = sum(log_num_samples_l)
-            logger.log(25,
+            logger.log(15,
                 '[Iter {}/{}, Epoch {}] train loss={:0.2e}, gnorm={:0.2e}, lr={:0.2e}, #samples processed={},'
                 ' #sample per second={:.2f}. ETA={:.2f}min'
                     .format(update_idx + 1, max_update,
@@ -701,7 +701,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             mx.npx.waitall()
             loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
-            logger.log(15, '[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
+            logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
                         ' total time spent={:.2f}min. Find new best={}, Find new top-{}={}'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60,
@@ -730,7 +730,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                 report_local_jsonl_f.flush()
                 report_idx += 1
             if no_better_rounds >= cfg.optimization.early_stopping_patience:
-                logger.log(15, 'Early stopping patience reached!')
+                logger.info('Early stopping patience reached!')
                 break
             total_time_spent = time.time() - start_tick
             if time_limit is not None and total_time_spent > time_limit:
