@@ -701,7 +701,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             mx.npx.waitall()
             loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
-            logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
+            logger.log(25, '[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
                         ' total time spent={:.2f}min. Find new best={}, Find new top-{}={}'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60,
