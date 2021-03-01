@@ -76,7 +76,8 @@ class TextPredictor:
             warn_if_exist=True
     ):
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
+        if self.verbosity is not None:
+            set_logger_verbosity(self.verbosity, logger=logger)
         self._label = label
         self._problem_type = problem_type
         self._eval_metric = eval_metric
@@ -85,8 +86,8 @@ class TextPredictor:
         self._fit_called = False
         self._backend = None
 
-    def set_verbosity(self, target_verbosity):
-        self.verbosity = target_verbosity
+    def set_verbosity(self, verbosity: int):
+        self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
 
     @property
@@ -251,6 +252,9 @@ class TextPredictor:
         :class:`TextPredictor` object. Returns self.
         """
         assert self._fit_called is False
+        verbosity = self.verbosity
+        if verbosity is None:
+            verbosity = 3
         if presets is not None:
             preset_hparams = ag_text_presets.create(presets)
         else:
@@ -332,7 +336,7 @@ class TextPredictor:
                               time_limit=time_limit,
                               seed=seed,
                               plot_results=plot_results,
-                              verbosity=self.verbosity)
+                              verbosity=verbosity)
         else:
             raise NotImplementedError("Currently, we only support using "
                                       "the autogluon-contrib-nlp and MXNet "
@@ -482,19 +486,23 @@ class TextPredictor:
         self._model.save(os.path.join(path, 'saved_model'))
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path: str, verbosity: int = None):
         """
-        Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
+        Load a TextPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
         Parameters
         ----------
         path : str
             The path to directory in which this Predictor was previously saved.
+        verbosity : int, default = None
+            Sets the verbosity level of this Predictor after it is loaded.
+            Valid values range from 0 (least verbose) to 4 (most verbose).
+            If None, logging verbosity is not changed from existing values.
+            Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
+            Refer to TextPredictor init for more information.
         """
-        assert os.path.exists(path),\
-            f'"{path}" does not exist. You may check the path again.'
-        with open(os.path.join(path,
-                               'text_predictor_assets.json'), 'r') as in_f:
+        assert os.path.exists(path), f'"{path}" does not exist. You may check the path again.'
+        with open(os.path.join(path, 'text_predictor_assets.json'), 'r') as in_f:
             assets = json.load(in_f)
         backend = assets['backend']
         label = assets['label']
@@ -503,11 +511,12 @@ class TextPredictor:
             model = MultiModalTextModel.load(os.path.join(path, 'saved_model'))
         else:
             raise NotImplementedError(f'Backend = "{backend}" is not supported.')
-        ret = cls(eval_metric=model._eval_metric,
-                  label=label,
-                  problem_type=model._problem_type,
-                  path=path,
-                  warn_if_exist=False)
-        ret._backend = assets['backend']
-        ret._model = model
-        return ret
+        predictor: TextPredictor = cls(label=label,
+                                       problem_type=model._problem_type,
+                                       eval_metric=model._eval_metric,
+                                       path=path,
+                                       verbosity=verbosity,
+                                       warn_if_exist=False)
+        predictor._backend = assets['backend']
+        predictor._model = model
+        return predictor

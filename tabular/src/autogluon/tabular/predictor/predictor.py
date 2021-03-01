@@ -2076,7 +2076,7 @@ class TabularPredictor:
         logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
-    def load(cls, path, verbosity=2):
+    def load(cls, path: str, verbosity: int = None):
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -2084,10 +2084,15 @@ class TabularPredictor:
         ----------
         path : str
             The path to directory in which this Predictor was previously saved.
-        verbosity : int, default = 2
-            Sets the verbosity level of this Predictor after it is loaded. Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
+        verbosity : int, default = None
+            Sets the verbosity level of this Predictor after it is loaded.
+            Valid values range from 0 (least verbose) to 4 (most verbose).
+            If None, logging verbosity is not changed from existing values.
+            Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
+            Refer to TabularPredictor init for more information.
         """
-        set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
+        if verbosity is not None:
+            set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")
 
