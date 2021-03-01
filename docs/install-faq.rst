@@ -1,5 +1,3 @@
-.. include:: install-warning.rst
-
 * Which version of MXNet does AutoGluon support?
 
    Currently, AutoGluon supports MXNet>=1.7.0. In order to ensure that you are installing mxnet
