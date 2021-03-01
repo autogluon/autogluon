@@ -62,7 +62,7 @@ Select your preferences below and run the corresponding install commands:
                  python3 -m pip install -U pip
                  python3 -m pip install -U setuptools wheel
                  python3 -m pip install -U "mxnet<2.0.0"
-                 python3 -m pip install --pre autogluon
+                 python3 -m pip install autogluon
 
            .. container:: gpu
 
@@ -74,7 +74,7 @@ Select your preferences below and run the corresponding install commands:
                  # Here we assume CUDA 10.1 is installed.  You should change the number
                  # according to your own CUDA version (e.g. mxnet_cu100 for CUDA 10.0).
                  python3 -m pip install -U "mxnet_cu101<2.0.0"
-                 python3 -m pip install --pre autogluon
+                 python3 -m pip install autogluon
 
         .. container:: source
 
@@ -122,7 +122,7 @@ Select your preferences below and run the corresponding install commands:
                  python3 -m pip install -U pip
                  python3 -m pip install -U setuptools wheel
                  python3 -m pip install -U "mxnet<2.0.0"
-                 python3 -m pip install --pre autogluon
+                 python3 -m pip install autogluon
 
            .. container:: gpu
 
