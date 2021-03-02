@@ -41,7 +41,7 @@ list_presets()
 
 There are two kinds of presets. The `simple_presets` are pre-defined configurations recommended for most users, which allow you specify whether you care more about predictive accuracy (`'best_quality'`) or more about training/inference speed (`'lower_quality_fast_train'`)
 
-The `advanced_presets` are pre-configured networks using different Transformer backbones such as ELECTRA, RoBERTa, or Multilingual BERT, and different feature fusion strategies. For example, `electra_small_fuse_late` means we use the ELECTRA-small model as the network backbone for text fields  and use the late fusion strategy described in ":label:`sec_textprediction_architecture`". The  `default` preset is the same as `electra_base_fuse_late`. Now let's train a model on our data with specified `presets`.
+The `advanced_presets` are pre-configured networks using different Transformer backbones such as ELECTRA, RoBERTa, or Multilingual BERT, and different feature fusion strategies. For example, `electra_small_fuse_late` means we use the ELECTRA-small model as the network backbone for text fields  and use the late fusion strategy described in ":ref:`sec_textprediction_architecture`". The  `default` preset is the same as `electra_base_fuse_late`. Now let's train a model on our data with specified `presets`.
 
 ```{.python .input}
 from autogluon.text import TextPredictor
@@ -97,9 +97,11 @@ def electra_small_fuse_late_train5():
 predictor.fit(train_data, presets='electra_small_fuse_late_train5', time_limit=60, seed=123)
 ```
 
-## HPO over a Customized Search Space via Random Search
+## HPO over a Customized Search Space via Bayesian Optimization
 
-To control which hyperparameter values are considered during `fit()`, we specify the `hyperparameters` argument. Rather than specifying a particular fixed value for a hyperparameter, we can specify a space of values to search over via `ag.core.space`. We can also specify which HPO method to use for the search via `search_strategy` (a simple [random search](https://www.jmlr.org/papers/volume13/bergstra12a/bergstra12a.pdf) is specified below).
+To control which hyperparameter values are considered during `fit()`, we specify the `hyperparameters` argument. Rather than specifying a particular fixed value for a hyperparameter, we can specify a space of values to search over via `ag.core.space`. 
+We can also specify which HPO method to use for the search via `search_strategy`. 
+By default, we will use [Bayesian Optimization](https://arxiv.org/pdf/1807.02811.pdf) as the searcher.
 In this example, we search for good values of the following hyperparameters:
 
 - warmup
@@ -118,7 +120,6 @@ def electra_small_basic_demo_hpo():
     search_space['optimization.lr'] = ag.core.space.Real(1E-5, 2E-4)
     search_space['optimization.wd'] = ag.core.space.Categorical(1E-4, 1E-3, 1E-2)
     search_space['optimization.num_train_epochs'] = 5
-    hparams['tune_kwargs']['search_strategy'] = 'random'
     return hparams
 ```
 
@@ -145,30 +146,5 @@ print('Accuracy = {:.2f}%'.format(test_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(test_score['f1'] * 100))
 ```
 
-## HPO via Bayesian Optimization + Hyperband
+You can also try setting `hyperparameters['tune_kwargs']['search_strategy']` to be `'random'`, `'bayesopt'`, `'bayesopt_hyperband'` as alternative HPO methods although they are currently experimental.
 
-Alternatively, we can use more advanced searchers for HPO like a combination of [Hyperband and Bayesian Optimization](https://arxiv.org/abs/2003.10865). [Hyperband](https://arxiv.org/pdf/1603.06560.pdf) will try multiple hyperparameter configurations simultaneously and will early stop training under poor configurations to free compute resources for exploring new hyperparameter configurations.  Compared to random search, [Bayesian Optimization](https://distill.pub/2020/bayesian-optimization/) more cleverly selects the next hyperparameter values to try.
-
-```{.python .input}
-hyperparameters = electra_small_basic_demo_hpo()
-hyperparameters['tune_kwargs']['search_strategy'] = 'bayesopt_hyperband'
-hyperparameters['tune_kwargs']['scheduler_options'] = {'max_t': 15} # Maximal number of epochs for training the neural network
-predictor_sst_hb = TextPredictor(path='ag_text_sst_hb', label='label', eval_metric='acc')
-predictor_sst_hb.set_verbosity(0)
-predictor_sst_hb.fit(train_data,
-                     hyperparameters=hyperparameters,
-                     time_limit=60 * 2,
-                     num_trials=8,
-                     seed=123)
-```
-
-
-```{.python .input}
-test_score = predictor_sst_hb.evaluate(test_data, metrics=['acc', 'f1'])
-print('Best Config = {}'.format(predictor_sst_hb.results['best_config']))
-print('Total Time = {}s'.format(predictor_sst_hb.results['total_time']))
-print('Accuracy = {:.2f}%'.format(test_score['acc'] * 100))
-print('F1 = {:.2f}%'.format(test_score['f1'] * 100))
-```
-
-You can also try setting `hyperparameters['tune_kwargs']['search_strategy']` to be `'bayesopt'` or `'local_sequential_auto'` as alternative HPO methods.
