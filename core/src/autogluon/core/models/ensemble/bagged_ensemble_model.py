@@ -288,7 +288,7 @@ class BaggedEnsembleModel(AbstractModel):
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: v0.1 Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features=None, is_oof=True, time_limit=None, silent=False, **kwargs) -> pd.DataFrame:
+    def compute_feature_importance(self, X, y, features=None, is_oof=False, time_limit=None, silent=False, **kwargs) -> pd.DataFrame:
         if features is None:
             features = self.load_child(model=self.models[0]).features
         if not is_oof:

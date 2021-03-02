@@ -1305,8 +1305,15 @@ class TabularPredictor:
             List of str feature names that feature importances are calculated for and returned, specify None to get all feature importances.
             If you only want to compute feature importances for some of the features, you can pass their names in as a list of str.
             Valid feature names change depending on the `feature_stage`.
+                To get the list of feature names for `feature_stage='original'`, call `predictor.feature_metadata_in.get_features()`.
                 To get the list of feature names for `feature_stage='transformed'`, call `list(predictor.transform_features().columns)`.
                 To get the list of feature names for `feature_stage=`transformed_model`, call `list(predictor.transform_features(model={model_name}).columns)`.
+            [Advanced] Can also contain tuples as elements of (feature_name, feature_list) form.
+                feature_name can be any string so long as it is unique with all other feature names / features in the list.
+                feature_list can be any list of valid features in the data.
+                This will compute importance of the combination of features in feature_list, naming the set of features in the returned DataFrame feature_name.
+                This importance will differ from adding the individual importances of each feature in feature_list, and will be more accurate to the overall group importance.
+                Example: ['featA', 'featB', 'featC', ('featBC', ['featB', 'featC'])]
         feature_stage : str, default = 'original'
             What stage of feature-processing should importances be computed for.
             Options:
