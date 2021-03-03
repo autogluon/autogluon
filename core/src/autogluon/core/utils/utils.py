@@ -461,6 +461,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
             This will compute importance of the combination of features in feature_list, naming the set of features in the returned DataFrame feature_name.
             This importance will differ from adding the individual importances of each feature in feature_list, and will be more accurate to the overall group importance.
             Example: ['featA', 'featB', 'featC', ('featBC', ['featB', 'featC'])]
+            In this example, the importance of 'featBC' will be calculated by jointly permuting 'featB' and 'featC' together as if they were a single two-dimensional feature.
     subsample_size : int, default None
         The amount of data rows to sample when computing importances.
         Higher values will improve the quality of feature importance estimates, but linearly increase the runtime.

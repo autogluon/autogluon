@@ -155,7 +155,7 @@ class TextPredictorModel(AbstractModel):
                        num_cpus=num_cpus,
                        hyperparameters=self.params,
                        seed=self.params.get('seed', 0))
-        self.model.set_verbosity(verbosity)  # FIXME: TextPredictor will reset root logger every time it is loaded, not ideal.
+        self.model.set_verbosity(verbosity)
         root_logger.setLevel(root_log_level)  # Reset log level
 
     def save(self, path: str = None, verbose=True) -> str:

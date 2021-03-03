@@ -1276,7 +1276,6 @@ class TabularPredictor:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    # TODO: Add option to specify list of features within features list, to check importances of groups of features. Make tuple to specify new feature name associated with group.
     def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, silent=False):
         """
         Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
@@ -1314,6 +1313,7 @@ class TabularPredictor:
                 This will compute importance of the combination of features in feature_list, naming the set of features in the returned DataFrame feature_name.
                 This importance will differ from adding the individual importances of each feature in feature_list, and will be more accurate to the overall group importance.
                 Example: ['featA', 'featB', 'featC', ('featBC', ['featB', 'featC'])]
+                In this example, the importance of 'featBC' will be calculated by jointly permuting 'featB' and 'featC' together as if they were a single two-dimensional feature.
         feature_stage : str, default = 'original'
             What stage of feature-processing should importances be computed for.
             Options:
