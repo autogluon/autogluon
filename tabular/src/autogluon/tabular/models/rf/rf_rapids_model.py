@@ -23,7 +23,7 @@ class RFRapidsModel(RFModel):
 
     conda create -n rapids-0.18 -c rapidsai -c nvidia -c conda-forge -c defaults rapids-blazing=0.18 python=3.7 cudatoolkit=10.1 -y
     conda activate rapids-0.18
-    pip install autogluon.tabular[all]
+    pip install --pre autogluon.tabular[all]
     """
     def _get_model_type(self):
         from cuml.ensemble import RandomForestClassifier, RandomForestRegressor
