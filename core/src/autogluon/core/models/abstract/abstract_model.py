@@ -562,8 +562,13 @@ class AbstractModel:
             model.set_contexts(path)
         return model
 
-    # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features=None, silent=False, importance_as_list=False, **kwargs) -> pd.DataFrame:
+    def compute_feature_importance(self,
+                                   X,
+                                   y,
+                                   features=None,
+                                   silent=False,
+                                   importance_as_list=False,
+                                   **kwargs) -> pd.DataFrame:
         if self.features is not None:
             X = X[self.features]
 
