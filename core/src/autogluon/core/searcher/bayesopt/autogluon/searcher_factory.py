@@ -135,7 +135,7 @@ def gp_fifo_searcher_factory(**kwargs) -> GPFIFOSearcher:
     :return: GPFIFOSearcher object
 
     """
-    assert kwargs['scheduler'] == 'fifo', \
+    assert kwargs['scheduler'] in ['fifo', 'local'], \
         "This factory needs scheduler = 'fifo' (instead of '{}')".format(
             kwargs['scheduler'])
     # Common objects
@@ -169,7 +169,7 @@ def gp_multifidelity_searcher_factory(**kwargs) -> GPMultiFidelitySearcher:
     :return: GPMultiFidelitySearcher object
 
     """
-    supp_schedulers = {'hyperband_stopping', 'hyperband_promotion'}
+    supp_schedulers = {'hyperband', 'local'}
     assert kwargs['scheduler'] in supp_schedulers, \
         "This factory needs scheduler in {} (instead of '{}')".format(
             supp_schedulers, kwargs['scheduler'])

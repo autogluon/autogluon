@@ -4,7 +4,7 @@ import logging
 import time
 from abc import abstractmethod
 
-from ...scheduler import *
+from ...scheduler import HyperbandScheduler, RLScheduler, FIFOScheduler
 from ...scheduler.seq_scheduler import LocalSequentialScheduler
 from ...utils import in_ipynb, try_import_mxnet
 from ...utils.utils import setup_compute
@@ -18,15 +18,11 @@ __all__ = [
 Results = collections.namedtuple('Results', 'model reward config time metadata')
 
 schedulers = {
-    'auto': LocalSequentialScheduler,
-    'local_sequential_auto': LocalSequentialScheduler,
-    'grid': FIFOScheduler,
-    'random': FIFOScheduler,
-    'skopt': FIFOScheduler,
-    'hyperband': HyperbandScheduler,
+    'local': LocalSequentialScheduler,
+    'fifo': FIFOScheduler,
     'rl': RLScheduler,
-    'bayesopt': FIFOScheduler,
-    'bayesopt_hyperband': HyperbandScheduler}
+    'hyperband': HyperbandScheduler,
+}
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -38,7 +34,6 @@ def create_scheduler(train_fn, search_strategy, scheduler_options):
         assert callable(search_strategy)
         scheduler_cls = search_strategy
         scheduler_options = copy.copy(scheduler_options)
-        scheduler_options['searcher'] = 'random'
     return scheduler_cls(train_fn, **scheduler_options)
 
 
@@ -59,7 +54,6 @@ class BaseTask(object):
         # create scheduler and schedule tasks
         scheduler = create_scheduler(
             train_fn, search_strategy, scheduler_options)
-        print('scheduler:', scheduler)
         scheduler.run()
         scheduler.join_jobs()
         # gather the best configuration
