@@ -260,6 +260,8 @@ class GPFIFOSearcher(GPSearcher):
             the default of the search space. Otherwise, the first is sampled
             at random
         :param debug_log: DebugLogPrinter for debug logging (optional)
+        :param cost_metric_name: If an `elapsed_time` record is passed to
+            `update`, the value is entered in the state using this key
         :param profiler: If given, HPO computations are profiled
         :param getconfig_callback: If given, this callback function is called
             at the end of each get_config. It receives the chosen config

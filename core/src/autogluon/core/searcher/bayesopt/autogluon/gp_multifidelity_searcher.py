@@ -105,6 +105,8 @@ class GPMultiFidelitySearcher(GPSearcher):
         :param first_is_default: If true, the first result of get_config is the
             default config of hp_ranges
         :param debug_log: DebugLogPrinter for debug logging (optional)
+        :param cost_metric_name: If an `elapsed_time` record is passed to
+            `update`, the value is entered in the state using this key
         :param profiler: If given, HPO computations are profiled
         :param getconfig_callback: If given, this callback function is called
             at the end of each get_config. It receives the chosen config
