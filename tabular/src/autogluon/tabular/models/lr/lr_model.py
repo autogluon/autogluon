@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer
 from autogluon.core.constants import BINARY, REGRESSION
 from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
-from .hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
+from .hyperparameters.parameters import get_param_baseline, INCLUDE, IGNORE, ONLY, _get_solver, preprocess_params_set
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
 from autogluon.core.models.abstract.model_trial import skip_hpo
@@ -34,15 +34,23 @@ class LinearModel(AbstractModel):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.model_class, self.penalty, self.handle_text = get_model_params(self.problem_type, self.params)
-        self.types_of_features = None
-        self.pipeline = None
+        self._pipeline = None
 
-        self.model_params, default_params = get_default_params(self.problem_type, self.penalty)
-        for param, val in default_params.items():
-            self._set_default_param_value(param, val)
+    def _get_model_type(self):
+        penalty = self.params.get('penalty', 'L2')
+        from sklearn.linear_model import LogisticRegression, Ridge, Lasso
+        if self.problem_type == REGRESSION:
+            if penalty == 'L2':
+                model_type = Ridge
+            elif penalty == 'L1':
+                model_type = Lasso
+            else:
+                raise AssertionError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+        else:
+            model_type = LogisticRegression
+        return model_type
 
-    def tokenize(self, s):
+    def _tokenize(self, s):
         return re.split('[ ]+', s)
 
     def _get_types_of_features(self, df):
@@ -50,9 +58,6 @@ class LinearModel(AbstractModel):
             Each value is a list of feature-names corresponding to columns in original dataframe.
             TODO: ensure features with zero variance have already been removed before this function is called.
         """
-        if self.types_of_features is not None:
-            logger.warning("Attempting to _get_types_of_features for LRModel, but previously already did this.")
-
         feature_types = self.feature_metadata.get_type_group_map_raw()
 
         categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
@@ -72,24 +77,24 @@ class LinearModel(AbstractModel):
             INCLUDE: self._select_features_handle_text_include,
             ONLY: self._select_features_handle_text_only,
             IGNORE: self._select_features_handle_text_ignore,
-        }.get(self.handle_text, self._select_features_handle_text_ignore)
+        }.get(self.params.get('handle_text', IGNORE), self._select_features_handle_text_ignore)
         return features_selector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     # TODO: handle collinear features - they will impact results quality
-    def _preprocess(self, X, is_train=False, vect_max_features=1000, **kwargs):
+    def _preprocess(self, X, is_train=False, **kwargs):
         if is_train:
             feature_types = self._get_types_of_features(X)
-            X = self.preprocess_train(X, feature_types, vect_max_features)
+            X = self._preprocess_train(X, feature_types, self.params['vectorizer_dict_size'])
         else:
-            X = self.pipeline.transform(X)
+            X = self._pipeline.transform(X)
         return X
 
-    def preprocess_train(self, X, feature_types, vect_max_features):
+    def _preprocess_train(self, X, feature_types, vect_max_features):
         transformer_list = []
         if len(feature_types['language']) > 0:
             pipeline = Pipeline(steps=[
                 ("preparator", NlpDataPreprocessor(nlp_cols=feature_types['language'])),
-                ("vectorizer", TfidfVectorizer(ngram_range=self.params['proc.ngram_range'], sublinear_tf=True, max_features=vect_max_features, tokenizer=self.tokenize)),
+                ("vectorizer", TfidfVectorizer(ngram_range=self.params['proc.ngram_range'], sublinear_tf=True, max_features=vect_max_features, tokenizer=self._tokenize)),
             ])
             transformer_list.append(('vect', pipeline))
         if len(feature_types['onehot']) > 0:
@@ -111,11 +116,15 @@ class LinearModel(AbstractModel):
                 ('quantile', QuantileTransformer(output_distribution='normal')),  # Or output_distribution = 'uniform'
             ])
             transformer_list.append(('skew', pipeline))
-        self.pipeline = FeatureUnion(transformer_list=transformer_list)
-        return self.pipeline.fit_transform(X)
+        self._pipeline = FeatureUnion(transformer_list=transformer_list)
+        return self._pipeline.fit_transform(X)
 
     def _set_default_params(self):
-        for param, val in get_param_baseline().items():
+        default_params = {'random_state': 0, 'fit_intercept': True}
+        if self.problem_type != REGRESSION:
+            default_params.update({'solver': _get_solver(self.problem_type), 'n_jobs': -1})
+        default_params.update(get_param_baseline())
+        for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
     def _get_default_searchspace(self):
@@ -126,33 +135,32 @@ class LinearModel(AbstractModel):
     def _fit(self,
              X,
              y,
-             X_val=None,
-             y_val=None,
-             time_limit=None,
              sample_weight=None,
              **kwargs):
-        hyperparams = self.params.copy()
-
+        X = self.preprocess(X, is_train=True)
         if self.problem_type == BINARY:
             y = y.astype(int).values
 
-        X = self.preprocess(X, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
-        params = {k: v for k, v in self.params.items() if k in self.model_params}
+        params = {k: v for k, v in self.params.items() if k not in preprocess_params_set}
 
         # Ridge/Lasso are using alpha instead of C, which is C^-1
         # https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
-        if self.problem_type == REGRESSION:
+        if self.problem_type == REGRESSION and 'alpha' not in params:
             # For numerical reasons, using alpha = 0 with the Lasso object is not advised, so we add epsilon
             params['alpha'] = 1 / (params['C'] if params['C'] != 0 else 1e-8)
             params.pop('C', None)
 
         # TODO: copy_X=True currently set during regression problem type, could potentially set to False to avoid unnecessary data copy.
-        model = self.model_class(**params)
+        model_cls = self._get_model_type()
+        model = model_cls(**params)
 
         logger.log(15, f'Training Model with the following hyperparameter settings:')
         logger.log(15, model)
 
-        self.model = model.fit(X, y, sample_weight=sample_weight)
+        if sample_weight is None:
+            self.model = model.fit(X, y)  # Necessary for rapids models
+        else:
+            self.model = model.fit(X, y, sample_weight=sample_weight)
 
     # TODO: Add HPO
     def _hyperparameter_tune(self, **kwargs):
