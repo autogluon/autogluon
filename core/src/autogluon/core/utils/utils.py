@@ -408,11 +408,23 @@ def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None):
         weighted_metric = metric(y, y_pred)
     return weighted_metric
 
+
 # Note: Do not send training data as input or the importances will be overfit.
 # TODO: Improve time estimate (Currently pessimistic)
-def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predict_func: Callable[..., np.ndarray], eval_metric: Scorer, features: list = None, subsample_size=None, num_shuffle_sets: int = None,
-                                           predict_func_kwargs: dict = None, transform_func: Callable[..., pd.DataFrame] = None, transform_func_kwargs: dict = None,
-                                           time_limit: float = None, silent=False, log_prefix='', importance_as_list=False) -> pd.DataFrame:
+def compute_permutation_feature_importance(X: pd.DataFrame,
+                                           y: pd.Series,
+                                           predict_func: Callable[..., np.ndarray],
+                                           eval_metric: Scorer,
+                                           features: list = None,
+                                           subsample_size=None,
+                                           num_shuffle_sets: int = None,
+                                           predict_func_kwargs: dict = None,
+                                           transform_func: Callable[..., pd.DataFrame] = None,
+                                           transform_func_kwargs: dict = None,
+                                           time_limit: float = None,
+                                           silent=False,
+                                           log_prefix='',
+                                           importance_as_list=False) -> pd.DataFrame:
     """
     Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
     A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -443,6 +455,13 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
     features : list, default None
         List of features to calculate importances for.
         If None, all features' importances will be calculated.
+        Can contain tuples as elements of (feature_name, feature_list) form.
+            feature_name can be any string so long as it is unique with all other feature names / features in the list.
+            feature_list can be any list of valid features in the data.
+            This will compute importance of the combination of features in feature_list, naming the set of features in the returned DataFrame feature_name.
+            This importance will differ from adding the individual importances of each feature in feature_list, and will be more accurate to the overall group importance.
+            Example: ['featA', 'featB', 'featC', ('featBC', ['featB', 'featC'])]
+            In this example, the importance of 'featBC' will be calculated by jointly permuting 'featB' and 'featC' together as if they were a single two-dimensional feature.
     subsample_size : int, default None
         The amount of data rows to sample when computing importances.
         Higher values will improve the quality of feature importance estimates, but linearly increase the runtime.
@@ -498,6 +517,9 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
         transform_func_kwargs = dict()
     if features is None:
         features = list(X.columns)
+
+    _validate_features(features=features, valid_features=list(X.columns))
+
     num_features = len(features)
 
     if subsample_size is not None:
@@ -564,6 +586,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
 
             row_index = 0
             for feature in parallel_computed_features:
+                if isinstance(feature, tuple):
+                    feature = feature[1]
                 row_index_end = row_index + row_count
                 X_raw.loc[row_index:row_index_end - 1, feature] = X_shuffled[feature].values
                 row_index = row_index_end
@@ -577,14 +601,20 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
 
             row_index = 0
             for feature in parallel_computed_features:
+                if isinstance(feature, tuple):
+                    feature_name = feature[0]
+                    feature_list = feature[1]
+                else:
+                    feature_name = feature
+                    feature_list = feature
                 # calculating importance score for given feature
                 row_index_end = row_index + row_count
                 y_pred_cur = y_pred[row_index:row_index_end]
                 score = eval_metric(y, y_pred_cur)
-                fi[feature] = score_baseline - score
+                fi[feature_name] = score_baseline - score
 
                 # resetting to original values for processed feature
-                X_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
+                X_raw.loc[row_index:row_index_end - 1, feature_list] = X[feature_list].values
 
                 row_index = row_index_end
         fi_dict_list.append(fi)
@@ -609,6 +639,37 @@ def compute_permutation_feature_importance(X: pd.DataFrame, y: pd.Series, predic
         logger.log(20, f'{log_prefix}\t{round(time.time() - time_start, 2)}s\t= Actual runtime (Completed {shuffle_repeats_completed} of {num_shuffle_sets} shuffle sets){log_final_suffix}')
 
     return fi_df
+
+
+def _validate_features(features: list, valid_features: list):
+    """Raises exception if features list contains invalid features or duplicate features"""
+    valid_features = set(valid_features)
+    used_features = set()
+    # validate features
+    for feature in features:
+        if isinstance(feature, tuple):
+            feature_name = feature[0]
+            feature_list = feature[1]
+            feature_list_set = set(feature_list)
+            if len(feature_list_set) != len(feature_list):
+                raise ValueError(f'Feature list contains duplicate features:\n'
+                                 f'{feature_list}')
+            for feature_in_list in feature_list:
+                if feature_in_list not in valid_features:
+                    raise ValueError(f'Feature does not exist in data: {feature_in_list}\n'
+                                     f'This feature came from the following feature set:\n'
+                                     f'{feature}\n'
+                                     f'Valid Features:\n'
+                                     f'{valid_features}')
+        else:
+            feature_name = feature
+            if feature_name not in valid_features:
+                raise ValueError(f'Feature does not exist in data: {feature_name}\n'
+                                 f'Valid Features:\n'
+                                 f'{valid_features}')
+        if feature_name in used_features:
+            raise ValueError(f'Feature is present multiple times in feature list: {feature_name}')
+        used_features.add(feature_name)
 
 
 def _compute_fi_with_stddev(fi_list_dict: dict, importance_as_list=False) -> DataFrame:

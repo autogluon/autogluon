@@ -4,7 +4,6 @@ import os
 import time
 from collections import Counter
 from statistics import mean
-from functools import reduce
 
 import numpy as np
 import pandas as pd
@@ -13,7 +12,7 @@ from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
-from ...utils.utils import generate_kfold, _compute_fi_with_stddev, extract_column
+from ...utils.utils import generate_kfold, _compute_fi_with_stddev
 
 from ..abstract.abstract_model import AbstractModel
 
@@ -286,9 +285,16 @@ class BaggedEnsembleModel(AbstractModel):
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weight=sample_weight)
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
-    # TODO: v0.1 Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
+    # TODO: Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features=None, is_oof=True, time_limit=None, silent=False, **kwargs) -> pd.DataFrame:
+    def compute_feature_importance(self,
+                                   X,
+                                   y,
+                                   features=None,
+                                   silent=False,
+                                   time_limit=None,
+                                   is_oof=False,
+                                   **kwargs) -> pd.DataFrame:
         if features is None:
             features = self.load_child(model=self.models[0]).features
         if not is_oof:

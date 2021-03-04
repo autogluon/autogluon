@@ -541,6 +541,8 @@ class AbstractLearner:
                 X, y = self.extract_label(X)
             y = self.label_cleaner.transform(y)
             X, y = self._remove_nan_label_rows(X, y)
+            if self.ignored_columns:
+                X = X.drop(columns=self.ignored_columns, errors='ignore')
 
             if feature_stage == 'original':
                 return trainer._get_feature_importance_raw(model=model, X=X, y=y, features=features, subsample_size=subsample_size, transform_func=self.transform_features, silent=silent, **kwargs)
