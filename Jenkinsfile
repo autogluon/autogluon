@@ -524,6 +524,7 @@ stage("Build Tutorials") {
         # only build for docs/torch
         shopt -s extglob
         rm -rf ./docs/tutorials/!(torch)
+        python -c "import torchvision; print(torchvision.__file__.split('__init__.py')[0])" | xargs -I {} find {} -name "*.py" -type f -print0 | xargs -0 sed -i 's,http://yann.lecun.com/exdb/mnist,https://apache-mxnet.s3-accelerate.dualstack.amazonaws.com/gluon/dataset/mnist,g'
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         ${cleanup_venv}
         """
