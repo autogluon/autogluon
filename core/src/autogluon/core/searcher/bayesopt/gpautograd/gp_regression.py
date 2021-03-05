@@ -4,7 +4,6 @@ import autograd.numpy as anp
 from typing import Optional, List
 
 from .constants import OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
-from .debug_gp_regression import DebugGPRegression
 from .gluon_blocks_helpers import encode_unwrap_parameter
 from .gp_model import GaussianProcessModel
 from .kernel import KernelFunction
@@ -56,9 +55,8 @@ class GaussianProcessRegression(GaussianProcessModel):
             initial_noise_variance: float = None,
             optimization_config: OptimizationConfig = None,
             random_seed=None, fit_reset_params: bool = True,
-            test_intermediates: Optional[dict] = None,
-            debug_writer: Optional[DebugGPRegression] = None):
-        
+            test_intermediates: Optional[dict] = None):
+
         if mean is None:
             mean = ScalarMeanFunction()
         if optimization_config is None:
@@ -71,7 +69,6 @@ class GaussianProcessRegression(GaussianProcessModel):
         self.fit_reset_params = fit_reset_params
         self.optimization_config = optimization_config
         self._test_intermediates = test_intermediates
-        self._debug_writer = debug_writer
         self.likelihood = MarginalLikelihood(
             kernel=kernel, mean=mean,
             initial_noise_variance=initial_noise_variance)
@@ -98,13 +95,7 @@ class GaussianProcessRegression(GaussianProcessModel):
 
         def executor(param_vec):
             param_converter.from_vec(param_vec)  # Assign param_dict
-            if self._debug_writer is not None:
-                self._debug_writer.store_args(
-                    self.likelihood.collect_params().values(), X, Y,
-                    self.likelihood.param_encoding_pairs())
             objective = negative_log_posterior(self.likelihood, X, Y)
-            if self._debug_writer is not None:
-                self._debug_writer.store_value(objective)
             if self.optimization_config.verbose:
                 msg_lst = ["[criterion = {}]".format(objective)]
                 for param, encoding in self.likelihood.param_encoding_pairs():
@@ -134,8 +125,6 @@ class GaussianProcessRegression(GaussianProcessModel):
         
         if self.fit_reset_params:
             self.reset_params()
-        if self._debug_writer is not None:
-            self._debug_writer.start_optimization()
         mean_function = self.likelihood.mean
         if isinstance(mean_function, ScalarMeanFunction):
             mean_function.set_mean_value(np.mean(Y))

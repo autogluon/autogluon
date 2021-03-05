@@ -9,7 +9,6 @@ from .model_factories import resource_kernel_factory
 from ..datatypes.hp_ranges_cs import HyperparameterRanges_CS
 from ..datatypes.hp_ranges import HyperparameterRanges
 from ..gpautograd.constants import OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
-from ..gpautograd.debug_gp_regression import DebugGPRegression
 from ..gpautograd.gp_regression import GaussianProcessRegression
 from ..gpautograd.kernel import Matern52
 from ..gpautograd.mean import ScalarMeanFunction
@@ -95,16 +94,10 @@ def _create_common_objects(**kwargs):
         lbfgs_maxiter=kwargs['opt_maxiter'],
         verbose=kwargs['opt_verbose'],
         n_starts=kwargs['opt_nstarts'])
-    debug_writer = None
-    if kwargs.get('opt_debug_writer', False):
-        fname_msk = kwargs.get('opt_debug_writer_fmask', 'debug_gpr_{}')
-        debug_writer = DebugGPRegression(
-            fname_msk=fname_msk, rolling_size=5)
     gpmodel = GaussianProcessRegression(
         kernel=kernel, mean=mean,
         optimization_config=optimization_config,
-        fit_reset_params=not opt_warmstart,
-        debug_writer=debug_writer)
+        fit_reset_params=not opt_warmstart)
     model_args = GPModelArgs(
         num_fantasy_samples=kwargs['num_fantasy_samples'],
         random_seed=random_seed,
