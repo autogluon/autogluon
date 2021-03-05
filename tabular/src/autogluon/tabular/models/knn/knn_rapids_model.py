@@ -1,10 +1,12 @@
 import logging
 
 from autogluon.core.constants import REGRESSION
+from autogluon.core.utils.try_import import try_import_rapids_cuml
 
 from .knn_model import KNNModel
 
 logger = logging.getLogger(__name__)
+
 
 # FIXME: Benchmarks show that CPU KNN can be trained in ~3 seconds with 0.2 second validation time for CoverType on automlbenchmark (m5.2xlarge)
 #  This is over 100 seconds validation time on CPU with rapids installed, investigate how it was so fast on CPU.
@@ -23,6 +25,7 @@ class KNNRapidsModel(KNNModel):
     pip install --pre autogluon.tabular[all]
     """
     def _get_model_type(self):
+        try_import_rapids_cuml()
         from cuml.neighbors import KNeighborsClassifier, KNeighborsRegressor
         if self.problem_type == REGRESSION:
             return KNeighborsRegressor
