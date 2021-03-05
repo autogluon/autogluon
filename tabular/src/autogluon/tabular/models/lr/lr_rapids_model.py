@@ -3,6 +3,7 @@ import logging
 import numpy as np
 
 from autogluon.core.constants import REGRESSION
+from autogluon.core.utils.try_import import try_import_rapids_cuml
 
 from .hyperparameters.parameters import get_param_baseline
 from .lr_model import LinearModel
@@ -24,6 +25,7 @@ class LinearRapidsModel(LinearModel):
     """
     def _get_model_type(self):
         penalty = self.params.get('penalty', 'L2')
+        try_import_rapids_cuml()
         from cuml.linear_model import LogisticRegression, Ridge, Lasso
         if self.problem_type == REGRESSION:
             if penalty == 'L2':
