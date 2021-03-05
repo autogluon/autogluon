@@ -11,7 +11,8 @@ __all__ = [
     'try_import_gluonnlp',
     'try_import_torch',
     'try_import_skopt',
-    'try_import_autogluon_text']
+    'try_import_autogluon_text',
+    'try_import_rapids_cuml']
 
 
 def try_import_mxboard():
@@ -155,3 +156,14 @@ def try_import_autogluon_text():
         raise ImportError("`import autogluon.text` failed.\n"
                           "A quick tip is to install via `pip install autogluon.text`.\n"
                           "Ensure that the version installed is the same as the version of the other autogluon modules seen in `pip freeze`.")
+
+
+def try_import_rapids_cuml():
+    try:
+        import cuml
+    except ImportError:
+        raise ImportError("`import cuml` failed.\n"
+                          "Ensure that you have a GPU and CUDA installation, and then install RAPIDS.\n"
+                          "You will likely need to create a fresh conda environment based off of a RAPIDS install, and then install AutoGluon on it.\n"
+                          "RAPIDS is highly experimental within AutoGluon, and we recommend to only use RAPIDS if you are an advanced user / developer.\n"
+                          "Please refer to RAPIDS install instructions for more information: https://rapids.ai/start.html#get-rapids")
