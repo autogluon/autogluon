@@ -51,7 +51,8 @@ def searcher_factory(searcher_name, **kwargs):
         Config space of train_fn, equal to train_fn.cs
     scheduler : str
         Scheduler type the searcher is used in. Supported are 'fifo'
-        (FIFOScheduler), 'hyperband' (HyperbandScheduler: type = 'stopping' or 'promotion')
+        (FIFOScheduler), 'hyperband_stopping', 'hyperband_promotion'
+        (HyperbandScheduler: type = 'stopping' or 'promotion')
     reward_attribute : str
         Name of reward attribute reported by train_fn, equal to
         reward_attr

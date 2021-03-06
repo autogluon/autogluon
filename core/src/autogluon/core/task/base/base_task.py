@@ -21,18 +21,19 @@ schedulers = {
     'local': LocalSequentialScheduler,
     'fifo': FIFOScheduler,
     'rl': RLScheduler,
-    'hyperband': HyperbandScheduler,
+    'hyperband_stopping': HyperbandScheduler,
+    'hyperband_promotion': HyperbandScheduler,
 }
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-def create_scheduler(train_fn, search_strategy, scheduler_options):
-    if isinstance(search_strategy, str):
-        scheduler_cls = schedulers[search_strategy.lower()]
+def create_scheduler(train_fn, scheduler, scheduler_options):
+    if isinstance(scheduler, str):
+        scheduler_cls = schedulers[scheduler.lower()]
     else:
-        assert callable(search_strategy)
-        scheduler_cls = search_strategy
+        assert callable(scheduler)
+        scheduler_cls = scheduler
         scheduler_options = copy.copy(scheduler_options)
     return scheduler_cls(train_fn, **scheduler_options)
 
