@@ -473,8 +473,8 @@ class TabularPredictor:
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                 Valid preset values:
-                    'auto': Uses the 'local_sequential_auto' preset.
-                    'local_sequential_auto': Performs sequential local search via bayesopt
+                    'auto': Uses the 'local' preset.
+                    'local': Performs sequential local search via bayesopt
                     'random': Performs HPO via random search.
                     'bayesopt': Performs HPO via bayesian optimization.
                 For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.

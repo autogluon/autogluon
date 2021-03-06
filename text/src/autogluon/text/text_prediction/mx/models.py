@@ -1046,7 +1046,7 @@ class MultiModalTextModel:
                 plt.show()
             self._results = local_results
         else:
-            if tune_kwargs['search_strategy'] != 'local_sequential_auto':
+            if tune_kwargs['search_strategy'] != 'local':
                 # Force forkserver if it's not using the local sequential HPO
                 force_forkserver()
             scheduler_cls = schedulers[tune_kwargs['search_strategy']]

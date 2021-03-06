@@ -116,7 +116,7 @@ class LocalSequentialScheduler(object):
         scheduler_opts = {}
         if searcher is 'auto':
             searcher = 'bayesopt'
-            scheduler_opts = {'scheduler': kwargs['scheduler']}
+            scheduler_opts = {'scheduler': 'local'}
 
         search_options = kwargs.get('search_options', None)
         if isinstance(searcher, str):
@@ -129,7 +129,7 @@ class LocalSequentialScheduler(object):
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
             if 'scheduler' not in _search_options:
-                _search_options['scheduler'] = kwargs['scheduler']
+                _search_options['scheduler'] = 'local'
             searcher = searcher_factory(searcher, **{**scheduler_opts, **_search_options})
         else:
             assert isinstance(searcher, BaseSearcher)
