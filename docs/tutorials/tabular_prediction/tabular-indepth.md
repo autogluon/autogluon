@@ -66,6 +66,7 @@ search_strategy = 'auto'  # to tune hyperparameters using Bayesian optimization 
 
 hyperparameter_tune_kwargs = {  # HPO is not performed unless hyperparameter_tune_kwargs is specified
     'num_trials': num_trials,
+    'scheduler' : 'local',
     'searcher': search_strategy,
 }
 
