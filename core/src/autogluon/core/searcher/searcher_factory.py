@@ -21,7 +21,7 @@ SEARCHER_CONFIGS = dict(
         # The searchers and their kwargs differ depending on the scheduler
         # type (fifo, hyperband_*)
         searcher_cls=lambda scheduler: GPFIFOSearcher if scheduler in ['fifo', 'local'] else GPMultiFidelitySearcher,
-        supported_schedulers={'fifo', 'hyperband', 'local'},
+        supported_schedulers={'fifo', 'hyperband_stopping', 'hyperband_promotion', 'local'},
     ),
 )
 
