@@ -64,13 +64,26 @@ X_train_norm = ln.fit_transform(X_train)
 X_test_norm = ln.transform(X_test)
 ```
 
-Initialize image transformer.
+Initialize image transformer. There are three built-in feature extraction options, 'tsne', 'pca', and 'kpca' to align with the original MatLab implementation.
 
 
 ```python
 it = ImageTransformer(feature_extractor='tsne', 
                       pixels=50, random_state=1701, 
                       n_jobs=-1)
+```
+
+Alternatively, any class instance with method `.fit_transform()` that returns a 2-dimensional array of extracted features can also be provided to the ImageTransformer class. This allows for customization of the feature extraction procedure.
+
+
+```python
+from sklearn.manifold import TSNE
+
+tsne = TSNE(n_components=2, perplexity=30, metric='cosine',
+            random_state=1701, n_jobs=-1)
+
+it = ImageTransformer(feature_extractor=tsne, pixels=50)
+
 ```
 
 Train image transformer on training data. Setting plot=True results in at 
@@ -80,20 +93,13 @@ minimum bounding rectagle (green) prior to rotation.
 
 ```python
 plt.figure(figsize=(5, 5))
-it.fit(X_train_norm, plot=True)
+_ = it.fit(X_train_norm, plot=True)
 ```
 
 
     
-![png](README_files/README_10_0.png)
+![png](README_files/README_12_0.png)
     
-
-
-
-
-
-    <pyDeepInsight.image_transformer.ImageTransformer at 0x7f7549a01220>
-
 
 
 The feature density matrix can be extracted from the trained transformer in order to view overall feature overlap.
@@ -116,7 +122,7 @@ _ = plt.title("Genes per pixel")
 
 
     
-![png](README_files/README_12_0.png)
+![png](README_files/README_14_0.png)
     
 
 
@@ -146,7 +152,7 @@ it.pixels = 50
 
 
     
-![png](README_files/README_14_0.png)
+![png](README_files/README_16_0.png)
     
 
 
@@ -179,7 +185,7 @@ plt.tight_layout()
 
 
     
-![png](README_files/README_20_0.png)
+![png](README_files/README_22_0.png)
     
 
 
@@ -199,7 +205,7 @@ plt.tight_layout()
 
 
     
-![png](README_files/README_22_0.png)
+![png](README_files/README_24_0.png)
     
 
 
