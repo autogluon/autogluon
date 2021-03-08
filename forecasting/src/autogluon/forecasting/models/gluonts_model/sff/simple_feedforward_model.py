@@ -1,6 +1,5 @@
 from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
-import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)

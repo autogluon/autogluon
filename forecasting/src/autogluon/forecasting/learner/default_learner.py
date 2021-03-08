@@ -1,14 +1,8 @@
-import copy
 import logging
-import math
 import time
-
-import pandas as pd
-from pandas import DataFrame
 
 from .abstract_learner import AbstractLearner
 from ..trainer.auto_trainer import AutoTrainer
-from autogluon.core.utils.utils import augment_rare_classes
 
 logger = logging.getLogger(__name__)
 

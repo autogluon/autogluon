@@ -1,6 +1,5 @@
 from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 from gluonts.model.seq2seq import MQCNNEstimator
-import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)

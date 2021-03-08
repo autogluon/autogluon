@@ -3,12 +3,11 @@ import logging
 
 import pandas as pd
 
-from autogluon.core.task.base import BasePredictor
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.loaders import load_pkl
-from ...learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
-from ...trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
 from autogluon.core.utils.utils import setup_outputdir
+from ...learner import AbstractLearner as Learner
+from ...trainer import AbstractTrainer
 from ...utils.dataset_utils import time_series_dataset
 
 __all__ = ['ForecastingPredictorV1']
@@ -44,16 +43,17 @@ class ForecastingPredictorV1:
         """Returns the list of model names trained in this `predictor` object."""
         return self._trainer.get_model_names_all()
 
-    def preprocessing(self, data):
+    def preprocessing(self, data, time_series_to_predict=None):
         if isinstance(data, pd.DataFrame):
             data = time_series_dataset(data,
                                        index_column=self.index_column,
                                        target_column=self.target_column,
-                                       time_column=self.time_column)
+                                       time_column=self.time_column,
+                                       chosen_ts=time_series_to_predict)
         return data
 
-    def predict(self, data, model=None, for_score=False, **kwargs):
-        processed_data = self.preprocessing(data)
+    def predict(self, data, time_series_to_predict=None, model=None, for_score=False, **kwargs):
+        processed_data = self.preprocessing(data, time_series_to_predict=time_series_to_predict)
         predict_targets = self._learner.predict(processed_data, model=model, for_score=for_score, **kwargs)
         return predict_targets
 

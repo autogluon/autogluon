@@ -59,7 +59,7 @@ if __name__ == '__main__':
     create_version_file()
     setup(
         # Metadata
-        name='autogluon.tabular',
+        name='autogluon.forecasting',
         version=version,
         author='AutoGluon Community',
         url='https://github.com/awslabs/autogluon',

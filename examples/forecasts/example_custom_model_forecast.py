@@ -1,7 +1,7 @@
 from autogluon.forecasting.models.gluonts_model.abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 from gluonts.model.deepar import DeepAREstimator
 from gluonts.mx.distribution.neg_binomial import NegativeBinomialOutput
-from autogluon.forecasting.utils.dataset_utils import train_test_split, time_series_dataset, rebuild_tabular
+from autogluon.forecasting.utils.dataset_utils import time_series_dataset
 from autogluon.forecasting.task.forecasting.forecasting import Forecasting as task
 
 

@@ -1,15 +1,15 @@
+import pandas as pd
+import logging
+from gluonts.dataset.common import Dataset, ListDataset, FileDataset
 from autogluon.core.task.base.base_task import BaseTask, schedulers, compile_scheduler_options
-from .dataset import TimeSeriesDataset
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.utils.utils import setup_outputdir
+from autogluon.core.utils.miscs import set_logger_verbosity
+from .dataset import TimeSeriesDataset
 from ...utils.dataset_utils import rebuild_tabular, train_test_split_dataframe, train_test_split_gluonts
 from ...learner import DefaultLearner as Learner
 from .predictor_legacy import ForecastingPredictorV1
 from ...trainer import AutoTrainer
-import pandas as pd
-from gluonts.dataset.common import Dataset, ListDataset, FileDataset
-from autogluon.core.utils.utils import setup_outputdir
-from autogluon.core.utils.miscs import set_logger_verbosity
-import logging
 
 __all__ = ['Forecasting']
 

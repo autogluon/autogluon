@@ -1,5 +1,4 @@
 import logging
-import pandas as pd
 
 from .abstract_trainer import AbstractTrainer
 from .model_presets.presets import get_preset_models

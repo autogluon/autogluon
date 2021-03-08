@@ -23,18 +23,22 @@ predictor = task.fit(train_data=train_data,
                      hyperparameters={
                          "MQCNN": {'context_length': ag.Int(70, 90, default=prediction_length * 4),
                                    "num_batches_per_epoch": 10,
-                                   "epochs": 5},
-                         # "DeepAR": {'context_length': ag.Int(70, 90),
-                         #            "num_batches_per_epoch": 10,
-                         #            "epochs": 50},
-                         # "SFF": {'context_length': ag.Int(70, 90),
-                         #         "num_batches_per_epoch": 10,
-                         #         "epochs": 50},
-
+                                   "epochs": 50},
+                         "DeepAR": {'context_length': ag.Int(70, 90),
+                                    "num_batches_per_epoch": 10,
+                                    "epochs": 50},
+                         "SFF": {'context_length': ag.Int(70, 90),
+                                 "num_batches_per_epoch": 10,
+                                 "epochs": 50},
+                         # "AutoTabular": {"context_length": ag.Int(10, 20),
+                         #                 "num_batches_per_epoch": 32,
+                         #                 "epochs": 5
+                         #                 }
                      },
                      search_strategy=searcher_type,
                      eval_metric=eval_metric,
-                     num_trials=5, )
+                     num_trials=1
+                     )
 # Int: [min(max(10, 2*prediction_length), 250), min(500,12*prediction_length)]
 predictor = None
 predictor = ForecastingPredictorV1.load(path)

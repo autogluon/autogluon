@@ -1,8 +1,11 @@
-from gluonts.dataset.repository.datasets import dataset_recipes
-from ..task.forecasting.dataset import TimeSeriesDataset
 import pandas as pd
-from gluonts.dataset.common import Dataset, ListDataset, FileDataset
 from copy import deepcopy
+from gluonts.dataset.repository.datasets import dataset_recipes
+from gluonts.dataset.common import Dataset, ListDataset, FileDataset
+from ..task.forecasting.dataset import TimeSeriesDataset
+
+
+
 
 
 __all__ = ['gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset', 'train_test_split_dataframe',
@@ -107,11 +110,13 @@ def train_test_split_gluonts(data, prediction_length, freq=None):
     return train_ds, test_ds
 
 
-def time_series_dataset(data, index_column=None, target_column="target", time_column="date"):
+def time_series_dataset(data, index_column=None, target_column="target", time_column="date", chosen_ts=None):
     rebuilt_data = rebuild_tabular(data,
                                    index_column=index_column,
                                    target_column=target_column,
                                    time_column=time_column)
     if index_column is None:
         index_column = "index_column"
+    if chosen_ts is not None:
+        rebuilt_data = rebuilt_data.loc[rebuilt_data[index_column].isin(chosen_ts)]
     return TimeSeriesDataset(rebuilt_data, index_column=index_column)

@@ -1,22 +1,14 @@
 import copy
 import logging
-import math
 import pprint
-import time
-
-import numpy as np
 import pandas as pd
 
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.task.base.base_task import schedulers
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
-from autogluon.core.utils.decorators import apply_presets
+from autogluon.core.utils.utils import setup_outputdir
 from autogluon.forecasting.utils.dataset_utils import rebuild_tabular, train_test_split_gluonts, \
-    train_test_split_dataframe, time_series_dataset
+    train_test_split_dataframe
 from autogluon.forecasting.task.forecasting.dataset import TimeSeriesDataset
 from ..task.forecasting.predictor_legacy import ForecastingPredictorV1
 from ..learner import AbstractLearner, DefaultLearner
@@ -24,6 +16,7 @@ from gluonts.dataset.common import FileDataset, ListDataset
 from ..trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
+
 
 class ForecastingPredictor(ForecastingPredictorV1):
     Dataset = TabularDataset
@@ -103,8 +96,7 @@ class ForecastingPredictor(ForecastingPredictorV1):
                                            time_column=time_column)
             train_data = TimeSeriesDataset(train_data, index_column=index_column)
             freq = train_data.get_freq()
-            if val_data is not None:
-                val_data = TimeSeriesDataset(val_data, index_column=index_column)
+            val_data = TimeSeriesDataset(val_data, index_column=index_column)
         elif isinstance(train_data, FileDataset) or isinstance(train_data, ListDataset):
             logger.log(30, "Training with dataset in gluon-ts format...")
             if val_data is None:
@@ -153,7 +145,8 @@ class ForecastingPredictor(ForecastingPredictorV1):
                           scheduler_options=scheduler_options,
                           hyperparameters=hyperparameters,
                           hyperparameter_tune=hyperparameter_tune,
-                          quantiles=quantiles)
+                          quantiles=quantiles,
+                          time_limits=time_limits,)
 
         self._set_post_fit_vars()
         self._post_fit(

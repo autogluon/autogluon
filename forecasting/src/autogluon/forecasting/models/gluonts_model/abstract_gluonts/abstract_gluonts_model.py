@@ -1,23 +1,25 @@
-import autogluon.core.utils.savers.save_pkl as save_pkl
-import autogluon.core.utils.loaders.load_pkl as load_pkl
-from ...abstract.abstract_model import AbstractModel
-from gluonts.evaluation.backtest import make_evaluation_predictions
-from gluonts.model.forecast import SampleForecast, QuantileForecast
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import copy
 import os
 import time
-from gluonts.evaluation import Evaluator
-from ..abstract_gluonts.model_trial import model_trial
 from tqdm import tqdm
+import logging
+
+from gluonts.model.predictor import Predictor
+from gluonts.evaluation.backtest import make_evaluation_predictions
+from gluonts.model.forecast import SampleForecast, QuantileForecast
+from gluonts.evaluation import Evaluator
+
+import autogluon.core.utils.savers.save_pkl as save_pkl
+import autogluon.core.utils.loaders.load_pkl as load_pkl
 from autogluon.core.scheduler.fifo import FIFOScheduler
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.task.base.base_predictor import BasePredictor
-from gluonts.model.predictor import Predictor
-import logging
 from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...abstract.abstract_model import AbstractModel
+from ..abstract_gluonts.model_trial import model_trial
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +146,10 @@ class AbstractGluonTSModel(AbstractModel):
 
         if not all(status):
             raise ValueError("Invalid quantile value.")
-        index = data.get_index()
+        if isinstance(data, pd.DataFrame):
+            index = data.get_index()
+        else:
+            index = [i["item_id"] for i in data]
         for i in range(len(index)):
             tmp_dict = {}
             for quantile in quantiles:
@@ -183,7 +188,7 @@ class AbstractGluonTSModel(AbstractModel):
         agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[metric]
 
-    def hyperparameter_tune(self, train_data, val_data, scheduler_options, **kwargs):
+    def hyperparameter_tune(self, train_data, val_data, scheduler_options, time_limit=None, **kwargs):
         time_start = time.time()
         logger.log(30, f"Start hyperparameter tuning for {self.name}")
         params_copy = self.params.copy()
@@ -197,23 +202,22 @@ class AbstractGluonTSModel(AbstractModel):
         dataset_val_filename = 'dataset_val.p'
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=val_data)
-        scheduler_func, scheduler_options = scheduler_options
-
+        scheduler_func, scheduler_params = scheduler_options
         util_args = dict(
             train_data_path=dataset_train_filename,
             val_data_path=dataset_val_filename,
             directory=directory,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_options["time_out"]
+            time_limit=scheduler_params["time_out"]
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)
-        scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_options)
+        scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_params)
         scheduler.run()
         scheduler.join_jobs()
         self.best_configs.update(scheduler.get_best_config())
-        return self._get_hpo_results(scheduler, scheduler_options, time_start)
+        return self._get_hpo_results(scheduler, scheduler_params, time_start)
 
     def _get_hpo_results(self, scheduler, scheduler_options, time_start):
         # Store results / models from this HPO run:

@@ -4,7 +4,7 @@ import logging
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core import args
-
+from ....utils.metric_utils import metric_coefficient
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +25,7 @@ def model_trial(args, reporter):
         reporter.terminate()
     else:
         # TODO: specify whether score is lower is better
-        reporter(epoch=1, validation_performance=-model.val_score)
+        reporter(epoch=1, validation_performance=model.val_score * metric_coefficient[eval_metric])
 
 
 def prepare_inputs(args):
@@ -53,7 +53,7 @@ def fit_and_save_model(model, params, train_data, val_data, eval_metric, time_st
     model.fit(train_data, time_limit=time_left)
     time_fit_end = time.time()
     logger.log(30, f"Evaluating model {model.name} with metric {eval_metric} on validation data...")
-    model.val_score = -model.score(val_data, eval_metric)
+    model.val_score = model.score(val_data, eval_metric) * metric_coefficient[eval_metric]
     logger.log(30, f"Validation score for model {model.name} is {model.val_score}")
     model.fit_time = time_fit_end - time_fit_start
     model.save()

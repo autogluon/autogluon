@@ -1,14 +1,13 @@
 import time
 import copy
-from ..models.gluonts_model.abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
+import pandas as pd
 import logging
+import os
+from gluonts.evaluation import Evaluator
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
-from collections import defaultdict
-import pandas as pd
-from gluonts.evaluation import Evaluator
-from gluonts.evaluation.backtest import make_evaluation_predictions
-import os
+from ..models.gluonts_model.abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
+
 
 logger = logging.getLogger(__name__)
 
