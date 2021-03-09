@@ -14,14 +14,15 @@ MODEL_TYPES = dict(
     MQCNN=MQCNNModel,
     SFF=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
-    AutoTabular=AutoTabularModel,
+    # AutoTabular=AutoTabularModel,
 )
 
+# disable AutoTabular until its saving issue is fixed.
 DEFAULT_MODEL_NAMES = {
     MQCNNModel: "MQCNN",
     SimpleFeedForwardModel: "SFF",
     DeepARModel: "DeepAR",
-    AutoTabularModel: "AutoTabular",
+    # AutoTabularModel: "AutoTabular",
 }
 
 DEFAULT_MODEL_PRIORITY = dict(
@@ -36,7 +37,7 @@ DEFAULT_MODEL_HPS = {
         "MQCNN": {},
         "SFF": {},
         "DeepAR": {},
-        "AutoTabular": {}
+        # "AutoTabular": {}
     }
 }
 
