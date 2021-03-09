@@ -117,7 +117,7 @@ class ForecastingPredictor(ForecastingPredictorV1):
                     '`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize '
                     '`refit_full`.')
 
-        set_best_to_refit_full = kwargs.get('set_best_to_refit_full', False)
+        set_best_to_refit_full = kwargs['set_best_to_refit_full']
         if set_best_to_refit_full and not refit_full:
             raise ValueError(
                 '`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to '
@@ -169,8 +169,8 @@ class ForecastingPredictor(ForecastingPredictorV1):
     def _validate_fit_kwargs(self, kwargs):
         kwargs_default = {
             "hyperparameter_tune": False,
-            "set_best_to_refit_full": True,
-            "keep_only_best": True,
+            "set_best_to_refit_full": False,
+            "keep_only_best": False,
             "refit_full": False,
             "save_data": True,
             "freq": None,
