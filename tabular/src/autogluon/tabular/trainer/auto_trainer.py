@@ -19,12 +19,14 @@ class AutoTrainer(AbstractTrainer):
         problem_type = kwargs.pop('problem_type', self.problem_type)
         eval_metric = kwargs.pop('eval_metric', self.eval_metric)
         num_classes = kwargs.pop('num_classes', self.num_classes)
+        quantile_levels = kwargs.pop('quantile_levels', self.quantile_levels)
         invalid_model_names = kwargs.pop('invalid_model_names', self._get_banned_model_names())
         feature_metadata = kwargs.pop('feature_metadata', self.feature_metadata)
         silent = kwargs.pop('silent', self.verbosity < 3)
 
         return get_preset_models(path=path, problem_type=problem_type, eval_metric=eval_metric,
-                                 num_classes=num_classes, hyperparameters=hyperparameters, invalid_model_names=invalid_model_names,
+                                 num_classes=num_classes, quantile_levels=quantile_levels,
+                                 hyperparameters=hyperparameters, invalid_model_names=invalid_model_names,
                                  feature_metadata=feature_metadata, silent=silent, **kwargs)
 
     def fit(self, X, y, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, **kwargs):
@@ -59,6 +61,8 @@ class AutoTrainer(AbstractTrainer):
         invalid_model_names = kwargs.pop('invalid_model_names', self._get_banned_model_names())
         feature_metadata = kwargs.pop('feature_metadata', self.feature_metadata)
         silent = kwargs.pop('silent', self.verbosity < 3)
+
+        # TODO: QUANTILE VERSION?
 
         return get_preset_models_distillation(
             path=path,

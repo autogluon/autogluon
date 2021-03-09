@@ -13,7 +13,7 @@ import pandas as pd
 
 from .model_trial import model_trial
 from ... import metrics, Space
-from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
@@ -60,6 +60,8 @@ class AbstractModel:
             'precision_weighted', 'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score']
         Options for regression:
             ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2']
+        Options for quantile regression:
+            ['pinball_loss']
         For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
 
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
@@ -83,6 +85,7 @@ class AbstractModel:
                  hyperparameters=None,
                  feature_metadata: FeatureMetadata = None,
                  num_classes=None,
+                 quantile_levels=None,
                  stopping_metric=None,
                  features=None,
                  **kwargs):
@@ -91,6 +94,7 @@ class AbstractModel:
         self.path_root = path
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
         self.num_classes = num_classes
+        self.quantile_levels = quantile_levels
         self.model = None
         self.problem_type = problem_type
         if eval_metric is not None:
@@ -466,6 +470,8 @@ class AbstractModel:
 
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
+        elif self.problem_type == QUANTILE:
+            return self.model.predict(X)
 
         y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
@@ -492,20 +498,25 @@ class AbstractModel:
     def score(self, X, y, metric=None, sample_weight=None, **kwargs):
         if metric is None:
             metric = self.eval_metric
+
         if metric.needs_pred:
+            y_pred = self.predict(X=X, **kwargs)
+        elif metric.needs_quantile:
             y_pred = self.predict(X=X, **kwargs)
         else:
             y_pred = self.predict_proba(X=X, **kwargs)
-        return compute_weighted_metric(y, y_pred, metric, sample_weight)
+        return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
 
     def score_with_y_pred_proba(self, y, y_pred_proba, metric=None, sample_weight=None):
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+        elif metric.needs_quantile:
+            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             y_pred = y_pred_proba
-        return compute_weighted_metric(y, y_pred, metric, sample_weight)
+        return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
 
     def save(self, path: str = None, verbose=True) -> str:
         """
@@ -849,6 +860,7 @@ class AbstractModel:
             'stopping_metric': self.stopping_metric.name,
             'fit_time': self.fit_time,
             'num_classes': self.num_classes,
+            'quantile_levels': self.quantile_levels,
             'predict_time': self.predict_time,
             'val_score': self.val_score,
             'hyperparameters': self.params,

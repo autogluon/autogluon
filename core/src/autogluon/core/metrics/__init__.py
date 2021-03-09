@@ -8,7 +8,7 @@ import sklearn.metrics
 
 from . import classification_metrics
 from .util import sanitize_array
-from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
+from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION, QUANTILE
 from ..utils.miscs import warning_filter
 from .classification_metrics import *
 
@@ -72,6 +72,11 @@ class Scorer(object, metaclass=ABCMeta):
     def needs_threshold(self) -> bool:
         raise NotImplementedError
 
+    @property
+    @abstractmethod
+    def needs_quantile(self) -> bool:
+        raise NotImplementedError
+
 
 class _PredictScorer(Scorer):
     def __call__(self, y_true, y_pred, sample_weight=None):
@@ -130,6 +135,10 @@ class _PredictScorer(Scorer):
     def needs_threshold(self):
         return False
 
+    @property
+    def needs_quantile(self):
+        return False
+
 
 class _ProbaScorer(Scorer):
     def __call__(self, y_true, y_pred, sample_weight=None):
@@ -168,6 +177,10 @@ class _ProbaScorer(Scorer):
 
     @property
     def needs_threshold(self):
+        return False
+
+    @property
+    def needs_quantile(self):
         return False
 
 
@@ -225,9 +238,77 @@ class _ThresholdScorer(Scorer):
     def needs_threshold(self):
         return True
 
+    @property
+    def needs_quantile(self):
+        return False
+
+
+class _QuantileScorer(Scorer):
+    def __call__(self, y_true, y_pred, quantile_levels, sample_weight=None):
+        """Evaluate predicted quantile target values for X relative to y_true.
+
+        Parameters
+        ----------
+        y_true : array-like
+            Gold standard target values for X.
+
+        y_pred : array-like, [n_samples x n_quantiles]
+            Model quantile predictions
+
+        quantile_levels : array-like
+            List of quantile levels
+
+        sample_weight : array-like, optional (default=None)
+            Sample weights.
+
+        Returns
+        -------
+        score : float
+            Score function applied to prediction of estimator on X.
+        """
+
+        if isinstance(y_true, list):
+            y_true = np.array(y_true)
+        if isinstance(y_pred, list):
+            y_pred = np.array(y_pred)
+        if isinstance(quantile_levels, list):
+            quantile_levels = np.array(quantile_levels)
+        type_true = type_of_target(y_true)
+
+        if len(y_pred.shape) == 2 or y_pred.shape[1] >= 1 or type_true == 'continuous':
+            pass  # must be quantile regression, all other task types would return at least two probabilities
+        else:
+            raise ValueError(type_true)
+
+        if sample_weight is not None:
+            return self._sign * self._score_func(y_true, y_pred,
+                                                 quantile_levels,
+                                                 sample_weight=sample_weight,
+                                                 **self._kwargs)
+        else:
+            return self._sign * self._score_func(y_true, y_pred,
+                                                 quantile_levels,
+                                                 **self._kwargs)
+
+    @property
+    def needs_pred(self):
+        return False
+
+    @property
+    def needs_proba(self):
+        return False
+
+    @property
+    def needs_threshold(self):
+        return False
+
+    @property
+    def needs_quantile(self):
+        return True
+
 
 def make_scorer(name, score_func, optimum=1, greater_is_better=True,
-                needs_proba=False, needs_threshold=False, **kwargs) -> Scorer:
+                needs_proba=False, needs_threshold=False, needs_quantile=False, **kwargs) -> Scorer:
     """Make a scorer from a performance metric or loss function.
 
     Factory inspired by scikit-learn which wraps scikit-learn scoring functions
@@ -256,6 +337,10 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
         Whether score_func takes a continuous decision certainty.
         This only works for binary classification.
 
+    needs_quantile : boolean, default=False
+        Whether score_func is based on quantile predictions.
+        This only works for quantile regression.
+
     **kwargs : additional arguments
         Additional parameters to be passed to score_func.
 
@@ -269,6 +354,8 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
         cls = _ProbaScorer
     elif needs_threshold:
         cls = _ThresholdScorer
+    elif needs_quantile:
+        cls = _QuantileScorer
     else:
         cls = _PredictScorer
     return cls(name, score_func, optimum, sign, kwargs)
@@ -440,7 +527,7 @@ for name, metric in [('precision', sklearn.metrics.precision_score),
 def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
-    all_available_metric_names = list(CLASSIFICATION_METRICS.keys()) + list(REGRESSION_METRICS.keys()) + ['soft_log_loss']
+    all_available_metric_names = list(CLASSIFICATION_METRICS.keys()) + list(REGRESSION_METRICS.keys()) + ['soft_log_loss', 'pinball_loss']
     if metric is not None and isinstance(metric, str):
         if metric in CLASSIFICATION_METRICS:
             if problem_type is not None and problem_type not in PROBLEM_TYPES_CLASSIFICATION:
@@ -454,6 +541,11 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
             # Requires mxnet
             from .softclass_metrics import soft_log_loss
             return soft_log_loss
+        elif metric == 'pinball_loss':
+            if problem_type is not None and problem_type is not QUANTILE:
+                raise ValueError(f"{metric_type}={metric} can only be used for quantile problems")
+            from .quantile_metrics import pinball_loss
+            return pinball_loss
         else:
             raise ValueError(
                 f"{metric} is an unknown metric, all available metrics are "

@@ -17,7 +17,7 @@ from pandas import DataFrame, Series
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
 from sklearn.model_selection import train_test_split
 
-from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS
+from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
 from ..metrics import accuracy, root_mean_squared_error, Scorer
 from ..features.infer_types import get_type_map_raw
 from ..features.types import R_INT, R_FLOAT, R_CATEGORY
@@ -239,6 +239,8 @@ def get_pred_from_proba_df(y_pred_proba, problem_type=BINARY):
     """From input DataFrame of pred_proba, return Series of pred"""
     if problem_type == REGRESSION:
         y_pred = y_pred_proba
+    elif problem_type == QUANTILE:
+        y_pred = y_pred_proba
     else:
         y_pred = y_pred_proba.idxmax(axis=1)
     return y_pred
@@ -249,6 +251,8 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
         y_pred = [1 if pred >= 0.5 else 0 for pred in y_pred_proba]
     elif problem_type == REGRESSION:
         y_pred = y_pred_proba
+    elif problem_type == QUANTILE:
+        y_pred = y_pred_proba
     else:
         y_pred = np.argmax(y_pred_proba, axis=1)
     return y_pred
@@ -258,7 +262,7 @@ def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_s
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
 
-    if problem_type in [REGRESSION, SOFTCLASS]:
+    if problem_type in [REGRESSION, QUANTILE, SOFTCLASS]:
         stratify = None
     else:
         stratify = y
@@ -378,6 +382,9 @@ def infer_eval_metric(problem_type: str) -> Scorer:
         return accuracy
     elif problem_type == MULTICLASS:
         return accuracy
+    elif problem_type == QUANTILE:
+        from autogluon.core.metrics.quantile_metrics import pinball_loss
+        return pinball_loss
     else:
         return root_mean_squared_error
 
@@ -391,21 +398,36 @@ def extract_column(X, col_name):
     return X, w
 
 
-def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None):
+def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, **kwargs):
     """ Report weighted metric if: weights is not None, weight_evaluation=True, and the given metric supports sample weights.
         If weight_evaluation=None, it will be set to False if weights=None, True otherwise.
     """
+    quantile_levels = None
+    if metric.needs_quantile:
+        quantile_levels = kwargs.pop('quantile_levels', None)
+        if quantile_levels is None:
+            raise ValueError("eval_metric='{metric.name}' requires a list of quantile levels predicting")
+
     if weight_evaluation is None:
         weight_evaluation = not (weights is None)
     if weight_evaluation and weights is None:
         raise ValueError("Sample weights cannot be None when weight_evaluation=True.")
     if not weight_evaluation:
-        return metric(y, y_pred)
+        if quantile_levels is not None:
+            return metric(y, y_pred, quantile_levels=quantile_levels)
+        else:
+            return metric(y, y_pred)
     try:
-        weighted_metric = metric(y, y_pred, sample_weight=weights)
+        if quantile_levels is not None:
+            weighted_metric = metric(y, y_pred, quantile_levels=quantile_levels, sample_weight=weights)
+        else:
+            weighted_metric = metric(y, y_pred, sample_weight=weights)
     except (ValueError, TypeError, KeyError):
         logger.log(30, f"WARNING: eval_metric='{metric.name}' does not support sample weights so they will be ignored in reported metric.")
-        weighted_metric = metric(y, y_pred)
+        if quantile_levels is not None:
+            weighted_metric = metric(y, y_pred, quantile_levels=quantile_levels)
+        else:
+            weighted_metric = metric(y, y_pred)
     return weighted_metric
 
 
