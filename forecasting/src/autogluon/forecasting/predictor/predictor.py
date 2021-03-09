@@ -37,6 +37,7 @@ class ForecastingPredictor(ForecastingPredictorV1):
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
 
+        self.eval_metric = eval_metric
         self._learner: AbstractLearner = learner_type(path_context=path, eval_metric=eval_metric, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None

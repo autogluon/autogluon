@@ -20,6 +20,8 @@ predictor = ForecastingPredictor(path=path, eval_metric=eval_metric).fit(train_d
                                                                          hyperparameter_tune=True,
                                                                          quantiles=[0.1, 0.5, 0.9],
                                                                          refit_full=True,
+                                                                         keep_only_best=True,
+                                                                         set_best_to_refit_full=True,
                                                                          search_strategy=searcher_type,
                                                                          hyperparameters={
                                                                              "MQCNN": {
