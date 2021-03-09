@@ -1,6 +1,6 @@
 """ Default (fixed) hyperparameter values used in Gradient Boosting model. """
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 
 DEFAULT_NUM_BOOST_ROUND = 10000  # default for single training run
 
@@ -12,6 +12,8 @@ def get_param_baseline_custom(problem_type, num_classes=None):
         return get_param_multiclass_baseline_custom(num_classes=num_classes)
     elif problem_type == REGRESSION:
         return get_param_regression_baseline_custom()
+    elif problem_type == QUANTILE:
+        return get_param_quantile_baseline_custom()
     elif problem_type == SOFTCLASS:
         return get_param_softclass_baseline_custom(num_classes=num_classes)
     else:
@@ -25,6 +27,8 @@ def get_param_baseline(problem_type, num_classes=None):
         return get_param_multiclass_baseline(num_classes=num_classes)
     elif problem_type == REGRESSION:
         return get_param_regression_baseline()
+    elif problem_type == QUANTILE:
+        return get_param_quantile_baseline()
     elif problem_type == SOFTCLASS:
         return get_param_softclass_baseline(num_classes=num_classes)
     else:
@@ -148,4 +152,36 @@ def get_param_softclass_baseline(num_classes):
 def get_param_softclass_baseline_custom(num_classes):
     params = get_param_multiclass_baseline_custom(num_classes)
     params.pop('metric', None)
+    return params.copy()
+
+
+def get_param_quantile_baseline():
+    params = {
+        'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
+        'num_threads': -1,
+        'learning_rate': 0.05,
+        'objective': 'quantile',
+        'metric': 'quantile',
+        'verbose': -1,
+        'boosting_type': 'gbdt',
+        'two_round': True,
+    }
+    return params
+
+
+def get_param_quantile_baseline_custom():
+    params = {
+        'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
+        'num_threads': -1,
+        'objective': 'quantile',
+        'metric': 'quantile',
+        'verbose': -1,
+        'boosting_type': 'gbdt',
+        'learning_rate': 0.03,
+        'num_leaves': 128,
+        'feature_fraction': 0.9,
+        'min_data_in_leaf': 5,
+        'two_round': True,
+        'seed_value': 0,
+    }
     return params.copy()

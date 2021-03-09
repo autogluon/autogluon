@@ -5,6 +5,7 @@ import math
 import pprint
 import time
 from typing import Union
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,7 @@ import networkx as nx
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
@@ -53,14 +54,14 @@ class TabularPredictor:
     label : str
         Name of the column that contains the target variable to predict.
     problem_type : str, default = None
-        Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
+        Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression', 'quantile').
         If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
     eval_metric : function or str, default = None
         Metric by which predictions will be ultimately evaluated on test data.
         AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data.
 
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-        Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
+        Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression, and 'pinball_loss' for quantile.
 
         Otherwise, options for classification:
             ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
@@ -204,6 +205,10 @@ class TabularPredictor:
     @property
     def class_labels_internal_map(self):
         return self._learner.label_cleaner.inv_map
+
+    @property
+    def quantile_levels(self):
+        return self._learner.quantile_levels
 
     @property
     def eval_metric(self):
@@ -639,6 +644,15 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
+
+        quantile_levels = kwargs.get('quantile_levels', None)
+        if isinstance(quantile_levels, float):
+            quantile_levels = [quantile_levels]
+        if isinstance(quantile_levels, Iterable):
+            quantile_levels = np.sort(np.array(quantile_levels))
+        self._learner.quantile_levels = quantile_levels
+        if quantile_levels is not None and self._learner.problem_type is None:
+            self._learner.problem_type = QUANTILE
 
         if ag_args is None:
             ag_args = {}
@@ -1089,7 +1103,9 @@ class TabularPredictor:
             'num_bag_folds': self._trainer.k_fold,
             'max_stack_level': self._trainer.get_max_level(),
         }
-        if self.problem_type != REGRESSION:
+        if self.problem_type == QUANTILE:
+            results['num_quantiles'] = len(self._trainer.quantile_list)
+        elif self.problem_type != REGRESSION:
             results['num_classes'] = self._trainer.num_classes
         # if hpo_used:
         #     results['hpo_results'] = self._trainer.hpo_results
@@ -1687,6 +1703,8 @@ class TabularPredictor:
 
         if self.problem_type == MULTICLASS and self._learner.label_cleaner.problem_type_transform == MULTICLASS:
             y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
+        elif self.problem_type == QUANTILE:
+            y_pred_proba_oof_transformed.columns = self._learner.quantile_levels
         else:
             y_pred_proba_oof_transformed.columns = [self.label]
             y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label]
@@ -2191,6 +2209,9 @@ class TabularPredictor:
 
             # private
             _save_bag_folds=None,
+
+            # quantile levels
+            quantile_levels=None,
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())

@@ -21,6 +21,7 @@ class EnsembleSelection:
             bagging: bool = False,
             tie_breaker: str = 'random',
             random_state: np.random.RandomState = None,
+            **kwargs,
     ):
         self.ensemble_size = ensemble_size
         self.problem_type = problem_type
@@ -35,6 +36,7 @@ class EnsembleSelection:
             self.random_state = random_state
         else:
             self.random_state = np.random.RandomState(seed=0)
+        self.quantile_levels = kwargs.get('quantile_levels', None)
 
     def fit(self, predictions, labels, time_limit=None, identifiers=None, sample_weight=None):
         self.ensemble_size = int(self.ensemble_size)
@@ -145,9 +147,11 @@ class EnsembleSelection:
     def _calculate_regret(self, y_true, y_pred_proba, metric, sample_weight=None):
         if metric.needs_pred:
             preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+        elif metric.needs_quantile:
+            preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             preds = y_pred_proba
-        score = compute_weighted_metric(y_true, preds, metric, sample_weight)
+        score = compute_weighted_metric(y_true, preds, metric, sample_weight, quantile_levels=self.quantile_levels)
         return metric._optimum - score
 
     def _calculate_weights(self):

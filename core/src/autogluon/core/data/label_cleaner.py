@@ -5,7 +5,7 @@ from typing import Union
 import numpy as np
 from pandas import DataFrame, Series
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 
 from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df
 
@@ -37,6 +37,8 @@ class LabelCleaner:
                 return LabelCleanerMulticlass(y, y_uncleaned)
         elif problem_type == REGRESSION:
             return LabelCleanerDummy(problem_type=problem_type)
+        elif problem_type == QUANTILE:
+            return LabelCleanerDummy(problem_type=problem_type)
         else:
             raise NotImplementedError
 
@@ -67,6 +69,7 @@ class LabelCleaner:
         elif isinstance(y, Series) and y.dtype.name == 'category':
             y = y.astype('object')
         return y
+
 
 class LabelCleanerMulticlass(LabelCleaner):
     def __init__(self, y: Series, y_uncleaned: Series):
@@ -254,8 +257,8 @@ class LabelCleanerDummy(LabelCleaner):
     def __init__(self, problem_type=REGRESSION):
         self.problem_type_transform = problem_type
 
-    def _transform(self, y: Series) -> Series:
+    def _transform(self, y: Union[Series, DataFrame]) -> Union[Series, DataFrame]:
         return y
 
-    def _inverse_transform(self, y: Series) -> Series:
+    def _inverse_transform(self, y: Union[Series, DataFrame]) -> Union[Series, DataFrame]:
         return y
