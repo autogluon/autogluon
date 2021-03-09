@@ -167,7 +167,7 @@ def compile_scheduler_options(
 # TODO: Migrate TextPredictor to use this version, delete old version
 def compile_scheduler_options_v2(
         scheduler_options, nthreads_per_trial,
-        ngpus_per_trial, num_trials, time_out, search_strategy=None, search_options=None, checkpoint=None, resume=False, visualizer=None,
+        ngpus_per_trial, num_trials, time_out, scheduler=None, search_strategy=None, search_options=None, checkpoint=None, resume=False, visualizer=None,
         time_attr=None, reward_attr=None, dist_ip_addrs=None, epochs=None):
     """
     Updates a copy of scheduler_options (scheduler-specific options, can be
@@ -181,6 +181,7 @@ def compile_scheduler_options_v2(
     epochs.
 
     :param scheduler_options:
+    :param scheduler:
     :param search_strategy:
     :param search_options:
     :param nthreads_per_trial:
@@ -207,6 +208,8 @@ def compile_scheduler_options_v2(
         dist_ip_addrs = []
     if search_strategy is None:
         search_strategy = 'random'
+    if scheduler is None:
+        scheduler = 'local'
     assert isinstance(search_strategy, str)
     if search_options is None:
         search_options = dict()
@@ -219,6 +222,7 @@ def compile_scheduler_options_v2(
     scheduler_params = {
         'resource': {
             'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
+        'scheduler': scheduler,
         'searcher': search_strategy,
         'search_options': search_options,
         'checkpoint': checkpoint,
@@ -250,6 +254,7 @@ def compile_scheduler_options_v2(
             scheduler_params['max_t'] = epochs
     required_options = [
         'resource',
+        'scheduler',
         'searcher',
         'search_options',
         'checkpoint',
