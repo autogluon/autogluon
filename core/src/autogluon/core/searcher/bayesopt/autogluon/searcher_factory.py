@@ -169,7 +169,7 @@ def gp_multifidelity_searcher_factory(**kwargs) -> GPMultiFidelitySearcher:
     :return: GPMultiFidelitySearcher object
 
     """
-    supp_schedulers = {'hyperband_stopping', 'hyperband_promotion', 'local'}
+    supp_schedulers = {'hyperband_stopping', 'hyperband_promotion'}
     assert kwargs['scheduler'] in supp_schedulers, \
         "This factory needs scheduler in {} (instead of '{}')".format(
             supp_schedulers, kwargs['scheduler'])
