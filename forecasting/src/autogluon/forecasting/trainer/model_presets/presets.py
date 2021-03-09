@@ -1,7 +1,7 @@
 from ...models.gluonts_model.mqcnn.mqcnn_model import MQCNNModel
 from ...models.gluonts_model.sff.simple_feedforward_model import SimpleFeedForwardModel
 from ...models.gluonts_model.deepar.deepar_model import DeepARModel
-from ...models.gluonts_model.auto_tabular.auto_tabular_model import AutoTabularModel
+# from ...models.gluonts_model.auto_tabular.auto_tabular_model import AutoTabularModel  # TODO: this module is missing in this branch
 from ...models.abstract.abstract_model import AbstractModel
 import copy
 import inspect
