@@ -340,8 +340,8 @@ class ImagePredictor(object):
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
                     infer_classes = list(map(str, data.label.unique().tolist()))
                     logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
-                    instruction = 'ImagePredictor.Dataset(train_data, classes=["0", "1", "2"])'
-                    logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly e.g. {instruction}')
+                    instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["0", "1", "2"])'
+                    logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
                     data = _ImageClassification.Dataset(data, classes=infer_classes)
                 else:
                     err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
@@ -349,6 +349,12 @@ class ImagePredictor(object):
                               'You may visit `https://auto.gluon.ai/stable/tutorials/image_prediction/dataset.html` ' + \
                               'for details.'
                     raise AttributeError(err_msg)
+        if len(data) < 1:
+            raise ValueError('Empty dataset.')
+        # check image relative/abs path is valid
+        sample = data.iloc[0]['image']
+        if not os.path.isfile(sample):
+            raise OSError(f'Detected invalid image path {sample}, please ensure all image paths are absolute or you are using the right working directory.')
         return data
 
     def _validate_kwargs(self, kwargs):
