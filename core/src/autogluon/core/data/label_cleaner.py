@@ -35,9 +35,7 @@ class LabelCleaner:
                 return LabelCleanerMulticlassToBinary(y, y_uncleaned)
             else:
                 return LabelCleanerMulticlass(y, y_uncleaned)
-        elif problem_type == REGRESSION:
-            return LabelCleanerDummy(problem_type=problem_type)
-        elif problem_type == QUANTILE:
+        elif problem_type in [REGRESSION, QUANTILE]:
             return LabelCleanerDummy(problem_type=problem_type)
         else:
             raise NotImplementedError

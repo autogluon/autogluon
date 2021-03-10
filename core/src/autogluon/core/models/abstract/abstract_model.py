@@ -468,9 +468,7 @@ class AbstractModel:
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
 
-        if self.problem_type == REGRESSION:
-            return self.model.predict(X)
-        elif self.problem_type == QUANTILE:
+        if self.problem_type in [REGRESSION, QUANTILE]:
             return self.model.predict(X)
 
         y_pred_proba = self.model.predict_proba(X)
@@ -499,9 +497,7 @@ class AbstractModel:
         if metric is None:
             metric = self.eval_metric
 
-        if metric.needs_pred:
-            y_pred = self.predict(X=X, **kwargs)
-        elif metric.needs_quantile:
+        if metric.needs_pred or metric.needs_quantile:
             y_pred = self.predict(X=X, **kwargs)
         else:
             y_pred = self.predict_proba(X=X, **kwargs)
@@ -511,8 +507,6 @@ class AbstractModel:
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
-            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-        elif metric.needs_quantile:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             y_pred = y_pred_proba

@@ -14,9 +14,7 @@ class Cleaner:
             return CleanerDummy()
         elif problem_type == MULTICLASS:
             return CleanerMulticlass(label=label, threshold=threshold)
-        elif problem_type == REGRESSION:
-            return CleanerDummy()
-        elif problem_type == QUANTILE:
+        elif problem_type in [REGRESSION, QUANTILE]:
             return CleanerDummy()
         else:
             raise NotImplementedError

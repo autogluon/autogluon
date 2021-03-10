@@ -542,7 +542,7 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
             from .softclass_metrics import soft_log_loss
             return soft_log_loss
         elif metric == 'pinball_loss':
-            if problem_type is not None and problem_type is not QUANTILE:
+            if problem_type is not None and problem_type != QUANTILE:
                 raise ValueError(f"{metric_type}={metric} can only be used for quantile problems")
             from .quantile_metrics import pinball_loss
             return pinball_loss

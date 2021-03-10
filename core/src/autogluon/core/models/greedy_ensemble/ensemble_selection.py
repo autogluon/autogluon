@@ -145,9 +145,7 @@ class EnsembleSelection:
         logger.debug("Ensemble indices: "+str(self.indices_))
 
     def _calculate_regret(self, y_true, y_pred_proba, metric, sample_weight=None):
-        if metric.needs_pred:
-            preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-        elif metric.needs_quantile:
+        if metric.needs_pred or metric.needs_quantile:
             preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             preds = y_pred_proba

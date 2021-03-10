@@ -52,7 +52,7 @@ class AbstractTrainer:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
         logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
-        if not self.eval_metric.needs_pred:
+        if not (self.eval_metric.needs_pred or self.eval_metric.needs_quantile):
             logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "\tTo change this, specify the eval_metric argument of fit()")
@@ -415,9 +415,7 @@ class AbstractTrainer:
         return X
 
     def score(self, X, y, model=None, weights=None) -> float:
-        if self.eval_metric.needs_quantile:
-            y_pred = self.predict(X=X, model=model)
-        elif self.eval_metric.needs_pred:
+        if self.eval_metric.needs_pred or self.eval_metric.needs_quantile:
             y_pred = self.predict(X=X, model=model)
         else:
             y_pred = self.predict_proba(X=X, model=model)
@@ -425,9 +423,7 @@ class AbstractTrainer:
                                        quantile_levels=self.quantile_levels)
 
     def score_with_y_pred_proba(self, y, y_pred_proba, weights=None) -> float:
-        if self.eval_metric.needs_quantile:
-            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-        elif self.eval_metric.needs_pred:
+        if self.eval_metric.needs_pred or self.eval_metric.needs_quantile:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             y_pred = y_pred_proba
@@ -1054,7 +1050,6 @@ class AbstractTrainer:
         model_fit_kwargs = dict(
             time_limit=time_limit,
             verbosity=self.verbosity,
-            quantile_levels=self.quantile_levels,
         )
         if self.sample_weight is not None:
             X, w_train = extract_column(X, self.sample_weight)
