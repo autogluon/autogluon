@@ -261,6 +261,11 @@ class ImagePredictor(object):
             else:
                 valid_names = '\n'.join(names)
                 raise ValueError(f'`tuning_data` {tuning_data} is not among valid list {valid_names}')
+
+        # data sanity check
+        train_data = self._validate_data(train_data)
+        tuning_data = self._validate_data(tuning_data)
+
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
             self._classifier._logger.setLevel(log_level)
@@ -325,6 +330,22 @@ class ImagePredictor(object):
         if hasattr(task, 'fit_history'):
             self._fit_summary['fit_history'] = task.fit_history()
         return self
+
+    def _validate_data(self, data):
+        """Check whether data is valid, try to convert with best effort if not"""
+        if not (hasattr(data, 'classes') and hasattr(data, 'to_mxnet')):
+            if isinstance(data, pd.DataFrame):
+                # raw dataframe, try to add metadata automatically
+                if 'label' in data.columns and 'image' in data.columns:
+                    logger.log(20, f'Converting raw DataFrame to ImagePredictor.Dataset...')
+                    data = _ImageClassification.Dataset(data, list(map(str, classes=data.label.unique().tolist())))
+                else:
+                    err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
+                              '`image` and `label` columns are required.' + \
+                              'You may visit `https://auto.gluon.ai/stable/tutorials/image_prediction/dataset.html` ' + \
+                              'for details.'
+                    raise AttributeError(err_msg)
+        return data
 
     def _validate_kwargs(self, kwargs):
         """validate and initialize default kwargs"""
