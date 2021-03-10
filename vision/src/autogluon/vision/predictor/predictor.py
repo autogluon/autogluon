@@ -264,7 +264,8 @@ class ImagePredictor(object):
 
         # data sanity check
         train_data = self._validate_data(train_data)
-        tuning_data = self._validate_data(tuning_data)
+        if tuning_data is not None:
+            tuning_data = self._validate_data(tuning_data)
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
@@ -340,7 +341,7 @@ class ImagePredictor(object):
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
                     infer_classes = list(map(str, data.label.unique().tolist()))
                     logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
-                    instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["0", "1", "2"])'
+                    instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
                     data = _ImageClassification.Dataset(data, classes=infer_classes)
                 else:
@@ -354,7 +355,7 @@ class ImagePredictor(object):
         # check image relative/abs path is valid
         sample = data.iloc[0]['image']
         if not os.path.isfile(sample):
-            raise OSError(f'Detected invalid image path {sample}, please ensure all image paths are absolute or you are using the right working directory.')
+            raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
         return data
 
     def _validate_kwargs(self, kwargs):
