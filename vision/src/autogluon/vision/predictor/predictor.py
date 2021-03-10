@@ -1,16 +1,16 @@
 """Image Prediction task"""
 import copy
-import pickle
 import logging
-import warnings
 import os
+import pickle
+import warnings
 
 import pandas as pd
-from autogluon.core import Int, Categorical
-from autogluon.core.utils import verbosity2loglevel, get_gpu_count
-from autogluon.core.utils import set_logger_verbosity
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
+
+from autogluon.core.utils import set_logger_verbosity
+from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 from ..utils import MXNetErrorCatcher
 
@@ -276,11 +276,13 @@ class ImagePredictor(object):
         if time_limit is None and num_trials is None:
             raise ValueError('`time_limit` and `num_trials` can not be `None` at the same time, '
                              'otherwise the training will not be terminated gracefully.')
-        config={'log_dir': self._log_dir,
-                'num_trials': 99999 if num_trials is None else max(1, num_trials),
-                'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
-                'search_strategy': searcher,
-                }
+        config = {'log_dir': self._log_dir,
+                  'num_trials': 99999 if num_trials is None else max(1, num_trials),
+                  'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
+                  'searcher': searcher,
+                  'search_strategy': searcher,  # needed for gluon-cv
+                  'scheduler': scheduler,
+                  }
         if max_reward is not None:
             config['max_reward'] = max_reward
         if nthreads_per_trial is not None:
