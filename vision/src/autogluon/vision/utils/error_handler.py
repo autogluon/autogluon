@@ -14,6 +14,7 @@ class MXNetErrorCatcher(contextlib.AbstractContextManager):
                 return True
             lines = [line for line in str(exc_value).splitlines() if 'MXNetError' in line]
             mxnet_err = str(exc_value)
+            print(mxnet_err)
             if lines:
                 mxnet_err = lines[-1].strip() + '\n'
             if 'GPU is not enabled' in mxnet_err:

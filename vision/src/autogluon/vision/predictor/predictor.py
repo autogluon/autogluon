@@ -337,8 +337,12 @@ class ImagePredictor(object):
             if isinstance(data, pd.DataFrame):
                 # raw dataframe, try to add metadata automatically
                 if 'label' in data.columns and 'image' in data.columns:
-                    logger.log(20, f'Converting raw DataFrame to ImagePredictor.Dataset...')
-                    data = _ImageClassification.Dataset(data, classes=list(map(str, data.label.unique().tolist())))
+                    logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
+                    infer_classes = list(map(str, data.label.unique().tolist()))
+                    logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
+                    instruction = 'ImagePredictor.Dataset(train_data, classes=["0", "1", "2"])'
+                    logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly e.g. {instruction}')
+                    data = _ImageClassification.Dataset(data, classes=infer_classes)
                 else:
                     err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
                               '`image` and `label` columns are required.' + \
