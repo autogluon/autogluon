@@ -338,7 +338,7 @@ class ImagePredictor(object):
                 # raw dataframe, try to add metadata automatically
                 if 'label' in data.columns and 'image' in data.columns:
                     logger.log(20, f'Converting raw DataFrame to ImagePredictor.Dataset...')
-                    data = _ImageClassification.Dataset(data, list(map(str, classes=data.label.unique().tolist())))
+                    data = _ImageClassification.Dataset(data, classes=list(map(str, data.label.unique().tolist())))
                 else:
                     err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
                               '`image` and `label` columns are required.' + \
