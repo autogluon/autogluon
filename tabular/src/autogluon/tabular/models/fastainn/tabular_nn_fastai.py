@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
+from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS, QUANTILE
 from autogluon.core.utils import try_import_fastai_v1
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
@@ -94,7 +94,7 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular import FillMissing, Categorify, Normalize
         self.procs = [FillMissing, Categorify, Normalize]
 
-        if self.problem_type == REGRESSION and self.y_scaler is not None:
+        if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
             y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
             y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
             logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
@@ -358,7 +358,12 @@ class NNFastAiTabularModel(AbstractModel):
                 return self.y_scaler.inverse_transform(preds.numpy()).reshape(-1)
             else:
                 return preds.numpy().reshape(-1)
-        if self.problem_type == BINARY:
+        elif self.problem_type == QUANTILE:
+            if self.y_scaler is not None:
+                return self.y_scaler.inverse_transform(preds.numpy())
+            else:
+                return preds.numpy()
+        elif self.problem_type == BINARY:
             return preds[:, 1].numpy()
         else:
             return preds.numpy()

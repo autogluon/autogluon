@@ -5,7 +5,6 @@ import math
 import pprint
 import time
 from typing import Union
-from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -188,8 +187,10 @@ class TabularPredictor:
 
         learner_type = kwargs.pop('learner_type', DefaultLearner)
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
+        quantile_levels = kwargs.get('quantile_levels', None)
 
         self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None, eval_metric=eval_metric, problem_type=problem_type,
+                                                      quantile_levels=quantile_levels,
                                                       sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
@@ -645,14 +646,14 @@ class TabularPredictor:
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
 
-        quantile_levels = kwargs.get('quantile_levels', None)
-        if isinstance(quantile_levels, float):
-            quantile_levels = [quantile_levels]
-        if isinstance(quantile_levels, Iterable):
-            quantile_levels = np.sort(np.array(quantile_levels))
-        self._learner.quantile_levels = quantile_levels
-        if quantile_levels is not None and self._learner.problem_type is None:
-            self._learner.problem_type = QUANTILE
+        # quantile_levels = kwargs.get('quantile_levels', None)
+        # if isinstance(quantile_levels, float):
+        #     quantile_levels = [quantile_levels]
+        # if isinstance(quantile_levels, Iterable):
+        #     quantile_levels = np.sort(np.array(quantile_levels))
+        # self._learner.quantile_levels = quantile_levels
+        # if quantile_levels is not None and self._learner.problem_type is None:
+        #     self._learner.problem_type = QUANTILE
 
         if ag_args is None:
             ag_args = {}
@@ -1104,7 +1105,7 @@ class TabularPredictor:
             'max_stack_level': self._trainer.get_max_level(),
         }
         if self.problem_type == QUANTILE:
-            results['num_quantiles'] = len(self._trainer.quantile_list)
+            results['num_quantiles'] = len(self.quantile_levels)
         elif self.problem_type != REGRESSION:
             results['num_classes'] = self._trainer.num_classes
         # if hpo_used:
@@ -1704,7 +1705,7 @@ class TabularPredictor:
         if self.problem_type == MULTICLASS and self._learner.label_cleaner.problem_type_transform == MULTICLASS:
             y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
         elif self.problem_type == QUANTILE:
-            y_pred_proba_oof_transformed.columns = self._learner.quantile_levels
+            y_pred_proba_oof_transformed.columns = self.quantile_levels
         else:
             y_pred_proba_oof_transformed.columns = [self.label]
             y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label]
@@ -2145,6 +2146,7 @@ class TabularPredictor:
         valid_kwargs = {
             'learner_type',
             'learner_kwargs',
+            'quantile_levels',
         }
         invalid_keys = []
         for key in kwargs:

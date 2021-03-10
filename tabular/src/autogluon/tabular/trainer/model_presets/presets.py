@@ -148,6 +148,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
     model_cfg_priority_dict = defaultdict(list)
     for model_type in hp_level:
         if problem_type == QUANTILE and model_type not in DEFAULT_QUANTILE_MODEL:
+            logger.warning(f"Model type '{model_type}' does not support `problem_type='{QUANTILE}'` yet. This model will be ignored.")
             continue
         models_of_type = hp_level[model_type]
         if not isinstance(models_of_type, list):

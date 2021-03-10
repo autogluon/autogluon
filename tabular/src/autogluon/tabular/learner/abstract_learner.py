@@ -6,6 +6,7 @@ import random
 import time
 import warnings
 from collections import OrderedDict
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -39,7 +40,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0, sample_weight=None, weight_evaluation=False):
+                 problem_type=None, quantile_levels=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0, sample_weight=None, weight_evaluation=False):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.ignored_columns = ignored_columns
@@ -48,7 +49,19 @@ class AbstractLearner:
         self.threshold = label_count_threshold
         self.problem_type = problem_type
         self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
-        self.quantile_levels = None if problem_type is not QUANTILE else np.array([0.01, 0.99])
+
+        if self.problem_type == QUANTILE and quantile_levels is None:
+            raise ValueError("if `problem_type='quantile'`, `quantile_levels` has to be specified")
+        if isinstance(quantile_levels, float):
+            quantile_levels = [quantile_levels]
+        if isinstance(quantile_levels, Iterable):
+            for i, quantile in enumerate(quantile_levels):
+                if quantile <= 0.0 or quantile >= 1.0:
+                    raise ValueError("quantile values have to be non-negative and less than 1.0 (0.0 < q < 1.0). "
+                                     "For example, 0.95 quantile = 95 percentile")
+            quantile_levels = np.sort(np.array(quantile_levels))
+        self.quantile_levels = quantile_levels
+
         self.cache_data = cache_data
         if not self.cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')

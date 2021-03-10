@@ -19,6 +19,7 @@ from sklearn.model_selection import train_test_split
 
 from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
 from ..metrics import accuracy, root_mean_squared_error, Scorer
+from ..metrics.quantile_metrics import pinball_loss
 from ..features.infer_types import get_type_map_raw
 from ..features.types import R_INT, R_FLOAT, R_CATEGORY
 
@@ -383,7 +384,6 @@ def infer_eval_metric(problem_type: str) -> Scorer:
     elif problem_type == MULTICLASS:
         return accuracy
     elif problem_type == QUANTILE:
-        from autogluon.core.metrics.quantile_metrics import pinball_loss
         return pinball_loss
     else:
         return root_mean_squared_error
@@ -402,32 +402,17 @@ def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, 
     """ Report weighted metric if: weights is not None, weight_evaluation=True, and the given metric supports sample weights.
         If weight_evaluation=None, it will be set to False if weights=None, True otherwise.
     """
-    quantile_levels = None
-    if metric.needs_quantile:
-        quantile_levels = kwargs.pop('quantile_levels', None)
-        if quantile_levels is None:
-            raise ValueError("eval_metric='{metric.name}' requires a list of quantile levels predicting")
-
     if weight_evaluation is None:
         weight_evaluation = not (weights is None)
     if weight_evaluation and weights is None:
         raise ValueError("Sample weights cannot be None when weight_evaluation=True.")
     if not weight_evaluation:
-        if quantile_levels is not None:
-            return metric(y, y_pred, quantile_levels=quantile_levels)
-        else:
-            return metric(y, y_pred)
+        return metric(y, y_pred, **kwargs)
     try:
-        if quantile_levels is not None:
-            weighted_metric = metric(y, y_pred, quantile_levels=quantile_levels, sample_weight=weights)
-        else:
-            weighted_metric = metric(y, y_pred, sample_weight=weights)
+        weighted_metric = metric(y, y_pred, sample_weight=weights, **kwargs)
     except (ValueError, TypeError, KeyError):
         logger.log(30, f"WARNING: eval_metric='{metric.name}' does not support sample weights so they will be ignored in reported metric.")
-        if quantile_levels is not None:
-            weighted_metric = metric(y, y_pred, quantile_levels=quantile_levels)
-        else:
-            weighted_metric = metric(y, y_pred)
+        weighted_metric = metric(y, y_pred, **kwargs)
     return weighted_metric
 
 # Note: Do not send training data as input or the importances will be overfit.
