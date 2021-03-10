@@ -282,7 +282,7 @@ class AbstractLearner:
 
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())
-            ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric)
+            ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric, sample_weight=w)
             ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None)  # TODO: Only fit non-nan
             oracle_weights = ensemble_selection.weights_
             oracle_pred_time_start = time.time()
