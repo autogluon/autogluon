@@ -244,6 +244,7 @@ class LocalSequentialScheduler(object):
             self.searcher.evaluation_failed(config=searcher_config)
             reporter(traceback=e)
             is_failed = True
+            result = {'traceback': str(e)}
         return is_failed, result
 
     def run_with_config(self, config):
