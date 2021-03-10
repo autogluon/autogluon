@@ -2,7 +2,8 @@ from autogluon.forecasting.models.gluonts_model.abstract_gluonts.abstract_gluont
 from gluonts.model.deepar import DeepAREstimator
 from gluonts.mx.distribution.neg_binomial import NegativeBinomialOutput
 from autogluon.forecasting.utils.dataset_utils import time_series_dataset
-from autogluon.forecasting.task.forecasting.forecasting import Forecasting as task
+from autogluon.forecasting import ForecastingPredictor
+from autogluon.forecasting import TabularDataset
 
 
 class CustomDeepARModel(AbstractGluonTSModel):
@@ -22,16 +23,19 @@ class CustomDeepARModel(AbstractGluonTSModel):
         self.model = DeepAREstimator.from_hyperparameters(**self.params)
 
 
-train_data = task.Dataset(file_path="https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
-test_data = task.Dataset(file_path="https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
+train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
+test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
 
-gluonts_train_data = time_series_dataset(train_data, index_column="name", target_column="ConfirmedCases", time_column="Date")
-gluonts_test_data = time_series_dataset(test_data, index_column="name", target_column="ConfirmedCases", time_column="Date")
+gluonts_train_data = time_series_dataset(train_data, index_column="name", target_column="ConfirmedCases",
+                                         time_column="Date")
+gluonts_test_data = time_series_dataset(test_data, index_column="name", target_column="ConfirmedCases",
+                                        time_column="Date")
 
-epochs = 50
+epochs = 5
 # # Use the model outside task
-customized_model = CustomDeepARModel(path="AutogluonModels/", freq="D", prediction_length=19, name="DeepAR",
-                                     hyperparameters={"epochs": epochs, "num_batches_per_epoch": 10, "distr_output": NegativeBinomialOutput()}, )
+customized_model = CustomDeepARModel(path="AutogluonModels/", freq="D", prediction_length=19,
+                                     hyperparameters={"epochs": epochs, "num_batches_per_epoch": 10,
+                                                      "distr_output": NegativeBinomialOutput()}, )
 customized_model.fit(gluonts_train_data)
 print(customized_model.score(gluonts_test_data))
 predictions = customized_model.predict(gluonts_test_data)
@@ -46,13 +50,13 @@ custom_hyperparameters = {CustomDeepARModel: {"epochs": epochs,
                                     "num_batches_per_epoch": 10}
                           }
 
-predictor = task.fit(train_data=train_data,
-                     prediction_length=19,
-                     index_column="name",
-                     target_column="ConfirmedCases",
-                     time_column="Date",
-                     hyperparameters=custom_hyperparameters,
-                     quantiles=[0.1, 0.5, 0.9])
+predictor = ForecastingPredictor().fit(train_data=train_data,
+                                       prediction_length=19,
+                                       index_column="name",
+                                       target_column="ConfirmedCases",
+                                       time_column="Date",
+                                       hyperparameters=custom_hyperparameters,
+                                       quantiles=[0.1, 0.5, 0.9])
 
 print(predictor.leaderboard())
 print(predictor.predict(test_data)["Afghanistan_"])
