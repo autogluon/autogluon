@@ -292,8 +292,8 @@ class ObjectDetector(object):
                     infer_classes = class_column.unique().tolist()
                     data['rois'] = data['rois'].apply(lambda x: x.update({'difficult': x.get('difficult', 0)} or x))
                     data = _ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
-                elif 'class' in data and 'xmin' in data  and 'ymin' in data and 'xmax' in data and 'ymax' in data:
-                    infer_classes = data.class.unique().tolist()
+                elif 'class' in data and 'xmin' in data and 'ymin' in data and 'xmax' in data and 'ymax' in data:
+                    infer_classes = data['class'].unique().tolist()
                     if 'difficult' not in data.columns:
                         data['difficult'] = 0
                     data = _ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
