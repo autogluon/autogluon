@@ -339,7 +339,7 @@ class ImagePredictor(object):
                 # raw dataframe, try to add metadata automatically
                 if 'label' in data.columns and 'image' in data.columns:
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
-                    infer_classes = list(map(str, data.label.unique().tolist()))
+                    infer_classes = list(data.label.unique().tolist())
                     logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
                     instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')

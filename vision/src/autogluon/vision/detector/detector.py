@@ -213,6 +213,11 @@ class ObjectDetector(object):
             time_limit = 7200
             logger.log(20, f'`time_limit=auto` set to `time_limit={time_limit}`.')
 
+        # data sanity check
+        train_data = self._validate_data(train_data)
+        if tuning_data is not None:
+            tuning_data = self._validate_data(tuning_data)
+
         if self._detector is not None:
             self._detector._logger.setLevel(log_level)
             self._detector._logger.propagate = True
@@ -270,6 +275,43 @@ class ObjectDetector(object):
         if hasattr(task, 'fit_history'):
             self._fit_summary['fit_history'] = task.fit_history()
         return self
+
+    def _validate_data(self, data):
+        """Check whether data is valid, try to convert with best effort if not"""
+        if len(data) < 1:
+            raise ValueError('Empty dataset.')
+        if not (hasattr(data, 'classes') and hasattr(data, 'to_mxnet')):
+            if isinstance(data, pd.DataFrame):
+                # raw dataframe, try to add metadata automatically
+                infer_classes = []
+                if 'rois' in data.columns and 'image' in data.columns:
+                    sample = data.iloc[0]['rois']
+                    for sample_key in ('class', 'xmin', 'ymin', 'xmax', 'ymax'):
+                        assert sample_key in sample, f'key `{sample_key}` required in `rois`'
+                    class_column = data.rois.apply(lambda x: x.get('class', 'unknown'))
+                    infer_classes = class_column.unique().tolist()
+                    data['rois'] = data['rois'].apply(lambda x: x.update({'difficult': x.get('difficult', 0)} or x))
+                    data = _ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
+                elif 'class' in data and 'xmin' in data  and 'ymin' in data and 'xmax' in data and 'ymax' in data:
+                    infer_classes = data.class.unique().tolist()
+                    if 'difficult' not in data.columns:
+                        data['difficult'] = 0
+                    data = _ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
+                else:
+                    err_msg = 'Unable to convert raw DataFrame to ObjectDetector Dataset, ' + \
+                              '`image` and `rois` columns are required.' + \
+                              'You may visit `https://auto.gluon.ai/stable/tutorials/object_detection/dataset.html` ' + \
+                              'for details.'
+                    raise AttributeError(err_msg)
+                logger.log(20, 'Converting raw DataFrame to ObjectDetector.Dataset...')
+                logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
+                instruction = 'train_data = ObjectDetector.Dataset(train_data, classes=["foo", "bar"])'
+                logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
+        # check image relative/abs path is valid
+        sample = data.iloc[0]['image']
+        if not os.path.isfile(sample):
+            raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
+        return data
 
     def _validate_kwargs(self, kwargs):
         """validate and initialize default kwargs"""

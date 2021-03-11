@@ -5,6 +5,12 @@ For classifying images based on their content, AutoGluon provides a simple `fit(
 
 .. container:: cards
 
+  .. card::
+     :title: Prepare Dataset for Image Prediction
+     :link: dataset.html
+
+     Dataset preparation for Image Prediction
+
    .. card::
       :title: Quick Start Using FIT
       :link: beginner.html
