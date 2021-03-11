@@ -5,6 +5,7 @@ import logging
 import warnings
 import os
 
+import pandas as pd
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from autogluon.core.utils import set_logger_verbosity
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
