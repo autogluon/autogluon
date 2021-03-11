@@ -338,6 +338,10 @@ class ImagePredictor(object):
             if isinstance(data, pd.DataFrame):
                 # raw dataframe, try to add metadata automatically
                 if 'label' in data.columns and 'image' in data.columns:
+                    # check image relative/abs path is valid
+                    sample = data.iloc[0]['image']
+                    if not os.path.isfile(sample):
+                        raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
                     infer_classes = list(data.label.unique().tolist())
                     logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
@@ -352,10 +356,6 @@ class ImagePredictor(object):
                     raise AttributeError(err_msg)
         if len(data) < 1:
             raise ValueError('Empty dataset.')
-        # check image relative/abs path is valid
-        sample = data.iloc[0]['image']
-        if not os.path.isfile(sample):
-            raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
         return data
 
     def _validate_kwargs(self, kwargs):

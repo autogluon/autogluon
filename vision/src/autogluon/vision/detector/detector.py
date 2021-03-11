@@ -284,6 +284,11 @@ class ObjectDetector(object):
             if isinstance(data, pd.DataFrame):
                 # raw dataframe, try to add metadata automatically
                 infer_classes = []
+                if 'image' in data.columns:
+                    # check image relative/abs path is valid
+                    sample = data.iloc[0]['image']
+                    if not os.path.isfile(sample):
+                        raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
                 if 'rois' in data.columns and 'image' in data.columns:
                     sample = data.iloc[0]['rois']
                     for sample_key in ('class', 'xmin', 'ymin', 'xmax', 'ymax'):
@@ -292,11 +297,13 @@ class ObjectDetector(object):
                     infer_classes = class_column.unique().tolist()
                     data['rois'] = data['rois'].apply(lambda x: x.update({'difficult': x.get('difficult', 0)} or x))
                     data = _ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
-                elif 'class' in data and 'xmin' in data and 'ymin' in data and 'xmax' in data and 'ymax' in data:
+                elif 'image' in data and 'class' in data and 'xmin' in data and 'ymin' in data and 'xmax' in data and 'ymax' in data:
                     infer_classes = data['class'].unique().tolist()
                     if 'difficult' not in data.columns:
                         data['difficult'] = 0
                     data = _ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
+                    data = data.pack()
+                    data.classes = infer_classes
                 else:
                     err_msg = 'Unable to convert raw DataFrame to ObjectDetector Dataset, ' + \
                               '`image` and `rois` columns are required.' + \
@@ -307,10 +314,6 @@ class ObjectDetector(object):
                 logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
                 instruction = 'train_data = ObjectDetector.Dataset(train_data, classes=["foo", "bar"])'
                 logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
-        # check image relative/abs path is valid
-        sample = data.iloc[0]['image']
-        if not os.path.isfile(sample):
-            raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
         return data
 
     def _validate_kwargs(self, kwargs):
