@@ -9,7 +9,8 @@ from . import make_scorer
 logger = logging.getLogger(__name__)
 
 
-def _pinball_loss(target_value, quantile_values, quantile_levels):
+def _pinball_loss(target_value, quantile_values, quantile_levels, sample_weight=None, quantile_weight=None):
+
     # "target_value" must be 2D pandas or numpy arrays
     target_value = np.array(target_value).reshape(-1, 1)
 
@@ -30,8 +31,8 @@ def _pinball_loss(target_value, quantile_values, quantile_levels):
     error_values = target_value - quantile_values
     loss_values = np.maximum(quantile_levels * error_values, (quantile_levels - 1) * error_values)
 
-    # return mean over all samples and quantile levels
-    return loss_values.mean()
+    # return mean over all samples (sample weighted) and quantile levels
+    return np.average(np.average(loss_values, weights=sample_weight, axis=0), weights=quantile_weight, axis=0)
 
 
 # Loss for quantile regression:

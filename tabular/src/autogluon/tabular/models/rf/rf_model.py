@@ -32,8 +32,8 @@ class RFModel(AbstractModel):
         if self.problem_type in [REGRESSION, SOFTCLASS]:
             return RandomForestRegressor
         elif self.problem_type == QUANTILE:
-            # logger.warning('\tWarning: sklearn forest models are experimental for quantile regression. '
-            #                'They may change or be removed without warning in future releases.')
+            logger.warning('\tWarning: sklearn forest models are experimental for quantile regression. '
+                           'They may change or be removed without warning in future releases.')
             return RandomForestQuantileRegressor
         else:
             return RandomForestClassifier
