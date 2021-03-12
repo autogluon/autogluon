@@ -55,7 +55,7 @@ class AbstractLearner:
         if isinstance(quantile_levels, float):
             quantile_levels = [quantile_levels]
         if isinstance(quantile_levels, Iterable):
-            for i, quantile in enumerate(quantile_levels):
+            for quantile in quantile_levels:
                 if quantile <= 0.0 or quantile >= 1.0:
                     raise ValueError("quantile values have to be non-negative and less than 1.0 (0.0 < q < 1.0). "
                                      "For example, 0.95 quantile = 95 percentile")
