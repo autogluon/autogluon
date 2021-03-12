@@ -3,7 +3,7 @@ import os
 import numpy as np
 from pandas import DataFrame, Series
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils import try_import_lightgbm
 
 
@@ -22,6 +22,9 @@ _ag_to_lgbm_metric_dict = {
         mean_absolute_error='l1',
         mean_squared_error='l2',
         root_mean_squared_error='rmse',
+    ),
+    QUANTILE: dict(
+        pinball_loss='quantile',
     ),
 }
 

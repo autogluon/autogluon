@@ -646,6 +646,15 @@ class TabularPredictor:
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
 
+        # quantile_levels = kwargs.get('quantile_levels', None)
+        # if isinstance(quantile_levels, float):
+        #     quantile_levels = [quantile_levels]
+        # if isinstance(quantile_levels, Iterable):
+        #     quantile_levels = np.sort(np.array(quantile_levels))
+        # self._learner.quantile_levels = quantile_levels
+        # if quantile_levels is not None and self._learner.problem_type is None:
+        #     self._learner.problem_type = QUANTILE
+
         if ag_args is None:
             ag_args = {}
         ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)

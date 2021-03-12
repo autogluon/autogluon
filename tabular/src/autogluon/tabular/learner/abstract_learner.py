@@ -55,7 +55,8 @@ class AbstractLearner:
         if isinstance(quantile_levels, float):
             quantile_levels = [quantile_levels]
         if isinstance(quantile_levels, Iterable):
-            for quantile in quantile_levels:
+            # for quantile in quantile_levels:
+            for i, quantile in enumerate(quantile_levels):
                 if quantile <= 0.0 or quantile >= 1.0:
                     raise ValueError("quantile values have to be non-negative and less than 1.0 (0.0 < q < 1.0). "
                                      "For example, 0.95 quantile = 95 percentile")
@@ -305,7 +306,9 @@ class AbstractLearner:
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())
             ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric, quantile_levels=self.quantile_levels)
-            ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None, sample_weight=w)  # TODO: Only fit non-nan
+            # ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None, sample_weight=w)  # TODO: Only fit non-nan
+            ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None)  # TODO: Only fit non-nan
+
             oracle_weights = ensemble_selection.weights_
             oracle_pred_time_start = time.time()
             oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]

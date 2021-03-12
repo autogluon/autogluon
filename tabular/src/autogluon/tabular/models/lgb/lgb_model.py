@@ -11,7 +11,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 
 from autogluon.core import Int, Space
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.features.types import R_OBJECT
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import try_import_lightgbm
@@ -40,6 +40,11 @@ class LGBModel(AbstractModel):
         super().__init__(**kwargs)
 
         self._internal_feature_map = None
+
+        if self.problem_type == QUANTILE:
+            self.model_quantiles = dict()
+        else:
+            self.model_quantiles = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
@@ -161,52 +166,108 @@ class LGBModel(AbstractModel):
             np.random.seed(seed_val)
 
         # Train LightGBM model:
-        try_import_lightgbm()
-        import lightgbm as lgb
-        from lightgbm.basic import LightGBMError
-        with warnings.catch_warnings():
-            # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
-            warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
-            warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
-            try:
-                self.model = lgb.train(**train_params)
-            except LightGBMError:
-                if train_params['params'].get('device', 'cpu') != 'gpu':
-                    raise
-                else:
-                    logger.warning('Warning: GPU mode might not be installed for LightGBM, GPU training raised an exception. Falling back to CPU training...'
-                                   'Refer to LightGBM GPU documentation: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version'
-                                   'One possible method is:'
-                                   '\tpip uninstall lightgbm -y'
-                                   '\tpip install lightgbm --install-option=--gpu'
-                                   )
-                    train_params['params']['device'] = 'cpu'
-                    self.model = lgb.train(**train_params)
-            retrain = False
-            if train_params['params'].get('boosting_type', '') == 'dart':
-                if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
-                    retrain = True
-                    if time_limit is not None:
-                        time_left = time_limit + start_time - time.time()
-                        if time_left < 0.5 * time_limit:
-                            retrain = False
-                    if retrain:
-                        logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
-                        train_params.pop('callbacks')
-                        train_params['num_boost_round'] = self.model.best_iteration
-                        self.model = lgb.train(**train_params)
-                    else:
-                        logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+        if self.problem_type == QUANTILE:
+            # for each quantile
+            self.params_trained['num_boost_round'] = list()
+            for quantile in self.quantile_levels:
+                train_params['params']['alpha'] = quantile
 
-        if dataset_val is not None and not retrain:
-            self.params_trained['num_boost_round'] = self.model.best_iteration
+                try_import_lightgbm()
+                import lightgbm as lgb
+                from lightgbm.basic import LightGBMError
+                with warnings.catch_warnings():
+                    # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+                    warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+                    warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
+                    try:
+                        self.model_quantiles[quantile] = lgb.train(**train_params)
+                    except LightGBMError:
+                        if train_params['params'].get('device', 'cpu') != 'gpu':
+                            raise
+                        else:
+                            logger.warning(
+                                'Warning: GPU mode might not be installed for LightGBM, GPU training raised an exception. Falling back to CPU training...'
+                                'Refer to LightGBM GPU documentation: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version'
+                                'One possible method is:'
+                                '\tpip uninstall lightgbm -y'
+                                '\tpip install lightgbm --install-option=--gpu'
+                                )
+                            train_params['params']['device'] = 'cpu'
+                            self.model_quantiles[quantile] = lgb.train(**train_params)
+                    retrain = False
+                    if train_params['params'].get('boosting_type', '') == 'dart':
+                        if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
+                            retrain = True
+                            if time_limit is not None:
+                                time_left = time_limit + start_time - time.time()
+                                if time_left < 0.5 * time_limit:
+                                    retrain = False
+                            if retrain:
+                                logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
+                                train_params.pop('callbacks')
+                                train_params['num_boost_round'] = self.model.best_iteration
+                                self.model_quantiles[quantile] = lgb.train(**train_params)
+                            else:
+                                logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+
+                if dataset_val is not None and not retrain:
+                    self.params_trained['num_boost_round'].append(self.model_quantiles[quantile].best_iteration)
+                else:
+                    self.params_trained['num_boost_round'].append(self.model_quantiles[quantile].current_iteration())
+                self.model = self.model_quantiles
+
         else:
-            self.params_trained['num_boost_round'] = self.model.current_iteration()
+            try_import_lightgbm()
+            import lightgbm as lgb
+            from lightgbm.basic import LightGBMError
+            with warnings.catch_warnings():
+                # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+                warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+                warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
+                try:
+                    self.model = lgb.train(**train_params)
+                except LightGBMError:
+                    if train_params['params'].get('device', 'cpu') != 'gpu':
+                        raise
+                    else:
+                        logger.warning('Warning: GPU mode might not be installed for LightGBM, GPU training raised an exception. Falling back to CPU training...'
+                                       'Refer to LightGBM GPU documentation: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version'
+                                       'One possible method is:'
+                                       '\tpip uninstall lightgbm -y'
+                                       '\tpip install lightgbm --install-option=--gpu'
+                                       )
+                        train_params['params']['device'] = 'cpu'
+                        self.model = lgb.train(**train_params)
+                retrain = False
+                if train_params['params'].get('boosting_type', '') == 'dart':
+                    if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
+                        retrain = True
+                        if time_limit is not None:
+                            time_left = time_limit + start_time - time.time()
+                            if time_left < 0.5 * time_limit:
+                                retrain = False
+                        if retrain:
+                            logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
+                            train_params.pop('callbacks')
+                            train_params['num_boost_round'] = self.model.best_iteration
+                            self.model = lgb.train(**train_params)
+                        else:
+                            logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+
+            if dataset_val is not None and not retrain:
+                self.params_trained['num_boost_round'] = self.model.best_iteration
+            else:
+                self.params_trained['num_boost_round'] = self.model.current_iteration()
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
+        elif self.problem_type == QUANTILE:
+            predict_list = []
+            for quantile in self.quantile_levels:
+                predict_list.append(self.model_quantiles[quantile].predict(X).reshape(-1, 1))
+            return np.concatenate(predict_list, 1)
 
         y_pred_proba = self.model.predict(X)
         if self.problem_type == BINARY:
@@ -385,6 +446,8 @@ class LGBModel(AbstractModel):
             train_loss_name = 'multi_logloss'
         elif self.problem_type == REGRESSION:
             train_loss_name = 'l2'
+        elif self.problem_type == QUANTILE:
+            train_loss_name = 'quantile'
         else:
             raise ValueError(f"unknown problem_type for LGBModel: {self.problem_type}")
         return train_loss_name
