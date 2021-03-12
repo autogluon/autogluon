@@ -5,7 +5,7 @@ For detecting the presence and location of objects in images, AutoGluon provides
 
 .. container:: cards
 
-  .. card::
+   .. card::
       :title: Prepare Dataset for Object Detector
       :link: dataset.html
 
