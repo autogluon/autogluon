@@ -69,7 +69,7 @@ install_vision = """
 """
 
 install_forecasting = """
-    python3 -m pip install -e forecasting/
+    python3 -m pip install --upgrade -e forecasting/
 """
 
 stage("Unit Test") {
@@ -672,6 +672,10 @@ stage("Build Docs") {
         cd ..
 
         cd vision/
+        python3 -m pip install --upgrade -e .
+        cd ..
+        
+        cd forecasting/
         python3 -m pip install --upgrade -e .
         cd ..
 
