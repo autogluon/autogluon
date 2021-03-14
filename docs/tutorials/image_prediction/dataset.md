@@ -12,6 +12,7 @@ There are generally three ways to load a dataset for ImagePredictor:
 We will go through these four methods one by one. First of all, let's import it
 
 ```{.python .input}
+%matplotlib inline
 import autogluon.core as ag
 from autogluon.vision import ImagePredictor
 import pandas as pd

@@ -11,6 +11,7 @@ There are generally two ways to load a dataset for ObjectDetector:
 - Manually convert raw annotations in any format, knowing this you will be able to deal with arbitrary dataset format.
 
 ```{.python .input}
+%matplotlib inline
 import autogluon.core as ag
 from autogluon.vision import ObjectDetector
 ```
