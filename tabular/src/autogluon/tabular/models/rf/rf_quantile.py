@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from sklearn.tree import BaseDecisionTree
 from sklearn.tree import DecisionTreeRegressor
@@ -6,6 +7,8 @@ from sklearn.ensemble._forest import ForestRegressor
 from sklearn.utils import check_array
 from sklearn.utils import check_X_y
 from sklearn.utils import check_random_state
+
+logger = logging.getLogger(__name__)
 
 
 def weighted_percentile(a, q, weights=None, sorter=None):
@@ -371,6 +374,9 @@ class BaseForestQuantileRegressor(ForestRegressor):
         self : object
             Returns self.
         """
+        logger.warning(f'\tWARNING: {self.__class__.__name__} are experimental for quantile regression. '
+                       f'They may change or be removed without warning in future releases.')
+
         # apply method requires X to be of dtype np.float32
         X, y = check_X_y(
             X, y, accept_sparse="csc", dtype=np.float32, multi_output=False)
@@ -556,18 +562,18 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
                  max_depth=None,
                  min_samples_split=2,
                  min_samples_leaf=1,
-                 min_weight_fraction_leaf=0.,
+                 # min_weight_fraction_leaf=0.,
                  max_features='auto',
                  max_leaf_nodes=None,
-                 min_impurity_decrease=0.,
-                 min_impurity_split=None,
+                 # min_impurity_decrease=0.,
+                 # min_impurity_split=None,
                  bootstrap=True,
                  oob_score=False,
                  n_jobs=1,
                  random_state=None,
                  verbose=0,
                  warm_start=False,
-                 ccp_alpha=0.0,
+                 # ccp_alpha=0.0,
                  max_samples=None):
         super(RandomForestQuantileRegressor, self).__init__(
             base_estimator=DecisionTreeQuantileRegressor(),
@@ -595,12 +601,12 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
-        self.min_weight_fraction_leaf = min_weight_fraction_leaf
+        # self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
         self.max_leaf_nodes = max_leaf_nodes
-        self.min_impurity_decrease = min_impurity_decrease
-        self.min_impurity_split = min_impurity_split
-        self.ccp_alpha = ccp_alpha
+        # self.min_impurity_decrease = min_impurity_decrease
+        # self.min_impurity_split = min_impurity_split
+        # self.ccp_alpha = ccp_alpha
 
 
 class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
@@ -711,18 +717,18 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
                  max_depth=None,
                  min_samples_split=2,
                  min_samples_leaf=1,
-                 min_weight_fraction_leaf=0.,
+                 # min_weight_fraction_leaf=0.,
                  max_features='auto',
                  max_leaf_nodes=None,
-                 min_impurity_decrease=0.,
-                 min_impurity_split=None,
+                 # min_impurity_decrease=0.,
+                 # min_impurity_split=None,
                  bootstrap=True,
                  oob_score=False,
                  n_jobs=1,
                  random_state=None,
                  verbose=0,
                  warm_start=False,
-                 ccp_alpha=0.0,
+                 # ccp_alpha=0.0,
                  max_samples=None):
         super(ExtraTreesQuantileRegressor, self).__init__(
             base_estimator=ExtraTreeQuantileRegressor(),
@@ -748,9 +754,9 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
-        self.min_weight_fraction_leaf = min_weight_fraction_leaf
+        # self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
         self.max_leaf_nodes = max_leaf_nodes
-        self.min_impurity_decrease = min_impurity_decrease
-        self.min_impurity_split = min_impurity_split
-        self.ccp_alpha = ccp_alpha
+        # self.min_impurity_decrease = min_impurity_decrease
+        # self.min_impurity_split = min_impurity_split
+        # self.ccp_alpha = ccp_alpha

@@ -402,6 +402,8 @@ def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, 
     """ Report weighted metric if: weights is not None, weight_evaluation=True, and the given metric supports sample weights.
         If weight_evaluation=None, it will be set to False if weights=None, True otherwise.
     """
+    if not metric.needs_quantile:
+        kwargs.pop('quantile_levels', None)
     if weight_evaluation is None:
         weight_evaluation = not (weights is None)
     if weight_evaluation and weights is None:
