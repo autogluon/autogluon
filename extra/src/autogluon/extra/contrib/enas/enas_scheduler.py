@@ -77,7 +77,7 @@ class ENAS_Scheduler(object):
         ctx = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu(0)]
         self.supernet.collect_params().reset_ctx(ctx)
         self.supernet.hybridize()
-        dataset_name = train_set
+        dataset_name = str(train_set)
 
         if isinstance(train_set, str):
             train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size,
