@@ -1,15 +1,18 @@
-# Image Prediction - Properly load any type of data as ImagePredictor Dataset
+# Image Prediction - Properly load any image dataset as ImagePredictor Dataset
 :label:`sec_imgdataset`
 
 Preparing the dataset for ImagePredictor is not difficult at all, however, we'd like to introduce the
 recommended ways to initialize the dataset so you will have smoother experience using `autogluon.vision.ImagePredictor`.
 
 There are generally three ways to load a dataset for ImagePredictor:
-- Load a csv file or construct your own `DataFrame` with `image` and `label` columns
+
+- Load a csv file or construct your own pandas `DataFrame` with `image` and `label` columns
+
 - Load a image folder directly with `ImagePredictor.Dataset`
+
 - Convert a list of images to dataset directly with `ImagePredictor.Dataset`
 
-We will go through these four methods one by one. First of all, let's import it
+We will go through these four methods one by one. First of all, let's import autogluon
 
 ```{.python .input}
 %matplotlib inline
@@ -48,7 +51,7 @@ Otherwise you may use the `DataFrame` as-is, `ImagePredictor` will apply auto co
 
 ## Load an image directory
 
-It's pretty common that sometimes you only have a folder of images, organized by the category names. Recursively loop through images is boring. You can use `ImagePredictor.Dataset.from_folders` or `ImagePredictor.Dataset.from_folder` to avoid implementing recursive search.
+It's pretty common that sometimes you only have a folder of images, organized by the category names. Recursively loop through images is tedious. You can use `ImagePredictor.Dataset.from_folders` or `ImagePredictor.Dataset.from_folder` to avoid implementing recursive search.
 
 The difference between `from_folders` and `from_folder` is the targeting folder structure.
 If you have a folder with splits, e.g., `train`, `test`, like:

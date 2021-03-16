@@ -21,4 +21,5 @@ For detecting the presence and location of objects in images, AutoGluon provides
    :maxdepth: 1
    :hidden:
 
+   dataset
    beginner

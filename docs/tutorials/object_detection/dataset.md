@@ -7,7 +7,9 @@ Preparing dataset for object detection is slightly difference and more difficult
 Our goal in this tutorial is to introduce the simplest methods to initiate or load a object detection datset for `autogluon.vision.ObjectDetector`.
 
 There are generally two ways to load a dataset for ObjectDetector:
+
 - Load an existing object detection dataset, in VOC or COCO formats, downloaded or exported by other labeling tools.
+
 - Manually convert raw annotations in any format, knowing this you will be able to deal with arbitrary dataset format.
 
 ```{.python .input}

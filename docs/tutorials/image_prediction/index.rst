@@ -34,6 +34,7 @@ For classifying images based on their content, AutoGluon provides a simple `fit(
    :maxdepth: 1
    :hidden:
 
+   dataset
    beginner
    hpo
    kaggle
