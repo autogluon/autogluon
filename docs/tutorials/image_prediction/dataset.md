@@ -80,12 +80,15 @@ Then you can load the splits with `from_folder`:
 
 ```{.python .input}
 # use the train from shopee-iet as new root
-root = os.path.dirname(train_data.iloc[0]['image'])
+root = os.path.join(os.path.dirname(train_data.iloc[0]['image']), '..')
 all_data = ImagePredictor.Dataset.from_folder(root)
 all_data.head()
+```
+
+```{.python .input}
 # you can manually split the dataset or use `random_split`
 train, val, test = all_data.random_split(val_size=0.1, test_size=0.1)
-print('train #', len(train), 'test #', len(test))
+print('train #:', len(train), 'test #:', len(test))
 ```
 
 ## Convert a list of images to dataset
