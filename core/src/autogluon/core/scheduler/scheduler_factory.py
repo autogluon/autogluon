@@ -9,9 +9,8 @@ logger = logging.getLogger()
 
 _scheduler_presets = {
     'auto': {'scheduler': 'local', 'searcher': 'bayesopt'},
-    'local': {'scheduler': 'local', 'searcher': 'bayesopt'},
-    'random': {'scheduler': 'fifo', 'searcher': 'random'},
-    'bayesopt': {'scheduler': 'fifo', 'searcher': 'bayesopt'},
+    'random': {'scheduler': 'local', 'searcher': 'random'},
+    'bayesopt': {'scheduler': 'local', 'searcher': 'bayesopt'},
     # Don't include hyperband and bayesopt hyperband at present
 }
 
@@ -33,8 +32,7 @@ def scheduler_factory(
         Hyperparameter tuning strategy and kwargs.
         If None, then hyperparameter tuning will not be performed.
         Valid preset values:
-            'auto': Uses the 'local' preset.
-            'local': Performs sequential local search via bayesopt
+            'auto': Uses the 'bayesopt' preset (this might change in the future).
             'random': Performs HPO via random search.
             'bayesopt': Performs HPO via bayesian optimization.
         For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
