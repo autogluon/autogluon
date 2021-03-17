@@ -32,9 +32,9 @@ def scheduler_factory(
         Hyperparameter tuning strategy and kwargs.
         If None, then hyperparameter tuning will not be performed.
         Valid preset values:
-            'auto': Uses the 'bayesopt' preset (this might change in the future).
-            'random': Performs HPO via random search.
-            'bayesopt': Performs HPO via bayesian optimization.
+            'auto': Uses the 'bayesopt' preset.
+            'random': Performs HPO via random search using local scheduler.
+            'bayesopt': Performs HPO via bayesian optimization using local scheduler.
         For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
             The 'searcher' key is required when providing a dict.
             Some schedulers may have different valid keys.

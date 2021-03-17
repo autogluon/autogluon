@@ -280,7 +280,8 @@ class ImagePredictor(object):
                   'num_trials': 99999 if num_trials is None else max(1, num_trials),
                   'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
                   'searcher': searcher,
-                  'search_strategy': searcher,  # needed for gluon-cv
+                  # needed for gluon-cv TODO: remove after gluon-cv is updated https://github.com/dmlc/gluon-cv/issues/1633
+                  'search_strategy': searcher,
                   'scheduler': scheduler,
                   }
         if max_reward is not None:
