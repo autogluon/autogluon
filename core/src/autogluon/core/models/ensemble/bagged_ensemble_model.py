@@ -39,7 +39,8 @@ class BaggedEnsembleModel(AbstractModel):
         self._k_per_n_repeat = []  # k-fold used for each n_repeat. == [5, 10, 3] if first kfold was 5, second was 10, and third was 3
         self._random_state = random_state
         self.low_memory = True
-        self.bagged_mode = None
+        self._bagged_mode = None
+        self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
 
         try:
             feature_metadata = self.model_base.feature_metadata
@@ -52,7 +53,10 @@ class BaggedEnsembleModel(AbstractModel):
         super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_metadata=feature_metadata, **kwargs)
 
     def _set_default_params(self):
-        default_params = {'save_bag_folds': True}
+        default_params = {
+            # 'use_child_oof': False,  # [Advanced] Whether to defer to child model for OOF preds and only train a single child.
+            'save_bag_folds': True,
+        }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
@@ -72,10 +76,10 @@ class BaggedEnsembleModel(AbstractModel):
     def is_fit(self):
         return len(self.models) != 0
 
-    # TODO: This assumes bagged ensemble has a complete k_fold and no partial k_fold models, this is likely fine but will act incorrectly if called when only a partial k_fold has been completed
-    #  Solving this is memory intensive, requires all oof_pred_probas from all n_repeats, so its probably not worth it.
-    @property
-    def oof_pred_proba(self):
+    def is_valid_oof(self):
+        return self.is_fit() and (self._child_oof or self._bagged_mode)
+
+    def get_oof_pred_proba(self):
         # TODO: Require is_valid == True (add option param to ignore is_valid)
         return self._oof_pred_proba_func(self._oof_pred_proba, self._oof_pred_model_repeats)
 
@@ -108,6 +112,13 @@ class BaggedEnsembleModel(AbstractModel):
              time_limit=None,
              sample_weight=None,
              **kwargs):
+        use_child_oof = self.params.get('use_child_oof', False)
+        if use_child_oof:
+            if self.is_fit():
+                # TODO: We may want to throw an exception instead and avoid calling fit more than once
+                return
+            k_fold = 1
+            k_fold_end = None
         if k_fold < 1:
             k_fold = 1
         if k_fold_end is None:
@@ -129,8 +140,7 @@ class BaggedEnsembleModel(AbstractModel):
             raise ValueError(f'k_fold_end must equal k_fold when (n_repeats - n_repeat_start) > 1, values: ({k_fold_end}, {k_fold})')
         if self._k is not None and self._k != k_fold:
             raise ValueError(f'k_fold must equal previously fit k_fold value for the current n_repeat, values: (({k_fold}, {self._k})')
-        fold_start = n_repeat_start * k_fold + k_fold_start
-        fold_end = (n_repeats - 1) * k_fold + k_fold_end
+
         time_start = time.time()
 
         model_base = self._get_model_base()
@@ -149,15 +159,28 @@ class BaggedEnsembleModel(AbstractModel):
             model_base.name = f'{model_base.name}S1F1'
             model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
             time_start_fit = time.time()
-            model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
+            model_base.fit(X=X, y=y, time_limit=time_limit, sample_weight=sample_weight, **kwargs)
             model_base.fit_time = time.time() - time_start_fit
             model_base.predict_time = None
-            self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
+            if use_child_oof:
+                logger.log(15, '\t`use_child_oof` was specified for this model. It will function similarly to a bagged model, but will only fit one child model.')
+                time_start_predict = time.time()
+                if callable(getattr(model_base, "get_oof_pred_proba", None)):
+                    # FIXME: Use a tag instead / as well so inherited models that don't support oof aren't assumed to support based on parent class.
+                    self._oof_pred_proba = model_base.get_oof_pred_proba()
+                else:
+                    logger.warning('\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores.')
+                    self._oof_pred_proba = model_base.predict_proba(X=X)
+                self._child_oof = True
+                model_base.predict_time = time.time() - time_start_predict
+                model_base.val_score = model_base.score_with_y_pred_proba(y=y, y_pred_proba=self._oof_pred_proba)
+            else:
+                self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
             self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
             self._n_repeats = 1
             self._n_repeats_finished = 1
             self._k_per_n_repeat = [1]
-            self.bagged_mode = False
+            self._bagged_mode = False
             model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
             if not self.params.get('save_bag_folds', True):
                 model_base.model = None
@@ -175,6 +198,8 @@ class BaggedEnsembleModel(AbstractModel):
         oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
 
         models = []
+        fold_start = n_repeat_start * k_fold + k_fold_start
+        fold_end = (n_repeats - 1) * k_fold + k_fold_end
         folds_to_fit = fold_end - fold_start
         for j in range(n_repeat_start, n_repeats):  # For each n_repeat
             cur_repeat_count = j - n_repeat_start
@@ -242,7 +267,7 @@ class BaggedEnsembleModel(AbstractModel):
                 self._k_per_n_repeat.append(k_fold)
         self.models += models
 
-        self.bagged_mode = True
+        self._bagged_mode = True
 
         if self._oof_pred_proba is None:
             self._oof_pred_proba = oof_pred_proba
@@ -279,7 +304,7 @@ class BaggedEnsembleModel(AbstractModel):
         self._load_oof()
         valid_indices = self._oof_pred_model_repeats > 0
         y = y[valid_indices]
-        y_pred_proba = self.oof_pred_proba[valid_indices]
+        y_pred_proba = self.get_oof_pred_proba()[valid_indices]
         if sample_weight is not None:
             sample_weight = sample_weight[valid_indices]
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weight=sample_weight)
@@ -318,7 +343,7 @@ class BaggedEnsembleModel(AbstractModel):
         log_final_suffix = ''
         for n_repeat, k in enumerate(self._k_per_n_repeat):
             if is_oof:
-                if not self.bagged_mode:
+                if self._child_oof or not self._bagged_mode:
                     raise AssertionError('Model trained with no validation data cannot get feature importances on training data, please specify new test data to compute feature importances (model=%s)' % self.name)
                 kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeat + 1)
                 cur_kfolds = kfolds[n_repeat * k:(n_repeat+1) * k]
@@ -577,7 +602,7 @@ class BaggedEnsembleModel(AbstractModel):
             _k_per_n_repeat=self._k_per_n_repeat,
             _random_state=self._random_state,
             low_memory=self.low_memory,  # If True, then model will attempt to use at most min_memory_size memory by having at most one child in memory. If False, model will use max_memory_size memory.
-            bagged_mode=self.bagged_mode,
+            bagged_mode=self._bagged_mode,
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
             child_hyperparameters=self._get_model_base().params,

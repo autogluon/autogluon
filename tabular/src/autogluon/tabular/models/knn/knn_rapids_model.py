@@ -36,3 +36,10 @@ class KNNRapidsModel(KNNModel):
         default_params = {'weights': 'uniform'}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    @classmethod
+    def _get_default_ag_args_ensemble(cls) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble()
+        extra_ag_args_ensemble = {'use_child_oof': False}
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble

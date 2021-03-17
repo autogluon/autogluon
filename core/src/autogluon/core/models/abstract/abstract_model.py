@@ -901,6 +901,15 @@ class AbstractModel:
         """
         return {}
 
+    @classmethod
+    def _get_default_ag_args_ensemble(cls) -> dict:
+        """
+        [Advanced] Dictionary of customization options related to meta properties of the model ensemble this model will be a child in.
+        Refer to hyperparameters of ensemble models for valid options.
+        """
+        return {}
+
+
     def _get_default_stopping_metric(self):
         """
         Returns the default stopping metric to use for early stopping.

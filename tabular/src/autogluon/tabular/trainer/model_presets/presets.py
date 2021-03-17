@@ -222,6 +222,7 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
         model_extra_ag_args = ag_args.copy()
         model_extra_ag_args.update(model_cfg[AG_ARGS])
         model_cfg[AG_ARGS] = model_extra_ag_args
+    default_ag_args_ensemble = model_type_real._get_default_ag_args_ensemble()
     if ag_args_ensemble is not None:
         model_extra_ag_args_ensemble = ag_args_ensemble.copy()
         model_extra_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
@@ -235,6 +236,9 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     if default_ag_args is not None:
         default_ag_args.update(model_cfg[AG_ARGS])
         model_cfg[AG_ARGS] = default_ag_args
+    if default_ag_args_ensemble is not None:
+        default_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
+        model_cfg[AG_ARGS_ENSEMBLE] = default_ag_args_ensemble
     return model_cfg
 
 

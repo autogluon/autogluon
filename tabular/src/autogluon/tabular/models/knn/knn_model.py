@@ -4,13 +4,10 @@ import numpy as np
 import math
 import psutil
 import time
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 
 from autogluon.core.constants import REGRESSION
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from autogluon.core.features.types import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
-
-from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.models import AbstractModel
 
@@ -22,11 +19,12 @@ class KNNModel(AbstractModel):
     """
     KNearestNeighbors model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
     """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._model_type = self._get_model_type()
-
     def _get_model_type(self):
+        try:
+            from ._knn_loo_variants import KNeighborsClassifier, KNeighborsRegressor
+        except:
+            from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+            logger.warning('WARNING: Leave-one-out variants of KNN failed to import. Falling back to standard KNN implementations.')
         if self.problem_type == REGRESSION:
             return KNeighborsRegressor
         else:
@@ -54,6 +52,13 @@ class KNNModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
+    @classmethod
+    def _get_default_ag_args_ensemble(cls) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble()
+        extra_ag_args_ensemble = {'use_child_oof': True}
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
+
     # TODO: Enable HPO for KNN
     def _get_default_searchspace(self):
         spaces = {}
@@ -74,7 +79,7 @@ class KNNModel(AbstractModel):
         num_rows_max = len(X)
         # FIXME: v0.1 Must store final num rows for refit_full or else will use everything! Worst case refit_full could train far longer than the original model.
         if time_limit is None or num_rows_max <= 10000:
-            self.model = self._model_type(**self.params).fit(X, y)
+            self.model = self._get_model_type()(**self.params).fit(X, y)
         else:
             self.model = self._fit_with_samples(X=X, y=y, time_limit=time_limit - (time.time() - time_start))
 
@@ -89,6 +94,18 @@ class KNNModel(AbstractModel):
                 logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory...')
             if model_memory_ratio > (0.20 * max_memory_usage_ratio):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
+
+    # TODO: Won't work for RAPIDS without modification
+    # TODO: support normalization?
+    # TODO: Technically isn't OOF, but can be used inplace of OOF. Perhaps rename to something more accurate?
+    def get_oof_pred_proba(self):
+        if callable(getattr(self.model, "predict_proba_loo", None)):
+            y_oof_pred_proba = self.model.predict_proba_loo()
+        elif callable(getattr(self.model, "predict_loo", None)):
+            y_oof_pred_proba = self.model.predict_loo()
+        else:
+            raise AssertionError(f'Model class {type(self.model)} does not support out-of-fold prediction generation.')
+        return self._convert_proba_to_unified_form(y_oof_pred_proba)
 
     # TODO: Consider making this fully generic and available to all models
     def _fit_with_samples(self, X, y, time_limit):
@@ -127,6 +144,7 @@ class KNNModel(AbstractModel):
 
         time_start_sample_loop = time.time()
         time_limit_left = time_limit - (time_start_sample_loop - time_start)
+        model_type = self._get_model_type()
         for i, samples in enumerate(num_rows_samples):
             if samples != num_rows_max:
                 if self.problem_type == REGRESSION:
@@ -138,7 +156,7 @@ class KNNModel(AbstractModel):
             else:
                 X_samp = X
                 y_samp = y
-            self.model = self._model_type(**self.params).fit(X_samp, y_samp)
+            self.model = model_type(**self.params).fit(X_samp, y_samp)
             time_limit_left_prior = time_limit_left
             time_fit_end_sample = time.time()
             time_limit_left = time_limit - (time_fit_end_sample - time_start)
@@ -157,6 +175,7 @@ class KNNModel(AbstractModel):
 
 class FAISSModel(KNNModel):
     def _get_model_type(self):
+        from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
         if self.problem_type == REGRESSION:
             return FAISSNeighborsRegressor
         else:
@@ -169,3 +188,10 @@ class FAISSModel(KNNModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
+
+    @classmethod
+    def _get_default_ag_args_ensemble(cls) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble()
+        extra_ag_args_ensemble = {'use_child_oof': False}
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
