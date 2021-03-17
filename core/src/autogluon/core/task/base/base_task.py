@@ -4,7 +4,7 @@ import logging
 import time
 from abc import abstractmethod
 
-from ...scheduler import *
+from ...scheduler import HyperbandScheduler, RLScheduler, FIFOScheduler
 from ...scheduler.seq_scheduler import LocalSequentialScheduler
 from ...utils import in_ipynb, try_import_mxnet
 from ...utils.utils import setup_compute
@@ -18,27 +18,23 @@ __all__ = [
 Results = collections.namedtuple('Results', 'model reward config time metadata')
 
 schedulers = {
-    'auto': LocalSequentialScheduler,
-    'local_sequential_auto': LocalSequentialScheduler,
-    'grid': FIFOScheduler,
-    'random': FIFOScheduler,
-    'skopt': FIFOScheduler,
-    'hyperband': HyperbandScheduler,
+    'local': LocalSequentialScheduler,
+    'fifo': FIFOScheduler,
     'rl': RLScheduler,
-    'bayesopt': FIFOScheduler,
-    'bayesopt_hyperband': HyperbandScheduler}
+    'hyperband_stopping': HyperbandScheduler,
+    'hyperband_promotion': HyperbandScheduler,
+}
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-def create_scheduler(train_fn, search_strategy, scheduler_options):
-    if isinstance(search_strategy, str):
-        scheduler_cls = schedulers[search_strategy.lower()]
+def create_scheduler(train_fn, scheduler, scheduler_options):
+    if isinstance(scheduler, str):
+        scheduler_cls = schedulers[scheduler.lower()]
     else:
-        assert callable(search_strategy)
-        scheduler_cls = search_strategy
+        assert callable(scheduler)
+        scheduler_cls = scheduler
         scheduler_options = copy.copy(scheduler_options)
-        scheduler_options['searcher'] = 'random'
     return scheduler_cls(train_fn, **scheduler_options)
 
 
@@ -59,7 +55,6 @@ class BaseTask(object):
         # create scheduler and schedule tasks
         scheduler = create_scheduler(
             train_fn, search_strategy, scheduler_options)
-        print('scheduler:', scheduler)
         scheduler.run()
         scheduler.join_jobs()
         # gather the best configuration
@@ -172,7 +167,7 @@ def compile_scheduler_options(
 # TODO: Migrate TextPredictor to use this version, delete old version
 def compile_scheduler_options_v2(
         scheduler_options, nthreads_per_trial,
-        ngpus_per_trial, num_trials, time_out, search_strategy=None, search_options=None, checkpoint=None, resume=False, visualizer=None,
+        ngpus_per_trial, num_trials, time_out, scheduler=None, search_strategy=None, search_options=None, checkpoint=None, resume=False, visualizer=None,
         time_attr=None, reward_attr=None, dist_ip_addrs=None, epochs=None):
     """
     Updates a copy of scheduler_options (scheduler-specific options, can be
@@ -186,6 +181,7 @@ def compile_scheduler_options_v2(
     epochs.
 
     :param scheduler_options:
+    :param scheduler:
     :param search_strategy:
     :param search_options:
     :param nthreads_per_trial:
@@ -212,6 +208,8 @@ def compile_scheduler_options_v2(
         dist_ip_addrs = []
     if search_strategy is None:
         search_strategy = 'random'
+    if scheduler is None:
+        scheduler = 'local'
     assert isinstance(search_strategy, str)
     if search_options is None:
         search_options = dict()
@@ -224,6 +222,7 @@ def compile_scheduler_options_v2(
     scheduler_params = {
         'resource': {
             'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
+        'scheduler': scheduler,
         'searcher': search_strategy,
         'search_options': search_options,
         'checkpoint': checkpoint,
@@ -255,6 +254,7 @@ def compile_scheduler_options_v2(
             scheduler_params['max_t'] = epochs
     required_options = [
         'resource',
+        'scheduler',
         'searcher',
         'search_options',
         'checkpoint',

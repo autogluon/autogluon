@@ -17,16 +17,16 @@ class TestTask(BaseTask):
         self._config = {}
         nthreads_per_trial = get_cpu_count()
         ngpus_per_trial = get_gpu_count()
-        self._config['search_strategy'] = self._config.get('search_strategy', 'random')
+        self._config['scheduler'] = self._config.get('scheduler', 'fifo')
         self._config['scheduler_options'] = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
             'num_trials': self._config.get('num_trials', 2),
             'time_out': self._config.get('time_limits', 60 * 60),
             'time_attr': 'epoch',
             'reward_attr': 'accuracy',
-            'searcher': self._config.get('search_strategy', {}),
+            'searcher': self._config.get('searcher', 'random'),
             'search_options': self._config.get('search_options', None)}
-        if self._config['search_strategy'] == 'hyperband':
+        if self._config['scheduler'] == 'hyperband':
             self._config['scheduler_options'].update({
                 'searcher': 'random',
                 'max_t': self._config.get('epochs', 50),
@@ -35,7 +35,7 @@ class TestTask(BaseTask):
     def fit(self):
         config = {'lr': ag.Categorical(0.1, 0.2, 0.3)}
         self.fn.register_args(**config)
-        results = self.run_fit(self.fn, self._config['search_strategy'],
+        results = self.run_fit(self.fn, self._config['scheduler'],
                                self._config['scheduler_options'])
 
 def test_valid_fn():

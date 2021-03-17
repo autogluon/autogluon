@@ -1,12 +1,32 @@
+from .gp_searcher import GPFIFOSearcher, GPMultiFidelitySearcher
+from .grid_searcher import GridSearcher
 from .searcher import RandomSearcher
 from .skopt_searcher import SKoptSearcher
-from .grid_searcher import GridSearcher
-from .gp_searcher import GPFIFOSearcher, GPMultiFidelitySearcher
 
 __all__ = ['searcher_factory']
 
+SEARCHER_CONFIGS = dict(
+    random=dict(
+        searcher_cls=RandomSearcher,
+    ),
+    skopt=dict(
+        searcher_cls=SKoptSearcher,
+        supported_schedulers={'fifo'},
+    ),
+    grid=dict(
+        searcher_cls=GridSearcher,
+    ),
+    bayesopt=dict(
+        # Gaussian process based Bayesian optimization
+        # The searchers and their kwargs differ depending on the scheduler
+        # type (fifo, hyperband_*)
+        searcher_cls=lambda scheduler: GPFIFOSearcher if scheduler in ['fifo', 'local'] else GPMultiFidelitySearcher,
+        supported_schedulers={'fifo', 'hyperband_stopping', 'hyperband_promotion', 'local'},
+    ),
+)
 
-def searcher_factory(name, **kwargs):
+
+def searcher_factory(searcher_name, **kwargs):
     """Factory for searcher objects
 
     This function creates searcher objects from string argument name and
@@ -23,7 +43,7 @@ def searcher_factory(name, **kwargs):
 
     Parameters
     ----------
-    name : str
+    searcher_name : str
         Searcher type. Supported are 'random' (RandomSearcher), 'skopt'
         (SKoptSearcher), 'grid' (GridSearcher), 'bayesopt' (GPFIFOSearcher,
         GPMultiFidelitySearcher)
@@ -59,33 +79,22 @@ def searcher_factory(name, **kwargs):
     GPFIFOSearcher
     GPMultiFidelitySearcher
     """
-    if name == 'random':
-        return RandomSearcher(**kwargs)
-    elif name == 'skopt':
-        _check_supported_scheduler(
-            name, kwargs.get('scheduler'), {'fifo'})
-        return SKoptSearcher(**kwargs)
-    elif name == 'grid':
-        return GridSearcher(**kwargs)
-    elif name == 'bayesopt':
-        # Gaussian process based Bayesian optimization
-        # The searchers and their kwargs differ depending on the scheduler
-        # type (fifo, hyperband_*)
-        scheduler = _check_supported_scheduler(
-            name, kwargs.get('scheduler'),
-            {'fifo', 'hyperband_stopping', 'hyperband_promotion'})
-        if scheduler == 'fifo':
-            return GPFIFOSearcher(**kwargs)
-        else:
-            return GPMultiFidelitySearcher(**kwargs)
+    if searcher_name in SEARCHER_CONFIGS:
+        searcher_config = SEARCHER_CONFIGS[searcher_name]
+        searcher_cls = searcher_config['searcher_cls']
+        scheduler = kwargs.get('scheduler')
+
+        # Check if searcher_cls is a lambda - evaluate then
+        if isinstance(searcher_cls, type(lambda: 0)):
+            searcher_cls = searcher_cls(scheduler)
+
+        if 'supported_schedulers' in searcher_config:
+            supported_schedulers = searcher_config['supported_schedulers']
+            assert scheduler is not None, "Scheduler must set search_options['scheduler']"
+            assert scheduler in supported_schedulers, \
+                f"Searcher '{searcher_name}' only works with schedulers {supported_schedulers} (not with '{scheduler}')"
+
+        searcher = searcher_cls(**kwargs)
+        return searcher
     else:
-        raise AssertionError("name = '{}' not supported".format(name))
-
-
-def _check_supported_scheduler(name, scheduler, supp_schedulers):
-    assert scheduler is not None, \
-        "Scheduler must set search_options['scheduler']"
-    assert scheduler in supp_schedulers, \
-        "Searcher '{}' only works with schedulers {} (not with '{}')".format(
-            name, supp_schedulers, scheduler)
-    return scheduler
+        raise AssertionError(f'searcher \'{searcher_name}\' is not supported')

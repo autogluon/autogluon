@@ -7,6 +7,7 @@ from typing import Tuple
 import numpy as np
 from tqdm.auto import tqdm
 
+from autogluon.core.scheduler.reporter import FakeReporter
 from autogluon.core.searcher import BaseSearcher, searcher_factory
 from autogluon.core.utils import EasyDict
 
@@ -113,12 +114,11 @@ class LocalSequentialScheduler(object):
                 "Need stopping criterion: Either num_trials or time_out"
 
     def get_searcher_(self, searcher, train_fn, **kwargs) -> BaseSearcher:
-        if searcher is 'local_sequential_auto':
-            searcher = 'auto'
         scheduler_opts = {}
         if searcher is 'auto':
             searcher = 'bayesopt'
-            scheduler_opts = {'scheduler': 'fifo'}
+            scheduler_opts = {'scheduler': 'local'}
+
         search_options = kwargs.get('search_options', None)
         if isinstance(searcher, str):
             if search_options is None:
@@ -130,7 +130,7 @@ class LocalSequentialScheduler(object):
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
             if 'scheduler' not in _search_options:
-                _search_options['scheduler'] = 'fifo'
+                _search_options['scheduler'] = 'local'
             searcher = searcher_factory(searcher, **{**scheduler_opts, **_search_options})
         else:
             assert isinstance(searcher, BaseSearcher)
@@ -150,7 +150,7 @@ class LocalSequentialScheduler(object):
         r = range(self.num_trials)
         for i in (tqdm(r) if self.num_trials < 1000 else r):
             trial_start_time = time.time()
-            is_failed = self.run_trial(task_id=i)
+            is_failed, result = self.run_trial(task_id=i)
             trial_end_time = time.time()
             trial_run_times.append(np.NaN if is_failed else (trial_end_time - trial_start_time))
 
@@ -207,7 +207,7 @@ class LocalSequentialScheduler(object):
             avg_trial_run_time = ((avg_trial_run_time * i) + trial_time) / (i + 1)
         return avg_trial_run_time
 
-    def run_trial(self, task_id=0) -> Tuple[bool, float, float]:
+    def run_trial(self, task_id=0) -> Tuple[bool, dict]:
         """
         Start a trial with a given task_id
 
@@ -228,20 +228,34 @@ class LocalSequentialScheduler(object):
         """
         searcher_config = self.searcher.get_config()
         reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
+        return self.run_job_(task_id, searcher_config, reporter)
+
+    def run_job_(self, task_id, searcher_config, reporter):
         args = deepcopy(EasyDict(self.train_fn.kwvars))
         args['task_id'] = task_id
         self.searcher.register_pending(searcher_config)
         is_failed = False
         try:
-            self.train_fn(args, config=searcher_config, reporter=reporter)
-            if reporter.last_result:
+            result = self.train_fn(args, config=searcher_config, reporter=reporter)
+            if type(reporter) is not FakeReporter and reporter.last_result:
                 self.searcher.update(config=searcher_config, **reporter.last_result)
         except Exception as e:
             logger.error(f'Exception during a trial: {e}')
             self.searcher.evaluation_failed(config=searcher_config)
             reporter(traceback=e)
             is_failed = True
-        return is_failed
+            result = {'traceback': str(e)}
+        return is_failed, result
+
+    def run_with_config(self, config):
+        """Run with config for final fit.
+        It launches a single training trial under any fixed values of the hyperparameters.
+        For example, after HPO has identified the best hyperparameter values based on a hold-out dataset,
+        one can use this function to retrain a model with the same hyperparameters on all the available labeled data
+        (including the hold out set). It can also returns other objects or states.
+        """
+        is_failed, result = self.run_job_('run_with_config', config, FakeReporter())
+        return result
 
     def join_jobs(self, timeout=None):
         pass  # Compatibility

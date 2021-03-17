@@ -8,11 +8,9 @@ logger = logging.getLogger()
 
 
 _scheduler_presets = {
-    'auto': {'searcher': 'local_sequential_auto'},
-    # 'grid': {'searcher': 'grid'},  # grid commented out as it isn't compatible with most default model search spaces
-    'random': {'searcher': 'random'},
-    'bayesopt': {'searcher': 'bayesopt'},
-    # 'skopt': {'searcher': 'skopt'},  # TODO: Remove skopt? Is it worthwhile to keep as an option?
+    'auto': {'scheduler': 'local', 'searcher': 'bayesopt'},
+    'random': {'scheduler': 'local', 'searcher': 'random'},
+    'bayesopt': {'scheduler': 'local', 'searcher': 'bayesopt'},
     # Don't include hyperband and bayesopt hyperband at present
 }
 
@@ -23,7 +21,6 @@ def scheduler_factory(
         num_trials: int = None,
         nthreads_per_trial='all',
         ngpus_per_trial='all',
-        scheduler_cls='auto',
         **kwargs):
     """
     Constructs a scheduler via lazy initialization based on the input hyperparameter_tune_kwargs.
@@ -35,10 +32,9 @@ def scheduler_factory(
         Hyperparameter tuning strategy and kwargs.
         If None, then hyperparameter tuning will not be performed.
         Valid preset values:
-            'auto': Uses the 'local_sequential_auto' preset.
-            'random': Performs HPO via random search.
-            'bayesopt': Performs HPO via bayesian optimization.
-            'local_sequential_auto': Performs sequential local search via bayesopt
+            'auto': Uses the 'bayesopt' preset.
+            'random': Performs HPO via random search using local scheduler.
+            'bayesopt': Performs HPO via bayesian optimization using local scheduler.
         For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
             The 'searcher' key is required when providing a dict.
             Some schedulers may have different valid keys.
@@ -62,9 +58,6 @@ def scheduler_factory(
             'all': Use all GPUs.
             'auto': Keep value as 'auto' in output, must be updated downstream.
         If None, use 0 GPUs.
-    scheduler_cls : str or cls, default = 'auto'
-        If 'auto', scheduler_cls will be automatically set to the best matching scheduler class corresponding to the chosen searcher.
-        It is recommended to always use 'auto' unless implementing custom schedulers.
     **kwargs :
         Kwargs to specify any other scheduler parameters.
         A kwarg will be ignored if also specified in hyperparameter_tune_kwargs.
@@ -111,6 +104,8 @@ def scheduler_factory(
         hyperparameter_tune_kwargs = get_hyperparameter_tune_kwargs_preset(hyperparameter_tune_kwargs)
     if not isinstance(hyperparameter_tune_kwargs, dict):
         raise ValueError(f"hyperparameter_tune_kwargs must be of type str or dict, but is type: {type(hyperparameter_tune_kwargs)}")
+    if 'scheduler' not in hyperparameter_tune_kwargs:
+        raise ValueError(f"Required key 'scheduler' is not present in hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
     if 'searcher' not in hyperparameter_tune_kwargs:
         raise ValueError(f"Required key 'searcher' is not present in hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
     if num_trials is None and time_out is not None:
@@ -125,13 +120,24 @@ def scheduler_factory(
         **kwargs,
     )
 
-    if isinstance(scheduler_cls, str) and scheduler_cls == 'auto':
-        scheduler_cls = schedulers[scheduler_params['searcher'].lower()]
+    scheduler_cls = hyperparameter_tune_kwargs.get('scheduler', 'unknown')
+    if isinstance(scheduler_cls, str):
+        scheduler_cls = get_scheduler_from_preset(scheduler_cls)
     if not inspect.isclass(scheduler_cls):
         raise ValueError(f'scheduler_cls must be a class, but was instead: {scheduler_cls}')
+
     if scheduler_params['time_out'] is None:
         scheduler_params.pop('time_out', None)
     return scheduler_cls, scheduler_params
+
+
+def get_scheduler_from_preset(scheduler_cls):
+    scheduler_cls = scheduler_cls.lower()
+    if scheduler_cls not in schedulers.keys():
+        raise ValueError(f"Required key 'scheduler' in hyperparameter_tune_kwargs must be one of the "
+                         f"values {schedulers.keys()}, but was instead: {scheduler_cls}")
+    scheduler_cls = schedulers.get(scheduler_cls)
+    return scheduler_cls
 
 
 def get_hyperparameter_tune_kwargs_preset(preset: str):

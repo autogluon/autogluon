@@ -135,7 +135,7 @@ def gp_fifo_searcher_factory(**kwargs) -> GPFIFOSearcher:
     :return: GPFIFOSearcher object
 
     """
-    assert kwargs['scheduler'] == 'fifo', \
+    assert kwargs['scheduler'] in ['fifo', 'local'], \
         "This factory needs scheduler = 'fifo' (instead of '{}')".format(
             kwargs['scheduler'])
     # Common objects

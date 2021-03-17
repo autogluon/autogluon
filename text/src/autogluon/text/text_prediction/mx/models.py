@@ -11,6 +11,8 @@ import pickle
 import functools
 import tqdm
 from typing import Tuple
+
+from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
 from sklearn.preprocessing import LabelEncoder
 import mxnet as mx
@@ -973,7 +975,8 @@ class MultiModalTextModel:
                 plot_results = False
         scheduler_options = compile_scheduler_options_v2(
             scheduler_options=scheduler_options,
-            search_strategy=tune_kwargs['search_strategy'],
+            scheduler=tune_kwargs['search_strategy'],
+            search_strategy=tune_kwargs['searcher'],
             search_options=tune_kwargs['search_options'],
             nthreads_per_trial=num_cpus,
             ngpus_per_trial=num_gpus,
@@ -1046,10 +1049,10 @@ class MultiModalTextModel:
                 plt.show()
             self._results = local_results
         else:
-            if tune_kwargs['search_strategy'] != 'local_sequential_auto':
+            if tune_kwargs['search_strategy'] != 'local':
                 # Force forkserver if it's not using the local sequential HPO
                 force_forkserver()
-            scheduler_cls = schedulers[tune_kwargs['search_strategy']]
+            scheduler_cls, scheduler_params = scheduler_factory(scheduler_options)
             # Create scheduler, run HPO experiment
             scheduler = scheduler_cls(train_fn, **scheduler_options)
             scheduler.run()
