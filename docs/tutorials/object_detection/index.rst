@@ -6,6 +6,12 @@ For detecting the presence and location of objects in images, AutoGluon provides
 .. container:: cards
 
    .. card::
+      :title: Prepare Dataset for Object Detector
+      :link: dataset.html
+
+      Prepare dataset for object detection.
+
+   .. card::
       :title: Quick Start Using FIT
       :link: beginner.html
 
@@ -15,4 +21,5 @@ For detecting the presence and location of objects in images, AutoGluon provides
    :maxdepth: 1
    :hidden:
 
+   dataset
    beginner

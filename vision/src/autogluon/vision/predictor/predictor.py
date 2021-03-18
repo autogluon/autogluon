@@ -262,6 +262,12 @@ class ImagePredictor(object):
             else:
                 valid_names = '\n'.join(names)
                 raise ValueError(f'`tuning_data` {tuning_data} is not among valid list {valid_names}')
+
+        # data sanity check
+        train_data = self._validate_data(train_data)
+        if tuning_data is not None:
+            tuning_data = self._validate_data(tuning_data)
+
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
             self._classifier._logger.setLevel(log_level)
@@ -332,6 +338,32 @@ class ImagePredictor(object):
         if hasattr(task, 'fit_history'):
             self._fit_summary['fit_history'] = task.fit_history()
         return self
+
+    def _validate_data(self, data):
+        """Check whether data is valid, try to convert with best effort if not"""
+        if not (hasattr(data, 'classes') and hasattr(data, 'to_mxnet')):
+            if isinstance(data, pd.DataFrame):
+                # raw dataframe, try to add metadata automatically
+                if 'label' in data.columns and 'image' in data.columns:
+                    # check image relative/abs path is valid
+                    sample = data.iloc[0]['image']
+                    if not os.path.isfile(sample):
+                        raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
+                    logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
+                    infer_classes = list(data.label.unique().tolist())
+                    logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
+                    instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
+                    logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
+                    data = _ImageClassification.Dataset(data, classes=infer_classes)
+                else:
+                    err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
+                              '`image` and `label` columns are required.' + \
+                              'You may visit `https://auto.gluon.ai/stable/tutorials/image_prediction/dataset.html` ' + \
+                              'for details.'
+                    raise AttributeError(err_msg)
+        if len(data) < 1:
+            raise ValueError('Empty dataset.')
+        return data
 
     def _validate_kwargs(self, kwargs):
         """validate and initialize default kwargs"""

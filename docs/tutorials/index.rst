@@ -7,6 +7,12 @@ Image Prediction
 .. container:: cards
 
    .. card::
+      :title: Dataset Preparation for Image Predictor
+      :link: image_prediction/dataset.html
+
+      Quick dataset preparation guide for image prediction.
+
+   .. card::
       :title: Quick Start Using FIT
       :link: image_prediction/beginner.html
 
@@ -28,6 +34,12 @@ Image Prediction
 Object Detection
 ----------------
 .. container:: cards
+
+   .. card::
+      :title: Dataset Preparation for Object Detector
+      :link: object_detection/dataset.html
+
+      Quick dataset preparation guide for object detection.
 
    .. card::
       :title: Quick Start Using FIT

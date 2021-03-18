@@ -12,10 +12,7 @@ class MXNetErrorCatcher(contextlib.AbstractContextManager):
             if 'KeyboardInterrupt' in str(exc_value):
                 self.exc_value = 'KeyboardInterrupt'
                 return True
-            lines = [line for line in str(exc_value).splitlines() if 'MXNetError' in line]
             mxnet_err = str(exc_value)
-            if lines:
-                mxnet_err = lines[-1].strip() + '\n'
             if 'GPU is not enabled' in mxnet_err:
                 self.hint += ('MXNet is not built with GPU support, make sure you have nvidia gpus enabled with '
                               'corresponding mxnet-cuxxx version installed, where `xxx` is the cuda version. '
