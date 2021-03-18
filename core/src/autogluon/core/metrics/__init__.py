@@ -8,9 +8,10 @@ import sklearn.metrics
 
 from . import classification_metrics
 from .util import sanitize_array
-from ..constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION, QUANTILE
+from ..constants import PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION, QUANTILE
 from ..utils.miscs import warning_filter
 from .classification_metrics import *
+from . import quantile_metrics
 
 
 class Scorer(object, metaclass=ABCMeta):
@@ -412,6 +413,15 @@ root_mean_squared_error = make_scorer('root_mean_squared_error',
                                       greater_is_better=False)
 root_mean_squared_error.add_alias('rmse')
 
+# Quantile pinball loss
+pinball_loss = make_scorer('pinball_loss',
+                           quantile_metrics.pinball_loss,
+                           needs_quantile=True,
+                           optimum=0.0,
+                           greater_is_better=False)
+pinball_loss.add_alias('pinball')
+
+
 # Standard Classification Scores
 accuracy = make_scorer('accuracy',
                        sklearn.metrics.accuracy_score)
@@ -505,6 +515,18 @@ for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_er
                              f'Consider to use a different alias.')
         REGRESSION_METRICS[alias] = scorer
 
+QUANTILE_METRICS = dict()
+for scorer in [pinball_loss]:
+    if scorer.name in QUANTILE_METRICS:
+        raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
+                         f'Consider to register with a different name.')
+    QUANTILE_METRICS[scorer.name] = scorer
+    for alias in scorer.alias:
+        if alias in QUANTILE_METRICS:
+            raise ValueError(f'Duplicated alias found! scorer={scorer}, alias={alias}. '
+                             f'Consider to use a different alias.')
+        QUANTILE_METRICS[alias] = scorer
+
 CLASSIFICATION_METRICS = dict()
 for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, roc_auc_ovo_macro, average_precision, log_loss, pac_score]:
     CLASSIFICATION_METRICS[scorer.name] = scorer
@@ -527,7 +549,8 @@ for name, metric in [('precision', sklearn.metrics.precision_score),
 def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
-    all_available_metric_names = list(CLASSIFICATION_METRICS.keys()) + list(REGRESSION_METRICS.keys()) + ['soft_log_loss', 'pinball_loss']
+    all_available_metric_names = list(CLASSIFICATION_METRICS.keys()) + list(REGRESSION_METRICS.keys()) + list(QUANTILE_METRICS.keys()) + ['soft_log_loss']
+
     if metric is not None and isinstance(metric, str):
         if metric in CLASSIFICATION_METRICS:
             if problem_type is not None and problem_type not in PROBLEM_TYPES_CLASSIFICATION:
@@ -537,15 +560,16 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
             if problem_type is not None and problem_type not in PROBLEM_TYPES_REGRESSION:
                 raise ValueError(f"{metric_type}={metric} can only be used for regression problems")
             return REGRESSION_METRICS[metric]
+        elif metric in QUANTILE_METRICS:
+            if problem_type is not None and problem_type != QUANTILE:
+                raise ValueError(f"{metric_type}={metric} can only be used for quantile problems")
+            return QUANTILE_METRICS[metric]
         elif metric == 'soft_log_loss':
+            if problem_type == QUANTILE:
+                raise ValueError(f"{metric_type}={metric} can not be used for quantile problems")
             # Requires mxnet
             from .softclass_metrics import soft_log_loss
             return soft_log_loss
-        elif metric == 'pinball_loss':
-            if problem_type is not None and problem_type != QUANTILE:
-                raise ValueError(f"{metric_type}={metric} can only be used for quantile problems")
-            from .quantile_metrics import pinball_loss
-            return pinball_loss
         else:
             raise ValueError(
                 f"{metric} is an unknown metric, all available metrics are "

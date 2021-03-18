@@ -669,6 +669,7 @@ class AbstractModel:
             problem_type=self.problem_type,
             eval_metric=self.eval_metric,
             num_classes=self.num_classes,
+            quantile_levels=self.quantile_levels,
             stopping_metric=self.stopping_metric,
             model=None,
             hyperparameters=hyperparameters,

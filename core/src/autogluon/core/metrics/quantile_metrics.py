@@ -4,12 +4,10 @@ import logging
 
 import numpy as np
 
-from . import make_scorer
-
 logger = logging.getLogger(__name__)
 
 
-def _pinball_loss(target_value, quantile_values, quantile_levels, sample_weight=None, quantile_weight=None):
+def pinball_loss(target_value, quantile_values, quantile_levels, sample_weight=None, quantile_weight=None):
 
     # "target_value" must be 2D pandas or numpy arrays
     target_value = np.array(target_value).reshape(-1, 1)
@@ -33,8 +31,3 @@ def _pinball_loss(target_value, quantile_values, quantile_levels, sample_weight=
 
     # return mean over all samples (sample weighted) and quantile levels
     return np.average(np.average(loss_values, weights=sample_weight, axis=0), weights=quantile_weight, axis=0)
-
-
-# Loss for quantile regression:
-pinball_loss = make_scorer('pinball_loss', _pinball_loss,
-                           needs_quantile=True, optimum=0.0, greater_is_better=False)

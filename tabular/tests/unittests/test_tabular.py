@@ -29,7 +29,7 @@ import pandas as pd
 import pytest
 
 import autogluon.core as ag
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 from autogluon.tabular import TabularDataset, TabularPredictor
 
 
@@ -516,6 +516,26 @@ def test_sample_weight():
     predictor.distill(time_limit=10)
     ldr = predictor.leaderboard(test_data_weighted)
 
+
+def test_quantile():
+    quantile_levels = [0.01, 0.02, 0.05, 0.98, 0.99]
+    dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip',
+               'name': 'toyRegression',
+               'problem_type': QUANTILE,
+               'label': 'y'}
+    directory_prefix = './datasets/'
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset['name'], url=dataset['url'])
+    print(f"Evaluating Benchmark Dataset {dataset['name']}")
+    directory = directory_prefix + dataset['name'] + "/"
+    savedir = directory + 'AutogluonOutput/'
+    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    fit_args = {'time_limit': 20}
+    predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'],
+                                 quantile_levels=quantile_levels).fit(train_data, **fit_args)
+    ldr = predictor.leaderboard(test_data)
+    perf = predictor.evaluate(test_data)
 
 
 @pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")

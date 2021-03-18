@@ -18,8 +18,7 @@ from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, Repea
 from sklearn.model_selection import train_test_split
 
 from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
-from ..metrics import accuracy, root_mean_squared_error, Scorer
-from ..metrics.quantile_metrics import pinball_loss
+from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
 from ..features.infer_types import get_type_map_raw
 from ..features.types import R_INT, R_FLOAT, R_CATEGORY
 
