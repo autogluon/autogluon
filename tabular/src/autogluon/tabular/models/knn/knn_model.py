@@ -10,6 +10,7 @@ from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from autogluon.core.features.types import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
 from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.utils import normalize_pred_probas
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,10 @@ class KNNModel(AbstractModel):
     """
     KNearestNeighbors model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
     """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._X_unused_index = None  # Keeps track of unused training data indices, necessary for LOO OOF generation
+
     def _get_model_type(self):
         try:
             from ._knn_loo_variants import KNeighborsClassifier, KNeighborsRegressor
@@ -96,32 +101,85 @@ class KNNModel(AbstractModel):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
     # TODO: Won't work for RAPIDS without modification
-    # TODO: support normalization?
     # TODO: Technically isn't OOF, but can be used inplace of OOF. Perhaps rename to something more accurate?
-    def get_oof_pred_proba(self):
+    def get_oof_pred_proba(self, X, normalize=None, **kwargs):
+        """X should be the same X passed to `.fit`"""
+        y_oof_pred_proba = self._get_oof_pred_proba(X=X, **kwargs)
+        if normalize is None:
+            normalize = self.normalize_pred_probas
+        if normalize:
+            y_oof_pred_proba = normalize_pred_probas(y_oof_pred_proba, self.problem_type)
+        y_oof_pred_proba = y_oof_pred_proba.astype(np.float32)
+        return y_oof_pred_proba
+
+    def _get_oof_pred_proba(self, X, **kwargs):
         if callable(getattr(self.model, "predict_proba_loo", None)):
             y_oof_pred_proba = self.model.predict_proba_loo()
         elif callable(getattr(self.model, "predict_loo", None)):
             y_oof_pred_proba = self.model.predict_loo()
         else:
             raise AssertionError(f'Model class {type(self.model)} does not support out-of-fold prediction generation.')
-        return self._convert_proba_to_unified_form(y_oof_pred_proba)
+        y_oof_pred_proba = self._convert_proba_to_unified_form(y_oof_pred_proba)
+        if X is not None and self._X_unused_index:
+            X_unused = X.iloc[self._X_unused_index]
+            y_pred_proba_new = self.predict_proba(X_unused)
+            X_unused_index = set(self._X_unused_index)
+            num_rows = len(X)
+            X_used_index = [i for i in range(num_rows) if i not in X_unused_index]
+            oof_pred_shape = y_oof_pred_proba.shape
+            if len(oof_pred_shape) == 1:
+                y_oof_tmp = np.zeros(num_rows, dtype=np.float32)
+                y_oof_tmp[X_used_index] = y_oof_pred_proba
+                y_oof_tmp[self._X_unused_index] = y_pred_proba_new
+            else:
+                y_oof_tmp = np.zeros((num_rows, oof_pred_shape[1]), dtype=np.float32)
+                y_oof_tmp[X_used_index, :] = y_oof_pred_proba
+                y_oof_tmp[self._X_unused_index, :] = y_pred_proba_new
+            y_oof_pred_proba = y_oof_tmp
+        return y_oof_pred_proba
 
     # TODO: Consider making this fully generic and available to all models
-    def _fit_with_samples(self, X, y, time_limit):
+    def _fit_with_samples(self,
+                          X,
+                          y,
+                          time_limit,
+                          start_samples=10000,
+                          max_samples=None,
+                          sample_growth_factor=2,
+                          sample_time_growth_factor=8):
         """
         Fit model with samples of the data repeatedly, gradually increasing the amount of data until time_limit is reached or all data is used.
 
-        X and y must already be preprocessed
+        X and y must already be preprocessed.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            The training data features (preprocessed).
+        y : Series
+            The training data ground truth labels.
+        time_limit : float, default = None
+            Time limit in seconds to adhere to when fitting model.
+        start_samples : int, default = 10000
+            Number of samples to start with. This will be multiplied by sample_growth_factor after each model fit to determine the next number of samples.
+            For example, if start_samples=10000, sample_growth_factor=2, then the number of samples per model fit would be [10000, 20000, 40000, 80000, ...]
+        max_samples : int, default = None
+            The maximum number of samples to use.
+            If None or greater than the number of rows in X, then it is set equal to the number of rows in X.
+        sample_growth_factor : float, default = 2
+            The rate of growth in sample size between each model fit. If 2, then the sample size doubles after each fit.
+        sample_time_growth_factor : float, default = 8
+            The multiplier to the expected fit time of the next model. If `sample_time_growth_factor=8` and a model took 10 seconds to train, the next model fit will be expected to take 80 seconds.
+            If an expected time is greater than the remaining time in `time_limit`, the model will not be trained and the method will return early.
         """
         time_start = time.time()
 
-        sample_growth_factor = 2  # Growth factor of each sample in terms of row count
-        sample_time_growth_factor = 8  # Assume next sample will take 8x longer than previous (Somewhat safe but there are datasets where it is even >8x.
-
         num_rows_samples = []
-        num_rows_max = len(X)
-        num_rows_cur = 10000
+        if max_samples is None:
+            num_rows_max = len(X)
+        else:
+            num_rows_max = min(len(X), max_samples)
+        num_rows_cur = start_samples
         while True:
             num_rows_cur = min(num_rows_cur, num_rows_max)
             num_rows_samples.append(num_rows_cur)
@@ -145,6 +203,7 @@ class KNNModel(AbstractModel):
         time_start_sample_loop = time.time()
         time_limit_left = time_limit - (time_start_sample_loop - time_start)
         model_type = self._get_model_type()
+        idx = None
         for i, samples in enumerate(num_rows_samples):
             if samples != num_rows_max:
                 if self.problem_type == REGRESSION:
@@ -156,6 +215,7 @@ class KNNModel(AbstractModel):
             else:
                 X_samp = X
                 y_samp = y
+                idx = None
             self.model = model_type(**self.params).fit(X_samp, y_samp)
             time_limit_left_prior = time_limit_left
             time_fit_end_sample = time.time()
@@ -166,6 +226,9 @@ class KNNModel(AbstractModel):
             if time_required_for_next > time_limit_left and i != len(num_rows_samples) - 1:
                 logger.log(20, f'\tNot enough time to train KNN model on all training rows. Fit {samples}/{num_rows_max} rows. (Training KNN model on {num_rows_samples[i+1]} rows is expected to take {round(time_required_for_next, 2)}s)')
                 break
+        if idx is not None:
+            idx = set(idx)
+            self._X_unused_index = [i for i in range(num_rows_max) if i not in idx]
         return self.model
 
     # TODO: Add HPO

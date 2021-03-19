@@ -167,7 +167,7 @@ class BaggedEnsembleModel(AbstractModel):
                 time_start_predict = time.time()
                 if callable(getattr(model_base, "get_oof_pred_proba", None)):
                     # FIXME: Use a tag instead / as well so inherited models that don't support oof aren't assumed to support based on parent class.
-                    self._oof_pred_proba = model_base.get_oof_pred_proba()
+                    self._oof_pred_proba = model_base.get_oof_pred_proba(X=X)
                 else:
                     logger.warning('\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores.')
                     self._oof_pred_proba = model_base.predict_proba(X=X)
