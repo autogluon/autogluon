@@ -1,4 +1,4 @@
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 
 # TODO this method is generalizable and potentially should be moved out into framework
 def get_param_baseline(problem_type, num_classes=None):
@@ -8,6 +8,8 @@ def get_param_baseline(problem_type, num_classes=None):
         return get_param_multiclass_baseline()
     elif problem_type == REGRESSION:
         return get_param_regression_baseline()
+    elif problem_type == QUANTILE:
+        return get_param_quantile_baseline()
     else:
         return get_param_binary_baseline()
 
@@ -42,4 +44,8 @@ def get_param_binary_baseline():
 
 
 def get_param_regression_baseline():
+    return get_param_multiclass_baseline()
+
+
+def get_param_quantile_baseline():
     return get_param_multiclass_baseline()

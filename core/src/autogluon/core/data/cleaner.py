@@ -1,7 +1,7 @@
 import logging
 from pandas import DataFrame
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ class Cleaner:
             return CleanerDummy()
         elif problem_type == MULTICLASS:
             return CleanerMulticlass(label=label, threshold=threshold)
-        elif problem_type == REGRESSION:
+        elif problem_type in [REGRESSION, QUANTILE]:
             return CleanerDummy()
         else:
             raise NotImplementedError

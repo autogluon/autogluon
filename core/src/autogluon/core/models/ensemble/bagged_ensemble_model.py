@@ -8,7 +8,7 @@ from statistics import mean
 import numpy as np
 import pandas as pd
 
-from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
+from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
@@ -64,7 +64,7 @@ class BaggedEnsembleModel(AbstractModel):
         return self.is_fit() and self.params.get('save_bag_folds', True)
 
     def is_stratified(self):
-        if self.problem_type == REGRESSION or self.problem_type == SOFTCLASS:
+        if self.problem_type in [REGRESSION, QUANTILE, SOFTCLASS]:
             return False
         else:
             return True
@@ -615,6 +615,8 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float32)
         elif self.problem_type == SOFTCLASS:
             oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float32)
+        elif self.problem_type == QUANTILE:
+            oof_pred_proba = np.zeros(shape=(len(X), len(self.quantile_levels)), dtype=np.float32)
         else:
             oof_pred_proba = np.zeros(shape=len(X), dtype=np.float32)
         oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)

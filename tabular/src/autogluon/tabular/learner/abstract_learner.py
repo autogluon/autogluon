@@ -6,6 +6,7 @@ import random
 import time
 import warnings
 from collections import OrderedDict
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
@@ -39,7 +40,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0, sample_weight=None, weight_evaluation=False):
+                 problem_type=None, quantile_levels=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0, sample_weight=None, weight_evaluation=False):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.ignored_columns = ignored_columns
@@ -48,6 +49,19 @@ class AbstractLearner:
         self.threshold = label_count_threshold
         self.problem_type = problem_type
         self.eval_metric = get_metric(eval_metric, self.problem_type, 'eval_metric')
+
+        if self.problem_type == QUANTILE and quantile_levels is None:
+            raise ValueError("if `problem_type='quantile'`, `quantile_levels` has to be specified")
+        if isinstance(quantile_levels, float):
+            quantile_levels = [quantile_levels]
+        if isinstance(quantile_levels, Iterable):
+            for quantile in quantile_levels:
+                if quantile <= 0.0 or quantile >= 1.0:
+                    raise ValueError("quantile values have to be non-negative and less than 1.0 (0.0 < q < 1.0). "
+                                     "For example, 0.95 quantile = 95 percentile")
+            quantile_levels = np.sort(np.array(quantile_levels))
+        self.quantile_levels = quantile_levels
+
         self.cache_data = cache_data
         if not self.cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
@@ -142,6 +156,8 @@ class AbstractLearner:
         if as_pandas:
             if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
                 y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels, index=X_index)
+            elif self.problem_type == QUANTILE:
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.quantile_levels, index=X_index)
             else:
                 y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=X_index)
         return y_pred_proba
@@ -154,12 +170,16 @@ class AbstractLearner:
         y_pred_proba = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False, inverse_transform=False)
         problem_type = self.label_cleaner.problem_type_transform or self.problem_type
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
-        y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
-        if as_pandas:
-            y_pred.index = X_index
-            y_pred.name = self.label
+        if problem_type != QUANTILE:
+            y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
+            if as_pandas:
+                y_pred.index = X_index
+                y_pred.name = self.label
+            else:
+                y_pred = y_pred.values
         else:
-            y_pred = y_pred.values
+            if as_pandas:
+                y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels, index=X_index)
         return y_pred
 
     def _validate_fit_input(self, X: DataFrame, **kwargs):
@@ -254,10 +274,12 @@ class AbstractLearner:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
                 y_pred = self.label_cleaner.transform(y_pred)
                 y = self.label_cleaner.transform(y)
+        elif self.eval_metric.needs_quantile:
+            y_pred = self.predict(X=X, model=model, as_pandas=False)
         else:
             y_pred = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False)
             y = self.label_cleaner.transform(y)
-        return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation)
+        return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
@@ -282,8 +304,9 @@ class AbstractLearner:
 
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())
-            ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric)
+            ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric, quantile_levels=self.quantile_levels)
             ensemble_selection.fit(predictions=pred_probas, labels=y_internal, identifiers=None, sample_weight=w)  # TODO: Only fit non-nan
+
             oracle_weights = ensemble_selection.weights_
             oracle_pred_time_start = time.time()
             oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
@@ -302,10 +325,13 @@ class AbstractLearner:
                 else:
                     y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
                     y_tmp = y
+            elif self.eval_metric.needs_quantile:
+                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+                y_tmp = y
             else:
                 y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
                 y_tmp = y_internal
-            scores[model_name] = compute_weighted_metric(y_tmp, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation)
+            scores[model_name] = compute_weighted_metric(y_tmp, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
@@ -394,7 +420,9 @@ class AbstractLearner:
         assert isinstance(y_pred, (np.ndarray, pd.Series, pd.DataFrame))
         self._validate_class_labels(y_true)
         if isinstance(y_pred, np.ndarray):
-            if len(y_pred.shape) > 1:
+            if self.problem_type == QUANTILE:
+                y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels)
+            elif len(y_pred.shape) > 1:
                 y_pred = pd.DataFrame(data=y_pred, columns=self.class_labels)
         if self.problem_type == BINARY:
             if isinstance(y_pred, pd.DataFrame):

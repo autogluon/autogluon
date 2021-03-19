@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from .abstract_learner import AbstractLearner
@@ -76,6 +76,7 @@ class DefaultLearner(AbstractLearner):
             problem_type=self.label_cleaner.problem_type_transform,
             eval_metric=self.eval_metric,
             num_classes=self.label_cleaner.num_classes,
+            quantile_levels=self.quantile_levels,
             feature_metadata=self.feature_generator.feature_metadata,
             low_memory=True,
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
@@ -116,6 +117,13 @@ class DefaultLearner(AbstractLearner):
 
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(X[self.label])
+            if self.quantile_levels is not None:
+                if self.problem_type == REGRESSION:
+                    self.problem_type = QUANTILE
+                else:
+                    raise ValueError("autogluon infers this to be classification problem for which quantile_levels "
+                                     "cannot be specified. If it is truly a quantile regression problem, "
+                                     "please specify:problem_type='quantile'")
 
         if X_val is not None and self.label in X_val.columns:
             holdout_frac = 1
@@ -246,7 +254,7 @@ class DefaultLearner(AbstractLearner):
 
     def _adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
         new_threshold = threshold
-        if self.problem_type == REGRESSION:
+        if self.problem_type in [REGRESSION, QUANTILE]:
             num_rows = len(y)
             holdout_frac = max(holdout_frac, 1 / num_rows + 0.001)
             num_bag_folds = min(num_bag_folds, num_rows)

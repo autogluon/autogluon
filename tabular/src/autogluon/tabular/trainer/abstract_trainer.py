@@ -8,7 +8,7 @@ import pandas as pd
 import psutil
 from collections import defaultdict
 
-from autogluon.core.constants import AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from autogluon.core.constants import AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
@@ -36,7 +36,7 @@ class AbstractTrainer:
     distill_stackname = 'distill'  # name of stack-level for distilled student models
 
     def __init__(self, path: str, problem_type: str, eval_metric=None,
-                 num_classes=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
+                 num_classes=None, quantile_levels=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
                  sample_weight=None, weight_evaluation=False, save_data=False, random_state=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
@@ -52,11 +52,12 @@ class AbstractTrainer:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
         logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
-        if not self.eval_metric.needs_pred:
+        if not (self.eval_metric.needs_pred or self.eval_metric.needs_quantile):
             logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "\tTo change this, specify the eval_metric argument of fit()")
         self.num_classes = num_classes
+        self.quantile_levels = quantile_levels
         self.feature_prune = False  # will be set to True if feature-pruning is turned on.
         self.low_memory = low_memory
         self.bagged_mode = True if k_fold >= 2 else False
@@ -414,18 +415,20 @@ class AbstractTrainer:
         return X
 
     def score(self, X, y, model=None, weights=None) -> float:
-        if self.eval_metric.needs_pred:
+        if self.eval_metric.needs_pred or self.eval_metric.needs_quantile:
             y_pred = self.predict(X=X, model=model)
         else:
             y_pred = self.predict_proba(X=X, model=model)
-        return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation)
+        return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation,
+                                       quantile_levels=self.quantile_levels)
 
     def score_with_y_pred_proba(self, y, y_pred_proba, weights=None) -> float:
-        if self.eval_metric.needs_pred:
+        if self.eval_metric.needs_pred or self.eval_metric.needs_quantile:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:
             y_pred = y_pred_proba
-        return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation)
+        return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation,
+                                       quantile_levels=self.quantile_levels)
 
     # TODO: Consider adding persist to disk functionality for pred_proba dictionary to lessen memory burden on large multiclass problems.
     #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
@@ -1332,7 +1335,8 @@ class AbstractTrainer:
             base_models_dict=base_models_dict,
             base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=model_names),
             base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=model_names),
-            hyperparameters=hyperparameters, num_classes=self.num_classes, random_state=level+self.random_state
+            hyperparameters=hyperparameters, num_classes=self.num_classes, quantile_levels=self.quantile_levels,
+            random_state=level+self.random_state
         )
         return dummy_stacker
 

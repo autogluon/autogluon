@@ -7,8 +7,9 @@ import time
 import numpy as np
 import psutil
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from .rf_quantile import RandomForestQuantileRegressor
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.features.types import R_OBJECT
 
@@ -30,6 +31,8 @@ class RFModel(AbstractModel):
     def _get_model_type(self):
         if self.problem_type in [REGRESSION, SOFTCLASS]:
             return RandomForestRegressor
+        elif self.problem_type == QUANTILE:
+            return RandomForestQuantileRegressor
         else:
             return RandomForestClassifier
 
@@ -157,6 +160,8 @@ class RFModel(AbstractModel):
             return self.model.predict(X)
         elif self.problem_type == SOFTCLASS:
             return self.model.predict(X)
+        elif self.problem_type == QUANTILE:
+            return self.model.predict(X, quantile_levels=self.quantile_levels)
 
         y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
