@@ -43,3 +43,6 @@ class KNNRapidsModel(KNNModel):
         extra_ag_args_ensemble = {'use_child_oof': False}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
+
+    def _more_tags(self):
+        return {'valid_oof': False}

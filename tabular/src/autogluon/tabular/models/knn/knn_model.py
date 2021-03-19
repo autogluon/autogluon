@@ -235,6 +235,9 @@ class KNNModel(AbstractModel):
     def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
+    def _more_tags(self):
+        return {'valid_oof': True}
+
 
 class FAISSModel(KNNModel):
     def _get_model_type(self):
@@ -258,3 +261,6 @@ class FAISSModel(KNNModel):
         extra_ag_args_ensemble = {'use_child_oof': False}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
+
+    def _more_tags(self):
+        return {'valid_oof': False}

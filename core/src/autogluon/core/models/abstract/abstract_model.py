@@ -1,5 +1,6 @@
 import copy
 import gc
+import inspect
 import logging
 import os
 import pickle
@@ -11,6 +12,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
+from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
@@ -922,6 +924,20 @@ class AbstractModel:
             stopping_metric = self.eval_metric
         stopping_metric = metrics.get_metric(stopping_metric, self.problem_type, 'stopping_metric')
         return stopping_metric
+
+    def _get_tags(self):
+        collected_tags = {}
+        for base_class in reversed(inspect.getmro(self.__class__)):
+            if hasattr(base_class, '_more_tags'):
+                # need the if because mixins might not have _more_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._more_tags(self)
+                collected_tags.update(more_tags)
+        return collected_tags
+
+    def _more_tags(self):
+        return _DEFAULT_TAGS
 
 
 class AbstractNeuralNetworkModel(AbstractModel):

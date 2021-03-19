@@ -40,6 +40,8 @@ class BaggedEnsembleModel(AbstractModel):
         self._random_state = random_state
         self.low_memory = True
         self._bagged_mode = None
+        # _child_oof currently is only set to True for KNN models, that are capable of LOO prediction generation to avoid needing bagging.
+        # TODO: Consider moving `_child_oof` logic to a separate class / refactor OOF logic.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
 
         try:
@@ -79,7 +81,7 @@ class BaggedEnsembleModel(AbstractModel):
     def is_valid_oof(self):
         return self.is_fit() and (self._child_oof or self._bagged_mode)
 
-    def get_oof_pred_proba(self):
+    def get_oof_pred_proba(self, **kwargs):
         # TODO: Require is_valid == True (add option param to ignore is_valid)
         return self._oof_pred_proba_func(self._oof_pred_proba, self._oof_pred_model_repeats)
 
@@ -165,8 +167,7 @@ class BaggedEnsembleModel(AbstractModel):
             if use_child_oof:
                 logger.log(15, '\t`use_child_oof` was specified for this model. It will function similarly to a bagged model, but will only fit one child model.')
                 time_start_predict = time.time()
-                if callable(getattr(model_base, "get_oof_pred_proba", None)):
-                    # FIXME: Use a tag instead / as well so inherited models that don't support oof aren't assumed to support based on parent class.
+                if model_base._get_tags().get('valid_oof', False):
                     self._oof_pred_proba = model_base.get_oof_pred_proba(X=X)
                 else:
                     logger.warning('\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores.')
@@ -714,3 +715,6 @@ class BaggedEnsembleModel(AbstractModel):
 
         # TODO: hpo_results likely not correct because no renames
         return bags, bags_performance, hpo_results
+
+    def _more_tags(self):
+        return {'valid_oof': True}
