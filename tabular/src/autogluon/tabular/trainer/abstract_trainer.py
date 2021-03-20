@@ -1123,6 +1123,8 @@ class AbstractTrainer:
         repeats_completed = 0
         time_start = time.time()
         for n in range(n_repeat_start, n_repeats):
+            if not models_valid:
+                break  # No models to repeat
             if time_limit is not None:
                 time_start_repeat = time.time()
                 time_left = time_limit - (time_start_repeat - time_start)
