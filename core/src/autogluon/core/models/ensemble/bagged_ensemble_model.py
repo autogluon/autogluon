@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 class BaggedEnsembleModel(AbstractModel):
     """
     Bagged ensemble meta-model which fits a given model multiple times across different splits of the training data.
+
+    For certain child models such as KNN, this may only train a single model and instead rely on the child model to generate out-of-fold predictions.
     """
     _oof_filename = 'oof.pkl'
 
