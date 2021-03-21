@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 class BaggedEnsembleModel(AbstractModel):
     """
     Bagged ensemble meta-model which fits a given model multiple times across different splits of the training data.
+
+    For certain child models such as KNN, this may only train a single model and instead rely on the child model to generate out-of-fold predictions.
     """
     _oof_filename = 'oof.pkl'
 
@@ -39,7 +41,11 @@ class BaggedEnsembleModel(AbstractModel):
         self._k_per_n_repeat = []  # k-fold used for each n_repeat. == [5, 10, 3] if first kfold was 5, second was 10, and third was 3
         self._random_state = random_state
         self.low_memory = True
-        self.bagged_mode = None
+        self._bagged_mode = None
+        # _child_oof currently is only set to True for KNN models, that are capable of LOO prediction generation to avoid needing bagging.
+        # TODO: Consider moving `_child_oof` logic to a separate class / refactor OOF logic.
+        # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
+        self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
 
         try:
             feature_metadata = self.model_base.feature_metadata
@@ -52,7 +58,10 @@ class BaggedEnsembleModel(AbstractModel):
         super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_metadata=feature_metadata, **kwargs)
 
     def _set_default_params(self):
-        default_params = {'save_bag_folds': True}
+        default_params = {
+            # 'use_child_oof': False,  # [Advanced] Whether to defer to child model for OOF preds and only train a single child.
+            'save_bag_folds': True,
+        }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
@@ -72,10 +81,10 @@ class BaggedEnsembleModel(AbstractModel):
     def is_fit(self):
         return len(self.models) != 0
 
-    # TODO: This assumes bagged ensemble has a complete k_fold and no partial k_fold models, this is likely fine but will act incorrectly if called when only a partial k_fold has been completed
-    #  Solving this is memory intensive, requires all oof_pred_probas from all n_repeats, so its probably not worth it.
-    @property
-    def oof_pred_proba(self):
+    def is_valid_oof(self):
+        return self.is_fit() and (self._child_oof or self._bagged_mode)
+
+    def get_oof_pred_proba(self, **kwargs):
         # TODO: Require is_valid == True (add option param to ignore is_valid)
         return self._oof_pred_proba_func(self._oof_pred_proba, self._oof_pred_model_repeats)
 
@@ -108,6 +117,13 @@ class BaggedEnsembleModel(AbstractModel):
              time_limit=None,
              sample_weight=None,
              **kwargs):
+        use_child_oof = self.params.get('use_child_oof', False)
+        if use_child_oof:
+            if self.is_fit():
+                # TODO: We may want to throw an exception instead and avoid calling fit more than once
+                return
+            k_fold = 1
+            k_fold_end = None
         if k_fold < 1:
             k_fold = 1
         if k_fold_end is None:
@@ -129,9 +145,6 @@ class BaggedEnsembleModel(AbstractModel):
             raise ValueError(f'k_fold_end must equal k_fold when (n_repeats - n_repeat_start) > 1, values: ({k_fold_end}, {k_fold})')
         if self._k is not None and self._k != k_fold:
             raise ValueError(f'k_fold must equal previously fit k_fold value for the current n_repeat, values: (({k_fold}, {self._k})')
-        fold_start = n_repeat_start * k_fold + k_fold_start
-        fold_end = (n_repeats - 1) * k_fold + k_fold_end
-        time_start = time.time()
 
         model_base = self._get_model_base()
         model_base.rename(name='')
@@ -144,37 +157,18 @@ class BaggedEnsembleModel(AbstractModel):
             self.model_base = None
 
         if k_fold == 1:
-            if self._n_repeats != 0:
-                raise ValueError(f'n_repeats must equal 0 when fitting a single model with k_fold < 2, values: ({self._n_repeats}, {k_fold})')
-            model_base.name = f'{model_base.name}S1F1'
-            model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
-            time_start_fit = time.time()
-            model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
-            model_base.fit_time = time.time() - time_start_fit
-            model_base.predict_time = None
-            self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
-            self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
-            self._n_repeats = 1
-            self._n_repeats_finished = 1
-            self._k_per_n_repeat = [1]
-            self.bagged_mode = False
-            model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-            if not self.params.get('save_bag_folds', True):
-                model_base.model = None
-            if self.low_memory:
-                self.save_child(model_base, verbose=False)
-                self.models = [model_base.name]
-            else:
-                self.models = [model_base]
-            self._add_child_times_to_bag(model=model_base)
+            self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, time_limit=time_limit, sample_weight=sample_weight, **kwargs)
             return
 
         # TODO: Preprocess data here instead of repeatedly
+        time_start = time.time()
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
         oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
 
         models = []
+        fold_start = n_repeat_start * k_fold + k_fold_start
+        fold_end = (n_repeats - 1) * k_fold + k_fold_end
         folds_to_fit = fold_end - fold_start
         for j in range(n_repeat_start, n_repeats):  # For each n_repeat
             cur_repeat_count = j - n_repeat_start
@@ -242,7 +236,7 @@ class BaggedEnsembleModel(AbstractModel):
                 self._k_per_n_repeat.append(k_fold)
         self.models += models
 
-        self.bagged_mode = True
+        self._bagged_mode = True
 
         if self._oof_pred_proba is None:
             self._oof_pred_proba = oof_pred_proba
@@ -279,10 +273,75 @@ class BaggedEnsembleModel(AbstractModel):
         self._load_oof()
         valid_indices = self._oof_pred_model_repeats > 0
         y = y[valid_indices]
-        y_pred_proba = self.oof_pred_proba[valid_indices]
+        y_pred_proba = self.get_oof_pred_proba()[valid_indices]
         if sample_weight is not None:
             sample_weight = sample_weight[valid_indices]
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weight=sample_weight)
+
+    def _fit_single(self, X, y, model_base, use_child_oof, time_limit, **kwargs):
+        if self.is_fit():
+            raise AssertionError('Model is already fit.')
+        if self._n_repeats != 0:
+            raise ValueError(f'n_repeats must equal 0 when fitting a single model with k_fold == 1, value: {self._n_repeats}')
+        model_base.name = f'{model_base.name}S1F1'
+        model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
+        time_start_fit = time.time()
+        model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
+        model_base.fit_time = time.time() - time_start_fit
+        model_base.predict_time = None
+        X_len = len(X)
+
+        # Check if pred_proba is going to take too long
+        if time_limit is not None and X_len >= 10000:
+
+            max_allowed_time = time_limit * 1.3  # allow some buffer
+            time_left = max(
+                max_allowed_time - model_base.fit_time,
+                time_limit * 0.1,  # At least 10% of time_limit
+                10,  # At least 10 seconds
+            )
+            # Sample at most 500 rows to estimate prediction time of all rows
+            # TODO: Consider moving this into end of abstract model fit for all models.
+            #  Currently this only fixes problem when in bagged mode, if not bagging, then inference could still be problamatic
+            n_sample = min(500, round(X_len*0.1))
+            frac = n_sample / X_len
+            X_sample = X.sample(n=n_sample)
+            time_start_predict = time.time()
+            model_base.predict_proba(X_sample)
+            time_predict_frac = time.time() - time_start_predict
+            time_predict_estimate = time_predict_frac / frac
+            logger.log(15, f'\t{round(time_predict_estimate, 2)}s\t= Estimated out-of-fold prediction time...')
+            if time_predict_estimate > time_left:
+                logger.warning(f'\tNot enough time to generate out-of-fold predictions for model. Estimated time required was {round(time_predict_estimate, 2)}s compared to {round(time_left, 2)}s of available time.')
+                raise TimeLimitExceeded
+
+        if use_child_oof:
+            logger.log(15, '\t`use_child_oof` was specified for this model. It will function similarly to a bagged model, but will only fit one child model.')
+            time_start_predict = time.time()
+            if model_base._get_tags().get('valid_oof', False):
+                self._oof_pred_proba = model_base.get_oof_pred_proba(X=X)
+            else:
+                logger.warning('\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores.')
+                self._oof_pred_proba = model_base.predict_proba(X=X)
+            self._child_oof = True
+            model_base.predict_time = time.time() - time_start_predict
+            model_base.val_score = model_base.score_with_y_pred_proba(y=y, y_pred_proba=self._oof_pred_proba)
+        else:
+            self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
+        self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
+        self._n_repeats = 1
+        self._n_repeats_finished = 1
+        self._k_per_n_repeat = [1]
+        self._bagged_mode = False
+        model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
+        if not self.params.get('save_bag_folds', True):
+            model_base.model = None
+        if self.low_memory:
+            self.save_child(model_base, verbose=False)
+            self.models = [model_base.name]
+        else:
+            self.models = [model_base]
+        self._add_child_times_to_bag(model=model_base)
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
@@ -318,7 +377,7 @@ class BaggedEnsembleModel(AbstractModel):
         log_final_suffix = ''
         for n_repeat, k in enumerate(self._k_per_n_repeat):
             if is_oof:
-                if not self.bagged_mode:
+                if self._child_oof or not self._bagged_mode:
                     raise AssertionError('Model trained with no validation data cannot get feature importances on training data, please specify new test data to compute feature importances (model=%s)' % self.name)
                 kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeat + 1)
                 cur_kfolds = kfolds[n_repeat * k:(n_repeat+1) * k]
@@ -577,7 +636,7 @@ class BaggedEnsembleModel(AbstractModel):
             _k_per_n_repeat=self._k_per_n_repeat,
             _random_state=self._random_state,
             low_memory=self.low_memory,  # If True, then model will attempt to use at most min_memory_size memory by having at most one child in memory. If False, model will use max_memory_size memory.
-            bagged_mode=self.bagged_mode,
+            bagged_mode=self._bagged_mode,
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
             child_hyperparameters=self._get_model_base().params,
@@ -691,3 +750,6 @@ class BaggedEnsembleModel(AbstractModel):
 
         # TODO: hpo_results likely not correct because no renames
         return bags, bags_performance, hpo_results
+
+    def _more_tags(self):
+        return {'valid_oof': True}

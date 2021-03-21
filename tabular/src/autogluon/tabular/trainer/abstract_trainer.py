@@ -920,7 +920,7 @@ class AbstractTrainer:
                 w = None
                 w_val = None
             if isinstance(model, BaggedEnsembleModel):
-                if model.bagged_mode or isinstance(model, WeightedEnsembleModel):
+                if model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
                     score = model.score_with_oof(y=y, sample_weight=w)
                 else:
                     score = None
@@ -1126,6 +1126,8 @@ class AbstractTrainer:
         repeats_completed = 0
         time_start = time.time()
         for n in range(n_repeat_start, n_repeats):
+            if not models_valid:
+                break  # No models to repeat
             if time_limit is not None:
                 time_start_repeat = time.time()
                 time_left = time_limit - (time_start_repeat - time_start)
