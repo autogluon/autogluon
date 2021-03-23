@@ -2005,7 +2005,7 @@ class AbstractTrainer:
             model_score = self.score(X_val, y_val_og, model=model_name, weights=w_val)
             model_obj = self.load_model(model_name)
             model_obj.val_score = model_score
-            model_obj.save()  # TODO: consider omitting for sake of efficiency
+            # model_obj.save()  # TODO: consider omitting for sake of efficiency
             self.model_graph.nodes[model_name]['val_score'] = model_score
             distilled_model_names.append(model_name)
         leaderboard = self.leaderboard()
