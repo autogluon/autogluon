@@ -4,12 +4,12 @@ import copy
 
 from .gp_model import GaussProcSurrogateModel, GPModel
 from .gpmodel_skipopt import SkipOptimizationPredicate, NeverSkipPredicate
-from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
-from ..autogluon.debug_log import DebugLogPrinter
-from ..datatypes.tuning_job_state import TuningJobState
 from ..datatypes.common import Candidate, PendingEvaluation, CandidateEvaluation
+from ..datatypes.tuning_job_state import TuningJobState
 from ..tuning_algorithms.base_classes import PendingCandidateStateTransformer
-from ..tuning_algorithms.default_algorithm import DEFAULT_METRIC
+from ..tuning_algorithms.defaults import DEFAULT_METRIC
+from ..utils.simple_profiler import SimpleProfiler
+from ..utils.debug_log import DebugLogPrinter
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +48,8 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
     def __init__(
             self, gpmodel: GPModel, init_state: TuningJobState,
             model_args: GPModelArgs,
-            skip_optimization: SkipOptimizationPredicate = None,
-            profiler: GPMXNetSimpleProfiler = None,
+            skip_optimization: Optional[SkipOptimizationPredicate] = None,
+            profiler: Optional[SimpleProfiler] = None,
             debug_log: Optional[DebugLogPrinter] = None):
         self._gpmodel = gpmodel
         self._state = copy.copy(init_state)
@@ -185,17 +185,19 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
     def mark_candidate_failed(self, candidate: Candidate):
         self._state.failed_candidates.append(candidate)
 
-    def _compute_model(self, skip_optimization: bool = None):
+    def _compute_model(self, skip_optimization=None):
         args = self._model_args
         if skip_optimization is None:
             skip_optimization = self.skip_optimization(self._state)
+            if skip_optimization and self._debug_log is not None:
+                logger.info("Skipping the refitting of GP hyperparameters")
         fit_parameters = not skip_optimization
         if fit_parameters and self._candidate_evaluations:
             # Did the labeled data really change since the last recent refit?
             # If not, skip the refitting
             if self._state.candidate_evaluations == self._candidate_evaluations:
                 fit_parameters = False
-                logger.warning(
+                logger.info(
                     "Skipping the refitting of GP hyperparameters, since the "
                     "labeled data did not change since the last recent fit")
         self._model = GaussProcSurrogateModel(

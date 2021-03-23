@@ -1,36 +1,33 @@
 import numpy as np
-from typing import Callable, Type, Tuple, Set, Iterable, Optional
+from typing import Callable, Type, Tuple, Set, Iterable, Optional, Any
 import ConfigSpace as CS
 from collections import Counter
 import logging
 
-from .config_ext import ExtendedConfiguration
-from .debug_log import DebugLogPrinter
-from .gp_fifo_searcher import GET_CONFIG_RANDOM_RETRIES, \
-    accumulate_profiling_record, MapReward, check_initial_candidates_scorer, \
-    create_initial_candidates_scorer, encode_state, decode_state
-from .gp_profiling import GPMXNetSimpleProfiler
-from .hp_ranges import HyperparameterRanges_CS
-from ..datatypes.common import CandidateEvaluation, PendingEvaluation, \
-    candidate_for_print
+from .gp_fifo_searcher import GET_CONFIG_RANDOM_RETRIES, GPSearcher, MapReward, \
+    create_initial_candidates_scorer, decode_state
+from ..datatypes.common import PendingEvaluation, candidate_for_print
+from ..datatypes.config_ext import ExtendedConfiguration
+from ..datatypes.hp_ranges_cs import HyperparameterRanges_CS
 from ..datatypes.tuning_job_state import TuningJobState
 from ..models.gp_model import GPModel
 from ..models.gpmodel_skipopt import SkipOptimizationPredicate
-from ..models.gpmodel_transformers import \
-    GPModelPendingCandidateStateTransformer, GPModelArgs
-from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction
+from ..models.gpmodel_transformers import GPModelArgs
+from ..tuning_algorithms.base_classes import LocalOptimizer, \
+    AcquisitionFunction
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
-from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, \
-    compute_blacklisted_candidates
-from ..tuning_algorithms.default_algorithm import dictionarize_objective, \
-    DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, \
-    DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
+from ..tuning_algorithms.common import compute_blacklisted_candidates
+from ..tuning_algorithms.defaults import DEFAULT_METRIC, \
+    DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, \
+    DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
+from ..utils.debug_log import DebugLogPrinter
 from ..utils.duplicate_detector import DuplicateDetectorIdentical
+from ..utils.simple_profiler import SimpleProfiler
 
 logger = logging.getLogger(__name__)
 
 
-class GPMultiFidelitySearcher(object):
+class GPMultiFidelitySearcher(GPSearcher):
     """
     Supports asynchronous multi-fidelity hyperparameter optimization, in the
     style of Hyperband or BOHB. Here, a joint GP surrogate model is fit to
@@ -52,10 +49,11 @@ class GPMultiFidelitySearcher(object):
             num_initial_candidates: int = DEFAULT_NUM_INITIAL_CANDIDATES,
             num_initial_random_choices: int = DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS,
             initial_scoring: Optional[str] = None,
-            profiler: Optional[GPMXNetSimpleProfiler] = None,
             first_is_default: bool = True,
             debug_log: Optional[DebugLogPrinter] = None,
-            cost_metric_name: Optional[str] = None):
+            cost_metric_name: Optional[str] = None,
+            profiler: Optional[SimpleProfiler] = None,
+            getconfig_callback: Optional[Callable[[dict], Any]] = None):
         """
         Note that the GPMXNetModel is created on demand (by the state
         transformer) in get_config, along with components needed for the BO
@@ -104,90 +102,41 @@ class GPMultiFidelitySearcher(object):
             this many candidates received label feedback
         :param initial_scoring: Scoring function to rank initial candidates.
             Default: thompson_indep (independent Thompson sampling)
-        :param profiler: If given, HPO computations are profiled
         :param first_is_default: If true, the first result of get_config is the
             default config of hp_ranges
         :param debug_log: DebugLogPrinter for debug logging (optional)
+        :param cost_metric_name: If an `elapsed_time` record is passed to
+            `update`, the value is entered in the state using this key
+        :param profiler: If given, HPO computations are profiled
+        :param getconfig_callback: If given, this callback function is called
+            at the end of each get_config. It receives the chosen config
+            (as dict) as single argument. One use case for this callback is
+            to store profiler records.
 
         """
-        self.hp_ranges = hp_ranges
-        self.random_seed = random_seed
-        self.num_initial_candidates = num_initial_candidates
-        self.num_initial_random_choices = num_initial_random_choices
-        self.map_reward = map_reward
-        self.resource_for_acquisition = resource_for_acquisition
-        self.local_minimizer_class = local_minimizer_class
-        self.acquisition_class = acquisition_class
-        self._gpmodel = gpmodel
-        self.initial_scoring = check_initial_candidates_scorer(initial_scoring)
+        assert isinstance(hp_ranges, HyperparameterRanges_CS), \
+            "hp_ranges must be of type HyperparameterRanges_CS"
         # Extended configuration space including resource attribute
         self.configspace_ext = ExtendedConfiguration(
             hp_ranges, resource_attr_key, resource_attr_range)
+        super().__init__(
+            hp_ranges, random_seed, gpmodel, model_args, map_reward,
+            acquisition_class, init_state, local_minimizer_class,
+            skip_optimization, num_initial_candidates,
+            num_initial_random_choices, initial_scoring, first_is_default,
+            debug_log, cost_metric_name, profiler, getconfig_callback)
+
+        self.resource_for_acquisition = resource_for_acquisition
+        self._gpmodel = gpmodel
         if debug_log is not None:
             # Configure DebugLogPrinter
             debug_log.set_configspace_ext(self.configspace_ext)
-        self.debug_log = debug_log
-        # Create state transformer
-        # Initial state is empty (note that the state is mutable)
-        if init_state is None:
-            init_state = TuningJobState(
-                hp_ranges=self.configspace_ext.hp_ranges_ext,
-                candidate_evaluations=[],
-                failed_candidates=[],
-                pending_evaluations=[])
-        self.state_transformer = GPModelPendingCandidateStateTransformer(
-            gpmodel=gpmodel,
-            init_state=init_state,
-            model_args=model_args,
-            skip_optimization=skip_optimization,
-            profiler=profiler,
-            debug_log=debug_log)
-        self.random_state = np.random.RandomState(random_seed)
-        self.random_generator = RandomStatefulCandidateGenerator(
-            self.configspace_ext.hp_ranges_ext, random_state=self.random_state)
-        self.profiler = profiler
-        self.do_profile = (profiler is not None)
-        self.first_is_default = first_is_default
-        if cost_metric_name is not None:
-            self.cost_metric_name = cost_metric_name
-        else:
-            self.cost_metric_name = 'elapsed_time'
-        # Sums up profiling records across all get_config calls
-        self._profile_record = dict()
-        if debug_log is not None:
-            deb_msg = "[GPMultiFidelitySearcher.__init__]\n"
-            deb_msg += ("- acquisition_class = {}\n".format(acquisition_class))
-            deb_msg += ("- local_minimizer_class = {}\n".format(local_minimizer_class))
-            deb_msg += ("- num_initial_candidates = {}\n".format(num_initial_candidates))
-            deb_msg += ("- num_initial_random_choices = {}\n".format(num_initial_random_choices))
-            deb_msg += ("- initial_scoring = {}\n".format(self.initial_scoring))
-            deb_msg += ("- first_is_default = {}".format(first_is_default))
-            logger.info(deb_msg)
 
-    def update(self, config: CS.Configuration, reward: float, resource: int,
-               **kwargs):
-        """
-        Registers new datapoint at config, with reward and resource.
-        Note that in general, config should previously have been registered as
-        pending (register_pending). If so, it is switched from pending
-        to labeled. If not, it is considered directly labeled.
+    def _hp_ranges_ext(self):
+        return self.configspace_ext.hp_ranges_ext
 
-        :param config:
-        :param reward:
-        :param resource:
-        """
-        config_ext = self.configspace_ext.get(config, resource)
-        crit_val = self.map_reward(reward)
-        metrics = dictionarize_objective(crit_val)
-        if 'elapsed_time' in kwargs:
-            metrics[self.cost_metric_name] = kwargs['elapsed_time']
-        self.state_transformer.label_candidate(CandidateEvaluation(
-            candidate=config_ext, metrics=metrics))
-        if self.debug_log is not None:
-            config_id = self.debug_log.config_id(config_ext)
-            msg = "Update for config_id {}: reward = {}, crit_val = {}".format(
-                config_id, reward, crit_val)
-            logger.info(msg)
+    def _config_ext_update(self, config, **kwargs):
+        return self.configspace_ext.get(config, kwargs['resource'])
 
     def register_pending(self, config: CS.Configuration, milestone: int):
         """
@@ -222,10 +171,8 @@ class GPMultiFidelitySearcher(object):
     def _get_unique_candidates(
             self, candidate_list: Iterable[CS.Configuration],
             target_resource: int) -> Set[CS.Configuration]:
-
-        remap_resource = lambda x: self.configspace_ext.remap_resource(
-            x, target_resource)
-        return set(map(remap_resource, candidate_list))
+        return set(self.configspace_ext.remap_resource(x, target_resource)
+                   for x in candidate_list)
 
     def _get_blacklisted_candidates(self, target_resource: int) -> Set[CS.Configuration]:
         """
@@ -252,9 +199,15 @@ class GPMultiFidelitySearcher(object):
         """
         state = self.state_transformer.state
         if self.do_profile:
-            fit_hyperparams = not self.state_transformer.skip_optimization(
-                state)
-            self.profiler.set_state(state, fit_hyperparams)
+            # Start new profiler block
+            meta = {
+                'fit_hyperparams': not self.state_transformer.skip_optimization(
+                    state),
+                'num_observed': len(state.candidate_evaluations),
+                'num_pending': len(state.pending_evaluations)
+            }
+            self.profiler.begin_block(meta)
+            self.profiler.start('all')
         # Fix resource attribute during the search to the value obtained from
         # self.resource_for_acquisition. Compute blacklisted_candidates.
         if state.candidate_evaluations:
@@ -291,12 +244,13 @@ class GPMultiFidelitySearcher(object):
             # this, the BO algorithm components can be constructed
             state = self.state_transformer.state
             if self.do_profile:
-                self.profiler.start('total_all')
-                self.profiler.start('total_update')
+                self.profiler.push_prefix('getconfig')
+                self.profiler.start('all')
+                self.profiler.start('gpmodel')
             # Note: Asking for the model triggers the posterior computation
             model = self.state_transformer.model()
             if self.do_profile:
-                self.profiler.stop('total_update')
+                self.profiler.stop('gpmodel')
             # BO should only search over configs at resource level
             # target_resource
             self._fix_resource_attribute(target_resource)
@@ -324,8 +278,6 @@ class GPMultiFidelitySearcher(object):
                 sample_unique_candidates=False,
                 debug_log=self.debug_log)
             # Next candidate decision
-            if self.do_profile:
-                self.profiler.start('total_nextcand')
             _config = bo_algorithm.next_candidates()
             assert len(_config) > 0, \
                 ("Failed to find a configuration not already chosen "
@@ -335,18 +287,18 @@ class GPMultiFidelitySearcher(object):
             # Remove resource attribute
             config = self.configspace_ext.remove_resource(next_config)
             if self.do_profile:
-                self.profiler.stop('total_nextcand')
-                self.profiler.stop('total_all')
+                self.profiler.stop('all')
+                self.profiler.pop_prefix()  # getconfig
 
         if self.debug_log is not None:
             self.debug_log.set_final_config(config)
             # All get_config debug log info is only written here
             self.debug_log.write_block()
         if self.do_profile:
+            self.profiler.stop('all')
             self.profiler.clear()
-            # Pull out profiling data from this block, add to _profile_record
-            accumulate_profiling_record(
-                self._profile_record, self.profiler, pick_random)
+        if self.getconfig_callback is not None:
+            self.getconfig_callback(config.get_dictionary())
 
         return config
 
@@ -378,55 +330,13 @@ class GPMultiFidelitySearcher(object):
         def filter_pred(x: PendingEvaluation) -> bool:
             x_dct = self.configspace_ext.remove_resource(
                 x.candidate, as_dict=True)
-            return (x_dct != config_dct)
+            return x_dct != config_dct
 
         self.state_transformer.filter_pending_evaluations(filter_pred)
 
     def remove_case(self, config: CS.Configuration, resource: int):
         config_ext = self.configspace_ext.get(config, resource)
         self.state_transformer.drop_candidate(config_ext)
-
-    def dataset_size(self):
-        return len(self.state_transformer.state.candidate_evaluations)
-
-    def cumulative_profile_record(self):
-        """
-        If profiling is activated, we sum up the profiling blocks for each
-        call of get_config and return it as dict. See get_config for what
-        is recorded:
-        - num_random: Number of get_config calls with random selection
-        - num_model: Number of get_config calls with model-based selection
-        - total_all: Sum of total times for all get_config calls
-        """
-        return self._profile_record
-
-    def get_params(self):
-        """
-        Note: Once MCMC is supported, this method will have to be refactored.
-
-        :return: Dictionary with current hyperparameter values
-        """
-        return self.state_transformer.get_params()
-
-    def set_params(self, param_dict):
-        self.state_transformer.set_params(param_dict)
-
-    def get_state(self):
-        """
-        The mutable state consists of the GP model parameters, the
-        TuningJobState, and the skip_optimization predicate (which can have a
-        mutable state).
-        We assume that skip_optimization can be pickled.
-
-        """
-        state = {
-            'model_params': self.get_params(),
-            'state': encode_state(self.state_transformer.state),
-            'skip_optimization': self.state_transformer.skip_optimization,
-            'random_state': self.random_state}
-        if self.debug_log is not None:
-            state['debug_log'] = self.debug_log.get_mutable_state()
-        return state
 
     def clone_from_state(self, state):
         # Create clone with mutable state taken from 'state'

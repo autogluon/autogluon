@@ -162,15 +162,19 @@ class HyperbandScheduler(FIFOScheduler):
         grace period, all share max_t and reduction_factor.
         If brackets == 1, we just run successive halving.
     training_history_callback : callable
-        Callback function func called every time a job finishes, if at least
-        training_history_callback_delta_secs seconds passed since the last
-        recent call. The call has the form:
-            func(self.training_history, self._start_time)
-        Here, self._start_time is time stamp for when experiment started.
+        Callback function func called every time a result is added to
+        training_history, if at least training_history_callback_delta_secs
+        seconds passed since the last recent call.
+        See _add_training_result for the signature of this callback function.
         Use this callback to serialize self.training_history after regular
         intervals.
     training_history_callback_delta_secs : float
         See training_history_callback.
+    training_history_searcher_info : bool
+        If True, information about the current state of the searcher is added
+        to every reported_result before added to training_history. This info
+        includes in particular the current hyperparameters of the surrogate
+        model of the searcher, as well as the dataset size.
     delay_get_config : bool
         If True, the call to searcher.get_config is delayed until a worker
         resource for evaluation is available. Otherwise, get_config is called
@@ -237,6 +241,11 @@ class HyperbandScheduler(FIFOScheduler):
         is True.
     random_seed : int
         Random seed for PRNG for bracket sampling
+    do_snapshots : bool
+        Support snapshots? If True, a snapshot of all running tasks and rung
+        levels is returned by _promote_config. This snapshot is passed to the
+        searcher in get_config.
+        Note: Currently, only the stopping variant supports snapshots.
 
     See Also
     --------
@@ -425,7 +434,6 @@ class HyperbandScheduler(FIFOScheduler):
                 'reported_result': None,
                 'keep_case': False}
             first_milestone = self.terminator.on_task_add(task, **kwargs)[-1]
-        # Register pending evaluation(s) with searcher
         debug_log = self.searcher.debug_log
         if kwargs.get('new_config', True):
             # Task starts a new config
@@ -455,6 +463,7 @@ class HyperbandScheduler(FIFOScheduler):
                 msg = "config_id {} promoted from {} (next milestone = {})".format(
                     config_id, kwargs['resume_from'], next_milestone)
                 logger.info(msg)
+        # Register pending evaluation(s) with searcher
         self.searcher.register_pending(
             task.args['config'], milestone=next_milestone)
         if self.maxt_pending and next_milestone != self.max_t:
@@ -463,6 +472,12 @@ class HyperbandScheduler(FIFOScheduler):
                 task.args['config'], milestone=self.max_t)
 
         # main process
+        if debug_log is not None:
+            logger.info("Starting job on node = {}".format(
+                task.resources.node.remote_id))
+            # Relay config_id to train_fn (for debug logging)
+            config_id = debug_log.config_id(task.args['config'])
+            task.args['args']['config_id'] = config_id
         job = cls.jobs.start_distributed_job(task, cls.managers)
         # reporter thread
         rp = threading.Thread(
@@ -472,10 +487,8 @@ class HyperbandScheduler(FIFOScheduler):
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
-        # Checkpoint thread. This is also used for training_history
-        # callback
-        if self._checkpoint is not None or \
-                self.training_history_callback is not None:
+        # Checkpoint thread
+        if self._checkpoint is not None:
             self._add_checkpointing_to_job(job)
         with self.managers.lock:
             self.scheduled_tasks.append(task_dict)
@@ -523,7 +536,6 @@ class HyperbandScheduler(FIFOScheduler):
                 continue
             # Time since start of experiment
             elapsed_time = self._elapsed_time()
-            reported_result['time_since_start'] = elapsed_time
 
             # Call before _add_training_results, since we may be able to report
             # extra information from the bracket:
@@ -534,13 +546,12 @@ class HyperbandScheduler(FIFOScheduler):
             milestone_reached = task_info['milestone_reached']
             # Append extra information to reported_result
             reported_result['bracket'] = task_info['bracket_id']
-            dataset_size = self.searcher.dataset_size()
-            if dataset_size > 0:
-                reported_result['searcher_data_size'] = dataset_size
-            for k, v in self.searcher.cumulative_profile_record().items():
-                reported_result['searcher_profile_' + k] = v
-            for k, v in self.searcher.model_parameters().items():
-                reported_result['searcher_params_' + k] = v
+            if self.training_history_searcher_info:
+                dataset_size = self.searcher.dataset_size()
+                if dataset_size > 0:
+                    reported_result['searcher_data_size'] = dataset_size
+                for k, v in self.searcher.model_parameters().items():
+                    reported_result['searcher_params_' + k] = v
             self._add_training_result(
                 task.task_id, reported_result, config=task.args['config'])
 
@@ -638,15 +649,16 @@ class HyperbandScheduler(FIFOScheduler):
         if last_result is not last_updated:
             self._update_searcher(task, last_result)
 
-    def state_dict(self, destination=None):
-        """Returns a dictionary containing a whole state of the Scheduler
+    def state_dict(self, destination=None, no_fifo_lock=False):
+        """Returns a dictionary containing a whole state of the scheduler
 
         Examples
         --------
         >>> import autogluon.core as ag
         >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
-        destination = super().state_dict(destination)
+        destination = super().state_dict(
+            destination, no_fifo_lock=no_fifo_lock)
         # Note: _running_tasks is not part of the state to be checkpointed.
         # The assumption is that if an experiment is resumed from a
         # checkpoint, tasks which did not finish at the checkpoint, are not
@@ -673,18 +685,30 @@ class HyperbandScheduler(FIFOScheduler):
             logger.info('Loading Terminator State {}'.format(self.terminator))
 
     def _snapshot_tasks(self, bracket_id):
-        return {
-            k: {'config': v['config'],
-                'time': v['time_stamp'],
-                'level': 0 if v['reported_result'] is None
-                else v['reported_result'][self._time_attr]}
-            for k, v in self._running_tasks.items()
-            if v['bracket'] == bracket_id}
+        # If all brackets share a single rung level system, then all
+        # running jobs have to be taken into account, otherwise only
+        # those jobs running in the same bracket
+        all_running = not self.terminator._rung_system_per_bracket
+        tasks = dict()
+        for k, v in self._running_tasks.items():
+            if all_running or (v['bracket'] == bracket_id):
+                reported_result = v['reported_result']
+                level = 0 if reported_result is None \
+                    else reported_result[self._time_attr]
+                # It is possible to have tasks in _running_tasks which have
+                # reached self.max_t. These must not end up in the snapshot
+                if level < self.max_t:
+                    tasks[k] = {
+                        'config': v['config'],
+                        'time': v['time_stamp'],
+                        'level': level}
+        return tasks
 
     # Snapshot (in extra_kwargs['snapshot']):
     # - max_resource
     # - reduction_factor
-    # - tasks: Info about running tasks in bracket bracket_id:
+    # - tasks: Info about running tasks in bracket bracket_id (or, if
+    #   brackets share the same rung level system, all running tasks):
     #   dict(task_id) -> dict:
     #   - config: config as dict
     #   - time: Time when task was started, or when last recent result was
@@ -692,7 +716,8 @@ class HyperbandScheduler(FIFOScheduler):
     #   - level: Level of last recent result report, or 0 if no reports yet
     # - rungs: Metric values at rung levels in bracket bracket_id:
     #   List of (rung_level, metric_dict), where metric_dict has entries
-    #   task_id: metric_value.
+    #   task_id: metric_value. Note that entries are sorted in decreasing order
+    #   w.r.t. rung_level.
     def _promote_config(self):
         with self._hyperband_lock:
             config, extra_kwargs = self.terminator.on_task_schedule()
@@ -942,8 +967,8 @@ class HyperbandBracketManager(object):
         return config, extra_kwargs
 
     def snapshot_rungs(self, bracket_id):
-        rung_sys, _ = self._get_rung_system_for_bracket_id(bracket_id)
-        return rung_sys.snapshot_rungs()
+        rung_sys, skip_rungs = self._get_rung_system_for_bracket_id(bracket_id)
+        return rung_sys.snapshot_rungs(skip_rungs)
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' + \

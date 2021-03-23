@@ -6,7 +6,7 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from numpy.testing import assert_allclose
 
-from autogluon.core.searcher.bayesopt.autogluon.hp_ranges import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges_cs import \
     HyperparameterRanges_CS
 from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRanges_Impl, HyperparameterRangeCategorical, \

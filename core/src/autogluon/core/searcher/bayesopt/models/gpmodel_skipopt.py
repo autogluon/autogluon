@@ -46,11 +46,10 @@ class AlwaysSkipPredicate(SkipOptimizationPredicate):
 class SkipPeriodicallyPredicate(SkipOptimizationPredicate):
     """
     Let N = len(state.candidate_evaluations) be the number of labeled
-    points. Optimizations are not skipped if N < init_length, and
-    afterwards optimizations are done every period times.
-
-    NOTE: This predicate cannot be a state-less function, because
-    __call__ may not be called for every value of N in sequence!
+    points. Optimizations are not skipped if N < init_length. Afterwards,
+    we increase a counter whenever N is larger than in the previous
+    call. With respect to this counter, optimizations are done every
+    period times, in between they are skipped.
 
     """
     def __init__(self, init_length: int, period: int):
@@ -61,30 +60,27 @@ class SkipPeriodicallyPredicate(SkipOptimizationPredicate):
         self.reset()
 
     def reset(self):
-        self.current_bound = self.init_length
-        self.lastrec_key = None
+        self._counter = 0
+        # Need to make sure that if called several times with the same state,
+        # we return the same value
+        self._last_size = None
+        self._last_retval = None
 
     def __call__(self, state: TuningJobState) -> bool:
         num_labeled = len(state.candidate_evaluations)
-        assert self.lastrec_key is None or \
-            num_labeled >= self.lastrec_key, \
-            "num_labeled = {} < {} = lastrec_key".format(
-                num_labeled, self.lastrec_key)
-        # self.lastrec_XYZ is needed in order to allow __call__
-        # to be called several times with the same num_labeled
-        if num_labeled == self.lastrec_key:
-            return self.lastrec_value
-        if num_labeled < self.current_bound:
-            ret_value = True
-        else:
-            # At this point, we passed current_bound, so should do the
-            # optimization
-            # Smallest init_length + k*period > num_labeled:
-            self.current_bound = num_labeled + self.period -\
-                ((num_labeled - self.init_length) % self.period)
+        if num_labeled == self._last_size:
+            return self._last_retval
+        if self._last_size is not None:
+            assert num_labeled > self._last_size, \
+                "num_labeled = {} < {} = _last_size".format(
+                    num_labeled, self._last_size)
+        if num_labeled < self.init_length:
             ret_value = False
-        self.lastrec_key = num_labeled
-        self.lastrec_value = ret_value
+        else:
+            ret_value = (self._counter % self.period != 0)
+            self._counter += 1
+        self._last_size = num_labeled
+        self._last_size = ret_value
         return ret_value
 
 

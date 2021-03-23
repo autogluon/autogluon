@@ -4,7 +4,6 @@ import autograd.numpy as anp
 from typing import Optional, List
 
 from .constants import OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
-from .debug_gp_regression import DebugGPRegression
 from .gluon_blocks_helpers import encode_unwrap_parameter
 from .gp_model import GaussianProcessModel
 from .kernel import KernelFunction
@@ -14,7 +13,7 @@ from .optimization_utils import apply_lbfgs_with_multiple_starts, \
     ParamVecDictConverter, make_scipy_objective
 from .posterior_state import GaussProcPosteriorState
 from .utils import param_to_pretty_string
-from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
+from autogluon.core.searcher.bayesopt.utils.simple_profiler import SimpleProfiler
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +55,8 @@ class GaussianProcessRegression(GaussianProcessModel):
             initial_noise_variance: float = None,
             optimization_config: OptimizationConfig = None,
             random_seed=None, fit_reset_params: bool = True,
-            test_intermediates: Optional[dict] = None,
-            debug_writer: Optional[DebugGPRegression] = None):
-        
+            test_intermediates: Optional[dict] = None):
+
         if mean is None:
             mean = ScalarMeanFunction()
         if optimization_config is None:
@@ -71,7 +69,6 @@ class GaussianProcessRegression(GaussianProcessModel):
         self.fit_reset_params = fit_reset_params
         self.optimization_config = optimization_config
         self._test_intermediates = test_intermediates
-        self._debug_writer = debug_writer
         self.likelihood = MarginalLikelihood(
             kernel=kernel, mean=mean,
             initial_noise_variance=initial_noise_variance)
@@ -98,13 +95,7 @@ class GaussianProcessRegression(GaussianProcessModel):
 
         def executor(param_vec):
             param_converter.from_vec(param_vec)  # Assign param_dict
-            if self._debug_writer is not None:
-                self._debug_writer.store_args(
-                    self.likelihood.collect_params().values(), X, Y,
-                    self.likelihood.param_encoding_pairs())
             objective = negative_log_posterior(self.likelihood, X, Y)
-            if self._debug_writer is not None:
-                self._debug_writer.store_value(objective)
             if self.optimization_config.verbose:
                 msg_lst = ["[criterion = {}]".format(objective)]
                 for param, encoding in self.likelihood.param_encoding_pairs():
@@ -114,7 +105,7 @@ class GaussianProcessRegression(GaussianProcessModel):
 
         return make_scipy_objective(executor), param_dict
 
-    def fit(self, X, Y, profiler: GPMXNetSimpleProfiler = None):
+    def fit(self, X, Y, profiler: SimpleProfiler = None):
         """
         Fit the parameters of the GP by optimizing the marginal likelihood,
         and set posterior states.
@@ -134,13 +125,11 @@ class GaussianProcessRegression(GaussianProcessModel):
         
         if self.fit_reset_params:
             self.reset_params()
-        if self._debug_writer is not None:
-            self._debug_writer.start_optimization()
         mean_function = self.likelihood.mean
         if isinstance(mean_function, ScalarMeanFunction):
             mean_function.set_mean_value(np.mean(Y))
         if profiler is not None:
-            profiler.start('fit_hyperpars')
+            profiler.start('fithyperpars')
         n_starts = self.optimization_config.n_starts
         ret_infos = apply_lbfgs_with_multiple_starts(
             *self._create_lbfgs_arguments(X, Y),
@@ -149,7 +138,7 @@ class GaussianProcessRegression(GaussianProcessModel):
             tol=self.optimization_config.lbfgs_tol,
             maxiter=self.optimization_config.lbfgs_maxiter)
         if profiler is not None:
-            profiler.stop('fit_hyperpars')
+            profiler.stop('fithyperpars')
 
         # Logging in response to failures of optimization runs
         n_succeeded = sum(x is None for x in ret_infos)
@@ -184,7 +173,7 @@ class GaussianProcessRegression(GaussianProcessModel):
             if vec is not None:
                 param.set_data(vec)
 
-    def recompute_states(self, X, Y, profiler: GPMXNetSimpleProfiler = None):
+    def recompute_states(self, X, Y, profiler: SimpleProfiler = None):
         """
         We allow Y to be a matrix with m>1 columns, which is useful to support
         batch decisions by fantasizing.
@@ -196,16 +185,16 @@ class GaussianProcessRegression(GaussianProcessModel):
         assert self._states is not None, self._states
         self._recompute_states(X, Y, profiler=profiler)
 
-    def _recompute_states(self, X, Y, profiler: GPMXNetSimpleProfiler = None):
+    def _recompute_states(self, X, Y, profiler: SimpleProfiler = None):
         if profiler is not None:
-            profiler.start('comp_posterstate')
+            profiler.start('posterstate')
         self._states = [GaussProcPosteriorState(
             X, Y, self.likelihood.mean, self.likelihood.kernel,
             self.likelihood.get_noise_variance(as_ndarray=True),
             debug_log=(self._test_intermediates is not None),
             test_intermediates=self._test_intermediates)]
         if profiler is not None:
-            profiler.stop('comp_posterstate')
+            profiler.stop('posterstate')
     
     def get_params(self):
         return self.likelihood.get_params()

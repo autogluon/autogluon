@@ -3,7 +3,7 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 import copy
 
-from .hp_ranges import HyperparameterRanges_CS
+from .hp_ranges_cs import HyperparameterRanges_CS
 
 RESOURCE_ATTR_PREFIX = 'RESOURCE_ATTR_'
 

@@ -6,7 +6,9 @@ from typing import Tuple, Optional, Dict
 
 from .kernel import KernelFunction
 from .mean import MeanFunction
-from .posterior_utils import cholesky_computations, predict_posterior_marginals, sample_posterior_marginals, sample_posterior_joint, cholesky_update, negative_log_marginal_likelihood
+from .posterior_utils import cholesky_computations, predict_posterior_marginals,\
+    sample_posterior_marginals, sample_posterior_joint, cholesky_update,\
+    negative_log_marginal_likelihood, sample_and_cholesky_update
 
 
 class GaussProcPosteriorState(object):
@@ -36,6 +38,7 @@ class GaussProcPosteriorState(object):
         """
         self.mean = mean
         self.kernel = kernel
+        self.noise_variance = anp.array(noise_variance, copy=True)
         if targets is not None:
             targets_shape = getval(targets.shape)
             targets = anp.reshape(targets, (targets_shape[0], -1))
@@ -149,9 +152,6 @@ class IncrementalUpdateGPPosteriorState(GaussProcPosteriorState):
         
         super(IncrementalUpdateGPPosteriorState, self).__init__(
             features, targets, mean, kernel, noise_variance, **kwargs)
-        
-        # Noise variance is needed here for updates (make copy, to be safe)
-        self.noise_variance = anp.array(noise_variance, copy=True)
 
     def update(self, feature: np.ndarray, target: np.ndarray) -> 'IncrementalUpdateGPPosteriorState':
         """
@@ -179,8 +179,39 @@ class IncrementalUpdateGPPosteriorState(GaussProcPosteriorState):
             noise_variance=self.noise_variance,
             chol_fact=chol_fact_new,
             pred_mat=pred_mat_new)
-        
         return state_new
+
+    def sample_and_update(self, feature: np.ndarray, mean_impute_mask=None) -> \
+        (np.ndarray, 'IncrementalUpdateGPPosteriorState'):
+        """
+        Draw target(s), shape (1, m), from current posterior state, then update
+        state based on these. The main computation of lvec is shared among the
+        two.
+        If mean_impute_mask is given, it is a boolean vector of size m (number
+        columns of pred_mat). Columns j of target, where mean_impute_ mask[j]
+        is true, are set to the predictive mean (instead of being sampled).
+
+        :param feature: Additional input xstar, shape (1, d)
+        :param mean_impute_mask: See above
+        :return: target, poster_state_new
+        """
+        feature = anp.reshape(feature, (1, -1))
+        assert feature.shape[1] == self.features.shape[1], \
+            "feature.shape[1] = {} != {} = self.features.shape[1]".format(
+                feature.shape[1], self.features.shape[1])
+        chol_fact_new, pred_mat_new, features_new, target = \
+            sample_and_cholesky_update(
+                self.features, self.chol_fact, self.pred_mat, self.mean,
+                self.kernel, self.noise_variance, feature, mean_impute_mask)
+        state_new = IncrementalUpdateGPPosteriorState(
+            features=features_new,
+            targets=None,
+            mean=self.mean,
+            kernel=self.kernel,
+            noise_variance=self.noise_variance,
+            chol_fact=chol_fact_new,
+            pred_mat=pred_mat_new)
+        return target, state_new
 
     def expand_fantasies(self, num_fantasies: int) \
             -> 'IncrementalUpdateGPPosteriorState':

@@ -5,11 +5,11 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 import copy
 
-from ..autogluon.hp_ranges import HyperparameterRanges_CS
 from ..datatypes.common import CandidateEvaluation
+from ..datatypes.hp_ranges_cs import HyperparameterRanges_CS
 from ..datatypes.tuning_job_state import TuningJobState
 from ..models.gp_model import get_internal_candidate_evaluations
-from ..tuning_algorithms.default_algorithm import dictionarize_objective, \
+from ..tuning_algorithms.defaults import dictionarize_objective, \
     DEFAULT_METRIC
 
 
