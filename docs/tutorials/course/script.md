@@ -14,7 +14,7 @@ import numpy as np
 
 import mxnet as mx
 from mxnet import gluon, init
-from autogluon.mxnet.task.nets import get_built_in_network
+from autogluon.extra.model_zoo._nets import get_built_in_network
 ```
 
 Define a function for dataset meta data:
