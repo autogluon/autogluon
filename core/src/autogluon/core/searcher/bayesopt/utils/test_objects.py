@@ -18,8 +18,7 @@ from ..gpautograd.gp_regression import GaussianProcessRegression
 from ..gpautograd.gpr_mcmc import GPRegressionMCMC
 from ..gpautograd.kernel import Matern52, KernelFunction
 from ..gpautograd.warping import WarpedKernel, Warping
-from ..tuning_algorithms.base_classes import CandidateGenerator
-from ..tuning_algorithms.defaults import dictionarize_objective
+from ..tuning_algorithms.base_classes import CandidateGenerator, dictionarize_objective
 
 
 def build_kernel(state: TuningJobState,

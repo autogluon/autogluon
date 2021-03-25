@@ -1,9 +1,36 @@
 from abc import ABC, abstractmethod
-from typing import List, Iterator, Iterable, Tuple, Type, Optional, Set, Dict
+from typing import List, Iterator, Iterable, Tuple, Type, Optional, Set, Dict, Union
 import numpy as np
 
 from ..datatypes.common import Candidate
 from ..datatypes.tuning_job_state import TuningJobState
+
+DEFAULT_METRIC = 'active_metric'
+DEFAULT_COST_METRIC = 'cost_metric'
+DEFAULT_CONSTRAINT_METRIC = 'constraint_metric'
+
+
+def dictionarize_objective(x):
+    return {DEFAULT_METRIC: x}
+
+
+def assign_active_metric(model, active_metric):
+    """ Checks that active_metric is provided when model consists of multiple output models.
+    Otherwise, just sets active_metric to the only model output name available.
+    """
+    model_output_names = sorted(model.keys())
+    num_output_models = len(model_output_names)
+    if num_output_models == 1:
+        if active_metric is not None:
+            assert active_metric == model_output_names[0], 'Only a single output model is given. ' \
+                                                           'Active metric must be set to that output model.'
+        active_metric = model_output_names[0]
+    else:
+        assert active_metric is not None, f'As model has {num_output_models}, active metric cannot be None. ' \
+                                          f'Please set active_metric to one of the model output names: ' \
+                                          f'{model_output_names}.'
+        assert active_metric in model_output_names
+    return active_metric
 
 
 class NextCandidatesAlgorithm:
@@ -116,6 +143,10 @@ class SurrogateModel(ABC):
         pass
 
 
+# Useful type that allows for a dictionary mapping each output name to a SurrogateModel
+OutputSurrogateModel = Union[SurrogateModel, Dict[str, SurrogateModel]]
+
+
 class ScoringFunction(ABC):
     """
     Class to score candidates, typically combine an acquisition function with
@@ -124,8 +155,7 @@ class ScoringFunction(ABC):
     NOTE: it will be minimized, i.e. lower is better
     """
     @abstractmethod
-    def score(self, candidates: Iterable[Candidate],
-              model: Optional[SurrogateModel] = None) -> List[float]:
+    def score(self, candidates: Iterable[Candidate], model: Optional[OutputSurrogateModel] = None) -> List[float]:
         """
         Requires multiple candidates, is this can be much quicker: we can use matrix operations
 
@@ -135,13 +165,13 @@ class ScoringFunction(ABC):
 
 
 class AcquisitionFunction(ScoringFunction):
-    @abstractmethod
-    def __init__(self, model: SurrogateModel):
+
+    def __init__(self, model: OutputSurrogateModel, active_metric: str = None):
         self.model = model
+        self.active_metric = active_metric
 
     @abstractmethod
-    def compute_acq(self, inputs: np.ndarray,
-                    model: Optional[SurrogateModel] = None) -> np.ndarray:
+    def compute_acq(self, inputs: np.ndarray, model: Optional[OutputSurrogateModel] = None) -> np.ndarray:
         """
         Note: If inputs has shape (d,), it is taken to be (1, d)
 
@@ -153,9 +183,7 @@ class AcquisitionFunction(ScoringFunction):
 
     @abstractmethod
     def compute_acq_with_gradient(
-            self, input: np.ndarray,
-            model: Optional[SurrogateModel] = None) -> \
-            Tuple[float, np.ndarray]:
+            self, input: np.ndarray, model: Optional[OutputSurrogateModel] = None) -> Tuple[float, np.ndarray]:
         """
         For a single input point x, compute acquisition function value f(x)
         and gradient nabla_x f.
@@ -166,11 +194,14 @@ class AcquisitionFunction(ScoringFunction):
         """
         pass
 
-    def score(self, candidates: Iterable[Candidate],
-              model: Optional[SurrogateModel] = None) -> List[float]:
+    def score(self, candidates: Iterable[Candidate], model: Optional[OutputSurrogateModel] = None) -> List[float]:
         if model is None:
             model = self.model
-        inputs = model.state.hp_ranges.to_ndarray_matrix(candidates)
+        elif isinstance(model, SurrogateModel):
+            model = dictionarize_objective(model)
+        assert set(model.keys()) == set(self.model.keys())
+        active_model = model[self.active_metric]
+        inputs = active_model.state.hp_ranges.to_ndarray_matrix(candidates)
         return list(self.compute_acq(inputs, model=model))
 
 
@@ -180,10 +211,14 @@ class LocalOptimizer(ABC):
     optimization method such as lbfgs. It would normally encapsulate an acquisition function and model
 
     """
-    def __init__(self, state: TuningJobState, model: SurrogateModel,
-                 acquisition_function_class: Type[AcquisitionFunction]):
+    def __init__(self, state: TuningJobState, model: OutputSurrogateModel,
+                 acquisition_function_class: Type[AcquisitionFunction], active_metric: str = None):
         self.state = state
         self.model = model
+        if isinstance(model, dict):
+            self.active_metric = assign_active_metric(model, active_metric)
+        else:
+            self.active_metric = active_metric
         self.acquisition_function_class = acquisition_function_class
 
     @abstractmethod

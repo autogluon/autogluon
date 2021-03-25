@@ -14,11 +14,10 @@ from ..models.gp_model import GPModel
 from ..models.gpmodel_skipopt import SkipOptimizationPredicate
 from ..models.gpmodel_transformers import GPModelArgs
 from ..tuning_algorithms.base_classes import LocalOptimizer, \
-    AcquisitionFunction
+    AcquisitionFunction, DEFAULT_METRIC
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
 from ..tuning_algorithms.common import compute_blacklisted_candidates
-from ..tuning_algorithms.defaults import DEFAULT_METRIC, \
-    DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, \
+from ..tuning_algorithms.defaults import DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, \
     DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
 from ..utils.debug_log import DebugLogPrinter
 from ..utils.duplicate_detector import DuplicateDetectorIdentical
