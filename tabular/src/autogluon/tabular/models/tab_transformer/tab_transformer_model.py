@@ -281,8 +281,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         best_val_metric = -np.inf  # higher = better
         best_val_epoch = 0
         best_loss = np.inf
-
-        self._verbosity = self.params.get('verbosity', 2)
+        
         if self._verbosity <= 1:
             verbose_eval = -1
         elif self._verbosity == 2:
@@ -352,7 +351,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
              reporter=None,
              **kwargs):
         import torch
-
+        
+        self._verbosity = kwargs.get('verbosity', 2)
         num_gpus = kwargs.get('num_gpus', None)
         if num_gpus is None:
             if torch.cuda.is_available():
