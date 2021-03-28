@@ -14,6 +14,7 @@ from autogluon.core import Int, Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.features.types import R_OBJECT
 from autogluon.core.models import AbstractModel
+from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils import try_import_lightgbm
 from autogluon.core.utils.savers import save_pkl
 
@@ -73,9 +74,8 @@ class LGBModel(AbstractModel):
              verbosity=2,
              **kwargs):
         start_time = time.time()
-        params = self.params.copy()
-
-        # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
+        ag_params = self._get_ag_params()
+        params = self._get_model_params()
         params = fixedvals_from_searchspaces(params)
 
         if verbosity <= 1:
@@ -88,8 +88,11 @@ class LGBModel(AbstractModel):
             verbose_eval = 1
 
         stopping_metric, stopping_metric_name = self._get_stopping_metric_internal()
-        dataset_train, dataset_val = self.generate_datasets(X=X, y=y, params=params, X_val=X_val, y_val=y_val,
-                                                            sample_weight=sample_weight, sample_weight_val=sample_weight_val, dataset_train=dataset_train, dataset_val=dataset_val)
+        dataset_train, dataset_val = self.generate_datasets(
+            X=X, y=y, params=params, X_val=X_val, y_val=y_val,
+            sample_weight=sample_weight, sample_weight_val=sample_weight_val,
+            dataset_train=dataset_train, dataset_val=dataset_val
+        )
         gc.collect()
 
         num_boost_round = params.pop('num_boost_round', 1000)
@@ -110,17 +113,16 @@ class LGBModel(AbstractModel):
             if params['min_data_in_leaf'] > num_rows_train:  # TODO: may not be necessary
                 params['min_data_in_leaf'] = max(1, int(num_rows_train / 5.0))
 
-        # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
-        if (dataset_val is not None) and (dataset_train is not None):
-            modifier = 1 if num_rows_train <= 10000 else 10000 / num_rows_train
-            early_stopping_rounds = max(round(modifier * 150), 10)
-        else:
-            early_stopping_rounds = 150
-
         callbacks = []
         valid_names = ['train_set']
         valid_sets = [dataset_train]
         if dataset_val is not None:
+            # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
+            early_stopping_rounds = ag_params.get('ag.es', 'auto')
+            if isinstance(early_stopping_rounds, str):
+                early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
+            if early_stopping_rounds is None:
+                early_stopping_rounds = 999999
             reporter = kwargs.get('reporter', None)
             train_loss_name = self._get_train_loss_name() if reporter is not None else None
             if train_loss_name is not None:
@@ -308,7 +310,7 @@ class LGBModel(AbstractModel):
         time_start = time.time()
         logger.log(15, "Beginning hyperparameter tuning for Gradient Boosting Model...")
         self._set_default_searchspace()
-        params_copy = self.params.copy()
+        params_copy = self._get_params()
         if isinstance(params_copy['min_data_in_leaf'], Int):
             upper_minleaf = params_copy['min_data_in_leaf'].upper
             if upper_minleaf > X.shape[0]:  # TODO: this min_data_in_leaf adjustment based on sample size may not be necessary
@@ -389,6 +391,9 @@ class LGBModel(AbstractModel):
             raise ValueError(f"unknown problem_type for LGBModel: {self.problem_type}")
         return train_loss_name
 
+    def _get_early_stopping_rounds(self, num_rows_train, strategy='auto'):
+        return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
+
     def get_model_feature_importance(self, use_original_feature_names=False):
         feature_names = self.model.feature_name()
         importances = self.model.feature_importance()
@@ -405,3 +410,6 @@ class LGBModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    def _ag_params(self) -> set:
+        return {'ag.es'}

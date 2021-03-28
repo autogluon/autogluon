@@ -84,7 +84,7 @@ class KNNModel(AbstractModel):
         num_rows_max = len(X)
         # FIXME: v0.1 Must store final num rows for refit_full or else will use everything! Worst case refit_full could train far longer than the original model.
         if time_limit is None or num_rows_max <= 10000:
-            self.model = self._get_model_type()(**self.params).fit(X, y)
+            self.model = self._get_model_type()(**self._get_model_params()).fit(X, y)
         else:
             self.model = self._fit_with_samples(X=X, y=y, time_limit=time_limit - (time.time() - time_start))
 
@@ -216,7 +216,7 @@ class KNNModel(AbstractModel):
                 X_samp = X
                 y_samp = y
                 idx = None
-            self.model = model_type(**self.params).fit(X_samp, y_samp)
+            self.model = model_type(**self._get_model_params()).fit(X_samp, y_samp)
             time_limit_left_prior = time_limit_left
             time_fit_end_sample = time.time()
             time_limit_left = time_limit - (time_fit_end_sample - time_start)

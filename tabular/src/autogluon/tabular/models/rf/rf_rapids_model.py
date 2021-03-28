@@ -45,6 +45,6 @@ class RFRapidsModel(RFModel):
                        'Consider using CPU instead if model quality is not sufficient.\n'
                        '\t\tLink to issue: https://github.com/rapidsai/cuml/issues/2518')
         X = self.preprocess(X)
-        self.model = self._get_model_type()(**self.params)
+        self.model = self._get_model_type()(**self._get_model_params())
         self.model = self.model.fit(X, y)
         self.params_trained['n_estimators'] = self.model.n_estimators

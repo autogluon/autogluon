@@ -72,7 +72,7 @@ class FastTextModel(AbstractModel):
         try_import_fasttext()
         import fasttext
 
-        params = self.params.copy()
+        params = self._get_model_params()
         quantize_model = params.pop('quantize_model', True)
 
         verbosity = kwargs.get('verbosity', 2)

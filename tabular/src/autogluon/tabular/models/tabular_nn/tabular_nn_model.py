@@ -180,7 +180,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
 
-        params = self.params.copy()
+        params = self._get_model_params()
         params = fixedvals_from_searchspaces(params)
         if self.feature_metadata is None:
             raise ValueError("Trainer class must set feature_metadata for this model")
@@ -723,7 +723,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         num_cpus = scheduler_params['resource']['num_cpus']
 
-        params_copy = self.params.copy()
+        params_copy = self._get_params()
 
         self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         self.batch_size = params_copy['batch_size']
