@@ -281,8 +281,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         best_val_metric = -np.inf  # higher = better
         best_val_epoch = 0
         best_loss = np.inf
-
-        self._verbosity = self.params.get('verbosity', 2)
+        
         if self._verbosity <= 1:
             verbose_eval = -1
         elif self._verbosity == 2:
@@ -291,14 +290,17 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
             verbose_eval = 10
         else:
             verbose_eval = 1
-
+        
+        if verbose_eval <= 0:
+            databar_disable = True  # Whether or not we want to suppress output based on our verbosity
+        else:
+            databar_disable = False
+        
         for e in range(epochs):
             if e == 0:
                 logger.log(15, "TabTransformer architecture:")
                 logger.log(15, str(self.model))
 
-            # Whether or not we want to suppress output based on our verbosity.
-            databar_disable = e % verbose_eval != 0
             train_loss, val_metric = self._epoch(net=self.model, loader_train=loader_train, loader_val=loader_val, y_val=y_val,
                                                  optimizers=optimizers, loss_criterion=loss_criterion, \
                                                  pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs,
@@ -349,7 +351,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
              reporter=None,
              **kwargs):
         import torch
-
+        
+        self._verbosity = kwargs.get('verbosity', 2)
         num_gpus = kwargs.get('num_gpus', None)
         if num_gpus is None:
             if torch.cuda.is_available():
