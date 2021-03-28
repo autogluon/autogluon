@@ -134,8 +134,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
              time_limit=None,
              **kwargs):
         start_time = time.time()
-        # TODO: This could be preprocess=True in general, just have preprocess=False for child models
-        X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
+        # TODO: This could be preprocess_nonadaptive=True in general, just have preprocess_nonadaptive=False for child models
+        X = self.preprocess(X=X, preprocess_nonadaptive=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
         self._add_stack_to_feature_metadata()
