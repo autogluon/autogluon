@@ -168,16 +168,16 @@ class ObjectDetector(object):
                 Mini batch size
             lr : float
                 Trainer learning rate for optimization process.
-            early_stop_patience : int
+            early_stop_patience : int, default=-1
                 Number of epochs with no improvement after which train is early stopped. Use -1 to disable.
-            early_stop_min_delta : float
+            early_stop_min_delta : float, default=1e-4
                 The small delta value to ignore when evaluating the metric. A large delta helps stablize the early
                 stopping strategy against tiny fluctuation, e.g. 0.5->0.49->0.48->0.499->0.500001 is still considered as
                 a good timing for early stopping.
             early_stop_baseline : float, default=0.0
                 The minimum(baseline) value to trigger early stopping. For example, with `early_stop_baseline=0.5`,
                 early stopping won't be triggered if the metric is less than 0.5 even if plateau is detected.
-            early_stop_max_value : float
+            early_stop_max_value : float, default=1.0
                 The max value for metric, early stop training instantly once the max value is achieved.
             You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
         **kwargs :
