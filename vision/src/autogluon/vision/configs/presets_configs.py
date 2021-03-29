@@ -26,7 +26,8 @@ preset_image_predictor = dict(
             'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
             'lr': Real(1e-5, 1e-2, log=True),
             'batch_size': Categorical(8, 16, 32, 64, 128),
-            'epochs': 200
+            'epochs': 200,
+            'early_stop_patience': -1
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 1024,
@@ -42,7 +43,8 @@ preset_image_predictor = dict(
             'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
             'lr': Real(1e-4, 1e-2, log=True),
             'batch_size': Categorical(8, 16, 32, 64, 128),
-            'epochs': 150
+            'epochs': 150,
+            'early_stop_patience': 20
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
@@ -58,7 +60,8 @@ preset_image_predictor = dict(
             'model': 'resnet50_v1b',
             'lr': 0.01,
             'batch_size': 64,
-            'epochs': 50
+            'epochs': 50,
+            'early_stop_patience': 5
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 8,
@@ -75,6 +78,7 @@ preset_image_predictor = dict(
             'lr': Categorical(0.01, 0.005, 0.001),
             'batch_size': Categorical(64, 128),
             'epochs': Categorical(50, 100),
+            'early_stop_patience': 10
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
@@ -93,7 +97,8 @@ preset_object_detector = dict(
             'transfer': 'faster_rcnn_fpn_resnet101_v1d_coco',
             'lr': Real(1e-5, 1e-3, log=True),
             'batch_size': Categorical(4, 8),
-            'epochs': 30
+            'epochs': 30,
+            'early_stop_patience': -1
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 128,
@@ -111,7 +116,8 @@ preset_object_detector = dict(
                                     'center_net_resnet50_v1b_coco'),
             'lr': Real(1e-4, 1e-2, log=True),
             'batch_size': Categorical(8, 16, 32, 64),
-            'epochs': 50
+            'epochs': 50,
+            'early_stop_patience': 20
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
@@ -127,7 +133,8 @@ preset_object_detector = dict(
             'transfer': 'ssd_512_resnet50_v1_coco',
             'lr': 0.01,
             'batch_size': Categorical(8, 16),
-            'epochs': 30
+            'epochs': 30,
+            'early_stop_patience': 5
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 16,
@@ -144,6 +151,7 @@ preset_object_detector = dict(
             'lr': Categorical(0.01, 0.005, 0.001),
             'batch_size': Categorical(32, 64, 128),
             'epochs': Categorical(30, 50),
+            'early_stop_patience': 10
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,

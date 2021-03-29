@@ -101,7 +101,8 @@ class ObjectDetector(object):
                         'transfer': Categorical('faster_rcnn_fpn_resnet101_v1d_coco'),
                         'lr': Real(1e-5, 1e-3, log=True),
                         'batch_size': Categorical(4, 8),
-                        'epochs': 30
+                        'epochs': 30,
+                        'early_stop_patience': -1
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 128,
@@ -117,7 +118,8 @@ class ObjectDetector(object):
                                                 'center_net_resnet50_v1b_coco'),
                         'lr': Real(1e-4, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64),
-                        'epochs': 50
+                        'epochs': 50,
+                        'early_stop_patience': 20
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 512,
@@ -131,7 +133,8 @@ class ObjectDetector(object):
                         'transfer': Categorical('ssd_512_resnet50_v1_coco'),
                         'lr': 0.01,
                         'batch_size': Categorical(8, 16),
-                        'epochs': 30
+                        'epochs': 30,
+                        'early_stop_patience': 5
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 16,
@@ -147,6 +150,7 @@ class ObjectDetector(object):
                         'lr': Categorical(0.01, 0.005, 0.001),
                         'batch_size': Categorical(32, 64, 128),
                         'epochs': Categorical(30, 50),
+                        'early_stop_patience': 10
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 32,
@@ -164,6 +168,17 @@ class ObjectDetector(object):
                 Mini batch size
             lr : float
                 Trainer learning rate for optimization process.
+            early_stop_patience : int
+                Number of epochs with no improvement after which train is early stopped. Use -1 to disable.
+            early_stop_min_delta : float
+                The small delta value to ignore when evaluating the metric. A large delta helps stablize the early
+                stopping strategy against tiny fluctuation, e.g. 0.5->0.49->0.48->0.499->0.500001 is still considered as
+                a good timing for early stopping.
+            early_stop_baseline : float, default=0.0
+                The minimum(baseline) value to trigger early stopping. For example, with `early_stop_baseline=0.5`,
+                early stopping won't be triggered if the metric is less than 0.5 even if plateau is detected.
+            early_stop_max_value : float
+                The max value for metric, early stop training instantly once the max value is achieved.
             You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
         **kwargs :
             holdout_frac : float, default = 0.1
@@ -255,6 +270,8 @@ class ObjectDetector(object):
             config.update(hyperparameters)
         if scheduler_options is not None:
             config.update(scheduler_options)
+        if 'early_stop_patience' not in config:
+            config['early_stop_patience'] = 10
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.object_detection').propagate = False

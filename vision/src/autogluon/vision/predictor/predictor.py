@@ -107,7 +107,8 @@ class ImagePredictor(object):
                         'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
                         'lr': Real(1e-5, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
-                        'epochs': 200
+                        'epochs': 200,
+                        'early_stop_patience': -1
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 1024,
@@ -121,7 +122,8 @@ class ImagePredictor(object):
                         'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
                         'lr': Real(1e-4, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
-                        'epochs': 150
+                        'epochs': 150,
+                        'early_stop_patience': 20
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 512,
@@ -135,7 +137,8 @@ class ImagePredictor(object):
                         'model': 'resnet50_v1b',
                         'lr': 0.01,
                         'batch_size': 64,
-                        'epochs': 50
+                        'epochs': 50,
+                        'early_stop_patience': 5
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 8,
@@ -151,6 +154,7 @@ class ImagePredictor(object):
                         'lr': Categorical(0.01, 0.005, 0.001),
                         'batch_size': Categorical(64, 128),
                         'epochs': Categorical(50, 100),
+                        'early_stop_patience': 10
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 32,
@@ -174,6 +178,17 @@ class ImagePredictor(object):
                 Mini batch size
             lr : float
                 Trainer learning rate for optimization process.
+            early_stop_patience : int, default=-1
+                Number of epochs with no improvement after which train is early stopped. Use -1 to disable.
+            early_stop_min_delta : float, default=1e-4
+                The small delta value to ignore when evaluating the metric. A large delta helps stablize the early
+                stopping strategy against tiny fluctuation, e.g. 0.5->0.49->0.48->0.499->0.500001 is still considered as
+                a good timing for early stopping.
+            early_stop_baseline : float, default=0.0
+                The minimum(baseline) value to trigger early stopping. For example, with `early_stop_baseline=0.5`,
+                early stopping won't be triggered if the metric is less than 0.5 even if plateau is detected.
+            early_stop_max_value : float, default=1.0
+                The max value for metric, early stop training instantly once the max value is achieved.
             You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
         **kwargs :
             holdout_frac : float, default = 0.1
@@ -315,6 +330,8 @@ class ImagePredictor(object):
             config.update(scheduler_options)
         if use_rec == True:
             config['use_rec'] = True
+        if 'early_stop_patience' not in config:
+            config['early_stop_patience'] = 10
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
