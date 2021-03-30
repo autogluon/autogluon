@@ -27,7 +27,7 @@ preset_image_predictor = dict(
             'lr': Real(1e-5, 1e-2, log=True),
             'batch_size': Categorical(8, 16, 32, 64, 128),
             'epochs': 200,
-            'early_stop_patience': -1
+            'early_stop_patience': 50
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 1024,
@@ -98,7 +98,7 @@ preset_object_detector = dict(
             'lr': Real(1e-5, 1e-3, log=True),
             'batch_size': Categorical(4, 8),
             'epochs': 30,
-            'early_stop_patience': -1
+            'early_stop_patience': 50
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 128,

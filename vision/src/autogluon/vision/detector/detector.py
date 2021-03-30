@@ -6,6 +6,7 @@ import warnings
 import os
 
 import pandas as pd
+import numpy as np
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from autogluon.core.utils import set_logger_verbosity
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
@@ -168,17 +169,18 @@ class ObjectDetector(object):
                 Mini batch size
             lr : float
                 Trainer learning rate for optimization process.
-            early_stop_patience : int, default=-1
-                Number of epochs with no improvement after which train is early stopped. Use -1 to disable.
+            early_stop_patience : int, default=10
+                Number of epochs with no improvement after which train is early stopped. Use `None` to disable.
             early_stop_min_delta : float, default=1e-4
                 The small delta value to ignore when evaluating the metric. A large delta helps stablize the early
                 stopping strategy against tiny fluctuation, e.g. 0.5->0.49->0.48->0.499->0.500001 is still considered as
                 a good timing for early stopping.
-            early_stop_baseline : float, default=0.0
+            early_stop_baseline : float, default=None
                 The minimum(baseline) value to trigger early stopping. For example, with `early_stop_baseline=0.5`,
                 early stopping won't be triggered if the metric is less than 0.5 even if plateau is detected.
-            early_stop_max_value : float, default=1.0
-                The max value for metric, early stop training instantly once the max value is achieved.
+                Use `None` to disable.
+            early_stop_max_value : float, default=None
+                The max value for metric, early stop training instantly once the max value is achieved. Use `None` to disable.
             You can get the list of accepted hyperparameters in `config.yaml` saved by this predictor.
         **kwargs :
             holdout_frac : float, default = 0.1
@@ -272,6 +274,13 @@ class ObjectDetector(object):
             config.update(scheduler_options)
         if 'early_stop_patience' not in config:
             config['early_stop_patience'] = 10
+        if config['early_stop_patience'] == None:
+            config['early_stop_patience'] = -1
+        # TODO(zhreshold): expose the transform function(or sign function) for converting custom metrics
+        if 'early_stop_baseline' not in config or config['early_stop_baseline'] == None:
+            config['early_stop_baseline'] = -np.Inf
+        if 'early_stop_max_value' not in config or config['early_stop_max_value'] == None:
+            config['early_stop_max_value'] = np.Inf
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.object_detection').propagate = False
