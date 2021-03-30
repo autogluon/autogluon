@@ -5,6 +5,7 @@ import os
 import pickle
 import warnings
 
+import numpy as np
 import pandas as pd
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
