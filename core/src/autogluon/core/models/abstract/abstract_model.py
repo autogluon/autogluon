@@ -953,7 +953,22 @@ class AbstractModel:
 
     # TODO: Add documentation for valid args for each model. Currently only `ag.es`
     def _ag_params(self) -> set:
-        """Set of params that are not passed to the inner model, but are used by the wrapper."""
+        """
+        Set of params that are not passed to self.model, but are used by the wrapper.
+        For developers, this is purely optional and is just for convenience to logically distinguish between model specific parameters and added AutoGluon functionality.
+        The goal is to have common parameter names for useful functionality shared between models,
+        even if the functionality is not natively available as a parameter in the model itself or under a different name.
+
+        Below are common patterns / options to make available. Their actual usage and options in a particular model should be documented in the model itself, as it has flexibility to differ.
+
+        Possible params:
+
+        ag.es : int, str, or tuple
+            generic name for early stopping logic. Typically can be an int or a str preset/strategy.
+            Also possible to pass tuple of (class, kwargs) to construct a custom early stopping object.
+                Refer to `autogluon.core.utils.early_stopping` for examples.
+
+        """
         return set()
 
     def _get_tags(self):
