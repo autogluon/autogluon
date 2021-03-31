@@ -118,7 +118,7 @@ class LGBModel(AbstractModel):
         if dataset_val is not None:
             from .callbacks import early_stopping_custom
             # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
-            early_stopping_rounds = ag_params.get('ag.es', 'adaptive')
+            early_stopping_rounds = ag_params.get('ag.early_stop', 'adaptive')
             if isinstance(early_stopping_rounds, (str, tuple, list)):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
             if early_stopping_rounds is None:
@@ -412,4 +412,4 @@ class LGBModel(AbstractModel):
         return default_auxiliary_params
 
     def _ag_params(self) -> set:
-        return {'ag.es'}
+        return {'ag.early_stop'}
