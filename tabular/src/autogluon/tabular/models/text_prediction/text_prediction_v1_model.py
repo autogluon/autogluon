@@ -10,7 +10,7 @@ import pandas as pd
 from autogluon.core.constants import REGRESSION, BINARY
 
 from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
-    S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
+    S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_URL
 from autogluon.core.utils import get_cpu_count, get_gpu_count, try_import_mxnet, try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
@@ -63,7 +63,7 @@ class TextPredictorModel(AbstractModel):
         extra_auxiliary_params = dict(
             get_features_kwargs=dict(
                 valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
-                invalid_special_types=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
+                invalid_special_types=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_URL],
             ),
         )
         default_auxiliary_params.update(extra_auxiliary_params)

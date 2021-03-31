@@ -31,6 +31,9 @@ S_TEXT_SPECIAL = 'text_special'
 # feature is a generated feature based off of a text feature that is an ngram.
 S_TEXT_NGRAM = 'text_ngram'
 
+# feature is an object type that contains a string url to an image that can be utilized in computer vision
+S_IMAGE_URL = 'image_url'
+
 # feature is a generated feature based off of a ML model's prediction probabilities of the label column for the row.
 # Any model which takes a stack feature as input is a stack ensemble.
 S_STACK = 'stack'

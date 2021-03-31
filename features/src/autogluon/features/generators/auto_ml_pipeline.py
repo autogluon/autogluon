@@ -1,6 +1,6 @@
 import logging
 
-from autogluon.core.features.types import R_INT, R_FLOAT, S_TEXT
+from autogluon.core.features.types import R_INT, R_FLOAT, S_TEXT, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_URL
 
 from .pipeline import PipelineFeatureGenerator
 from .category import CategoryFeatureGenerator
@@ -42,6 +42,11 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     enable_raw_text_features : bool, default False
         Whether to use the raw text features. The generated raw text features will end up with '_raw_text' suffix.
         For example, 'sentence' --> 'sentence_raw_text'
+    enable_vision_features : bool, default True
+        [Experimental]
+        Whether to keep 'object' features identified as 'image_url' special type. Features of this form should have a url path to an image file as their value.
+        Only vision models can leverage these features, and these features will not be treated as categorical.
+        Note: 'image_url' features will not be automatically inferred. These features must be explicitly specified as such in a custom FeatureMetadata object.
     vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
         sklearn CountVectorizer object to use in :class:`TextNgramFeatureGenerator`.
         Only used if `enable_text_ngram_features=True`.
@@ -66,10 +71,17 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     >>>
     >>> X_test_transformed = feature_generator.transform(test_data)
     """
-    def __init__(self, enable_numeric_features=True, enable_categorical_features=True,
+    def __init__(self,
+                 enable_numeric_features=True,
+                 enable_categorical_features=True,
                  enable_datetime_features=True,
-                 enable_text_special_features=True, enable_text_ngram_features=True,
-                 enable_raw_text_features=False, vectorizer=None, text_ngram_params=None, **kwargs):
+                 enable_text_special_features=True,
+                 enable_text_ngram_features=True,
+                 enable_raw_text_features=False,
+                 enable_vision_features=True,
+                 vectorizer=None,
+                 text_ngram_params=None,
+                 **kwargs):
         if 'generators' in kwargs:
             raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
         if 'enable_raw_features' in kwargs:
@@ -82,6 +94,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_text_special_features = enable_text_special_features
         self.enable_text_ngram_features = enable_text_ngram_features
         self.enable_raw_text_features = enable_raw_text_features
+        self.enable_vision_features = enable_vision_features
         self.text_ngram_params = text_ngram_params if text_ngram_params else {}
 
         generators = self._get_default_generators(vectorizer=vectorizer)
@@ -103,5 +116,9 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(TextSpecialFeatureGenerator())
         if self.enable_text_ngram_features:
             generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
+        if self.enable_vision_features:
+            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
+                valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_URL],
+            )))
         generators = [generator_group]
         return generators

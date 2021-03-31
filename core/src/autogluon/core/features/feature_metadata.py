@@ -176,6 +176,17 @@ class FeatureMetadata:
         features_to_remove = [feature for feature in self.get_features() if feature not in features]
         return self.remove_features(features=features_to_remove, inplace=inplace)
 
+    def add_special_types(self, type_map_special: dict, inplace=False):
+        """Adds special types to features"""
+        if inplace:
+            metadata = self
+        else:
+            metadata = copy.deepcopy(self)
+        for feature, special_types in type_map_special.items():
+            for special_type in special_types:
+                metadata.type_group_map_special[special_type].append(feature)
+        return metadata
+
     @staticmethod
     def _remove_features_from_type_group_map(d, features):
         for key, features_orig in d.items():

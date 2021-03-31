@@ -4,7 +4,7 @@ import logging
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
-from autogluon.core.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_TEXT, S_TEXT_AS_CATEGORY
+from autogluon.core.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_URL, S_TEXT, S_TEXT_AS_CATEGORY
 
 from .abstract import AbstractFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
@@ -51,7 +51,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = None, maximum_num_cat: int = None, fillna: str = None, **kwargs):
+    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = 2, maximum_num_cat: int = None, fillna: str = None, **kwargs):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
         if minimum_cat_count is not None and minimum_cat_count < 1:
@@ -93,7 +93,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     def get_default_infer_features_in_args() -> dict:
         return dict(
             valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
-            invalid_special_types=[S_DATETIME_AS_OBJECT]
+            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_URL]
         )
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:
