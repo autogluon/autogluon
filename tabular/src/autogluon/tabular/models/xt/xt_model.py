@@ -1,7 +1,7 @@
-from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor
-from ..rf.rf_quantile import ExtraTreesQuantileRegressor
-from ..rf.rf_model import RFModel
+
 from autogluon.core.constants import REGRESSION, QUANTILE
+
+from ..rf.rf_model import RFModel
 
 
 class XTModel(RFModel):
@@ -10,8 +10,11 @@ class XTModel(RFModel):
     """
     def _get_model_type(self):
         if self.problem_type == REGRESSION:
+            from sklearn.ensemble import ExtraTreesRegressor
             return ExtraTreesRegressor
         elif self.problem_type == QUANTILE:
+            from ..rf.rf_quantile import ExtraTreesQuantileRegressor
             return ExtraTreesQuantileRegressor
         else:
+            from sklearn.ensemble import ExtraTreesClassifier
             return ExtraTreesClassifier
