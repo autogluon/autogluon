@@ -705,7 +705,7 @@ class AbstractModel:
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         self._set_default_searchspace()
-        params_copy = self.params.copy()
+        params_copy = self._get_params()
         directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
         scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
@@ -918,7 +918,6 @@ class AbstractModel:
         """
         return {}
 
-
     def _get_default_stopping_metric(self):
         """
         Returns the default stopping metric to use for early stopping.
@@ -931,6 +930,46 @@ class AbstractModel:
             stopping_metric = self.eval_metric
         stopping_metric = metrics.get_metric(stopping_metric, self.problem_type, 'stopping_metric')
         return stopping_metric
+
+    def _get_params(self) -> dict:
+        """Gets all params."""
+        return self.params.copy()
+
+    def _get_ag_params(self) -> dict:
+        """Gets params that are not passed to the inner model, but are used by the wrapper."""
+        ag_param_names = self._ag_params()
+        if ag_param_names:
+            return {key: val for key, val in self.params.items() if key in ag_param_names}
+        else:
+            return dict()
+
+    def _get_model_params(self) -> dict:
+        """Gets params that are passed to the inner model."""
+        ag_param_names = self._ag_params()
+        if ag_param_names:
+            return {key: val for key, val in self.params.items() if key not in ag_param_names}
+        else:
+            return self._get_params()
+
+    # TODO: Add documentation for valid args for each model. Currently only `ag.es`
+    def _ag_params(self) -> set:
+        """
+        Set of params that are not passed to self.model, but are used by the wrapper.
+        For developers, this is purely optional and is just for convenience to logically distinguish between model specific parameters and added AutoGluon functionality.
+        The goal is to have common parameter names for useful functionality shared between models,
+        even if the functionality is not natively available as a parameter in the model itself or under a different name.
+
+        Below are common patterns / options to make available. Their actual usage and options in a particular model should be documented in the model itself, as it has flexibility to differ.
+
+        Possible params:
+
+        ag.es : int, str, or tuple
+            generic name for early stopping logic. Typically can be an int or a str preset/strategy.
+            Also possible to pass tuple of (class, kwargs) to construct a custom early stopping object.
+                Refer to `autogluon.core.utils.early_stopping` for examples.
+
+        """
+        return set()
 
     def _get_tags(self):
         collected_tags = {}

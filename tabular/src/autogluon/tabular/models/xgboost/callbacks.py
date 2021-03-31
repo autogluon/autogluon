@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 class EarlyStoppingCustom(EarlyStopping):
     """Augments early stopping in XGBoost to also consider time_limit and memory usage"""
     def __init__(self, rounds, time_limit=None, start_time=None, verbose=False, **kwargs):
+        if rounds is None:
+            # Disable early stopping via rounds
+            rounds = 999999
         super().__init__(rounds=rounds, **kwargs)
         self.time_limit = time_limit
         self.start_time = start_time

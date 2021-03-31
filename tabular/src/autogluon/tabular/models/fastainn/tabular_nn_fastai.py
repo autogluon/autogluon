@@ -170,7 +170,7 @@ class NNFastAiTabularModel(AbstractModel):
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
 
-        params = self.params.copy()
+        params = self._get_model_params()
 
         self.y_scaler = params.get('y_scaler', None)
         if self.y_scaler is not None:

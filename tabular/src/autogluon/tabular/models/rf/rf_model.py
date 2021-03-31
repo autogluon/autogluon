@@ -75,8 +75,8 @@ class RFModel(AbstractModel):
              **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        hyperparams = self.params.copy()
-        n_estimators_final = hyperparams['n_estimators']
+        params = self._get_model_params()
+        n_estimators_final = params['n_estimators']
 
         n_estimators_minimum = min(40, n_estimators_final)
         n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
@@ -103,15 +103,15 @@ class RFModel(AbstractModel):
         if n_estimators_final > n_estimators_test * 2:
             if self.problem_type == MULTICLASS:
                 n_estimator_increments = [n_estimators_test, n_estimators_final]
-                hyperparams['warm_start'] = True
+                params['warm_start'] = True
             else:
                 if expected_memory_usage > (0.05 * max_memory_usage_ratio):  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
                     # Causes ~10% training slowdown, so try to avoid if memory is not an issue
                     n_estimator_increments = [n_estimators_test, n_estimators_final]
-                    hyperparams['warm_start'] = True
+                    params['warm_start'] = True
 
-        hyperparams['n_estimators'] = n_estimator_increments[0]
-        self.model = self._get_model_type()(**hyperparams)
+        params['n_estimators'] = n_estimator_increments[0]
+        self.model = self._get_model_type()(**params)
 
         time_train_start = time.time()
         for i, n_estimators in enumerate(n_estimator_increments):

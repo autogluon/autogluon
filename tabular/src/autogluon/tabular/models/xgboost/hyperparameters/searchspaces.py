@@ -23,7 +23,7 @@ def get_base_searchspace():
         'booster': 'gbtree',
         'n_jobs': os.cpu_count(), # TODO: xgboost plans to accept -1 for compability with other packages. After that, resolving this issue.
         'learning_rate': Real(lower=5e-3, upper=0.2, default=0.1, log=True),
-        'max_depth': Int(lower=3, upper=10, default=3),
+        'max_depth': Int(lower=3, upper=10, default=6),
         'min_child_weight': Int(lower=1, upper=5, default=1),
         'gamma': Real(lower=0, upper=5, default=0.01),
         'subsample': Real(lower=0.5, upper=1.0, default=1.0),

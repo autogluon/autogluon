@@ -2,14 +2,15 @@ import os
 import time
 import logging
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.constants import REGRESSION, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.features.types import R_OBJECT
+from autogluon.core.models import AbstractModel
+from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils import try_import_xgboost
 
 from . import xgboost_utils
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
-from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
 
@@ -69,14 +70,14 @@ class XGBoostModel(AbstractModel):
              num_gpus=0,
              sample_weight=None,
              sample_weight_val=None,
+             verbosity=2,
              **kwargs):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
-
-        params = self.params.copy()
+        ag_params = self._get_ag_params()
+        params = self._get_model_params()
         max_category_levels = params.pop('proc.max_category_levels', 100)
 
-        verbosity = kwargs.get('verbosity', 2)
         if verbosity <= 2:
             verbose = False
             verbose_eval = None
@@ -94,13 +95,14 @@ class XGBoostModel(AbstractModel):
         eval_metric = self.get_eval_metric()
 
         if X_val is None:
-            early_stopping_rounds = 150
+            early_stopping_rounds = None
             eval_set.append((X, y))  # TODO: if the train dataset is large, use sample of train dataset for validation
         else:
-            modifier = 1 if num_rows_train <= 10000 else 10000 / num_rows_train
-            early_stopping_rounds = max(round(modifier * 150), 10)
             X_val = self.preprocess(X_val, is_train=False)
             eval_set.append((X_val, y_val))
+            early_stopping_rounds = ag_params.get('ag.es', 'auto')
+            if isinstance(early_stopping_rounds, str):
+                early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
 
         if num_gpus != 0:
             params['tree_method'] = 'gpu_hist'
@@ -144,3 +146,9 @@ class XGBoostModel(AbstractModel):
 
         y_pred_proba = self.model.predict_proba(X, ntree_limit=self._best_ntree_limit)
         return self._convert_proba_to_unified_form(y_pred_proba)
+
+    def _get_early_stopping_rounds(self, num_rows_train, strategy='auto'):
+        return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
+
+    def _ag_params(self) -> set:
+        return {'ag.es'}
