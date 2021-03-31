@@ -19,7 +19,6 @@ from autogluon.core.utils import try_import_lightgbm
 from autogluon.core.utils.savers import save_pkl
 
 from . import lgb_utils
-from .callbacks import early_stopping_custom
 from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
@@ -117,9 +116,10 @@ class LGBModel(AbstractModel):
         valid_names = ['train_set']
         valid_sets = [dataset_train]
         if dataset_val is not None:
+            from .callbacks import early_stopping_custom
             # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
-            early_stopping_rounds = ag_params.get('ag.es', 'auto')
-            if isinstance(early_stopping_rounds, str):
+            early_stopping_rounds = ag_params.get('ag.es', 'adaptive')
+            if isinstance(early_stopping_rounds, (str, tuple, list)):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
             if early_stopping_rounds is None:
                 early_stopping_rounds = 999999
