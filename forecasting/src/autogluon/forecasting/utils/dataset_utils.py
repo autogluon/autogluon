@@ -3,15 +3,19 @@ from copy import deepcopy
 from gluonts.dataset.repository.datasets import dataset_recipes
 from gluonts.dataset.common import Dataset, ListDataset, FileDataset
 from gluonts.dataset.field_names import FieldName
-
+from autogluon.features.generators import IdentityFeatureGenerator, CategoryFeatureGenerator
+from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY
+import logging
 
 __all__ = ['TimeSeriesDataset', 'gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset', 'train_test_split_dataframe',
            'train_test_split_gluonts']
 
+logger = logging.getLogger()
+
 
 class TimeSeriesDataset(ListDataset):
 
-    def __init__(self, df, index_column=None):
+    def __init__(self, df, index_column=None, static_features=None):
         """
         transform a dataframe in the following form to a gluon-ts dataset
         >>> X
@@ -21,6 +25,12 @@ class TimeSeriesDataset(ListDataset):
         2            B           1           2           3
 
         """
+        if static_features is None:
+            self.static_cat_features = None
+            self.static_real_features = None
+            self.cardinality = None
+        else:
+            self.static_cat_features, self.static_real_features, self.cardinality = extract_static_feature(index_column, static_features)
 
         if index_column is not None:
             target = df.drop(index_column, axis=1)
@@ -38,7 +48,9 @@ class TimeSeriesDataset(ListDataset):
             {
                 FieldName.TARGET: target,
                 FieldName.START: pd.Timestamp(date_list[0], freq=self.freq),
-                FieldName.ITEM_ID: item_id
+                FieldName.ITEM_ID: item_id,
+                FieldName.FEAT_STATIC_CAT: self.static_cat_features.loc[self.static_cat_features[index_column].isin([item_id])].drop(index_column, axis=1).values[0] if self.static_cat_features is not None else [],
+                FieldName.FEAT_STATIC_REAL: self.static_real_features.loc[self.static_real_features[index_column].isin([item_id])].drop(index_column, axis=1).values[0] if self.static_real_features is not None else [],
             }
             for (target, item_id) in zip(target_values, self.index)
         ]
@@ -52,6 +64,21 @@ class TimeSeriesDataset(ListDataset):
 
     def get_last_date(self):
         return self.last_date
+
+    def use_feat_static_cat(self):
+        if self.static_cat_features is None:
+            return False
+        else:
+            return len(self.static_cat_features) != 0
+
+    def use_feat_static_real(self):
+        if self.static_real_features is None:
+            return False
+        else:
+            return len(self.static_real_features) != 0
+
+    def get_static_cat_cardinality(self):
+        return self.cardinality
 
 
 def gluonts_builtin_datasets():
@@ -152,7 +179,12 @@ def train_test_split_gluonts(data, prediction_length, freq=None):
     return train_ds, test_ds
 
 
-def time_series_dataset(data, index_column=None, target_column="target", time_column="date", chosen_ts=None):
+def time_series_dataset(data,
+                        index_column=None,
+                        target_column="target",
+                        time_column="date",
+                        chosen_ts=None,
+                        static_features=None):
     rebuilt_data = rebuild_tabular(data,
                                    index_column=index_column,
                                    target_column=target_column,
@@ -161,4 +193,35 @@ def time_series_dataset(data, index_column=None, target_column="target", time_co
         index_column = "index_column"
     if chosen_ts is not None:
         rebuilt_data = rebuilt_data.loc[rebuilt_data[index_column].isin(chosen_ts)]
-    return TimeSeriesDataset(rebuilt_data, index_column=index_column)
+    return TimeSeriesDataset(rebuilt_data, index_column=index_column, static_features=static_features)
+
+
+def extract_static_feature(index_column, features):
+    #TODO: Find a way to do fillna
+    if index_column is None:
+        index_column = "index_column"
+    indices = features[index_column]
+    features = features.drop(index_column, axis=1)
+    cardinality = []
+    for column in features.columns:
+        try:
+            features[column] = features[column].astype(R_FLOAT)
+            if len(features[column].unique()) <= 10:
+                logger.log(30, f"static feature column {column} has 10 or less unique values, assuming it is categorical.")
+                features[column] = features[column].astype(R_CATEGORY)
+                cardinality.append(len(features[column].unique()))
+        except ValueError:
+            logger.log(30, f"Cannot convert column {column} to float, assuming it is categorical.")
+            cardinality.append(len(features[column].unique()))
+            pass
+    static_real_features = IdentityFeatureGenerator(
+        infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}
+    ).fit_transform(features)
+    static_cat_features = CategoryFeatureGenerator().fit_transform(
+        IdentityFeatureGenerator(
+            infer_features_in_args={"invalid_raw_types": [R_INT, R_FLOAT]}
+        ).fit_transform(features)
+    )
+    static_cat_features[index_column] = indices
+    static_real_features[index_column] = indices
+    return static_cat_features, static_real_features, cardinality

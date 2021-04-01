@@ -19,4 +19,4 @@ class AutoTabularModel(AbstractGluonTSModel):
                          **kwargs)
 
     def create_model(self):
-        self.model = TabularEstimator.from_hyperparameters(**self.params)
+        self.model = TabularEstimator.from_hyperparameters(path=self.path, **self.params)

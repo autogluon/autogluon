@@ -20,7 +20,7 @@ class AbstractTrainer:
     trainer_info_json_name = 'info.json'
 
     def __init__(self, path: str, freq, prediction_length, scheduler_options=None, eval_metric=None,
-                 save_data=True, **kwargs):
+                 save_data=True, use_feat_static_cat=False, use_feat_static_real=False, cardinality=None, **kwargs):
         self.path = path
         self.freq = freq
         self.prediction_length = prediction_length
@@ -52,6 +52,11 @@ class AbstractTrainer:
         self.low_memory = False
 
         self.hyperparameters = {}
+
+        self.use_feat_static_cat = use_feat_static_cat
+        self.use_feat_static_real = use_feat_static_real
+        self.cardinality = cardinality
+
 
     @property
     def path_root(self) -> str:

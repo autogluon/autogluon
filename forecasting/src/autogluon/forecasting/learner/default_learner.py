@@ -14,7 +14,7 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     def _fit(self, train_data, freq, prediction_length, val_data=None, scheduler_options=None, hyperparameter_tune=False,
-            hyperparameters=None, time_limit=None, **kwargs):
+            hyperparameters=None, time_limit=None, use_feat_static_cat=False, use_feat_static_real=False, cardinality=None, **kwargs):
         self._time_limit = time_limit
         time_start = time.time()
         if time_limit:
@@ -29,6 +29,9 @@ class DefaultLearner(AbstractLearner):
             prediction_length=prediction_length,
             eval_metric=self.eval_metric,
             scheduler_options=scheduler_options,
+            use_feat_static_cat=use_feat_static_cat,
+            use_feat_static_real=use_feat_static_real,
+            cardinality=cardinality,
             **kwargs
         )
 

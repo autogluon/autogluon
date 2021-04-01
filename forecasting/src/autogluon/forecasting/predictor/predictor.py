@@ -44,6 +44,14 @@ class ForecastingPredictor:
         self._learner_type = type(self._learner)
         self._trainer = None
 
+        self.index_column = None
+        self.time_column = None
+        self.target_column = None
+
+        self.use_feat_static_cat = False
+        self.use_feat_static_real = False
+        self.cardinality = None
+
     def fit(self,
             train_data,
             prediction_length,
@@ -53,6 +61,7 @@ class ForecastingPredictor:
             val_data=None,
             hyperparameters=None,
             time_limits=None,
+            static_features=None,
             **kwargs):
         if self._learner.is_fit:
             raise AssertionError(
@@ -97,9 +106,13 @@ class ForecastingPredictor:
                                            index_column=index_column,
                                            target_column=target_column,
                                            time_column=time_column)
-            train_data = TimeSeriesDataset(train_data, index_column=index_column)
+            train_data = TimeSeriesDataset(train_data, index_column=index_column, static_features=static_features)
+            self.use_feat_static_cat = train_data.use_feat_static_cat()
+            self.use_feat_static_real = train_data.use_feat_static_real()
+            self.cardinality = train_data.get_static_cat_cardinality()
             freq = train_data.get_freq()
-            val_data = TimeSeriesDataset(val_data, index_column=index_column)
+
+            val_data = TimeSeriesDataset(val_data, index_column=index_column, static_features=static_features)
         elif isinstance(train_data, FileDataset) or isinstance(train_data, ListDataset):
             logger.log(30, "Training with dataset in gluon-ts format...")
             if val_data is None:
@@ -144,6 +157,9 @@ class ForecastingPredictor:
         self._learner.fit(train_data=train_data,
                           freq=freq,
                           prediction_length=prediction_length,
+                          use_feat_static_cat=self.use_feat_static_cat,
+                          use_feat_static_real=self.use_feat_static_real,
+                          cardinality=self.cardinality,
                           val_data=val_data,
                           scheduler_options=scheduler_options,
                           hyperparameters=hyperparameters,
@@ -194,22 +210,25 @@ class ForecastingPredictor:
         """Returns the list of model names trained in this `predictor` object."""
         return self._trainer.get_model_names_all()
 
-    def preprocessing(self, data, time_series_to_predict=None):
+    def preprocessing(self, data, time_series_to_predict=None, static_features=None):
+        if (self.use_feat_static_cat or self.use_feat_static_real) and static_features is None:
+            raise ValueError("Static features are used for training, cannot predict without static features.")
         if isinstance(data, pd.DataFrame):
             data = time_series_dataset(data,
                                        index_column=self.index_column,
                                        target_column=self.target_column,
                                        time_column=self.time_column,
-                                       chosen_ts=time_series_to_predict)
+                                       chosen_ts=time_series_to_predict,
+                                       static_features=static_features)
         return data
 
-    def predict(self, data, time_series_to_predict=None, model=None, for_score=False, **kwargs):
-        processed_data = self.preprocessing(data, time_series_to_predict=time_series_to_predict)
+    def predict(self, data, time_series_to_predict=None, model=None, for_score=False, static_features=None, **kwargs):
+        processed_data = self.preprocessing(data, time_series_to_predict=time_series_to_predict, static_features=static_features)
         predict_targets = self._learner.predict(processed_data, model=model, for_score=for_score, **kwargs)
         return predict_targets
 
-    def evaluate(self, data, **kwargs):
-        processed_data = self.preprocessing(data)
+    def evaluate(self, data, static_features=None, **kwargs):
+        processed_data = self.preprocessing(data, static_features=static_features)
         perf = self._learner.score(processed_data, **kwargs)
         return perf
 
@@ -248,9 +267,9 @@ class ForecastingPredictor:
     def get_model_best(self):
         return self._trainer.get_model_best()
 
-    def leaderboard(self, data=None):
+    def leaderboard(self, data=None, static_features=None):
         if data is not None:
-            data = self.preprocessing(data)
+            data = self.preprocessing(data, static_features=static_features)
         return self._learner.leaderboard(data)
 
     def fit_summary(self, verbosity=3):

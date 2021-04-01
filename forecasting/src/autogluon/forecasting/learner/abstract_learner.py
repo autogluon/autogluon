@@ -55,7 +55,7 @@ class AbstractLearner:
                          **kwargs)
 
     def _fit(self, train_data, freq, prediction_length, val_data=None, scheduler_options=None, hyperparameter_tune=False,
-             hyperparameters=None, **kwargs):
+             hyperparameters=None, use_feat_static_cat=False, use_feat_static_real=False, cardinality=None, **kwargs):
         raise NotImplementedError
 
     def refit_full(self, models='all'):
