@@ -8,7 +8,6 @@ def test_task():
     test_result = classifier.predict(test_dataset)
     single_test = classifier.predict(test_dataset.iloc[0]['image'])
     single_proba = classifier.predict_proba(test_dataset.iloc[0]['image'])
-    print('test result', test_result)
     classifier.save('classifier.ag')
     classifier2 = Task.load('classifier.ag')
     fit_summary = classifier2.fit_summary()
@@ -17,3 +16,7 @@ def test_task():
     test_feature = classifier2.predict_feature(test_dataset)
     single_test2 = classifier2.predict(test_dataset.iloc[0]['image'])
     assert single_test2.equals(single_test)
+    # to numpy
+    test_proba = classifier2.predict_proba(test_dataset, as_pandas=False)
+    test_feature = classifier2.predict_feature(test_dataset, as_pandas=False)
+    single_test2 = classifier2.predict(test_dataset.iloc[0]['image'], as_pandas=False)

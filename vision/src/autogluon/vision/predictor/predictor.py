@@ -440,14 +440,11 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
-        proba = self._classifier.predict(data)
-        if 'image' in proba.columns:
-            ret = proba.groupby(["image"]).agg(list)
-        ret = proba
+        ret = self._classifier.predict(data, with_proba=True)
         if as_pandas:
             return ret
         else:
-            return ret.as_numpy()
+            return ret.to_numpy()
 
     def predict(self, data, as_pandas=True):
         """Predict images as a whole, return labels(class category).
@@ -479,7 +476,7 @@ class ImagePredictor(object):
         if as_pandas:
             return ret
         else:
-            return ret.as_numpy()
+            return ret.to_numpy()
 
     def predict_feature(self, data, as_pandas=True):
         """Predict images visual feature representations, return the features as numpy (1xD) vector.
@@ -505,7 +502,7 @@ class ImagePredictor(object):
         if as_pandas:
             return ret
         else:
-            return ret.as_numpy()
+            return ret.to_numpy()
 
     def evaluate(self, data):
         """Evaluate model performance on validation data.
