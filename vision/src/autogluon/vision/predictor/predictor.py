@@ -419,7 +419,7 @@ class ImagePredictor(object):
         kwargs['hyperparameter_tune_kwargs'] = hpo_tune_args
         return kwargs
 
-    def predict_proba(self, data, as_pandas=True):
+    def predict_proba(self, data, as_pandas=True, squeeze=False):
         """Predict images as a whole, return the probabilities of each category rather
         than class-labels.
 
@@ -430,6 +430,8 @@ class ImagePredictor(object):
         as_pandas : bool, default = True
             Whether to return the output as a pandas object (True) or list of numpy array(s) (False).
             Pandas object is a DataFrame.
+        squeeze : bool, default = False
+            Whether to squeeze probabilities of a single image into a list.
 
         Returns
         -------
@@ -440,7 +442,13 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
-        ret = self._classifier.predict(data, with_proba=True)
+        if squeeze:
+            # TODO(zhreshold): make this default to True in next API breaking release
+            ret = self._classifier.predict(data, with_proba=True)
+        else:
+            ret = self._classifier.predict(data)
+            if 'image' in ret.columns:
+                ret = ret.groupby(["image"]).agg(list)
         if as_pandas:
             return ret
         else:
