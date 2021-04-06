@@ -4,7 +4,7 @@ import logging
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
-from autogluon.core.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_URL, S_TEXT, S_TEXT_AS_CATEGORY
+from autogluon.core.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_TEXT, S_TEXT_AS_CATEGORY
 
 from .abstract import AbstractFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
@@ -93,7 +93,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     def get_default_infer_features_in_args() -> dict:
         return dict(
             valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
-            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_URL]
+            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH]
         )
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:

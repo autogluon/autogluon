@@ -1,6 +1,6 @@
 import logging
 
-from autogluon.core.features.types import R_INT, R_FLOAT, S_TEXT, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_URL
+from autogluon.core.features.types import R_INT, R_FLOAT, S_TEXT, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_PATH
 
 from .pipeline import PipelineFeatureGenerator
 from .category import CategoryFeatureGenerator
@@ -44,9 +44,9 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         For example, 'sentence' --> 'sentence_raw_text'
     enable_vision_features : bool, default True
         [Experimental]
-        Whether to keep 'object' features identified as 'image_url' special type. Features of this form should have a url path to an image file as their value.
+        Whether to keep 'object' features identified as 'image_path' special type. Features of this form should have a url path to an image file as their value.
         Only vision models can leverage these features, and these features will not be treated as categorical.
-        Note: 'image_url' features will not be automatically inferred. These features must be explicitly specified as such in a custom FeatureMetadata object.
+        Note: 'image_path' features will not be automatically inferred. These features must be explicitly specified as such in a custom FeatureMetadata object.
     vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
         sklearn CountVectorizer object to use in :class:`TextNgramFeatureGenerator`.
         Only used if `enable_text_ngram_features=True`.
@@ -118,7 +118,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
         if self.enable_vision_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
-                valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_URL],
+                valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_PATH],
             )))
         generators = [generator_group]
         return generators

@@ -6,7 +6,7 @@ import os
 import pandas as pd
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.features.types import R_OBJECT, S_IMAGE_URL
+from autogluon.core.features.types import R_OBJECT, S_IMAGE_PATH
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import get_cpu_count, get_gpu_count, try_import_mxnet, try_import_autogluon_vision
 
@@ -20,12 +20,15 @@ logger = logging.getLogger(__name__)
 # TODO: refit_full does not work as expected: It won't use all data, will just split train data internally.
 class ImagePredictorModel(AbstractModel):
     """Wrapper of autogluon.vision.ImagePredictor"""
-    nn_model_name = 'image_nn'
+    nn_model_name = 'image_predictor'
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._label_column_name = 'label'
-        self._load_model = None  # Whether to load inner model when loading.
+
+        # Whether to load inner model when loading. Set to None on init as it is only used during save/load
+        self._load_model = None
+
         self._classes = None
         self._internal_feature_map = None
 
@@ -34,7 +37,7 @@ class ImagePredictorModel(AbstractModel):
         extra_auxiliary_params = dict(
             get_features_kwargs=dict(
                 valid_raw_types=[R_OBJECT],
-                required_special_types=[S_IMAGE_URL],
+                required_special_types=[S_IMAGE_PATH],
             ),
         )
         default_auxiliary_params.update(extra_auxiliary_params)
@@ -71,28 +74,13 @@ class ImagePredictorModel(AbstractModel):
              sample_weight=None,
              verbosity=2,
              **kwargs):
-        """The internal fit function
-
-        Parameters
-        ----------
-        X
-            Features of the training dataset
-        y
-            Labels of the training dataset
-        X_val
-            Features of the validation dataset
-        y_val
-            Labels of the validation dataset
-        time_limit
-            The time limit for the fit function
-        kwargs
-            Other keyword arguments
-
-        """
         try_import_mxnet()
         try_import_autogluon_vision()
         from autogluon.vision import ImagePredictor, ImageDataset
         params = self._get_model_params()
+
+        if self.problem_type == REGRESSION:
+            raise AssertionError(f'ImagePredictorModel does not support `problem_type="{REGRESSION}"`')
 
         X = self.preprocess(X, fit=True)
         if X_val is not None:
@@ -121,7 +109,10 @@ class ImagePredictorModel(AbstractModel):
             # eval_metric=self.eval_metric,  # TODO: Vision only works with accuracy
             verbosity=verbosity_image
         )
-        classes = list(y.unique())
+        if y_val is None:
+            classes = list(y.unique())
+        else:
+            classes = list(pd.concat([y, y_val], ignore_index=True).unique())
         classes.sort()
         self._classes = classes
 

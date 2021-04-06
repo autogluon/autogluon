@@ -2,7 +2,7 @@ import logging
 
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_CATEGORY, R_OBJECT, S_TEXT, S_IMAGE_URL
+from autogluon.core.features.types import R_CATEGORY, R_OBJECT, S_TEXT, S_IMAGE_PATH
 from autogluon.core.features.feature_metadata import FeatureMetadata
 
 from .abstract import AbstractFeatureGenerator
@@ -47,7 +47,7 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
                 if S_TEXT in special_types:
                     # We should not drop a text column
                     continue
-                elif S_IMAGE_URL in special_types:
+                elif S_IMAGE_PATH in special_types:
                     # We should not drop an image url column
                     continue
                 else:
