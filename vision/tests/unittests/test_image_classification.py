@@ -12,7 +12,7 @@ def test_task():
     classifier2 = Task.load('classifier.ag')
     fit_summary = classifier2.fit_summary()
     test_acc = classifier2.evaluate(test_dataset)
-    test_proba = classifier2.predict_proba(test_dataset)
+    test_proba = classifier2.predict_proba(test_dataset, squeeze=True)
     test_feature = classifier2.predict_feature(test_dataset)
     single_test2 = classifier2.predict(test_dataset.iloc[0]['image'])
     assert single_test2.equals(single_test)
