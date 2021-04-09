@@ -34,7 +34,7 @@ _ARGUMENT_KEYS = {
     'num_trials', 'time_out', 'max_reward', 'reward_attr', 'time_attr', 'constraint_attr',
     'dist_ip_addrs', 'visualizer', 'training_history_callback',
     'training_history_callback_delta_secs', 'training_history_searcher_info',
-    'delay_get_config'}
+    'delay_get_config', 'stop_jobs_after_time_out'}
 
 _DEFAULT_OPTIONS = {
     'resource': {'num_cpus': 1, 'num_gpus': 0},
@@ -46,7 +46,8 @@ _DEFAULT_OPTIONS = {
     'visualizer': 'none',
     'training_history_callback_delta_secs': 60,
     'training_history_searcher_info': False,
-    'delay_get_config': True}
+    'delay_get_config': True,
+    'stop_jobs_after_time_out': True}
 
 _CONSTRAINTS = {
     'checkpoint': String(),
@@ -60,7 +61,8 @@ _CONSTRAINTS = {
     'visualizer': String(),
     'training_history_callback_delta_secs': Integer(1, None),
     'training_history_searcher_info': Boolean(),
-    'delay_get_config': Boolean()}
+    'delay_get_config': Boolean(),
+    'stop_jobs_after_time_out': Boolean()}
 
 
 class FIFOScheduler(TaskScheduler):
@@ -128,6 +130,12 @@ class FIFOScheduler(TaskScheduler):
         just after a job has been started.
         For searchers which adapt to past data, True should be preferred.
         Otherwise, it does not matter.
+    stop_jobs_after_time_out : bool
+        Relevant only if `time_out` is used. If True, jobs which report a
+        metric are stopped once `time_out` has passed. Otherwise, such jobs
+        are allowed to continue until the end, or until stopped for other
+        reasons. The latter can mean an experiment runs far longer than
+        `time_out`.
 
 
     Examples
@@ -236,6 +244,17 @@ class FIFOScheduler(TaskScheduler):
         self.training_history_searcher_info = \
             kwargs['training_history_searcher_info']
         self._delay_get_config = kwargs['delay_get_config']
+        self._stop_jobs_after_time_out = False
+        if time_out is not None:
+            self._stop_jobs_after_time_out = kwargs['stop_jobs_after_time_out']
+            if self._stop_jobs_after_time_out:
+                msg = \
+                    "The meaning of 'time_out' has changed. Previously, jobs started before\n" + \
+                    "'time_out' were allowed to continue until stopped by other means. Now,\n" + \
+                    "we stop jobs once 'time_out' is passed (at the next metric reporting).\n" + \
+                    "If you like to keep the old behaviour, use\n" + \
+                    "   'stop_jobs_after_time_out=False'"
+                logger.warning(msg)
         # Resume experiment from checkpoint?
         if kwargs['resume']:
             assert checkpoint is not None, \
@@ -540,7 +559,7 @@ class FIFOScheduler(TaskScheduler):
         if result.get('done', False):
             return False  # reporter terminate
         # If we are past self.time_out, we want to stop the job
-        if self.time_out is not None:
+        if self._stop_jobs_after_time_out:
             elapsed_time = self._elapsed_time()
             if elapsed_time > self.time_out:
                 if debug_log is not None:

@@ -178,6 +178,12 @@ class HyperbandScheduler(FIFOScheduler):
         just after a job has been started.
         For searchers which adapt to past data, True should be preferred.
         Otherwise, it does not matter.
+    stop_jobs_after_time_out : bool
+        Relevant only if `time_out` is used. If True, jobs which report a
+        metric are stopped once `time_out` has passed. Otherwise, such jobs
+        are allowed to continue until the end, or until stopped for other
+        reasons. The latter can mean an experiment runs far longer than
+        `time_out`.
     type : str
         Type of Hyperband scheduler:
             stopping:
@@ -537,7 +543,7 @@ class HyperbandScheduler(FIFOScheduler):
         # Time since start of experiment
         elapsed_time = self._elapsed_time()
         # If we are past self.time_out, we want to stop the job
-        if self.time_out is not None and elapsed_time > self.time_out:
+        if self._stop_jobs_after_time_out and elapsed_time > self.time_out:
             if debug_log is not None:
                 msg = "config_id {}: Terminating because elapsed_time = {} > {} = self.time_out".format(
                     config_id, elapsed_time, self.time_out)
