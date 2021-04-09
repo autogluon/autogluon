@@ -26,7 +26,7 @@ requirements = [
 
     f'autogluon.core=={version}',
     f'autogluon.mxnet=={version}',
-    'pyarrow>=3.0.0',
+    'pyarrow',
     'autogluon-contrib-nlp==0.0.1b20210201',
 ]
 
