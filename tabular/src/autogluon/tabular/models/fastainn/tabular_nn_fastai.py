@@ -163,7 +163,7 @@ class NNFastAiTabularModel(AbstractModel):
              **kwargs):
         try_import_fastai()
         from fastai.tabular.model import tabular_config
-        from fastai.tabular.learner import tabular_learner
+        from .fastai_helpers import tabular_learner
         from fastcore.basics import defaults
         from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
         import torch
