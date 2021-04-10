@@ -268,8 +268,9 @@ class NNFastAiTabularModel(AbstractModel):
         df_train[LABEL] = pd.concat([y, y_val], ignore_index=True)
         train_idx = np.arange(len(X))
         if X_val is None:
-            val_idx = train_idx + len(train_idx)  # use validation set for refit_full case - it's not going to be used for early stopping
-            df_train = pd.concat([df_train, df_train], ignore_index=True)
+            # use validation set for refit_full case - it's not going to be used for early stopping
+            val_idx = np.array([0, 1]) + len(train_idx)
+            df_train = pd.concat([df_train, df_train[:2]], ignore_index=True)
         else:
             val_idx = np.arange(len(X_val)) + len(X)
         return df_train, train_idx, val_idx
