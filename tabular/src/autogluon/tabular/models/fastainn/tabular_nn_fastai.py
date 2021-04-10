@@ -1,23 +1,23 @@
 import copy
 import logging
 import time
-from functools import partial
+from builtins import classmethod
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from autogluon.core.constants import REGRESSION, BINARY, MULTICLASS
-from autogluon.core.utils import try_import_fastai_v1
+
+from autogluon.core.constants import REGRESSION, BINARY
+from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
+from autogluon.core.models import AbstractModel
+from autogluon.core.models.abstract.model_trial import skip_hpo
+from autogluon.core.utils import try_import_fastai
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
-
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
-from autogluon.core.models import AbstractModel
-from autogluon.core.models.abstract.model_trial import skip_hpo
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
@@ -58,17 +58,14 @@ class NNFastAiTabularModel(AbstractModel):
             'bs': batch size; default is 256
 
             'lr': maximum learning rate for one cycle policy; default is 1e-2;
-            see also https://fastai1.fast.ai/train.html#fit_one_cycle, One-cycle policy paper: https://arxiv.org/abs/1803.09820
+            see also https://docs.fast.ai/callback.schedule.html#Learner.fit_one_cycle,
+            One-cycle policy paper: https://arxiv.org/abs/1803.09820
 
             'epochs': number of epochs; default is 30
 
-            # Early stopping settings. See more details here: https://fastai1.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
+            # Early stopping settings. See more details here: https://docs.fast.ai/callback.tracker.html#EarlyStoppingCallback
             'early.stopping.min_delta': 0.0001,
             'early.stopping.patience': 10,
-
-            'smoothing': If > 0, then use LabelSmoothingCrossEntropy loss function for binary/multi-class classification;
-            otherwise use default loss function for this type of problem; default is 0.0.
-            See: https://docs.fast.ai/layers.html#LabelSmoothingCrossEntropy
     """
 
     model_internals_file_name = 'model-internals.pkl'
@@ -83,15 +80,16 @@ class NNFastAiTabularModel(AbstractModel):
         self._inner_features = None
         self._load_model = None  # Whether to load inner model when loading.
 
-    def _preprocess_train(self, X, y, X_val, y_val, num_workers):
-        from fastai.data_block import FloatList
-        from fastai.tabular import TabularList
-
+    def _preprocess_train(self, X, y, X_val, y_val):
+        from fastai.tabular.core import TabularPandas
+        from fastai.data.block import RegressionBlock, CategoryBlock
+        from fastai.data.transforms import IndexSplitter
+        from fastcore.basics import range_of
         X = self.preprocess(X, fit=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
-        from fastai.tabular import FillMissing, Categorify, Normalize
+        from fastai.tabular.core import FillMissing, Categorify, Normalize
         self.procs = [FillMissing, Categorify, Normalize]
 
         if self.problem_type == REGRESSION and self.y_scaler is not None:
@@ -104,14 +102,19 @@ class NNFastAiTabularModel(AbstractModel):
 
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
         df_train, train_idx, val_idx = self._generate_datasets(X, y_norm, X_val, y_val_norm)
-        label_class = FloatList if self.problem_type == REGRESSION else None
+
+        y_block = RegressionBlock() if self.problem_type == REGRESSION else CategoryBlock()
 
         # Copy cat_columns and cont_columns because TabularList is mutating the list
-        data = (TabularList.from_df(df_train, path=self.path,
-                                    cat_names=self.cat_columns.copy(), cont_names=self.cont_columns.copy(), procs=self.procs)
-                .split_by_idxs(train_idx, val_idx)
-                .label_from_df(cols=LABEL, label_cls=label_class)
-                .databunch(bs=self.params['bs'] if len(X) > self.params['bs'] else 32, num_workers=num_workers))
+        data = TabularPandas(
+            df_train,
+            cat_names=self.cat_columns.copy(),
+            cont_names=self.cont_columns.copy(),
+            procs=self.procs,
+            y_block=y_block,
+            y_names=LABEL,
+            splits=IndexSplitter(val_idx)(range_of(df_train)),
+        )
         return data
 
     def _preprocess(self, X: pd.DataFrame, fit=False, **kwargs):
@@ -158,13 +161,12 @@ class NNFastAiTabularModel(AbstractModel):
              num_gpus=0,
              sample_weight=None,
              **kwargs):
-        try_import_fastai_v1()
+        try_import_fastai()
+        from fastai.tabular.model import tabular_config
+        from .fastai_helpers import tabular_learner
+        from fastcore.basics import defaults
+        from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
         import torch
-        from fastai.layers import LabelSmoothingCrossEntropy
-        from fastai.tabular import tabular_learner
-        from fastai.utils.mod_display import progress_disabled_ctx
-        from fastai.core import defaults
-        from .callbacks import EarlyStoppingCallbackWithTimeLimit, SaveModelCallback
 
         start_time = time.time()
         if sample_weight is not None:  # TODO: support
@@ -190,13 +192,14 @@ class NNFastAiTabularModel(AbstractModel):
                 defaults.device = torch.device('cuda')
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
-        data = self._preprocess_train(X, y, X_val, y_val, num_workers=num_workers)
+        data = self._preprocess_train(X, y, X_val, y_val)
 
-        nn_metric, objective_func_name = self.__get_objective_func_name()
+        nn_metric, objective_func_name = self.__get_objective_func_name(self.stopping_metric)
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
-        objective_optim_mode = 'min' if objective_func_name in [
-            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'r2'  # Regression objectives
-        ] else 'auto'
+        objective_optim_mode = np.less if objective_func_name in [
+            'log_loss',
+            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'  # Regression objectives
+        ] else np.greater
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
         if params.get('layers', None) is not None:
@@ -204,16 +207,10 @@ class NNFastAiTabularModel(AbstractModel):
         elif self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
         else:
-            base_size = max(len(data.classes) * 2, 100)
+            base_size = max(data.c * 2, 100)
             layers = [base_size * 2, base_size]
 
         loss_func = None
-        if self.problem_type in [BINARY, MULTICLASS] and params.get('smoothing', 0.0) > 0.0:
-            loss_func = LabelSmoothingCrossEntropy(params['smoothing'])
-
-        ps = params['ps']
-        if type(ps) != list:
-            ps = [ps]
 
         if time_limit:
             time_elapsed = time.time() - start_time
@@ -222,34 +219,48 @@ class NNFastAiTabularModel(AbstractModel):
             time_left = None
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-        early_stopping_fn = partial(EarlyStoppingCallbackWithTimeLimit, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
-                                    min_delta=params['early.stopping.min_delta'], patience=params['early.stopping.patience'],
-                                    time_limit=time_left, best_epoch_stop=best_epoch_stop)
+        dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
 
         self.model = tabular_learner(
-            data, layers=layers, ps=ps, emb_drop=params['emb_drop'], metrics=nn_metric,
-            loss_func=loss_func, callback_fns=[early_stopping_fn]
+            dls, layers=layers, metrics=nn_metric,
+            config=tabular_config(ps=params['ps'], embed_p=params['emb_drop']),
+            loss_func=loss_func,
         )
         logger.log(15, self.model.model)
 
+        save_callback = AgSaveModelCallback(
+            monitor=objective_func_name_to_monitor, comp=objective_optim_mode, fname=self.name,
+            best_epoch_stop=best_epoch_stop, with_opt=True
+        )
+
+        early_stopping = EarlyStoppingCallbackWithTimeLimit(
+            monitor=objective_func_name_to_monitor,
+            comp=objective_optim_mode,
+            min_delta=params['early.stopping.min_delta'],
+            patience=params['early.stopping.patience'],
+            time_limit=time_left, best_epoch_stop=best_epoch_stop
+        )
+
+        callbacks = [save_callback, early_stopping]
+
         with make_temp_directory() as temp_dir:
-            save_callback = SaveModelCallback(self.model, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, name=self.name,
-                                              best_epoch_stop=best_epoch_stop)
-            with progress_disabled_ctx(self.model) as model:
-                original_path = model.path
-                model.path = Path(temp_dir)
-                model.fit_one_cycle(params['epochs'], params['lr'], callbacks=save_callback)
+            with self.model.no_bar():
+                with self.model.no_logging():
+                    original_path = self.model.path
+                    self.model.path = Path(temp_dir)
+                    self.model.fit_one_cycle(params['epochs'], params['lr'], cbs=callbacks)
 
-                # Load the best one and export it
-                model.load(self.name)
+                    # Load the best one and export it
+                    self.model = self.model.load(self.name)
 
-                if objective_func_name == 'log_loss':
-                    eval_result = model.validate()[0]
-                else:
-                    eval_result = model.validate()[1].numpy().reshape(-1)[0]
+                    if objective_func_name == 'log_loss':
+                        eval_result = self.model.validate(dl=dls.valid)[0]
+                    else:
+                        eval_result = self.model.validate(dl=dls.valid)[1]
 
-                logger.log(15, f'Model validation metrics: {eval_result}')
-                model.path = original_path
+                    logger.log(15, f'Model validation metrics: {eval_result}')
+                    self.model.path = original_path
+
             self.params_trained['best_epoch'] = save_callback.best_epoch
 
     def _generate_datasets(self, X, y, X_val, y_val):
@@ -257,77 +268,33 @@ class NNFastAiTabularModel(AbstractModel):
         df_train[LABEL] = pd.concat([y, y_val], ignore_index=True)
         train_idx = np.arange(len(X))
         if X_val is None:
-            val_idx = train_idx  # use validation set for refit_full case - it's not going to be used for early stopping
+            # use validation set for refit_full case - it's not going to be used for early stopping
+            val_idx = np.array([0, 1]) + len(train_idx)
+            df_train = pd.concat([df_train, df_train[:2]], ignore_index=True)
         else:
             val_idx = np.arange(len(X_val)) + len(X)
         return df_train, train_idx, val_idx
 
-    def __get_objective_func_name(self):
-        from fastai.metrics import root_mean_squared_error, mean_squared_error, mean_absolute_error, accuracy, FBeta, AUROC, Precision, Recall, r2_score
-
-        metrics_map = {
-            # Regression
-            'root_mean_squared_error': root_mean_squared_error,
-            'mean_squared_error': mean_squared_error,
-            'mean_absolute_error': mean_absolute_error,
-            'r2': r2_score,
-            # Not supported: median_absolute_error
-
-            # Classification
-            'accuracy': accuracy,
-
-            'f1': FBeta(beta=1),
-            'f1_macro': FBeta(beta=1, average='macro'),
-            'f1_micro': FBeta(beta=1, average='micro'),
-            'f1_weighted': FBeta(beta=1, average='weighted'),  # this one has some issues
-
-            'roc_auc': AUROC(),
-
-            'precision': Precision(),
-            'precision_macro': Precision(average='macro'),
-            'precision_micro': Precision(average='micro'),
-            'precision_weighted': Precision(average='weighted'),
-
-            'recall': Recall(),
-            'recall_macro': Recall(average='macro'),
-            'recall_micro': Recall(average='micro'),
-            'recall_weighted': Recall(average='weighted'),
-            'log_loss': None,
-            # Not supported: pac_score
-        }
+    def __get_objective_func_name(self, stopping_metric):
+        metrics_map = self.__get_metrics_map()
 
         # Unsupported metrics will be replaced by defaults for a given problem type
-        objective_func_name = self.stopping_metric.name
+        objective_func_name = stopping_metric.name
         if objective_func_name not in metrics_map.keys():
             if self.problem_type == REGRESSION:
                 objective_func_name = 'mean_squared_error'
             else:
                 objective_func_name = 'log_loss'
-            logger.warning(f'Metric {self.stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
+            logger.warning(f'Metric {stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
 
-        if objective_func_name in metrics_map.keys():
-            nn_metric = metrics_map[objective_func_name]
-        else:
-            nn_metric = None
+        nn_metric = metrics_map.get(objective_func_name, None)
+
         return nn_metric, objective_func_name
 
     def __get_objective_func_to_monitor(self, objective_func_name):
         monitor_obj_func = {
-            'roc_auc': 'auroc',
-
-            'f1': 'f_beta',
-            'f1_macro': 'f_beta',
-            'f1_micro': 'f_beta',
-            'f1_weighted': 'f_beta',
-
-            'precision_macro': 'precision',
-            'precision_micro': 'precision',
-            'precision_weighted': 'precision',
-
-            'recall_macro': 'recall',
-            'recall_micro': 'recall',
-            'recall_weighted': 'recall',
-            'log_loss': 'valid_loss',
+            **{k: m.name if hasattr(m, 'name') else m.__name__ for k, m in self.__get_metrics_map().items() if m is not None},
+            'log_loss': 'valid_loss'
         }
         objective_func_name_to_monitor = objective_func_name
         if objective_func_name in monitor_obj_func:
@@ -335,10 +302,6 @@ class NNFastAiTabularModel(AbstractModel):
         return objective_func_name_to_monitor
 
     def _predict_proba(self, X, **kwargs):
-        from fastai.basic_data import DatasetType
-        from fastai.tabular import TabularList
-        from fastai.utils.mod_display import progress_disabled_ctx
-
         X = self.preprocess(X, **kwargs)
 
         single_row = len(X) == 1
@@ -347,10 +310,10 @@ class NNFastAiTabularModel(AbstractModel):
             X = pd.concat([X, X]).reset_index(drop=True)
 
         # Copy cat_columns and cont_columns because TabularList is mutating the list
-        self.model.data.add_test(TabularList.from_df(
-            X, cat_names=self.cat_columns.copy(), cont_names=self.cont_columns.copy(), procs=self.procs))
-        with progress_disabled_ctx(self.model) as model:
-            preds, _ = model.get_preds(ds_type=DatasetType.Test)
+        test_dl = self.model.dls.test_dl(X)
+        with self.model.no_bar():
+            with self.model.no_logging():
+                preds, _ = self.model.get_preds(dl=test_dl)
         if single_row:
             preds = preds[:1, :]
         if self.problem_type == REGRESSION:
@@ -364,6 +327,7 @@ class NNFastAiTabularModel(AbstractModel):
             return preds.numpy()
 
     def save(self, path: str = None, verbose=True) -> str:
+        from .fastai_helpers import export
         self._load_model = self.model is not None
         __model = self.model
         self.model = None
@@ -371,16 +335,22 @@ class NNFastAiTabularModel(AbstractModel):
         self.model = __model
         # Export model
         if self._load_model:
-            save_pkl.save_with_fn(f'{path}{self.model_internals_file_name}', self.model, lambda m, buffer: m.export(buffer), verbose=verbose)
+            save_pkl.save_with_fn(
+                f'{path}{self.model_internals_file_name}',
+                self.model,
+                pickle_fn=lambda m, buffer: export(m, buffer),
+                verbose=verbose
+            )
         self._load_model = None
         return path
 
+
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
+        from fastai.learner import load_learner
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
         if model._load_model:
-            from fastai.basic_train import load_learner
-            model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(model.path, p), verbose=verbose)
+            model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(p), verbose=verbose)
         model._load_model = None
         return model
 
@@ -405,3 +375,39 @@ class NNFastAiTabularModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    def __get_metrics_map(self):
+        from fastai.metrics import rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
+        from .fastai_helpers import medae
+        metrics_map = {
+            # Regression
+            'root_mean_squared_error': rmse,
+            'mean_squared_error': mse,
+            'mean_absolute_error': mae,
+            'r2': R2Score(),
+            'median_absolute_error': medae,
+
+            # Classification
+            'accuracy': accuracy,
+
+            'f1': FBeta(beta=1),
+            'f1_macro': FBeta(beta=1, average='macro'),
+            'f1_micro': FBeta(beta=1, average='micro'),
+            'f1_weighted': FBeta(beta=1, average='weighted'),  # this one has some issues
+
+            'roc_auc': RocAucBinary(),
+
+            'precision': Precision(),
+            'precision_macro': Precision(average='macro'),
+            'precision_micro': Precision(average='micro'),
+            'precision_weighted': Precision(average='weighted'),
+
+            'recall': Recall(),
+            'recall_macro': Recall(average='macro'),
+            'recall_micro': Recall(average='micro'),
+            'recall_weighted': Recall(average='weighted'),
+            'log_loss': None,
+            # Not supported: pac_score
+        }
+        return metrics_map
+

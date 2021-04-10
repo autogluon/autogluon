@@ -24,7 +24,6 @@ def get_searchspace_binary():
         'epochs': Int(lower=5, upper=30, default=30),
         'early.stopping.min_delta': 0.0001,
         'early.stopping.patience': 20,
-        'smoothing': Real(0.0, 0.3, default=0.0, log=True),
     }
     return spaces
 
