@@ -35,6 +35,9 @@ class LGBModel(AbstractModel):
     LightGBM model: https://lightgbm.readthedocs.io/en/latest/
 
     Hyperparameter options: https://lightgbm.readthedocs.io/en/latest/Parameters.html
+
+    Extra hyperparameter options:
+        ag.early_stop : int, specifies the early stopping rounds. Defaults to an adaptive strategy. Recommended to keep default.
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -78,7 +78,7 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                 logger.debug('Manually stop training by creating file at location: ', manual_stop_file)
 
         if isinstance(stopping_rounds, int):
-            es_template = SimpleES(stopping_rounds=stopping_rounds)
+            es_template = SimpleES(patience=stopping_rounds)
         else:
             es_template = stopping_rounds[0](**stopping_rounds[1])
 
