@@ -4,13 +4,7 @@ logger = logging.getLogger(__name__)
 
 import numpy as np
 from scipy import stats
-try:
-    # TODO: Difficult to add user switch for daal usage without duplicating code (Sklearn and daal versions of KNN for predict_loo
-    from daal4py.sklearn.neighbors import KNeighborsClassifier as _KNeighborsClassifier, KNeighborsRegressor as _KNeighborsRegressor
-    # daal backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
-    logger.log(15, '\tUsing daal4py KNN backend...')
-except:
-    from sklearn.neighbors import KNeighborsClassifier as _KNeighborsClassifier, KNeighborsRegressor as _KNeighborsRegressor
+from sklearn.neighbors import KNeighborsClassifier as _KNeighborsClassifier, KNeighborsRegressor as _KNeighborsRegressor
 from sklearn.neighbors._base import _get_weights
 from sklearn.utils.extmath import weighted_mode
 

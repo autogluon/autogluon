@@ -34,7 +34,9 @@ class RFModel(AbstractModel):
         if self.params_aux.get('use_daal', False):
             # Disabled by default because it appears to degrade performance
             try:
+                # TODO: Use sklearnex instead once a suitable toggle option is provided that won't impact future models
                 from daal4py.sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+                logger.log(15, '\tUsing daal4py RF backend...')
                 self._daal = True
             except:
                 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
