@@ -47,9 +47,13 @@ extras_require = {
         'torch>=1.0,<2.0',
         'fastai>=2.0,<3.0',
     ],
+    'skex': [
+        'scikit-learn-intelex<2021.3',
+    ],
 }
 
 all_requires = []
+# TODO: Consider adding 'skex' to 'all'
 for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
