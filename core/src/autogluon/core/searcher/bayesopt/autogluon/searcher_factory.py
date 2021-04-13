@@ -29,8 +29,9 @@ __all__ = ['gp_fifo_searcher_factory',
 
 
 def _create_gp_and_model_args(
-        hp_ranges_cs, random_seed, active_metric, max_metric_value=None, is_hyperband=False, **kwargs):
+        hp_ranges_cs, active_metric, max_metric_value=None, is_hyperband=False, **kwargs):
     opt_warmstart = kwargs.get('opt_warmstart', False)
+    random_seed = kwargs.get('random_seed', 31415927)
     kernel = Matern52(dimension=hp_ranges_cs.ndarray_size(), ARD=True)
     mean = ScalarMeanFunction()
     if is_hyperband:
@@ -110,7 +111,6 @@ def _create_common_objects(**kwargs):
     # Underlying GP regression model
     gpmodel, model_args = _create_gp_and_model_args(
         hp_ranges_cs=hp_ranges_cs,
-        random_seed=random_seed,
         active_metric=DEFAULT_METRIC,
         max_metric_value=max_metric_value,
         is_hyperband=is_hyperband,
@@ -198,7 +198,6 @@ def constrained_gp_fifo_searcher_factory(**kwargs) -> ConstrainedGPFIFOSearcher:
     # We need two GP models: one for active metric (gpmodel), the other for constraint metric (gpmodel_constraint)
     gpmodel_constraint, model_args_constraint = _create_gp_and_model_args(
         hp_ranges_cs=hp_ranges_cs,
-        random_seed=random_seed,
         active_metric=DEFAULT_CONSTRAINT_METRIC,
         **kwargs)
     output_gpmodels = {DEFAULT_METRIC: gpmodel,
