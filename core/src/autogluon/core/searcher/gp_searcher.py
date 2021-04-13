@@ -5,6 +5,7 @@ from .bayesopt.autogluon.searcher_factory import gp_fifo_searcher_factory, \
     gp_multifidelity_searcher_factory, constrained_gp_fifo_searcher_factory, gp_fifo_searcher_defaults, \
     gp_multifidelity_searcher_defaults, constrained_gp_fifo_searcher_defaults
 from .searcher import BaseSearcher
+from .bayesopt.tuning_algorithms.base_classes import DEFAULT_CONSTRAINT_METRIC
 from ..utils.default_arguments import check_and_merge_defaults
 
 __all__ = ['GPFIFOSearcher',
@@ -222,7 +223,6 @@ class ConstrainedGPFIFOSearcher(GPFIFOSearcher):
                 kwargs, *constrained_gp_fifo_searcher_defaults(),
                 dict_name='search_options')
             _gp_searcher = constrained_gp_fifo_searcher_factory(**_kwargs)
-            self._constraint_attribute = _kwargs['constraint_metric']
         super().__init__(
             _gp_searcher.hp_ranges.config_space,
             reward_attribute=kwargs.get('reward_attribute'))
@@ -237,7 +237,7 @@ class ConstrainedGPFIFOSearcher(GPFIFOSearcher):
             config_cs = self._to_config_cs(config)
             self.gp_searcher.update(
                 config_cs, reward=kwargs[self._reward_attribute],
-                constraint=kwargs[self._constraint_attribute])
+                constraint=kwargs[DEFAULT_CONSTRAINT_METRIC])
 
 
 class GPMultiFidelitySearcher(BaseSearcher):

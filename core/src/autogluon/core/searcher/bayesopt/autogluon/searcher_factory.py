@@ -28,6 +28,33 @@ __all__ = ['gp_fifo_searcher_factory',
            'gp_multifidelity_searcher_defaults']
 
 
+def _create_gp_and_model_args(
+        hp_ranges_cs, random_seed, active_metric, max_metric_value=None, is_hyperband=False, **kwargs):
+    opt_warmstart = kwargs.get('opt_warmstart', False)
+    kernel = Matern52(dimension=hp_ranges_cs.ndarray_size(), ARD=True)
+    mean = ScalarMeanFunction()
+    if is_hyperband:
+        kernel, mean = resource_kernel_factory(
+            kwargs['gp_resource_kernel'],
+            kernel_x=kernel, mean_x=mean,
+            max_metric_value=max_metric_value)
+    optimization_config = OptimizationConfig(
+        lbfgs_tol=DEFAULT_OPTIMIZATION_CONFIG.lbfgs_tol,
+        lbfgs_maxiter=kwargs['opt_maxiter'],
+        verbose=kwargs['opt_verbose'],
+        n_starts=kwargs['opt_nstarts'])
+    gpmodel = GaussianProcessRegression(
+        kernel=kernel, mean=mean,
+        optimization_config=optimization_config,
+        fit_reset_params=not opt_warmstart)
+    model_args = GPModelArgs(
+        num_fantasy_samples=kwargs['num_fantasy_samples'],
+        random_seed=random_seed,
+        active_metric=active_metric,
+        normalize_targets=True)
+    return gpmodel, model_args
+
+
 def _create_common_objects(**kwargs):
     scheduler = kwargs['scheduler']
     config_space = kwargs['configspace']
@@ -80,30 +107,14 @@ def _create_common_objects(**kwargs):
         max_metric_value = _map_reward(min_reward)
     else:
         max_metric_value = None
-    opt_warmstart = kwargs.get('opt_warmstart', False)
-
     # Underlying GP regression model
-    kernel = Matern52(dimension=hp_ranges_cs.ndarray_size(), ARD=True)
-    mean = ScalarMeanFunction()
-    if is_hyperband:
-        kernel, mean = resource_kernel_factory(
-            kwargs['gp_resource_kernel'],
-            kernel_x=kernel, mean_x=mean,
-            max_metric_value=max_metric_value)
-    optimization_config = OptimizationConfig(
-        lbfgs_tol=DEFAULT_OPTIMIZATION_CONFIG.lbfgs_tol,
-        lbfgs_maxiter=kwargs['opt_maxiter'],
-        verbose=kwargs['opt_verbose'],
-        n_starts=kwargs['opt_nstarts'])
-    gpmodel = GaussianProcessRegression(
-        kernel=kernel, mean=mean,
-        optimization_config=optimization_config,
-        fit_reset_params=not opt_warmstart)
-    model_args = GPModelArgs(
-        num_fantasy_samples=kwargs['num_fantasy_samples'],
+    gpmodel, model_args = _create_gp_and_model_args(
+        hp_ranges_cs=hp_ranges_cs,
         random_seed=random_seed,
-        active_metric=kwargs.get('active_metric', DEFAULT_METRIC),
-        normalize_targets=True)
+        active_metric=DEFAULT_METRIC,
+        max_metric_value=max_metric_value,
+        is_hyperband=is_hyperband,
+        **kwargs)
     debug_log = DebugLogPrinter() if kwargs.get('debug_log', False) else None
 
     return hp_ranges_cs, random_seed, gpmodel, model_args, profiler, \
@@ -183,31 +194,17 @@ def constrained_gp_fifo_searcher_factory(**kwargs) -> ConstrainedGPFIFOSearcher:
     # Common objects
     hp_ranges_cs, random_seed, gpmodel, model_args, profiler, _map_reward, \
     skip_optimization, debug_log = _create_common_objects(**kwargs)
-    constraint_metric_name = kwargs.get('constraint_metric', DEFAULT_CONSTRAINT_METRIC)
-    active_metric_name = kwargs.get('active_metric', DEFAULT_METRIC)
     initial_scoring = kwargs.get('initial_scoring', 'acq_func')
-    opt_warmstart = kwargs.get('opt_warmstart', False)
-    # Constrained GP regression model
-    kernel = Matern52(dimension=hp_ranges_cs.ndarray_size(), ARD=True)
-    mean = ScalarMeanFunction()
-    optimization_config = OptimizationConfig(
-        lbfgs_tol=DEFAULT_OPTIMIZATION_CONFIG.lbfgs_tol,
-        lbfgs_maxiter=kwargs['opt_maxiter'],
-        verbose=kwargs['opt_verbose'],
-        n_starts=kwargs['opt_nstarts'])
-    gpmodel_constraint = GaussianProcessRegression(
-        kernel=kernel, mean=mean,
-        optimization_config=optimization_config,
-        fit_reset_params=not opt_warmstart)
-    model_args_constraint = GPModelArgs(
-        num_fantasy_samples=kwargs['num_fantasy_samples'],
+    # We need two GP models: one for active metric (gpmodel), the other for constraint metric (gpmodel_constraint)
+    gpmodel_constraint, model_args_constraint = _create_gp_and_model_args(
+        hp_ranges_cs=hp_ranges_cs,
         random_seed=random_seed,
-        active_metric=constraint_metric_name,
-        normalize_targets=True)
-    output_gpmodels = {active_metric_name: gpmodel,
-                       constraint_metric_name: gpmodel_constraint}
-    output_model_args = {active_metric_name: model_args,
-                         constraint_metric_name: model_args_constraint}
+        active_metric=DEFAULT_CONSTRAINT_METRIC,
+        **kwargs)
+    output_gpmodels = {DEFAULT_METRIC: gpmodel,
+                       DEFAULT_CONSTRAINT_METRIC: gpmodel_constraint}
+    output_model_args = {DEFAULT_METRIC: model_args,
+                         DEFAULT_CONSTRAINT_METRIC: model_args_constraint}
     constrained_gp_searcher = ConstrainedGPFIFOSearcher(
         hp_ranges=hp_ranges_cs,
         random_seed=random_seed,
@@ -293,8 +290,6 @@ def _common_defaults(is_hyperband: bool, is_constrained: bool) -> (Set[str], dic
         default_options['resource_acq'] = 'bohb'
         default_options['num_init_random'] = 10
     if is_constrained:
-        default_options['active_metric'] = DEFAULT_METRIC
-        default_options['constraint_metric'] = DEFAULT_CONSTRAINT_METRIC
         default_options['initial_scoring'] = 'acq_func'
 
     constraints = {

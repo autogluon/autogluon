@@ -81,10 +81,8 @@ class ConstrainedGPFIFOSearcher(GPFIFOSearcher):
             (as dict) as single argument. One use case for this callback is
             to store profiler records.
         """
-        self.active_metric_name = DEFAULT_METRIC
-        self.constraint_metric_name = DEFAULT_CONSTRAINT_METRIC
-        super().__init__(hp_ranges, random_seed, output_gpmodels[self.active_metric_name],
-                         output_models_args[self.active_metric_name], map_reward, acquisition_class, init_state,
+        super().__init__(hp_ranges, random_seed, output_gpmodels[DEFAULT_METRIC],
+                         output_models_args[DEFAULT_METRIC], map_reward, acquisition_class, init_state,
                          local_minimizer_class, skip_optimization, num_initial_candidates, num_initial_random_choices,
                          initial_scoring, first_is_default, debug_log, cost_metric_name, profiler, getconfig_callback)
 
@@ -116,8 +114,8 @@ class ConstrainedGPFIFOSearcher(GPFIFOSearcher):
         """
         crit_val = self.map_reward(reward)
         constr_val = constraint
-        metrics = {self.active_metric_name: crit_val,
-                   self.constraint_metric_name: constr_val}
+        metrics = {DEFAULT_METRIC: crit_val,
+                   DEFAULT_CONSTRAINT_METRIC: constr_val}
         if 'elapsed_time' in kwargs:
             metrics[self.cost_metric_name] = kwargs['elapsed_time']
         self.state_transformer.label_candidate(CandidateEvaluation(
@@ -187,11 +185,15 @@ class ConstrainedGPFIFOSearcher(GPFIFOSearcher):
             if self.do_profile:
                 self.profiler.stop('total_update')
             # Create BO algorithm
-            initial_candidates_scorer = create_initial_candidates_scorer(
-                self.initial_scoring, output_models, self.acquisition_class, self.random_state,
-                self.active_metric_name)
-            local_optimizer = self.local_minimizer_class(
-                state, output_models, self.acquisition_class, self.active_metric_name)
+            initial_candidates_scorer = create_initial_candidates_scorer(initial_scoring=self.initial_scoring,
+                                                                         model=output_models,
+                                                                         acquisition_class=self.acquisition_class,
+                                                                         random_state=self.random_state,
+                                                                         active_output=DEFAULT_METRIC)
+            local_optimizer = self.local_minimizer_class(state=state,
+                                                         model=output_models,
+                                                         acquisition_function_class=self.acquisition_class,
+                                                         active_metric=DEFAULT_METRIC)
             bo_algorithm = BayesianOptimizationAlgorithm(
                 initial_candidates_generator=self.random_generator,
                 initial_candidates_scorer=initial_candidates_scorer,

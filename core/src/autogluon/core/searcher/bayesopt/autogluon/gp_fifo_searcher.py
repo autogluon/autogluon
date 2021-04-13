@@ -54,7 +54,7 @@ def create_initial_candidates_scorer(
             model = model[active_output]
         return IndependentThompsonSampling(model, random_state=random_state)
     else:
-        return acquisition_class(model, active_output)
+        return acquisition_class(model, active_metric=active_output)
 
 
 def check_initial_candidates_scorer(initial_scoring: str) -> str:
