@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import numpy as np
 from scipy import stats
 from sklearn.neighbors import KNeighborsClassifier as _KNeighborsClassifier, KNeighborsRegressor as _KNeighborsRegressor

@@ -38,6 +38,17 @@ class LinearModel(AbstractModel):
 
     def _get_model_type(self):
         penalty = self.params.get('penalty', 'L2')
+        if self.params_aux.get('use_daal', False):
+            # Disabled by default until more testing is done, appears to give 20x training speedup when enabled
+            try:
+                # TODO: Add more granular switch, currently this affects all future LR models even if they had `use_daal=False`
+                from sklearnex import patch_sklearn
+                patch_sklearn("ridge")
+                patch_sklearn("lasso")
+                patch_sklearn("logistic")
+                logger.log(15, '\tUsing daal4py LR backend...')
+            except:
+                pass
         from sklearn.linear_model import LogisticRegression, Ridge, Lasso
         if self.problem_type == REGRESSION:
             if penalty == 'L2':
