@@ -944,7 +944,7 @@ class TabularPredictor:
         return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, data=None, extra_info=False, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, silent=False):
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
         Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -1035,7 +1035,14 @@ class TabularPredictor:
                     If A is a descendant of B, then B is an ancestor of A.
                     If this model is deleted, then all descendant models will no longer be able to infer on new data, and their 'can_infer' values will be False.
                     A model can only have descendant models whose 'stack_level' are higher than itself.
-
+        extra_metrics : list, default = None
+            A list of metrics to calculate scores for and include in the output DataFrame.
+            Only valid when `data` is specified. The scores refer to the scores on `data` (same data as used to calculate the `score_test` column).
+            This list can contain any values which would also be valid for `eval_metric` in predictor init.
+            For example, `extra_metrics=['accuracy', 'roc_auc', 'log_loss']` would be valid in binary classification.
+            This example would return 3 additional columns in the output DataFrame, whose column names match the names of the metrics.
+            Passing `extra_metrics=[predictor.eval_metric]` would return an extra column in the name of the eval metric that has identical values to `score_test`.
+            This also works with custom metrics. If passing an object instead of a string, the column name will be equal to the `.name` attribute of the object.
         only_pareto_frontier : bool, default = False
             If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
             At minimum this will include the model with the highest score and the model with the lowest inference time.
@@ -1049,7 +1056,8 @@ class TabularPredictor:
         :class:`pd.DataFrame` of model performance summary information.
         """
         data = self.__get_dataset(data) if data is not None else data
-        return self._learner.leaderboard(X=data, extra_info=extra_info, only_pareto_frontier=only_pareto_frontier, silent=silent)
+        return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
+                                         only_pareto_frontier=only_pareto_frontier, silent=silent)
 
     def fit_summary(self, verbosity=3):
         """
