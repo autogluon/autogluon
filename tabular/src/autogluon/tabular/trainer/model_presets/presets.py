@@ -23,8 +23,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     GBM=70,
     CAT=60,
     XGB=55,
-    NN=50,
-    FASTAI=45,
+    FASTAI=50,
+    NN=45,
     LR=40,
     FASTTEXT=0,
     AG_TEXT_NN=0,
@@ -35,8 +35,8 @@ DEFAULT_MODEL_PRIORITY = dict(
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
 PROBLEM_TYPE_MODEL_PRIORITY = {
     MULTICLASS: dict(
-        NN=120,
-        FASTAI=115,
+        FASTAI=120,
+        NN=115,
         KNN=110,
     ),
 }
