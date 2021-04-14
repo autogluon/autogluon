@@ -2,8 +2,8 @@ import ConfigSpace as CS
 import multiprocessing as mp
 
 from .bayesopt.autogluon.searcher_factory import gp_fifo_searcher_factory, \
-    gp_multifidelity_searcher_factory, gp_fifo_searcher_defaults, \
-    gp_multifidelity_searcher_defaults
+    gp_multifidelity_searcher_factory, constrained_gp_fifo_searcher_factory, gp_fifo_searcher_defaults, \
+    gp_multifidelity_searcher_defaults, constrained_gp_fifo_searcher_defaults
 from .searcher import BaseSearcher
 from ..utils.default_arguments import check_and_merge_defaults
 
@@ -206,6 +206,35 @@ class GPFIFOSearcher(BaseSearcher):
 
     def _to_config_cs(self, config):
         return _to_config_cs(self.gp_searcher.hp_ranges.config_space, config)
+
+
+class ConstrainedGPFIFOSearcher(GPFIFOSearcher):
+    def __init__(self, configspace, **kwargs):
+        _gp_searcher = kwargs.get('_constrained_gp_searcher')
+        if _gp_searcher is None:
+            kwargs['configspace'] = configspace
+            self.initial_scoring = 'acq_func'
+            if 'initial_scoring' in kwargs:
+                assert kwargs['initial_scoring'] == 'acq_func', 'Thompson sampling is not supported for Constrained BO.'
+            _kwargs = check_and_merge_defaults(
+                kwargs, *constrained_gp_fifo_searcher_defaults(),
+                dict_name='search_options')
+            _gp_searcher = constrained_gp_fifo_searcher_factory(**_kwargs)
+        super().__init__(
+            _gp_searcher.hp_ranges.config_space,
+            reward_attribute=kwargs.get('reward_attribute'))
+        self.gp_searcher = _gp_searcher
+        # This lock protects gp_searcher. We are not using self.LOCK, this
+        # can lead to deadlocks when superclass methods are called
+        self._gp_lock = mp.Lock()
+
+    def update(self, config, **kwargs):
+        BaseSearcher.update(self, config, **kwargs)
+        with self._gp_lock:
+            config_cs = self._to_config_cs(config)
+            self.gp_searcher.update(
+                config_cs, reward=kwargs[self._reward_attribute],
+                constraint=kwargs[self._constraint_attribute])
 
 
 class GPMultiFidelitySearcher(BaseSearcher):

@@ -18,6 +18,7 @@ from .scheduler import TaskScheduler
 from ..decorator import _autogluon_method
 from ..searcher import BaseSearcher
 from ..searcher import searcher_factory
+from ..searcher.bayesopt.tuning_algorithms.base_classes import DEFAULT_CONSTRAINT_METRIC
 from ..task.task import Task
 from ..utils import save, load, mkdir, try_import_mxboard
 from ..utils.default_arguments import check_and_merge_defaults, \
@@ -30,10 +31,10 @@ logger = logging.getLogger(__name__)
 
 _ARGUMENT_KEYS = {
     'args', 'resource', 'searcher', 'search_options', 'checkpoint', 'resume',
-    'num_trials', 'time_out', 'max_reward', 'reward_attr', 'time_attr',
+    'num_trials', 'time_out', 'max_reward', 'reward_attr', 'time_attr', 'constraint_attr',
     'dist_ip_addrs', 'visualizer', 'training_history_callback',
     'training_history_callback_delta_secs', 'training_history_searcher_info',
-    'delay_get_config'}
+    'delay_get_config', 'stop_jobs_after_time_out'}
 
 _DEFAULT_OPTIONS = {
     'resource': {'num_cpus': 1, 'num_gpus': 0},
@@ -41,10 +42,12 @@ _DEFAULT_OPTIONS = {
     'resume': False,
     'reward_attr': 'accuracy',
     'time_attr': 'epoch',
+    'constraint_attr': DEFAULT_CONSTRAINT_METRIC,
     'visualizer': 'none',
     'training_history_callback_delta_secs': 60,
     'training_history_searcher_info': False,
-    'delay_get_config': True}
+    'delay_get_config': True,
+    'stop_jobs_after_time_out': True}
 
 _CONSTRAINTS = {
     'checkpoint': String(),
@@ -54,10 +57,12 @@ _CONSTRAINTS = {
     'max_reward': Float(),
     'reward_attr': String(),
     'time_attr': String(),
+    'constraint_attr': String(),
     'visualizer': String(),
     'training_history_callback_delta_secs': Integer(1, None),
     'training_history_searcher_info': Boolean(),
-    'delay_get_config': Boolean()}
+    'delay_get_config': Boolean(),
+    'stop_jobs_after_time_out': Boolean()}
 
 
 class FIFOScheduler(TaskScheduler):
@@ -89,10 +94,15 @@ class FIFOScheduler(TaskScheduler):
         `time_out` must be given.
     time_out : float
         If given, jobs are started only until this time_out (wall clock time).
+        Moreover, we also stop jobs after time_out has passed, when they
+        report a result.
         One of `num_trials`, `time_out` must be given.
     reward_attr : str
         Name of reward (i.e., metric to maximize) attribute in data obtained
         from reporter
+    constraint_attr : str
+        Name of constraint attribute in data obtained from reporter
+        for running constrained Bayesian optimization
     time_attr : str
         Name of resource (or time) attribute in data obtained from reporter.
         This attribute is optional for FIFO scheduling, but becomes mandatory
@@ -120,6 +130,12 @@ class FIFOScheduler(TaskScheduler):
         just after a job has been started.
         For searchers which adapt to past data, True should be preferred.
         Otherwise, it does not matter.
+    stop_jobs_after_time_out : bool
+        Relevant only if `time_out` is used. If True, jobs which report a
+        metric are stopped once `time_out` has passed. Otherwise, such jobs
+        are allowed to continue until the end, or until stopped for other
+        reasons. The latter can mean an experiment runs far longer than
+        `time_out`.
 
 
     Examples
@@ -162,6 +178,7 @@ class FIFOScheduler(TaskScheduler):
             _search_options = search_options.copy()
             _search_options['configspace'] = train_fn.cs
             _search_options['reward_attribute'] = kwargs['reward_attr']
+            _search_options['constraint_attr'] = kwargs['constraint_attr']
             _search_options['resource_attribute'] = kwargs['time_attr']
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
@@ -198,6 +215,7 @@ class FIFOScheduler(TaskScheduler):
         self._checkpoint = checkpoint
         self._reward_attr = kwargs['reward_attr']
         self._time_attr = kwargs['time_attr']
+        self._constraint_attr = kwargs['constraint_attr']
         self.visualizer = kwargs['visualizer'].lower()
         if self.visualizer == 'tensorboard' or self.visualizer == 'mxboard':
             assert checkpoint is not None, "Need checkpoint to be set"
@@ -226,6 +244,17 @@ class FIFOScheduler(TaskScheduler):
         self.training_history_searcher_info = \
             kwargs['training_history_searcher_info']
         self._delay_get_config = kwargs['delay_get_config']
+        self._stop_jobs_after_time_out = False
+        if time_out is not None:
+            self._stop_jobs_after_time_out = kwargs['stop_jobs_after_time_out']
+            if self._stop_jobs_after_time_out:
+                msg = \
+                    "The meaning of 'time_out' has changed. Previously, jobs started before\n" + \
+                    "'time_out' were allowed to continue until stopped by other means. Now,\n" + \
+                    "we stop jobs once 'time_out' is passed (at the next metric reporting).\n" + \
+                    "If you like to keep the old behaviour, use\n" + \
+                    "   'stop_jobs_after_time_out=False'"
+                logger.warning(msg)
         # Resume experiment from checkpoint?
         if kwargs['resume']:
             assert checkpoint is not None, \
@@ -335,6 +364,34 @@ class FIFOScheduler(TaskScheduler):
             assert isinstance(task, dict)
             return {'TASK_ID': task['TASK_ID'], 'Config': task['Config']}
 
+    def on_task_add(self, task, **kwargs):
+        """
+        Called when new task is added. Register new task, inform searcher
+        (pending evaluation) and train_fn.
+
+        :param task:
+        :param kwargs:
+
+        """
+        config = task.args['config']
+        # Register pending evaluation
+        self.searcher.register_pending(config)
+        # Relay config_id to train_fn (for debug logging)
+        debug_log = self.searcher.debug_log
+        if debug_log is not None:
+            config_id = debug_log.config_id(config)
+            task.args['args']['config_id'] = config_id
+
+    def _class_for_add_job(self):
+        return FIFOScheduler
+
+    def _add_checkpointing_to_job(self, job):
+        def _save_checkpoint_callback(fut):
+            self._cleaning_tasks()
+            self.save()
+
+        job.add_done_callback(_save_checkpoint_callback)
+
     def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
 
@@ -351,26 +408,23 @@ class FIFOScheduler(TaskScheduler):
             - resume_from: config promoted from this milestone
             - milestone: config promoted to this milestone (next from resume_from)
         """
-        cls = FIFOScheduler
+        cls = self._class_for_add_job()
         if not self._delay_get_config:
-            # Wait for resource to become available here, as this has not happened
-            # in schedule_next before
+            # Wait for resource to become available here, as this has not
+            # happened in schedule_next before
             cls.managers.request_resources(task.resources)
-        # reporter
-        reporter = DistStatusReporter(remote=task.resources.node)
+        # Create reporter (if not passed in kwargs)
+        reporter = kwargs.get(
+            'reporter', DistStatusReporter(remote=task.resources.node))
         task.args['reporter'] = reporter
-        # Register pending evaluation
-        self.searcher.register_pending(task.args['config'])
-        # main process
-        debug_log = self.searcher.debug_log
-        if debug_log is not None:
+        # Register task, inform searcher and train_fn
+        self.on_task_add(task, **kwargs)
+        # Main process
+        if self.searcher.debug_log is not None:
             logger.info("Starting job on node = {}".format(
                 task.resources.node.remote_id))
-            # Relay config_id to train_fn (for debug logging)
-            config_id = debug_log.config_id(task.args['config'])
-            task.args['args']['config_id'] = config_id
         job = cls.jobs.start_distributed_job(task, cls.managers)
-        # reporter thread
+        # Reporter thread
         rp = threading.Thread(
             target=self._run_reporter,
             args=(task, job, reporter),
@@ -378,11 +432,11 @@ class FIFOScheduler(TaskScheduler):
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
+        with self.managers.lock:
+            self.scheduled_tasks.append(task_dict)
         # Checkpoint thread
         if self._checkpoint is not None:
             self._add_checkpointing_to_job(job)
-        with self.managers.lock:
-            self.scheduled_tasks.append(task_dict)
 
     def _clean_task_internal(self, task_dict):
         task_dict['ReporterThread'].join()
@@ -403,50 +457,138 @@ class FIFOScheduler(TaskScheduler):
         Decides whether 'training_history_callback' is to be called. This
         callback is (in general) serializing 'training_history' (or required
         parts of it). It may also serialize the current scheduler state.
+        Checks condition for training_history_callback and executes the
+        callback if this is met. This callback is (in general) serializing
+        'training_history' (or required parts of it). It may also serialize the
+        current scheduler state.
 
         To this end, we partition time since start of experiment (see
         `_elapsed_time') into blocks of 'training_history_callback_delta_secs'
         seconds. The callback is triggered only if the last recent call
         happened in an earlier block.
 
-        :return: Should callback be executed?
+        :return: Has callback been called?
+
         """
-        if self.training_history_callback is None:
-            return False
-        assert self._training_history_callback_last_block is not None
-        current_block = self._training_history_callback_current_block()
-        return (current_block > self._training_history_callback_last_block)
+        do_call = False
+        if self.training_history_callback is not None:
+            assert self._training_history_callback_last_block is not None
+            current_block = self._training_history_callback_current_block()
+            do_call = (current_block >
+                       self._training_history_callback_last_block)
+        if do_call:
+            # Note: no_fifo_lock = True avoids deadlock in 'state_dict',
+            # since we acquired the _fifo_lock already
+            self.training_history_callback(
+                self.training_history,
+                self._start_time,
+                config_history=self.config_history,
+                state_dict=self.state_dict(no_fifo_lock=True))
+            # Callback could take some time, so make sure to call
+            # _training_history_callback_current_block here again
+            self._training_history_callback_last_block = \
+                self._training_history_callback_current_block()
+        return do_call
+
+    def _add_training_result(self, task_id, reported_result, config=None):
+        if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
+            if 'loss' in reported_result:
+                self.mxboard.add_scalar(
+                    tag='loss',
+                    value=(
+                        f'task {task_id} valid_loss',
+                        reported_result['loss']
+                    ),
+                    global_step=reported_result[self._time_attr]
+                )
+            self.mxboard.add_scalar(
+                tag=self._reward_attr,
+                value=(
+                    f'task {task_id} {self._reward_attr}',
+                    reported_result[self._reward_attr]
+                ),
+                global_step=reported_result[self._time_attr]
+            )
+        # This locking block includes the (optional) call of
+        # training_history_callback. We need to make sure that it is not called
+        # by two reporter threads at the same time
+        with self._fifo_lock:
+            # Note: We store all of reported_result in
+            # training_history[task_id], not just the reward value.
+            task_key = str(task_id)
+            new_entry = copy.copy(reported_result)
+            if task_key in self.training_history:
+                self.training_history[task_key].append(new_entry)
+            else:
+                self.training_history[task_key] = [new_entry]
+                if config:
+                    self.config_history[task_key] = config
+            # training_history_callback mechanism
+            self._trigger_training_history_callback()
+
+    def _append_extra_searcher_info(self, result):
+        # Extra information from searcher (optional)
+        if self.training_history_searcher_info:
+            dataset_size = self.searcher.dataset_size()
+            if dataset_size > 0:
+                result['searcher_data_size'] = dataset_size
+            for k, v in self.searcher.model_parameters().items():
+                result['searcher_params_' + k] = v
+
+    def on_task_report(self, task, result):
+        """
+        Called by reporter thread once a new result is reported.
+
+        :param task:
+        :param result:
+        :return: Should reporter move on? Otherwise, it terminates
+
+        """
+        debug_log = self.searcher.debug_log
+        config = task.args['config']
+        config_id = debug_log.config_id(config) if debug_log else None
+        if 'traceback' in result:
+            # Evaluation has failed
+            logger.critical(result['traceback'])
+            self.searcher.evaluation_failed(config, **result)
+            if debug_log is not None:
+                msg = "config_id {}: Evaluation failed:\n{}".format(
+                    config_id, result['traceback'])
+                logger.info(msg)
+            return False  # reporter terminate
+        if result.get('done', False):
+            return False  # reporter terminate
+        # If we are past self.time_out, we want to stop the job
+        if self._stop_jobs_after_time_out:
+            elapsed_time = self._elapsed_time()
+            if elapsed_time > self.time_out:
+                if debug_log is not None:
+                    msg = "config_id {}: Terminating because elapsed_time = {} > {} = self.time_out".format(
+                        config_id, elapsed_time, self.time_out)
+                    logger.info(msg)
+                return False  # reporter terminate
+        if len(result) == 0:
+            # An empty dict should just be skipped
+            if debug_log is not None:
+                msg = "config_id {}: Skipping empty dict received from reporter".format(
+                    config_id)
+                logger.info(msg)
+        else:
+            self._append_extra_searcher_info(result)
+            self._add_training_result(task.task_id, result, config=config)
+        return True  # reporter move on
 
     def _run_reporter(self, task, task_job, reporter):
         last_result = None
         while not task_job.done():
             reported_result = reporter.fetch()
-            if 'traceback' in reported_result:
-                # Evaluation has failed
-                logger.critical(reported_result['traceback'])
-                self.searcher.evaluation_failed(
-                    config=task.args['config'], **reported_result)
+            if self.on_task_report(task, reported_result):
+                if len(reported_result) > 0:
+                    last_result = reported_result
                 reporter.move_on()
+            else:
+                reporter.terminate()
                 break
-            if reported_result.get('done', False):
-                reporter.move_on()
-                break
-            if len(reported_result) == 0:
-                # An empty dict should just be skipped
-                logger.warning("Skipping empty dict received from reporter")
-                continue
-
-            # Extra information from searcher (optional)
-            if self.training_history_searcher_info:
-                dataset_size = self.searcher.dataset_size()
-                if dataset_size > 0:
-                    reported_result['searcher_data_size'] = dataset_size
-                for k, v in self.searcher.model_parameters().items():
-                    reported_result['searcher_params_' + k] = v
-            self._add_training_result(
-                task.task_id, reported_result, config=task.args['config'])
-            reporter.move_on()
-            last_result = reported_result
         # Pass all of last_result to searcher
         if last_result is not None:
             self.searcher.update(config=task.args['config'], **last_result)
@@ -492,52 +634,6 @@ class FIFOScheduler(TaskScheduler):
         """Get the best reward from the finished jobs.
         """
         return self.searcher.get_best_reward()
-
-    def _add_training_result(self, task_id, reported_result, config=None):
-        if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
-            if 'loss' in reported_result:
-                self.mxboard.add_scalar(
-                    tag='loss',
-                    value=(
-                        f'task {task_id} valid_loss',
-                        reported_result['loss']
-                    ),
-                    global_step=reported_result[self._time_attr]
-                )
-            self.mxboard.add_scalar(
-                tag=self._reward_attr,
-                value=(
-                    f'task {task_id} {self._reward_attr}',
-                    reported_result[self._reward_attr]
-                ),
-                global_step=reported_result[self._time_attr]
-            )
-        # This locking block includes the (optional) call of
-        # training_history_callback. We need to make sure that it is not called
-        # by two reporter threads at the same time
-        with self._fifo_lock:
-            # Note: We store all of reported_result in
-            # training_history[task_id], not just the reward value.
-            task_key = str(task_id)
-            new_entry = copy.copy(reported_result)
-            if task_key in self.training_history:
-                self.training_history[task_key].append(new_entry)
-            else:
-                self.training_history[task_key] = [new_entry]
-                if config:
-                    self.config_history[task_key] = config
-            # training_history_callback mechanism
-            if self._trigger_training_history_callback():
-                # Note: no_fifo_lock = True avoids deadlock in 'state_dict',
-                # since we acquired the _fifo_lock already
-                self.training_history_callback(
-                    self.training_history,
-                    self._start_time,
-                    config_history=self.config_history,
-                    state_dict=self.state_dict(no_fifo_lock=True))
-                self._training_history_callback_last_block = \
-                    self._training_history_callback_current_block()
-
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
         """Get Training Curves

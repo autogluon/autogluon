@@ -4,7 +4,7 @@ from scipy.optimize import fmin_l_bfgs_b
 import logging
 
 from .base_classes import SurrogateModel, AcquisitionFunction, \
-    ScoringFunction, LocalOptimizer
+    ScoringFunction, LocalOptimizer, OutputSurrogateModel
 from ..datatypes.common import Candidate
 from ..datatypes.tuning_job_state import TuningJobState
 
@@ -47,9 +47,9 @@ class IndependentThompsonSampling(ScoringFunction):
 
 
 class LBFGSOptimizeAcquisition(LocalOptimizer):
-    def __init__(self, state: TuningJobState, model: SurrogateModel,
-                 acquisition_function_class: Type[AcquisitionFunction]):
-        super().__init__(state, model, acquisition_function_class)
+    def __init__(self, state: TuningJobState, model: OutputSurrogateModel,
+                 acquisition_function_class: Type[AcquisitionFunction], active_metric: str = None):
+        super().__init__(state, model, acquisition_function_class, active_metric)
         # Number criterion evaluations in last recent optimize call
         self.num_evaluations = None
 
@@ -59,7 +59,7 @@ class LBFGSOptimizeAcquisition(LocalOptimizer):
         if model is None:
             model = self.model
         state = self.state
-        acquisition_function = self.acquisition_function_class(model)
+        acquisition_function = self.acquisition_function_class(model, self.active_metric)
 
         x0 = state.hp_ranges.to_ndarray(candidate)
         bounds = state.hp_ranges.get_ndarray_bounds()

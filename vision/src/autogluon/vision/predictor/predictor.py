@@ -10,6 +10,8 @@ import pandas as pd
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 
+from autogluon.core.constants import MULTICLASS
+from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
@@ -25,6 +27,8 @@ class ImagePredictor(object):
 
     Parameters
     ----------
+    label : str, default = 'label'
+        Name of the column that contains the target variable to predict.
     problem_type : str, default = None
         Type of prediction problem. Options: ('multiclass'). If problem_type = None, the prediction problem type is inferred
          based on the provided dataset. Currently only multiclass(or single class vs. background) classification is supported.
@@ -43,7 +47,7 @@ class ImagePredictor(object):
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
     Dataset = _ImageClassification.Dataset
 
-    def __init__(self, problem_type=None, eval_metric=None, path=None, verbosity=2):
+    def __init__(self, label='label', problem_type=None, eval_metric=None, path=None, verbosity=2):
         self._problem_type = problem_type
         self._eval_metric = eval_metric
         if path is None:
@@ -51,7 +55,10 @@ class ImagePredictor(object):
         self._log_dir = path
         self._verbosity = verbosity
         self._classifier = None
+        self._label_cleaner = None
         self._fit_summary = {}
+        self._label = label
+        assert isinstance(self._label, str)
         os.makedirs(self._log_dir, exist_ok=True)
 
     @property
@@ -219,7 +226,8 @@ class ImagePredictor(object):
         """
         if self._problem_type is None:
             # options: multiclass
-            self._problem_type = 'multiclass'
+            self._problem_type = MULTICLASS
+        assert self._problem_type in (MULTICLASS,), f"Invalid problem_type: {self._problem_type}"
         if self._eval_metric is None:
             # options: accuracy,
             self._eval_metric = 'accuracy'
@@ -236,6 +244,9 @@ class ImagePredictor(object):
         searcher = kwargs['hyperparameter_tune_kwargs']['searcher']
         max_reward = kwargs['hyperparameter_tune_kwargs']['max_reward']
         scheduler_options = kwargs['hyperparameter_tune_kwargs']['scheduler_options']
+        # deep copy to avoid inplace overwrite
+        train_data = copy.deepcopy(train_data)
+        tuning_data = copy.deepcopy(tuning_data)
 
         log_level = verbosity2loglevel(self._verbosity)
         set_logger_verbosity(self._verbosity, logger=logger)
@@ -282,8 +293,14 @@ class ImagePredictor(object):
 
         # data sanity check
         train_data = self._validate_data(train_data)
+        train_labels = _get_valid_labels(train_data)
+        self._label_cleaner = LabelCleaner.construct(problem_type=self._problem_type, y=train_labels, y_uncleaned=train_labels)
+        train_labels_cleaned = self._label_cleaner.transform(train_labels)
+        # converting to internal label set
+        _set_valid_labels(train_data, train_labels_cleaned)
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
+            _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
@@ -367,6 +384,12 @@ class ImagePredictor(object):
 
     def _validate_data(self, data):
         """Check whether data is valid, try to convert with best effort if not"""
+        if isinstance(data, pd.DataFrame):
+            # TODO(zhreshold): allow custom label column without this renaming trick
+            if self._label != 'label' and self._label in data.columns:
+                # data is deepcopied so it's okay to overwrite directly
+                data = data.rename(columns={'label': '_unused_label', self._label: 'label'}, errors='ignore')
+
         if not (hasattr(data, 'classes') and hasattr(data, 'to_mxnet')):
             if isinstance(data, pd.DataFrame):
                 # raw dataframe, try to add metadata automatically
@@ -376,7 +399,7 @@ class ImagePredictor(object):
                     if not os.path.isfile(sample):
                         raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
-                    infer_classes = list(data.label.unique().tolist())
+                    infer_classes = sorted(data.label.unique().tolist())
                     logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
                     instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
@@ -387,6 +410,16 @@ class ImagePredictor(object):
                               'You may visit `https://auto.gluon.ai/stable/tutorials/image_prediction/dataset.html` ' + \
                               'for details.'
                     raise AttributeError(err_msg)
+            else:
+                raise TypeError(f"Unable to process dataset of type: {type(data)}")
+        elif isinstance(data, _ImageClassification.Dataset):
+            assert 'label' in data.columns
+            assert hasattr(data, 'classes')
+            # check whether classes are outdated, no action required if all unique labels is subset of `classes`
+            unique_labels = sorted(data['label'].unique().tolist())
+            if not (all(ulabel in data.classes for ulabel in unique_labels)):
+                data = _ImageClassification.Dataset(data, classes=unique_labels)
+                logger.log(20, f'Reset labels to {unique_labels}')
         if len(data) < 1:
             raise ValueError('Empty dataset.')
         return data
@@ -440,14 +473,20 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
-        proba = self._classifier.predict(data)
-        if 'image' in proba.columns:
-            ret = proba.groupby(["image"]).agg(list)
-        ret = proba
+        assert self._label_cleaner is not None
+        y_pred_proba = self._classifier.predict(data, with_proba=True)
+        if isinstance(data, pd.DataFrame) and 'image' in data:
+            idx_to_image_map = data[['image']]
+            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
+            y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
+            y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
+        y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
+        ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
+
         if as_pandas:
             return ret
         else:
-            return ret.as_numpy()
+            return ret.to_numpy()
 
     def predict(self, data, as_pandas=True):
         """Predict images as a whole, return labels(class category).
@@ -469,17 +508,25 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
+        assert self._label_cleaner is not None
         proba = self._classifier.predict(data)
         if 'image' in proba.columns:
             # multiple images
-            ret = proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
+            assert isinstance(data, pd.DataFrame) and 'image' in data.columns
+            y_pred = proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
+            idx_to_image_map = data[['image']]
+            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
+            y_pred = idx_to_image_map.merge(y_pred, on='image')
+            y_pred = y_pred.set_index('index').rename_axis(None)
+            ret = self._label_cleaner.inverse_transform(y_pred['id'].rename('label'))
         else:
             # single image
             ret = proba.loc[[proba["score"].idxmax()]]
+            ret = self._label_cleaner.inverse_transform(ret['id'].rename('label'))
         if as_pandas:
             return ret
         else:
-            return ret.as_numpy()
+            return ret.to_numpy()
 
     def predict_feature(self, data, as_pandas=True):
         """Predict images visual feature representations, return the features as numpy (1xD) vector.
@@ -505,7 +552,7 @@ class ImagePredictor(object):
         if as_pandas:
             return ret
         else:
-            return ret.as_numpy()
+            return ret.to_numpy()
 
     def evaluate(self, data):
         """Evaluate model performance on validation data.
@@ -581,6 +628,28 @@ class ImagePredictor(object):
         """
         return tuple(_SUPPORTED_MODELS)
 
+
+def _get_valid_labels(data):
+    ret = None
+    if isinstance(data, pd.DataFrame):
+        ret = data['label']
+    else:
+        from d8.image_classification import Dataset as D8D
+        if isinstance(data, D8D):
+            ret = data.df['class_name']
+    if ret is None:
+        raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
+    return ret
+
+def _set_valid_labels(data, label):
+    if isinstance(data, pd.DataFrame):
+        data['label'] = label
+    else:
+        from d8.image_classification import Dataset as D8D
+        if isinstance(data, D8D):
+            data.df['class_name'] = label
+        else:
+            raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
 
 def _get_supported_models():
     all_models = get_model_list()

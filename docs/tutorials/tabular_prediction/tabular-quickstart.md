@@ -54,6 +54,11 @@ print("Predictions:  \n", y_pred)
 perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
 ```
 
+We can also evaluate the performance of each individual trained model on our (labeled) test data:
+```{.python .input}
+predictor.leaderboard(test_data, silent=True)
+```
+
 Now you're ready to try AutoGluon on your own tabular datasets!
 As long as they're stored in a popular format like CSV, you should be able to achieve strong predictive performance with just 2 lines of code:
 
@@ -157,6 +162,12 @@ performance = predictor_age.evaluate(test_data)
 ```
 
 Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` argument of `fit()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = 'mean_absolute_error'`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon may sometimes flips their sign and print them as negative values during training (as it internally assumes higher values are better).
+
+We can call leaderboard to see the per-model performance:
+
+```{.python .input}
+predictor_age.leaderboard(test_data, silent=True)
+```
 
 **Data Formats:** AutoGluon can currently operate on data tables already loaded into Python as pandas DataFrames, or those stored in files of [CSV format](https://en.wikipedia.org/wiki/Comma-separated_values) or [Parquet format](https://databricks.com/glossary/what-is-parquet). If your data live in multiple tables, you will first need to join them into a single table whose rows correspond to statistically independent observations (datapoints) and columns correspond to different features (aka. variables/covariates).
 

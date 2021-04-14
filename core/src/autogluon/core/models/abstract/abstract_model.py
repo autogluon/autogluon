@@ -483,7 +483,12 @@ class AbstractModel:
         For multiclass and softclass classification, keeps y_pred_proba as a 2 dimensional array of prediction probabilities for each class.
         For regression, converts y_pred_proba to a 1 dimensional array of predictions.
         """
-        if self.problem_type == BINARY:
+        if self.problem_type == REGRESSION:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            else:
+                return y_pred_proba[:, 1]
+        elif self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             elif y_pred_proba.shape[1] > 1:
@@ -492,8 +497,8 @@ class AbstractModel:
                 return y_pred_proba
         elif y_pred_proba.shape[1] > 2:  # Multiclass, Softclass
             return y_pred_proba
-        else:  # Regression
-            return y_pred_proba[:, 1]
+        else:  # Unknown problem type
+            raise AssertionError(f'Unknown y_pred_proba format for `problem_type="{self.problem_type}"`.')
 
     def score(self, X, y, metric=None, sample_weight=None, **kwargs):
         if metric is None:
@@ -951,7 +956,7 @@ class AbstractModel:
         else:
             return self._get_params()
 
-    # TODO: Add documentation for valid args for each model. Currently only `ag.es`
+    # TODO: Add documentation for valid args for each model. Currently only `ag.early_stop`
     def _ag_params(self) -> set:
         """
         Set of params that are not passed to self.model, but are used by the wrapper.
@@ -963,7 +968,7 @@ class AbstractModel:
 
         Possible params:
 
-        ag.es : int, str, or tuple
+        ag.early_stop : int, str, or tuple
             generic name for early stopping logic. Typically can be an int or a str preset/strategy.
             Also possible to pass tuple of (class, kwargs) to construct a custom early stopping object.
                 Refer to `autogluon.core.utils.early_stopping` for examples.

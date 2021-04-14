@@ -187,7 +187,7 @@ def base_optimization_config():
     cfg.nbest = 1                   # Keep the top K performed models
     cfg.per_device_batch_size = 16  # Per-device batch-size
     cfg.auto_per_device_batch_size = True  # Whether to automatically determine the runnable
-                                           # per-device batch_size.
+    # per-device batch_size.
     cfg.val_batch_size_mult = 2  # By default, we 2X the batch size for validation
     cfg.lr = 1E-4
     cfg.final_lr = 0.0
@@ -213,7 +213,7 @@ def base_model_config():
     cfg.train_stochastic_chunk = False   # Whether to sample a stochastic chunk from the training text
     cfg.test_stochastic_chunk = False    # Whether to use stochastic chunk in testing
     cfg.use_avg_nbest = False            # Whether to average the top performed models and use that as the final model.
-                                         # This will usually give us better performance.
+    # This will usually give us better performance.
     cfg._disable_update = False          # This is a hack for trying to disable the update. Should not be used usually
     cfg.inference_num_repeat = 1         # Whether to turn on randomness and repeat the inference for multiple times.
     return cfg
@@ -274,7 +274,7 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
 
     predictions = [[] for _ in range(num_repeat)]
     use_logits = num_repeat > 1 and (problem_type == MULTICLASS or problem_type == BINARY)\
-                 and not extract_embedding
+        and not extract_embedding
     if use_logits:
         logits = [[] for _ in range(num_repeat)]
     ctx_l = net.collect_params().list_ctx()
@@ -322,8 +322,7 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
 
 
 def calculate_metric(scorer, ground_truth, predictions, problem_type):
-    if problem_type == BINARY and scorer.name == 'roc_auc':
-        # For ROC_AUC, we need to feed in the probability of positive class to the scorer.
+    if problem_type == BINARY and predictions.ndim > 1 and scorer.name in ['roc_auc', 'average_precision']:
         return scorer._sign * scorer(ground_truth, predictions[:, 1])
     else:
         return scorer._sign * scorer(ground_truth, predictions)
@@ -477,8 +476,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
         f.write(str(cfg))
     logger.info(f'Max length for chunking text: {max_length}, '
-                   f'Stochastic chunk: Train-{train_stochastic_chunk}/Test-{test_stochastic_chunk}, '
-                   f'Test #repeat: {inference_num_repeat}.')
+                f'Stochastic chunk: Train-{train_stochastic_chunk}/Test-{test_stochastic_chunk}, '
+                f'Test #repeat: {inference_num_repeat}.')
     cls_id, sep_id = get_cls_sep_id(tokenizer)
     train_batchify_fn = MultiModalTextBatchify(
         num_text_inputs=len(preprocessor.text_feature_names),
@@ -530,7 +529,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         num_text_features=1,
         num_categorical_features=len(preprocessor.categorical_feature_names),
         num_numerical_features=len(preprocessor.numerical_feature_names) > 0,
-        numerical_input_units=None if len(preprocessor.numerical_feature_names) == 0 else len(preprocessor.numerical_feature_names),
+        numerical_input_units=None if len(preprocessor.numerical_feature_names) == 0 else len(
+            preprocessor.numerical_feature_names),
         num_categories=preprocessor.categorical_num_categories,
         get_embedding=False,
         cfg=cfg.model.network,
@@ -539,7 +539,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     net.hybridize()
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
     logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
-                                                             num_total_fixed_params))
+                                                          num_total_fixed_params))
     # Initialize the optimizer
     updates_per_epoch = int(np.ceil(len(train_dataloader) / (num_accumulated * len(ctx_l))))
     optimizer, optimizer_params, max_update \
@@ -566,7 +566,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     # Set grad_req if gradient accumulation is required
     if num_accumulated > 1:
         logger.log(15, 'Using gradient accumulation.'
-                    ' Global batch size = {}'.format(cfg.optimization.batch_size))
+                   ' Global batch size = {}'.format(cfg.optimization.batch_size))
         for p in params:
             p.grad_req = 'add'
         net.collect_params().zero_grad()
@@ -591,7 +591,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     best_report_items = None
     report_local_jsonl_f = open(os.path.join(exp_dir, 'results_local.jsonl'), 'w')
     logger.info(f'Local training results will be saved to '
-                   f'{os.path.join(exp_dir, "results_local.jsonl")}.')
+                f'{os.path.join(exp_dir, "results_local.jsonl")}.')
     for update_idx in range(max_update):
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)
@@ -626,15 +626,15 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
             log_num_samples = sum(log_num_samples_l)
             logger.log(15,
-                '[Iter {}/{}, Epoch {}] train loss={:0.2e}, gnorm={:0.2e}, lr={:0.2e}, #samples processed={},'
-                ' #sample per second={:.2f}. ETA={:.2f}min'
-                    .format(update_idx + 1, max_update,
-                            int(update_idx / updates_per_epoch),
-                            log_loss / log_num_samples, total_norm, trainer.learning_rate,
-                            log_num_samples,
-                            log_num_samples / (time.time() - logging_start_tick),
-                            (time.time() - start_tick) / (update_idx + 1)
-                            * (max_update - update_idx - 1) / 60))
+                       '[Iter {}/{}, Epoch {}] train loss={:0.2e}, gnorm={:0.2e}, lr={:0.2e}, #samples processed={},'
+                       ' #sample per second={:.2f}. ETA={:.2f}min'
+                       .format(update_idx + 1, max_update,
+                               int(update_idx / updates_per_epoch),
+                               log_loss / log_num_samples, total_norm, trainer.learning_rate,
+                               log_num_samples,
+                               log_num_samples / (time.time() - logging_start_tick),
+                               (time.time() - start_tick) / (update_idx + 1)
+                               * (max_update - update_idx - 1) / 60))
             logging_start_tick = time.time()
             log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
             log_num_samples_l = [0 for _ in ctx_l]
@@ -704,21 +704,21 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
             logger.log(25, '[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
-                        ' total time spent={:.2f}min. Find new best={}, Find new top-{}={}'.format(
-                update_idx + 1, max_update, int(update_idx / updates_per_epoch),
-                loss_string, valid_time_spent, (time.time() - start_tick) / 60,
-                find_better, nbest, find_topn_better))
+                       ' total time spent={:.2f}min. Find new best={}, Find new top-{}={}'.format(
+                           update_idx + 1, max_update, int(update_idx / updates_per_epoch),
+                           loss_string, valid_time_spent, (time.time() - start_tick) / 60,
+                           find_better, nbest, find_topn_better))
             if reporter is not None:
                 report_items = [('iteration', update_idx + 1),
                                 ('report_idx', report_idx + 1),
                                 ('epoch', int(update_idx / updates_per_epoch))] + \
-                               [(metric.name, score)
-                                for score, metric in zip(log_scores, log_metric_scorers)] + \
-                               [('find_better', find_better),
-                                ('find_new_topn', find_topn_better),
-                                ('nbest_stat', json.dumps([best_performance_score,
-                                                           best_performance_update_idx])),
-                                ('elapsed_time', int(time.time() - start_tick))]
+                    [(metric.name, score)
+                     for score, metric in zip(log_scores, log_metric_scorers)] + \
+                    [('find_better', find_better),
+                     ('find_new_topn', find_topn_better),
+                     ('nbest_stat', json.dumps([best_performance_score,
+                                                best_performance_update_idx])),
+                     ('elapsed_time', int(time.time() - start_tick))]
                 if eval_metric_scorer._sign < 0:
                     report_items.append(('reward_attr', -dev_score))
                 else:
@@ -964,8 +964,8 @@ class MultiModalTextModel:
                                    '"AUTOGLUON_TEXT_TRAIN_WITHOUT_GPU=1" to force the model to '
                                    'use CPU for training.')
         logger.info(f"The GluonNLP V0 backend is used. "
-                       f"We will use {num_cpus} cpus and "
-                       f"{num_gpus} gpus to train each trial.")
+                    f"We will use {num_cpus} cpus and "
+                    f"{num_gpus} gpus to train each trial.")
         if scheduler_options is None:
             scheduler_options = dict()
         if plot_results is None:
@@ -1211,7 +1211,7 @@ class MultiModalTextModel:
                                           f'We have type(data)="{type(data)}"')
         dataset = self.preprocessor.transform(data[self._feature_columns])
         inference_batch_size = self.config.optimization.per_device_batch_size \
-                               * self.config.optimization.val_batch_size_mult
+            * self.config.optimization.val_batch_size_mult
         cls_id, sep_id = get_cls_sep_id(self.preprocessor.tokenizer)
         if stochastic_chunk is None:
             stochastic_chunk = self.config.model.test_stochastic_chunk
@@ -1414,7 +1414,7 @@ class MultiModalTextModel:
             num_categorical_features=len(preprocessor.categorical_feature_names),
             num_numerical_features=len(preprocessor.numerical_feature_names) > 0,
             numerical_input_units=None if len(preprocessor.numerical_feature_names) == 0
-                                       else len(preprocessor.numerical_feature_names),
+            else len(preprocessor.numerical_feature_names),
             num_categories=preprocessor.categorical_num_categories,
             get_embedding=False,
             cfg=cfg.model.network,
@@ -1461,7 +1461,7 @@ class MultiModalTextModel:
                                           f'We have type(data)="{type(data)}"')
         dataset = self.preprocessor.transform(data[self.feature_columns])
         inference_batch_size = self.config.optimization.per_device_batch_size \
-                               * self.config.optimization.val_batch_size_mult
+            * self.config.optimization.val_batch_size_mult
         cls_id, sep_id = get_cls_sep_id(self.preprocessor.tokenizer)
         if stochastic_chunk is None:
             stochastic_chunk = self.config.model.test_stochastic_chunk
@@ -1485,7 +1485,7 @@ class MultiModalTextModel:
                 num_categorical_features=len(self.preprocessor.categorical_feature_names),
                 num_numerical_features=len(self.preprocessor.numerical_feature_names) > 0,
                 numerical_input_units=None if len(self.preprocessor.numerical_feature_names) == 0
-                                           else len(self.preprocessor.numerical_feature_names),
+                else len(self.preprocessor.numerical_feature_names),
                 num_categories=self.preprocessor.categorical_num_categories,
                 get_embedding=True,
                 cfg=self.config.model.network,

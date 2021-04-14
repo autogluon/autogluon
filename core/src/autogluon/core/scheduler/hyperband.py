@@ -1,6 +1,5 @@
 import pickle
 import logging
-import threading
 import numpy as np
 import multiprocessing as mp
 import os
@@ -9,7 +8,6 @@ import copy
 from .fifo import FIFOScheduler
 from .hyperband_stopping import StoppingRungSystem
 from .hyperband_promotion import PromotionRungSystem
-from .reporter import DistStatusReporter
 from ..utils import load
 from ..utils.default_arguments import check_and_merge_defaults, \
     Integer, Boolean, Categorical, filter_by_key
@@ -22,9 +20,8 @@ logger = logging.getLogger(__name__)
 
 _ARGUMENT_KEYS = {
     'max_t', 'grace_period', 'reduction_factor', 'brackets', 'type',
-    'maxt_pending', 'searcher_data', 'do_snapshots', 'rung_system_per_bracket',
-    'keep_size_ratios', 'random_seed', 'rung_levels'
-}
+    'searcher_data', 'do_snapshots', 'rung_system_per_bracket',
+    'keep_size_ratios', 'random_seed', 'rung_levels'}
 
 _DEFAULT_OPTIONS = {
     'resume': False,
@@ -32,7 +29,6 @@ _DEFAULT_OPTIONS = {
     'reduction_factor': 3,
     'brackets': 1,
     'type': 'stopping',
-    'maxt_pending': False,
     'searcher_data': 'rungs',
     'do_snapshots': False,
     'rung_system_per_bracket': True,
@@ -46,7 +42,6 @@ _CONSTRAINTS = {
     'reduction_factor': Integer(2, None),
     'brackets': Integer(1, None),
     'type': Categorical(('stopping', 'promotion')),
-    'maxt_pending': Boolean(),
     'searcher_data': Categorical(
         ('rungs', 'all', 'rungs_and_last')),
     'do_snapshots': Boolean(),
@@ -131,6 +126,8 @@ class HyperbandScheduler(FIFOScheduler):
         `time_out` must be given.
     time_out : float
         If given, jobs are started only until this time_out (wall clock time).
+        Moreover, we also stop jobs after time_out has passed, when they
+        report a result.
         One of `num_trials`, `time_out` must be given.
     reward_attr : str
         Name of reward (i.e., metric to maximize) attribute in data obtained
@@ -181,6 +178,12 @@ class HyperbandScheduler(FIFOScheduler):
         just after a job has been started.
         For searchers which adapt to past data, True should be preferred.
         Otherwise, it does not matter.
+    stop_jobs_after_time_out : bool
+        Relevant only if `time_out` is used. If True, jobs which report a
+        metric are stopped once `time_out` has passed. Otherwise, such jobs
+        are allowed to continue until the end, or until stopped for other
+        reasons. The latter can mean an experiment runs far longer than
+        `time_out`.
     type : str
         Type of Hyperband scheduler:
             stopping:
@@ -202,12 +205,6 @@ class HyperbandScheduler(FIFOScheduler):
                 See :class:`PromotionRungSystem`.
     dist_ip_addrs : list of str
         IP addresses of remote machines.
-    maxt_pending : bool
-        Relevant only if a model-based searcher is used.
-        If True, register pending config at level max_t whenever a task is started.
-        This has a direct effect on the acquisition function (for model-based
-        variant), which operates at level max_t. On the other hand, it decreases
-        the variance of the latent process there.
     searcher_data : str
         Relevant only if a model-based searcher is used, and if train_fn is such
         that we receive results (from the reporter) at each successive resource
@@ -297,10 +294,11 @@ class HyperbandScheduler(FIFOScheduler):
                 inferred_max_t))
             max_t = inferred_max_t
         # Deprecated kwargs
-        if 'keep_size_ratios' in kwargs:
-            if kwargs['keep_size_ratios']:
-                logger.warning("keep_size_ratios is deprecated, will be ignored")
-            del kwargs['keep_size_ratios']
+        deprecated_keys = ('keep_size_ratios', 'maxt_pending')
+        for k in deprecated_keys:
+            if k in kwargs:
+                logger.warning("'{}' is deprecated, will be ignored".format(k))
+                del kwargs[k]
         # If rung_levels is given, grace_period and reduction_factor are ignored
         rung_levels = kwargs.get('rung_levels')
         if rung_levels is not None:
@@ -348,7 +346,6 @@ class HyperbandScheduler(FIFOScheduler):
 
         self.max_t = max_t
         self.scheduler_type = scheduler_type
-        self.maxt_pending = kwargs['maxt_pending']
         self.terminator = HyperbandBracketManager(
             scheduler_type, self._time_attr, self._reward_attr, max_t,
             rung_levels, brackets, rung_system_per_bracket,
@@ -393,11 +390,10 @@ class HyperbandScheduler(FIFOScheduler):
         else:
             return None
 
-    def add_job(self, task, **kwargs):
-        """Adding a training task to the scheduler.
-
-        Args:
-            task (:class:`autogluon.scheduler.Task`): a new training task
+    def on_task_add(self, task, **kwargs):
+        """
+        Called when new task is added. Register new task, inform searcher
+        (pending evaluation) and train_fn (resume_from, checkpointing).
 
         Relevant entries in kwargs:
         - bracket: HB bracket to be used. Has been sampled in _promote_config
@@ -408,41 +404,31 @@ class HyperbandScheduler(FIFOScheduler):
         - config_key: Internal key for config
         - resume_from: config promoted from this milestone
         - milestone: config promoted to this milestone (next from resume_from)
-        """
-        cls = HyperbandScheduler
-        if not self._delay_get_config:
-            # Wait for resource to become available here, as this has not happened
-            # in schedule_next before
-            cls.managers.request_resources(task.resources)
-        # reporter and terminator
-        if 'reporter' in kwargs: 
-            # MOHyperbandScheduler provides a custom reporter
-            reporter = kwargs['reporter']
-        else:
-            reporter = DistStatusReporter(remote=task.resources.node)
-        task.args['reporter'] = reporter
 
+        :param task:
+        :param kwargs:
+
+        """
         # Register task
         task_key = str(task.task_id)
+        config = task.args['config']
+        debug_log = self.searcher.debug_log
+        config_id = debug_log.config_id(config) if debug_log else None
         with self._hyperband_lock:
             assert task_key not in self._running_tasks, \
                 "Task {} is already registered as running".format(task_key)
             self._running_tasks[task_key] = {
-                'config': task.args['config'],
+                'config': config,
                 'time_stamp': kwargs['elapsed_time'],
                 'bracket': kwargs['bracket'],
                 'reported_result': None,
                 'keep_case': False}
             first_milestone = self.terminator.on_task_add(task, **kwargs)[-1]
-        debug_log = self.searcher.debug_log
         if kwargs.get('new_config', True):
             # Task starts a new config
             next_milestone = first_milestone
-            logger.debug("Adding new task (first milestone = {}):\n{}".format(
-                next_milestone, task))
             if debug_log is not None:
                 # Debug log output
-                config_id = debug_log.config_id(task.args['config'])
                 msg = "config_id {} starts (first milestone = {})".format(
                     config_id, next_milestone)
                 logger.info(msg)
@@ -453,183 +439,162 @@ class HyperbandScheduler(FIFOScheduler):
             # in train_fn as args.scheduler.resume_from
             if 'scheduler' not in task.args['args']:
                 task.args['args']['scheduler'] = dict()
-            task.args['args']['scheduler']['resume_from'] = kwargs['resume_from']
+            resume_from = kwargs['resume_from']
+            task.args['args']['scheduler']['resume_from'] = resume_from
             next_milestone = kwargs['milestone']
-            logger.debug("Promotion task (next milestone = {}):\n{}".format(
-                next_milestone, task))
             if debug_log is not None:
                 # Debug log output
-                config_id = debug_log.config_id(task.args['config'])
                 msg = "config_id {} promoted from {} (next milestone = {})".format(
-                    config_id, kwargs['resume_from'], next_milestone)
+                    config_id, resume_from, next_milestone)
                 logger.info(msg)
         # Register pending evaluation(s) with searcher
-        self.searcher.register_pending(
-            task.args['config'], milestone=next_milestone)
-        if self.maxt_pending and next_milestone != self.max_t:
-            # Also introduce pending evaluation for resource max_t
-            self.searcher.register_pending(
-                task.args['config'], milestone=self.max_t)
-
-        # main process
+        self.searcher.register_pending(config, milestone=next_milestone)
+        # Relay config_id to train_fn (for debug logging)
         if debug_log is not None:
-            logger.info("Starting job on node = {}".format(
-                task.resources.node.remote_id))
-            # Relay config_id to train_fn (for debug logging)
-            config_id = debug_log.config_id(task.args['config'])
             task.args['args']['config_id'] = config_id
-        job = cls.jobs.start_distributed_job(task, cls.managers)
-        # reporter thread
-        rp = threading.Thread(
-            target=self._run_reporter,
-            args=(task, job, reporter),
-            daemon=False)
-        rp.start()
-        task_dict = self._dict_from_task(task)
-        task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
-        # Checkpoint thread
-        if self._checkpoint is not None:
-            self._add_checkpointing_to_job(job)
-        with self.managers.lock:
-            self.scheduled_tasks.append(task_dict)
 
-    def _update_searcher(self, task, result):
+    def _class_for_add_job(self):
+        return HyperbandScheduler
+
+    def _update_searcher_internal(self, task, result):
         config = task.args['config']
         if self.searcher_data == 'rungs_and_last':
+            # Remove last recently added result for this task. This is not
+            # done if it fell on a rung level (i.e., `keep_case` is True)
             with self._hyperband_lock:
-                task_info = self._running_tasks[str(task.task_id)]
-                if task_info['reported_result'] is not None:
-                    # Remove last recently added result for this task. This is
-                    # not done if it fell on a rung level
-                    if not task_info['keep_case']:
-                        rem_result = task_info['reported_result']
-                        self.searcher.remove_case(config, **rem_result)
+                task_record = self._running_tasks[str(task.task_id)]
+                if (task_record['reported_result'] is not None) and \
+                        (not task_record['keep_case']):
+                    rem_result = task_record['reported_result']
+                    self.searcher.remove_case(config, **rem_result)
         self.searcher.update(config, **result)
 
-    def _run_reporter(self, task, task_job, reporter):
-        last_result = None
-        last_updated = None
-        task_key = str(task.task_id)
-        while not task_job.done():
-            reported_result = reporter.fetch()
-            if 'traceback' in reported_result:
-                # Evaluation has failed
-                logger.exception(reported_result['traceback'])
-                self.searcher.evaluation_failed(
-                    config=task.args['config'], **reported_result)
-                reporter.move_on()
-                with self._hyperband_lock:
-                    self.terminator.on_task_remove(task)
-                break
-            if reported_result.get('done', False):
-                reporter.move_on()
-                with self._hyperband_lock:
-                    if last_result is not None:
-                        self.terminator.on_task_complete(task, last_result)
-                    # Cleanup
-                    del self._running_tasks[task_key]
-                break
-            if len(reported_result) == 0:
-                # An empty dict should just be skipped
-                if self.searcher.debug_log is not None:
-                    logger.info("Skipping empty dict received from reporter")
-                continue
-            # Time since start of experiment
-            elapsed_time = self._elapsed_time()
+    def _update_searcher(self, task, result, task_info):
+        """
+        Updates searcher with `result` (depending on `searcher_data`), and
+        registers pending configs with searcher.
 
-            # Call before _add_training_results, since we may be able to report
-            # extra information from the bracket:
-            with self._hyperband_lock:
-                task_info = self.terminator.on_task_report(
-                    task, reported_result)
-            task_continues = task_info['task_continues']
-            milestone_reached = task_info['milestone_reached']
-            # Append extra information to reported_result
-            reported_result['bracket'] = task_info['bracket_id']
-            if self.training_history_searcher_info:
-                dataset_size = self.searcher.dataset_size()
-                if dataset_size > 0:
-                    reported_result['searcher_data_size'] = dataset_size
-                for k, v in self.searcher.model_parameters().items():
-                    reported_result['searcher_params_' + k] = v
-            self._add_training_result(
-                task.task_id, reported_result, config=task.args['config'])
+        :param task:
+        :param result: Record obtained from reporter
+        :param task_info: Info from self.terminator.on_task_report
+        :return: Has searcher been updated?
 
-            if self.searcher_data == 'rungs':
-                # Only results on rung levels are reported to the searcher
-                if task_continues and milestone_reached:
-                    # Update searcher with intermediate result
-                    # Note: If task_continues is False here, we also call
-                    # searcher.update, but outside the loop.
-                    self._update_searcher(task, reported_result)
-                    last_updated = reported_result
+        """
+        task_continues = task_info['task_continues']
+        milestone_reached = task_info['milestone_reached']
+        did_update = False
+        if self.searcher_data == 'rungs':
+            if milestone_reached:
+                # Update searcher with intermediate result
+                self._update_searcher_internal(task, result)
+                did_update = True
+                if task_continues:
                     next_milestone = task_info.get('next_milestone')
                     if next_milestone is not None:
                         self.searcher.register_pending(
                             task.args['config'], milestone=next_milestone)
-            elif not task_info.get('ignore_data', False):
-                # All results are reported to the searcher,
-                # except task_info['ignore_data'] is True. The latter happens
-                # only for tasks running promoted configs. In this case, we may
-                # receive reports before the first milestone is reached, which
-                # should not be passed to the searcher (they'd duplicate earlier
-                # datapoints).
-                # See also header comment of PromotionRungSystem.
-                self._update_searcher(task, reported_result)
-                last_updated = reported_result
-                # Since all results are reported, the next report for this task
-                # will be for resource + 1.
-                # NOTE: This assumes that results are reported for all successive
-                # resource levels (int). If any resource level is skipped,
-                # there may be left-over pending candidates, which will be
-                # removed once the task finishes.
-                if task_continues:
-                    self.searcher.register_pending(
-                        task.args['config'],
-                        milestone=int(reported_result[self._time_attr]) + 1)
+        elif not task_info.get('ignore_data', False):
+            # All results are reported to the searcher, except if
+            # task_info['ignore_data'] is True. The latter happens only for
+            # tasks running promoted configs. In this case, we may receive
+            # reports before the first milestone is reached, which should not
+            # be passed to the searcher (they'd duplicate earlier
+            # datapoints).
+            # See also header comment of PromotionRungSystem.
+            self._update_searcher_internal(task, result)
+            did_update = True
+            # Since all results are reported, the next report for this task
+            # will be for resource + 1.
+            # NOTE: This assumes that results are reported for all successive
+            # resource levels (int). If any resource level is skipped,
+            # there may be left-over pending candidates, which will be
+            # removed once the task finishes.
+            if task_continues:
+                self.searcher.register_pending(
+                    task.args['config'],
+                    milestone=int(result[self._time_attr]) + 1)
+        return did_update
 
+    def on_task_report(self, task, result):
+        """
+        Called by reporter thread once a new result is reported.
+
+        :param task:
+        :param result:
+        :return: Should reporter move on? Otherwise, it terminates
+
+        """
+        task_key = str(task.task_id)
+        debug_log = self.searcher.debug_log
+        config = task.args['config']
+        config_id = debug_log.config_id(config) if debug_log else None
+        task_continues = None
+        if 'traceback' in result:
+            # Evaluation has failed
+            logger.critical(result['traceback'])
+            self.searcher.evaluation_failed(config, **result)
+            if debug_log is not None:
+                msg = "config_id {}: Evaluation failed:\n{}".format(
+                    config_id, result['traceback'])
+                logger.info(msg)
+            task_continues = False
+        elif result.get('done', False):
+            task_continues = False
+        # Time since start of experiment
+        elapsed_time = self._elapsed_time()
+        # If we are past self.time_out, we want to stop the job
+        if self._stop_jobs_after_time_out and elapsed_time > self.time_out:
+            if debug_log is not None:
+                msg = "config_id {}: Terminating because elapsed_time = {} > {} = self.time_out".format(
+                    config_id, elapsed_time, self.time_out)
+                logger.info(msg)
+            task_continues = False
+        elif len(result) == 0:
+            # An empty dict should just be skipped
+            if debug_log is not None:
+                msg = "config_id {}: Skipping empty dict received from reporter".format(
+                    config_id)
+                logger.info(msg)
+            task_continues = True
+
+        if task_continues is None:
+            # Call before _add_training_results, since we may be able to report
+            # extra information from the bracket:
+            with self._hyperband_lock:
+                task_info = self.terminator.on_task_report(task, result)
+            task_continues = task_info['task_continues']
+            milestone_reached = task_info['milestone_reached']
+            # Append extra information to result
+            result['bracket'] = task_info['bracket_id']
+            if not task_continues:
+                result['terminated'] = True
+            self._append_extra_searcher_info(result)
+            # Pass result to training_history
+            self._add_training_result(task.task_id, result, config=config)
+            # Update searcher and register pending
+            self._update_searcher(task, result, task_info)
             # Change snapshot entry for task
             # Note: This must not be done above, because what _update_searcher
             # is doing, depends on the entry *before* its update here.
             with self._hyperband_lock:
-                # Note: reported_result may contain all sorts of extra info.
+                # Note: result may contain all sorts of extra info.
                 # All we need to maintain in the snapshot are reward and
-                # resource level
-                # 'keep_case' entry (only used if searcher_data == 'rungs_and_last'):
-                # The result is kept in the dataset iff milestone_reached == True (i.e.,
-                # we are at a rung level). Otherwise, it is removed once
-                # _update_searcher is called for the next recent result.
+                # resource level.
+                # 'keep_case' entry (only used if searcher_data ==
+                # 'rungs_and_last'): The result is kept in the dataset iff
+                # milestone_reached == True (i.e., we are at a rung level).
+                # Otherwise, it is removed once _update_searcher is called for
+                # the next recent result.
                 self._running_tasks[task_key].update({
                     'time_stamp': elapsed_time,
                     'reported_result': {
-                        self._reward_attr: reported_result[self._reward_attr],
-                        self._time_attr: reported_result[self._time_attr]},
+                        self._reward_attr: result[self._reward_attr],
+                        self._time_attr: result[self._time_attr]},
                     'keep_case': milestone_reached})
 
-            last_result = reported_result
-            if task_continues:
-                debug_log = self.searcher.debug_log
-                if milestone_reached and debug_log is not None:
-                    # Debug log output
-                    config_id = debug_log.config_id(task.args['config'])
-                    milestone = int(reported_result[self._time_attr])
-                    next_milestone = task_info['next_milestone']
-                    msg = "config_id {}: Reaches {}, continues".format(
-                        config_id, milestone)
-                    if next_milestone is not None:
-                        msg += " to {}".format(next_milestone)
-                    logger.info(msg)
-                reporter.move_on()
-            else:
-                # Note: The 'terminated' signal is sent even in the promotion
-                # variant. It means that the *task* terminates, while the
-                # evaluation of the config is just paused
-                last_result['terminated'] = True
-                debug_log = self.searcher.debug_log
-                if debug_log is not None:
-                    # Debug log output
-                    config_id = debug_log.config_id(task.args['config'])
-                    resource = int(reported_result[self._time_attr])
+            if debug_log is not None:
+                resource = int(result[self._time_attr])
+                if not task_continues:
                     if self.scheduler_type == 'stopping' or resource >= self.max_t:
                         act_str = 'Terminating'
                     else:
@@ -637,52 +602,30 @@ class HyperbandScheduler(FIFOScheduler):
                     msg = "config_id {}: {} evaluation at {}".format(
                         config_id, act_str, resource)
                     logger.info(msg)
-                with self._hyperband_lock:
-                    self.terminator.on_task_remove(task)
-                    # Cleanup
+                elif milestone_reached:
+                    msg = "config_id {}: Reaches {}, continues".format(
+                        config_id, resource)
+                    next_milestone = task_info.get('next_milestone')
+                    if next_milestone is not None:
+                        msg += " to {}".format(next_milestone)
+                    logger.info(msg)
+
+        if not task_continues:
+            with self._hyperband_lock:
+                self.terminator.on_task_remove(task)
+                # Cleanup
+                if task_key in self._running_tasks:
                     del self._running_tasks[task_key]
+        return task_continues
+
+    def _run_reporter(self, task, task_job, reporter):
+        while not task_job.done():
+            reported_result = reporter.fetch()
+            if self.on_task_report(task, reported_result):
+                reporter.move_on()
+            else:
                 reporter.terminate()
                 break
-
-        # Pass all of last_result to searcher (unless this has already been
-        # done)
-        if last_result is not last_updated:
-            self._update_searcher(task, last_result)
-
-    def state_dict(self, destination=None, no_fifo_lock=False):
-        """Returns a dictionary containing a whole state of the scheduler
-
-        Examples
-        --------
-        >>> import autogluon.core as ag
-        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
-        """
-        destination = super().state_dict(
-            destination, no_fifo_lock=no_fifo_lock)
-        # Note: _running_tasks is not part of the state to be checkpointed.
-        # The assumption is that if an experiment is resumed from a
-        # checkpoint, tasks which did not finish at the checkpoint, are not
-        # restarted
-        with self._hyperband_lock:
-            destination['terminator'] = pickle.dumps(self.terminator)
-        return destination
-
-    def load_state_dict(self, state_dict):
-        """Load from the saved state dict.
-
-        Examples
-        --------
-        >>> import autogluon.core as ag
-        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
-        """
-        with self._hyperband_lock:
-            assert len(self._running_tasks) == 0, \
-                "load_state_dict must only be called as part of scheduler construction"
-            super().load_state_dict(state_dict)
-            # Note: _running_tasks is empty from __init__, it is not recreated,
-            # since running tasks are not part of the checkpoint
-            self.terminator = pickle.loads(state_dict['terminator'])
-            logger.info('Loading Terminator State {}'.format(self.terminator))
 
     def _snapshot_tasks(self, bracket_id):
         # If all brackets share a single rung level system, then all
@@ -737,6 +680,41 @@ class HyperbandScheduler(FIFOScheduler):
                     extra_kwargs['milestone'])
                 logger.info(msg)
             return config, extra_kwargs
+
+    def state_dict(self, destination=None, no_fifo_lock=False):
+        """Returns a dictionary containing a whole state of the scheduler
+
+        Examples
+        --------
+        >>> import autogluon.core as ag
+        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        """
+        destination = super().state_dict(
+            destination, no_fifo_lock=no_fifo_lock)
+        # Note: _running_tasks is not part of the state to be checkpointed.
+        # The assumption is that if an experiment is resumed from a
+        # checkpoint, tasks which did not finish at the checkpoint, are not
+        # restarted
+        with self._hyperband_lock:
+            destination['terminator'] = pickle.dumps(self.terminator)
+        return destination
+
+    def load_state_dict(self, state_dict):
+        """Load from the saved state dict.
+
+        Examples
+        --------
+        >>> import autogluon.core as ag
+        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        """
+        with self._hyperband_lock:
+            assert len(self._running_tasks) == 0, \
+                "load_state_dict must only be called as part of scheduler construction"
+            super().load_state_dict(state_dict)
+            # Note: _running_tasks is empty from __init__, it is not recreated,
+            # since running tasks are not part of the checkpoint
+            self.terminator = pickle.loads(state_dict['terminator'])
+            logger.info('Loading Terminator State {}'.format(self.terminator))
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
@@ -900,10 +878,9 @@ class HyperbandBracketManager(object):
         needed for making decisions (e.g., stop / continue task, update
         model, etc)
         - task_continues: Should task continue or stop/pause?
-        - update_searcher: True if rung level (or max_t) is hit, at which point
-          the searcher should be updated
+        - milestone_reached: True if rung level (or max_t) is hit
         - next_milestone: If hit rung level < max_t, this is the subsequent
-          rung level (otherwise: None). Used for pending candidates
+          rung level (otherwise: None)
         - bracket_id: Bracket in which the task is running
 
         :param task: Only task.task_id is used
@@ -929,13 +906,6 @@ class HyperbandBracketManager(object):
                     and (ret_dict['next_milestone'] is None):
                 ret_dict['next_milestone'] = self._max_t
         return ret_dict
-
-    def on_task_complete(self, task, result):
-        rung_sys, _, skip_rungs = self._get_rung_system(task.task_id)
-        rung_sys.on_task_report(
-            task, result[self._time_attr], result[self._reward_attr],
-            skip_rungs=skip_rungs)
-        self.on_task_remove(task)
 
     def on_task_remove(self, task):
         task_id = task.task_id

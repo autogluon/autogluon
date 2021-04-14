@@ -11,45 +11,32 @@ from autogluon.core.searcher.bayesopt.datatypes.tuning_job_state import \
 from autogluon.core.searcher.bayesopt.gpautograd.constants import \
     DEFAULT_MCMC_CONFIG, DEFAULT_OPTIMIZATION_CONFIG
 from autogluon.core.searcher.bayesopt.models.meanstd_acqfunc_impl import \
-    EIAcquisitionFunction
+    EIpuAcquisitionFunction
 from autogluon.core.searcher.bayesopt.models.gp_model import \
     GaussProcSurrogateModel
 from autogluon.core.searcher.bayesopt.tuning_algorithms.bo_algorithm_components import \
     LBFGSOptimizeAcquisition
 from autogluon.core.searcher.bayesopt.tuning_algorithms.base_classes import \
-    dictionarize_objective, DEFAULT_METRIC
+    dictionarize_objective, DEFAULT_METRIC, DEFAULT_COST_METRIC
 from autogluon.core.searcher.bayesopt.utils.test_objects import \
     default_gpmodel, default_gpmodel_mcmc
 
 
-# This setup makes little sense for good testing.
-#
-# When default model for no MCMC is plotted:
-# - Plot on [0, 1]^2:
-#   - Mean essentially constant at 10, stddev essentially constant at 2.5
-#   - EI essentially constant at -0.12717145
-# - Plot on [0, 0.1]^2:
-#   - Mean = 10, except dropping in corner, stddev = 2.5
-#   - EI essentially constant, dropping in corner
-# - Plot on [0, 0.01]^2:
-#   - Mean growing 0 -> 8, sttdev = 2.5, but drops to 0 in corner
-#   - EI from -0.66 to -0.12, -> 0 only very close to origin
-# - Plot on [0, 0.001]^2:
-#   - Mean growing 0 -> 1.5, stddev growing 0 -> 1.8
-#   - EI about -0.6, but -> 0 close to origin
-# EI is minimized (value -0.66817) very close to origin (order 0.001). Grows to
-# 0 at origin, increases to constant -0.12717145 very rapidly away from origin.
-#
-# In fact, if EI is optimized starting at a point outside [0, 0.1]^2, the optimizer
-# returns with the starting point, and test_optimization_improves fails.
-def default_models(do_mcmc=True) -> List[GaussProcSurrogateModel]:
+def default_models(metric, do_mcmc=True) -> List[GaussProcSurrogateModel]:
     X = [
         (0.0, 0.0),
         (1.0, 0.0),
         (0.0, 1.0),
         (1.0, 1.0),
     ]
-    Y = [dictionarize_objective(np.sum(x) * 10.0) for x in X]
+    if metric == DEFAULT_METRIC:
+        Y = [dictionarize_objective(np.sum(x) * 10.0) for x in X]
+    elif metric == DEFAULT_COST_METRIC:
+        # Increasing the first hp increases cost
+        Y = [{metric: 1.0 + x[0] * 2.0}
+             for x in X]
+    else:
+        raise ValueError(f"{metric} is not a valid metric")
 
     state = TuningJobState(
         HyperparameterRanges_Impl(
@@ -67,7 +54,7 @@ def default_models(do_mcmc=True) -> List[GaussProcSurrogateModel]:
         state, random_seed=random_seed,
         optimization_config=DEFAULT_OPTIMIZATION_CONFIG)
     result = [GaussProcSurrogateModel(
-        state, DEFAULT_METRIC, random_seed, gpmodel, fit_parameters=True,
+        state, metric, random_seed, gpmodel, fit_parameters=True,
         num_fantasy_samples=20)]
     if do_mcmc:
         gpmodel_mcmc = default_gpmodel_mcmc(
@@ -75,22 +62,22 @@ def default_models(do_mcmc=True) -> List[GaussProcSurrogateModel]:
             mcmc_config=DEFAULT_MCMC_CONFIG)
         result.append(
             GaussProcSurrogateModel(
-                state, DEFAULT_METRIC, random_seed, gpmodel_mcmc,
+                state, metric, random_seed, gpmodel_mcmc,
                 fit_parameters=True,num_fantasy_samples=20))
     return result
 
 
-def plot_ei_mean_std(model, ei, max_grid=1.0):
+def plot_ei_mean_std(model, eipu, max_grid=1.0):
     import matplotlib.pyplot as plt
 
     grid = np.linspace(0, max_grid, 400)
     Xgrid, Ygrid = np.meshgrid(grid, grid)
     inputs = np.hstack([Xgrid.reshape(-1, 1), Ygrid.reshape(-1, 1)])
-    Z_ei = ei.compute_acq(inputs)[0]
+    Z_ei = eipu.compute_acq(inputs)[0]
     predictions = model.predict(inputs)[0]
     Z_means = predictions['mean']
     Z_std = predictions['std']
-    titles = ['EI', 'mean', 'std']
+    titles = ['EIpu', 'mean', 'std']
     for i, (Z, title) in enumerate(zip([Z_ei, Z_means, Z_std], titles)):
         plt.subplot(1, 3, i + 1)
         plt.imshow(
@@ -108,8 +95,11 @@ def test_sanity_check():
     # - test that values that are further from evaluated candidates have higher expected improvement
     #   given similar mean
     # - test that points closer to better points have higher expected improvement
-    for model in default_models(do_mcmc=False):
-        ei = EIAcquisitionFunction(model)
+    active_models = default_models(DEFAULT_METRIC, do_mcmc=False)
+    cost_models = default_models(DEFAULT_COST_METRIC, do_mcmc=False)
+    for active_model, cost_model in zip(active_models, cost_models):
+        models = {DEFAULT_METRIC: active_model, DEFAULT_COST_METRIC: cost_model}
+        eipu = EIpuAcquisitionFunction(models, active_metric=DEFAULT_METRIC)
         X = np.array([
             (0.0, 0.0),  # 0
             (1.0, 0.0),  # 1
@@ -122,18 +112,17 @@ def test_sanity_check():
             (0.1, 0.1),  # 8
             (0.9, 0.9),  # 9
         ])
-        _acq = ei.compute_acq(X).flatten()
-        #print('Negative EI values:')
-        #print(_acq)
-        acq = list(_acq)
-
+        acq = list(eipu.compute_acq(X).flatten())
         assert all(a <= 0 for a in acq), acq
 
-        # lower evaluations should correspond to better acquisition
+        # lower evaluations with lower cost should correspond to better acquisition
         # second inequality is less equal because last two values are likely zero
         assert acq[0] < acq[1] <= acq[3], acq
-        # Note: The improvement here is tiny, just 0.01%:
         assert acq[8] < acq[9], acq
+
+        # evaluations with same EI but lower cost give a better EIpu
+        assert acq[5] < acq[4]
+        assert acq[7] < acq[6]
 
         # further from an evaluated point should correspond to better acquisition
         assert acq[6] < acq[4] < acq[1], acq
@@ -141,24 +130,27 @@ def test_sanity_check():
 
 
 def test_best_value():
-    # test that the best value affects expected improvement
-    for model in default_models():
-        ei = EIAcquisitionFunction(model)
+    # test that the best value affects the cost-aware expected improvement
+    active_models = default_models(DEFAULT_METRIC)
+    cost_models = default_models(DEFAULT_COST_METRIC)
+    for active_model, cost_model in zip(active_models, cost_models):
+        models = {DEFAULT_METRIC: active_model, DEFAULT_COST_METRIC: cost_model}
+        eipu = EIpuAcquisitionFunction(models, active_metric=DEFAULT_METRIC)
 
         random = np.random.RandomState(42)
         test_X = random.uniform(low=0.0, high=1.0, size=(10, 2))
 
-        acq_best0 = list(ei.compute_acq(test_X).flatten())
+        acq_best0 = list(eipu.compute_acq(test_X).flatten())
         zero_row = np.zeros((1, 2))
-        acq0_best0 = ei.compute_acq(zero_row)
+        acq0_best0 = eipu.compute_acq(zero_row)
 
         # override current best
         def new_current_best():
-            return np.array([10])
-        model.current_best = new_current_best
+            return np.array([30])
+        models[DEFAULT_METRIC].current_best = new_current_best
 
-        acq_best2 = list(ei.compute_acq(test_X).flatten())
-        acq0_best2 = ei.compute_acq(zero_row)
+        acq_best2 = list(eipu.compute_acq(test_X).flatten())
+        acq0_best2 = eipu.compute_acq(zero_row)
 
         # if the best is only 2 the acquisition function should be better (lower value)
         assert all(a2 < a0 for a2, a0 in zip(acq_best2, acq_best0))
@@ -167,39 +159,34 @@ def test_best_value():
         assert acq0_best2 < acq0_best0 - 1.0
 
 
-# The original version of this test is failing. See comments above.
-# In fact, if EI is optimized from a starting point outside [0, 0.1]^2,
-# the gradient is tiny there, so the optimizer returns with the starting
-# point, and no improvement is made.
-#
-# If the starting point is sampled in [0, 0.1]^2, the test works. The optimum
-# of EI is very close to the origin.
 def test_optimization_improves():
     debug_output = False
     # Pick a random point, optimize and the expected improvement should be better:
     # But only if the starting point is not too far from the origin
     random = np.random.RandomState(42)
-    for model in default_models():
-        ei = EIAcquisitionFunction(model)
+    active_models = default_models(DEFAULT_METRIC)
+    cost_models = default_models(DEFAULT_COST_METRIC)
+    for active_model, cost_model in zip(active_models, cost_models):
+        models = {DEFAULT_METRIC: active_model, DEFAULT_COST_METRIC: cost_model}
+        eipu = EIpuAcquisitionFunction(models, active_metric=DEFAULT_METRIC)
         opt = LBFGSOptimizeAcquisition(
-            model.state, model, EIAcquisitionFunction)
+            models[DEFAULT_METRIC].state, models, EIpuAcquisitionFunction, DEFAULT_METRIC)
         if debug_output:
-            print('\n\nGP MCMC' if model.does_mcmc() else 'GP Opt')
-            fzero = ei.compute_acq(np.zeros((1, 2)))[0]
+            print('\n\nGP MCMC' if models.does_mcmc() else 'GP Opt')
+            fzero = eipu.compute_acq(np.zeros((1, 2)))[0]
             print('f(0) = {}'.format(fzero))
-        if debug_output and not model.does_mcmc():
-            print('Hyperpars: {}'.format(model.get_params()))
+        if debug_output and not models.does_mcmc():
+            print('Hyperpars: {}'.format(models.get_params()))
             # Plot the thing!
-            plot_ei_mean_std(model, ei, max_grid=0.001)
-            plot_ei_mean_std(model, ei, max_grid=0.01)
-            plot_ei_mean_std(model, ei, max_grid=0.1)
-            plot_ei_mean_std(model, ei, max_grid=1.0)
+            plot_ei_mean_std(models, eipu, max_grid=0.001)
+            plot_ei_mean_std(models, eipu, max_grid=0.01)
+            plot_ei_mean_std(models, eipu, max_grid=0.1)
+            plot_ei_mean_std(models, eipu, max_grid=1.0)
 
         non_zero_acq_at_least_once = False
         for iter in range(10):
-            #initial_point = random.uniform(low=0.0, high=1.0, size=(2,))
             initial_point = random.uniform(low=0.0, high=0.1, size=(2,))
-            acq0, df0 = ei.compute_acq_with_gradient(initial_point)
+            acq0, df0 = eipu.compute_acq_with_gradient(initial_point)
             if debug_output:
                 print('\nInitial point: f(x0) = {}, x0 = {}'.format(
                     acq0, initial_point))
@@ -207,7 +194,7 @@ def test_optimization_improves():
             if acq0 != 0:
                 non_zero_acq_at_least_once = True
                 optimized = np.array(opt.optimize(tuple(initial_point)))
-                acq_opt = ei.compute_acq(optimized)[0]
+                acq_opt = eipu.compute_acq(optimized)[0]
                 if debug_output:
                     print('Final point: f(x1) = {}, x1 = {}'.format(
                         acq_opt, optimized))
@@ -216,20 +203,22 @@ def test_optimization_improves():
 
         assert non_zero_acq_at_least_once
 
-# Changes from original version: Half of the time, we sample x in [0, 0.02]^2, where
-# the shape of EI is more interesting
+
 def test_numerical_gradient():
     debug_output = False
     random = np.random.RandomState(42)
     eps = 1e-6
 
-    for model in default_models():
-        ei = EIAcquisitionFunction(model)
+    active_models = default_models(DEFAULT_METRIC)
+    cost_models = default_models(DEFAULT_COST_METRIC)
+    for active_model, cost_model in zip(active_models, cost_models):
+        models = {DEFAULT_METRIC: active_model, DEFAULT_COST_METRIC: cost_model}
+        eipu = EIpuAcquisitionFunction(models, active_metric=DEFAULT_METRIC)
 
         for iter in range(10):
             high = 1.0 if iter < 5 else 0.02
             x = random.uniform(low=0.0, high=high, size=(2,))
-            f0, analytical_gradient = ei.compute_acq_with_gradient(x)
+            f0, analytical_gradient = eipu.compute_acq_with_gradient(x)
             analytical_gradient = analytical_gradient.flatten()
             if debug_output:
                 print('x0 = {}, f(x_0) = {}, grad(x_0) = {}'.format(
@@ -238,8 +227,8 @@ def test_numerical_gradient():
             for i in range(2):
                 h = np.zeros_like(x)
                 h[i] = eps
-                fpeps = ei.compute_acq(x+h)[0]
-                fmeps = ei.compute_acq(x-h)[0]
+                fpeps = eipu.compute_acq(x+h)[0]
+                fmeps = eipu.compute_acq(x-h)[0]
                 numerical_derivative = (fpeps - fmeps) / (2 * eps)
                 if debug_output:
                     print('f(x0+eps) = {}, f(x0-eps) = {}, findiff = {}, deriv = {}'.format(
@@ -252,15 +241,18 @@ def test_numerical_gradient():
 
 def test_value_same_as_with_gradient():
     # test that compute_acq and compute_acq_with_gradients return the same acquisition values
-    for model in default_models():
-        ei = EIAcquisitionFunction(model)
+    active_models = default_models(DEFAULT_METRIC)
+    cost_models = default_models(DEFAULT_COST_METRIC)
+    for active_model, cost_model in zip(active_models, cost_models):
+        models = {DEFAULT_METRIC: active_model, DEFAULT_COST_METRIC: cost_model}
+        eipu = EIpuAcquisitionFunction(models, active_metric=DEFAULT_METRIC)
 
         random = np.random.RandomState(42)
         X = random.uniform(low=0.0, high=1.0, size=(10, 2))
 
         # assert same as computation with gradients
-        vec1 = ei.compute_acq(X).flatten()
-        vec2 = np.array([ei.compute_acq_with_gradient(x)[0] for x in X])
+        vec1 = eipu.compute_acq(X).flatten()
+        vec2 = np.array([eipu.compute_acq_with_gradient(x)[0] for x in X])
         np.testing.assert_almost_equal(vec1, vec2)
 
 

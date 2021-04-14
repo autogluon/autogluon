@@ -24,7 +24,7 @@ AutoGluon Predictors
 
    Evaluate predictions on test data:
 
-   >>> test_acc = predictor.evaluate(test_data)
+   >>> leaderboard = predictor.leaderboard(test_data)
 
 
 

@@ -1,6 +1,4 @@
-
 from autogluon.core.constants import REGRESSION, QUANTILE
-
 from ..rf.rf_model import RFModel
 
 

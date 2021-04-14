@@ -23,7 +23,7 @@ requirements = [
     'pandas',
     'scikit-learn',
 
-    'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
+    'psutil>=5.7.3,<5.9',  # TODO: Consider capping to <6.0 instead, capping to 5.9 to avoid possible issues.
     'networkx>=2.3,<3.0',
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
@@ -38,7 +38,7 @@ extras_require = {
         'lightgbm>=3.0,<4.0',
     ],
     'catboost': [
-        'catboost>=0.23.0,<0.25',
+        'catboost>=0.24.0,<0.26',
     ],
     'xgboost': [
         'xgboost>=1.3.2,<1.4',

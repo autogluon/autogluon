@@ -156,17 +156,8 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
                                                     params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
 
-    def _fit(self,
-             X,
-             y,
-             X_val=None,
-             y_val=None,
-             time_limit=None,
-             sample_weight=None,
-             num_cpus=1,
-             num_gpus=0,
-             reporter=None,
-             **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None,
+             time_limit=None, sample_weight=None, num_cpus=1, num_gpus=0, reporter=None, **kwargs):
         """ X (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_val (pd.DataFrame): test data features (should have same column names as Xtrain)
             y (pd.Series):

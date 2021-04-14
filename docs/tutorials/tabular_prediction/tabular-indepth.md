@@ -81,7 +81,7 @@ We again demonstrate how to use the trained models to predict on the test data.
 ```{.python .input}
 y_pred = predictor.predict(test_data_nolabel)
 print("Predictions:  ", list(y_pred)[:5])
-perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=False)
+perf = predictor.evaluate(test_data, auxiliary_metrics=False)
 ```
 
 Use the following to view a summary of what happened during fit. Now this command will show details of the hyperparameter-tuning process for each type of model:
@@ -165,6 +165,24 @@ predictor.leaderboard(extra_info=True, silent=True)
 
 The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`), and how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [leaderboard documentation](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.leaderboard) for full details.
 
+To show scores for other metrics, you can specify the `extra_metrics` argument when passing in `test_data`:
+
+```{.python .input}
+predictor.leaderboard(test_data, extra_metrics=['accuracy', 'balanced_accuracy', 'log_loss'], silent=True)
+```
+
+Notice that `log_loss` scores are negative.
+This is because metrics in AutoGluon are always shown in `higher_is_better` form.
+This means that metrics such as `log_loss` and `root_mean_squared_error` will have their signs FLIPPED, and values will be negative.
+This is necessary to avoid the user needing to know the metric to understand if higher is better when looking at leaderboard.
+
+One additional caviat: It is possible that `log_loss` values can be `-inf` when computed via `extra_metrics`.
+This is because the models were not optimized with `log_loss` in mind during training and
+may have prediction probabilities giving a class `0` (particularly common with K-Nearest-Neighbors models).
+Because `log_loss` gives infinite error when the correct class was given `0` probability, this results in a score of `-inf`.
+It is therefore recommended that `log_loss` should not be used as a secondary metric to determine model quality.
+Either use `log_loss` as the `eval_metric` or avoid it altogether.
+
 Here's how to specify a particular model to use for prediction instead of AutoGluon's default model-choice:
 
 ```{.python .input}
@@ -188,19 +206,15 @@ predictor_information = predictor.info()
 The `predictor` also remembers what metric predictions should be evaluated with, which can be done with ground truth labels as follows:
 
 ```{.python .input}
-y_pred = predictor.predict(test_data_nolabel)
-perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
+y_pred_proba = predictor.predict_proba(test_data_nolabel)
+perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred_proba)
 ```
 
-However, you must be careful here as certain metrics require predicted probabilities rather than classes.
 Since the label columns remains in the `test_data` DataFrame, we can instead use the shorthand:
 
 ```{.python .input}
 perf = predictor.evaluate(test_data)
 ```
-
-which will correctly select between `predict()` or `predict_proba()` depending on the evaluation metric.
-
 
 ## Interpretability (feature importance)
 

@@ -10,24 +10,25 @@ from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, St
 from .presets_custom import get_preset_custom
 from ..utils import process_hyperparameters
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
-    TabularNeuralNetModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel
+    TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
 
 # Higher values indicate higher priority, priority dictates the order models are trained for a given level.
 DEFAULT_MODEL_PRIORITY = dict(
-    RF=100,
-    XT=90,
-    KNN=80,
-    GBM=70,
-    CAT=60,
-    XGB=55,
-    NN=50,
-    FASTAI=45,
-    LR=40,
+    KNN=100,
+    GBM=90,
+    RF=80,
+    CAT=70,
+    XT=60,
+    FASTAI=50,
+    XGB=40,
+    LR=30,
+    NN=20,
     FASTTEXT=0,
     AG_TEXT_NN=0,
+    AG_IMAGE_NN=0,
     TRANSF=0,
     custom=0,
 )
@@ -35,9 +36,7 @@ DEFAULT_MODEL_PRIORITY = dict(
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
 PROBLEM_TYPE_MODEL_PRIORITY = {
     MULTICLASS: dict(
-        NN=120,
-        FASTAI=115,
-        KNN=110,
+        FASTAI=95,
     ),
 }
 
@@ -51,7 +50,7 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
-DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'ENS_WEIGHTED'] # TODO: OTHERS will be added
+DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'FASTAI', 'QNN', 'ENS_WEIGHTED'] # TODO: OTHERS will be added
 
 MODEL_TYPES = dict(
     RF=RFModel,
@@ -61,10 +60,12 @@ MODEL_TYPES = dict(
     CAT=CatBoostModel,
     XGB=XGBoostModel,
     NN=TabularNeuralNetModel,
+    QNN=TabularNeuralQuantileModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
     AG_TEXT_NN=TextPredictorModel,
+    AG_IMAGE_NN=ImagePredictorModel,
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
 )
@@ -77,10 +78,12 @@ DEFAULT_MODEL_NAMES = {
     CatBoostModel: 'CatBoost',
     XGBoostModel: 'XGBoost',
     TabularNeuralNetModel: 'NeuralNetMXNet',
+    TabularNeuralQuantileModel: 'QuantileNeuralNet',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
-    TextPredictorModel: 'TextNeuralNetwork',
+    TextPredictorModel: 'TextPredictor',
+    ImagePredictorModel: 'ImagePredictor',
     FastTextModel: 'FastText',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
 }
@@ -146,10 +149,14 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
         hyperparameters = {'default': hyperparameters}
     hp_level = hyperparameters[level_key]
     model_cfg_priority_dict = defaultdict(list)
-    for model_type in hp_level:
+    model_type_list = list(hp_level.keys())
+    for model_type in model_type_list:
         if problem_type == QUANTILE and model_type not in DEFAULT_QUANTILE_MODEL:
-            logger.warning(f"Model type '{model_type}' does not support `problem_type='{QUANTILE}'` yet. This model will be ignored.")
-            continue
+            if model_type == 'NN':
+                model_type = 'QNN'
+                hp_level['QNN'] = hp_level.pop('NN')
+            else:
+                continue
         models_of_type = hp_level[model_type]
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]

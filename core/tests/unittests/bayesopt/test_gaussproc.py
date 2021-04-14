@@ -13,9 +13,9 @@ from autogluon.core.searcher.bayesopt.gpautograd.constants import \
     DEFAULT_MCMC_CONFIG, DEFAULT_OPTIMIZATION_CONFIG
 from autogluon.core.searcher.bayesopt.models.gp_model import \
     GaussProcSurrogateModel
-from autogluon.core.searcher.bayesopt.models.meanstd_acqfunc import \
+from autogluon.core.searcher.bayesopt.models.meanstd_acqfunc_impl import \
     EIAcquisitionFunction
-from autogluon.core.searcher.bayesopt.tuning_algorithms.defaults import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.base_classes import \
     DEFAULT_METRIC, dictionarize_objective
 from autogluon.core.searcher.bayesopt.utils.test_objects import default_gpmodel, \
     default_gpmodel_mcmc
