@@ -951,7 +951,7 @@ class AbstractModel:
         else:
             return self._get_params()
 
-    # TODO: Add documentation for valid args for each model. Currently only `ag.es`
+    # TODO: Add documentation for valid args for each model. Currently only `ag.early_stop`
     def _ag_params(self) -> set:
         """
         Set of params that are not passed to self.model, but are used by the wrapper.
@@ -963,7 +963,7 @@ class AbstractModel:
 
         Possible params:
 
-        ag.es : int, str, or tuple
+        ag.early_stop : int, str, or tuple
             generic name for early stopping logic. Typically can be an int or a str preset/strategy.
             Also possible to pass tuple of (class, kwargs) to construct a custom early stopping object.
                 Refer to `autogluon.core.utils.early_stopping` for examples.
