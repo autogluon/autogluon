@@ -38,7 +38,7 @@ extras_require = {
         'lightgbm>=3.0,<4.0',
     ],
     'catboost': [
-        'catboost>=0.23.0,<0.25',
+        'catboost>=0.24.0,<0.26',
     ],
     'xgboost': [
         'xgboost>=1.3.2,<1.4',
