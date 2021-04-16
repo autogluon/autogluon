@@ -449,6 +449,19 @@ class ImagePredictor(object):
             ret = self._classifier.predict(data)
             if 'image' in ret.columns:
                 ret = ret.groupby(["image"]).agg(list)
+        if isinstance(data, pd.DataFrame):
+            y_pred_proba = ret
+            classes = list(range(predictor._classifier.num_class))
+            idx_to_image_map = data[['image']]
+            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
+            y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
+            y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
+            class_preds_dict = {}
+            for i, clss in enumerate(classes):
+                class_preds_list = [preds[i] for preds in list(y_pred_proba['image_proba'])]
+                class_preds_dict[clss] = class_preds_list
+
+            ret = pd.DataFrame(class_preds_dict, index=y_pred_proba.index)
         if as_pandas:
             return ret
         else:
@@ -481,6 +494,17 @@ class ImagePredictor(object):
         else:
             # single image
             ret = proba.loc[[proba["score"].idxmax()]]
+
+        # update format of returned dataframe
+        if isinstance(data, pd.DataFrame):
+            y_pred = ret
+            idx_to_image_map = data[['image']]
+            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
+            y_pred = idx_to_image_map.merge(y_pred, on='image')
+            y_pred = y_pred.set_index('index').rename_axis(None)
+            ret = y_pred['id'].rename('label')
+        else:
+            raise NotImplementedError
         if as_pandas:
             return ret
         else:
