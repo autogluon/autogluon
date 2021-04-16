@@ -2,9 +2,10 @@ import autogluon.core as ag
 import numpy as np
 import pytest
 
-ACTIVE_METRIC_NAME = 'obj_metric'
-CONSTRAINT_METRIC_NAME = 'constr_metric'
+ACTIVE_METRIC_NAME = 'brainin_objective'
+CONSTRAINT_METRIC_NAME = 'brainin_constraint'
 REWARD_ATTR_NAME = 'objective'
+CONSTRAINT_ATTR_NAME = 'constraint_metric'
 
 
 def brainin_with_constraint(x1, x2, constraint_offset):
@@ -43,7 +44,8 @@ def run_bayesopt_multi_output_test(searcher, constraint_offset):
         searcher=searcher,
         search_options=search_options,
         num_trials=10,
-        reward_attr=REWARD_ATTR_NAME
+        reward_attr=REWARD_ATTR_NAME,
+        constraint_attr=CONSTRAINT_ATTR_NAME,
     )
     # Run HPO experiment
     myscheduler.run()

@@ -143,7 +143,10 @@ class SurrogateModel(ABC):
         pass
 
 
-# Useful type that allows for a dictionary mapping each output name to a SurrogateModel
+# Useful type that allows for a dictionary mapping each output name to a SurrogateModel.
+# This is needed for multi-output BO methods such as constrained BO, where each output
+# is associated to a model. This type includes the Union with the standard
+# SurrogateModel type for backward compatibility.
 OutputSurrogateModel = Union[SurrogateModel, Dict[str, SurrogateModel]]
 
 

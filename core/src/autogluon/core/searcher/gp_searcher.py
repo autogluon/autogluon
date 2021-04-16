@@ -5,7 +5,6 @@ from .bayesopt.autogluon.searcher_factory import gp_fifo_searcher_factory, \
     gp_multifidelity_searcher_factory, constrained_gp_fifo_searcher_factory, gp_fifo_searcher_defaults, \
     gp_multifidelity_searcher_defaults, constrained_gp_fifo_searcher_defaults
 from .searcher import BaseSearcher
-from .bayesopt.tuning_algorithms.base_classes import DEFAULT_CONSTRAINT_METRIC
 from ..utils.default_arguments import check_and_merge_defaults
 
 __all__ = ['GPFIFOSearcher',
@@ -214,11 +213,9 @@ class ConstrainedGPFIFOSearcher(GPFIFOSearcher):
         _gp_searcher = kwargs.get('_constrained_gp_searcher')
         if _gp_searcher is None:
             kwargs['configspace'] = configspace
+            self.initial_scoring = 'acq_func'
             if 'initial_scoring' in kwargs:
-                self.initial_scoring = kwargs.get('initial_scoring', 'acq_func')
-                assert self.initial_scoring == 'acq_func', 'Thompson sampling is not supported for Constrained BO.'
-            else:
-                self.initial_scoring = 'acq_func'
+                assert kwargs['initial_scoring'] == 'acq_func', 'Thompson sampling is not supported for Constrained BO.'
             _kwargs = check_and_merge_defaults(
                 kwargs, *constrained_gp_fifo_searcher_defaults(),
                 dict_name='search_options')
@@ -237,7 +234,7 @@ class ConstrainedGPFIFOSearcher(GPFIFOSearcher):
             config_cs = self._to_config_cs(config)
             self.gp_searcher.update(
                 config_cs, reward=kwargs[self._reward_attribute],
-                constraint=kwargs[DEFAULT_CONSTRAINT_METRIC])
+                constraint=kwargs[self._constraint_attribute])
 
 
 class GPMultiFidelitySearcher(BaseSearcher):
