@@ -483,7 +483,12 @@ class AbstractModel:
         For multiclass and softclass classification, keeps y_pred_proba as a 2 dimensional array of prediction probabilities for each class.
         For regression, converts y_pred_proba to a 1 dimensional array of predictions.
         """
-        if self.problem_type == BINARY:
+        if self.problem_type == REGRESSION:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            else:
+                return y_pred_proba[:, 1]
+        elif self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             elif y_pred_proba.shape[1] > 1:
@@ -492,7 +497,7 @@ class AbstractModel:
                 return y_pred_proba
         elif y_pred_proba.shape[1] > 2:  # Multiclass, Softclass
             return y_pred_proba
-        else:  # Regression
+        else:  # Unknown problem type
             return y_pred_proba[:, 1]
 
     def score(self, X, y, metric=None, sample_weight=None, **kwargs):
