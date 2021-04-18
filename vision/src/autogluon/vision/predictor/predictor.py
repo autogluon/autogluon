@@ -10,6 +10,8 @@ import pandas as pd
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 
+from autogluon.core.constants import MULTICLASS
+from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
@@ -51,6 +53,7 @@ class ImagePredictor(object):
         self._log_dir = path
         self._verbosity = verbosity
         self._classifier = None
+        self._label_cleaner = None
         self._fit_summary = {}
         os.makedirs(self._log_dir, exist_ok=True)
 
@@ -219,7 +222,8 @@ class ImagePredictor(object):
         """
         if self._problem_type is None:
             # options: multiclass
-            self._problem_type = 'multiclass'
+            self._problem_type = MULTICLASS
+        assert self._problem_type in (MULTICLASS,), f"Invalid problem_type: {self._problem_type}"
         if self._eval_metric is None:
             # options: accuracy,
             self._eval_metric = 'accuracy'
@@ -282,8 +286,14 @@ class ImagePredictor(object):
 
         # data sanity check
         train_data = self._validate_data(train_data)
+        train_labels = train_data['label']
+        self._label_cleaner = LabelCleaner.construct(problem_type=self._problem_type, y=train_labels, y_uncleaned=train_labels)
+        train_labels_cleaned = self._label_cleaner.transform(train_labels)
+        # converting to internal label set
+        train_data['label'] = train_labels_cleaned
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
+            tuning_data['label'] = self._label_cleaner.transform(tuning_data['label'])
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
@@ -442,26 +452,21 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
+        assert self._label_cleaner is not None
         if squeeze:
             # TODO(zhreshold): make this default to True in next API breaking release
-            ret = self._classifier.predict(data, with_proba=True)
+            y_pred_proba = self._classifier.predict(data, with_proba=True)
+            if isinstance(data, pd.DataFrame) and 'image' in data:
+                idx_to_image_map = data[['image']]
+                idx_to_image_map = idx_to_image_map.reset_index(drop=False)
+                y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
+                y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
+            y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
+            ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
         else:
             ret = self._classifier.predict(data)
             if 'image' in ret.columns:
                 ret = ret.groupby(["image"]).agg(list)
-        if isinstance(data, pd.DataFrame):
-            y_pred_proba = ret
-            classes = list(range(predictor._classifier.num_class))
-            idx_to_image_map = data[['image']]
-            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
-            y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
-            y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
-            class_preds_dict = {}
-            for i, clss in enumerate(classes):
-                class_preds_list = [preds[i] for preds in list(y_pred_proba['image_proba'])]
-                class_preds_dict[clss] = class_preds_list
-
-            ret = pd.DataFrame(class_preds_dict, index=y_pred_proba.index)
         if as_pandas:
             return ret
         else:
@@ -487,24 +492,21 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
+        assert self._label_cleaner is not None
         proba = self._classifier.predict(data)
         if 'image' in proba.columns:
             # multiple images
-            ret = proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
-        else:
-            # single image
-            ret = proba.loc[[proba["score"].idxmax()]]
-
-        # update format of returned dataframe
-        if isinstance(data, pd.DataFrame):
-            y_pred = ret
+            assert isinstance(data, pd.DataFrame) and 'image' in data.columns
+            y_pred = proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
             idx_to_image_map = data[['image']]
             idx_to_image_map = idx_to_image_map.reset_index(drop=False)
             y_pred = idx_to_image_map.merge(y_pred, on='image')
             y_pred = y_pred.set_index('index').rename_axis(None)
-            ret = y_pred['id'].rename('label')
+            ret = self._label_cleaner.inverse_transform(y_pred['id'].rename('label'))
         else:
-            raise NotImplementedError
+            # single image
+            ret = proba.loc[[proba["score"].idxmax()]]
+            ret = self._label_cleaner.inverse_transform(ret['id'].rename('label'))
         if as_pandas:
             return ret
         else:
