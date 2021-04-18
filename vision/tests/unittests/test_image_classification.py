@@ -1,4 +1,5 @@
 from autogluon.vision import ImagePredictor as Task
+import pandas as pd
 
 def test_task():
     dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
@@ -15,6 +16,7 @@ def test_task():
     test_proba = classifier2.predict_proba(test_dataset, squeeze=True)
     test_feature = classifier2.predict_feature(test_dataset)
     single_test2 = classifier2.predict(test_dataset.iloc[0]['image'])
+    assert isinstance(single_test2, pd.Series)
     assert single_test2.equals(single_test)
     # to numpy
     test_proba = classifier2.predict_proba(test_dataset, as_pandas=False)

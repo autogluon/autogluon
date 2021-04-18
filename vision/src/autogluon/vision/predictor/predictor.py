@@ -464,6 +464,7 @@ class ImagePredictor(object):
             y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
             ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
         else:
+            logger.warning('Deprecated `predict_proba` with `squeeze=False`, it is inconsistent with other autogluon features, this functionality will be removed in the next release.')
             ret = self._classifier.predict(data)
             if 'image' in ret.columns:
                 ret = ret.groupby(["image"]).agg(list)
