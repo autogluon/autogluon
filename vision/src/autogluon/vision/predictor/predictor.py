@@ -286,14 +286,14 @@ class ImagePredictor(object):
 
         # data sanity check
         train_data = self._validate_data(train_data)
-        train_labels = train_data['label']
+        train_labels = _get_valid_labels(train_data)
         self._label_cleaner = LabelCleaner.construct(problem_type=self._problem_type, y=train_labels, y_uncleaned=train_labels)
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
         # converting to internal label set
-        train_data['label'] = train_labels_cleaned
+        _set_valid_labels(train_data, self._label_cleaner.transform(_get_valid_labels(train_data)))
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
-            tuning_data['label'] = self._label_cleaner.transform(tuning_data['label'])
+            _set_valid_labels(tunning_data, self._label_cleaner.transform(_get_valid_labels(tunning_data)))
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
@@ -613,6 +613,28 @@ class ImagePredictor(object):
         """
         return tuple(_SUPPORTED_MODELS)
 
+
+def _get_valid_labels(data):
+    ret = None
+    if isinstance(data, pd.DataFrame):
+        ret = data['label']
+    else:
+        from d8.image_classification import Dataset as D8D
+        if isinstance(data, D8D):
+            ret = data.df['class_name']
+    if ret is None:
+        raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
+    return ret
+
+def _set_valid_labels(data, label):
+    if isinstance(data, pd.DataFrame):
+        data['label'] = label
+    else:
+        from d8.image_classification import Dataset as D8D
+        if isinstance(data, D8D):
+            data.df['class_name'] = label
+        else:
+            raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
 
 def _get_supported_models():
     all_models = get_model_list()
