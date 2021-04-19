@@ -171,6 +171,18 @@ To show scores for other metrics, you can specify the `extra_metrics` argument w
 predictor.leaderboard(test_data, extra_metrics=['accuracy', 'balanced_accuracy', 'log_loss'], silent=True)
 ```
 
+Notice that `log_loss` scores are negative.
+This is because metrics in AutoGluon are always shown in `higher_is_better` form.
+This means that metrics such as `log_loss` and `root_mean_squared_error` will have their signs FLIPPED, and values will be negative.
+This is necessary to avoid the user needing to know the metric to understand if higher is better when looking at leaderboard.
+
+One additional caviat: It is possible that `log_loss` values can be `-inf` when computed via `extra_metrics`.
+This is because the models were not optimized with `log_loss` in mind during training and
+may have prediction probabilities giving a class `0` (particularly common with K-Nearest-Neighbors models).
+Because `log_loss` gives infinite error when the correct class was given `0` probability, this results in a score of `-inf`.
+It is therefore recommended that `log_loss` should not be used as a secondary metric to determine model quality.
+Either use `log_loss` as the `eval_metric` or avoid it altogether.
+
 Here's how to specify a particular model to use for prediction instead of AutoGluon's default model-choice:
 
 ```{.python .input}
