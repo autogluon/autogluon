@@ -429,7 +429,7 @@ class ImagePredictor(object):
         kwargs['hyperparameter_tune_kwargs'] = hpo_tune_args
         return kwargs
 
-    def predict_proba(self, data, as_pandas=True, squeeze=False):
+    def predict_proba(self, data, as_pandas=True):
         """Predict images as a whole, return the probabilities of each category rather
         than class-labels.
 
@@ -440,8 +440,6 @@ class ImagePredictor(object):
         as_pandas : bool, default = True
             Whether to return the output as a pandas object (True) or list of numpy array(s) (False).
             Pandas object is a DataFrame.
-        squeeze : bool, default = False
-            Whether to squeeze probabilities of a single image into a list.
 
         Returns
         -------
@@ -453,21 +451,15 @@ class ImagePredictor(object):
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
-        if squeeze:
-            # TODO(zhreshold): make this default to True in next API breaking release
-            y_pred_proba = self._classifier.predict(data, with_proba=True)
-            if isinstance(data, pd.DataFrame) and 'image' in data:
-                idx_to_image_map = data[['image']]
-                idx_to_image_map = idx_to_image_map.reset_index(drop=False)
-                y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
-                y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
-            y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
-            ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
-        else:
-            logger.warning('Deprecated `predict_proba` with `squeeze=False`, it is inconsistent with other autogluon features, this functionality will be removed in the next release.')
-            ret = self._classifier.predict(data)
-            if 'image' in ret.columns:
-                ret = ret.groupby(["image"]).agg(list)
+        y_pred_proba = self._classifier.predict(data, with_proba=True)
+        if isinstance(data, pd.DataFrame) and 'image' in data:
+            idx_to_image_map = data[['image']]
+            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
+            y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
+            y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
+        y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
+        ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
+        
         if as_pandas:
             return ret
         else:
