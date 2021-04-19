@@ -293,7 +293,7 @@ class ImagePredictor(object):
         _set_valid_labels(train_data, self._label_cleaner.transform(_get_valid_labels(train_data)))
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
-            _set_valid_labels(tunning_data, self._label_cleaner.transform(_get_valid_labels(tunning_data)))
+            _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
