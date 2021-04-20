@@ -319,7 +319,7 @@ class BaggedEnsembleModel(AbstractModel):
             logger.log(15, '\t`use_child_oof` was specified for this model. It will function similarly to a bagged model, but will only fit one child model.')
             time_start_predict = time.time()
             if model_base._get_tags().get('valid_oof', False):
-                self._oof_pred_proba = model_base.get_oof_pred_proba(X=X)
+                self._oof_pred_proba = model_base.get_oof_pred_proba(X=X, y=y)
             else:
                 logger.warning('\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores.')
                 self._oof_pred_proba = model_base.predict_proba(X=X)
