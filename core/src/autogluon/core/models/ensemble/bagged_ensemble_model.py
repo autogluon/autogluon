@@ -1,13 +1,11 @@
-import copy
-import logging
-import os
-import time
 from collections import Counter
 from statistics import mean
 
 import numpy as np
 import pandas as pd
+from autogluon.core.models.ensemble.fold_fitting_strategy import *
 
+from .fold_fitting_strategy import SequentialLocalFoldFittingStrategy
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
@@ -170,70 +168,28 @@ class BaggedEnsembleModel(AbstractModel):
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats - 1) * k_fold + k_fold_end
         folds_to_fit = fold_end - fold_start
+        fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats)
         for j in range(n_repeat_start, n_repeats):  # For each n_repeat
             cur_repeat_count = j - n_repeat_start
             fold_start_n_repeat = fold_start + cur_repeat_count * k_fold
             fold_end_n_repeat = min(fold_start_n_repeat + k_fold, fold_end)
-            # TODO: Consider moving model fit inner for loop to a function to simply this code
+
             for i in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
                 fold_num_in_repeat = i - (j * k_fold)  # The fold in the current repeat set (first fold in set = 0)
-                folds_finished = i - fold_start
-                folds_left = fold_end - i
-                fold = kfolds[i]
-                time_elapsed = time.time() - time_start
-                if time_limit is not None:
-                    time_left = time_limit - time_elapsed
-                    required_time_per_fold = time_left / folds_left
-                    time_limit_fold = required_time_per_fold * 0.8
-                    if folds_finished > 0:
-                        expected_time_required = time_elapsed * folds_to_fit / folds_finished
-                        expected_remaining_time_required = expected_time_required * folds_left / folds_to_fit
-                        if expected_remaining_time_required > time_left:
-                            raise TimeLimitExceeded
-                    if time_left <= 0:
-                        raise TimeLimitExceeded
-                else:
-                    time_limit_fold = None
 
-                time_start_fold = time.time()
-                train_index, val_index = fold
-                X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
-                y_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
-                fold_model = copy.deepcopy(model_base)
-                fold_model.name = f'{fold_model.name}S{j+1}F{fold_num_in_repeat+1}'  # S5F3 = 3rd fold of the 5th repeat set
-                fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
-                kwargs_fold = kwargs.copy()
-                if sample_weight is not None:
-                    kwargs_fold['sample_weight'] = sample_weight[train_index]
-                    kwargs_fold['sample_weight_val'] = sample_weight[val_index]
-                fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
-                time_train_end_fold = time.time()
-                if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
-                    if i != (fold_end - 1):
-                        time_elapsed = time.time() - time_start
-                        time_left = time_limit - time_elapsed
-                        expected_time_required = time_elapsed * folds_to_fit / (folds_finished + 1)
-                        expected_remaining_time_required = expected_time_required * (folds_left - 1) / folds_to_fit
-                        if expected_remaining_time_required > time_left:
-                            raise TimeLimitExceeded
-                pred_proba = fold_model.predict_proba(X_val_fold)
-                time_predict_end_fold = time.time()
-                fold_model.fit_time = time_train_end_fold - time_start_fold
-                fold_model.predict_time = time_predict_end_fold - time_train_end_fold
-                fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=pred_proba)
-                fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-                if not self.params.get('save_bag_folds', True):
-                    fold_model.model = None
-                if self.low_memory:
-                    self.save_child(fold_model, verbose=False)
-                    models.append(fold_model.name)
-                else:
-                    models.append(fold_model)
-                oof_pred_proba[val_index] += pred_proba
-                oof_pred_model_repeats[val_index] += 1
-                self._add_child_times_to_bag(model=fold_model)
+                fold_ctx = dict(
+                    model_name_suffix=f'S{j + 1}F{fold_num_in_repeat + 1}',  # S5F3 = 3rd fold of the 5th repeat set
+                    fold=kfolds[i],
+                    is_last_fold=i != (fold_end - 1),
+                    folds_to_fit=folds_to_fit,
+                    folds_finished=i - fold_start,
+                    folds_left=fold_end - i,
+                )
+
+                fold_fitting_strategy.schedule_fold_model_fit(model_base, fold_ctx, kwargs)
             if (fold_end_n_repeat != fold_end) or (k_fold == k_fold_end):
                 self._k_per_n_repeat.append(k_fold)
+        fold_fitting_strategy.after_all_folds_scheduled()
         self.models += models
 
         self._bagged_mode = True
@@ -303,7 +259,7 @@ class BaggedEnsembleModel(AbstractModel):
             # Sample at most 500 rows to estimate prediction time of all rows
             # TODO: Consider moving this into end of abstract model fit for all models.
             #  Currently this only fixes problem when in bagged mode, if not bagging, then inference could still be problamatic
-            n_sample = min(500, round(X_len*0.1))
+            n_sample = min(500, round(X_len * 0.1))
             frac = n_sample / X_len
             X_sample = X.sample(n=n_sample)
             time_start_predict = time.time()
@@ -380,9 +336,9 @@ class BaggedEnsembleModel(AbstractModel):
                 if self._child_oof or not self._bagged_mode:
                     raise AssertionError('Model trained with no validation data cannot get feature importances on training data, please specify new test data to compute feature importances (model=%s)' % self.name)
                 kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeat + 1)
-                cur_kfolds = kfolds[n_repeat * k:(n_repeat+1) * k]
+                cur_kfolds = kfolds[n_repeat * k:(n_repeat + 1) * k]
             else:
-                cur_kfolds = [(None, list(range(len(X))))]*k
+                cur_kfolds = [(None, list(range(len(X))))] * k
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
@@ -640,8 +596,8 @@ class BaggedEnsembleModel(AbstractModel):
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
             child_hyperparameters=self._get_model_base().params,
-            child_hyperparameters_fit = self._get_compressed_params_trained(),
-            child_ag_args_fit = self._get_model_base().params_aux,
+            child_hyperparameters_fit=self._get_compressed_params_trained(),
+            child_ag_args_fit=self._get_model_base().params_aux,
         )
         info['bagged_info'] = bagged_info
         info['children_info'] = children_info
@@ -703,7 +659,8 @@ class BaggedEnsembleModel(AbstractModel):
         X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[test_index, :]
         y_fold, y_val_fold = y.iloc[train_index], y.iloc[test_index]
         orig_time = scheduler_options[1]['time_out']
-        scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
+        if orig_time:
+            scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
         hpo_models, hpo_model_performances, hpo_results = self.model_base.hyperparameter_tune(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
         scheduler_options[1]['time_out'] = orig_time
 
