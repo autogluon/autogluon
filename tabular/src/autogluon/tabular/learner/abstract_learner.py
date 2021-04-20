@@ -282,10 +282,12 @@ class AbstractLearner:
         return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
-    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
+    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, silent=False):
         leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
         if y is None:
             X, y = self.extract_label(X)
+        if extra_metrics is None:
+            extra_metrics = []
         self._validate_class_labels(y)
         w = None
         if self.weight_evaluation:
@@ -316,22 +318,40 @@ class AbstractLearner:
             pred_time_test_marginal['OracleEnsemble'] = oracle_pred_time
             all_trained_models.append('OracleEnsemble')
 
+        scoring_args = dict(
+            y=y,
+            y_internal=y_internal,
+            sample_weight=w
+        )
+
+        extra_scores = {}
         for model_name, y_pred_proba_internal in model_pred_proba_dict.items():
-            if self.eval_metric.needs_pred:
-                if self.problem_type == BINARY:
-                    # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
-                    y_pred = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
-                    y_tmp = y_internal
-                else:
-                    y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
-                    y_tmp = y
-            elif self.eval_metric.needs_quantile:
-                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
-                y_tmp = y
-            else:
-                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
-                y_tmp = y_internal
-            scores[model_name] = compute_weighted_metric(y_tmp, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
+            scores[model_name] = self._score_with_pred_proba(
+                y_pred_proba_internal=y_pred_proba_internal,
+                metric=self.eval_metric,
+                **scoring_args
+            )
+            for metric in extra_metrics:
+                metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
+                if metric.name not in extra_scores:
+                    extra_scores[metric.name] = {}
+                extra_scores[metric.name][model_name] = self._score_with_pred_proba(
+                    y_pred_proba_internal=y_pred_proba_internal,
+                    metric=metric,
+                    **scoring_args
+                )
+
+        if extra_scores:
+            series = []
+            for metric in extra_scores:
+                series.append(pd.Series(extra_scores[metric], name=metric))
+            df_extra_scores = pd.concat(series, axis=1)
+            extra_metrics_names = list(df_extra_scores.columns)
+            df_extra_scores['model'] = df_extra_scores.index
+            df_extra_scores = df_extra_scores.reset_index(drop=True)
+        else:
+            df_extra_scores = None
+            extra_metrics_names = None
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
@@ -366,6 +386,8 @@ class AbstractLearner:
                 'pred_time_test_marginal': [pred_time_test_marginal[model] for model in model_names_final],
             }
         )
+        if df_extra_scores is not None:
+            df = pd.merge(df, df_extra_scores, on='model', how='left')
 
         df_merged = pd.merge(df, leaderboard_df, on='model', how='left')
         df_merged = df_merged.sort_values(by=['score_test', 'pred_time_test', 'score_val', 'pred_time_val', 'model'], ascending=[False, True, False, True, False]).reset_index(drop=True)
@@ -373,6 +395,10 @@ class AbstractLearner:
         explicit_order = [
             'model',
             'score_test',
+        ]
+        if extra_metrics_names is not None:
+            explicit_order += extra_metrics_names
+        explicit_order += [
             'score_val',
             'pred_time_test',
             'pred_time_val',
@@ -382,12 +408,36 @@ class AbstractLearner:
             'fit_time_marginal',
             'stack_level',
             'can_infer',
+            'fit_order',
         ]
         df_columns_other = [column for column in df_columns_lst if column not in explicit_order]
         df_columns_new = explicit_order + df_columns_other
         df_merged = df_merged[df_columns_new]
 
         return df_merged
+
+    def _score_with_pred_proba(self,
+                               y,
+                               y_internal,
+                               y_pred_proba_internal,
+                               metric,
+                               sample_weight=None):
+        metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
+        if metric.needs_pred:
+            if self.problem_type == BINARY:
+                # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
+                y_pred = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
+                y_tmp = y_internal
+            else:
+                y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+                y_tmp = y
+        elif metric.needs_quantile:
+            y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+            y_tmp = y
+        else:
+            y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
+            y_tmp = y_internal
+        return compute_weighted_metric(y_tmp, y_pred, metric, sample_weight, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _validate_class_labels(self, y: Series):
         null_count = y.isnull().sum()
@@ -533,10 +583,12 @@ class AbstractLearner:
         X = X.drop(self.label, axis=1)
         return X, y
 
-    def leaderboard(self, X=None, y=None, extra_info=False, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, X=None, y=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, silent=False):
         if X is not None:
-            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, silent=True)
+            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, silent=True)
         else:
+            if extra_metrics:
+                raise AssertionError('`extra_metrics` is only valid when data is specified.')
             trainer = self.load_trainer()
             leaderboard = trainer.leaderboard(extra_info=extra_info)
         if only_pareto_frontier:

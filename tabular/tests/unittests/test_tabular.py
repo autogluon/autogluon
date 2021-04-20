@@ -84,11 +84,13 @@ def test_advanced_functionality():
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = TabularPredictor(label=label, path=savedir).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
-    leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True)
+    extra_metrics = ['accuracy', 'roc_auc', 'log_loss']
+    leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True, extra_metrics=extra_metrics)
     assert set(predictor.get_model_names()) == set(leaderboard['model'])
     assert set(predictor.get_model_names()) == set(leaderboard_extra['model'])
     assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
     assert len(leaderboard) == len(leaderboard_extra)
+    assert set(leaderboard_extra.columns).issuperset(set(extra_metrics))  # Assert that extra_metrics are present in output
     num_models = len(predictor.get_model_names())
     feature_importances = predictor.feature_importance(data=test_data)
     original_features = set(train_data.columns)
