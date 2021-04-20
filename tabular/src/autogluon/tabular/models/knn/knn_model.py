@@ -25,6 +25,16 @@ class KNNModel(AbstractModel):
         self._X_unused_index = None  # Keeps track of unused training data indices, necessary for LOO OOF generation
 
     def _get_model_type(self):
+        if self.params_aux.get('use_daal', True):
+            try:
+                # TODO: Add more granular switch, currently this affects all future KNN models even if they had `use_daal=False`
+                from sklearnex import patch_sklearn
+                patch_sklearn("knn_classifier")
+                patch_sklearn("knn_regressor")
+                # daal backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
+                logger.log(15, '\tUsing daal4py KNN backend...')
+            except:
+                pass
         try:
             from ._knn_loo_variants import KNeighborsClassifier, KNeighborsRegressor
         except:

@@ -14,11 +14,11 @@ PYTHON_REQUIRES = '>=3.6, <3.9'
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
-    'numpy': '==1.19.5',
+    'numpy': '==1.19.5',  # TODO: v0.3 consider upgrading
     'pandas': '>=1.0.0,<2.0',
     'scikit-learn': '>=0.22.0,<0.25',
-    'scipy': '==1.5.4',
-    'gluoncv': '>=0.10.1.post0,<0.12.0',
+    'scipy': '>=1.5.4,<1.7',
+    'gluoncv': '>=0.10.1.post0,<0.12.0',  # FIXME: v0.2 limit version for release
     'tqdm': '>=4.38.0',
     'Pillow': '<=8.1',
     'graphviz': '<0.9.0,>=0.8.1',
