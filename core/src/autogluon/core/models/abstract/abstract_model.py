@@ -498,7 +498,7 @@ class AbstractModel:
         elif y_pred_proba.shape[1] > 2:  # Multiclass, Softclass
             return y_pred_proba
         else:  # Unknown problem type
-            return y_pred_proba[:, 1]
+            raise AssertionError(f'Unknown y_pred_proba format for `problem_type="{self.problem_type}"`.')
 
     def score(self, X, y, metric=None, sample_weight=None, **kwargs):
         if metric is None:

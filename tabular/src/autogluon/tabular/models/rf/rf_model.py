@@ -245,8 +245,9 @@ class RFModel(AbstractModel):
 
         # TODO: Regression does not return NaN for missing rows, instead it sets them to 0. This makes life hard.
         #  The below code corrects the missing rows to NaN instead of 0.
-        # Don't bother if >40 trees, near impossible to have missing
-        if self.problem_type == REGRESSION and self.model.n_estimators <= 40:
+        # Don't bother if >60 trees, near impossible to have missing
+        # If using 68% of data for training, chance of missing for each row is 1 in 11 billion.
+        if self.problem_type == REGRESSION and self.model.n_estimators <= 60:
             from sklearn.ensemble._forest import _get_n_samples_bootstrap, _generate_unsampled_indices
             n_samples = len(y)
 
@@ -292,7 +293,7 @@ class RFModel(AbstractModel):
     @classmethod
     def _get_default_ag_args_ensemble(cls) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble()
-        extra_ag_args_ensemble = {'use_child_oof': True}
+        extra_ag_args_ensemble = {'use_child_oof': False}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
