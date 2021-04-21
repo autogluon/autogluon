@@ -126,7 +126,7 @@ class CatBoostModel(AbstractModel):
             eval_set = X_val
             modifier = min(1.0, 10000 / num_rows_train)
             num_sample_iter_max = max(round(modifier * 50), 2)
-            early_stopping_rounds = ag_params.get('ag.es', 'auto')
+            early_stopping_rounds = ag_params.get('ag.early_stop', 'auto')
             if isinstance(early_stopping_rounds, str):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
 
@@ -328,4 +328,4 @@ class CatBoostModel(AbstractModel):
         return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
 
     def _ag_params(self) -> set:
-        return {'ag.es'}
+        return {'ag.early_stop'}

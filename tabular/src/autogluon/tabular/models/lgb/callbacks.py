@@ -1,56 +1,16 @@
-import collections, warnings, time, os, psutil, logging
+import copy
+import logging
+import os
+import psutil
+import time
+import warnings
 from operator import gt, lt
 
-from autogluon.core.utils.savers import save_pointer
-from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils import try_import_lightgbm
+from lightgbm.callback import _format_eval_result, EarlyStopException
+
+from autogluon.core.utils.early_stopping import SimpleES
 
 logger = logging.getLogger(__name__)
-
-
-def save_model_callback(path, latest_model_checkpoint, interval, offset):
-    def _callback(env):
-        if ((env.iteration - offset) % interval == 0) & (env.iteration != 0):
-            save_pkl.save(path=path, object=env.model)
-            save_pointer.save(path=latest_model_checkpoint, content_path=path)
-    _callback.before_iteration = True
-    _callback.order = 0
-    return _callback
-
-
-# TODO: dart might alter previous iterations, check if this is occurring, if so then save snapshot of model when best_iteration to preserve quality
-def record_evaluation_custom(path, eval_result, interval, offset=0, early_stopping_rounds=None):
-    """Create a callback that records the evaluation history into ``eval_result``.
-
-    Parameters
-    ----------
-    eval_result : dict
-       A dictionary to store the evaluation results.
-
-    Returns
-    -------
-    callback : function
-        The callback that records the evaluation history into the passed dictionary.
-    """
-    if not isinstance(eval_result, dict):
-        raise TypeError('Eval_result should be a dictionary')
-    eval_result.clear()
-
-    def _init(env):
-        for data_name, _, _, _ in env.evaluation_result_list:
-            eval_result.setdefault(data_name, collections.defaultdict(list))
-
-    def _callback(env):
-        if not eval_result:
-            _init(env)
-        for data_name, eval_name, result, _ in env.evaluation_result_list:
-            eval_result[data_name][eval_name].append(result)
-        if (interval > 0) and ((env.iteration - offset) % interval == 0) and (env.iteration != 0):
-            # min_error = min(eval_result['valid_set']['multi_error'])
-            # print('iter:', env.iteration, 'min_error:', min_error)
-            save_pkl.save(path=path, object=eval_result)
-    _callback.order = 20
-    return _callback
 
 
 # TODO: Add option to stop if current run's metric value is X% lower, such as min 30%, current 40% -> Stop
@@ -69,8 +29,9 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
 
     Parameters
     ----------
-    stopping_rounds : int
-       The possible number of rounds without the trend occurrence.
+    stopping_rounds : int or tuple
+       If int, The possible number of rounds without the trend occurrence.
+       If tuple, contains early stopping class as first element and class init kwargs as second element.
     first_metric_only : bool, optional (default=False)
        Whether to use only the first metric for early stopping.
     verbose : bool, optional (default=True)
@@ -92,10 +53,10 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
     cmp_op = []
     enabled = [True]
     indices_to_check = []
-    timex = [time.time()]
     mem_status = psutil.Process()
     init_mem_rss = []
     init_mem_avail = []
+    es = []
 
     def _init(env):
         if not ignore_dart_warning:
@@ -116,10 +77,16 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
             if manual_stop_file:
                 logger.debug('Manually stop training by creating file at location: ', manual_stop_file)
 
+        if isinstance(stopping_rounds, int):
+            es_template = SimpleES(patience=stopping_rounds)
+        else:
+            es_template = stopping_rounds[0](**stopping_rounds[1])
+
         for eval_ret in env.evaluation_result_list:
             best_iter.append(0)
             best_score_list.append(None)
             best_trainloss.append(None)
+            es.append(copy.deepcopy(es_template))
             if eval_ret[3]:
                 best_score.append(float('-inf'))
                 cmp_op.append(gt)
@@ -143,8 +110,6 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
         init_mem_avail.append(psutil.virtual_memory().available)
 
     def _callback(env):
-        try_import_lightgbm()
-        from lightgbm.callback import _format_eval_result, EarlyStopException
         if not cmp_op:
             _init(env)
         if not enabled[0]:
@@ -155,9 +120,11 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
         else:
             train_loss_val = 0.0
         for i in indices_to_check:
+            is_best_iter = False
             eval_result = env.evaluation_result_list[i]
             _, eval_metric, score, greater_is_better = eval_result
             if best_score_list[i] is None or cmp_op[i](score, best_score[i]):
+                is_best_iter = True
                 best_score[i] = score
                 best_iter[i] = env.iteration
                 best_score_list[i] = env.evaluation_result_list
@@ -176,7 +143,8 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                              eval_metric=eval_metric,  # eval_metric here is the stopping_metric from LGBModel
                              greater_is_better=greater_is_better,
                              )
-            if env.iteration - best_iter[i] >= stopping_rounds:
+            early_stop = es[i].update(cur_round=env.iteration, is_best=is_best_iter)
+            if early_stop:
                 if verbose:
                     logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))

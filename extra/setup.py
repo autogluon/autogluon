@@ -25,7 +25,6 @@ requirements = [
     'gluoncv',
     'graphviz',
 
-    'bokeh',  # TODO: Remove bokeh, it should be purely optional and specific to core, not extra
     f'autogluon.core=={version}',
 ]
 

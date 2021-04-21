@@ -6,8 +6,6 @@ import time
 
 import numpy as np
 import psutil
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from .rf_quantile import RandomForestQuantileRegressor
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
@@ -27,12 +25,27 @@ class RFModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
+        self._daal = False  # Whether daal4py backend is being used
 
     def _get_model_type(self):
+        if self.problem_type == QUANTILE:
+            from .rf_quantile import RandomForestQuantileRegressor
+            return RandomForestQuantileRegressor
+        if self.params_aux.get('use_daal', False):
+            # Disabled by default because it appears to degrade performance
+            try:
+                # TODO: Use sklearnex instead once a suitable toggle option is provided that won't impact future models
+                from daal4py.sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+                logger.log(15, '\tUsing daal4py RF backend...')
+                self._daal = True
+            except:
+                from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+                self._daal = False
+        else:
+            from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+            self._daal = False
         if self.problem_type in [REGRESSION, SOFTCLASS]:
             return RandomForestRegressor
-        elif self.problem_type == QUANTILE:
-            return RandomForestQuantileRegressor
         else:
             return RandomForestClassifier
 
@@ -74,6 +87,9 @@ class RFModel(AbstractModel):
              sample_weight=None,
              **kwargs):
         time_start = time.time()
+
+        model_cls = self._get_model_type()
+
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         params = self._get_model_params()
         n_estimators_final = params['n_estimators']
@@ -111,19 +127,27 @@ class RFModel(AbstractModel):
                     params['warm_start'] = True
 
         params['n_estimators'] = n_estimator_increments[0]
-        self.model = self._get_model_type()(**params)
+        if self._daal:
+            if params.get('warm_start', False):
+                params['warm_start'] = False
+
+        model = model_cls(**params)
 
         time_train_start = time.time()
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
-                self.model.n_estimators = n_estimators
-            self.model = self.model.fit(X, y, sample_weight=sample_weight)
+                if params.get('warm_start', False):
+                    model.n_estimators = n_estimators
+                else:
+                    params['n_estimators'] = n_estimators
+                    model = model_cls(**params)
+            model = model.fit(X, y, sample_weight=sample_weight)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
                 model_size_bytes = 0
-                for estimator in self.model.estimators_:  # Uses far less memory than pickling the entire forest at once
+                for estimator in model.estimators_:  # Uses far less memory than pickling the entire forest at once
                     model_size_bytes += sys.getsizeof(pickle.dumps(estimator))
-                expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / self.model.n_estimators)
+                expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / model.n_estimators)
                 available_mem = psutil.virtual_memory().available
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
 
@@ -150,6 +174,7 @@ class RFModel(AbstractModel):
                     if n_estimator_increments[j] > n_estimators_ideal:
                         n_estimator_increments[j] = n_estimators_ideal
 
+        self.model = model
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
