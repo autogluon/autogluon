@@ -240,6 +240,9 @@ class ImagePredictor(object):
         searcher = kwargs['hyperparameter_tune_kwargs']['searcher']
         max_reward = kwargs['hyperparameter_tune_kwargs']['max_reward']
         scheduler_options = kwargs['hyperparameter_tune_kwargs']['scheduler_options']
+        # deep copy to avoid inplace overwrite
+        train_data = copy.deepcopy(train_data)
+        tuning_data = copy.deepcopy(tuning_data)
 
         log_level = verbosity2loglevel(self._verbosity)
         set_logger_verbosity(self._verbosity, logger=logger)
@@ -285,15 +288,20 @@ class ImagePredictor(object):
                 raise ValueError(f'`tuning_data` {tuning_data} is not among valid list {valid_names}')
 
         # data sanity check
-        train_data = self._validate_data(train_data)
         train_labels = _get_valid_labels(train_data)
         self._label_cleaner = LabelCleaner.construct(problem_type=self._problem_type, y=train_labels, y_uncleaned=train_labels)
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
+        train_data = self._validate_data(train_data)
         # converting to internal label set
-        _set_valid_labels(train_data, self._label_cleaner.transform(_get_valid_labels(train_data)))
+        _set_valid_labels(train_data, train_labels_cleaned)
+        sorted_classes = sorted(train_labels_cleaned.unique())
+        if isinstance(train_data, Dataset):
+            train_data.classes = sorted_classes
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
+            if isinstance(tuning_data, Dataset):
+                tuning_data.classes = sorted_classes
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
@@ -397,6 +405,9 @@ class ImagePredictor(object):
                               'You may visit `https://auto.gluon.ai/stable/tutorials/image_prediction/dataset.html` ' + \
                               'for details.'
                     raise AttributeError(err_msg)
+            else:
+                raise TypeError(f"Unable to process dataset of type: {type(data)}")
+
         if len(data) < 1:
             raise ValueError('Empty dataset.')
         return data
@@ -459,7 +470,7 @@ class ImagePredictor(object):
             y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
         y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
         ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
-        
+
         if as_pandas:
             return ret
         else:
