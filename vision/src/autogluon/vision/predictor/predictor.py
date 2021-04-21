@@ -295,12 +295,12 @@ class ImagePredictor(object):
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
         sorted_classes = sorted(train_labels_cleaned.unique())
-        if isinstance(train_data, Dataset):
+        if isinstance(train_data, _ImageClassification.Dataset):
             train_data.classes = sorted_classes
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
-            if isinstance(tuning_data, Dataset):
+            if isinstance(tuning_data, _ImageClassification.Dataset):
                 tuning_data.classes = sorted_classes
 
         if self._classifier is not None:
