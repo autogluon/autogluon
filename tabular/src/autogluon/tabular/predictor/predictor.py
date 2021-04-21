@@ -40,9 +40,6 @@ logger = logging.getLogger()  # return root logger
 # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 # TODO: Resolve raw text feature usage in default feature generator
 
-# Done for Tabular
-# TODO: Remove all `time_limits` in project, replace with `time_limit`
-
 
 class TabularPredictor:
     """
@@ -464,7 +461,7 @@ class TabularPredictor:
                 To further improve predictions, avoid increasing `num_bag_folds` much beyond 10 and instead increase `num_bag_sets`.
             num_bag_sets : int, default = None
                 Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = `num_bag_folds * num_bag_sets`.
-                Defaults to 1 if `time_limit` is not specified, otherwise 20 (always disabled if `num_bag_folds` is not specified).
+                Defaults to 1 if `time_limit` is not specified, otherwise 5 (always disabled if `num_bag_folds` is not specified).
                 Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
             num_stack_levels : int, default = None
                 Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `num_stack_levels+1` (set = 0 to disable stack ensembling).
@@ -2323,7 +2320,7 @@ class TabularPredictor:
         if num_bag_sets is None:
             if num_bag_folds >= 2:
                 if time_limit is not None:
-                    num_bag_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
+                    num_bag_sets = 5
                 else:
                     num_bag_sets = 1
             else:
