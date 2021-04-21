@@ -206,7 +206,8 @@ class AbstractTrainer:
 
     # TODO: Enable easier re-mapping of trained models -> hyperparameters input (They don't share a key since name can change)
     def train_multi_levels(self, X, y, hyperparameters: dict, X_val=None, y_val=None, X_unlabeled=None, base_model_names: List[str] = None,
-                           feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, level_start=1, level_end=1, time_limit=None, name_suffix: str = None, relative_stack=True) -> List[str]:
+                           feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None,
+                           level_start=1, level_end=1, time_limit=None, name_suffix: str = None, relative_stack=True, level_time_modifier=0.333) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
             hyperparameters is used to determine the models used in each stack layer.
@@ -214,6 +215,13 @@ class AbstractTrainer:
         Trains both core and aux models.
             core models are standard models which are fit on the data features. Core models will also use model predictions if base_model_names was specified or if level != 1.
             aux models are ensemble models which only use the predictions of core models as features. These models never use the original features.
+
+        level_time_modifier : float, default 0.333
+            The amount of extra time given relatively to early stack levels compared to later stack levels.
+            If 0, then all stack levels are given 100%/L of the time, where L is the number of stack levels.
+            If 1, then all stack levels are given 100% of the time, meaning if the first level uses all of the time given to it, the other levels won't train.
+            Time given to a level = remaining_time / remaining_levels * (1 + level_time_modifier), capped by total remaining time.
+
         Returns a list of the model names that were trained from this method call, in order of fit.
         """
         self._time_limit = time_limit
@@ -248,7 +256,9 @@ class AbstractTrainer:
             aux_kwargs_level = aux_kwargs.copy()
             if time_limit is not None:
                 time_train_level_start = time.time()
-                time_limit_for_level = (time_limit - (time_train_level_start - time_train_start)) / (level_end + 1 - level)
+                levels_left = level_end - level + 1
+                time_left = time_limit - (time_train_level_start - time_train_start)
+                time_limit_for_level = min(time_left / levels_left * (1 + level_time_modifier), time_left)
                 time_limit_core = time_limit_for_level
                 time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
                 core_kwargs_level['time_limit'] = core_kwargs_level.get('time_limit', time_limit_core)
