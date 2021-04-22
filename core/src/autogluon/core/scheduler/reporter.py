@@ -41,7 +41,6 @@ class DistStatusReporter(object):
         self._stop = Variable(client=remote)
         self._stop.set(False)
         self._continue_semaphore = DistSemaphore(0, remote)
-        self._last_report_time = time.time()
 
     def __call__(self, **kwargs):
         """Report updated training status.
@@ -54,11 +53,6 @@ class DistStatusReporter(object):
         _______
         >>> reporter(accuracy=1, training_iters=4)
         """
-        report_time = time.time()
-        if 'time_this_iter' not in kwargs:
-            kwargs['time_this_iter'] = report_time - self._last_report_time
-        self._last_report_time = report_time
-
         logger.debug('Reporting {}'.format(json.dumps(kwargs)))
         try:
             self._queue.put(kwargs.copy())
@@ -81,11 +75,6 @@ class DistStatusReporter(object):
 
     def move_on(self):
         self._continue_semaphore.release()
-
-    def _start(self):
-        """Adjust the real starting time
-        """
-        self._last_report_time = time.time()
 
     def save_dict(self, **state_dict):
         raise NotImplementedError
@@ -157,9 +146,7 @@ class LocalStatusReporter(object):
     def __init__(self, dict_path=None):#, result_queue, continue_semaphore):
         self._queue = mp.Queue(1)
         self._stop = mp.Value('i', 0)
-        self._last_report_time = None
         self._continue_semaphore = mp.Semaphore(0)
-        self._last_report_time = time.time()
         self._save_dict = False
         self.dict_path = dict_path
 
@@ -173,11 +160,6 @@ class LocalStatusReporter(object):
         -------
         >>> reporter(accuracy=1, training_iters=4)
         """
-        report_time = time.time()
-        if 'time_this_iter' not in kwargs:
-            kwargs['time_this_iter'] = report_time - self._last_report_time
-        self._last_report_time = report_time
-
         self._queue.put(kwargs.copy(), block=True)
         logger.debug('StatusReporter reporting: {}'.format(json.dumps(kwargs)))
 
@@ -195,11 +177,6 @@ class LocalStatusReporter(object):
     def terminate(self):
         self._stop.value = 1
         self._continue_semaphore.release()
-
-    def _start(self):
-        """Adjust the real starting time
-        """
-        self._last_report_time = time.time()
 
     def save_dict(self, **state_dict):
         """Save the serializable state_dict
