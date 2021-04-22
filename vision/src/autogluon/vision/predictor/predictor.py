@@ -408,7 +408,7 @@ class ImagePredictor(object):
             # check whether classes are outdated, no action required if all unique labels is subset of `classes`
             unique_labels = sorted(data['label'].unique().tolist())
             if not (all(ulabel in data.classes for ulabel in unique_labels)):
-                data.classes = unique_labels
+                data = _ImageClassification.Dataset(data, classes=unique_labels)
                 logger.log(20, f'Reset labels to {unique_labels}')
         if len(data) < 1:
             raise ValueError('Empty dataset.')
