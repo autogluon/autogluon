@@ -389,7 +389,7 @@ class ImagePredictor(object):
                     if not os.path.isfile(sample):
                         raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
-                    infer_classes = list(data.label.unique().tolist())
+                    infer_classes = sorted(data.label.unique().tolist())
                     logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
                     instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
@@ -406,7 +406,7 @@ class ImagePredictor(object):
             assert 'label' in data.columns
             assert hasattr(data, 'classes')
             # check whether classes are outdated, no action required if all unique labels is subset of `classes`
-            unique_labels = sorted(data['label'].unique())
+            unique_labels = sorted(data['label'].unique().tolist())
             if not (all(ulabel in data.classes for ulabel in unique_labels)):
                 data.classes = unique_labels
                 logger.log(20, f'Reset classification labels to {unique_labels}')
