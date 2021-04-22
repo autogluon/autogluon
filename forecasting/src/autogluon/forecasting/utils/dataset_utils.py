@@ -3,7 +3,7 @@ from copy import deepcopy
 from gluonts.dataset.repository.datasets import dataset_recipes
 from gluonts.dataset.common import Dataset, ListDataset, FileDataset
 from gluonts.dataset.field_names import FieldName
-from autogluon.features.generators import IdentityFeatureGenerator, CategoryFeatureGenerator
+from autogluon.features.generators import IdentityFeatureGenerator, CategoryFeatureGenerator, FillNaFeatureGenerator
 from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY
 import logging
 
@@ -38,6 +38,10 @@ class TimeSeriesDataset(ListDataset):
         else:
             target = df.copy()
             self.index = ["index_column"]
+        # check whether index in static features corresponds to index in data
+        if static_features is not None:
+            if sorted(static_features[index_column]) != sorted(self.index):
+                raise ValueError(f"Index column does not match between static features and the data given.")
         target_values = target.values
         date_list = target.columns
         self.last_date = date_list[-1]
@@ -193,13 +197,13 @@ def time_series_dataset(data,
         index_column = "index_column"
     if chosen_ts is not None:
         rebuilt_data = rebuilt_data.loc[rebuilt_data[index_column].isin(chosen_ts)]
+        static_features = static_features.loc[static_features[index_column].isin(chosen_ts)]
     return TimeSeriesDataset(rebuilt_data, index_column=index_column, static_features=static_features)
 
 
 def extract_static_feature(index_column, features):
-    #TODO: Find a way to do fillna
     if index_column is None:
-        index_column = "index_column"
+        raise ValueError("Index column is not given for static features.")
     indices = features[index_column]
     features = features.drop(index_column, axis=1)
     cardinality = []
@@ -212,16 +216,22 @@ def extract_static_feature(index_column, features):
                 cardinality.append(len(features[column].unique()))
         except ValueError:
             logger.log(30, f"Cannot convert column {column} to float, assuming it is categorical.")
-            cardinality.append(len(features[column].unique()))
-            pass
+            if len(features[column].unqiue()) == len(features[column]):
+                logger.log(30, f"Categorical feature {column} has different values for all rows, discarding it.")
+            else:
+                cardinality.append(len(features[column].unique()))
+    # Extracting static real features and fillna with mean
     static_real_features = IdentityFeatureGenerator(
         infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}
     ).fit_transform(features)
-    static_cat_features = CategoryFeatureGenerator().fit_transform(
-        IdentityFeatureGenerator(
-            infer_features_in_args={"invalid_raw_types": [R_INT, R_FLOAT]}
-        ).fit_transform(features)
-    )
+    for column in static_real_features:
+        static_real_features[column].fillna(static_real_features[column].mean(), inplace=True)
+    # Extracting static cat features, na is deal with as an additional category.
+    static_cat_features = IdentityFeatureGenerator(
+        infer_features_in_args={"invalid_raw_types": [R_INT, R_FLOAT]}
+    ).fit_transform(features)
+    static_cat_features = CategoryFeatureGenerator().fit_transform(static_cat_features)
+
     static_cat_features[index_column] = indices
     static_real_features[index_column] = indices
     return static_cat_features, static_real_features, cardinality

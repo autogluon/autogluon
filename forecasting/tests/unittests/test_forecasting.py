@@ -26,7 +26,7 @@ def test_forecasting():
                                                                                      "num_batches_per_epoch": 10,
                                                                                      "epochs": 5},
                                                                              },
-                                                                             num_trials=3
+                                                                             num_trials=2
 
                                                                              )
 

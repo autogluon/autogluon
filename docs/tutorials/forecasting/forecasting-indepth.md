@@ -51,9 +51,6 @@ predictor = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(tr
                                                                               time_column="Date",
                                                                               hyperparameter_tune=True,
                                                                               quantiles=[0.1, 0.5, 0.9],
-                                                                              refit_full=True,
-                                                                              keep_only_best=True,
-                                                                              set_best_to_refit_full=True,
                                                                               search_strategy=searcher_type,
                                                                               hyperparameters={
                                                                                   "MQCNN": mqcnn_params,
@@ -102,4 +99,66 @@ specific_model.get_info()
 ```{.python .input}
 specific_predictions = predictor.predict(test_data, model=specific_model)
 specific_predictions["Afghanistan_"]
+```
+
+# Static Features
+We allow users to input additional time series static features to help with the prediction.
+
+```{.python .input}
+static_features = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries"
+                                 "/toy_static_features.csv")
+static_features.head()
+```
+
+```{.python .input}
+mqcnn_params = {
+    "context_length": ag.Int(75, 100),
+    "num_batches_per_epoch": 32,
+    "epochs": 5
+}
+
+deepar_params = {
+    "context_length": ag.Int(75, 100),
+    "num_batches_per_epoch": 32,
+    "distr_output": NegativeBinomialOutput(),
+    "epochs": 5
+}
+
+sff_params = {
+    "context_length": ag.Int(75, 100),
+    "num_batches_per_epoch": 32,
+    "epochs": 5
+}
+
+predictor = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(train_data,
+                                                                              prediction_length=19,
+                                                                              static_features=static_features,
+                                                                              index_column="name",
+                                                                              target_column="ConfirmedCases",
+                                                                              time_column="Date",
+                                                                              hyperparameter_tune=True,
+                                                                              quantiles=[0.1, 0.5, 0.9],
+                                                                              search_strategy=searcher_type,
+                                                                              hyperparameters={
+                                                                                  "MQCNN": mqcnn_params,
+                                                                                  "DeepAR": deepar_params,
+                                                                                  "SFF": sff_params,
+                                                                              },
+                                                                              num_trials=2
+                                                                              )
+```
+
+If you provide static features when training, then when using predictor.leaderboard(), predictor.evaluate(), and predictor.predict(), static features must be provided as well, otherwise, an exception will be raised.
+
+```{.python .input}
+predictor.leaderboard(test_data, static_features=static_features)
+```
+
+```{.python .input}
+specific_predictions = predictor.predict(test_data, static_features=static_features)
+specific_predictions["Afghanistan_"]
+```
+
+```{.python .input}
+
 ```

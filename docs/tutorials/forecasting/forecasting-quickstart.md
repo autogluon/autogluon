@@ -37,6 +37,8 @@ test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/dataset
 ```
 
 ```{.python .input}
+# reload the predictor
+predictor = None
 predictor = ForecastingPredictor.load(save_path)
 predictor.leaderboard(test_data)
 ```
@@ -51,4 +53,8 @@ We can also use the predictor.fit_summary() to summarize the fit process:
 
 ```{.python .input}
 predictor.fit_summary()
+```
+
+```{.python .input}
+
 ```

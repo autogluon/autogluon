@@ -1,3 +1,5 @@
+""" Example script for defining and using custom models in AutoGluon Forecasting """
+
 from autogluon.forecasting.models.gluonts_model.abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 from gluonts.model.deepar import DeepAREstimator
 from gluonts.mx.distribution.neg_binomial import NegativeBinomialOutput

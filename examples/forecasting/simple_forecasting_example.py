@@ -1,3 +1,5 @@
+""" Example script for predicting columns of tables, demonstrating simple use-case """
+
 from autogluon.forecasting import ForecastingPredictor
 from autogluon.forecasting import TabularDataset
 
