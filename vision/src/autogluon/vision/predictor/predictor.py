@@ -294,14 +294,9 @@ class ImagePredictor(object):
         train_data = self._validate_data(train_data)
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
-        sorted_classes = sorted(train_labels_cleaned.unique())
-        if isinstance(train_data, _ImageClassification.Dataset):
-            train_data.classes = sorted_classes
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
-            if isinstance(tuning_data, _ImageClassification.Dataset):
-                tuning_data.classes = sorted_classes
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
@@ -407,7 +402,14 @@ class ImagePredictor(object):
                     raise AttributeError(err_msg)
             else:
                 raise TypeError(f"Unable to process dataset of type: {type(data)}")
-
+        elif isinstance(data, _ImageClassification.Dataset):
+            assert 'label' in data.columns
+            assert hasattr(data, 'classes')
+            # check whether classes are outdated, no action required if all unique labels is subset of `classes`
+            unique_labels = sorted(data['label'].unique())
+            if not (all(ulabel in data.classes for ulabel in unique_labels)):
+                data.classes = unique_labels
+                logger.log(20, f'Reset classification labels to {unique_labels}')
         if len(data) < 1:
             raise ValueError('Empty dataset.')
         return data
