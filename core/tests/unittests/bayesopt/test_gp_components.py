@@ -9,7 +9,7 @@ from autogluon.core.searcher.bayesopt.datatypes.scaling import LinearScaling, \
     LogScaling
 from autogluon.core.searcher.bayesopt.models.gp_model import \
     get_internal_candidate_evaluations
-from autogluon.core.searcher.bayesopt.tuning_algorithms.defaults import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.base_classes import \
     dictionarize_objective, DEFAULT_METRIC
 from autogluon.core.searcher.bayesopt.utils.test_objects import \
     dimensionality_and_warping_ranges

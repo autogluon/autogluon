@@ -3,8 +3,8 @@ import pickle
 
 from autogluon.core.searcher.bayesopt.autogluon.searcher_factory import \
     gp_fifo_searcher_factory, gp_fifo_searcher_defaults
-from autogluon.core.searcher.bayesopt.tuning_algorithms.defaults \
-    import DEFAULT_METRIC
+from autogluon.core.searcher.bayesopt.tuning_algorithms.base_classes import \
+    DEFAULT_METRIC
 from autogluon.core.searcher.bayesopt.utils.comparison_gpy import \
     Ackley, sample_data, assert_equal_candidates, assert_equal_randomstate
 

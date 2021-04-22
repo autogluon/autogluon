@@ -18,6 +18,7 @@ from .scheduler import TaskScheduler
 from ..decorator import _autogluon_method
 from ..searcher import BaseSearcher
 from ..searcher import searcher_factory
+from ..searcher.bayesopt.tuning_algorithms.base_classes import DEFAULT_CONSTRAINT_METRIC
 from ..task.task import Task
 from ..utils import save, load, mkdir, try_import_mxboard
 from ..utils.default_arguments import check_and_merge_defaults, \
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 _ARGUMENT_KEYS = {
     'args', 'resource', 'searcher', 'search_options', 'checkpoint', 'resume',
-    'num_trials', 'time_out', 'max_reward', 'reward_attr', 'time_attr',
+    'num_trials', 'time_out', 'max_reward', 'reward_attr', 'time_attr', 'constraint_attr',
     'dist_ip_addrs', 'visualizer', 'training_history_callback',
     'training_history_callback_delta_secs', 'training_history_searcher_info',
     'delay_get_config'}
@@ -41,6 +42,7 @@ _DEFAULT_OPTIONS = {
     'resume': False,
     'reward_attr': 'accuracy',
     'time_attr': 'epoch',
+    'constraint_attr': DEFAULT_CONSTRAINT_METRIC,
     'visualizer': 'none',
     'training_history_callback_delta_secs': 60,
     'training_history_searcher_info': False,
@@ -54,6 +56,7 @@ _CONSTRAINTS = {
     'max_reward': Float(),
     'reward_attr': String(),
     'time_attr': String(),
+    'constraint_attr': String(),
     'visualizer': String(),
     'training_history_callback_delta_secs': Integer(1, None),
     'training_history_searcher_info': Boolean(),
@@ -93,6 +96,9 @@ class FIFOScheduler(TaskScheduler):
     reward_attr : str
         Name of reward (i.e., metric to maximize) attribute in data obtained
         from reporter
+    constraint_attr : str
+        Name of constraint attribute in data obtained from reporter
+        for running constrained Bayesian optimization
     time_attr : str
         Name of resource (or time) attribute in data obtained from reporter.
         This attribute is optional for FIFO scheduling, but becomes mandatory
@@ -162,6 +168,7 @@ class FIFOScheduler(TaskScheduler):
             _search_options = search_options.copy()
             _search_options['configspace'] = train_fn.cs
             _search_options['reward_attribute'] = kwargs['reward_attr']
+            _search_options['constraint_attr'] = kwargs['constraint_attr']
             _search_options['resource_attribute'] = kwargs['time_attr']
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
@@ -198,6 +205,7 @@ class FIFOScheduler(TaskScheduler):
         self._checkpoint = checkpoint
         self._reward_attr = kwargs['reward_attr']
         self._time_attr = kwargs['time_attr']
+        self._constraint_attr = kwargs['constraint_attr']
         self.visualizer = kwargs['visualizer'].lower()
         if self.visualizer == 'tensorboard' or self.visualizer == 'mxboard':
             assert checkpoint is not None, "Need checkpoint to be set"

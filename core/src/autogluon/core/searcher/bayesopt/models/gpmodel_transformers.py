@@ -1,24 +1,22 @@
-from typing import List, Callable, Optional, NamedTuple
+from typing import Dict, List, Callable, Optional, NamedTuple, Union
 import logging
 import copy
 
-from .gp_model import GaussProcSurrogateModel, GPModel
+from .gp_model import GaussProcSurrogateModel, GaussianProcessRegression, GPRegressionMCMC, \
+    GaussProcSurrogateOutputModel, GPModelArgs, GPModelArgsOutput, GPModel, GPOutputModel
 from .gpmodel_skipopt import SkipOptimizationPredicate, NeverSkipPredicate
 from ..datatypes.common import Candidate, PendingEvaluation, CandidateEvaluation
 from ..datatypes.tuning_job_state import TuningJobState
-from ..tuning_algorithms.base_classes import PendingCandidateStateTransformer
-from ..tuning_algorithms.defaults import DEFAULT_METRIC
+from ..tuning_algorithms.base_classes import PendingCandidateStateTransformer, dictionarize_objective, DEFAULT_METRIC
 from ..utils.simple_profiler import SimpleProfiler
 from ..utils.debug_log import DebugLogPrinter
 
 logger = logging.getLogger(__name__)
 
 
-class GPModelArgs(NamedTuple):
-    num_fantasy_samples: int
-    random_seed: int
-    active_metric: str = DEFAULT_METRIC
-    normalize_targets: bool = True
+def _assert_same_keys(dict1, dict2):
+    assert set(dict1.keys()) == set(dict2.keys()), \
+        f'{list(dict1.keys())} and {list(dict2.keys())} need to be the same keys. '
 
 
 class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
@@ -44,16 +42,29 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
     data in the state changes. We put a safeguard in place to avoid refitting
     when the labeled data is unchanged.
 
+    Note that gpmodel can also be a dictionary mapping output names to
+    GP models. In that case, the state is shared but the models for each
+    output metric are updated independently.
+
     """
     def __init__(
-            self, gpmodel: GPModel, init_state: TuningJobState,
-            model_args: GPModelArgs,
+            self, gpmodel: GPOutputModel, init_state: TuningJobState,
+            model_args: GPModelArgsOutput,
             skip_optimization: Optional[SkipOptimizationPredicate] = None,
             profiler: Optional[SimpleProfiler] = None,
             debug_log: Optional[DebugLogPrinter] = None):
+        self._use_single_model = False
+        if isinstance(gpmodel, GaussianProcessRegression) or isinstance(gpmodel, GPRegressionMCMC):
+            self._use_single_model = True
+        if not self._use_single_model:
+            assert isinstance(gpmodel, Dict), f'{gpmodel} is neither an instance of GaussianProcessRegression ' \
+                                              f'nor GPRegressionMCMC. It is assumed that we are in the multi-output ' \
+                                              f'case and that it must be a Dict. No other types are supported. '
+            assert isinstance(model_args, Dict), f'{model_args} must be a Dict, consistently with {gpmodel}.'
+            _assert_same_keys(gpmodel, model_args)
         self._gpmodel = gpmodel
-        self._state = copy.copy(init_state)
         self._model_args = model_args
+        self._state = copy.copy(init_state)
         if skip_optimization is None:
             self.skip_optimization = NeverSkipPredicate()
         else:
@@ -61,12 +72,12 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
         self._profiler = profiler
         self._debug_log = debug_log
         # GPMXNetModel computed on demand
-        self._model: GaussProcSurrogateModel = None
+        self._model: GaussProcSurrogateOutputModel = None
         self._candidate_evaluations = None
         # _model_params is returned by get_params. Careful: This is not just
         # self._gpmodel.get_params(), since the current GaussProcSurrogateModel
         # may append additional parameters
-        self._model_params = gpmodel.get_params()
+        self._assign_model_params(self._gpmodel)
         # DEBUG
         self._debug_fantasy_values = None
 
@@ -74,13 +85,14 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
     def state(self) -> TuningJobState:
         return self._state
 
-    def model(self, **kwargs) -> GaussProcSurrogateModel:
+    def model(self, **kwargs) -> GaussProcSurrogateOutputModel:
         """
         If skip_optimization is given, it overrides the self.skip_optimization
         predicate.
 
-        :return: GPMXNetModel for current state
-
+        :return: GPMXNetModel for current state in the standard single model case;
+                 in the multi-model case, it returns a dictionary mapping output names
+                 to GPMXNetModel instances for current state (shared across models).
         """
         if self._model is None:
             skip_optimization = kwargs.get('skip_optimization')
@@ -91,8 +103,13 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
         return self._model_params
 
     def set_params(self, param_dict):
-        self._gpmodel.set_params(param_dict)
-        self._model_params = self._gpmodel.get_params()
+        if self._use_single_model:
+            self._gpmodel.set_params(param_dict)
+        else:
+            _assert_same_keys(self._gpmodel, param_dict)
+            for key in self._gpmodel:
+                self._gpmodel[key].set_params(param_dict[key])
+        self._assign_model_params(self._gpmodel)
 
     def append_candidate(self, candidate: Candidate):
         """
@@ -186,7 +203,6 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
         self._state.failed_candidates.append(candidate)
 
     def _compute_model(self, skip_optimization=None):
-        args = self._model_args
         if skip_optimization is None:
             skip_optimization = self.skip_optimization(self._state)
             if skip_optimization and self._debug_log is not None:
@@ -200,24 +216,53 @@ class GPModelPendingCandidateStateTransformer(PendingCandidateStateTransformer):
                 logger.info(
                     "Skipping the refitting of GP hyperparameters, since the "
                     "labeled data did not change since the last recent fit")
-        self._model = GaussProcSurrogateModel(
-            state=self._state,
-            active_metric=args.active_metric,
-            random_seed=args.random_seed,
-            gpmodel=self._gpmodel,
-            fit_parameters=fit_parameters,
-            num_fantasy_samples=args.num_fantasy_samples,
-            normalize_targets=args.normalize_targets,
-            profiler=self._profiler,
-            debug_log=self._debug_log,
-            debug_fantasy_values=self._debug_fantasy_values)
-        # DEBUG: Supplied values are used only once
-        self._debug_fantasy_values = None
+
+        if self._use_single_model:
+            gpmodels = dictionarize_objective(self._gpmodel)
+            model_args = dictionarize_objective(self._model_args)
+        else:
+            gpmodels = self._gpmodel
+            model_args = self._model_args
+        _assert_same_keys(gpmodels, model_args)
+        output_models = {}
+        for metric_name in gpmodels:
+            args = model_args[metric_name]
+            model = GaussProcSurrogateModel(
+                state=self._state,
+                active_metric=metric_name,
+                random_seed=args.random_seed,
+                gpmodel=gpmodels[metric_name],
+                fit_parameters=fit_parameters,
+                num_fantasy_samples=args.num_fantasy_samples,
+                normalize_targets=args.normalize_targets,
+                profiler=self._profiler,
+                debug_log=self._debug_log,
+                debug_fantasy_values=self._debug_fantasy_values)
+            output_models[args.active_metric] = model
+        if self._use_single_model:
+            self._model = output_models[DEFAULT_METRIC]
+        else:
+            self._model = output_models
         # Note: This may be different than self._gpmodel.get_params(), since
         # the GaussProcSurrogateModel may append additional info
-        self._model_params = self._model.get_params()
+        self._assign_model_params(self._model)
+        # DEBUG: Supplied values are used only once
+        self._debug_fantasy_values = None
         if fit_parameters:
             # Keep copy of labeled data in order to avoid unnecessary
             # refitting
             self._candidate_evaluations = copy.copy(
                 self._state.candidate_evaluations)
+
+    def _assign_model_params(self, model):
+        """
+        Gets model parameters from model and assigns them to self._model_params.
+
+        In the multi-model case, self._model_params is a dictionary mapping
+        each model name to its parameters.
+        """
+        if self._use_single_model:
+            self._model_params = model.get_params()
+        else:
+            self._model_params = {key: value.get_params()
+                                  for key, value in model.items()}

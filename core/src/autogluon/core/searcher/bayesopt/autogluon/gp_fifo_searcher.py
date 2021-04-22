@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Callable, Type, NamedTuple, Optional, Any
+from typing import Callable, Dict, Type, NamedTuple, Optional, Any
 import copy
 import logging
 import ConfigSpace as CS
@@ -9,19 +9,15 @@ from ..datatypes.common import CandidateEvaluation, Candidate, \
 from ..datatypes.hp_ranges import HyperparameterRanges
 from ..datatypes.hp_ranges_cs import HyperparameterRanges_CS
 from ..datatypes.tuning_job_state import TuningJobState
-from ..models.gp_model import GaussProcSurrogateModel, GPModel
+from ..models.gp_model import GaussProcSurrogateOutputModel, GPModel
 from ..models.gpmodel_skipopt import SkipOptimizationPredicate
-from ..models.gpmodel_transformers import \
-    GPModelPendingCandidateStateTransformer, GPModelArgs
-from ..tuning_algorithms.base_classes import LocalOptimizer, \
-    AcquisitionFunction, ScoringFunction
+from ..models.gpmodel_transformers import GPModelPendingCandidateStateTransformer, GPModelArgs
+from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction, ScoringFunction, \
+    dictionarize_objective, DEFAULT_METRIC
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
-from ..tuning_algorithms.bo_algorithm_components import \
-    IndependentThompsonSampling
-from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, \
-    compute_blacklisted_candidates
-from ..tuning_algorithms.defaults import dictionarize_objective, \
-    DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, \
+from ..tuning_algorithms.bo_algorithm_components import IndependentThompsonSampling
+from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, compute_blacklisted_candidates
+from ..tuning_algorithms.defaults import DEFAULT_LOCAL_OPTIMIZER_CLASS, \
     DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
 from ..utils.debug_log import DebugLogPrinter
 from ..utils.duplicate_detector import DuplicateDetectorIdentical
@@ -49,13 +45,16 @@ DEFAULT_INITIAL_SCORING = 'thompson_indep'
 
 
 def create_initial_candidates_scorer(
-        initial_scoring: str, model: GaussProcSurrogateModel,
+        initial_scoring: str, model: GaussProcSurrogateOutputModel,
         acquisition_class: Type[AcquisitionFunction],
-        random_state: np.random.RandomState) -> ScoringFunction:
+        random_state: np.random.RandomState, active_output: str = None) -> ScoringFunction:
     if initial_scoring == 'thompson_indep':
+        if isinstance(model, Dict):
+            assert active_output in model
+            model = model[active_output]
         return IndependentThompsonSampling(model, random_state=random_state)
     else:
-        return acquisition_class(model)
+        return acquisition_class(model, active_metric=active_output)
 
 
 def check_initial_candidates_scorer(initial_scoring: str) -> str:
@@ -106,6 +105,7 @@ class GPSearcher(object):
                 candidate_evaluations=[],
                 failed_candidates=[],
                 pending_evaluations=[])
+        self._init_state = init_state
         self.state_transformer = GPModelPendingCandidateStateTransformer(
             gpmodel=gpmodel,
             init_state=init_state,
@@ -352,7 +352,6 @@ class GPFIFOSearcher(GPSearcher):
         else:
             # Obtain current SurrogateModel from state transformer. Based on
             # this, the BO algorithm components can be constructed
-            state = self.state_transformer.state
             if self.do_profile:
                 self.profiler.push_prefix('getconfig')
                 self.profiler.start('all')

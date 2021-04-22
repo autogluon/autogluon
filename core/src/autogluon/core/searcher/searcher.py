@@ -55,7 +55,10 @@ class BaseSearcher(object):
         from ..scheduler import FIFOScheduler
         from ..scheduler.seq_scheduler import LocalSequentialScheduler
 
-        if isinstance(scheduler, FIFOScheduler) or isinstance(scheduler, LocalSequentialScheduler):
+        if isinstance(scheduler, FIFOScheduler):
+            self._reward_attribute = scheduler._reward_attr
+            self._constraint_attribute = scheduler._constraint_attr
+        if isinstance(scheduler, LocalSequentialScheduler):
             self._reward_attribute = scheduler._reward_attr
 
     @staticmethod

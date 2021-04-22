@@ -12,7 +12,7 @@ from autogluon.core.searcher.bayesopt.datatypes.tuning_job_state import \
 from autogluon.core.searcher.bayesopt.tuning_algorithms.common import \
     compute_blacklisted_candidates, generate_unique_candidates, \
     RandomCandidateGenerator
-from autogluon.core.searcher.bayesopt.tuning_algorithms.defaults \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.base_classes \
     import dictionarize_objective
 from autogluon.core.searcher.bayesopt.utils.test_objects import \
     RepeatedCandidateGenerator
