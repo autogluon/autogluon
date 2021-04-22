@@ -28,6 +28,7 @@ def test_task():
     single_test2 = classifier2.predict(test_dataset.iloc[0]['image'], as_pandas=False)
 
 def test_task_label_remap():
+    ImagePredictor = Task
     train_dataset, _, test_dataset = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     label_remap = {0: 'd', 1: 'c', 2: 'b', 3: 'a'}
     train_dataset = train_dataset.replace({"label": label_remap})
