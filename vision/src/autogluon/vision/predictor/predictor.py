@@ -288,10 +288,10 @@ class ImagePredictor(object):
                 raise ValueError(f'`tuning_data` {tuning_data} is not among valid list {valid_names}')
 
         # data sanity check
+        train_data = self._validate_data(train_data)
         train_labels = _get_valid_labels(train_data)
         self._label_cleaner = LabelCleaner.construct(problem_type=self._problem_type, y=train_labels, y_uncleaned=train_labels)
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
-        train_data = self._validate_data(train_data)
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
         if tuning_data is not None:
@@ -409,7 +409,7 @@ class ImagePredictor(object):
             unique_labels = sorted(data['label'].unique().tolist())
             if not (all(ulabel in data.classes for ulabel in unique_labels)):
                 data.classes = unique_labels
-                logger.log(20, f'Reset classification labels to {unique_labels}')
+                logger.log(20, f'Reset labels to {unique_labels}')
         if len(data) < 1:
             raise ValueError('Empty dataset.')
         return data

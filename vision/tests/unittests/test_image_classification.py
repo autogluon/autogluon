@@ -9,7 +9,7 @@ def test_task():
     classifier = Task()
     classifier.fit(dataset, num_trials=2, hyperparameters={'epochs': 1, 'early_stop_patience': 3})
     # assert input dataset not altered
-    assert dataset_copy == dataset
+    assert all(dataset_copy.index == dataset.index)
     test_result = classifier.predict(test_dataset)
     single_test = classifier.predict(test_dataset.iloc[0]['image'])
     single_proba = classifier.predict_proba(test_dataset.iloc[0]['image'])
