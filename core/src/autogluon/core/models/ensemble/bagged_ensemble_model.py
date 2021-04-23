@@ -168,7 +168,8 @@ class BaggedEnsembleModel(AbstractModel):
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats - 1) * k_fold + k_fold_end
         folds_to_fit = fold_end - fold_start
-        fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats)
+        fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(
+            self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats)
         for j in range(n_repeat_start, n_repeats):  # For each n_repeat
             cur_repeat_count = j - n_repeat_start
             fold_start_n_repeat = fold_start + cur_repeat_count * k_fold

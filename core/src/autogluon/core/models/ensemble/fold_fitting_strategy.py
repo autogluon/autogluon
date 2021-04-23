@@ -62,7 +62,15 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
             self._fit_fold_model(*job)
 
     def _fit_fold_model(self, model_base, fold_ctx, kwargs):
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        time_start_fold = time.time()
+        time_limit_fold = self._get_fold_time_limit(fold_ctx)
+        fold_model = self._fit(model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs)
+        fold_model, pred_proba = self._predict_oof(fold_model, fold_ctx)
+
+        self._update_bagged_ensembe(fold_model, pred_proba, fold_ctx)
+
+    def _get_fold_time_limit(self, fold_ctx):
+        _, folds_finished, folds_left, folds_to_fit, _, _ = self._get_fold_properties(fold_ctx)
         time_elapsed = time.time() - self.time_start
         if self.time_limit is not None:
             time_left = self.time_limit - time_elapsed
@@ -77,7 +85,21 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
                 raise TimeLimitExceeded
         else:
             time_limit_fold = None
-        time_start_fold = time.time()
+        return time_limit_fold
+
+    def _update_bagged_ensembe(self, fold_model, pred_proba, fold_ctx):
+        _, val_index = fold_ctx['fold']
+        model_to_append = fold_model
+        if self.bagged_ensemble_model.low_memory:
+            self.bagged_ensemble_model.save_child(fold_model, verbose=False)
+            model_to_append = fold_model.name
+        self.models.append(model_to_append)
+        self.oof_pred_proba[val_index] += pred_proba
+        self.oof_pred_model_repeats[val_index] += 1
+        self.bagged_ensemble_model._add_child_times_to_bag(model=fold_model)
+
+    def _fit(self, model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs):
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
         train_index, val_index = fold
         X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
         y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
@@ -88,24 +110,16 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         if self.sample_weight is not None:
             kwargs_fold['sample_weight'] = self.sample_weight[train_index]
             kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
-
-        fold_model, pred_proba = self._model_fit(X_fold, X_val_fold, fold_model, kwargs_fold, time_limit_fold, y_fold, y_val_fold, time_start_fold, fold_ctx)
-
-        train_index, val_index = fold_ctx['fold']
-        model_to_append = fold_model
-        if self.bagged_ensemble_model.low_memory:
-            self.bagged_ensemble_model.save_child(fold_model, verbose=False)
-            model_to_append = fold_model.name
-        self.models.append(model_to_append)
-        self.oof_pred_proba[val_index] += pred_proba
-        self.oof_pred_model_repeats[val_index] += 1
-        self.bagged_ensemble_model._add_child_times_to_bag(model=fold_model)
-
-    def _model_fit(self, X_fold, X_val_fold, fold_model, kwargs_fold, time_limit_fold, y_fold, y_val_fold, time_start_fold, fold_ctx):
         fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
+        fold_model.fit_time = time.time() - time_start_fold
+        return fold_model
+
+    def _predict_oof(self, fold_model, fold_ctx):
         time_train_end_fold = time.time()
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
-
+        _, val_index = fold
+        X_val_fold = self.X.iloc[val_index, :]
+        y_val_fold = self.y.iloc[val_index]
         if self.time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
             if is_last_fold:
                 time_elapsed = time.time() - self.time_start
@@ -115,9 +129,7 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
                 if expected_remaining_time_required > time_left:
                     raise TimeLimitExceeded
         pred_proba = fold_model.predict_proba(X_val_fold)
-        time_predict_end_fold = time.time()
-        fold_model.fit_time = time_train_end_fold - time_start_fold
-        fold_model.predict_time = time_predict_end_fold - time_train_end_fold
+        fold_model.predict_time = time.time() - time_train_end_fold
         fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=pred_proba)
         fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if not self.bagged_ensemble_model.params.get('save_bag_folds', True):
