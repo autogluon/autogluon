@@ -41,11 +41,13 @@ class ImagePredictor(object):
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via logger.setLevel(L),
         where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
+    label : str, default = 'label'
+        Name of the column that contains the target variable to predict.
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
     Dataset = _ImageClassification.Dataset
 
-    def __init__(self, problem_type=None, eval_metric=None, path=None, verbosity=2):
+    def __init__(self, problem_type=None, eval_metric=None, path=None, verbosity=2, label='label'):
         self._problem_type = problem_type
         self._eval_metric = eval_metric
         if path is None:
@@ -55,6 +57,8 @@ class ImagePredictor(object):
         self._classifier = None
         self._label_cleaner = None
         self._fit_summary = {}
+        self._label = label
+        assert isinstance(self._label, str)
         os.makedirs(self._log_dir, exist_ok=True)
 
     @property
@@ -380,6 +384,12 @@ class ImagePredictor(object):
 
     def _validate_data(self, data):
         """Check whether data is valid, try to convert with best effort if not"""
+        if isinstance(data, pd.DataFrame):
+            # TODO(zhreshold): allow custom label column without this renaming trick
+            if self._label != 'label' and self._label in data.columns:
+                # data is deepcopied so it's okay to overwrite directly
+                data = data.rename(columns={'label': '_unused_label', self._label: 'label'}, errors='ignore')
+
         if not (hasattr(data, 'classes') and hasattr(data, 'to_mxnet')):
             if isinstance(data, pd.DataFrame):
                 # raw dataframe, try to add metadata automatically
