@@ -69,7 +69,10 @@ class RFModel(AbstractModel):
             'n_jobs': -1,
             'random_state': 0,
             'bootstrap': True,  # Required for OOB estimates, setting to False will raise exception if bagging.
-            'min_samples_leaf': 5,  # Significantly reduces info leakage to stacker models. Never use the default/1 when using as base model.
+            # TODO: min_samples_leaf=5 is too large on most problems, however on some datasets it helps a lot (airlines likes >40 min_samples_leaf, adult likes 2 much better than 1)
+            #  This value would need to be tuned per dataset, likely very worthwhile.
+            #  Higher values = less OOF info leak, default = 1, which maximizes info leak.
+            # 'min_samples_leaf': 5,  # Significantly reduces info leakage to stacker models. Never use the default/1 when using as base model.
             # 'oob_score': True,  # Disabled by default as it is better to do it post-fit via custom logic.
         }
         for param, val in default_params.items():
