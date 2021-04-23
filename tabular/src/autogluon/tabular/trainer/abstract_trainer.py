@@ -18,7 +18,6 @@ from autogluon.core.utils.savers import save_json, save_pkl
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
-from autogluon.core.models.ensemble.fold_fitting_strategy import SequentialLocalFoldFittingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -309,7 +308,7 @@ class AbstractTrainer:
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=1, base_model_names: List[str] = None, stack_name='core',
                              ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel,
-                             name_suffix: str = None, get_models_func=None, fold_fitting_strategy=SequentialLocalFoldFittingStrategy, **kwargs) -> List[str]:
+                             name_suffix: str = None, get_models_func=None, fold_fitting_strategy=None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 1, then the models will use base model predictions as additional features.

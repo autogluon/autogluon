@@ -20,6 +20,7 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.core.utils.decorators import apply_presets
+from autogluon.core.models.ensemble.fold_fitting_strategy import SequentialLocalFoldFittingStrategy
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
@@ -644,6 +645,7 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
+        fold_fitting_strategy = kwargs['fold_fitting_strategy']
 
         if ag_args is None:
             ag_args = {}
@@ -697,7 +699,13 @@ class TabularPredictor:
                 logger.log(20, f'Warning: Training may take a very long time because `time_limit` was not specified and `train_data` is large ({num_rows_train} samples, {round(mb_mem_usage_train_data, 2)} MB).')
                 logger.log(20, f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.')
 
-        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
+        core_kwargs = {
+            'ag_args': ag_args,
+            'ag_args_ensemble': ag_args_ensemble,
+            'ag_args_fit': ag_args_fit,
+            'excluded_model_types': excluded_model_types,
+            'fold_fitting_strategy': fold_fitting_strategy,
+        }
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity)
@@ -2240,6 +2248,9 @@ class TabularPredictor:
 
             # quantile levels
             quantile_levels=None,
+
+            # Fitting strategy for bagged ensemble models
+            fold_fitting_strategy=SequentialLocalFoldFittingStrategy,
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())

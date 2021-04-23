@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 from autogluon.core.models.ensemble.fold_fitting_strategy import *
 
-from .fold_fitting_strategy import SequentialLocalFoldFittingStrategy
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
@@ -26,7 +25,7 @@ class BaggedEnsembleModel(AbstractModel):
     """
     _oof_filename = 'oof.pkl'
 
-    def __init__(self, model_base: AbstractModel, fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy, random_state=0, **kwargs):
+    def __init__(self, model_base: AbstractModel, fold_fitting_strategy: AbstractFoldFittingStrategy = None, random_state=0, **kwargs):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
