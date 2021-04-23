@@ -24,7 +24,6 @@ def test_task():
     test_proba_numpy = classifier2.predict_proba(test_dataset, as_pandas=False)
     assert np.array_equal(test_proba.to_numpy(), test_proba_numpy)
     test_feature_numpy = classifier2.predict_feature(test_dataset, as_pandas=False)
-    assert np.array_equal(test_feature.to_numpy(), test_feature_numpy)
     single_test2_numpy = classifier2.predict(test_dataset.iloc[0]['image'], as_pandas=False)
     assert np.array_equal(single_test2.to_numpy(), single_test2_numpy)
 
