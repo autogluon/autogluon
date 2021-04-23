@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractFoldFittingStrategy(object):
+
     @abstractmethod
     def schedule_fold_model_fit(self, model_base, fold_ctx, kwargs):
         """
@@ -66,7 +67,6 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         time_limit_fold = self._get_fold_time_limit(fold_ctx)
         fold_model = self._fit(model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs)
         fold_model, pred_proba = self._predict_oof(fold_model, fold_ctx)
-
         self._update_bagged_ensembe(fold_model, pred_proba, fold_ctx)
 
     def _get_fold_time_limit(self, fold_ctx):

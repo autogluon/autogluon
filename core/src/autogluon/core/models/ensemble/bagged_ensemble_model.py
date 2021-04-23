@@ -26,7 +26,7 @@ class BaggedEnsembleModel(AbstractModel):
     """
     _oof_filename = 'oof.pkl'
 
-    def __init__(self, model_base: AbstractModel, random_state=0, **kwargs):
+    def __init__(self, model_base: AbstractModel, fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy, random_state=0, **kwargs):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
@@ -44,6 +44,7 @@ class BaggedEnsembleModel(AbstractModel):
         # TODO: Consider moving `_child_oof` logic to a separate class / refactor OOF logic.
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
+        self._cls_fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy
 
         try:
             feature_metadata = self.model_base.feature_metadata
@@ -168,7 +169,8 @@ class BaggedEnsembleModel(AbstractModel):
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats - 1) * k_fold + k_fold_end
         folds_to_fit = fold_end - fold_start
-        fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(
+        # noinspection PyCallingNonCallable
+        fold_fitting_strategy: AbstractFoldFittingStrategy = self._cls_fold_fitting_strategy(
             self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats)
         for j in range(n_repeat_start, n_repeats):  # For each n_repeat
             cur_repeat_count = j - n_repeat_start
