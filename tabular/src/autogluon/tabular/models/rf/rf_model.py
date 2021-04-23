@@ -65,10 +65,11 @@ class RFModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            'n_estimators': 300,
+            'n_estimators': 600,
             'n_jobs': -1,
             'random_state': 0,
             'bootstrap': True,  # Required for OOB estimates, setting to False will raise exception if bagging.
+            'min_samples_leaf': 5,  # Significantly reduces info leakage to stacker models. Never use the default/1 when using as base model.
             # 'oob_score': True,  # Disabled by default as it is better to do it post-fit via custom logic.
         }
         for param, val in default_params.items():
@@ -293,7 +294,7 @@ class RFModel(AbstractModel):
     @classmethod
     def _get_default_ag_args_ensemble(cls) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble()
-        extra_ag_args_ensemble = {'use_child_oof': False}
+        extra_ag_args_ensemble = {'use_child_oof': True}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
