@@ -31,11 +31,11 @@ def test_task():
 def test_task_label_remap():
     ImagePredictor = Task
     train_dataset, _, test_dataset = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
-    dataset_copy = copy.deepcopy(train_dataset)
     label_remap = {0: 'd', 1: 'c', 2: 'b', 3: 'a'}
     train_dataset = train_dataset.replace({"label": label_remap})
     test_dataset = test_dataset.replace({"label": label_remap})
     predictor = ImagePredictor()
+    dataset_copy = copy.deepcopy(train_dataset)
     predictor.fit(train_dataset, hyperparameters={'epochs': 2})
     # assert input dataset not altered
     assert dataset_copy.equals(train_dataset)
