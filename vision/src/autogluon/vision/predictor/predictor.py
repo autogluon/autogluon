@@ -27,6 +27,8 @@ class ImagePredictor(object):
 
     Parameters
     ----------
+    label : str, default = 'label'
+        Name of the column that contains the target variable to predict.
     problem_type : str, default = None
         Type of prediction problem. Options: ('multiclass'). If problem_type = None, the prediction problem type is inferred
          based on the provided dataset. Currently only multiclass(or single class vs. background) classification is supported.
@@ -41,13 +43,11 @@ class ImagePredictor(object):
         Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
         If using logging, you can alternatively control amount of information printed via logger.setLevel(L),
         where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
-    label : str, default = 'label'
-        Name of the column that contains the target variable to predict.
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
     Dataset = _ImageClassification.Dataset
 
-    def __init__(self, problem_type=None, eval_metric=None, path=None, verbosity=2, label='label'):
+    def __init__(self, label='label', problem_type=None, eval_metric=None, path=None, verbosity=2):
         self._problem_type = problem_type
         self._eval_metric = eval_metric
         if path is None:
