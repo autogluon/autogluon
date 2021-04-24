@@ -65,7 +65,9 @@ class RFModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            'n_estimators': 600,
+            # TODO: 600 is much better, but increases info leakage in stacking -> therefore 300 is ~equal in stack ensemble final quality.
+            #  Consider adding targeted noise to OOF to avoid info leakage, or increase `min_samples_leaf`.
+            'n_estimators': 300,
             'n_jobs': -1,
             'random_state': 0,
             'bootstrap': True,  # Required for OOB estimates, setting to False will raise exception if bagging.
