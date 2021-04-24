@@ -281,9 +281,9 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             y_pred = predictor.predict(test_data)
             perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
             if dataset['problem_type'] != REGRESSION:
-                perf = 1.0 - perf_dict['accuracy_score'] # convert accuracy to error-rate
+                perf = 1.0 - perf_dict['accuracy']  # convert accuracy to error-rate
             else:
-                perf = 1.0 - perf_dict['r2_score'] # unexplained variance score.
+                perf = 1.0 - perf_dict['r2']  # unexplained variance score.
             performance_vals[idx] = perf
             print("Performance on dataset %s: %s   (previous perf=%s)" % (dataset['name'], performance_vals[idx], dataset['performance_val']))
             if (not fast_benchmark) and (performance_vals[idx] > dataset['performance_val'] * perf_threshold):

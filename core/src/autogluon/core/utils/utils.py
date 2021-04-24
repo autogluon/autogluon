@@ -412,7 +412,11 @@ def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, 
     try:
         weighted_metric = metric(y, y_pred, sample_weight=weights, **kwargs)
     except (ValueError, TypeError, KeyError):
-        logger.log(30, f"WARNING: eval_metric='{metric.name}' does not support sample weights so they will be ignored in reported metric.")
+        if hasattr(metric, 'name'):
+            metric_name = metric.name
+        else:
+            metric_name = metric
+        logger.log(30, f"WARNING: eval_metric='{metric_name}' does not support sample weights so they will be ignored in reported metric.")
         weighted_metric = metric(y, y_pred, **kwargs)
     return weighted_metric
 

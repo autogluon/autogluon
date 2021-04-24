@@ -10,10 +10,8 @@ from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
-from numpy import corrcoef
 from pandas import DataFrame, Series
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
-from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
+from sklearn.metrics import classification_report
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.metrics import confusion_matrix, get_metric
@@ -437,7 +435,23 @@ class AbstractLearner:
         else:
             y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
             y_tmp = y_internal
-        return compute_weighted_metric(y_tmp, y_pred, metric, sample_weight, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
+        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
+
+    def _score_with_pred(self,
+                         y,
+                         y_internal,
+                         y_pred_internal,
+                         metric,
+                         sample_weight=None):
+        metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
+        if self.problem_type == BINARY:
+            # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
+            y_pred = y_pred_internal
+            y_tmp = y_internal
+        else:
+            y_pred = self.label_cleaner.inverse_transform(y_pred_internal)
+            y_tmp = y
+        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _validate_class_labels(self, y: Series):
         null_count = y.isnull().sum()
@@ -454,13 +468,12 @@ class AbstractLearner:
                 # log_loss / pac_score
                 raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
 
-    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
+    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False):
         """ Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
                 auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
                 detailed_report (bool): Should we computed more-detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True).
-                high_always_good (bool): If True, this means higher values of returned metric are ALWAYS superior (so metrics like MSE should be returned negated)
 
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
@@ -474,84 +487,100 @@ class AbstractLearner:
                 y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels)
             elif len(y_pred.shape) > 1:
                 y_pred = pd.DataFrame(data=y_pred, columns=self.class_labels)
-        if self.problem_type == BINARY:
-            if isinstance(y_pred, pd.DataFrame):
-                # roc_auc crashes if this isn't done
-                y_pred = y_pred[self.positive_class]
-                is_proba = True
-            elif not self.eval_metric.needs_pred:
-                raise AssertionError(f'`evaluate_predictions` requires y_pred_proba input for binary classification '
-                                     f'when evaluating "{self.eval_metric.name}"... Please generate valid input via `predictor.predict_proba(data)`.\n'
-                                     f'This may have occurred if you passed in predict input instead of predict_proba input, '
-                                     f'or if you specified `as_multiclass=False` to `predictor.predict_proba(data, as_multiclass=False)`, '
-                                     f'which is not supported by `evaluate_predictions`.')
-        elif self.problem_type == MULTICLASS:
-            if isinstance(y_pred, pd.DataFrame):
-                is_proba = True
-        if is_proba and self.eval_metric.needs_pred:
+
+        if isinstance(y_pred, pd.DataFrame):
+            is_proba = True
+        elif not self.eval_metric.needs_pred:
+            raise AssertionError(f'`evaluate_predictions` requires y_pred_proba input '
+                                 f'when evaluating "{self.eval_metric.name}"... Please generate valid input via `predictor.predict_proba(data)`.\n'
+                                 f'This may have occurred if you passed in predict input instead of predict_proba input, '
+                                 f'or if you specified `as_multiclass=False` to `predictor.predict_proba(data, as_multiclass=False)`, '
+                                 f'which is not supported by `evaluate_predictions`.')
+        if is_proba:
+            y_pred_proba = y_pred
+            y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
             if self.problem_type == BINARY:
-                y_pred = get_pred_from_proba(y_pred_proba=y_pred, problem_type=self.problem_type)
-                y_pred = self.label_cleaner.inverse_transform(y_pred)
-            else:
-                y_pred = get_pred_from_proba_df(y_pred_proba=y_pred, problem_type=self.problem_type)
-        if not self.eval_metric.needs_pred:
-            y_true = self.label_cleaner.transform(y_true)  # Get labels in numeric order
-            performance = self.eval_metric(y_true, y_pred)
-        elif self.problem_type == BINARY:
-            # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
-            y_true_internal = self.label_cleaner.transform(y_true)
-            y_pred_internal = self.label_cleaner.transform(y_pred)
-            performance = self.eval_metric(y_true_internal, y_pred_internal)
+                # roc_auc crashes if this isn't done
+                y_pred_proba = y_pred_proba[self.positive_class]
         else:
-            performance = self.eval_metric(y_true, y_pred)
+            y_pred_proba = None
+            y_pred = pd.Series(y_pred)
+        if y_pred_proba is not None:
+            y_pred_proba_internal = self.label_cleaner.transform_proba(y_pred_proba, as_pandas=True)
+        else:
+            y_pred_proba_internal = None
+        y_true_internal = self.label_cleaner.transform(y_true)  # Get labels in numeric order
+        y_true_internal = y_true_internal.fillna(-1)
+        y_pred_internal = self.label_cleaner.transform(y_pred)  # Get labels in numeric order
 
-        metric = self.eval_metric.name
+        # Compute auxiliary metrics:
+        auxiliary_metrics_lst = [self.eval_metric]
+        performance_dict = {}
 
-        if not high_always_good:
-            performance = self.eval_metric.convert_score_to_sklearn_val(performance)  # flip negative once again back to positive (so higher is no longer necessarily better)
-
-        if not silent:
-            logger.log(20, f"Evaluation: {metric} on test data: {performance}")
-
-        if not auxiliary_metrics:
-            return performance
-
-        # Otherwise compute auxiliary metrics:
-        auxiliary_metrics = []
-        if self.problem_type == REGRESSION:  # Adding regression metrics
-            pearson_corr = lambda x, y: corrcoef(x, y)[0][1]
-            pearson_corr.__name__ = 'pearson_correlation'
-            auxiliary_metrics += [
-                mean_absolute_error, explained_variance_score, r2_score, pearson_corr, mean_squared_error, median_absolute_error,
-                # max_error
-            ]
-        else:  # Adding classification metrics
-            auxiliary_metrics += [accuracy_score, balanced_accuracy_score, matthews_corrcoef]
+        if auxiliary_metrics:
+            if self.problem_type == REGRESSION:  # Adding regression metrics
+                auxiliary_metrics_lst += [
+                    'root_mean_squared_error',
+                    'mean_squared_error',
+                    'mean_absolute_error',
+                    'r2',
+                    'pearsonr',
+                    'median_absolute_error',
+                ]
+            if self.problem_type in [BINARY, MULTICLASS]:  # Adding classification metrics
+                auxiliary_metrics_lst += [
+                    'accuracy',
+                    'balanced_accuracy',
+                    # 'log_loss',  # Don't include as it probably adds more confusion to novice users (can be infinite)
+                    'mcc',
+                ]
             if self.problem_type == BINARY:  # binary-specific metrics
-                # def auc_score(y_true, y_pred): # TODO: this requires y_pred to be probability-scores
-                #     fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label)
-                #   return auc(fpr, tpr)
-                f1micro_score = lambda y_true, y_pred: f1_score(y_true, y_pred, average='micro')
-                f1micro_score.__name__ = f1_score.__name__
-                auxiliary_metrics += [f1micro_score]  # TODO: add auc?
-            # elif self.problem_type == MULTICLASS:  # multiclass metrics
-            #     auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include top-5, top-10 accuracy here.
+                auxiliary_metrics_lst += [
+                    'roc_auc',
+                    'f1',
+                    'precision',
+                    'recall',
+                ]
 
-        performance_dict = OrderedDict({metric: performance})
-        for metric_function in auxiliary_metrics:
-            if isinstance(metric_function, tuple):
-                metric_function, metric_kwargs = metric_function
+        scoring_args = dict(
+            y=y_true,
+            y_internal=y_true_internal,
+            # sample_weight=sample_weight,  # TODO: add sample_weight support
+        )
+
+        for aux_metric in auxiliary_metrics_lst:
+            if isinstance(aux_metric, str):
+                aux_metric = get_metric(metric=aux_metric, problem_type=self.problem_type, metric_type='aux_metric')
+            if not aux_metric.needs_pred and y_pred_proba_internal is None:
+                logger.log(15, f'Skipping {aux_metric.name} because no prediction probabilities are available to score.')
+                continue
+
+            if aux_metric.name not in performance_dict:
+                if y_pred_proba_internal is not None:
+                    score = self._score_with_pred_proba(
+                        y_pred_proba_internal=y_pred_proba_internal,
+                        metric=aux_metric,
+                        **scoring_args
+                    )
+                else:
+                    score = self._score_with_pred(
+                        y_pred_internal=y_pred_internal,
+                        metric=aux_metric,
+                        **scoring_args
+                    )
+                performance_dict[aux_metric.name] = score
+
+        if self.eval_metric.name in performance_dict:
+            score_eval = performance_dict[self.eval_metric.name]
+            score_eval_flipped = self.eval_metric.convert_score_to_sklearn_val(score_eval)  # flip negative once again back to positive (so higher is no longer necessarily better)
+            if score_eval_flipped != score_eval:
+                flipped = True
             else:
-                metric_kwargs = None
-            metric_name = metric_function.__name__
-            if metric_name not in performance_dict:
-                try:  # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
-                    if metric_kwargs:
-                        performance_dict[metric_name] = metric_function(y_true, y_pred, **metric_kwargs)
-                    else:
-                        performance_dict[metric_name] = metric_function(y_true, y_pred)
-                except ValueError:
-                    pass
+                flipped = False
+            if not silent:
+                logger.log(20, f"Evaluation: {self.eval_metric.name} on test data: {score_eval}")
+                if flipped:
+                    logger.log(20, f"\tNote: Scores are always higher_is_better. This metric score can be multiplied by -1 to get the metric value.")
 
         if not silent:
             logger.log(20, "Evaluations on test data:")

@@ -870,7 +870,7 @@ class TabularPredictor:
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
             The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
         as_pandas : bool, default = True
             Whether to return the output as a pandas object (True) or numpy array (False).
             Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
@@ -891,55 +891,61 @@ class TabularPredictor:
         data = self.__get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
-    def evaluate(self, data, silent=False):
+    def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
         Report the predictive performance evaluated over a given dataset.
-        This is basically a shortcut for: `pred = predict(data); evaluate_predictions(data[label], preds, auxiliary_metrics=False)`
-        that automatically uses `predict_proba()` instead of `predict()` when appropriate.
+        This is basically a shortcut for: `pred_proba = predict_proba(data); evaluate_predictions(data[label], pred_proba)`.
 
         Parameters
         ----------
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
             This dataset must also contain the `label` with the same column-name as previously specified.
             If str is passed, `data` will be loaded using the str value as the file path.
-
-        silent : bool (optional)
-            Should performance results be printed?
-
-        Returns
-        -------
-        Predictive performance value on the given dataset, based on the `eval_metric` used by this Predictor.
-        """
-        data = self.__get_dataset(data)
-        perf = self._learner.score(data)
-        perf = self.eval_metric.convert_score_to_sklearn_val(perf)  # flip negative once again back to positive (so higher is no longer necessarily better)
-        if not silent:
-            print("Predictive performance on given data: %s = %s" % (self.eval_metric, perf))
-        return perf
-
-    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True):
-        """
-        Evaluate the provided predictions against ground truth labels.
-        Evaluation is based on the `eval_metric` previously specifed to `fit()`, or default metrics if none was specified.
-
-        Parameters
-        ----------
-        y_true : list or :class:`np.array`
-            The ordered collection of ground-truth labels.
-        y_pred : list or :class:`np.array`
-            The ordered collection of predictions.
-            Caution: For certain types of `eval_metric` (such as 'roc_auc'), `y_pred` must be predicted-probabilities rather than predicted labels.
-        silent : bool (optional)
-            Should performance results be printed?
-        auxiliary_metrics: bool (optional)
+        model : str (optional)
+            The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        silent : bool, default = False
+            If False, performance results are printed.
+        auxiliary_metrics: bool, default = True
             Should we compute other (`problem_type` specific) metrics in addition to the default metric?
-        detailed_report : bool (optional)
+        detailed_report : bool, default = False
             Should we computed more detailed versions of the `auxiliary_metrics`? (requires `auxiliary_metrics = True`)
 
         Returns
         -------
-        Scalar performance value if `auxiliary_metrics = False`.
-        If `auxiliary_metrics = True`, returns dict where keys = metrics, values = performance along each metric.
+        Returns dict where keys = metrics, values = performance along each metric. To get the `eval_metric` score, do `output[predictor.eval_metric.name]`
+        NOTE: Metrics scores always show in higher is better form.
+        This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
+        """
+        data = self.__get_dataset(data)
+        y_pred_proba = self.predict_proba(data=data, model=model)
+        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent, auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
+
+    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
+        """
+        Evaluate the provided prediction probabilities against ground truth labels.
+        Evaluation is based on the `eval_metric` previously specified to `fit()`, or default metrics if none was specified.
+
+        Parameters
+        ----------
+        y_true : :class:`np.array` or :class:`pd.Series`
+            The ordered collection of ground-truth labels.
+        y_pred : :class:`pd.Series` or :class:`pd.DataFrame`
+            The ordered collection of prediction probabilities or predictions.
+            Obtainable via the output of `predictor.predict_proba`.
+            Caution: For certain types of `eval_metric` (such as 'roc_auc'), `y_pred` must be predicted-probabilities rather than predicted labels.
+        silent : bool, default = False
+            If False, performance results are printed.
+        auxiliary_metrics: bool, default = True
+            Should we compute other (`problem_type` specific) metrics in addition to the default metric?
+        detailed_report : bool, default = False
+            Should we computed more detailed versions of the `auxiliary_metrics`? (requires `auxiliary_metrics = True`)
+
+        Returns
+        -------
+        Returns dict where keys = metrics, values = performance along each metric.
+        NOTE: Metrics scores always show in higher is better form.
+        This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
         return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
