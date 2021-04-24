@@ -33,7 +33,9 @@ def test_task_label_remap():
     label_remap = {0: 'd', 1: 'c', 2: 'b', 3: 'a'}
     train_dataset = train_dataset.replace({"label": label_remap})
     test_dataset = test_dataset.replace({"label": label_remap})
-    predictor = ImagePredictor()
+    # rename label column
+    train_dataset = train_dataset.rename(columns={'label': 'my_label'})
+    predictor = ImagePredictor(label='my_label')
     dataset_copy = copy.deepcopy(train_dataset)
     predictor.fit(train_dataset, hyperparameters={'epochs': 2})
     # assert input dataset not altered
