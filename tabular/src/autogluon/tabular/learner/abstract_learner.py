@@ -211,7 +211,6 @@ class AbstractLearner:
                 suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation=True to instead report weighted metrics."
             logger.log(20, prefix+suffix)
 
-
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:
             if model is not None and base_models is not None:
@@ -478,6 +477,10 @@ class AbstractLearner:
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
+
+        if self.weight_evaluation:
+            raise AssertionError('evaluate_predictions does not support `weight_evaluation=True`. Use `predictor.leaderboard` instead.')
+
         is_proba = False
         assert isinstance(y_true, (np.ndarray, pd.Series))
         assert isinstance(y_pred, (np.ndarray, pd.Series, pd.DataFrame))
