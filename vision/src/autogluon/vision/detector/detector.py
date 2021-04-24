@@ -393,7 +393,7 @@ class ObjectDetector(object):
         if as_pandas:
             return ret
         else:
-            return ret.as_numpy()
+            return ret.to_numpy()
 
     def evaluate(self, data):
         """Evaluate model performance on validation data.

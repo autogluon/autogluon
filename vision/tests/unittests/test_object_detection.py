@@ -14,3 +14,5 @@ def test_task():
     test_map = detector2.evaluate(test_data)
     test_result2 = detector2.predict(test_data)
     assert test_result2.equals(test_result)
+    # to numpy
+    test_result2 = detector2.predict(test_data, as_pandas=False)
