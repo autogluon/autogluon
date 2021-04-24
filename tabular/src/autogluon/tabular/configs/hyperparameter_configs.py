@@ -8,8 +8,8 @@ hyperparameter_config_dict = dict(
     default={
         'NN': {},
         'GBM': [
-            {},
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+            {},
             'GBMLarge',
         ],
         'CAT': {},
@@ -34,8 +34,8 @@ hyperparameter_config_dict = dict(
     light={
         'NN': {},
         'GBM': [
-            {},
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+            {},
             'GBMLarge',
         ],
         'CAT': {},
