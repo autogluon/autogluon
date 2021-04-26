@@ -2,11 +2,14 @@ import os
 import time
 import logging
 
-from autogluon.core.constants import REGRESSION, PROBLEM_TYPES_CLASSIFICATION
+import psutil
+
+from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.features.types import R_OBJECT
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils import try_import_xgboost
+from autogluon.core.utils.exceptions import NotEnoughMemoryError
 
 from . import xgboost_utils
 from .hyperparameters.parameters import get_param_baseline
@@ -89,6 +92,7 @@ class XGBoostModel(AbstractModel):
             verbose_eval = 1
 
         X = self.preprocess(X, is_train=True, max_category_levels=max_category_levels)
+        self._assert_memory_safe(X=X, y=y)
         num_rows_train = X.shape[0]
 
         eval_set = []
@@ -152,3 +156,27 @@ class XGBoostModel(AbstractModel):
 
     def _ag_params(self) -> set:
         return {'ag.early_stop'}
+
+    # FIXME: This is copy-pasted from CatBoostModel, make a generic memory check method / function and re-use.
+    def _assert_memory_safe(self, X, y):
+        num_rows_train = len(X)
+        num_cols_train = len(X.columns)
+        if self.problem_type == MULTICLASS:
+            if self.num_classes is not None:
+                num_classes = self.num_classes
+            else:
+                num_classes = 10  # Guess if not given, can do better by looking at y
+        elif self.problem_type == SOFTCLASS:  # TODO: delete this elif if it's unnecessary.
+            num_classes = y.shape[1]
+        else:
+            num_classes = 1
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        approx_mem_size_req = num_rows_train * num_cols_train * num_classes / 2  # TODO: Extremely crude approximation, can be vastly improved
+        if approx_mem_size_req > 1e9:  # > 1 GB
+            available_mem = psutil.virtual_memory().available
+            ratio = approx_mem_size_req / available_mem
+            if ratio > (1 * max_memory_usage_ratio):
+                logger.warning('\tWarning: Not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+                raise NotEnoughMemoryError
+            elif ratio > (0.2 * max_memory_usage_ratio):
+                logger.warning('\tWarning: Potentially not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
