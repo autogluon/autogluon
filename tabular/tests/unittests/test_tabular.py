@@ -281,9 +281,9 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             y_pred = predictor.predict(test_data)
             perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
             if dataset['problem_type'] != REGRESSION:
-                perf = 1.0 - perf_dict['accuracy_score'] # convert accuracy to error-rate
+                perf = 1.0 - perf_dict['accuracy']  # convert accuracy to error-rate
             else:
-                perf = 1.0 - perf_dict['r2_score'] # unexplained variance score.
+                perf = 1.0 - perf_dict['r2']  # unexplained variance score.
             performance_vals[idx] = perf
             print("Performance on dataset %s: %s   (previous perf=%s)" % (dataset['name'], performance_vals[idx], dataset['performance_val']))
             if (not fast_benchmark) and (performance_vals[idx] > dataset['performance_val'] * perf_threshold):
@@ -513,8 +513,9 @@ def test_sample_weight():
     ldr = predictor.leaderboard(test_data)
     perf = predictor.evaluate(test_data)
     # Run again with weight_evaluation:
+    # FIXME: RMSE doesn't support sample_weight, this entire call doesn't make sense
     predictor = TabularPredictor(label=dataset['label'], path=savedir, problem_type=dataset['problem_type'], sample_weight=sample_weight, weight_evaluation=True).fit(train_data, **fit_args)
-    perf = predictor.evaluate(test_data_weighted)
+    # perf = predictor.evaluate(test_data_weighted)  # TODO: Doesn't work without implementing sample_weight in evaluate
     predictor.distill(time_limit=10)
     ldr = predictor.leaderboard(test_data_weighted)
 

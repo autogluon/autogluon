@@ -34,7 +34,5 @@ print(test_data.head())
 perf = predictor.evaluate(test_data)  # shorthand way to evaluate our predictor if test-labels are available
 
 # Otherwise we make predictions and can evaluate them later:
-y_test = test_data[label]
-test_data = test_data.drop(labels=[label], axis=1)  # Delete labels from test data since we wouldn't have them in practice
-y_pred = predictor.predict(test_data)
-perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
+y_pred = predictor.predict_proba(test_data)
+perf = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred, auxiliary_metrics=True)
