@@ -91,8 +91,8 @@ class XGBoostModel(AbstractModel):
             verbose = True
             verbose_eval = 1
 
-        X = self.preprocess(X, is_train=True, max_category_levels=max_category_levels)
         self._assert_memory_safe(X=X, y=y)
+        X = self.preprocess(X, is_train=True, max_category_levels=max_category_levels)
         num_rows_train = X.shape[0]
 
         eval_set = []
@@ -159,8 +159,8 @@ class XGBoostModel(AbstractModel):
 
     # FIXME: This is copy-pasted from CatBoostModel, make a generic memory check method / function and re-use.
     def _assert_memory_safe(self, X, y):
-        num_rows_train = len(X)
-        num_cols_train = len(X.columns)
+        num_rows_train = X.shape[0]
+        num_cols_train = X.shape[1]
         if self.problem_type == MULTICLASS:
             if self.num_classes is not None:
                 num_classes = self.num_classes
