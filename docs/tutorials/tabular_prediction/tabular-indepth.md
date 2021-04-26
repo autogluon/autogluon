@@ -81,7 +81,7 @@ We again demonstrate how to use the trained models to predict on the test data.
 ```{.python .input}
 y_pred = predictor.predict(test_data_nolabel)
 print("Predictions:  ", list(y_pred)[:5])
-perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=False)
+perf = predictor.evaluate(test_data, auxiliary_metrics=False)
 ```
 
 Use the following to view a summary of what happened during fit. Now this command will show details of the hyperparameter-tuning process for each type of model:
@@ -206,19 +206,15 @@ predictor_information = predictor.info()
 The `predictor` also remembers what metric predictions should be evaluated with, which can be done with ground truth labels as follows:
 
 ```{.python .input}
-y_pred = predictor.predict(test_data_nolabel)
-perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
+y_pred_proba = predictor.predict_proba(test_data_nolabel)
+perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred_proba)
 ```
 
-However, you must be careful here as certain metrics require predicted probabilities rather than classes.
 Since the label columns remains in the `test_data` DataFrame, we can instead use the shorthand:
 
 ```{.python .input}
 perf = predictor.evaluate(test_data)
 ```
-
-which will correctly select between `predict()` or `predict_proba()` depending on the evaluation metric.
-
 
 ## Interpretability (feature importance)
 
