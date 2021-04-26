@@ -92,7 +92,6 @@ VALID_AG_ARGS_KEYS = {
     'name_bag_suffix',
     'model_type',
     'priority',
-    'priority_offset',
     'problem_types',
     'disable_in_hpo',
     'valid_stacker',
