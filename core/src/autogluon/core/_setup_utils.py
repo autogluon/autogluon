@@ -16,7 +16,7 @@ PYTHON_REQUIRES = '>=3.6, <3.9'
 DEPENDENT_PACKAGES = {
     'numpy': '==1.19.5',  # TODO: v0.3 consider upgrading
     'pandas': '>=1.0.0,<2.0',
-    'scikit-learn': '>=0.22.0,<0.25',
+    'scikit-learn': '>=0.23.2,<0.25',  # 0.22 crashes during efficient OOB in Tabular
     'scipy': '>=1.5.4,<1.7',
     'gluoncv': '>=0.10.1.post0,<0.11',
     'tqdm': '>=4.38.0',
