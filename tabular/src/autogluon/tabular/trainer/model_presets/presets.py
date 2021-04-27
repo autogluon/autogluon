@@ -17,15 +17,15 @@ logger = logging.getLogger(__name__)
 
 # Higher values indicate higher priority, priority dictates the order models are trained for a given level.
 DEFAULT_MODEL_PRIORITY = dict(
-    RF=100,
-    XT=90,
-    KNN=80,
-    GBM=70,
-    CAT=60,
-    XGB=55,
+    KNN=100,
+    GBM=90,
+    RF=80,
+    CAT=70,
+    XT=60,
     FASTAI=50,
-    NN=45,
-    LR=40,
+    XGB=40,
+    LR=30,
+    NN=20,
     FASTTEXT=0,
     AG_TEXT_NN=0,
     TRANSF=0,
@@ -35,9 +35,7 @@ DEFAULT_MODEL_PRIORITY = dict(
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
 PROBLEM_TYPE_MODEL_PRIORITY = {
     MULTICLASS: dict(
-        FASTAI=120,
-        NN=115,
-        KNN=110,
+        FASTAI=95,
     ),
 }
 
@@ -51,7 +49,7 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
-DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'ENS_WEIGHTED'] # TODO: OTHERS will be added
+DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'ENS_WEIGHTED']  # TODO: OTHERS will be added
 
 MODEL_TYPES = dict(
     RF=RFModel,

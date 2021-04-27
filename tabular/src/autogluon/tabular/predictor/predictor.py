@@ -355,8 +355,8 @@ class TabularPredictor:
                 hyperparameters = {
                     'NN': {},
                     'GBM': [
-                        {},
                         {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+                        {},
                         'GBMLarge',
                     ],
                     'CAT': {},
@@ -407,7 +407,7 @@ class TabularPredictor:
                             name_main: (str) The main name of the model. Example: 'RandomForest'.
                             name_prefix: (str) Add a custom prefix to the model name. Unused by default.
                             name_suffix: (str) Add a custom suffix to the model name. Unused by default.
-                            priority: (int) Determines the order in which the model is trained. Larger values result in the model being trained earlier. Default values range from 100 (RF) to 0 (custom), dictated by model type. If you want this model to be trained first, set priority = 999.
+                            priority: (int) Determines the order in which the model is trained. Larger values result in the model being trained earlier. Default values range from 100 (KNN) to 0 (custom), dictated by model type. If you want this model to be trained first, set priority = 999.
                             problem_types: (list) List of valid problem types for the model. `problem_types=['binary']` will result in the model only being trained if `problem_type` is 'binary'.
                             disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune_kwargs=None`.
                             valid_stacker: (bool) If False, the model will not be trained as a level 2 or higher stacker model.
