@@ -45,7 +45,7 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 requirements = [
     'numpy>=1.16.0',
     'scipy>=1.3.3',
-    'gluonts>=0.5.1',
+    'gluonts>=0.7.0',
     'pandas>=1.0.0,<2.0',
     'psutil>=5.0.0,<=5.7.0',
     f'autogluon.core=={version}'
