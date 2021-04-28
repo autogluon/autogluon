@@ -11,7 +11,7 @@ test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/dataset
 static_features = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries"
                                  "/toy_static_features.csv")
 # change this to specify search strategy, can try bayesopt, random, or skopt
-searcher_type = "random"
+searcher_type = "local"
 # change this to specify eval metric, one of ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
 eval_metric = "mean_wQuantileLoss"
 

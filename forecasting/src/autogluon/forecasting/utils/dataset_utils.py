@@ -15,7 +15,7 @@ logger = logging.getLogger()
 
 class TimeSeriesDataset(ListDataset):
 
-    def __init__(self, df, index_column=None, static_features=None):
+    def __init__(self, df, index_column=None, static_features=None, prev_inferred=None):
         """
         transform a dataframe in the following form to a gluon-ts dataset
         >>> X
@@ -30,7 +30,7 @@ class TimeSeriesDataset(ListDataset):
             self.static_real_features = None
             self.cardinality = None
         else:
-            self.static_cat_features, self.static_real_features, self.cardinality = extract_static_feature(index_column, static_features)
+            self.static_cat_features, self.static_real_features, self.cardinality = extract_static_feature(index_column, static_features, prev_inferred=prev_inferred)
 
         if index_column is not None:
             target = df.drop(index_column, axis=1)
@@ -80,6 +80,12 @@ class TimeSeriesDataset(ListDataset):
             return False
         else:
             return len(self.static_real_features) != 0
+
+    def static_cat_columns(self):
+        return self.static_cat_features.columns if self.static_cat_features is not None else None
+
+    def static_real_columns(self):
+        return self.static_real_features.columns if self.static_real_features is not None else None
 
     def get_static_cat_cardinality(self):
         return self.cardinality
@@ -188,7 +194,8 @@ def time_series_dataset(data,
                         target_column="target",
                         time_column="date",
                         chosen_ts=None,
-                        static_features=None):
+                        static_features=None,
+                        prev_inferred=None):
     rebuilt_data = rebuild_tabular(data,
                                    index_column=index_column,
                                    target_column=target_column,
@@ -198,40 +205,48 @@ def time_series_dataset(data,
     if chosen_ts is not None:
         rebuilt_data = rebuilt_data.loc[rebuilt_data[index_column].isin(chosen_ts)]
         static_features = static_features.loc[static_features[index_column].isin(chosen_ts)]
-    return TimeSeriesDataset(rebuilt_data, index_column=index_column, static_features=static_features)
+    return TimeSeriesDataset(rebuilt_data, index_column=index_column, static_features=static_features, prev_inferred=prev_inferred)
 
 
-def extract_static_feature(index_column, features):
-    if index_column is None:
-        raise ValueError("Index column is not given for static features.")
-    indices = features[index_column]
-    features = features.drop(index_column, axis=1)
-    cardinality = []
-    for column in features.columns:
-        try:
-            features[column] = features[column].astype(R_FLOAT)
-            if len(features[column].unique()) <= 10:
-                logger.log(30, f"static feature column {column} has 10 or less unique values, assuming it is categorical.")
-                features[column] = features[column].astype(R_CATEGORY)
-                cardinality.append(len(features[column].unique()))
-        except ValueError:
-            logger.log(30, f"Cannot convert column {column} to float, assuming it is categorical.")
-            if len(features[column].unqiue()) == len(features[column]):
-                logger.log(30, f"Categorical feature {column} has different values for all rows, discarding it.")
-            else:
-                cardinality.append(len(features[column].unique()))
-    # Extracting static real features and fillna with mean
-    static_real_features = IdentityFeatureGenerator(
-        infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}
-    ).fit_transform(features)
-    for column in static_real_features:
-        static_real_features[column].fillna(static_real_features[column].mean(), inplace=True)
-    # Extracting static cat features, na is deal with as an additional category.
-    static_cat_features = IdentityFeatureGenerator(
-        infer_features_in_args={"invalid_raw_types": [R_INT, R_FLOAT]}
-    ).fit_transform(features)
-    static_cat_features = CategoryFeatureGenerator().fit_transform(static_cat_features)
+def extract_static_feature(index_column, features, prev_inferred=None):
+    if prev_inferred is not None:
+        logger.log(30, "Using previous inferred feature columns...")
+        logger.log(30, f"Static Cat Features Dataframe including {list([prev_inferred['static_cat_columns']])}")
+        logger.log(30, f"Static Real Features Dataframe including {list(prev_inferred['static_real_columns'])}")
+        static_cat_features = features[prev_inferred["static_cat_columns"]]
+        static_real_features = features[prev_inferred["static_real_columns"]]
+        cardinality = prev_inferred["cardinality"]
+    else:
+        if index_column is None:
+            raise ValueError("Index column is not given for static features.")
+        indices = features[index_column]
+        features = features.drop(index_column, axis=1)
+        cardinality = []
+        for column in features.columns:
+            try:
+                features[column] = features[column].astype(R_FLOAT)
+                if len(features[column].unique()) <= 10:
+                    logger.log(30, f"static feature column {column} has 10 or less unique values, assuming it is categorical.")
+                    features[column] = features[column].astype(R_CATEGORY)
+                    cardinality.append(len(features[column].unique()))
+            except ValueError:
+                logger.log(30, f"Cannot convert column {column} to float, assuming it is categorical.")
+                if len(features[column].unqiue()) == len(features[column]):
+                    logger.log(30, f"Categorical feature {column} has different values for all rows, discarding it.")
+                else:
+                    cardinality.append(len(features[column].unique()))
+        # Extracting static real features and fillna with mean
+        static_real_features = IdentityFeatureGenerator(
+            infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}
+        ).fit_transform(features)
+        for column in static_real_features:
+            static_real_features[column].fillna(static_real_features[column].mean(), inplace=True)
+        # Extracting static cat features, na is deal with as an additional category.
+        static_cat_features = IdentityFeatureGenerator(
+            infer_features_in_args={"invalid_raw_types": [R_INT, R_FLOAT]}
+        ).fit_transform(features)
+        static_cat_features = CategoryFeatureGenerator().fit_transform(static_cat_features)
 
-    static_cat_features[index_column] = indices
-    static_real_features[index_column] = indices
+        static_cat_features[index_column] = indices
+        static_real_features[index_column] = indices
     return static_cat_features, static_real_features, cardinality

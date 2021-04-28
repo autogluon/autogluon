@@ -213,7 +213,7 @@ class AbstractGluonTSModel(AbstractModel):
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)
-        scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_params)
+        scheduler = scheduler_func(model_trial, **scheduler_params)
         scheduler.run()
         scheduler.join_jobs()
         self.best_configs.update(scheduler.get_best_config())

@@ -39,22 +39,22 @@ def get_default_hps(key, prediction_length):
             "MQCNN": {},
             "SFF": {},
             "DeepAR": {},
-            # "AutoTabular": {} # Predicting with AutoTabular model seems quite slow.
+            "AutoTabular": {} # Predicting with AutoTabular model seems quite slow.
         },
         "default_hpo": {
             "MQCNN": {
-                'context_length': ag.Int(min(max(10, 2*prediction_length), 250), min(500,12*prediction_length),
+                'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250), max(min(500,12*prediction_length), 4 * prediction_length),
                                          default=prediction_length * 4),
                 "num_batches_per_epoch": 32,
                 "epochs": 50},
             "DeepAR": {
-                'context_length': ag.Int(min(max(10, 2*prediction_length), 250), min(500,12*prediction_length),
-                                         default=prediction_length * 4),
+                'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250), max(min(500,12*prediction_length), 4 * prediction_length),
+                                         default=prediction_length),
                 "num_batches_per_epoch": 32,
                 "epochs": 50},
             "SFF": {
-                'context_length': ag.Int(min(max(10, 2*prediction_length), 250), min(500,12*prediction_length),
-                                         default=prediction_length * 4),
+                'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250), max(min(500,12*prediction_length), 4 * prediction_length),
+                                         default=prediction_length),
                 "num_batches_per_epoch": 32,
                 "epochs": 50},
         }

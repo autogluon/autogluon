@@ -48,9 +48,12 @@ class ForecastingPredictor:
         self.time_column = None
         self.target_column = None
 
+        self.static_cat_columns = None
+        self.static_real_columns = None
         self.use_feat_static_cat = False
         self.use_feat_static_real = False
         self.cardinality = None
+        self.prev_inferred_static_features = {}
 
     def fit(self,
             train_data,
@@ -107,12 +110,18 @@ class ForecastingPredictor:
                                            target_column=target_column,
                                            time_column=time_column)
             train_data = TimeSeriesDataset(train_data, index_column=index_column, static_features=static_features)
+
+            self.static_cat_columns = train_data.static_cat_columns()
+            self.static_real_columns = train_data.static_real_columns()
             self.use_feat_static_cat = train_data.use_feat_static_cat()
             self.use_feat_static_real = train_data.use_feat_static_real()
             self.cardinality = train_data.get_static_cat_cardinality()
+            self.prev_inferred_static_features = {"static_cat_columns": self.static_cat_columns,
+                                                  "static_real_columns": self.static_real_columns,
+                                                  "cardinality": self.cardinality}
             freq = train_data.get_freq()
 
-            val_data = TimeSeriesDataset(val_data, index_column=index_column, static_features=static_features)
+            val_data = TimeSeriesDataset(val_data, index_column=index_column, static_features=static_features, prev_inferred=self.prev_inferred_static_features)
         elif isinstance(train_data, FileDataset) or isinstance(train_data, ListDataset):
             logger.log(30, "Training with dataset in gluon-ts format...")
             if val_data is None:
@@ -143,8 +152,8 @@ class ForecastingPredictor:
         logger.log(30, f"Random seed set to {random_seed}")
         quantiles = kwargs.get("quantiles", ["0.5"])
         logger.log(30, f"All models will be trained for quantiles {quantiles}.")
-        scheduler_options = {"searcher": search_strategy,
-                             "resource": {"num_cpus": 1, "num_gpus": 0},
+
+        scheduler_options = {"resource": {"num_cpus": 1, "num_gpus": 0},
                              "num_trials": num_trials,
                              "reward_attr": "validation_performance",
                              "time_attr": "epoch",
@@ -178,7 +187,7 @@ class ForecastingPredictor:
 
     def _validate_hyperparameter_tune_kwargs(self, kwargs):
         hyperparameter_kwargs_default = {
-            "search_strategy": "random",
+            "search_strategy": "local",
             "num_trials": 1,
         }
         copied_hyperparameter_tune_kwargs = copy.deepcopy(hyperparameter_kwargs_default)
@@ -219,7 +228,8 @@ class ForecastingPredictor:
                                        target_column=self.target_column,
                                        time_column=self.time_column,
                                        chosen_ts=time_series_to_predict,
-                                       static_features=static_features)
+                                       static_features=static_features,
+                                       prev_inferred=self.prev_inferred_static_features)
         return data
 
     def predict(self, data, time_series_to_predict=None, model=None, for_score=False, static_features=None, **kwargs):

@@ -106,7 +106,7 @@ class AbstractTrainer:
 
         return path, model_paths
 
-    def get_models(self, hyperparameters):
+    def get_models(self, hyperparameters, **kwargs):
         raise NotImplementedError
 
     def save(self):
@@ -168,6 +168,7 @@ class AbstractTrainer:
                                                                                         scheduler_options=(
                                                                                             self._scheduler_func,
                                                                                             self._scheduler_options))
+            hpo_results.pop('search_strategy', None)
             self.hpo_results[model.name] = hpo_results
             model_names_trained = []
             for model_hpo_name, model_path in hpo_models.items():
@@ -225,7 +226,7 @@ class AbstractTrainer:
         if hyperparameters is not None:
             hyperparameters = copy.deepcopy(hyperparameters)
         if models is None:
-            models = self.get_models(hyperparameters)
+            models = self.get_models(hyperparameters, hyperparameter_tune=hyperparameter_tune)
         model_names_trained = []
         for i, model in enumerate(models):
             model_names_trained += self._train_single_full(train_data, model, val_data=val_data,
