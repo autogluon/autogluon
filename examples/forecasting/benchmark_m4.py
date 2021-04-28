@@ -19,8 +19,9 @@ predictor = ForecastingPredictor(path="m4_benchmark").fit(train_data,
                                                           refit_full=True,
                                                           keep_only_best=True,
                                                           set_best_to_refit_full=True,
-                                                          num_trials=2,
+                                                          num_trials=10,
                                                           )
-
-print(predictor.leaderboard())
+leaderboard = predictor.leaderboard()
+leaderboard.to_csv("./results.csv", index=False)
+print(leaderboard)
 print(predictor.evaluate(test_data))
