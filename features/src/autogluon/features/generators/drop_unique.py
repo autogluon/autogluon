@@ -48,7 +48,7 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
                     # We should not drop a text column
                     continue
                 elif S_IMAGE_PATH in special_types:
-                    # We should not drop an image url column
+                    # We should not drop an image path column
                     continue
                 else:
                     features_to_drop.append(column)

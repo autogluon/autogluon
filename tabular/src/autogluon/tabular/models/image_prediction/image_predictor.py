@@ -2,6 +2,7 @@
 from typing import Optional
 import logging
 import os
+import pickle
 
 import pandas as pd
 
@@ -29,7 +30,6 @@ class ImagePredictorModel(AbstractModel):
         # Whether to load inner model when loading. Set to None on init as it is only used during save/load
         self._load_model = None
 
-        self._classes = None
         self._internal_feature_map = None
 
     def _get_default_auxiliary_params(self) -> dict:
@@ -63,6 +63,10 @@ class ImagePredictorModel(AbstractModel):
                 self._internal_feature_map = {X_features[0]: 'image'}
         if self._internal_feature_map:
             X = X.rename(columns=self._internal_feature_map)
+        from autogluon.vision import ImageDataset
+        if isinstance(X, ImageDataset):
+            # Use normal DataFrame, otherwise can crash due to `class` attribute conflicts
+            X = pd.DataFrame(X)
         return X
 
     def _fit(self,
@@ -76,7 +80,7 @@ class ImagePredictorModel(AbstractModel):
              **kwargs):
         try_import_mxnet()
         try_import_autogluon_vision()
-        from autogluon.vision import ImagePredictor, ImageDataset
+        from autogluon.vision import ImagePredictor
         params = self._get_model_params()
 
         if self.problem_type == REGRESSION:
@@ -87,7 +91,7 @@ class ImagePredictorModel(AbstractModel):
             X_val = self.preprocess(X_val)
 
         if sample_weight is not None:  # TODO: support
-            logger.log(15, "sample_weight not yet supported for ImagePredictorModel, this model will ignore them in training.")
+            logger.log(15, "\tsample_weight not yet supported for ImagePredictorModel, this model will ignore them in training.")
 
         X = X.reset_index(drop=True)
         y = y.reset_index(drop=True)
@@ -109,20 +113,13 @@ class ImagePredictorModel(AbstractModel):
             # eval_metric=self.eval_metric,  # TODO: Vision only works with accuracy
             verbosity=verbosity_image
         )
-        if y_val is None:
-            classes = list(y.unique())
-        else:
-            classes = list(pd.concat([y, y_val], ignore_index=True).unique())
-        classes.sort()
-        self._classes = classes
 
-        X = ImageDataset(X, classes=classes)
-        if X_val is not None:
-            X_val = ImageDataset(X_val, classes=classes)
+        logger.log(15, f'\tHyperparameters: {params}')
 
+        # FIXME: ImagePredictor crashes if given float time_limit
         self.model.fit(train_data=X,
                        tuning_data=X_val,
-                       time_limit=time_limit,
+                       time_limit=int(time_limit),
                        hyperparameters=params,
                        random_state=0)
         # self.model.set_verbosity(verbosity)  # TODO: How to set verbosity of fit predictor?
@@ -136,24 +133,14 @@ class ImagePredictorModel(AbstractModel):
             # return self.model.predict(X, as_pandas=False)
             raise AssertionError(f'ImagePredictorModel does not support `problem_type="{REGRESSION}"`')
 
-        y_pred_proba = self.model.predict_proba(X, as_pandas=True)
-
-        ##################
-        # FIXME: Vision should just have the standard predict_proba format by default, this is a huge amount of computation to convert
-        y_pred_proba = y_pred_proba[['score', 'id', 'image']]
-        idx_to_image_map = X[['image']]
-        idx_to_image_map = idx_to_image_map.reset_index(drop=True).reset_index(drop=False)
-        y_pred_proba = y_pred_proba.merge(idx_to_image_map, on='image')
-        y_pred_proba = y_pred_proba.drop(columns=['image'])
-        class_preds = []
-        for clss in self._classes:
-            cur_clss = y_pred_proba[y_pred_proba['id'] == clss]
-            cur_clss = cur_clss.set_index('index')['score']
-            class_preds.append(cur_clss)
-        y_pred_proba = pd.concat(class_preds, axis=1).to_numpy()
-        ##################
-
+        y_pred_proba = self.model.predict_proba(X, as_pandas=False)
         return self._convert_proba_to_unified_form(y_pred_proba)
+
+    def _get_default_searchspace(self):
+        try_import_autogluon_vision()
+        from autogluon.vision.configs import presets_configs
+        searchspace = presets_configs.preset_image_predictor['good_quality_fast_inference']['hyperparameters']
+        return searchspace
 
     def save(self, path: str = None, verbose=True) -> str:
         self._load_model = self.model is not None
@@ -188,9 +175,7 @@ class ImagePredictorModel(AbstractModel):
         memory_size
             The total memory size in bytes.
         """
-        # FIXME: How to get correct size of model?
-        total_size = 0
-        return total_size
+        return len(pickle.dumps(self.model._classifier, pickle.HIGHEST_PROTOCOL))
 
     def _get_default_resources(self):
         num_cpus = get_cpu_count()

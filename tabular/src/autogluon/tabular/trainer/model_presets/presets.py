@@ -80,7 +80,7 @@ DEFAULT_MODEL_NAMES = {
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
-    TextPredictorModel: 'TextNeuralNetwork',
+    TextPredictorModel: 'TextPredictor',
     ImagePredictorModel: 'ImagePredictor',
     FastTextModel: 'FastText',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
