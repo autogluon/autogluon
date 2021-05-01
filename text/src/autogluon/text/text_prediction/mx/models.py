@@ -322,7 +322,7 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
 
 
 def calculate_metric(scorer, ground_truth, predictions, problem_type):
-    if problem_type == BINARY and scorer.name == 'roc_auc':
+    if problem_type == BINARY and predictions.ndim > 1:
         # For ROC_AUC, we need to feed in the probability of positive class to the scorer.
         return scorer._sign * scorer(ground_truth, predictions[:, 1])
     else:
