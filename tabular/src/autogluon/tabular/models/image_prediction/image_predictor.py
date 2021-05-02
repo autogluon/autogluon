@@ -117,9 +117,12 @@ class ImagePredictorModel(AbstractModel):
         logger.log(15, f'\tHyperparameters: {params}')
 
         # FIXME: ImagePredictor crashes if given float time_limit
+        if time_limit is not None:
+            time_limit = int(time_limit)
+
         self.model.fit(train_data=X,
                        tuning_data=X_val,
-                       time_limit=int(time_limit),
+                       time_limit=time_limit,
                        hyperparameters=params,
                        random_state=0)
         # self.model.set_verbosity(verbosity)  # TODO: How to set verbosity of fit predictor?
