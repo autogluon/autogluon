@@ -77,7 +77,7 @@ class AbstractGluonTSModel(AbstractModel):
         self.path_root = self.path.rsplit(self.path_suffix, 1)[0]
 
     def set_default_parameters(self):
-        self.params = {"epochs": 50, "num_batches_per_epoch": 32}
+        self.params = {}
 
     @staticmethod
     def create_contexts(path_context):
