@@ -11,3 +11,4 @@ from .tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from .fastainn.tabular_nn_fastai import NNFastAiTabularModel
 from .fasttext.fasttext_model import FastTextModel
 from .text_prediction.text_prediction_v1_model import TextPredictorModel
+from .image_prediction.image_predictor import ImagePredictorModel

@@ -12,6 +12,7 @@ __all__ = [
     'try_import_torch',
     'try_import_skopt',
     'try_import_autogluon_text',
+    'try_import_autogluon_vision',
     'try_import_rapids_cuml']
 
 
@@ -160,6 +161,15 @@ def try_import_autogluon_text():
     except ImportError:
         raise ImportError("`import autogluon.text` failed.\n"
                           "A quick tip is to install via `pip install autogluon.text`.\n"
+                          "Ensure that the version installed is the same as the version of the other autogluon modules seen in `pip freeze`.")
+
+
+def try_import_autogluon_vision():
+    try:
+        import autogluon.vision
+    except ImportError:
+        raise ImportError("`import autogluon.vision` failed.\n"
+                          "A quick tip is to install via `pip install autogluon.vision`.\n"
                           "Ensure that the version installed is the same as the version of the other autogluon modules seen in `pip freeze`.")
 
 
