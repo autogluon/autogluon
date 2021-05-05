@@ -165,12 +165,18 @@ AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/
 
 - `autogluon.tabular` - only functionality for tabular data (TabularPredictor)
     - The default installation of `autogluon.tabular` standalone is a skeleton installation.
-    - Install via `pip install autogluon.tabular[all]` to get the same installation as via `pip install autogluon`
+    - Install via `pip install autogluon.tabular[all]` to get the same installation of tabular as via `pip install autogluon`
     - Available optional dependencies: `lightgbm,catboost,xgboost,fastai`. These are included in `all`.
+    - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
+
     - Experimental optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable, or `pip install "scikit-learn-intelex<2021.3"` after a standard installation of AutoGluon.
 - `autogluon.vision` - only functionality for computer vision (ImagePredictor, ObjectDetector)
 - `autogluon.text` - only functionality for natural language processing (TextPredictor)
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
 - `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
 - `autogluon.extra` - miscellaneous extra functionality such as `Efficient Neural Architecture Search <tutorials/nas/enas_proxylessnas.html>`_
-- `autogluon.mxnet` - miscellaneous extra functionality for MXNet.
+- `autogluon.mxnet` - miscellaneous extra MXNet functionality.
+
+To install a submodule from source, follow the instructions for installing the entire package from source but replace the line `cd autogluon && ./full_install.sh` with `cd autogluon && python3 -m pip install -e {SUBMODULE_NAME}/{OPTIONAL_DEPENDENCIES}`
+
+- For example, to install `autogluon.tabular[lightgbm,catboost]` from source, the command would be: `cd autogluon && python3 -m pip install -e tabular/[lightgbm,catboost]`
