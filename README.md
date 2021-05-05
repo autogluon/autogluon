@@ -29,6 +29,14 @@ test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test
 predictor = TabularPredictor(label='class').fit(train_data, time_limit=120)  # Fit models for 120s
 leaderboard = predictor.leaderboard(test_data)
 ```
+
+| AutoGluon Task | Quickstart | API |
+| :--- | :---: | :---: |
+| TabularPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-0) |
+| TextPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-3) |
+| ImagePredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-1) |
+| ObjectDetector | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/object_detection/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-2) |
+
 ## News
 
 **Announcement for previous users:** The AutoGluon codebase has been modularized into [namespace packages](https://packaging.python.org/guides/packaging-namespace-packages/), which means you now only need those dependencies relevant to your prediction task of interest! For example, you can now work with tabular data without having to [install](https://auto.gluon.ai/dev/install.html) dependencies required for AutoGluon's computer vision tasks (and vice versa). Unfortunately this improvement required a minor API change (eg. instead of `from autogluon import TabularPrediction`, you should now do: `from autogluon.tabular import TabularPredictor`), for all versions newer than v0.0.15. Documentation/tutorials under the old API may still be viewed [for version 0.0.15](https://auto.gluon.ai/0.0.15/index.html) which is the last released version under the old API.
