@@ -57,7 +57,7 @@ class FeatureMetadata:
     # Note: This is not optimized for speed. Do not rely on this function during inference.
     # TODO: Add valid_names, invalid_names arguments which override all other arguments for the features listed?
     def get_features(self, valid_raw_types: list = None, valid_special_types: list = None, invalid_raw_types: list = None, invalid_special_types: list = None,
-                     required_special_types: list = None, required_raw_special_pairs: List[Tuple[str, List[str]]] = None, required_exact=False, required_at_least_one_special=False):
+                     required_special_types: list = None, required_raw_special_pairs: List[Tuple[str, List[str]]] = None, required_exact=False, required_at_least_one_special=False) -> List[str]:
         """
         Returns a list of features held within the feature metadata object after being pruned through the available parameters.
 
@@ -177,13 +177,37 @@ class FeatureMetadata:
         features_to_remove = [feature for feature in self.get_features() if feature not in features]
         return self.remove_features(features=features_to_remove, inplace=inplace)
 
-    def add_special_types(self, type_map_special: dict, inplace=False):
-        """Adds special types to features"""
+    def add_special_types(self, type_map_special: Dict[str, List[str]], inplace=False):
+        """
+        Adds special types to features.
+
+        Parameters
+        ----------
+        type_map_special : Dict[str, List[str]]
+            Dictionary of feature -> list of special types to add.
+            Features in dictionary must already exist in the FeatureMetadata object.
+        inplace : bool, default False
+            If True, updates self inplace and returns self.
+            If False, updates a copy of self and returns copy.
+        Returns
+        -------
+        :class:`FeatureMetadata` object.
+
+        Examples
+        --------
+        >>> from autogluon.core.features.feature_metadata import FeatureMetadata
+        >>> feature_metadata = FeatureMetadata({'FeatureA': 'int', 'FeatureB': 'object'})
+        >>> feature_metadata = feature_metadata.add_special_types({'FeatureA': ['MySpecialType'], 'FeatureB': ['MySpecialType', 'text']})
+        """
         if inplace:
             metadata = self
         else:
             metadata = copy.deepcopy(self)
+        valid_features = set(self.get_features())
+
         for feature, special_types in type_map_special.items():
+            if feature not in valid_features:
+                raise ValueError(f'"{feature}" does not exist in this FeatureMetadata object. Only existing features can be assigned special types.')
             for special_type in special_types:
                 metadata.type_group_map_special[special_type].append(feature)
         return metadata
