@@ -18,7 +18,7 @@ from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_mod
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.core.utils.decorators import apply_presets
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
@@ -689,6 +689,13 @@ class TabularPredictor:
             if ag_args_ensemble is None:
                 ag_args_ensemble = {}
             ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
+
+        if time_limit is None:
+            mb_mem_usage_train_data = get_approximate_df_mem_usage(train_data, sample_ratio=0.2).sum() / 1e6
+            num_rows_train = len(train_data)
+            if mb_mem_usage_train_data >= 50 or num_rows_train >= 100000:
+                logger.log(20, f'Warning: Training may take a very long time because `time_limit` was not specified and `train_data` is large ({num_rows_train} samples, {round(mb_mem_usage_train_data, 2)} MB).')
+                logger.log(20, f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `hyperparameters` configuration.')
 
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,

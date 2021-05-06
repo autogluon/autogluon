@@ -8,6 +8,7 @@ import time
 import sys
 from typing import Callable
 from datetime import datetime
+from functools import wraps
 
 import numpy as np
 import pandas as pd
@@ -735,6 +736,23 @@ def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_rat
     return feature_batch_count
 
 
+def suspend_logging(func):
+    """hides any logs within the called func that are below warnings"""
+    @wraps(func)
+    def inner(*args, **kwargs):
+        root_logger = logging.getLogger()
+        previous_log_level = root_logger.getEffectiveLevel()
+        print(previous_log_level)
+        try:
+            root_logger.setLevel(max(30, previous_log_level))
+            return func(*args, **kwargs)
+        finally:
+            root_logger.setLevel(previous_log_level)
+    return inner
+
+
+# suspect_logging to hide the Pandas log of NumExpr initialization
+@suspend_logging
 def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
     if sample_ratio >= 1:
         return df.memory_usage(deep=True)
@@ -753,6 +771,7 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
                 sample_ratio_cat = num_categories_sample / num_categories
                 memory_usage[column] = df[column].cat.codes.dtype.itemsize * num_rows + df[column].cat.categories[:num_categories_sample].memory_usage(deep=True) / sample_ratio_cat
         if columns_inexact:
+            # this line causes NumExpr log, suspend_logging is used to hide the log.
             memory_usage_inexact = df[columns_inexact].head(num_rows_sample).memory_usage(deep=True)[columns_inexact] / sample_ratio
             memory_usage = memory_usage_inexact.combine_first(memory_usage)
         return memory_usage
