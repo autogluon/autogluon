@@ -742,7 +742,6 @@ def suspend_logging(func):
     def inner(*args, **kwargs):
         root_logger = logging.getLogger()
         previous_log_level = root_logger.getEffectiveLevel()
-        print(previous_log_level)
         try:
             root_logger.setLevel(max(30, previous_log_level))
             return func(*args, **kwargs)
