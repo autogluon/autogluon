@@ -237,7 +237,7 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
         model_extra_ag_args = ag_args.copy()
         model_extra_ag_args.update(model_cfg[AG_ARGS])
         model_cfg[AG_ARGS] = model_extra_ag_args
-    default_ag_args_ensemble = model_type_real._get_default_ag_args_ensemble()
+    default_ag_args_ensemble = model_type_real._get_default_ag_args_ensemble(problem_type=problem_type)
     if ag_args_ensemble is not None:
         model_extra_ag_args_ensemble = ag_args_ensemble.copy()
         model_extra_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
@@ -254,12 +254,6 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     if default_ag_args_ensemble is not None:
         default_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
         model_cfg[AG_ARGS_ENSEMBLE] = default_ag_args_ensemble
-    if issubclass(model_type, RFModel) and problem_type == QUANTILE:  # TODO: consider moving this logic into models
-        model_ag_args_ensemble = model_cfg.get(AG_ARGS_ENSEMBLE, dict())
-        if 'use_child_oof' in model_ag_args_ensemble:
-            logger.log(15, "ag_args_ensemble option 'use_child_oof' not supported for RF/XT quantile models, set to False.")
-            model_ag_args_ensemble['use_child_oof'] = False
-            model_cfg[AG_ARGS_ENSEMBLE] = model_ag_args_ensemble
     return model_cfg
 
 
