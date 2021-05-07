@@ -181,7 +181,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
             else:
                 model_cfgs_to_process.append(model_cfg)
         for model_cfg in model_cfgs_to_process:
-            model_cfg = clean_model_cfg(model_cfg=model_cfg, model_type=model_type, ag_args=ag_args, ag_args_ensemble=ag_args_ensemble, ag_args_fit=ag_args_fit)
+            model_cfg = clean_model_cfg(model_cfg=model_cfg, model_type=model_type, ag_args=ag_args, ag_args_ensemble=ag_args_ensemble, ag_args_fit=ag_args_fit, problem_type=problem_type)
             model_cfg[AG_ARGS]['priority'] = model_cfg[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             model_priority = model_cfg[AG_ARGS]['priority']
             # Check if model_cfg is valid
@@ -211,7 +211,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
     return models, model_args_fit
 
 
-def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None):
+def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None, problem_type=None):
     model_cfg = copy.deepcopy(model_cfg)
     if AG_ARGS not in model_cfg:
         model_cfg[AG_ARGS] = dict()
@@ -252,6 +252,12 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     if default_ag_args_ensemble is not None:
         default_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
         model_cfg[AG_ARGS_ENSEMBLE] = default_ag_args_ensemble
+    if issubclass(model_type, RFModel) and problem_type == QUANTILE:
+        model_ag_args_ensemble = model_cfg.get(AG_ARGS_ENSEMBLE, dict())
+        if 'use_child_oof' in model_ag_args_ensemble:
+            logger.log(15, "ag_args_ensemble option 'use_child_oof' not supported for RF/XT quantile models, set to False.")
+            model_ag_args_ensemble['use_child_oof'] = False
+            model_cfg[AG_ARGS_ENSEMBLE] = model_ag_args_ensemble
     return model_cfg
 
 
