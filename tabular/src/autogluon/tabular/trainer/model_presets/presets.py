@@ -252,7 +252,7 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     if default_ag_args_ensemble is not None:
         default_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
         model_cfg[AG_ARGS_ENSEMBLE] = default_ag_args_ensemble
-    if issubclass(model_type, RFModel) and problem_type == QUANTILE:
+    if issubclass(model_type, RFModel) and problem_type == QUANTILE:  # TODO: consider moving this logic into models
         model_ag_args_ensemble = model_cfg.get(AG_ARGS_ENSEMBLE, dict())
         if 'use_child_oof' in model_ag_args_ensemble:
             logger.log(15, "ag_args_ensemble option 'use_child_oof' not supported for RF/XT quantile models, set to False.")
