@@ -750,7 +750,7 @@ def suspend_logging(func):
     return inner
 
 
-# suspect_logging to hide the Pandas log of NumExpr initialization
+# suspend_logging to hide the Pandas log of NumExpr initialization
 @suspend_logging
 def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
     if sample_ratio >= 1:

@@ -695,7 +695,7 @@ class TabularPredictor:
             num_rows_train = len(train_data)
             if mb_mem_usage_train_data >= 50 or num_rows_train >= 100000:
                 logger.log(20, f'Warning: Training may take a very long time because `time_limit` was not specified and `train_data` is large ({num_rows_train} samples, {round(mb_mem_usage_train_data, 2)} MB).')
-                logger.log(20, f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `hyperparameters` configuration.')
+                logger.log(20, f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.')
 
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
