@@ -1,6 +1,6 @@
 """ Default (fixed) hyperparameter values used in Neural network model """
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 
 
 def get_fixed_params():
@@ -76,6 +76,34 @@ def get_hyper_params():
     return hyper_params
 
 
+def get_quantile_fixed_params():
+    """ Parameters that currently cannot be searched during HPO """
+    params = get_fixed_params()
+    new_params = {
+        'num_updates': 20000,  # maximum number of updates
+        'updates_wo_improve': 500,  # we terminate training if validation performance hasn't improved in the last 'updates_wo_improve' # of updates
+        'max_batch_size': 512,  # max batch-size
+    }
+    params.update(new_params)
+    return params
+
+
+def get_quantile_hyper_params():
+    """ Parameters that currently can be searched during HPO """
+    hyper_params = get_hyper_params()
+    new_hyper_params = {
+        'num_layers': 4,  # number of layers
+        # Options: [2, 3, 4, 5]
+        'hidden_size': 128,  # hidden size
+        # Options: [128, 256, 512]
+        'gamma': 5.0,  # margin loss weight
+        # Options: range(0.1, 10.0)
+        'alpha': 0.01, # alpha for huber pinball loss
+    }
+    hyper_params.update(new_hyper_params)
+    return hyper_params
+
+
 # Note: params for original NNTabularModel were:
 # weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
 def get_default_param(problem_type, num_classes=None):
@@ -85,6 +113,8 @@ def get_default_param(problem_type, num_classes=None):
         return get_param_multiclass(num_classes=num_classes)
     elif problem_type == REGRESSION:
         return get_param_regression()
+    elif problem_type == QUANTILE:
+        return get_param_quantile()
     else:
         return get_param_binary()
 
@@ -104,4 +134,10 @@ def get_param_binary():
 def get_param_regression():
     params = get_fixed_params()
     params.update(get_hyper_params())
+    return params
+
+
+def get_param_quantile():
+    params = get_quantile_fixed_params()
+    params.update(get_quantile_hyper_params())
     return params

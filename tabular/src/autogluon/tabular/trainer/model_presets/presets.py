@@ -10,7 +10,7 @@ from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, St
 from .presets_custom import get_preset_custom
 from ..utils import process_hyperparameters
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
-    TabularNeuralNetModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel
+    TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
-DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'ENS_WEIGHTED']  # TODO: OTHERS will be added
+DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'FASTAI', 'QNN', 'ENS_WEIGHTED'] # TODO: OTHERS will be added
 
 MODEL_TYPES = dict(
     RF=RFModel,
@@ -60,6 +60,7 @@ MODEL_TYPES = dict(
     CAT=CatBoostModel,
     XGB=XGBoostModel,
     NN=TabularNeuralNetModel,
+    QNN=TabularNeuralQuantileModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
@@ -77,6 +78,7 @@ DEFAULT_MODEL_NAMES = {
     CatBoostModel: 'CatBoost',
     XGBoostModel: 'XGBoost',
     TabularNeuralNetModel: 'NeuralNetMXNet',
+    TabularNeuralQuantileModel: 'QuantileNeuralNet',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
@@ -147,10 +149,14 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
         hyperparameters = {'default': hyperparameters}
     hp_level = hyperparameters[level_key]
     model_cfg_priority_dict = defaultdict(list)
-    for model_type in hp_level:
+    model_type_list = list(hp_level.keys())
+    for model_type in model_type_list:
         if problem_type == QUANTILE and model_type not in DEFAULT_QUANTILE_MODEL:
-            logger.warning(f"Model type '{model_type}' does not support `problem_type='{QUANTILE}'` yet. This model will be ignored.")
-            continue
+            if model_type == 'NN':
+                model_type = 'QNN'
+                hp_level['QNN'] = hp_level.pop('NN')
+            else:
+                continue
         models_of_type = hp_level[model_type]
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]

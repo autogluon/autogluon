@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 def pinball_loss(target_value, quantile_values, quantile_levels, sample_weight=None, quantile_weight=None):
-
     # "target_value" must be 2D pandas or numpy arrays
     target_value = np.array(target_value).reshape(-1, 1)
 

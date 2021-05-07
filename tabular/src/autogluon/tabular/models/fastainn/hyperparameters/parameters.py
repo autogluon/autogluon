@@ -1,5 +1,6 @@
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 
+
 # TODO this method is generalizable and potentially should be moved out into framework
 def get_param_baseline(problem_type, num_classes=None):
     if problem_type == BINARY:
@@ -48,4 +49,8 @@ def get_param_regression_baseline():
 
 
 def get_param_quantile_baseline():
-    return get_param_multiclass_baseline()
+    params = get_param_regression_baseline()
+
+    # residual threshold parameter in HuberPinballLoss
+    params.update({'alpha': 0.01})
+    return params

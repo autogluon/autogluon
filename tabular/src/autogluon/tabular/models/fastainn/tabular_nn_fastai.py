@@ -4,10 +4,11 @@ import time
 from builtins import classmethod
 from pathlib import Path
 
+import sklearn
 import numpy as np
 import pandas as pd
 
-from autogluon.core.constants import REGRESSION, BINARY
+from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.abstract.model_trial import skip_hpo
@@ -85,6 +86,7 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.data.block import RegressionBlock, CategoryBlock
         from fastai.data.transforms import IndexSplitter
         from fastcore.basics import range_of
+
         X = self.preprocess(X, fit=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
@@ -92,7 +94,7 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular.core import FillMissing, Categorify, Normalize
         self.procs = [FillMissing, Categorify, Normalize]
 
-        if self.problem_type == REGRESSION and self.y_scaler is not None:
+        if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
             y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
             y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
             logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
@@ -102,8 +104,7 @@ class NNFastAiTabularModel(AbstractModel):
 
         logger.log(15, f'Using {len(self.cont_columns)} cont features')
         df_train, train_idx, val_idx = self._generate_datasets(X, y_norm, X_val, y_val_norm)
-
-        y_block = RegressionBlock() if self.problem_type == REGRESSION else CategoryBlock()
+        y_block = RegressionBlock() if self.problem_type in [REGRESSION, QUANTILE] else CategoryBlock()
 
         # Copy cat_columns and cont_columns because TabularList is mutating the list
         data = TabularPandas(
@@ -166,6 +167,7 @@ class NNFastAiTabularModel(AbstractModel):
         from .fastai_helpers import tabular_learner
         from fastcore.basics import defaults
         from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
+        from .quantile_helpers import HuberPinballLoss
         import torch
 
         start_time = time.time()
@@ -175,6 +177,8 @@ class NNFastAiTabularModel(AbstractModel):
         params = self._get_model_params()
 
         self.y_scaler = params.get('y_scaler', None)
+        if self.problem_type == QUANTILE and self.y_scaler is None:
+            self.y_scaler = sklearn.preprocessing.MinMaxScaler()
         if self.y_scaler is not None:
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
@@ -198,7 +202,8 @@ class NNFastAiTabularModel(AbstractModel):
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
         objective_optim_mode = np.less if objective_func_name in [
             'log_loss',
-            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'  # Regression objectives
+            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2',  # Regression objectives
+            'pinball_loss', # Quantile objective
         ] else np.greater
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
@@ -206,11 +211,16 @@ class NNFastAiTabularModel(AbstractModel):
             layers = params['layers']
         elif self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
+        elif self.problem_type == QUANTILE:
+            base_size = max(len(self.quantile_levels) * 4, 128)
+            layers = [base_size, base_size, base_size]
         else:
             base_size = max(data.c * 2, 100)
             layers = [base_size * 2, base_size]
 
         loss_func = None
+        if self.problem_type == QUANTILE:
+            loss_func = HuberPinballLoss(self.quantile_levels, alpha=self.params['alpha'])
 
         if time_limit:
             time_elapsed = time.time() - start_time
@@ -220,6 +230,9 @@ class NNFastAiTabularModel(AbstractModel):
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
+
+        if self.problem_type == QUANTILE:
+            dls.c = len(self.quantile_levels)
 
         self.model = tabular_learner(
             dls, layers=layers, metrics=nn_metric,
@@ -283,6 +296,8 @@ class NNFastAiTabularModel(AbstractModel):
         if objective_func_name not in metrics_map.keys():
             if self.problem_type == REGRESSION:
                 objective_func_name = 'mean_squared_error'
+            elif self.problem_type == QUANTILE:
+                objective_func_name = 'pinball_loss'
             else:
                 objective_func_name = 'log_loss'
             logger.warning(f'Metric {stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
@@ -321,7 +336,14 @@ class NNFastAiTabularModel(AbstractModel):
                 return self.y_scaler.inverse_transform(preds.numpy()).reshape(-1)
             else:
                 return preds.numpy().reshape(-1)
-        if self.problem_type == BINARY:
+        elif self.problem_type == QUANTILE:
+            from .quantile_helpers import isotonic
+            if self.y_scaler is not None:
+                preds = self.y_scaler.inverse_transform(preds.numpy()).reshape(-1, len(self.quantile_levels))
+            else:
+                preds = preds.numpy().reshape(-1, len(self.quantile_levels))
+            return isotonic(preds, self.quantile_levels)
+        elif self.problem_type == BINARY:
             return preds[:, 1].numpy()
         else:
             return preds.numpy()
@@ -379,6 +401,7 @@ class NNFastAiTabularModel(AbstractModel):
     def __get_metrics_map(self):
         from fastai.metrics import rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
         from .fastai_helpers import medae
+        from .quantile_helpers import PinballLoss
         metrics_map = {
             # Regression
             'root_mean_squared_error': rmse,
@@ -407,7 +430,8 @@ class NNFastAiTabularModel(AbstractModel):
             'recall_micro': Recall(average='micro'),
             'recall_weighted': Recall(average='weighted'),
             'log_loss': None,
+
+            'pinball_loss': PinballLoss(quantile_levels=self.quantile_levels)
             # Not supported: pac_score
         }
         return metrics_map
-
