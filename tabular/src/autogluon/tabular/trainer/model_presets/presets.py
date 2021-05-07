@@ -177,7 +177,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
                         raise ImportError(AG_TEXT_IMPORT_ERROR)
                     model_cfgs_to_process.append(ag_text_presets.create(model_cfg))
                 else:
-                    model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type, num_classes=num_classes)
+                    model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type)
             else:
                 model_cfgs_to_process.append(model_cfg)
         for model_cfg in model_cfgs_to_process:
@@ -205,6 +205,8 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
         invalid_name_set.add(model.name)
         if 'hyperparameter_tune_kwargs' in model_cfg[AG_ARGS]:
             model_args_fit[model.name] = {'hyperparameter_tune_kwargs': model_cfg[AG_ARGS]['hyperparameter_tune_kwargs']}
+        if 'ag_args_ensemble' in model_cfg and not model_cfg['ag_args_ensemble']:
+            model_cfg.pop('ag_args_ensemble')
         if not silent:
             logger.log(20, f'\t{model.name}: \t{model_cfg}')
         models.append(model)
