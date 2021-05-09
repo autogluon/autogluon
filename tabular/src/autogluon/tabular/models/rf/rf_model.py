@@ -297,10 +297,11 @@ class RFModel(AbstractModel):
         return default_auxiliary_params
 
     @classmethod
-    def _get_default_ag_args_ensemble(cls) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble()
-        extra_ag_args_ensemble = {'use_child_oof': True}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+    def _get_default_ag_args_ensemble(cls, problem_type=None, **kwargs) -> dict:
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(problem_type=problem_type, **kwargs)
+        if problem_type != QUANTILE:  # use_child_oof not supported in quantile regression
+            extra_ag_args_ensemble = {'use_child_oof': True}
+            default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
     def _more_tags(self):
