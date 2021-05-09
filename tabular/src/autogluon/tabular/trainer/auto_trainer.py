@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
-    def get_models(self, hyperparameters, **kwargs):
+    def construct_model_templates(self, hyperparameters, **kwargs):
         path = kwargs.pop('path', self.path)
         problem_type = kwargs.pop('problem_type', self.problem_type)
         eval_metric = kwargs.pop('eval_metric', self.eval_metric)
@@ -53,7 +53,7 @@ class AutoTrainer(AbstractTrainer):
                                        feature_prune=feature_prune,
                                        num_stack_levels=num_stack_levels, time_limit=time_limit, core_kwargs=core_kwargs)
 
-    def get_models_distillation(self, hyperparameters, **kwargs):
+    def construct_model_templates_distillation(self, hyperparameters, **kwargs):
         path = kwargs.pop('path', self.path)
         problem_type = kwargs.pop('problem_type', self.problem_type)
         eval_metric = kwargs.pop('eval_metric', self.eval_metric)

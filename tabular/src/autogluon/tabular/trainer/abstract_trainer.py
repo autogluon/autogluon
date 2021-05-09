@@ -174,12 +174,11 @@ class AbstractTrainer:
         else:
             return -1
 
-    # TODO: Rename method for v0.1
-    def get_models(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
+    def construct_model_templates(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
 
-    def get_models_distillation(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
+    def construct_model_templates_distillation(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
         """Constructs a list of unfit models based on the hyperparameters dict for softclass distillation."""
         raise NotImplementedError
 
@@ -233,6 +232,7 @@ class AbstractTrainer:
         if relative_stack:
             if level_start != 1:
                 raise AssertionError(f'level_start must be 1 when `relative_stack=True`. (level_start = {level_start})')
+            level_add = 0
             if base_model_names:
                 max_base_model_level = self.get_max_level(models=base_model_names)
                 level_start = max_base_model_level + 1
@@ -251,6 +251,8 @@ class AbstractTrainer:
         aux_kwargs = {} if aux_kwargs is None else aux_kwargs.copy()
 
         model_names_fit = []
+        if level_start != level_end:
+            logger.log(20, f'AutoGluon will fit {level_end - level_start + 1} stack levels (L{level_start} to L{level_end}) ...')
         for level in range(level_start, level_end + 1):
             core_kwargs_level = core_kwargs.copy()
             aux_kwargs_level = aux_kwargs.copy()
@@ -314,7 +316,7 @@ class AbstractTrainer:
         The data provided in this method should not contain stack features, as they will be automatically generated if necessary.
         """
         if get_models_func is None:
-            get_models_func = self.get_models
+            get_models_func = self.construct_model_templates
         if base_model_names is None:
             base_model_names = []
         if not self.bagged_mode and level != 1:
@@ -359,6 +361,7 @@ class AbstractTrainer:
                     for model_name in model_args_fit if 'hyperparameter_tune_kwargs' in model_args_fit[model_name]
                 }
                 kwargs['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
+        logger.log(20, f'Fitting {len(models)} L{level} models ...')
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
@@ -832,7 +835,7 @@ class AbstractTrainer:
 
     def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None, get_models_func=None) -> List[str]:
         if get_models_func is None:
-            get_models_func = self.get_models
+            get_models_func = self.construct_model_templates
         if len(base_model_names) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return []
@@ -910,6 +913,7 @@ class AbstractTrainer:
         time_limit = model_fit_kwargs.get('time_limit', None)
         model_names_trained = []
         try:
+            fit_log_message = f'Fitting model: {model.name} ...'
             if time_limit is not None:
                 if time_limit <= 0:
                     logger.log(15, f'Skipping {model.name} due to lack of time remaining.')
@@ -918,9 +922,8 @@ class AbstractTrainer:
                     time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
                 else:
                     time_left_total = time_limit
-                logger.log(20, f'Fitting model: {model.name} ... Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.')
-            else:
-                logger.log(20, f'Fitting model: {model.name} ...')
+                fit_log_message += f' Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
+            logger.log(20, fit_log_message)
             model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
             fit_end_time = time.time()
             if self.weight_evaluation:
@@ -1995,10 +1998,10 @@ class AbstractTrainer:
 
         core_kwargs = {
             'stack_name': self.distill_stackname,
-            'get_models_func': self.get_models_distillation,
+            'get_models_func': self.construct_model_templates_distillation,
         }
         aux_kwargs = {
-            'get_models_func': self.get_models_distillation,
+            'get_models_func': self.construct_model_templates_distillation,
             'check_if_best': False,
         }
 
