@@ -36,9 +36,10 @@ DEFAULT_MODEL_PRIORITY = dict(
 def get_default_hps(key, prediction_length):
     DEFAULT_MODEL_HPS = {
         "default": {
+            "SFF": {},
             "MQCNN": {},
             "DeepAR": {},
-            "AutoTabular": {} # Predicting with AutoTabular model seems quite slow.
+            # "AutoTabular": {} # Predicting with AutoTabular model seems quite slow.
         },
         "default_hpo": {
             "MQCNN": {
@@ -51,11 +52,17 @@ def get_default_hps(key, prediction_length):
                                          max(min(500, 12 * prediction_length), prediction_length),
                                          default=prediction_length),
             },
-            "AutoTabular": {
+            "SFF": {
                 'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
                                          max(min(500, 12 * prediction_length), prediction_length),
                                          default=prediction_length),
             },
+            # TODO: Autotabular in gluonts is not fully functioning. Will be added later.
+            # "AutoTabular": {
+            #     'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
+            #                              max(min(500, 12 * prediction_length), prediction_length),
+            #                              default=prediction_length),
+            # },
         }
     }
     return DEFAULT_MODEL_HPS[key]
