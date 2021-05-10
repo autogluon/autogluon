@@ -4,14 +4,7 @@ Given the increasing importance of machine learning (ML) in our lives, with a wi
 
 In several real-world domains, accuracy is not the only objective of interest. The model should simultaneously give guarantees on other important aspects. Algorithmic fairness tries to find algorithms that not only keep a high level of accuracy but also enforce a certain level of fairness and avoid biases.
 
-The approach in this tutorial is based on the paper "Fair Bayesian Optimization". Link: https://arxiv.org/abs/2006.05109
-
-If you use this code please cite 'Fair Bayesian Optimization'. Valerio Perrone, Michele Donini, Muhammad Bilal Zafar, Robin Schmucker, Krishnaram Kenthapadi, Cédric Archambeau. AIES. 2021.
-
-In this tutorial we are going to use the German Credit Data (1). This dataset contains a binary classification task, where the goal is to predict if a person has "good" or "bad" credit risk. The dataset contains 20 attributes, including a sensitive features such as the (binary) gender of the person. In the following we download, load and explore this dataset.
-
-(1) Dua, D. and Graff, C. (2019). [UCI Machine Learning Repository](http://archive.ics.uci.edu/ml). Irvine, CA: University of California, School of Information and Computer Science.
-
+In this tutorial we are going to use the German Credit Data from the [UCI Machine Learning Repository](http://archive.ics.uci.edu/ml). This dataset contains a binary classification task, where the goal is to predict if a person has "good" or "bad" credit risk.
 
 
 ```python
@@ -147,7 +140,7 @@ df["Telephone"] = df["Telephone"].replace(["A191", "A192"], ["none", "yes"]).ast
 df["ForeignWorker"] = df["ForeignWorker"].replace(["A201", "A202"], ["yes", "no"]).astype("category")
 ```
 
-We can plot a few statistics to see if there is a risk of bias, due to unbalanced data or other facotrs. Let's begin with checking the data we laoded.
+We can plot a few statistics to see if there is a risk of bias, due to unbalanced data or other factors. Let's begin with checking the data we loaded.
 
 
 ```python
@@ -212,7 +205,7 @@ In this tutorial we decided to select a commonly used measure for bias called St
 
 $$DSP(f) = \Big| \mathbb{P}_{(x,y)} \big[ f(x)>0 \, \big| \, x \text{ in group } A \big] -  \mathbb{P}_{(x,y)} \big[ f(x)>0 \, \big| \, x \text{ in group } B \big] \Big| \leq \epsilon.$$
 
-Another possible definition is called Equal Opportunity (OP), that is defined as the property of having a similar True Poisitve Rate among the different groups. Also in this case we can defined the Difference in Equal Opportunity (DEO), and our goal is to keep it smaller that $\epsilon$:
+Another possible definition is called [Equal Opportunity](https://ai.googleblog.com/2016/10/equality-of-opportunity-in-machine.html) (EO), defined as the property of having a similar True Positive Rate among the different groups. Also in this case we can define the Difference in Equal Opportunity (DEO), and our goal is to keep it smaller that $\epsilon$:
 
 $$DEO(f) = \Big| \mathbb{P}_{(x,y)} \big[ f(x)>0 \, \big| \, x \text{ in group } A, y = 1 \big] -  \mathbb{P}_{(x,y)} \big[ f(x)>0 \, \big| \, x \text{ in group } B, y = 1 \big] \Big| \leq \epsilon$$
 
@@ -316,9 +309,8 @@ FAIRNESS_THRESHOLD = 0.01
 FAIRNESS_DEFINITION = DSP  # You can use any fairness definition, such as DSP or DEO
 ```
 
-We tune RF on a 4-dimensional search space: 
+We tune RF on a 3-dimensional search space: 
 
-* number of trees in {1, 2, . . . , 64}
 * min_samples_split in [0.01, 0.5] (log scaled)
 * tree maximum depth in {1, 2, 3, 4, 5}
 * criterion for quality of split in {Gini, Entropy}
@@ -326,14 +318,12 @@ We tune RF on a 4-dimensional search space:
 
 ```python
 def create_train_fn_constraint(fairness_threshold, fairness_definition):
-    @ag.args(n_estimators=ag.space.Int(lower=1, upper=128),
-             min_samples_split=ag.space.Real(lower=0.01, upper=1.0, log=True),
+    @ag.args(min_samples_split=ag.space.Real(lower=0.01, upper=1.0, log=True),
              max_depth=ag.space.Int(lower=1, upper=50),
              criterion=ag.space.Categorical('gini', 'entropy')
             )
     def run_opaque_box(args, reporter):
-        opaque_box_eval = opaque_box(args.n_estimators, 
-                                     args.min_samples_split,
+        opaque_box_eval = opaque_box(args.min_samples_split,
                                      args.max_depth, 
                                      args.criterion, 
                                      fairness_threshold,
@@ -349,9 +339,8 @@ run_opaque_box = create_train_fn_constraint(fairness_threshold=FAIRNESS_THRESHOL
 
 
 ```python
-def opaque_box(n_estimators, min_samples_split, max_depth, criterion, fairness_threshold, fairness_definition):
-    classifier = RandomForestClassifier(n_estimators=n_estimators, 
-                                        max_depth=max_depth,
+def opaque_box(min_samples_split, max_depth, criterion, fairness_threshold, fairness_definition):
+    classifier = RandomForestClassifier(max_depth=max_depth,
                                         min_samples_split=min_samples_split,
                                         criterion=criterion)
     classifier.fit(X_train, Y_train)
@@ -500,7 +489,7 @@ for method_name in ['BO', 'CBO']:
 
 In the plots above, the horizontal line is the fairness constraint,
 set to DSP ≤ 0.01, and darker dots correspond to later BO iterations. Standard BO can get stuck in high-performing yet unfair
-regions, failing to return a feasible solution. It is interesting to note how BO and CBO differently explore the search space. CBO is able to focus the exploration over the fair area of the hyperparameter space.
+regions, failing to return a well-performing, feasible solution. CBO is able to focus the exploration over the fair area of the hyperparameter space, and finds a more accurate fair solution.
 
 The presented method is model-agnostic and is able to handle any statistical notion of fairness. For instance, you can
 repeat the experiments plugging in a constraint on DEO instead of DSP.
