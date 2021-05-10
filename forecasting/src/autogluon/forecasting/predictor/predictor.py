@@ -361,18 +361,17 @@ class ForecastingPredictor:
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False):
         if refit_full is True:
-            if keep_only_best is True:
-                if set_best_to_refit_full is True:
-                    refit_full = 'best'
-                else:
-                    logger.warning(f'refit_full was set to {refit_full}, but keep_only_best=True and set_best_to_refit_full=False. Disabling refit_full to avoid training models which would be automatically deleted.')
-                    refit_full = False
+            if set_best_to_refit_full is True:
+                refit_full = 'best'
             else:
                 refit_full = 'all'
 
         if refit_full is not False:
             trainer_model_best = self._trainer.get_model_best()
+
             self.refit_full(models=refit_full)
+            self._trainer = self._learner.load_trainer()
+            print(self._trainer.model_full_dict)
             if set_best_to_refit_full:
                 if trainer_model_best in self._trainer.model_full_dict.keys():
                     self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
@@ -384,3 +383,28 @@ class ForecastingPredictor:
 
     def refit_full(self, models='all'):
         return self._learner.refit_full(models=models)
+
+    # def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limit=None):
+    #     """
+    #     Returns True if hyperparameter_tune_kwargs is None or can construct a valid scheduler.
+    #     Returns False if hyperparameter_tune_kwargs results in an invalid scheduler.
+    #     """
+    #     if hyperparameter_tune_kwargs is None:
+    #         return True
+    #
+    #     scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit,
+    #                                                         nthreads_per_trial='auto', ngpus_per_trial='auto')
+    #
+    #     assert scheduler_params['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
+    #     if scheduler_params.get('dist_ip_addrs', None):
+    #         logger.warning('Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
+    #
+    #     if scheduler_params['num_trials'] == 1:
+    #         logger.warning('Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. This can occur if time_limit was not specified in `fit()`.')
+    #         return False
+    #
+    #     scheduler_ngpus = scheduler_params['resource'].get('num_gpus', 0)
+    #     if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
+    #         logger.warning(f"Warning: TabularPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
+    #
+    #     return True

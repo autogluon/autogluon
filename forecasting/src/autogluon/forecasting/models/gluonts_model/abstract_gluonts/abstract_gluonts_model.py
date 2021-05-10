@@ -111,10 +111,10 @@ class AbstractGluonTSModel(AbstractModel):
     def create_model(self):
         pass
 
-    def fit(self, train_data, time_limit=None):
+    def fit(self, train_data, val_data=None, time_limit=None):
         if time_limit is None or time_limit > 0:
             self.create_model()
-            self.model = self.model.train(train_data)
+            self.model = self.model.train(train_data, validation_data=val_data)
         else:
             raise TimeLimitExceeded
 

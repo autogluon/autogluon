@@ -50,7 +50,7 @@ def fit_and_save_model(model, params, train_data, val_data, eval_metric, time_st
 
     model.params.update(params)
     time_fit_start = time.time()
-    model.fit(train_data, time_limit=time_left)
+    model.fit(train_data, val_data=val_data, time_limit=time_left)
     time_fit_end = time.time()
     logger.log(30, f"Evaluating model {model.name} with metric {eval_metric} on validation data...")
     model.val_score = model.score(val_data, eval_metric) * metric_coefficient[eval_metric]

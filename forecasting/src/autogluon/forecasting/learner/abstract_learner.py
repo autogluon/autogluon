@@ -117,7 +117,8 @@ class AbstractLearner:
         if self.trainer is not None:
             return self.trainer
         else:
-            return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
+            trainer = self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
+            return trainer
 
     def save_trainer(self, trainer):
         if self.is_trainer_present:
