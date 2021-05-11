@@ -2,6 +2,7 @@ from gluonts.dataset.repository.datasets import get_dataset
 from autogluon.forecasting import ForecastingPredictor
 import os
 import time
+
 dataset_list = ["m4_hourly",
                 "m4_daily",
                 "m4_weekly",
@@ -18,15 +19,15 @@ for dataset_name in dataset_list:
     test_data = dataset.test
     prediction_length = dataset.metadata.prediction_length
     freq = dataset.metadata.freq
-    predictor = ForecastingPredictor(path="m4_benchmark").fit(train_data,
-                                                              prediction_length,
-                                                              freq=freq,
-                                                              hyperparameter_tune=True,
-                                                              quantiles=[0.1, 0.5, 0.9],
-                                                              refit_full=True,
-                                                              set_best_to_refit_full=True,
-                                                              num_trials=10,
-                                                              )
+    predictor = ForecastingPredictor(path=f"autogluon_benchmark_{dataset_name}").fit(train_data,
+                                                                                     prediction_length,
+                                                                                     freq=freq,
+                                                                                     hyperparameter_tune=True,
+                                                                                     quantiles=[0.1, 0.5, 0.9],
+                                                                                     refit_full=True,
+                                                                                     set_best_to_refit_full=True,
+                                                                                     num_trials=10,
+                                                                                     )
     leaderboard = predictor.leaderboard(dataset.test)
     leaderboard.to_csv(f"benchmark_results/results_{dataset_name}_{int(time.time())}.csv", index=False)
     print(leaderboard)
