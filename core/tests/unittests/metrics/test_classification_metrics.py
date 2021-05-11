@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import sklearn
-from autogluon.core.metrics import confusion_matrix, log_loss
+from autogluon.core.metrics import confusion_matrix, log_loss, quadratic_kappa
 
 
 def test_confusion_matrix_with_valid_inputs_without_labels_and_weights():
@@ -173,3 +173,17 @@ def test_log_loss_with_sklearn(gt, probs):
 
     ag_loss_as_sklearn = log_loss.convert_score_to_sklearn_val(ag_loss)
     np.testing.assert_allclose(ag_loss_as_sklearn, sklearn_log_loss)
+
+
+def test_quadratic_kappa():
+    actuals = np.array([4, 4, 3, 4, 4, 4, 1, 1, 2, 1])
+    preds = np.array([0, 2, 1, 0, 0, 0, 1, 1, 2, 1])
+    value = quadratic_kappa(actuals, preds)
+    assert round(value, 3) == -0.139
+
+    actuals = np.array([0, 1, 0, 1])
+    preds = np.array([[0.8, 0.1, 0.1],
+                      [0.7, 0.1, 0.2],
+                      [0.1, 0.8, 0.1],
+                      [0.1, 0.1, 0.8]])
+    value = quadratic_kappa(actuals, preds)
