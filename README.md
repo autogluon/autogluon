@@ -99,7 +99,7 @@ Also have a look at our paper ["Model-based Asynchronous Hyperparameter and Neur
 }
 ```
 
-AutoGluon includes an algorithm for constrained hyperparameter optimization. Check out our paper applying it to optimize model performance under fairness constraints: ["Fair Bayesian Optimization"](https://arxiv.org/abs/2006.05109), AIES (2021).
+AutoGluon includes an [algorithm for constrained hyperparameter optimization](https://auto.gluon.ai/dev/tutorials/course/fairbo.html). Check out our paper applying it to optimize model performance under fairness constraints: ["Fair Bayesian Optimization"](https://arxiv.org/abs/2006.05109), AIES (2021).
 
 ```bibtex
 @article{fairbo,
