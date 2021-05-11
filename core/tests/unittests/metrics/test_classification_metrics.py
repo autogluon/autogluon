@@ -187,3 +187,4 @@ def test_quadratic_kappa():
                       [0.1, 0.8, 0.1],
                       [0.1, 0.1, 0.8]])
     value = quadratic_kappa(actuals, preds)
+    assert value == 0.25
