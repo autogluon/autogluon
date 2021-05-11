@@ -146,6 +146,14 @@ Tune Custom Models
       and its state-of-the-art schedulers and
       model-based searchers to tune a MLP.
 
+   .. card::
+      :title: Fair Bayesian Optimization
+      :link: course/fairbo.html
+
+      Example of how to use constrained 
+      Bayesian Optimization in AutoGluon to tune 
+      ML models under fairness constraints.
+
 
 Neural Architecture Search
 --------------------------

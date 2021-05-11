@@ -43,6 +43,12 @@ Tutorials to hyperparameter-tune any custom models or Python code.
 
       Complete example of using AutoGluon's state-of-the-art hyperparameter optimization to tune a basic MLP model.
 
+   .. card::
+      :title: Fair Bayesian Optimization
+      :link: fairbo.html
+
+      Tune models under fairness constraints using AutoGluon's constrained Bayesian optimization.
+
 .. toctree::
    :maxdepth: 1
    :hidden:
@@ -53,3 +59,4 @@ Tutorials to hyperparameter-tune any custom models or Python code.
    script
    distributed
    mlp
+   fairbo
