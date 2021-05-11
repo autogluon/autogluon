@@ -457,7 +457,7 @@ recall = make_scorer('recall',
                      sklearn.metrics.recall_score)
 
 # Register other metrics
-quadratic_kappa = make_scorer('quadratic_kappa', quadratic_kappa, needs_proba=True)
+quadratic_kappa = make_scorer('quadratic_kappa', quadratic_kappa, needs_proba=False)
 
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
