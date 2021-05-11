@@ -11,7 +11,22 @@ from ...utils import get_pred_from_proba, compute_weighted_metric
 logger = logging.getLogger(__name__)
 
 
-class EnsembleSelection:
+class AbstractWeightedEnsemble:
+    def predict(self, X):
+        y_pred_proba = self.predict_proba(X)
+        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+
+    def predict_proba(self, X):
+        return self.weight_pred_probas(X, weights=self.weights_)
+
+    @staticmethod
+    def weight_pred_probas(pred_probas, weights):
+        preds_norm = [pred * weight for pred, weight in zip(pred_probas, weights)]
+        preds_ensemble = np.sum(preds_norm, axis=0)
+        return preds_ensemble
+
+
+class EnsembleSelection(AbstractWeightedEnsemble):
     def __init__(
             self,
             ensemble_size: int,
@@ -164,15 +179,13 @@ class EnsembleSelection:
 
         self.weights_ = weights
 
-    def predict(self, X):
-        y_pred_proba = self.predict_proba(X)
-        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
-    def predict_proba(self, X):
-        return self.weight_pred_probas(X, weights=self.weights_)
+class SimpleWeightedEnsemble(AbstractWeightedEnsemble):
+    """Predefined user-weights ensemble"""
+    def __init__(self, weights, problem_type, **kwargs):
+        self.weights_ = weights
+        self.problem_type = problem_type
 
-    @staticmethod
-    def weight_pred_probas(pred_probas, weights):
-        preds_norm = [pred * weight for pred, weight in zip(pred_probas, weights)]
-        preds_ensemble = np.sum(preds_norm, axis=0)
-        return preds_ensemble
+    @property
+    def ensemble_size(self):
+        return len(self.weights_)

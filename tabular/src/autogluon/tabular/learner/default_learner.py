@@ -127,6 +127,10 @@ class DefaultLearner(AbstractLearner):
 
         if X_val is not None and self.label in X_val.columns:
             holdout_frac = 1
+        # FIXME: Breaks in extremely rare edge case with use_bag_holdout=True if threshold is not sufficient
+        #  THIS MUST BE FIXED BEFORE MERGING
+        #  Fix strategy: holdout data doesn't need any examples of rare classes (or only 1), so we can split it with special logic.
+        #  For train_data after split, only need 2 examples per class for folds, so each model has at least 1 training row in its fold data. No need to have all classes in held-out fold.
         self.threshold, holdout_frac, num_bag_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds)
 
         if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
