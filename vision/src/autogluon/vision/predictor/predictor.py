@@ -19,6 +19,8 @@ from ..utils import MXNetErrorCatcher
 
 __all__ = ['ImagePredictor']
 
+from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
+
 logger = logging.getLogger()  # return root logger
 
 
@@ -328,6 +330,9 @@ class ImagePredictor(object):
             config['max_reward'] = max_reward
         if nthreads_per_trial is not None:
             config['nthreads_per_trial'] = nthreads_per_trial
+        elif is_fork_enabled():
+            # This is needed to address multiprocessing.context.TimeoutError in fork mode
+            config['nthreads_per_trial'] = 0
         if ngpus_per_trial is not None:
             config['ngpus_per_trial'] = ngpus_per_trial
         if isinstance(hyperparameters, dict):
