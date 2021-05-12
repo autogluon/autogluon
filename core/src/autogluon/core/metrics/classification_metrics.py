@@ -5,6 +5,8 @@ import pandas as pd
 from scipy.sparse import coo_matrix
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils import check_consistent_length
+from sklearn.metrics import cohen_kappa_score
+
 try:
     from sklearn.metrics._classification import _check_targets, type_of_target
 except:
@@ -332,3 +334,35 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
         return cm_df
     else:
         return cm
+
+# TODO Add the "labels" option to metrics that will require the label map.
+#  We will need to update how we use those metrics accordingly.
+def quadratic_kappa(y_true, y_pred):
+    """Calculate the cohen kappa score with quadratic weighting scheme.
+
+    This is also known as "quadratic kappa" in the Kaggle competitions
+    such as petfinder: https://www.kaggle.com/c/petfinder-adoption-prediction/overview/evaluation
+
+    We will also support probabilistic input to ensure that the function knows
+    the number of possible classes.
+
+    Parameters
+    ----------
+    y_true
+        Shape (#samples,)
+    y_pred
+        Shape (#samples, #class) or (#samples,)
+
+    Returns
+    -------
+    score
+        scalar score
+    """
+    labels = None
+    if y_pred.ndim > 1:
+        if labels is not None:
+            assert len(labels) == y_pred.shape[1]
+        else:
+            labels = np.arange(y_pred.shape[1])
+        y_pred = np.argmax(y_pred, axis=-1)
+    return cohen_kappa_score(y_true, y_pred, labels=labels, weights='quadratic')

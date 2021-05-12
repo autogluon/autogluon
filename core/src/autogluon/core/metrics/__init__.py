@@ -456,6 +456,9 @@ precision = make_scorer('precision',
 recall = make_scorer('recall',
                      sklearn.metrics.recall_score)
 
+# Register other metrics
+quadratic_kappa = make_scorer('quadratic_kappa', quadratic_kappa, needs_proba=False)
+
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
     """
@@ -528,7 +531,8 @@ for scorer in [pinball_loss]:
         QUANTILE_METRICS[alias] = scorer
 
 CLASSIFICATION_METRICS = dict()
-for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, roc_auc_ovo_macro, average_precision, log_loss, pac_score]:
+for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, roc_auc_ovo_macro, average_precision,
+               log_loss, pac_score, quadratic_kappa]:
     CLASSIFICATION_METRICS[scorer.name] = scorer
     for alias in scorer.alias:
         CLASSIFICATION_METRICS[alias] = scorer
