@@ -335,7 +335,8 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
     else:
         return cm
 
-
+# TODO Add the "labels" option to metrics that will require the label map.
+#  We will need to update how we use those metrics accordingly.
 def quadratic_kappa(y_true, y_pred):
     """Calculate the cohen kappa score with quadratic weighting scheme.
 
