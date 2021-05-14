@@ -267,15 +267,19 @@ class TextPredictor:
         else:
             label_columns = list(self._label)
         # Get the training and tuning data as pandas dataframe
-        if not isinstance(train_data, pd.DataFrame):
+        if isinstance(train_data, str):
             train_data = load_pd.load(train_data)
+        if not isinstance(train_data, pd.DataFrame):
+            raise AssertionError(f'train_data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
         all_columns = list(train_data.columns)
         feature_columns = [ele for ele in all_columns if ele not in label_columns]
         train_data = train_data[all_columns]
         # Get tuning data
         if tuning_data is not None:
-            if not isinstance(tuning_data, pd.DataFrame):
+            if isinstance(tuning_data, str):
                 tuning_data = load_pd.load(tuning_data)
+            if not isinstance(tuning_data, pd.DataFrame):
+                raise AssertionError(f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
             tuning_data = tuning_data[all_columns]
         else:
             if holdout_frac is None:
