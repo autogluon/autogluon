@@ -1,3 +1,7 @@
+import copy
+import logging
+import os
+import time
 from collections import Counter
 from statistics import mean
 
@@ -583,6 +587,14 @@ class BaggedEnsembleModel(AbstractModel):
             max_memory_size = info['memory_size']
             min_memory_size = info['memory_size'] - sum_memory_size_child + max_memory_size_child
 
+        # Necessary if save_space is used as save_space deletes model_base.
+        if len(self.models) > 0:
+            child_model = self.load_child(self.models[0])
+        else:
+            child_model = self._get_model_base()
+        child_hyperparameters = child_model.params
+        child_ag_args_fit = child_model.params_aux
+
         bagged_info = dict(
             child_model_type=self._child_type.__name__,
             num_child_models=len(self.models),
@@ -597,9 +609,9 @@ class BaggedEnsembleModel(AbstractModel):
             bagged_mode=self._bagged_mode,
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
-            child_hyperparameters=self._get_model_base().params,
+            child_hyperparameters=child_hyperparameters,
             child_hyperparameters_fit=self._get_compressed_params_trained(),
-            child_ag_args_fit=self._get_model_base().params_aux,
+            child_ag_args_fit=child_ag_args_fit,
         )
         info['bagged_info'] = bagged_info
         info['children_info'] = children_info
