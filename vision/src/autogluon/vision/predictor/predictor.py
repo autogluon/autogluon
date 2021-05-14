@@ -339,6 +339,12 @@ class ImagePredictor(object):
             if 'batch_size' in hyperparameters:
                 bs = hyperparameters['batch_size']
                 _check_gpu_memory_presets(bs, ngpus_per_trial, 4, 256)  # 256MB per sample
+                # batch size cannot be larger than dataset size
+                bs = min(bs, len(train_data))
+                config['batch_size'] = bs
+                if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs < ngpus_per_trial:
+                    # batch size must be larger than # gpus
+                    config['ngpus_per_trial'] = bs
             net = hyperparameters.pop('net', None)
             if net is not None:
                 config['custom_net'] = net
@@ -420,9 +426,13 @@ class ImagePredictor(object):
         elif isinstance(data, _ImageClassification.Dataset):
             assert 'label' in data.columns
             assert hasattr(data, 'classes')
+            orig_classes = data.classes
+            if not isinstance(data.classes, (tuple, list)):
+                # consider it as an invalid dataset without proper label, try to reconstruct as a normal DataFrame
+                orig_classes = []
             # check whether classes are outdated, no action required if all unique labels is subset of `classes`
             unique_labels = sorted(data['label'].unique().tolist())
-            if not (all(ulabel in data.classes for ulabel in unique_labels)):
+            if not (all(ulabel in orig_classes for ulabel in unique_labels)):
                 data = _ImageClassification.Dataset(data, classes=unique_labels)
                 logger.log(20, f'Reset labels to {unique_labels}')
         if len(data) < 1:
