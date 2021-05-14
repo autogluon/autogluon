@@ -339,12 +339,6 @@ class ImagePredictor(object):
             if 'batch_size' in hyperparameters:
                 bs = hyperparameters['batch_size']
                 _check_gpu_memory_presets(bs, ngpus_per_trial, 4, 256)  # 256MB per sample
-                # batch size cannot be larger than dataset size
-                bs = min(bs, len(train_data))
-                config['batch_size'] = bs
-                if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs < ngpus_per_trial:
-                    # batch size must be larger than # gpus
-                    config['ngpus_per_trial'] = bs
             net = hyperparameters.pop('net', None)
             if net is not None:
                 config['custom_net'] = net
@@ -369,6 +363,12 @@ class ImagePredictor(object):
             config['early_stop_baseline'] = -np.Inf
         if 'early_stop_max_value' not in config or config['early_stop_max_value'] == None:
             config['early_stop_max_value'] = np.Inf
+        # batch size cannot be larger than dataset size
+        bs = min(config.get('batch_size', 16), len(train_data))
+        config['batch_size'] = bs
+        if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs < ngpus_per_trial:
+            # batch size must be larger than # gpus
+            config['ngpus_per_trial'] = bs
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False

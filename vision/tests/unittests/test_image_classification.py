@@ -56,4 +56,4 @@ def test_invalid_image_dataset():
     invalid_test = ag.unzip(invalid_test)
     df = ImagePredictor.Dataset.from_csv(os.path.join(invalid_test, 'train.csv'), root=os.path.join(invalid_test, 'train_images'))
     predictor = ImagePredictor(label="labels")
-    predictor.fit(df, time_limit=60)
+    predictor.fit(df, df.copy(), time_limit=60)
