@@ -1,4 +1,6 @@
 from autogluon.vision import ImagePredictor as Task
+import autogluon.core as ag
+import os
 import pandas as pd
 import numpy as np
 import copy
@@ -47,3 +49,11 @@ def test_task_label_remap():
     score_accuracy = accuracy(y_true=test_dataset['label'], y_pred=pred)
     score_log_loss = log_loss(y_true=test_dataset['label'].replace(label_remap_inverse), y_pred=pred_proba.to_numpy())
     assert score_accuracy > 0.2  # relax
+
+def test_invalid_image_dataset():
+    ImagePredictor = Task
+    invalid_test = ag.download('https://autogluon.s3-us-west-2.amazonaws.com/miscs/test_autogluon_invalid_dataset.zip')
+    invalid_test = ag.unzip(invalid_test)
+    df = ImagePredictor.Dataset.from_csv(os.path.join(invalid_test, 'train.csv'), root=os.path.join(invalid_test, 'train_images'))
+    predictor = ImagePredictor(label="labels")
+    predictor.fit(df, df.copy(), time_limit=60)
