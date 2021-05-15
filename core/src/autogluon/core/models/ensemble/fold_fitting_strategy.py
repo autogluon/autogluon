@@ -4,6 +4,9 @@ import os
 import time
 from abc import abstractmethod
 
+from numpy import ndarray
+from pandas import DataFrame, Series
+
 from ...utils.exceptions import TimeLimitExceeded
 
 logger = logging.getLogger(__name__)
@@ -34,16 +37,8 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
     This strategy fits the folds locally in a sequence.
     """
 
-    def __init__(self, bagged_ensemble_model, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats):
-        """
-        Parameters
-        ----------
-        path : str
-            Directory location to store all outputs.
-        params: dict
-            Fitting parameters
-
-        """
+    def __init__(self, bagged_ensemble_model, X: DataFrame, y: Series, sample_weight, time_limit: float, time_start: float,
+                 models: list, oof_pred_proba: ndarray, oof_pred_model_repeats: ndarray):
         self.X = X
         self.y = y
         self.sample_weight = sample_weight
@@ -67,7 +62,7 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         time_limit_fold = self._get_fold_time_limit(fold_ctx)
         fold_model = self._fit(model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs)
         fold_model, pred_proba = self._predict_oof(fold_model, fold_ctx)
-        self._update_bagged_ensembe(fold_model, pred_proba, fold_ctx)
+        self._update_bagged_ensemble(fold_model, pred_proba, fold_ctx)
 
     def _get_fold_time_limit(self, fold_ctx):
         _, folds_finished, folds_left, folds_to_fit, _, _ = self._get_fold_properties(fold_ctx)
@@ -87,7 +82,7 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
             time_limit_fold = None
         return time_limit_fold
 
-    def _update_bagged_ensembe(self, fold_model, pred_proba, fold_ctx):
+    def _update_bagged_ensemble(self, fold_model, pred_proba, fold_ctx):
         _, val_index = fold_ctx['fold']
         model_to_append = fold_model
         if self.bagged_ensemble_model.low_memory:
@@ -121,7 +116,7 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         X_val_fold = self.X.iloc[val_index, :]
         y_val_fold = self.y.iloc[val_index]
         if self.time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
-            if is_last_fold:
+            if not is_last_fold:
                 time_elapsed = time.time() - self.time_start
                 time_left = self.time_limit - time_elapsed
                 expected_time_required = time_elapsed * folds_to_fit / (folds_finished + 1)
