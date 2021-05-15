@@ -308,7 +308,7 @@ class AbstractTrainer:
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=1, base_model_names: List[str] = None, stack_name='core',
                              ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel,
-                             name_suffix: str = None, get_models_func=None, fold_fitting_strategy=None, **kwargs) -> List[str]:
+                             name_suffix: str = None, get_models_func=None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 1, then the models will use base model predictions as additional features.
@@ -348,7 +348,6 @@ class AbstractTrainer:
                     'base_model_paths_dict': base_model_paths,
                     'base_model_types_dict': base_model_types,
                     'random_state': level + self.random_state,
-                    'fold_fitting_strategy': fold_fitting_strategy,
                 }
                 get_models_kwargs.update(dict(
                     ag_args_ensemble=ag_args_ensemble,

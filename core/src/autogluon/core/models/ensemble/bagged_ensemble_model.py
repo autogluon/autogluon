@@ -25,7 +25,7 @@ class BaggedEnsembleModel(AbstractModel):
     """
     _oof_filename = 'oof.pkl'
 
-    def __init__(self, model_base: AbstractModel, fold_fitting_strategy: AbstractFoldFittingStrategy = None, random_state=0, **kwargs):
+    def __init__(self, model_base: AbstractModel, random_state=0, **kwargs):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
@@ -43,7 +43,6 @@ class BaggedEnsembleModel(AbstractModel):
         # TODO: Consider moving `_child_oof` logic to a separate class / refactor OOF logic.
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
-        self._cls_fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy
 
         try:
             feature_metadata = self.model_base.feature_metadata
@@ -116,6 +115,7 @@ class BaggedEnsembleModel(AbstractModel):
              sample_weight=None,
              **kwargs):
         use_child_oof = self.params.get('use_child_oof', False)
+        fold_fitting_strategy = self.params.get('fold_fitting_strategy', SequentialLocalFoldFittingStrategy)
         if use_child_oof:
             if self.is_fit():
                 # TODO: We may want to throw an exception instead and avoid calling fit more than once
@@ -169,7 +169,7 @@ class BaggedEnsembleModel(AbstractModel):
         fold_end = (n_repeats - 1) * k_fold + k_fold_end
         folds_to_fit = fold_end - fold_start
         # noinspection PyCallingNonCallable
-        fold_fitting_strategy: AbstractFoldFittingStrategy = self._cls_fold_fitting_strategy(
+        fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy(
             self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats)
         for j in range(n_repeat_start, n_repeats):  # For each n_repeat
             cur_repeat_count = j - n_repeat_start
