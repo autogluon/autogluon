@@ -1208,7 +1208,7 @@ class MultiModalTextModel:
                 data = load_pd.load(data)
             else:
                 raise NotImplementedError(f'The format of data is not understood. '
-                                          f'We have type(data)="{type(data)}"')
+                                          f'We have type(data)="{type(data)}", but a pandas DataFrame was required.')
         dataset = self.preprocessor.transform(data[self._feature_columns])
         inference_batch_size = self.config.optimization.per_device_batch_size \
             * self.config.optimization.val_batch_size_mult

@@ -2276,9 +2276,14 @@ class TabularPredictor:
         if unlabeled_data is not None and isinstance(unlabeled_data, str):
             unlabeled_data = TabularDataset(unlabeled_data)
 
+        if not isinstance(train_data, pd.DataFrame):
+            raise AssertionError(f'train_data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
+
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None:
+            if not isinstance(tuning_data, pd.DataFrame):
+                raise AssertionError(f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
             train_features = [column for column in train_data.columns if column != self.label]
             tuning_features = [column for column in tuning_data.columns if column != self.label]
             if self.sample_weight is not None:
@@ -2291,6 +2296,8 @@ class TabularPredictor:
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
+            if not isinstance(unlabeled_data, pd.DataFrame):
+                raise AssertionError(f'unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}')
             train_features = [column for column in train_data.columns if column != self.label]
             unlabeled_features = [column for column in unlabeled_data.columns]
             if self.sample_weight is not None:
