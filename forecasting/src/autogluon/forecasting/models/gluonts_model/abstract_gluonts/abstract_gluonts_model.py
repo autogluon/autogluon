@@ -150,6 +150,11 @@ class AbstractGluonTSModel(AbstractModel):
             index = data.get_index()
         else:
             index = [i["item_id"] for i in data]
+
+        index_count = {}
+        for idx in index:
+            index_count[idx] = index_count.get(idx, 0) + 1
+
         for i in range(len(index)):
             tmp_dict = {}
             for quantile in quantiles:
@@ -158,7 +163,10 @@ class AbstractGluonTSModel(AbstractModel):
             df.index = pd.date_range(start=predicted_targets[i].start_date,
                                      periods=self.params["prediction_length"],
                                      freq=self.params["freq"])
-            result_dict[index[i]] = df
+            if index_count[index[i]] > 1:
+                result_dict[f"{index[i]}_{predicted_targets[i].start_date}"] = df
+            else:
+                result_dict[index[i]] = df
         return result_dict
 
     def predict_for_scoring(self, data, num_samples=100):
