@@ -1394,7 +1394,7 @@ class MultiModalTextModel:
         # TODO(sxjscience) Post 0.1. In general, we will need to support compatible version check
         version = assets['version']
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(cfg.model.backbone.name)
+            = get_backbone(cfg.model.backbone.name, load_backbone=False)
         if 'roberta' in cfg.model.backbone.name:
             text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
         else:
