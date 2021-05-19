@@ -7,15 +7,14 @@ from statistics import mean
 
 import numpy as np
 import pandas as pd
-from autogluon.core.models.ensemble.fold_fitting_strategy import *
 
+from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy
+from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
 from ...utils.utils import generate_kfold, _compute_fi_with_stddev
-
-from ..abstract.abstract_model import AbstractModel
 
 logger = logging.getLogger(__name__)
 
