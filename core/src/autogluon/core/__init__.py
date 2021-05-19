@@ -18,3 +18,8 @@ __logging.getLogger("distributed.logging.distributed").setLevel(__logging.ERROR)
 __logging.getLogger("distributed.worker").setLevel(__logging.ERROR)
 
 __logging.basicConfig(format='%(message)s')  # just print message in logs
+
+try:
+    from .version import __version__
+except ImportError:
+    pass
