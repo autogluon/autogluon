@@ -52,6 +52,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._symbols_per_feature = self._filter_symbols(X, self._symbols)
+        self._feature_names_dict = self._compute_feature_names_dict()
         X_out = self._transform(X)
         type_family_groups_special = {
             S_TEXT_SPECIAL: list(X_out.columns)
@@ -60,6 +61,20 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_text_special(X)
+
+    def _compute_feature_names_dict(self) -> dict:
+        feature_names = dict()
+        for feature in self.features_in:
+            feature_names_cur = dict()
+            for feature_name_base in ['char_count', 'word_count', 'capital_ratio', 'lower_ratio', 'digit_ratio', 'special_ratio']:
+                feature_names_cur[feature_name_base] = f'{feature}.{feature_name_base}'
+            symbols = self._symbols_per_feature[feature]
+            for symbol in symbols:
+                feature_names_cur[symbol] = {}
+                feature_names_cur[symbol]['count'] = f'{feature}.symbol_count.{symbol}'
+                feature_names_cur[symbol]['ratio'] = f'{feature}.symbol_ratio.{symbol}'
+            feature_names[feature] = feature_names_cur
+        return feature_names
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
@@ -83,31 +98,30 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         if self.features_in:
             X_text_special_combined = dict()
             for nlp_feature in self.features_in:
-                df_text_special = self._generate_text_special(X[nlp_feature], nlp_feature, symbols=self._symbols_per_feature[nlp_feature])
-                X_text_special_combined.update(df_text_special)
+                X_text_special_combined = self._generate_text_special(X[nlp_feature], nlp_feature, symbols=self._symbols_per_feature[nlp_feature], X_dict=X_text_special_combined)
             X_text_special_combined = pd.DataFrame(X_text_special_combined, index=X.index)
         else:
             X_text_special_combined = pd.DataFrame(index=X.index)
         return X_text_special_combined
 
-    def _generate_text_special(self, X: Series, feature: str, symbols: list) -> dict:
-        X_text_special = dict()
+    def _generate_text_special(self, X: Series, feature: str, symbols: list, X_dict: dict) -> dict:
+        fn = self._feature_names_dict[feature]
 
-        X_text_special[feature + '.char_count'] = np.array([self.char_count(value) for value in X], dtype=np.uint32)
-        X_text_special[feature + '.word_count'] = np.array([self.word_count(value) for value in X], dtype=np.uint32)
-        X_text_special[feature + '.capital_ratio'] = np.array([self.capital_ratio(value) for value in X], dtype=np.float32)
-        X_text_special[feature + '.lower_ratio'] = np.array([self.lower_ratio(value) for value in X], dtype=np.float32)
-        X_text_special[feature + '.digit_ratio'] = np.array([self.digit_ratio(value) for value in X], dtype=np.float32)
-        X_text_special[feature + '.special_ratio'] = np.array([self.special_ratio(value) for value in X], dtype=np.float32)
+        X_dict[fn['char_count']] = np.array([self.char_count(value) for value in X], dtype=np.uint32)
+        X_dict[fn['word_count']] = np.array([self.word_count(value) for value in X], dtype=np.uint32)
+        X_dict[fn['capital_ratio']] = np.array([self.capital_ratio(value) for value in X], dtype=np.float32)
+        X_dict[fn['lower_ratio']] = np.array([self.lower_ratio(value) for value in X], dtype=np.float32)
+        X_dict[fn['digit_ratio']] = np.array([self.digit_ratio(value) for value in X], dtype=np.float32)
+        X_dict[fn['special_ratio']] = np.array([self.special_ratio(value) for value in X], dtype=np.float32)
 
-        char_count = X_text_special[feature + '.char_count']
+        char_count = X_dict[fn['char_count']]
         char_count_valid = char_count != 0
         shape = char_count.shape
         for symbol in symbols:
-            X_text_special[feature + '.symbol_count.' + symbol] = np.array([value.count(symbol) for value in X], dtype=np.uint32)
-            X_text_special[feature + '.symbol_ratio.' + symbol] = np.divide(X_text_special[feature + '.symbol_count.' + symbol], char_count, out=np.zeros(shape, dtype=np.float32), where=char_count_valid)
+            X_dict[fn[symbol]['count']] = np.array([value.count(symbol) for value in X], dtype=np.uint32)
+            X_dict[fn[symbol]['ratio']] = np.divide(X_dict[fn[symbol]['count']], char_count, out=np.zeros(shape, dtype=np.float32), where=char_count_valid)
 
-        return X_text_special
+        return X_dict
 
     @staticmethod
     def word_count(string: str) -> int:
