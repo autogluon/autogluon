@@ -6,7 +6,7 @@ def test_text_special_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
 
-    generator = TextSpecialFeatureGenerator()
+    generator = TextSpecialFeatureGenerator(min_occur_ratio=0, min_occur_offset=0)
 
     expected_feature_metadata_in_full = {
         ('object', ('text',)): ['text'],

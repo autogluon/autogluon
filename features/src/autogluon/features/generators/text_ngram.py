@@ -64,6 +64,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         self.prefilter_tokens = prefilter_tokens 
         self.prefilter_token_count = prefilter_token_count 
         self.token_mask = None
+        self._feature_names_dict = dict()
 
     def _fit_transform(self, X: DataFrame, y: Series = None, problem_type: str = None, **kwargs) -> (DataFrame, dict):
         
@@ -194,13 +195,16 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
             if not self._is_fit:
                 transform_matrix = self._adjust_vectorizer_memory_usage(transform_matrix=transform_matrix, text_data=text_data, vectorizer_fit=vectorizer_fit, downsample_ratio=downsample_ratio)
+                nlp_features_names = vectorizer_fit.get_feature_names()
+                nlp_features_names_final = np.array([f'{nlp_feature}.{x}' for x in nlp_features_names]
+                                                    + [f'{nlp_feature}._total_']
+                                                    )
+                self._feature_names_dict[nlp_feature] = nlp_features_names_final
 
-            nlp_features_names = vectorizer_fit.get_feature_names()
-
-            X_nlp_features = pd.DataFrame(transform_matrix.toarray())  # TODO: Consider keeping sparse
-            X_nlp_features.columns = [f'{nlp_feature}.{x}' for x in nlp_features_names]
-            X_nlp_features[nlp_feature + '._total_'] = X_nlp_features.gt(0).sum(axis=1).astype(np.int32)
-
+            transform_array = transform_matrix.toarray()
+            nonzero_count = np.count_nonzero(transform_array, axis=1).astype(np.uint16)
+            transform_array = np.append(transform_array, np.expand_dims(nonzero_count, axis=1), axis=1)
+            X_nlp_features = pd.DataFrame(transform_array, columns=self._feature_names_dict[nlp_feature], index=X.index)  # TODO: Consider keeping sparse
             X_nlp_features_combined.append(X_nlp_features)
 
         if X_nlp_features_combined:

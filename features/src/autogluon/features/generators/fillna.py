@@ -42,19 +42,32 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
         self.inplace = inplace
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
-        self._fillna_feature_map = {feature: self.fillna_map.get(self.feature_metadata_in.get_feature_type_raw(feature), self.fillna_default) for feature in self.feature_metadata_in.get_features()}
+        features = self.feature_metadata_in.get_features()
+        self._fillna_feature_map = dict()
+        for feature in features:
+            feature_raw_type = self.feature_metadata_in.get_feature_type_raw(feature)
+            feature_fillna_val = self.fillna_map.get(feature_raw_type, self.fillna_default)
+            if feature_fillna_val is not np.nan:
+                self._fillna_feature_map[feature] = feature_fillna_val
         return self._transform(X), self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
-        if self.inplace:
-            X.fillna(self._fillna_feature_map, inplace=True, downcast=False)
-        else:
-            X = X.fillna(self._fillna_feature_map, inplace=False, downcast=False)
+        if self._fillna_feature_map:
+            if self.inplace:
+                X.fillna(self._fillna_feature_map, inplace=True, downcast=False)
+            else:
+                X = X.fillna(self._fillna_feature_map, inplace=False, downcast=False)
         return X
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
         return dict()
+
+    def _remove_features_in(self, features):
+        super()._remove_features_in(features)
+        if features:
+            for feature in features:
+                self._fillna_feature_map.pop(feature, None)
 
     def _more_tags(self):
         return {'feature_interactions': False}

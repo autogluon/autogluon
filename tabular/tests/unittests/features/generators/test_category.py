@@ -9,12 +9,12 @@ def test_category_feature_generator(generator_helper, data_helper):
     input_data = data_helper.generate_multi_feature_standard()
     category_input_data = input_data[['obj', 'cat']].astype('category')
 
-    generator_1 = CategoryFeatureGenerator()
-    generator_2 = CategoryFeatureGenerator(maximum_num_cat=2)
+    generator_1 = CategoryFeatureGenerator(minimum_cat_count=None)
+    generator_2 = CategoryFeatureGenerator(minimum_cat_count=None, maximum_num_cat=2)
     generator_3 = CategoryFeatureGenerator(minimum_cat_count=3)
-    generator_4 = CategoryFeatureGenerator(cat_order='count')
-    generator_5 = CategoryFeatureGenerator(fillna='mode')
-    generator_6 = CategoryFeatureGenerator(minimize_memory=False)
+    generator_4 = CategoryFeatureGenerator(minimum_cat_count=None, cat_order='count')
+    generator_5 = CategoryFeatureGenerator(minimum_cat_count=None, fillna='mode')
+    generator_6 = CategoryFeatureGenerator(minimum_cat_count=None, minimize_memory=False)
 
     expected_feature_metadata_in_full = {
         ('object', ()): ['obj'],

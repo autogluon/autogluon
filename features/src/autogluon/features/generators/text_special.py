@@ -2,6 +2,7 @@ import logging
 import re
 from typing import List
 
+import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
@@ -24,6 +25,11 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
     symbols : List[str], optional
         List of string symbols to compute counts and ratios for as features.
         If not specified, defaults to ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
+    min_occur_ratio : float, default 0.01
+        Minimum ratio of symbol occurrence to consider as a feature.
+        If a symbol appears in fewer than 1 in 1/min_occur_ratio samples, it will not be used as a feature.
+    min_occur_offset : int, default 10
+        Minimum symbol occurrences to consider as a feature. This is added to the threshold calculated from min_occur_ratio.
     bin_features : bool, default True
         If True, adds a BinnedFeatureGenerator to the front of post_generators such that all features generated from this generator are then binned.
         This is useful for 'text_special' features because it lowers the chance models will overfit on the features and reduces their memory usage.
@@ -33,15 +39,19 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
     """
-    def __init__(self, symbols: List[str] = None, bin_features: bool = True, post_drop_duplicates: bool = True, **kwargs):
+    def __init__(self, symbols: List[str] = None, min_occur_ratio=0.01, min_occur_offset=10, bin_features: bool = True, post_drop_duplicates: bool = True, **kwargs):
         super().__init__(post_drop_duplicates=post_drop_duplicates, **kwargs)
         if symbols is None:
             symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
         self._symbols = symbols  # Symbols to generate count and ratio features for.
+        self._symbols_per_feature = dict()
+        self._min_occur_ratio = min_occur_ratio
+        self._min_occur_offset = min_occur_offset
         if bin_features:
-            self._post_generators = [BinnedFeatureGenerator(inplace=True)] + self._post_generators
+            self._post_generators = [BinnedFeatureGenerator()] + self._post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
+        self._symbols_per_feature = self._filter_symbols(X, self._symbols)
         X_out = self._transform(X)
         type_family_groups_special = {
             S_TEXT_SPECIAL: list(X_out.columns)
@@ -55,30 +65,47 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
     def get_default_infer_features_in_args() -> dict:
         return dict(required_special_types=[S_TEXT])
 
+    def _filter_symbols(self, X: DataFrame, symbols: list):
+        symbols_per_feature = dict()
+        if self.features_in:
+            num_samples = len(X)
+            occur_threshold = min(np.ceil(self._min_occur_offset + num_samples * self._min_occur_ratio), np.ceil(num_samples / 2))
+            for nlp_feature in self.features_in:
+                symbols_feature = []
+                for symbol in symbols:
+                    occur_symbol = np.sum([value.count(symbol) != 0 for value in X[nlp_feature]])
+                    if occur_symbol >= occur_threshold:
+                        symbols_feature.append(symbol)
+                symbols_per_feature[nlp_feature] = np.array(symbols_feature)
+        return symbols_per_feature
+
     def _generate_features_text_special(self, X: DataFrame) -> DataFrame:
         if self.features_in:
-            X_text_special_combined = []
+            X_text_special_combined = dict()
             for nlp_feature in self.features_in:
-                df_text_special = self._generate_text_special(X[nlp_feature], nlp_feature)
-                X_text_special_combined.append(df_text_special)
-            X_text_special_combined = pd.concat(X_text_special_combined, axis=1)
+                df_text_special = self._generate_text_special(X[nlp_feature], nlp_feature, symbols=self._symbols_per_feature[nlp_feature])
+                X_text_special_combined.update(df_text_special)
+            X_text_special_combined = pd.DataFrame(X_text_special_combined, index=X.index)
         else:
             X_text_special_combined = pd.DataFrame(index=X.index)
         return X_text_special_combined
 
-    def _generate_text_special(self, X: Series, feature: str) -> DataFrame:
-        X_text_special: DataFrame = DataFrame(index=X.index)
-        X_text_special[feature + '.char_count'] = [self.char_count(value) for value in X]
-        X_text_special[feature + '.word_count'] = [self.word_count(value) for value in X]
-        X_text_special[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X]
-        X_text_special[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X]
-        X_text_special[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X]
-        X_text_special[feature + '.special_ratio'] = [self.special_ratio(value) for value in X]
+    def _generate_text_special(self, X: Series, feature: str, symbols: list) -> dict:
+        X_text_special = dict()
 
-        for symbol in self._symbols:
-            X_text_special[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X]
-            X_text_special[feature + '.symbol_ratio.' + symbol] = X_text_special[feature + '.symbol_count.' + symbol] / X_text_special[feature + '.char_count']
-            X_text_special[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
+        X_text_special[feature + '.char_count'] = np.array([self.char_count(value) for value in X], dtype=np.uint32)
+        X_text_special[feature + '.word_count'] = np.array([self.word_count(value) for value in X], dtype=np.uint32)
+        X_text_special[feature + '.capital_ratio'] = np.array([self.capital_ratio(value) for value in X], dtype=np.float32)
+        X_text_special[feature + '.lower_ratio'] = np.array([self.lower_ratio(value) for value in X], dtype=np.float32)
+        X_text_special[feature + '.digit_ratio'] = np.array([self.digit_ratio(value) for value in X], dtype=np.float32)
+        X_text_special[feature + '.special_ratio'] = np.array([self.special_ratio(value) for value in X], dtype=np.float32)
+
+        char_count = X_text_special[feature + '.char_count']
+        char_count_valid = char_count != 0
+        shape = char_count.shape
+        for symbol in symbols:
+            X_text_special[feature + '.symbol_count.' + symbol] = np.array([value.count(symbol) for value in X], dtype=np.uint32)
+            X_text_special[feature + '.symbol_ratio.' + symbol] = np.divide(X_text_special[feature + '.symbol_count.' + symbol], char_count, out=np.zeros(shape, dtype=np.float32), where=char_count_valid)
 
         return X_text_special
 
@@ -119,8 +146,9 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             return 0
         return sum(1 for c in string if c.isupper()) / len(string)
 
-    @staticmethod
-    def symbol_in_string_count(string: str, character: str) -> int:
-        if not string:
-            return 0
-        return sum(1 for c in string if c == character)
+    def _remove_features_in(self, features: list):
+        super()._remove_features_in(features)
+        if self._symbols_per_feature:
+            for feature in features:
+                if feature in self._symbols_per_feature:
+                    self._symbols_per_feature.pop(feature)

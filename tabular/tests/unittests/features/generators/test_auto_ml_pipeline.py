@@ -91,8 +91,8 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
     assert output_data['float'].equals(input_data['float'])
 
     # object and category checks
-    assert list(output_data['obj'].values) == [1, 2, 1, 4, 4, 4, 3, 0, 0]
-    assert list(output_data['cat'].values) == [0, 1, 0, 3, 3, 3, 2, np.nan, np.nan]
+    assert list(output_data['obj'].values) == [1, np.nan, 1, 2, 2, 2, np.nan, 0, 0]
+    assert list(output_data['cat'].values) == [0, np.nan, 0, 1, 1, 1, np.nan, np.nan, np.nan]
 
     # datetime checks
     assert list(output_data['datetime'].values) == list(output_data['datetime_as_object'].values)
