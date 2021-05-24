@@ -33,7 +33,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         # check if not same
         if self._type_map_real_opt != X.dtypes.to_dict():
-            if self._int_features.size != 0:
+            if self._int_features.size:
                 null_count = X[self._int_features].isnull().any()
                 # If int feature contains null during inference but not during fit.
                 if null_count.any():
