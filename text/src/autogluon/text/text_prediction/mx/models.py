@@ -46,7 +46,7 @@ from .utils import average_checkpoints, set_seed
 from .. import constants as _C
 from ..utils import logging_config
 from ..presets import ag_text_presets
-from ... import version
+
 
 logger = logging.getLogger(__name__)  # return logger
 
