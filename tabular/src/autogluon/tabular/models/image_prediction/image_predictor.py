@@ -48,7 +48,7 @@ class ImagePredictorModel(AbstractModel):
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
             'valid_stacker': False,
-            'problem_types': [BINARY, MULTICLASS],  # Does not support regression
+            'problem_types': [BINARY, MULTICLASS, REGRESSION],  # Does not support regression
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
@@ -82,9 +82,6 @@ class ImagePredictorModel(AbstractModel):
         try_import_autogluon_vision()
         from autogluon.vision import ImagePredictor
         params = self._get_model_params()
-
-        if self.problem_type == REGRESSION:
-            raise AssertionError(f'ImagePredictorModel does not support `problem_type="{REGRESSION}"`')
 
         X = self.preprocess(X, fit=True)
         if X_val is not None:
