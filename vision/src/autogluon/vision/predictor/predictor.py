@@ -229,11 +229,12 @@ class ImagePredictor(object):
         if self._problem_type is None:
             # options: multiclass
             self._problem_type = MULTICLASS
-        assert self._problem_type in (MULTICLASS,), f"Invalid problem_type: {self._problem_type}"
+        
         if self._eval_metric is None:
             # options: accuracy,
             self._eval_metric = 'accuracy'
-
+        print('image prediction for {}'.format(self._problem_type))
+        print('eval metric is {}'.format(self._eval_metric))
         # init/validate kwargs
         kwargs = self._validate_kwargs(kwargs)
         # unpack

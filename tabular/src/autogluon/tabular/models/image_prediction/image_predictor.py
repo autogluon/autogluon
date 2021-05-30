@@ -107,7 +107,7 @@ class ImagePredictorModel(AbstractModel):
         self.model = ImagePredictor(
             problem_type=self.problem_type,
             path=self.path,
-            # eval_metric=self.eval_metric,  # TODO: Vision only works with accuracy
+            eval_metric=self.eval_metric,  # TODO: Vision multiclass/binary problem works with accuracy, regression with rmse
             verbosity=verbosity_image
         )
 
