@@ -181,11 +181,15 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, feature_
             else:
                 model_cfgs_to_process.append(model_cfg)
         for model_cfg in model_cfgs_to_process:
+            print('before clean_model_cfg :{}'.format(model_cfg))
             model_cfg = clean_model_cfg(model_cfg=model_cfg, model_type=model_type, ag_args=ag_args, ag_args_ensemble=ag_args_ensemble, ag_args_fit=ag_args_fit, problem_type=problem_type)
+            print('after clean_model_cfg :{}'.format(model_cfg))
             model_cfg[AG_ARGS]['priority'] = model_cfg[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             model_priority = model_cfg[AG_ARGS]['priority']
             # Check if model_cfg is valid
             is_valid = is_model_cfg_valid(model_cfg, level=level, problem_type=problem_type)
+            if not is_valid:
+                print('{} {}'.format(model_cfg, problem_type))
             if AG_ARGS_FIT in model_cfg and not model_cfg[AG_ARGS_FIT]:
                 model_cfg.pop(AG_ARGS_FIT)
             if is_valid:
@@ -275,6 +279,8 @@ def is_model_cfg_valid(model_cfg, level=1, problem_type=None):
         is_valid = False  # Not valid as a base model
     elif problem_type is not None and problem_type not in model_cfg[AG_ARGS].get('problem_types', [problem_type]):
         is_valid = False  # Not valid for this problem_type
+        print ('{} is not a valid problem type'.format(problem_type))
+        print ('only {} are supported!'.format(model_cfg[AG_ARGS].get('problem_types', [problem_type])))
     return is_valid
 
 

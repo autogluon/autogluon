@@ -267,6 +267,9 @@ class AbstractTrainer:
                 aux_kwargs_level['time_limit'] = aux_kwargs_level.get('time_limit', time_limit_aux)
             if level != 1:
                 feature_prune = False  # TODO: Enable feature prune on levels > 1
+            logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py train_multi_levels 270')
+            logger.log(20, hyperparameters)
+            logger.log(20, base_model_names)
             base_model_names, aux_models = self.stack_new_level(
                 X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
                 models=hyperparameters, level=level, base_model_names=base_model_names,
@@ -296,6 +299,9 @@ class AbstractTrainer:
         if name_suffix:
             core_kwargs['name_suffix'] = core_kwargs.get('name_suffix', '') + name_suffix
             aux_kwargs['name_suffix'] = aux_kwargs.get('name_suffix', '') + name_suffix
+        logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py stack_new_level 302')
+        logger.log(20, models)
+        logger.log(20, base_model_names)
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
                                                 level=level, base_model_names=base_model_names, feature_prune=feature_prune, **core_kwargs)
 
@@ -354,8 +360,12 @@ class AbstractTrainer:
                     ensemble_type=ensemble_type,
                     ensemble_kwargs=ensemble_kwargs,
                 ))
-
+            print(get_models_kwargs)
+            logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py stack_new_level_core 363')
+            logger.log(20, models)
             models, model_args_fit = get_models_func(hyperparameters=models, **get_models_kwargs)
+            logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py stack_new_level_core 366')
+            logger.log(20, models)
             if model_args_fit:
                 hyperparameter_tune_kwargs = {
                     model_name: model_args_fit[model_name]['hyperparameter_tune_kwargs']
@@ -368,7 +378,7 @@ class AbstractTrainer:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
         if X_unlabeled is not None:
             X_unlabeled = self.get_inputs_to_stacker(X_unlabeled, base_models=base_model_names, fit=False)
-
+        
         # FIXME: TODO: v0.1 X_unlabeled isn't cached so it won't be available during refit_full or fit_extra.
         return self._train_multi(X=X_init, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models, level=level, stack_name=stack_name, **kwargs)
 
@@ -386,7 +396,6 @@ class AbstractTrainer:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
-
         return self.generate_weighted_ensemble(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
 
     def predict(self, X, model=None):
@@ -1307,6 +1316,8 @@ class AbstractTrainer:
         if X_val is not None:
             self._num_rows_train += len(X_val)
         self._num_cols_train = len(list(X.columns))
+        logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py 1309')
+#         logger.log(20, 'skip')
         model_names_fit = self.train_multi_levels(X, y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
                                                   X_unlabeled=X_unlabeled, level_start=1, level_end=num_stack_levels+1, time_limit=time_limit, **kwargs)
         if len(self.get_model_names()) == 0:
