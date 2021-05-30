@@ -10,7 +10,7 @@ import pandas as pd
 from gluoncv.auto.tasks import ImageClassification as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 
-from autogluon.core.constants import MULTICLASS
+from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
@@ -227,12 +227,15 @@ class ImagePredictor(object):
                     Extra options for HPO scheduler, please refer to :class:`autogluon.core.Searcher` for details.
         """
         if self._problem_type is None:
-            # options: multiclass
+            # options: multiclass, binary, regression
             self._problem_type = MULTICLASS
         
         if self._eval_metric is None:
-            # options: accuracy,
-            self._eval_metric = 'accuracy'
+            # options: accuracy,rmse
+            if self._problem_type == REGRESSION:
+                self._eval_metric = 'rmse'
+            else:
+                self._eval_metric = 'accuracy'
         print('image prediction for {}'.format(self._problem_type))
         print('eval metric is {}'.format(self._eval_metric))
         # init/validate kwargs
