@@ -2,6 +2,7 @@ import copy
 import logging
 import pprint
 import pandas as pd
+import numpy as np
 
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.task.base.base_task import schedulers
@@ -9,10 +10,15 @@ from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.utils import setup_outputdir
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.forecasting.utils.dataset_utils import rebuild_tabular, train_test_split_gluonts, \
     train_test_split_dataframe
 from autogluon.forecasting.utils.dataset_utils import TimeSeriesDataset
+
 from gluonts.dataset.common import FileDataset, ListDataset
+from gluonts.evaluation import Evaluator
+from gluonts.model.forecast import SampleForecast, QuantileForecast
+
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer
 from ..utils.dataset_utils import time_series_dataset
@@ -63,6 +69,7 @@ class ForecastingPredictor:
             target_column="target_column",
             val_data=None,
             hyperparameters=None,
+            hyperparameter_tune_kwargs=None,
             time_limits=None,
             static_features=None,
             **kwargs):
@@ -76,12 +83,16 @@ class ForecastingPredictor:
         self.target_column = target_column
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_kwargs(kwargs)
-        kwargs = self._validate_hyperparameter_tune_kwargs(kwargs)
+        if not self._validate_hyperparameter_tune_kwargs(hyperparameter_tune_kwargs, time_limits=time_limits):
+            hyperparameter_tune_kwargs = None
+            logger.warning(30, "Invalid hyperparameter_tune_kwarg, disabling hyperparameter tuning.")
+
         verbosity = kwargs.get('verbosity', self.verbosity)
         set_logger_verbosity(verbosity, logger=logger)
-        hyperparameter_tune = kwargs["hyperparameter_tune"]
-        num_trials = kwargs["num_trials"]
-        search_strategy = kwargs["search_strategy"]
+        if hyperparameter_tune_kwargs is None:
+            hyperparameter_tune = False
+        else:
+            hyperparameter_tune = True
 
         if verbosity >= 3:
             logger.log(20, '============ fit kwarg info ============')
@@ -153,15 +164,14 @@ class ForecastingPredictor:
         quantiles = kwargs.get("quantiles", ["0.5"])
         logger.log(30, f"All models will be trained for quantiles {quantiles}.")
 
-        scheduler_options = {"resource": {"num_cpus": 1, "num_gpus": 0},
-                             "num_trials": num_trials,
-                             "reward_attr": "validation_performance",
-                             "time_attr": "epoch",
-                             "time_out": time_limits}
+        scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                                                            time_out=time_limits,
+                                                            nthreads_per_trial='auto', ngpus_per_trial='auto')
+        if time_limits is None and scheduler_params["num_trials"] is None:
+            logger.log(30, "None of time_limits and num_tirals are set, by default setting num_tirals=2")
+            scheduler_params["num_trials"] = 2
 
-        scheduler_cls = schedulers[search_strategy.lower()]
-
-        scheduler_options = (scheduler_cls, scheduler_options)
+        scheduler_options = (scheduler_cls, scheduler_params)
 
         self._learner.fit(train_data=train_data,
                           freq=freq,
@@ -185,18 +195,8 @@ class ForecastingPredictor:
         self.save()
         return self
 
-    def _validate_hyperparameter_tune_kwargs(self, kwargs):
-        hyperparameter_kwargs_default = {
-            "search_strategy": "local",
-            "num_trials": 1,
-        }
-        copied_hyperparameter_tune_kwargs = copy.deepcopy(hyperparameter_kwargs_default)
-        copied_hyperparameter_tune_kwargs.update(kwargs)
-        return copied_hyperparameter_tune_kwargs
-
     def _validate_fit_kwargs(self, kwargs):
         kwargs_default = {
-            "hyperparameter_tune": False,
             "set_best_to_refit_full": False,
             "keep_only_best": False,
             "refit_full": False,
@@ -242,9 +242,9 @@ class ForecastingPredictor:
         perf = self._learner.score(processed_data, **kwargs)
         return perf
 
-    def evaluate_predictions(self, forecasts, tss, **kwargs):
-
-        return self._learner.evaluate(forecasts, tss, **kwargs)
+    # def evaluate_predictions(self, forecasts, tss, **kwargs):
+    #
+    #     return self._learner.evaluate(forecasts, tss, **kwargs)
 
     @classmethod
     def load(cls, output_directory, verbosity=2):
@@ -371,7 +371,6 @@ class ForecastingPredictor:
 
             self.refit_full(models=refit_full)
             self._trainer = self._learner.load_trainer()
-            print(self._trainer.model_full_dict)
             if set_best_to_refit_full:
                 if trainer_model_best in self._trainer.model_full_dict.keys():
                     self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
@@ -384,27 +383,47 @@ class ForecastingPredictor:
     def refit_full(self, models='all'):
         return self._learner.refit_full(models=models)
 
-    # def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limit=None):
-    #     """
-    #     Returns True if hyperparameter_tune_kwargs is None or can construct a valid scheduler.
-    #     Returns False if hyperparameter_tune_kwargs results in an invalid scheduler.
-    #     """
-    #     if hyperparameter_tune_kwargs is None:
-    #         return True
-    #
-    #     scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit,
-    #                                                         nthreads_per_trial='auto', ngpus_per_trial='auto')
-    #
-    #     assert scheduler_params['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
-    #     if scheduler_params.get('dist_ip_addrs', None):
-    #         logger.warning('Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
-    #
-    #     if scheduler_params['num_trials'] == 1:
-    #         logger.warning('Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. This can occur if time_limit was not specified in `fit()`.')
-    #         return False
-    #
-    #     scheduler_ngpus = scheduler_params['resource'].get('num_gpus', 0)
-    #     if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
-    #         logger.warning(f"Warning: TabularPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
-    #
-    #     return True
+    def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limits=None):
+        """
+        Returns True if hyperparameter_tune_kwargs is None or can construct a valid scheduler.
+        Returns False if hyperparameter_tune_kwargs results in an invalid scheduler.
+        """
+        if hyperparameter_tune_kwargs is None:
+            return True
+
+        scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limits,
+                                                            nthreads_per_trial='auto', ngpus_per_trial='auto')
+        assert scheduler_params['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
+        if scheduler_params.get('dist_ip_addrs', None):
+            logger.warning('Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
+
+        if scheduler_params['num_trials'] == 1:
+            logger.warning('Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. This can occur if time_limit was not specified in `fit()`.')
+            return False
+
+        scheduler_ngpus = scheduler_params['resource'].get('num_gpus', 0)
+        if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
+            logger.warning(f"Warning: TabularPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
+        return True
+
+    @classmethod
+    def evaluate_predictions(cls, forecasts, targets, eval_metric=None):
+        quantile_forecasts = []
+        for ts_id, forecast in forecasts.items():
+            tmp = []
+            for quantile in forecast.columns:
+                tmp.append(forecast[quantile])
+            quantile_forecasts.append(QuantileForecast(
+                forecast_arrays=np.array(tmp),
+                start_date=forecast.index[0],
+                freq=pd.infer_freq(forecast.index),
+                forecast_keys=forecast.columns,
+                item_id=ts_id,
+            ))
+        evaluator = Evaluator()
+        num_series = len(targets)
+        agg_metrics, item_metrics = evaluator(iter(targets), iter(quantile_forecasts), num_series=num_series)
+        if eval_metric is None:
+            return agg_metrics
+        else:
+            return agg_metrics[eval_metric]

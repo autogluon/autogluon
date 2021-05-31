@@ -217,7 +217,7 @@ class AbstractGluonTSModel(AbstractModel):
             directory=directory,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_params["time_out"]
+            time_limit=scheduler_params.get("time_out", None)
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)
