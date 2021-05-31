@@ -449,6 +449,8 @@ class AbstractModel:
         For regression problems, this returns the predicted values as a Series.
         """
         y_pred_proba = self.predict_proba(X, **kwargs)
+#         print('abstract_model.py')
+#         print (y_pred_proba)
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
@@ -484,6 +486,7 @@ class AbstractModel:
         For regression, converts y_pred_proba to a 1 dimensional array of predictions.
         """
         if self.problem_type == REGRESSION:
+            y_pred_proba = np.squeeze(y_pred_proba, axis=-1)
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             else:
