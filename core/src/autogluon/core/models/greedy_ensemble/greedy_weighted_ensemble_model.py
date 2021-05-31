@@ -13,14 +13,8 @@ class GreedyWeightedEnsembleModel(AbstractModel):
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
         self.model_base = model_base
-        self.num_pred_cols_per_model = 1
-        if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            self.num_pred_cols_per_model = self.num_classes
-        elif self.problem_type == QUANTILE:
-            self.num_pred_cols_per_model = len(self.quantile_levels)
+        self.num_pred_cols_per_model = None
         self.base_model_names = base_model_names
-        if self.base_model_names is not None:
-            self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.weights_ = None
 
     def _set_default_params(self):
@@ -34,6 +28,17 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         X = self.convert_pred_probas_df_to_list(X)
         return X
 
+    def _initialize(self, **kwargs):
+        super()._initialize(**kwargs)
+        self.num_pred_cols_per_model = 1
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
+            self.num_pred_cols_per_model = self.num_classes
+        elif self.problem_type == QUANTILE:
+            self.num_pred_cols_per_model = len(self.quantile_levels)
+        if self.base_model_names is None:
+            self.base_model_names = self._infer_base_model_names()
+        self.features = self._set_stack_columns(base_model_names=self.base_model_names)
+
     # TODO: Check memory after loading best model predictions, only load top X model predictions that fit in memory
     def _fit(self,
              X,
@@ -43,11 +48,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
              time_limit=None,
              sample_weight=None,
              **kwargs):
-        if self.base_model_names is None:
-            self.base_model_names = self._infer_base_model_names()
-            self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         X = self.preprocess(X)
-
         self.model = self.model_base(ensemble_size=self.params['ensemble_size'], problem_type=self.problem_type, quantile_levels=self.quantile_levels, metric=self.stopping_metric)
         self.model = self.model.fit(X, y, time_limit=time_limit, sample_weight=sample_weight)
         self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)

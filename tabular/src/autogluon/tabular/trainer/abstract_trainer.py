@@ -617,7 +617,7 @@ class AbstractTrainer:
                 model_name = model.name
                 model_full = model.convert_to_refit_full_template()
                 # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-                model_full.params_aux['max_memory_usage_ratio'] = model_full.params_aux['max_memory_usage_ratio'] * 1.15
+                model_full._user_params_aux['max_memory_usage_ratio'] = model.params_aux['max_memory_usage_ratio'] * 1.15
                 # TODO: Do it for all models in the level at once to avoid repeated processing of data?
                 base_model_names = self.get_base_model_names(model_name)
                 stacker_type = type(model)

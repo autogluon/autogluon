@@ -404,7 +404,6 @@ class BaggedEnsembleModel(AbstractModel):
         )
         init_args.update(super()._get_init_args())
         init_args.pop('problem_type')
-        init_args.pop('feature_metadata')
         return init_args
 
     def _get_compressed_params(self, model_params_list=None):

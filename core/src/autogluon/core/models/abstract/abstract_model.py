@@ -128,13 +128,17 @@ class AbstractModel:
             self._user_params_aux = hyperparameters.pop(AG_ARGS_FIT)  # TODO: Delete after initialization?
         else:
             self._user_params_aux = None
+        if self._user_params_aux is None:
+            self._user_params_aux = dict()
+        self._user_params = hyperparameters  # TODO: Delete after initialization?
+        if self._user_params is None:
+            self._user_params = dict()
 
         if stopping_metric is not None:
             if 'stopping_metric' in self._user_params_aux:
                 raise AssertionError('stopping_metric was specified in both hyperparameters ag_args_fit and model init. Please specify only once.')
         self.stopping_metric = stopping_metric
 
-        self._user_params = hyperparameters  # TODO: Delete after initialization?
         self.params_trained = dict()
         self._is_initialized = False
 
@@ -729,13 +733,9 @@ class AbstractModel:
             name=self.name,
             problem_type=self.problem_type,
             eval_metric=self.eval_metric,
-            num_classes=self.num_classes,
-            quantile_levels=self.quantile_levels,
-            stopping_metric=self.stopping_metric,
-            model=None,
             hyperparameters=hyperparameters,
-            features=self.features,
-            feature_metadata=self.feature_metadata
+            quantile_levels=self.quantile_levels,
+            stopping_metric=self.stopping_metric
         )
         return init_args
 
