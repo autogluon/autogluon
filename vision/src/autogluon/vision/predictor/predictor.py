@@ -229,12 +229,15 @@ class ImagePredictor(object):
         if self._problem_type is None:
             # options: multiclass, binary, regression
             self._problem_type = MULTICLASS
-        
+        assert self._problem_type in (MULTICLASS, BINARY, REGRESSION), f"Invalid problem_type: {self._problem_type}"
         if self._eval_metric is None:
-            # options: accuracy,rmse
             if self._problem_type == REGRESSION:
+                # options: rmse
+                logger.log(20, 'ImagePredictor sets rmse as default eval_metric for regression problems.')
                 self._eval_metric = 'rmse'
             else:
+                # options: accuracy
+                logger.log(20, 'ImagePredictor sets accuracy as default eval_metric for classification problems.')
                 self._eval_metric = 'accuracy'
         print('image prediction for {}'.format(self._problem_type))
         print('eval metric is {}'.format(self._eval_metric))
@@ -378,7 +381,7 @@ class ImagePredictor(object):
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
-        task = _ImageClassification(config=config)
+        task = _ImageClassification(problem_type=self._problem_type, config=config)
         # GluonCV can't handle these separately - patching created config
         task.search_strategy = scheduler
         task.scheduler_options['searcher'] = searcher
@@ -404,7 +407,6 @@ class ImagePredictor(object):
             if self._label != 'label' and self._label in data.columns:
                 # data is deepcopied so it's okay to overwrite directly
                 data = data.rename(columns={'label': '_unused_label', self._label: 'label'}, errors='ignore')
-
         if not (hasattr(data, 'classes') and hasattr(data, 'to_mxnet')):
             if isinstance(data, pd.DataFrame):
                 # raw dataframe, try to add metadata automatically
@@ -414,10 +416,15 @@ class ImagePredictor(object):
                     if not os.path.isfile(sample):
                         raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
-                    infer_classes = sorted(data.label.unique().tolist())
-                    logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
+                    if self._problem_type == MULTICLASS or self._problem_type == BINARY:
+                        infer_classes = sorted(data.label.unique().tolist())
+                        logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
+                    elif self._problem_type == REGRESSION:
+                        infer_classes = []
+                        logger.log(20, f'Regression problem does not need classes')
                     instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
+                    print('num_class = {}'.format(len(infer_classes)))
                     data = _ImageClassification.Dataset(data, classes=infer_classes)
                 else:
                     err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
