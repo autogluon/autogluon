@@ -47,7 +47,7 @@ class LGBModel(AbstractModel):
         self._requires_remap = None
 
     def _set_default_params(self):
-        default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
+        default_params = get_param_baseline(problem_type=self.problem_type)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
@@ -98,6 +98,9 @@ class LGBModel(AbstractModel):
             dataset_train=dataset_train, dataset_val=dataset_val
         )
         gc.collect()
+
+        if self.problem_type in [MULTICLASS, SOFTCLASS] and 'num_classes' not in params:
+            params['num_classes'] = self.num_classes
 
         num_boost_round = params.pop('num_boost_round', 1000)
         dart_retrain = params.pop('dart_retrain', False)  # Whether to retrain the model to get optimal iteration if model is trained in 'dart' mode.

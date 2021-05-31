@@ -44,15 +44,10 @@ class BaggedEnsembleModel(AbstractModel):
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
 
-        try:
-            feature_metadata = self.model_base.feature_metadata
-        except:
-            feature_metadata = None
-
         eval_metric = kwargs.pop('eval_metric', self.model_base.eval_metric)
-        stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)
+        stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)  # FIXME: Has to be moved to post-model_base initialization, otherwise could be misaligned.
 
-        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_metadata=feature_metadata, **kwargs)
+        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, **kwargs)
 
     def _set_default_params(self):
         default_params = {
@@ -146,9 +141,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         model_base = self._get_model_base()
         model_base.rename(name='')
-        if self.features is not None:
-            model_base.features = self.features
-        model_base.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
+        kwargs['feature_metadata'] = self.feature_metadata
+        kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
 
         if self.model_base is not None:
             self.save_model_base(self.model_base)
@@ -648,7 +642,8 @@ class BaggedEnsembleModel(AbstractModel):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
-        self.model_base.feature_metadata = self.feature_metadata  # TODO: Move this
+        kwargs['feature_metadata'] = self.feature_metadata
+        kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
         self.model_base.set_contexts(self.path + 'hpo' + os.path.sep)
 
         # TODO: Preprocess data here instead of repeatedly
