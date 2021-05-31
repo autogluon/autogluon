@@ -46,7 +46,8 @@ from .utils import average_checkpoints, set_seed
 from .. import constants as _C
 from ..utils import logging_config
 from ..presets import ag_text_presets
-
+# from ... import version
+# there is no version module
 
 logger = logging.getLogger(__name__)  # return logger
 
@@ -1361,7 +1362,8 @@ class MultiModalTextModel:
                     'log_metrics': log_metrics,
                     'feature_columns': self._feature_columns,
                     'column_types': self._column_types,
-                    'version': version.__version__,
+#                     'version': version.__version__,
+                    'version': 0.0 # I don't know what is good to put here
                 }, of, ensure_ascii=True)
 
     @classmethod
