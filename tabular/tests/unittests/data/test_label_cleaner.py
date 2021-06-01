@@ -206,8 +206,16 @@ def test_label_cleaner_regression():
 def test_label_softclass():
     # Given
     problem_type = SOFTCLASS
-    input_labels = pd.Series([2, 4, 2, 2, 4, 1])
+    input_labels = pd.DataFrame([
+        [0, 1, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0],
+        [0, 0, 0.3, 0.6, 0.1, 0],
+    ])
 
-    # Raise exception
-    with pytest.raises(NotImplementedError):
-        LabelCleaner.construct(problem_type=problem_type, y=input_labels, y_uncleaned=None)
+    # When
+    label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=input_labels, y_uncleaned=None)
+
+    # Then
+    assert input_labels.equals(label_cleaner.transform(input_labels))
+    assert input_labels.equals(label_cleaner.inverse_transform(input_labels))
+    assert label_cleaner.num_classes == 6
