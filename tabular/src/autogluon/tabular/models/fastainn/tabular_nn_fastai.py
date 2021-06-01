@@ -321,6 +321,7 @@ class NNFastAiTabularModel(AbstractModel):
             X = pd.concat([X, X]).reset_index(drop=True)
         # Copy cat_columns and cont_columns because TabularList is mutating the list
         # TODO: This call has very high fixed cost with many features (0.7s for a single row with 3k features)
+        #  Primarily due to normalization performed on the inputs
         test_dl = self.model.dls.test_dl(X, inplace=True)
         with self.model.no_bar():
             with self.model.no_logging():

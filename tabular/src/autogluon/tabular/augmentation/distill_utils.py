@@ -75,13 +75,14 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
     logger.log(20, f"SPUNGE: Augmenting training data with {num_augmented_samples} synthetic samples for distillation...")
 
     X = X.copy()
+    nan_category = '__NaN__'
     category_featnames = feature_metadata.get_features(valid_raw_types=[R_CATEGORY])
     for feature in category_featnames:
         current_categories = X[feature].cat.categories
-        if '__NaN__' in current_categories:
-            X[feature] = X[feature].fillna('__NaN__')
+        if nan_category in current_categories:
+            X[feature] = X[feature].fillna(nan_category)
         else:
-            X[feature] = X[feature].cat.add_categories('__NaN__').fillna('__NaN__')
+            X[feature] = X[feature].cat.add_categories(nan_category).fillna(nan_category)
 
     num_feature_perturb = max(1, int(frac_perturb*len(X.columns)))
     X_aug = pd.concat([X.iloc[[0]].copy()]*num_augmented_samples)
@@ -109,7 +110,7 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
             X_aug[feature] = pd.Series(aug_data, index=X_aug.index)
 
     for feature in category_featnames:
-        X_aug[feature] = X_aug[feature].cat.remove_categories('__NaN__')
+        X_aug[feature] = X_aug[feature].cat.remove_categories(nan_category)
 
     return X_aug
 

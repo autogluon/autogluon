@@ -202,6 +202,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
                 self._feature_names_dict[nlp_feature] = nlp_features_names_final
 
             transform_array = transform_matrix.toarray()
+            # This count could technically overflow in absurd situations. Consider making dtype a variable that is computed.
             nonzero_count = np.count_nonzero(transform_array, axis=1).astype(np.uint16)
             transform_array = np.append(transform_array, np.expand_dims(nonzero_count, axis=1), axis=1)
             X_nlp_features = pd.DataFrame(transform_array, columns=self._feature_names_dict[nlp_feature], index=X.index)  # TODO: Consider keeping sparse
