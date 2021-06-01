@@ -536,6 +536,9 @@ class ImagePredictor(object):
             The returned dataframe will contain labels. If more than one image in input,
             the returned dataframe will contain `images` column, and all results are concatenated.
         """
+        if self._problem_type in [REGRESSION]:
+            return self.predict_proba(data, as_pandas)
+        
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
