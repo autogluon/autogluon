@@ -151,11 +151,7 @@ class FeatureMetadata:
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
     def get_type_map_special(self) -> dict:
-        type_map_special = dict()
-        features = self.get_features()
-        for feature in features:
-            type_map_special[feature] = self.get_feature_types_special(feature)
-        return type_map_special
+        return {feature: self.get_feature_types_special(feature) for feature in self.get_features()}
 
     def get_type_group_map_raw(self):
         type_group_map_raw = defaultdict(list)
