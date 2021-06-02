@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -8,11 +7,8 @@ from pandas import DataFrame, IntervalIndex, Series
 logger = logging.getLogger(__name__)
 
 
-def bin_column(series: Series, mapping, dtype):
-    mapping_dict = {k: v for v, k in enumerate(list(mapping))}
-    series_out = pd.cut(series, mapping)
-    series_out_int = np.array([mapping_dict[val] for val in series_out], dtype=dtype)
-    return series_out_int
+def bin_column(series: Series, bins, dtype):
+    return np.digitize(series, bins=bins, right=True).astype(dtype)
 
 
 # TODO: Rewrite with normalized value counts as binning technique, will be more performant and optimal
@@ -21,7 +17,7 @@ def generate_bins(X_features: DataFrame, features_to_bin: list, ideal_bins: int 
     starting_cats = 1000
     bin_index_starting = [np.floor(X_len * (num + 1) / starting_cats) for num in range(starting_cats - 1)]
     bin_epsilon = 0.000000001
-    bin_mapping = defaultdict()
+    bin_mapping = dict()
     max_iterations = 20
     for column in features_to_bin:
         num_cats_initial = starting_cats
@@ -61,7 +57,8 @@ def generate_bins(X_features: DataFrame, features_to_bin: list, ideal_bins: int 
                 is_satisfied = True
                 # print('max_iterations met, stopping prior to satisfaction!', column, len(interval_index))
 
-        bin_mapping[column] = interval_index
+        bins_final = interval_index.right.values
+        bin_mapping[column] = bins_final
     return bin_mapping
 
 

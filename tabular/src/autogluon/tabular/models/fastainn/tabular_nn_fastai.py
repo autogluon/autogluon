@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
-from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL
+from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.utils import try_import_fastai
@@ -33,7 +33,6 @@ from .hyperparameters.searchspaces import get_default_searchspace
 # MacOS issue: torchvision==0.7.0 + torch==1.6.0 can cause segfaults; use torch==1.2.0 torchvision==0.4.0
 
 LABEL = '__label__'
-MISSING = '__!#ag_internal_missing#!__'
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +77,6 @@ class NNFastAiTabularModel(AbstractModel):
         self.columns_fills = None
         self.procs = None
         self.y_scaler = None
-        self._inner_features = None
         self._load_model = None  # Whether to load inner model when loading.
 
     def _preprocess_train(self, X, y, X_val, y_val):
@@ -128,28 +126,26 @@ class NNFastAiTabularModel(AbstractModel):
                 cat_cols_to_drop = X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values
             except:
                 cat_cols_to_drop = []
+            X_columns = list(X.columns)
             cat_cols_to_keep = [col for col in X.columns.values if (col not in cat_cols_to_drop)]
             cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
             logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
             self.cat_columns = cat_cols_to_use
-            self.cat_columns = [feature for feature in self.cat_columns if feature in list(X.columns)]
-            self.cont_columns = [feature for feature in self.cont_columns if feature in list(X.columns)]
-
-            self.columns_fills = {}
-            for c in self.cat_columns:
-                self.columns_fills[c] = MISSING
-            for c in self.cont_columns:
+            self.cat_columns = [feature for feature in self.cat_columns if feature in X_columns]
+            self.cont_columns = [feature for feature in self.cont_columns if feature in X_columns]
+            nullable_numeric_features = self.feature_metadata.get_features(valid_raw_types=[R_FLOAT, R_DATETIME], invalid_special_types=[S_TEXT_SPECIAL])
+            nullable_numeric_features = [feature for feature in nullable_numeric_features if feature in X_columns]
+            self.columns_fills = dict()
+            for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
-            self._inner_features = self.cat_columns + self.cont_columns
         return self._fill_missing(X)
 
     def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = df[self._inner_features].copy()
-        for c in self.cat_columns:
-            df[c] = df[c].cat.add_categories(MISSING)
-            df[c] = df[c].fillna(self.columns_fills[c])
-        for c in self.cont_columns:
-            df[c] = df[c].fillna(self.columns_fills[c])
+        # FIXME: Consider representing categories as int
+        if self.columns_fills:
+            df = df.fillna(self.columns_fills, inplace=False, downcast=False)
+        else:
+            df = df.copy()
         return df
 
     def _fit(self,
@@ -323,9 +319,10 @@ class NNFastAiTabularModel(AbstractModel):
         # fastai has issues predicting on a single row, duplicating the row as a workaround
         if single_row:
             X = pd.concat([X, X]).reset_index(drop=True)
-
         # Copy cat_columns and cont_columns because TabularList is mutating the list
-        test_dl = self.model.dls.test_dl(X)
+        # TODO: This call has very high fixed cost with many features (0.7s for a single row with 3k features)
+        #  Primarily due to normalization performed on the inputs
+        test_dl = self.model.dls.test_dl(X, inplace=True)
         with self.model.no_bar():
             with self.model.no_logging():
                 preds, _ = self.model.get_preds(dl=test_dl)
@@ -365,7 +362,6 @@ class NNFastAiTabularModel(AbstractModel):
             )
         self._load_model = None
         return path
-
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):

@@ -1,7 +1,7 @@
 import logging
 
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, RangeIndex
 
 from autogluon.core.features.types import R_CATEGORY, R_INT
 
@@ -37,11 +37,10 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
         category_maps = {}
         for column in X:
             old_categories = list(X[column].cat.categories.values)
-            new_categories = list(range(len(old_categories)))
-            category_maps[column] = {old_code: new_code for old_code, new_code in zip(old_categories, new_categories)}
+            new_categories = RangeIndex(len(old_categories))  # Memory optimal categories
+            category_maps[column] = new_categories
         return category_maps
 
-    # TODO: Compress further, uint16, etc.
     def _minimize_categorical_memory_usage(self, X: DataFrame):
         if self._category_maps:
             if not self.inplace:

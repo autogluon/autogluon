@@ -16,10 +16,9 @@ logger = logging.getLogger(__name__)
 # TODO: Add more parameters (possibly pass in binning function as an argument for full control)
 class BinnedFeatureGenerator(AbstractFeatureGenerator):
     """BinnedFeatureGenerator bins incoming int and float features to num_bins unique int values, maintaining relative rank order."""
-    def __init__(self, num_bins=10, inplace=False, **kwargs):
+    def __init__(self, num_bins=10, **kwargs):
         super().__init__(**kwargs)
         self.num_bins = num_bins
-        self.inplace = inplace
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._bin_map = self._get_bin_map(X=X)
@@ -40,14 +39,11 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
         return binning.generate_bins(X, list(X.columns), ideal_bins=self.num_bins)
 
     def _transform_bin(self, X: DataFrame):
-        if self._bin_map:
-            if not self.inplace:
-                X = X.copy(deep=True)
-            with pd.option_context('mode.chained_assignment', None):
-                # Pandas complains about SettingWithCopyWarning, but this should be valid.
-                for column in self._bin_map:
-                    X[column] = binning.bin_column(series=X[column], mapping=self._bin_map[column], dtype=self._astype_map[column])
-        return X
+        X_out = dict()
+        for column in self._bin_map:
+            X_out[column] = binning.bin_column(series=X[column], bins=self._bin_map[column], dtype=self._astype_map[column])
+        X_out = pd.DataFrame(X_out, index=X.index)
+        return X_out
 
     def _remove_features_in(self, features: list):
         super()._remove_features_in(features)

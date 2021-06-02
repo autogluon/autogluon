@@ -5,6 +5,7 @@ from sklearn.neighbors import NearestNeighbors
 from autogluon.core.metrics import mean_squared_error
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.features.feature_metadata import FeatureMetadata
+from autogluon.core.features.types import R_CATEGORY, R_FLOAT, R_INT
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ def postprocess_augmented(X_aug, X):
     return X_aug.reset_index(drop=True, inplace=False)
 
 
+# TODO: This can easily be optimized heavily
 def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10000, frac_perturb=0.1, continuous_feature_noise=0.1, **kwargs):
     """ Generates synthetic datapoints for learning to mimic teacher model in distillation
         via simplified version of MUNGE strategy (that does not require near-neighbor search).
@@ -71,10 +73,21 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
     if frac_perturb > 1.0:
         raise ValueError("frac_perturb must be <= 1")
     logger.log(20, f"SPUNGE: Augmenting training data with {num_augmented_samples} synthetic samples for distillation...")
+
+    X = X.copy()
+    nan_category = '__NaN__'
+    category_featnames = feature_metadata.get_features(valid_raw_types=[R_CATEGORY])
+    for feature in category_featnames:
+        current_categories = X[feature].cat.categories
+        if nan_category in current_categories:
+            X[feature] = X[feature].fillna(nan_category)
+        else:
+            X[feature] = X[feature].cat.add_categories(nan_category).fillna(nan_category)
+
     num_feature_perturb = max(1, int(frac_perturb*len(X.columns)))
     X_aug = pd.concat([X.iloc[[0]].copy()]*num_augmented_samples)
     X_aug.reset_index(drop=True, inplace=True)
-    continuous_types = ['float', 'int']
+    continuous_types = [R_FLOAT, R_INT]
     continuous_featnames = feature_metadata.get_features(valid_raw_types=continuous_types)  # these features will have shuffled values with added noise
 
     for i in range(num_augmented_samples): # hot-deck sample some features per datapoint
@@ -95,6 +108,9 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
             mask = np.random.binomial(n=1, p=frac_perturb, size=num_augmented_samples)
             aug_data = aug_data + noise*mask
             X_aug[feature] = pd.Series(aug_data, index=X_aug.index)
+
+    for feature in category_featnames:
+        X_aug[feature] = X_aug[feature].cat.remove_categories(nan_category)
 
     return X_aug
 

@@ -1,6 +1,7 @@
 import copy
 import logging
 
+import pandas as pd
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
@@ -51,7 +52,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = None, maximum_num_cat: int = None, fillna: str = None, **kwargs):
+    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = 2, maximum_num_cat: int = None, fillna: str = None, **kwargs):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
         if minimum_cat_count is not None and minimum_cat_count < 1:
@@ -98,14 +99,14 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:
         if self.features_in:
-            X_category = X.astype('category')
+            X_category = dict()
             if self.category_map is not None:
-                X_category = copy.deepcopy(X_category)  # TODO: Add inplace version / parameter
-                for column in self.category_map:
-                    X_category[column].cat.set_categories(self.category_map[column], inplace=True)
+                for column, column_map in self.category_map.items():
+                    X_category[column] = pd.Categorical(X[column], categories=column_map)
+                X_category = DataFrame(X_category, index=X.index)
                 if self._fillna_map is not None:
-                    for column in self._fillna_map:
-                        X_category[column].fillna(self._fillna_map[column], inplace=True)
+                    for column, column_map in self._fillna_map.items():
+                        X_category[column].fillna(column_map, inplace=True)
         else:
             X_category = DataFrame(index=X.index)
         return X_category
