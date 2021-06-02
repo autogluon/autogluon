@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.
 # TODO: Try midstack Semi-Supervised. Just take final models and re-train them, use bagged preds for SS rows. This would be very cheap and easy to try.
+# TODO: Move to autogluon.core
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
     trainer_info_name = 'info.pkl'
