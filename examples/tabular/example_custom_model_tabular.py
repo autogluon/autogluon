@@ -71,13 +71,12 @@ train_data = train_data.head(1000)  # subsample for faster demo
 X = train_data.drop(columns=[label])
 y = train_data[label]
 
-problem_type = infer_problem_type(y=y)  # Infer problem type (or else specify directly)
-naive_bayes_model = NaiveBayesModel(path='AutogluonModels/', name='CustomNaiveBayes', problem_type=problem_type)
-
 # Construct a LabelCleaner to neatly convert labels to float/integers during model training/inference, can also use to inverse_transform back to original.
+problem_type = infer_problem_type(y=y)  # Infer problem type (or else specify directly)
 label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
 y_clean = label_cleaner.transform(y)
 
+naive_bayes_model = NaiveBayesModel()
 naive_bayes_model.fit(X=X, y=y_clean)  # Fit custom model
 
 # To save to disk and load the model, do the following:

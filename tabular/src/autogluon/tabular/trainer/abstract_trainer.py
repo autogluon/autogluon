@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from autogluon.core.constants import AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
+from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.
 # TODO: Try midstack Semi-Supervised. Just take final models and re-train them, use bagged preds for SS rows. This would be very cheap and easy to try.
+# TODO: Move to autogluon.core
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
     trainer_info_name = 'info.pkl'
@@ -616,7 +618,7 @@ class AbstractTrainer:
                 model_name = model.name
                 model_full = model.convert_to_refit_full_template()
                 # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-                model_full.params_aux['max_memory_usage_ratio'] = model_full.params_aux['max_memory_usage_ratio'] * 1.15
+                model_full._user_params_aux['max_memory_usage_ratio'] = model.params_aux['max_memory_usage_ratio'] * 1.15
                 # TODO: Do it for all models in the level at once to avoid repeated processing of data?
                 base_model_names = self.get_base_model_names(model_name)
                 stacker_type = type(model)
@@ -1077,6 +1079,23 @@ class AbstractTrainer:
             ens_sample_weight =  kwargs.get('ens_sample_weight', None)
             if ens_sample_weight is not None:
                 model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
+
+        #######################
+        # FIXME: This section is a hack, compute genuine feature_metadata for each stack level instead
+        #  Don't do this here, do this upstream so it isn't recomputed for each model
+        #  Add feature_metadata to model_fit_kwargs
+        # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
+        # FIXME: This doesn't assign proper special types to stack features, relying on a hack in StackerEnsembleModel to assign S_STACK to feature metadata, don't do this.
+        #  Remove hack in StackerEnsembleModel
+        feature_metadata = self.feature_metadata
+        features_base = self.feature_metadata.get_features()
+        features_new = [feature for feature in X.columns if feature not in features_base]
+        if features_new:
+            feature_metadata_new = FeatureMetadata.from_df(X[features_new])
+            feature_metadata = feature_metadata.join_metadata(feature_metadata_new).keep_features(list(X.columns))
+        model_fit_kwargs['feature_metadata'] = feature_metadata
+        #######################
+
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
@@ -1351,9 +1370,10 @@ class AbstractTrainer:
             base_models_dict=base_models_dict,
             base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=model_names),
             base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=model_names),
-            hyperparameters=hyperparameters, num_classes=self.num_classes, quantile_levels=self.quantile_levels,
+            hyperparameters=hyperparameters, quantile_levels=self.quantile_levels,
             random_state=level+self.random_state
         )
+        dummy_stacker.initialize(num_classes=self.num_classes)
         return dummy_stacker
 
     # TODO: Enable raw=True for bagged models when X=None

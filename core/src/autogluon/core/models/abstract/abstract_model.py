@@ -16,25 +16,20 @@ from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...data.label_cleaner import LabelCleaner
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
-from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, compute_permutation_feature_importance, compute_weighted_metric
+from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 
 logger = logging.getLogger(__name__)
 
-# TODO: Consider removing num_classes from init, inferring during fit instead.
-# TODO: Consider adding option for problem_type = None, and infer during fit.
-# TODO: Consider name = None as default, name only matters when saving model.
-# TODO: Consider path = None as default, use similar logic to TabularPredictor to set path automatically.
 # TODO: Consider removing stopping_metric from init, only use ag_args_fit to specify stopping_metric.
-# TODO: Consider removing features from init, only use feature_metadata.
-# TODO: Consider removing feature_metadata from init, have feature_metadata be fit argument?
-# TODO: Remove **kwargs from init?
+# TODO: Consider removing quantile_levels from init, only use ag_args_fit to specify quantile_levels.
 
 
 class AbstractModel:
@@ -43,13 +38,16 @@ class AbstractModel:
 
     Parameters
     ----------
-    path : str
+    path : str, default = None
         Directory location to store all outputs.
-    name : str
+        If None, a new unique time-stamped directory is chosen.
+    name : str, default = None
         Name of the subdirectory inside path where model will be saved.
         The final model directory will be path+name+os.path.sep()
-    problem_type : str
+        If None, defaults to the model's class name: self.__class__.__name__
+    problem_type : str, default = None
         Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
+        If None, will attempt to infer the problem type based on training data labels during training.
     eval_metric : :class:`autogluon.core.metrics.Scorer` or str, default = None
         Metric by which predictions will be ultimately evaluated on test data.
         This only impacts `model.score()`, as eval_metric is not used during training.
@@ -70,9 +68,6 @@ class AbstractModel:
     hyperparameters : dict, default = None
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
-    feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`, default = None
-        Contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical.
-        If None, feature_metadata is inferred during fit.
     """
 
     model_file_name = 'model.pkl'
@@ -80,41 +75,45 @@ class AbstractModel:
     model_info_json_name = 'info.json'
 
     def __init__(self,
-                 path: str,
-                 name: str,
-                 problem_type: str,
+                 path: str = None,
+                 name: str = None,
+                 problem_type: str = None,
                  eval_metric: Union[str, metrics.Scorer] = None,
                  hyperparameters=None,
-                 feature_metadata: FeatureMetadata = None,
-                 num_classes=None,
                  quantile_levels=None,
-                 stopping_metric=None,
-                 features=None,
-                 **kwargs):
+                 stopping_metric=None):
 
-        self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
+        if name is None:
+            self.name = self.__class__.__name__
+            logger.log(20, f'Warning: No name was specified for model, defaulting to class name: {self.name}')
+        else:
+            self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
+
         self.path_root = path
+        if self.path_root is None:
+            path_suffix = self.name
+            if len(self.name) > 0:
+                if self.name[0] != os.path.sep:
+                    path_suffix = os.path.sep + path_suffix
+            # TODO: Would be ideal to not create dir, but still track that it is unique. However, this isn't possible to do without a global list of used dirs or using UUID.
+            path_cur = setup_outputdir(path=None, create_dir=True, path_suffix=path_suffix)
+            self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
+            logger.log(20, f'Warning: No path was specified for model, defaulting to: {self.path_root}')
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
-        self.num_classes = num_classes
+
+        self.num_classes = None
         self.quantile_levels = quantile_levels
         self.model = None
         self.problem_type = problem_type
+
         if eval_metric is not None:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
         else:
-            self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
-            logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
+            self.eval_metric = None
+        self.normalize_pred_probas = None
 
-        if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
-            self.normalize_pred_probas = True
-            logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
-        else:
-            self.normalize_pred_probas = False
-
-        if feature_metadata is not None:
-            feature_metadata = copy.deepcopy(feature_metadata)
-        self.feature_metadata = feature_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
-        self.features = features
+        self.features = None
+        self.feature_metadata = None
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
@@ -123,27 +122,43 @@ class AbstractModel:
         self.params = {}
         self.params_aux = {}
 
-        self._set_default_auxiliary_params()
         if hyperparameters is not None:
             hyperparameters = hyperparameters.copy()
-            if AG_ARGS_FIT in hyperparameters:
-                ag_args_fit = hyperparameters.pop(AG_ARGS_FIT)
-                self.params_aux.update(ag_args_fit)
-
-        if stopping_metric is None:
-            self.stopping_metric = self.params_aux.get('stopping_metric', self._get_default_stopping_metric())
+        if hyperparameters is not None and AG_ARGS_FIT in hyperparameters:
+            self._user_params_aux = hyperparameters.pop(AG_ARGS_FIT)  # TODO: Delete after initialization?
         else:
-            if 'stopping_metric' in self.params_aux:
-                raise AssertionError('stopping_metric was specified in both hyperparameters ag_args_fit and model init. Please specify only once.')
-            self.stopping_metric = stopping_metric
-        self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, 'stopping_metric')
+            self._user_params_aux = None
+        if self._user_params_aux is None:
+            self._user_params_aux = dict()
+        self._user_params = hyperparameters  # TODO: Delete after initialization?
+        if self._user_params is None:
+            self._user_params = dict()
 
+        if stopping_metric is not None:
+            if 'stopping_metric' in self._user_params_aux:
+                raise AssertionError('stopping_metric was specified in both hyperparameters ag_args_fit and model init. Please specify only once.')
+        self.stopping_metric = stopping_metric
+
+        self.params_trained = dict()
+        self._is_initialized = False
+
+    def _init_params(self):
+        hyperparameters = self._user_params
         self._set_default_params()
         self.nondefault_params = []
         if hyperparameters is not None:
             self.params.update(hyperparameters)
             self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
+
+    def _init_params_aux(self):
+        hyperparameters = self._user_params_aux
+        self._set_default_auxiliary_params()
+        if hyperparameters is not None:
+            hyperparameters = hyperparameters.copy()
+            if AG_ARGS_FIT in hyperparameters:
+                ag_args_fit = hyperparameters.pop(AG_ARGS_FIT)
+                self.params_aux.update(ag_args_fit)
 
     @property
     def path_suffix(self):
@@ -283,25 +298,24 @@ class AbstractModel:
         If preprocessing code will produce the same output regardless of which child model processes the input data, then it should live here to avoid redundant repeated processing for each child.
         This means this method cannot be used for data normalization. Refer to `_preprocess` instead.
         """
-        if self.features is None:
-            self._preprocess_set_features(X=X)
         # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
         if list(X.columns) != self.features:
             X = X[self.features]
         return X
 
-    def _preprocess_set_features(self, X: pd.DataFrame):
+    def _preprocess_set_features(self, X: pd.DataFrame, feature_metadata: FeatureMetadata = None):
         """
         Infers self.features and self.feature_metadata from X.
 
         If no valid features were found, a NoValidFeatures exception is raised.
         """
-        self.features = list(X.columns)
+        if self.features is None:
+            self.features = list(X.columns)
         # TODO: Consider changing how this works or where it is done
-        if self.feature_metadata is None:
+        if feature_metadata is None:
             feature_metadata = FeatureMetadata.from_df(X)
         else:
-            feature_metadata = self.feature_metadata
+            feature_metadata = copy.deepcopy(feature_metadata)
         get_features_kwargs = self.params_aux.get('get_features_kwargs', None)
         if get_features_kwargs is not None:
             valid_features = feature_metadata.get_features(**get_features_kwargs)
@@ -342,6 +356,46 @@ class AbstractModel:
         kwargs['time_limit'] = time_limit
         kwargs = self._preprocess_fit_resources(**kwargs)
         return kwargs
+
+    def initialize(self, **kwargs):
+        if not self._is_initialized:
+            self._initialize(**kwargs)
+            self._is_initialized = True
+
+        kwargs.pop('feature_metadata', None)
+        kwargs.pop('num_classes', None)
+        return kwargs
+
+    def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, **kwargs):
+        if num_classes is not None:
+            self.num_classes = num_classes
+        if y is not None:
+            if self.problem_type is None:
+                self.problem_type = infer_problem_type(y=y)
+            if self.num_classes is None:
+                label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y)
+                self.num_classes = label_cleaner.num_classes
+        if self.eval_metric is None:
+            self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
+            logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
+        self.eval_metric = metrics.get_metric(self.eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
+
+        if self.stopping_metric is None:
+            self.stopping_metric = self.params_aux.get('stopping_metric', self._get_default_stopping_metric())
+        self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, 'stopping_metric')
+
+        if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
+            self.normalize_pred_probas = True
+            logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
+        else:
+            self.normalize_pred_probas = False
+
+        self._init_params_aux()
+
+        if X is not None:
+            self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
+
+        self._init_params()
 
     def _preprocess_fit_resources(self, silent=False, **kwargs):
         default_num_cpus, default_num_gpus = self._get_default_resources()
@@ -395,6 +449,9 @@ class AbstractModel:
         num_gpus : int, default = 'auto'
             How many GPUs to use during fit.
             If 'auto', model decides.
+        feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`, default = None
+            Contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical.
+            If None, feature_metadata is inferred during fit.
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
@@ -406,6 +463,7 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
+        kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
             self._fit(**kwargs)
@@ -675,18 +733,17 @@ class AbstractModel:
             name=self.name,
             problem_type=self.problem_type,
             eval_metric=self.eval_metric,
-            num_classes=self.num_classes,
-            quantile_levels=self.quantile_levels,
-            stopping_metric=self.stopping_metric,
-            model=None,
             hyperparameters=hyperparameters,
-            features=self.features,
-            feature_metadata=self.feature_metadata
+            quantile_levels=self.quantile_levels,
+            stopping_metric=self.stopping_metric
         )
         return init_args
 
     def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
         scheduler_options = copy.deepcopy(scheduler_options)
+        if 'time_out' not in scheduler_options[1]:
+            scheduler_options[1]['time_out'] = time_limit
+        kwargs = self.initialize(time_limit=scheduler_options[1]['time_out'], **kwargs)
         resource = copy.deepcopy(scheduler_options[1]['resource'])
         if 'num_cpus' in resource:
             if resource['num_cpus'] == 'auto':
@@ -696,8 +753,6 @@ class AbstractModel:
                 resource.pop('num_gpus')
 
         scheduler_options[1]['resource'] = self._preprocess_fit_resources(silent=True, **resource)
-        if 'time_out' not in scheduler_options[1]:
-            scheduler_options[1]['time_out'] = time_limit
         return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
 
     def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
