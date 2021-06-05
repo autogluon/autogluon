@@ -4,9 +4,9 @@ import time
 from builtins import classmethod
 from pathlib import Path
 
-import sklearn
 import numpy as np
 import pandas as pd
+import sklearn
 
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
@@ -17,6 +17,7 @@ from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.utils.savers import save_pkl
+
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -160,7 +161,7 @@ class NNFastAiTabularModel(AbstractModel):
              **kwargs):
         try_import_fastai()
         from fastai.tabular.model import tabular_config
-        from .fastai_helpers import tabular_learner
+        from fastai.tabular.learner import tabular_learner
         from fastcore.basics import defaults
         from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
         from .quantile_helpers import HuberPinballLoss
