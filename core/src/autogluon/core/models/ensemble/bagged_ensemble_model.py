@@ -61,6 +61,14 @@ class BaggedEnsembleModel(AbstractModel):
             self._set_default_param_value(param, val)
         super()._set_default_params()
 
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            drop_unique=False,  # TODO: Get the value from child instead
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
+
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
 
