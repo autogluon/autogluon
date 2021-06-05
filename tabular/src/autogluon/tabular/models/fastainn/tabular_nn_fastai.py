@@ -198,8 +198,8 @@ class NNFastAiTabularModel(AbstractModel):
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
         objective_optim_mode = np.less if objective_func_name in [
             'log_loss',
-            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2',  # Regression objectives
-            'pinball_loss', # Quantile objective
+            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error',  # Regression objectives
+            'pinball_loss',  # Quantile objective
         ] else np.greater
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
