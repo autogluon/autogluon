@@ -4,9 +4,9 @@ import time
 from builtins import classmethod
 from pathlib import Path
 
-import sklearn
 import numpy as np
 import pandas as pd
+import sklearn
 
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
@@ -95,7 +95,8 @@ class NNFastAiTabularModel(AbstractModel):
         if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
             y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
             y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
-            logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
+            logger.log(15, f'Training with scaled targets: {self.y_scaler} - NN epochs training metric '
+                           f'will be different from the final results - use leaderboard validation scores instead')
         else:
             y_norm = y
             y_val_norm = y_val
@@ -120,10 +121,19 @@ class NNFastAiTabularModel(AbstractModel):
         X = super()._preprocess(X=X, **kwargs)
         if fit:
             self.cat_columns = self.feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
-            self.cont_columns = self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
+
+            # TODO this will be fixed in feature generators
+            bool_conts = X.nunique()
+            conts_drop = bool_conts[bool_conts < 2]
+
+            self.cont_columns = [c for c in self.feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME]) if c not in conts_drop]
             try:
                 X_stats = X.describe(include='all').T.reset_index()
-                cat_cols_to_drop = X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values
+                cat_cols_to_drop = X_stats[
+                    (X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000))
+                    | (X_stats['unique'].isna())
+                    | (X_stats['unique'] < 2)
+                    ]['index'].values
             except:
                 cat_cols_to_drop = []
             X_columns = list(X.columns)
@@ -160,7 +170,7 @@ class NNFastAiTabularModel(AbstractModel):
              **kwargs):
         try_import_fastai()
         from fastai.tabular.model import tabular_config
-        from .fastai_helpers import tabular_learner
+        from fastai.tabular.learner import tabular_learner
         from fastcore.basics import defaults
         from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
         from .quantile_helpers import HuberPinballLoss
@@ -173,8 +183,12 @@ class NNFastAiTabularModel(AbstractModel):
         params = self._get_model_params()
 
         self.y_scaler = params.get('y_scaler', None)
-        if self.problem_type == QUANTILE and self.y_scaler is None:
-            self.y_scaler = sklearn.preprocessing.MinMaxScaler()
+        if self.y_scaler is None:
+            if self.problem_type == QUANTILE:
+                self.y_scaler = sklearn.preprocessing.MinMaxScaler()
+            elif self.problem_type == REGRESSION:
+                self.y_scaler = sklearn.preprocessing.StandardScaler()
+
         if self.y_scaler is not None:
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
