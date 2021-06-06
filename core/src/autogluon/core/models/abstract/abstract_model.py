@@ -112,8 +112,11 @@ class AbstractModel:
             self.eval_metric = None
         self.normalize_pred_probas = None
 
-        self.features = None
-        self.feature_metadata = None
+        self.features = None  # External features, do not use internally
+        self.feature_metadata = None  # External feature metadata, do not use internally
+        self._features = None  # Internal features, safe to use internally
+        self._feature_metadata = None  # Internal feature metadata, safe to use interally
+        self._is_features_in_same_as_ex = None  # Whether self.features == self._features
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
@@ -207,6 +210,7 @@ class AbstractModel:
             max_time_limit_ratio=1.0,  # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3, time_limit would be changed to 3.
             max_time_limit=None,  # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
             min_time_limit=0,  # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
+            # drop_unique=True,  # Whether to drop features that have only 1 unique value
             # num_cpus=None,
             # num_gpus=None,
             # ignore_hpo=False,
@@ -286,6 +290,8 @@ class AbstractModel:
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
         """
+        if not self._is_features_in_same_as_ex:
+            X = X[self._features]
         return X
 
     # TODO: Remove kwargs?
@@ -333,6 +339,24 @@ class AbstractModel:
         self.feature_metadata = feature_metadata.keep_features(self.features)
         if not self.features:
             raise NoValidFeatures
+        # FIXME: Consider counting NaNs as unique values, if unique_counts == 2 (including NaN), then treat as boolean
+        if self.params_aux.get('drop_unique', True):
+            # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
+            unique_counts = X[self.features].nunique(axis=0)
+            columns_to_drop = list(unique_counts[unique_counts < 2].index)
+            features_to_drop_internal = columns_to_drop
+            if not features_to_drop_internal:
+                features_to_drop_internal = None
+        else:
+            features_to_drop_internal = None
+        if features_to_drop_internal is not None:
+            self._features = [feature for feature in self.features if feature not in features_to_drop_internal]
+            self._feature_metadata = self.feature_metadata.keep_features(self._features)
+            self._is_features_in_same_as_ex = False
+        else:
+            self._features = self.features
+            self._feature_metadata = self.feature_metadata
+            self._is_features_in_same_as_ex = True
 
     def _preprocess_fit_args(self, **kwargs):
         sample_weight = kwargs.get('sample_weight', None)
@@ -1060,7 +1084,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
         if self._types_of_features is not None:
             Warning("Attempting to _get_types_of_features for Model, but previously already did this.")
 
-        feature_types = self.feature_metadata.get_type_group_map_raw()
+        feature_types = self._feature_metadata.get_type_group_map_raw()
         categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
         continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
@@ -1070,7 +1094,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
             logger.log(15, f"Model will additionally ignore the following columns: {unknown_features}")
             df = df.drop(columns=unknown_features)
-            self.features = list(df.columns)
+            self._features = list(df.columns)
 
         self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
         if self.features_to_drop:
@@ -1082,7 +1106,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
             # continuous = numeric features to rescale
             # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
             # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-            features_to_consider = [feat for feat in self.features if feat not in self.features_to_drop]
+            features_to_consider = [feat for feat in self._features if feat not in self.features_to_drop]
             for feature in features_to_consider:
                 feature_data = df[feature]  # pd.Series
                 num_unique_vals = len(feature_data.unique())

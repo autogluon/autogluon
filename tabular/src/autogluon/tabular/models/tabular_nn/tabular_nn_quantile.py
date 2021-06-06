@@ -65,8 +65,6 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
                            " this model will ignore them in training.")
         params = self.params.copy()
         params = fixedvals_from_searchspaces(params)
-        if self.feature_metadata is None:
-            raise ValueError("Trainer class must set feature_metadata for this model")
         if num_cpus is not None:
             self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         else:
@@ -325,8 +323,6 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
             train_dataset = X
         else:
             X = self.preprocess(X)
-            if self.features is None:
-                self.features = list(X.columns)
             train_dataset = self.process_train_data(df=X, labels=y,
                                                     impute_strategy=impute_strategy,
                                                     max_category_levels=max_category_levels,
@@ -375,8 +371,6 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
 
         # sklearn processing n_quantiles warning
         warnings.filterwarnings("ignore", module='sklearn.preprocessing')
-        if set(df.columns) != set(self.features):
-            raise ValueError("Column names in provided Dataframe do not match self.features")
         if labels is None:
             raise ValueError("Attempting process training data without labels")
         if len(labels) != len(df):
@@ -470,8 +464,6 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
 
         # changes non-specified default hyperparams from fixed values to search-spaces.
         self._set_default_searchspace()
-        if self.feature_metadata is None:
-            raise ValueError("Trainer class must set feature_metadata for this model")
         scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")

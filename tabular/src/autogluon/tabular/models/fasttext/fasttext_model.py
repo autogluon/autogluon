@@ -88,7 +88,6 @@ class FastTextModel(AbstractModel):
             logger.log(15, "sample_weight not yet supported for FastTextModel, this model will ignore them in training.")
 
         X = self.preprocess(X)
-        logger.debug("NLP features %s", self.features)
 
         self._label_dtype = y.dtype
         self._label_map = {label: f"__label__{i}" for i, label in enumerate(y.unique())}
@@ -114,8 +113,9 @@ class FastTextModel(AbstractModel):
     # TODO: text features: alternate text preprocessing steps
     # TODO: categorical features: special encoding:  <feature name>_<feature value>
     def _preprocess(self, X: pd.DataFrame, **kwargs) -> list:
+        X = super()._preprocess(X, **kwargs)
         text_col = (
-            X[self.features]
+            X
             .astype(str)
             .fillna(" ")
             .apply(lambda r: " ".join(v for v in r.values), axis=1)
