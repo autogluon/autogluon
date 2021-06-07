@@ -33,7 +33,20 @@ class AutoTrainer(AbstractTrainer):
 
         if (y_val is None) or (X_val is None):
             if not self.bagged_mode or use_bag_holdout:
-                X, X_val, y, y_val = generate_train_test_split(X, y, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_state)
+                if self.bagged_mode:
+                    # Need at least 2 samples of each class in train data after split for downstream k-fold splits
+                    # to ensure each k-fold has at least 1 sample of each class in training data
+                    min_cls_count_train = 2
+                else:
+                    min_cls_count_train = 1
+                X, X_val, y, y_val = generate_train_test_split(
+                    X,
+                    y,
+                    problem_type=self.problem_type,
+                    test_size=holdout_frac,
+                    random_state=self.random_state,
+                    min_cls_count_train=min_cls_count_train,
+                )
                 logger.log(20, f'Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}')
         elif self.bagged_mode:
             # TODO: User could be intending to blend instead. Add support for blend stacking.

@@ -387,8 +387,11 @@ class AbstractTrainer:
         if X_unlabeled is not None:
             X_unlabeled = self.get_inputs_to_stacker(X_unlabeled, base_models=base_model_names, fit=False)
 
+        fit_kwargs = dict(num_classes=self.num_classes)
+
         # FIXME: TODO: v0.1 X_unlabeled isn't cached so it won't be available during refit_full or fit_extra.
-        return self._train_multi(X=X_init, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models, level=level, stack_name=stack_name, **kwargs)
+        return self._train_multi(X=X_init, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
+                                 models=models, level=level, stack_name=stack_name, fit_kwargs=fit_kwargs, **kwargs)
 
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
@@ -893,7 +896,22 @@ class AbstractTrainer:
         w = None
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)
-        models = self._train_multi(X=X, y=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune_kwargs=None, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit, ens_sample_weight=w)
+        models = self._train_multi(
+            X=X,
+            y=y,
+            X_val=None,
+            y_val=None,
+            models=[weighted_ensemble_model],
+            k_fold=k_fold,
+            n_repeats=n_repeats,
+            hyperparameter_tune_kwargs=None,
+            feature_prune=False,
+            stack_name=stack_name,
+            level=level,
+            time_limit=time_limit,
+            ens_sample_weight=w,
+            fit_kwargs=dict(num_classes=self.num_classes),  # FIXME: Is this the right way to do this?
+        )
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
                 if self.model_best is None:
@@ -1070,7 +1088,7 @@ class AbstractTrainer:
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False, hyperparameter_tune_kwargs=None,
-                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, **kwargs) -> List[str]:
+                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1080,10 +1098,13 @@ class AbstractTrainer:
             k_fold = self.k_fold
         if n_repeats is None:
             n_repeats = self.n_repeats
+        if fit_kwargs is None:
+            fit_kwargs = dict()
         model_fit_kwargs = dict(
             time_limit=time_limit,
             verbosity=self.verbosity,
         )
+        model_fit_kwargs.update(fit_kwargs)
         if self.sample_weight is not None:
             X, w_train = extract_column(X, self.sample_weight)
             if w_train is not None:  # may be None for ensemble

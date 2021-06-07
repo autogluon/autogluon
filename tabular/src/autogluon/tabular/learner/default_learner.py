@@ -127,20 +127,20 @@ class DefaultLearner(AbstractLearner):
 
         if X_val is not None and self.label in X_val.columns:
             holdout_frac = 1
-        # FIXME: Breaks in extremely rare edge case with use_bag_holdout=True if threshold is not sufficient
-        #  THIS MUST BE FIXED BEFORE MERGING
-        #  Fix strategy: holdout data doesn't need any examples of rare classes (or only 1), so we can split it with special logic.
-        #  For train_data after split, only need 2 examples per class for folds, so each model has at least 1 training row in its fold data. No need to have all classes in held-out fold.
-        self.threshold, holdout_frac, num_bag_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds)
 
         if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
-            X = augment_rare_classes(X, self.label, self.threshold)
+            if num_bag_folds > 0:
+                self.threshold = 2
+                X = augment_rare_classes(X, self.label, threshold=2)
+            else:
+                self.threshold = 1
+
+        self.threshold, holdout_frac, num_bag_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds)
 
         # Gets labels prior to removal of infrequent classes
         y_uncleaned = X[self.label].copy()
 
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
-        # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
         X, y = self.extract_label(X)
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned, positive_class=self._positive_class)
@@ -258,19 +258,20 @@ class DefaultLearner(AbstractLearner):
 
     def _adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
         new_threshold = threshold
-        if self.problem_type in [REGRESSION, QUANTILE]:
-            num_rows = len(y)
-            holdout_frac = max(holdout_frac, 1 / num_rows + 0.001)
-            num_bag_folds = min(num_bag_folds, num_rows)
-            return new_threshold, holdout_frac, num_bag_folds
+        num_rows = len(y)
+        holdout_frac = max(holdout_frac, 1 / num_rows + 0.001)
+        num_bag_folds = min(num_bag_folds, num_rows)
 
         if num_bag_folds < 2:
-            minimum_safe_threshold = math.ceil(1 / holdout_frac)
+            minimum_safe_threshold = 1
         else:
-            minimum_safe_threshold = num_bag_folds
+            minimum_safe_threshold = 2
 
         if minimum_safe_threshold > new_threshold:
             new_threshold = minimum_safe_threshold
+
+        if self.problem_type in [REGRESSION, QUANTILE]:
+            return new_threshold, holdout_frac, num_bag_folds
 
         class_counts = y.value_counts()
         total_rows = class_counts.sum()
@@ -295,17 +296,6 @@ class DefaultLearner(AbstractLearner):
             new_threshold = class_counts.iloc[i]
             if (num_rows_valid >= minimum_rows_to_keep) and (num_classes_valid >= minimum_class_to_keep):
                 break
-
-        if new_threshold == 1:
-            new_threshold = 2  # threshold=1 is invalid, can't perform any train/val split in this case.
-        self.threshold = new_threshold
-
-        if new_threshold < minimum_safe_threshold:
-            if num_bag_folds >= 2:
-                if num_bag_folds > new_threshold:
-                    num_bag_folds = new_threshold
-            elif math.ceil(1 / holdout_frac) > new_threshold:
-                holdout_frac = 1 / new_threshold + 0.001
 
         return new_threshold, holdout_frac, num_bag_folds
 
