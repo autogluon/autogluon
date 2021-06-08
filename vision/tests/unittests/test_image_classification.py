@@ -20,7 +20,7 @@ def test_task():
     # raw dataframe
     df_test_dataset = pd.DataFrame(test_dataset)
     test_acc = classifier2.evaluate(df_test_dataset)
-    assert test_acc > 0.2, f'{test_acc} too bad'
+    assert test_acc[-1] > 0.2, f'{test_acc} too bad'
     test_proba = classifier2.predict_proba(test_dataset)
     test_feature = classifier2.predict_feature(test_dataset)
     single_test2 = classifier2.predict(test_dataset.iloc[0]['image'])
