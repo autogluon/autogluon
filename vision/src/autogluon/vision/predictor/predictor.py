@@ -586,8 +586,6 @@ class ImagePredictor(object):
             assert self._label in data.columns, f'{self._label} is not present in evaluation data'
             # note that evaluation data must use the same classes as training data, otherwise incorrect result
             data = _ImageClassification.Dataset(data, classes=self._train_classes)
-        if data.classes != self._train_classes:
-            warnings.warn(f"Evaluating with {data.classes} while the predictor is trained with labels {self._train_classes}. The result may not be accurate!")
         return self._classifier.evaluate(data)
 
     def fit_summary(self):
