@@ -1305,8 +1305,6 @@ class AbstractTrainer:
         if X_val is not None:
             self._num_rows_train += len(X_val)
         self._num_cols_train = len(list(X.columns))
-        logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py 1309')
-#         logger.log(20, 'skip')
         model_names_fit = self.train_multi_levels(X, y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
                                                   X_unlabeled=X_unlabeled, level_start=1, level_end=num_stack_levels+1, time_limit=time_limit, **kwargs)
         if len(self.get_model_names()) == 0:
