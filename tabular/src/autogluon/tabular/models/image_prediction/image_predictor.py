@@ -48,7 +48,7 @@ class ImagePredictorModel(AbstractModel):
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
             'valid_stacker': False,
-            'problem_types': [BINARY, MULTICLASS, REGRESSION],  # Does not support regression
+            'problem_types': [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
@@ -107,7 +107,7 @@ class ImagePredictorModel(AbstractModel):
         self.model = ImagePredictor(
             problem_type=self.problem_type,
             path=self.path,
-            eval_metric=self.eval_metric,  # TODO: Vision multiclass/binary problem works with accuracy, regression with rmse
+            # eval_metric=self.eval_metric,  # TODO: multiclass/binary vision problem works only with accuracy, regression with rmse
             verbosity=verbosity_image
         )
 

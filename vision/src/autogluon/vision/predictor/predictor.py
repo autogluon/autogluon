@@ -233,14 +233,12 @@ class ImagePredictor(object):
         if self._eval_metric is None:
             if self._problem_type == REGRESSION:
                 # options: rmse
-                logger.log(20, 'ImagePredictor sets rmse as default eval_metric for regression problems.')
                 self._eval_metric = 'rmse'
+                logger.log(20, 'ImagePredictor sets rmse as default eval_metric for regression problems.')
             else:
                 # options: accuracy
-                logger.log(20, 'ImagePredictor sets accuracy as default eval_metric for classification problems.')
                 self._eval_metric = 'accuracy'
-        print('image prediction for {}'.format(self._problem_type))
-        print('eval metric is {}'.format(self._eval_metric))
+                logger.log(20, 'ImagePredictor sets accuracy as default eval_metric for classification problems.')
         # init/validate kwargs
         kwargs = self._validate_kwargs(kwargs)
         # unpack
@@ -416,7 +414,7 @@ class ImagePredictor(object):
                     if not os.path.isfile(sample):
                         raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
-                    if self._problem_type == MULTICLASS or self._problem_type == BINARY:
+                    if self._problem_type in [MULTICLASS, BINARY]:
                         infer_classes = sorted(data.label.unique().tolist())
                         logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
                     elif self._problem_type == REGRESSION:
@@ -424,7 +422,6 @@ class ImagePredictor(object):
                         logger.log(20, f'Regression problem does not need classes')
                     instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
-                    print('num_class = {}'.format(len(infer_classes)))
                     data = _ImageClassification.Dataset(data, classes=infer_classes)
                 else:
                     err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
@@ -501,18 +498,16 @@ class ImagePredictor(object):
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
         y_pred_proba = self._classifier.predict(data, with_proba=True)
-        print (type(self._label_cleaner))
         if isinstance(data, pd.DataFrame) and 'image' in data:
             idx_to_image_map = data[['image']]
             idx_to_image_map = idx_to_image_map.reset_index(drop=False)
             y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
             y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
-        if self._problem_type == MULTICLASS or self._problem_type == BINARY:
+        if self._problem_type in [MULTICLASS, BINARY]:
             y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
             ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
         elif self._problem_type == REGRESSION:
             ret = y_pred_proba.drop(['image'], axis=1, errors='ignore')
-        print(ret)
         if as_pandas:
             return ret
         else:

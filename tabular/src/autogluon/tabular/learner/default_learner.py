@@ -93,7 +93,6 @@ class DefaultLearner(AbstractLearner):
             self.eval_metric = trainer.eval_metric
 
         self.save()
-        logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/learner/default_learner.py 96')
         trainer.fit(X, y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
         self.save_trainer(trainer=trainer)
         time_end = time.time()

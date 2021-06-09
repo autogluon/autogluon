@@ -267,9 +267,6 @@ class AbstractTrainer:
                 aux_kwargs_level['time_limit'] = aux_kwargs_level.get('time_limit', time_limit_aux)
             if level != 1:
                 feature_prune = False  # TODO: Enable feature prune on levels > 1
-            logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py train_multi_levels 270')
-            logger.log(20, hyperparameters)
-            logger.log(20, base_model_names)
             base_model_names, aux_models = self.stack_new_level(
                 X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
                 models=hyperparameters, level=level, base_model_names=base_model_names,
@@ -299,9 +296,6 @@ class AbstractTrainer:
         if name_suffix:
             core_kwargs['name_suffix'] = core_kwargs.get('name_suffix', '') + name_suffix
             aux_kwargs['name_suffix'] = aux_kwargs.get('name_suffix', '') + name_suffix
-        logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py stack_new_level 302')
-        logger.log(20, models)
-        logger.log(20, base_model_names)
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
                                                 level=level, base_model_names=base_model_names, feature_prune=feature_prune, **core_kwargs)
 
@@ -360,12 +354,7 @@ class AbstractTrainer:
                     ensemble_type=ensemble_type,
                     ensemble_kwargs=ensemble_kwargs,
                 ))
-            print(get_models_kwargs)
-            logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py stack_new_level_core 363')
-            logger.log(20, models)
             models, model_args_fit = get_models_func(hyperparameters=models, **get_models_kwargs)
-            logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/abstract_trainer.py stack_new_level_core 366')
-            logger.log(20, models)
             if model_args_fit:
                 hyperparameter_tune_kwargs = {
                     model_name: model_args_fit[model_name]['hyperparameter_tune_kwargs']

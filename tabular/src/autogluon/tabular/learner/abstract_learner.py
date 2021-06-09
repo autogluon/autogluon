@@ -135,7 +135,6 @@ class AbstractLearner:
         if self.is_fit:
             raise AssertionError('Learner is already fit.')
         self._validate_fit_input(X=X, X_val=X_val, **kwargs)
-        logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/learner/abstract_learner.py 138')
         return self._fit(X=X, X_val=X_val, **kwargs)
 
     def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,

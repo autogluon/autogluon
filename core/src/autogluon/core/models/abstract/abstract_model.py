@@ -449,8 +449,6 @@ class AbstractModel:
         For regression problems, this returns the predicted values as a Series.
         """
         y_pred_proba = self.predict_proba(X, **kwargs)
-#         print('abstract_model.py')
-#         print (y_pred_proba)
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 

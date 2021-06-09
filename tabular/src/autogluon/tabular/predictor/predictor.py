@@ -703,8 +703,6 @@ class TabularPredictor:
             'ag_args_fit': ag_args_fit,
             'excluded_model_types': excluded_model_types,
         }
-        logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/predictor/predictor.py 707')
-        logger.log(20, hyperparameters)
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity)

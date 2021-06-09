@@ -49,8 +49,6 @@ class AutoTrainer(AbstractTrainer):
                 X, X_val, y, y_val = generate_train_test_split(X, y, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_state)
                 logger.log(20, f'Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}')
 
-        logger.log(20, '~/autogluon/tabular/src/autogluon/tabular/trainer/auto_trainer.py 52')
-        logger.log(20, hyperparameters)
         self._train_multi_and_ensemble(X, y, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters,
                                        feature_prune=feature_prune,
                                        num_stack_levels=num_stack_levels, time_limit=time_limit, core_kwargs=core_kwargs)
