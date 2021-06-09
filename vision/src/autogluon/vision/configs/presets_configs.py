@@ -57,14 +57,14 @@ preset_image_predictor = dict(
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
     medium_quality_faster_train={
         'hyperparameters': {
-            'model': ['resnet50_v1b', 'resnet34_v1b'],
+            'model': 'resnet50_v1b',
             'lr': 0.01,
             'batch_size': 64,
             'epochs': 50,
             'early_stop_patience': 5
             },
         'hyperparameter_tune_kwargs': {
-            'num_trials': 2,
+            'num_trials': 1,
             'search_strategy': 'random',
         },
         'time_limit': 1*3600,
