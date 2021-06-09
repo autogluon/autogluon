@@ -7,7 +7,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from gluoncv.auto.tasks import ImageClassification as _ImageClassification
+from gluoncv.auto.tasks import ImagePrediction as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
@@ -512,7 +512,7 @@ class ImagePredictor(object):
             ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
         elif self._problem_type == REGRESSION:
             ret = y_pred_proba.drop(['image'], axis=1, errors='ignore')
-#         print(ret)
+        print(ret)
         if as_pandas:
             return ret
         else:
