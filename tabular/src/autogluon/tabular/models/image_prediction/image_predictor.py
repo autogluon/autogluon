@@ -127,12 +127,6 @@ class ImagePredictorModel(AbstractModel):
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
-
-#         if self.problem_type == REGRESSION:
-#             # FIXME: This probably won't work
-#             # return self.model.predict(X, as_pandas=False)
-#             raise AssertionError(f'ImagePredictorModel does not support `problem_type="{REGRESSION}"`')
-
         y_pred_proba = self.model.predict_proba(X, as_pandas=False)
         return self._convert_proba_to_unified_form(y_pred_proba)
 

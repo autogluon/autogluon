@@ -511,6 +511,8 @@ class ImagePredictor(object):
         if as_pandas:
             return ret
         else:
+            if self._problem_type == REGRESSION:
+                return ret.to_numpy().squeeze(axis=-1)
             return ret.to_numpy()
 
     def predict(self, data, as_pandas=True):

@@ -484,7 +484,6 @@ class AbstractModel:
         For regression, converts y_pred_proba to a 1 dimensional array of predictions.
         """
         if self.problem_type == REGRESSION:
-            y_pred_proba = np.squeeze(y_pred_proba, axis=-1)
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             else:
