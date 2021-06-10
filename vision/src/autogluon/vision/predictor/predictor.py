@@ -60,6 +60,7 @@ class ImagePredictor(object):
         self._label_cleaner = None
         self._fit_summary = {}
         self._label = label
+        self._train_classes = None
         assert isinstance(self._label, str)
         os.makedirs(self._log_dir, exist_ok=True)
 
@@ -380,6 +381,7 @@ class ImagePredictor(object):
         task.scheduler_options['searcher'] = searcher
         task._logger.setLevel(log_level)
         task._logger.propagate = True
+        self._train_classes = train_data.classes
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             with MXNetErrorCatcher() as err:
@@ -579,6 +581,11 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier not initialized, try `fit` first.')
+        assert self._train_classes is not None
+        if isinstance(data, pd.DataFrame) and not isinstance(data, _ImageClassification.Dataset):
+            assert self._label in data.columns, f'{self._label} is not present in evaluation data'
+            # note that evaluation data must use the same classes as training data, otherwise incorrect result
+            data = _ImageClassification.Dataset(data, classes=self._train_classes)
         return self._classifier.evaluate(data)
 
     def fit_summary(self):

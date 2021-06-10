@@ -63,10 +63,6 @@ preset_image_predictor = dict(
             'epochs': 50,
             'early_stop_patience': 5
             },
-        'hyperparameter_tune_kwargs': {
-            'num_trials': 8,
-            'search_strategy': 'random',
-        },
         'time_limit': 1*3600,
     },
 
