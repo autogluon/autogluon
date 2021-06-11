@@ -493,10 +493,11 @@ class ImagePredictor(object):
         assert self._label_cleaner is not None
         y_pred_proba = self._classifier.predict(data, with_proba=True)
         if isinstance(data, pd.DataFrame) and 'image' in data:
+            index_name = data.index.name
             idx_to_image_map = data[['image']]
             idx_to_image_map = idx_to_image_map.reset_index(drop=False)
             y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
-            y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
+            y_pred_proba = y_pred_proba.set_index(index_name).rename_axis(None)
         y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
         ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
 
@@ -530,11 +531,12 @@ class ImagePredictor(object):
         if 'image' in proba.columns:
             # multiple images
             assert isinstance(data, pd.DataFrame) and 'image' in data.columns
+            index_name = data.index.name
             y_pred = proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
             idx_to_image_map = data[['image']]
             idx_to_image_map = idx_to_image_map.reset_index(drop=False)
             y_pred = idx_to_image_map.merge(y_pred, on='image')
-            y_pred = y_pred.set_index('index').rename_axis(None)
+            y_pred = y_pred.set_index(index_name).rename_axis(None)
             ret = self._label_cleaner.inverse_transform(y_pred['id'].rename('label'))
         else:
             # single image
