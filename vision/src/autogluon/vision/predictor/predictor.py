@@ -494,6 +494,9 @@ class ImagePredictor(object):
         y_pred_proba = self._classifier.predict(data, with_proba=True)
         if isinstance(data, pd.DataFrame) and 'image' in data:
             index_name = data.index.name
+            if index_name is None:
+                # TODO: This crashes if a feature is already named 'index'.
+                index_name = 'index'
             idx_to_image_map = data[['image']]
             idx_to_image_map = idx_to_image_map.reset_index(drop=False)
             y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
@@ -532,6 +535,9 @@ class ImagePredictor(object):
             # multiple images
             assert isinstance(data, pd.DataFrame) and 'image' in data.columns
             index_name = data.index.name
+            if index_name is None:
+                # TODO: This crashes if a feature is already named 'index'.
+                index_name = 'index'
             y_pred = proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
             idx_to_image_map = data[['image']]
             idx_to_image_map = idx_to_image_map.reset_index(drop=False)
