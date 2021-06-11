@@ -14,6 +14,7 @@ from autogluon.core.constants import MULTICLASS
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
+from autogluon.core.utils.utils import generate_train_test_split
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 from ..utils import MXNetErrorCatcher
 
@@ -301,9 +302,20 @@ class ImagePredictor(object):
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
+        if tuning_data is None:
+            train_data, tuning_data, _, _ = generate_train_test_split(X=train_data, y=train_data[self._label], problem_type=self._problem_type, test_size=holdout_frac)
+            logger.info('Randomly split train_data into train[%d]/validation[%d] splits.',
+                              len(train_data), len(tuning_data))
+            train_data = train_data.reset_index(drop=True)
+            tuning_data = tuning_data.reset_index(drop=True)
+
+        train_data = self._validate_data(train_data)
+        train_data = self.Dataset(train_data, classes=train_data.classes)
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
+            # converting to internal label set
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
+            tuning_data = self.Dataset(tuning_data, classes=tuning_data.classes)
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
