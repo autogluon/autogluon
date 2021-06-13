@@ -311,12 +311,14 @@ class ImagePredictor(object):
             tuning_data = tuning_data.reset_index(drop=True)
 
         train_data = self._validate_data(train_data)
-        train_data = self.Dataset(train_data, classes=train_data.classes)
+        if isinstance(train_data, self.Dataset):
+            train_data = self.Dataset(train_data, classes=train_data.classes)
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
             # converting to internal label set
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
-            tuning_data = self.Dataset(tuning_data, classes=tuning_data.classes)
+            if isinstance(tuning_data, self.Dataset):
+                tuning_data = self.Dataset(tuning_data, classes=tuning_data.classes)
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
