@@ -22,11 +22,11 @@ for dataset_name in dataset_list:
     predictor = ForecastingPredictor(path=f"autogluon_benchmark_{dataset_name}").fit(train_data,
                                                                                      prediction_length,
                                                                                      freq=freq,
+                                                                                     hyperparameter_tune=True,
                                                                                      quantiles=[0.1, 0.5, 0.9],
                                                                                      refit_full=True,
                                                                                      set_best_to_refit_full=True,
                                                                                      num_trials=10,
-                                                                                     time_limits=5,
                                                                                      )
     leaderboard = predictor.leaderboard(dataset.test)
     leaderboard.to_csv(f"benchmark_results/results_{dataset_name}_{int(time.time())}.csv", index=False)
