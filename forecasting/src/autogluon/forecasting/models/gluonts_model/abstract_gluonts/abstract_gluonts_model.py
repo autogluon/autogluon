@@ -28,6 +28,7 @@ class AbstractGluonTSModel(AbstractModel):
 
     model_file_name = "model.pkl"
     gluonts_model_path = "gluon_ts"
+    prev_fitting_time = []
 
     def __init__(self, path: str, freq: str, prediction_length: int, name: str, eval_metric: str = None,
                  hyperparameters=None, model=None, **kwargs):
@@ -113,8 +114,11 @@ class AbstractGluonTSModel(AbstractModel):
 
     def fit(self, train_data, val_data=None, time_limit=None):
         if time_limit is None or time_limit > 0:
+            start_time = time.time()
             self.create_model()
             self.model = self.model.train(train_data, validation_data=val_data)
+            end_time = time.time()
+            AbstractGluonTSModel.prev_fitting_time.append(end_time - start_time)
         else:
             raise TimeLimitExceeded
 
@@ -242,15 +246,10 @@ class AbstractGluonTSModel(AbstractModel):
         }
 
         hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model
-        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
-            raise NotImplementedError("need to fetch model files from remote Workers")
-            # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
-            # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
 
         hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
         hpo_model_performances = {}
         for trial in sorted(hpo_results['trial_info'].keys()):
-            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
             file_id = "trial_" + str(trial)  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep

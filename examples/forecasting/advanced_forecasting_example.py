@@ -47,6 +47,11 @@ predictor = ForecastingPredictor(path=path, eval_metric=eval_metric).fit(train_d
                                                                                                           default=prediction_length * 4),
                                                                                  "num_batches_per_epoch": 10,
                                                                                  "epochs": 5},
+                                                                             "AutoTabular": {
+                                                                                 'context_length': ag.Int(70, 90,
+                                                                                                          default=prediction_length * 4),
+                                                                                 "num_batches_per_epoch": 10,
+                                                                                 "epochs": 5},
                                                                          },
                                                                          time_limits=5
                                                                          )

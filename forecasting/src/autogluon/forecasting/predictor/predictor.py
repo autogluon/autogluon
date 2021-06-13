@@ -163,15 +163,17 @@ class ForecastingPredictor:
         logger.log(30, f"Random seed set to {random_seed}")
         quantiles = kwargs.get("quantiles", ["0.5"])
         logger.log(30, f"All models will be trained for quantiles {quantiles}.")
+        if hyperparameter_tune_kwargs is not None:
+            scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                                                                time_out=time_limits,
+                                                                nthreads_per_trial='auto', ngpus_per_trial='auto')
+            if time_limits is None and scheduler_params["num_trials"] is None:
+                logger.log(30, "None of time_limits and num_tirals are set, by default setting num_tirals=2")
+                scheduler_params["num_trials"] = 2
 
-        scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                                                            time_out=time_limits,
-                                                            nthreads_per_trial='auto', ngpus_per_trial='auto')
-        if time_limits is None and scheduler_params["num_trials"] is None:
-            logger.log(30, "None of time_limits and num_tirals are set, by default setting num_tirals=2")
-            scheduler_params["num_trials"] = 2
-
-        scheduler_options = (scheduler_cls, scheduler_params)
+            scheduler_options = (scheduler_cls, scheduler_params)
+        else:
+            scheduler_options = (None, None)
 
         self._learner.fit(train_data=train_data,
                           freq=freq,

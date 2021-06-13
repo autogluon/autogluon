@@ -154,8 +154,8 @@ class AbstractTrainer:
         self.model_info[model.name]["fit_time"] = model.fit_time
         self.model_info[model.name]["score"] = model.val_score
 
-    def _train_single(self, train_data, model: AbstractGluonTSModel, time_limit=None):
-        model.fit(train_data=train_data, time_limit=time_limit)
+    def _train_single(self, train_data, model: AbstractGluonTSModel, val_data=None, time_limit=None):
+        model.fit(train_data=train_data, val_data=val_data, time_limit=time_limit)
         return model
 
     def _train_single_full(self, train_data, model: AbstractGluonTSModel, val_data=None, hyperparameter_tune=False,
@@ -191,7 +191,7 @@ class AbstractTrainer:
                     return model_names_trained
             else:
                 logging.log(20, f'Fitting model: {model.name} ...')
-            model = self._train_single(train_data, model)
+            model = self._train_single(train_data, model, val_data=val_data)
             fit_end_time = time.time()
             if val_data is not None:
                 score = -model.score(val_data)
