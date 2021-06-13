@@ -19,6 +19,7 @@ from autogluon.core.utils.savers import save_json, save_pkl
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
+from ..models.quantile_ensemble.quantile_aggregator import LinearAggregatorModel
 
 logger = logging.getLogger(__name__)
 
@@ -264,7 +265,10 @@ class AbstractTrainer:
                 time_left = time_limit - (time_train_level_start - time_train_start)
                 time_limit_for_level = min(time_left / levels_left * (1 + level_time_modifier), time_left)
                 time_limit_core = time_limit_for_level
-                time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
+                if self.problem_type == QUANTILE:
+                    time_limit_aux = max(time_limit_for_level * 0.4, min(time_limit, 360))
+                else:
+                    time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
                 core_kwargs_level['time_limit'] = core_kwargs_level.get('time_limit', time_limit_core)
                 aux_kwargs_level['time_limit'] = aux_kwargs_level.get('time_limit', time_limit_aux)
             if level != 1:
@@ -303,6 +307,8 @@ class AbstractTrainer:
 
         if self.bagged_mode:
             aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
+            if self.problem_type == QUANTILE:
+                aux_models += self.stack_new_level_quantile_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
         else:
             aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, base_model_names=core_models, level=level+1, **aux_kwargs)
         return core_models, aux_models
@@ -377,7 +383,7 @@ class AbstractTrainer:
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
-    def stack_new_level_aux(self, X, y, base_model_names: List[str], level, fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
+    def stack_new_level_aux(self, X, y, base_model_names: List[str], level, fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True, **kwargs) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
@@ -390,6 +396,26 @@ class AbstractTrainer:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
 
         return self.generate_weighted_ensemble(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
+
+    def stack_new_level_quantile_aux(self, X, y, base_model_names: List[str], level, fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True, ag_args=None, excluded_model_types=None, **kwargs) -> List[str]:
+        """
+        Trains auxiliary models (for quantile predictions) using the provided base models.
+        Level must be greater than the level of any of the base models.
+        Auxiliary models never use the original features and only train with the predictions of other models as features.
+        """
+        X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=True)
+        if self.weight_evaluation:
+            X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
+            if w is not None:
+                X_stack_preds[self.sample_weight] = w.values/w.mean()
+        hyperparameter_tune_kwargs = None
+        if ag_args is not None:
+            hyperparameter_tune_kwargs = ag_args.get('hyperparameter_tune_kwargs', None)
+        return self.generate_quantile_aggregator(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names,
+                                                 k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit,
+                                                 name_suffix=name_suffix, get_models_func=get_models_func,
+                                                 check_if_best=check_if_best, excluded_model_types=excluded_model_types,
+                                                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs)
 
     def predict(self, X, model=None):
         if model is None:
@@ -653,6 +679,8 @@ class AbstractTrainer:
                         model_loaded.predict_time = None
                         self.set_model_attribute(model=model_weighted_ensemble, attribute='val_score', val=None)
                         self.save_model(model_loaded)
+                elif issubclass(stacker_type, LinearAggregatorModel):
+                    pass
                 else:
                     models_trained = self.stack_new_level_core(X=X_full, y=y_full, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME,
                                                                hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=0, n_repeats=1, ensemble_type=stacker_type)
@@ -891,13 +919,84 @@ class AbstractTrainer:
                         self.model_best = weighted_ensemble_model_name
         return models
 
+    def generate_quantile_aggregator(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None,
+                                     hyperparameters=None, time_limit=None, name_suffix: str = None, save_bag_folds=None,
+                                     check_if_best=True, child_hyperparameters=None, get_models_func=None,
+                                     excluded_model_types=None, hyperparameter_tune_kwargs=None) -> List[str]:
+        if get_models_func is None:
+            get_models_func = self.construct_model_templates
+        if len(base_model_names) == 0:
+            logger.log(20, 'No base models to train on, skipping quantile aggregator...')
+            return []
+
+        if child_hyperparameters is None:
+            child_hyperparameters = {}
+
+        if save_bag_folds is None:
+            can_infer_dict = self.get_models_attribute_dict('can_infer', models=base_model_names)
+            if False in can_infer_dict.values():
+                save_bag_folds = False
+            else:
+                save_bag_folds = True
+
+        aggr_model, aggr_model_args_fit = get_models_func(
+            hyperparameters={
+                'default': {
+                    'QUANTILE_AGGR': [child_hyperparameters],
+                }
+            },
+            ensemble_type=LinearAggregatorModel,
+            ensemble_kwargs=dict(
+                base_model_names=base_model_names,
+                base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=base_model_names),
+                base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=base_model_names),
+                base_model_types_inner_dict=self.get_models_attribute_dict(attribute='type_inner', models=base_model_names),
+                base_model_performances_dict=self.get_models_attribute_dict(attribute='val_score', models=base_model_names),
+                hyperparameters=hyperparameters,
+                random_state=level + self.random_state,
+            ),
+            ag_args={'name_bag_suffix': '', 'hyperparameter_tune_kwargs': hyperparameter_tune_kwargs},
+            ag_args_ensemble={'save_bag_folds': save_bag_folds},
+            excluded_model_types=excluded_model_types,
+            name_suffix=name_suffix,
+            level=level,
+        )
+        if aggr_model_args_fit:
+            hyperparameter_tune_kwargs = {
+                model_name: aggr_model_args_fit[model_name]['hyperparameter_tune_kwargs']
+                for model_name in aggr_model_args_fit if 'hyperparameter_tune_kwargs' in aggr_model_args_fit[model_name]
+            }
+        w = None
+        if self.weight_evaluation:
+            X, w = extract_column(X, self.sample_weight)
+
+        holdout_frac = default_holdout_frac(len(X), hyperparameter_tune=False if hyperparameter_tune_kwargs is None else True)
+        X, X_val, y, y_val = generate_train_test_split(X, y, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_state)
+        models = self._train_multi(X=X, y=y, X_val=X_val, y_val=y_val, models=aggr_model, k_fold=k_fold, n_repeats=n_repeats,
+                                   hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=False, stack_name=stack_name,
+                                   level=level, time_limit=time_limit, ens_sample_weight=w)
+        for weighted_ensemble_model_name in models:
+            if check_if_best and weighted_ensemble_model_name in self.get_model_names():
+                if self.model_best is None:
+                    self.model_best = weighted_ensemble_model_name
+                else:
+                    best_score = self.get_model_attribute(self.model_best, 'val_score')
+                    cur_score = self.get_model_attribute(weighted_ensemble_model_name, 'val_score')
+                    if cur_score > best_score:
+                        # new best model
+                        self.model_best = weighted_ensemble_model_name
+        return models
+
     def _train_single(self, X, y, model: AbstractModel, X_val=None, y_val=None, **model_fit_kwargs) -> AbstractModel:
         """
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
         if isinstance(model, BaggedEnsembleModel):
-            model.fit(X=X, y=y, **model_fit_kwargs)
+            if X_val is not None and y_val is not None:
+                model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
+            else:
+                model.fit(X=X, y=y, **model_fit_kwargs)
         else:
             model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
@@ -938,6 +1037,8 @@ class AbstractTrainer:
             if isinstance(model, BaggedEnsembleModel):
                 if model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
                     score = model.score_with_oof(y=y, sample_weight=w)
+                elif X_val is not None and y_val is not None:
+                    score = model.score(X=X_val, y=y_val, sample_weight=w_val)
                 else:
                     score = None
             else:
@@ -1076,7 +1177,7 @@ class AbstractTrainer:
                 X_val, w_val = extract_column(X_val, self.sample_weight)
                 if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
                     model_fit_kwargs['sample_weight_val'] = w_val.values/w_val.mean()
-            ens_sample_weight =  kwargs.get('ens_sample_weight', None)
+            ens_sample_weight = kwargs.get('ens_sample_weight', None)
             if ens_sample_weight is not None:
                 model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
 
@@ -1107,7 +1208,7 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             logger.log(20, f'Hyperparameter tuning model: {model.name} ...')
             try:
-                if isinstance(model, BaggedEnsembleModel):
+                if isinstance(model, BaggedEnsembleModel) and k_fold:
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
                 else:
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X, y=y, X_val=X_val, y_val=y_val, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)

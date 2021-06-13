@@ -703,9 +703,16 @@ class TabularPredictor:
             'ag_args_fit': ag_args_fit,
             'excluded_model_types': excluded_model_types,
         }
+
+        aux_kwargs = {
+            'ag_args': ag_args,
+            'excluded_model_types': excluded_model_types,
+        }
+
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
-                          holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity)
+                          holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
+                          num_stack_levels=num_stack_levels, hyperparameters=hyperparameters,
+                          core_kwargs=core_kwargs, aux_kwargs=aux_kwargs, time_limit=time_limit, verbosity=verbosity)
         self._set_post_fit_vars()
 
         self._post_fit(

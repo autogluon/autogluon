@@ -1,3 +1,4 @@
+import os
 import logging
 
 import torch
@@ -233,6 +234,209 @@ class NeuralMultiQuantileRegressor(nn.Module):
             return predict_data.data.cpu().numpy()
 
 
+class NeuralQuantileAggregator(nn.Module):
+    def __init__(self,
+                 num_base_preds,
+                 quantile_levels,
+                 train_dataset=None,
+                 params=None,
+                 architecture_desc=None,
+                 device=None):
+        if (architecture_desc is None) and (train_dataset is None or params is None):
+            raise ValueError("train_dataset, params cannot = None if architecture_desc=None")
+        super(NeuralQuantileAggregator, self).__init__()
+        self.register_buffer('quantile_levels', torch.Tensor(quantile_levels).float().reshape(1, -1))
+        self.num_quantiles = self.quantile_levels.size()[-1]
+        self.num_base_preds = num_base_preds
+        self.device = torch.device('cpu') if device is None else device
+        if architecture_desc is None:
+            # adpatively specify network architecture based on training dataset
+            self.from_logits = False
+            self.has_vector_features = train_dataset.has_vector_features()
+            self.has_embed_features = train_dataset.num_embed_features() > 0
+            self.has_language_features = train_dataset.num_language_features() > 0
+            if self.has_embed_features:
+                num_categs_per_feature = train_dataset.getNumCategoriesEmbeddings()
+                embed_dims = getEmbedSizes(train_dataset, params, num_categs_per_feature)
+            if self.has_vector_features:
+                vector_dims = train_dataset.data_list[train_dataset.vectordata_index].shape[-1]
+        else:
+            # ignore train_dataset, params, etc. Recreate architecture based on description:
+            self.architecture_desc = architecture_desc
+            self.has_vector_features = architecture_desc['has_vector_features']
+            self.has_embed_features = architecture_desc['has_embed_features']
+            self.has_language_features = architecture_desc['has_language_features']
+            self.from_logits = architecture_desc['from_logits']
+            params = architecture_desc['params']
+            if self.has_embed_features:
+                num_categs_per_feature = architecture_desc['num_categs_per_feature']
+                embed_dims = architecture_desc['embed_dims']
+            if self.has_vector_features:
+                vector_dims = architecture_desc['vector_dims']
+        # init input / output size
+        input_size = 0
+        output_size = self.num_quantiles * self.num_base_preds
+
+        # define embedding layer:
+        if self.has_embed_features:
+            self.embed_blocks = nn.ModuleList()
+            for i in range(len(num_categs_per_feature)):
+                self.embed_blocks.append(nn.Embedding(num_embeddings=num_categs_per_feature[i],
+                                                      embedding_dim=embed_dims[i]))
+                input_size += embed_dims[i]
+
+        # language block not supported
+        if self.has_language_features:
+            self.text_block = None
+            raise NotImplementedError("text data cannot be handled")
+
+        # update input size
+        if self.has_vector_features:
+            input_size += vector_dims
+
+        # activation
+        act_fn = nn.Identity()
+        if params['activation'] == 'elu':
+            act_fn = nn.ELU()
+        elif params['activation'] == 'relu':
+            act_fn = nn.ReLU()
+        elif params['activation'] == 'tanh':
+            act_fn = nn.Tanh()
+
+        # layers
+        layers = [nn.Linear(input_size, params['hidden_size']), act_fn]
+        for _ in range(params['num_layers'] - 1):
+            layers.append(nn.Dropout(params['dropout_prob']))
+            layers.append(nn.Linear(params['hidden_size'], params['hidden_size']))
+            layers.append(act_fn)
+        layers.append(nn.Linear(params['hidden_size'], output_size))
+        self.main_block = nn.Sequential(*layers)
+
+        # for huber loss
+        self.alpha = params['alpha']
+
+        if architecture_desc is None:  # Save Architecture description
+            self.architecture_desc = {'has_vector_features': self.has_vector_features,
+                                      'has_embed_features': self.has_embed_features,
+                                      'has_language_features': self.has_language_features,
+                                      'params': params,
+                                      'from_logits': self.from_logits}
+            if self.has_embed_features:
+                self.architecture_desc['num_categs_per_feature'] = num_categs_per_feature
+                self.architecture_desc['embed_dims'] = embed_dims
+            if self.has_vector_features:
+                self.architecture_desc['vector_dims'] = vector_dims
+
+    def init_params(self):
+        for layer in self.children():
+            if hasattr(layer, 'reset_parameters'):
+                layer.reset_parameters()
+
+    def forward(self, data_batch):
+        base_preds = data_batch['base_pred'].to(self.device)
+        input_data = []
+        if self.has_vector_features:
+            input_data.append(data_batch['vector'].to(self.device))
+        if self.has_embed_features:
+            embed_data = data_batch['embed']
+            for i in range(len(self.embed_blocks)):
+                input_data.append(self.embed_blocks[i](embed_data[i].to(self.device)))
+        if self.has_language_features:
+            pass
+
+        if len(input_data) > 1:
+            input_data = torch.cat(input_data, dim=1)
+        else:
+            input_data = input_data[0]
+
+        weight_data = self.main_block(input_data)
+        weight_data = weight_data.contiguous().reshape(-1, self.num_base_preds, self.num_quantiles)
+        weight_data = weight_data.softmax(-2)
+
+        output_data = base_preds.contiguous().reshape(-1, self.num_base_preds, 1) * weight_data
+        output_data = torch.sum(output_data, 1)
+        return output_data
+
+    def monotonize(self, input_data):
+        # number of quantiles
+        num_quantiles = input_data.size()[-1]
+
+        # split into below 50% and above 50%
+        idx_50 = num_quantiles // 2
+
+        # if a small number of quantiles are estimated or quantile levels are not centered at 0.5
+        if num_quantiles < 3 or self.quantile_levels[0, idx_50] != 0.5:
+            return input_data
+
+        # below 50%
+        below_50 = input_data[:, :(idx_50 + 1)].contiguous()
+        below_50 = torch.flip(torch.cummin(torch.flip(below_50, [-1]), -1)[0], [-1])
+
+        # above 50%
+        above_50 = input_data[:, idx_50:].contiguous()
+        above_50 = torch.cummax(above_50, -1)[0]
+
+        # refined output
+        ordered_data = torch.cat([below_50[:, :-1], above_50], -1)
+        return ordered_data
+
+    def huber_pinball_loss(self, input_data, target_data):
+        error_data = target_data.contiguous().reshape(-1, 1) - input_data
+        loss_data = torch.where(torch.abs(error_data) < self.alpha,
+                                0.5 * error_data * error_data,
+                                self.alpha * (torch.abs(error_data) - 0.5 * self.alpha))
+        loss_data /= self.alpha
+
+        scale = torch.where(error_data >= 0,
+                            torch.ones_like(error_data) * self.quantile_levels,
+                            torch.ones_like(error_data) * (1 - self.quantile_levels))
+        loss_data *= scale
+        return loss_data.mean()
+
+    def margin_loss(self, input_data, margin_scale=0.0001):
+        # number of samples
+        batch_size, num_quantiles = input_data.size()
+
+        # compute margin loss (batch_size x output_size(above) x output_size(below))
+        error_data = input_data.unsqueeze(1) - input_data.unsqueeze(2)
+
+        # margin data (num_quantiles x num_quantiles)
+        margin_data = self.quantile_levels.permute(1, 0) - self.quantile_levels
+        margin_data = torch.tril(margin_data, -1) * margin_scale
+
+        # compute accumulated margin
+        loss_data = torch.tril(error_data + margin_data, diagonal=-1)
+        loss_data = loss_data.relu()
+        loss_data = loss_data.sum() / float(batch_size * (num_quantiles * num_quantiles - num_quantiles) * 0.5)
+        return loss_data
+
+    def compute_loss(self,
+                     data_batch,
+                     weight=0.0,
+                     margin=0.0):
+        # train mode
+        self.train()
+        predict_data = self(data_batch)
+        target_data = data_batch['label'].to(self.device)
+
+        # get prediction and margin loss
+        if margin > 0.0:
+            m_loss = self.margin_loss(predict_data)
+        else:
+            m_loss = 0.0
+
+        h_loss = (1 - weight) * self.huber_pinball_loss(self.monotonize(predict_data), target_data).mean()
+        h_loss += weight * self.huber_pinball_loss(predict_data, target_data).mean()
+        return h_loss + margin * m_loss
+
+    def predict(self, input_data):
+        self.eval()
+        with torch.no_grad():
+            predict_data = self(input_data)
+            predict_data = self.monotonize(predict_data)
+            return predict_data.data.cpu().numpy()
+
+
 class TabularPyTorchDataset(torch.utils.data.Dataset):
     """
         This class is following the structure of TabularNNDataset in tabular_nn_dataset.py
@@ -274,7 +478,8 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
                  processed_array,
                  feature_arraycol_map,
                  feature_type_map,
-                 labels=None):
+                 labels=None,
+                 base_preds=None):
         """ Args:
             processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
             feature_arraycol_map (OrderedDict): Mapsfeature-name -> list of column-indices in processed_array
@@ -304,6 +509,8 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
         self.data_desc = []
         self.data_list = []
         self.label_index = None
+        self.base_pred_index = None
+        self.num_base_preds = None
         self.vectordata_index = None
         self.vecfeature_col_map = {}
         self.feature_dataindex_map = {}
@@ -345,6 +552,15 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
             self.data_desc.append("label")
             self.label_index = len(self.data_list)
             self.data_list.append(labels.astype('float32').reshape(-1, 1))
+
+        # base prediction data
+        if base_preds is not None:
+            base_preds = np.array(base_preds)
+            self.data_desc.append("base_pred")
+            self.base_pred_index = len(self.data_list)
+            self.data_list.append(base_preds.astype('float32').reshape(self.num_examples, -1))
+            self.num_base_preds = self.data_list[self.base_pred_index].shape[1]
+
         self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]]
         self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]
 
@@ -365,6 +581,8 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
                 output_dict['language'].append(self.data_list[i][idx])
         if self.label_index is not None:
             output_dict['label'] = self.data_list[self.label_index][idx]
+        if self.base_pred_index is not None:
+            output_dict['base_pred'] = self.data_list[self.base_pred_index][idx]
         return output_dict
 
     def __len__(self):
@@ -390,6 +608,13 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
         """ Returns numpy array of labels for this dataset """
         if self.label_index is not None:
             return self.data_list[self.label_index]
+        else:
+            return None
+
+    def get_base_preds(self):
+        """ Returns numpy array of base model predictions for this dataset """
+        if self.base_pred_index is not None:
+            return self.data_list[self.base_pred_index]
         else:
             return None
 
@@ -432,6 +657,8 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
     def save(self, file_prefix=""):
         """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
         dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
+        if not os.path.exists(os.path.dirname(dataobj_file)):
+            os.makedirs(os.path.dirname(dataobj_file))
         torch.save(self, dataobj_file)
         logger.debug("TabularPyTorchDataset Dataset saved to a file: \n %s" % dataobj_file)
 
