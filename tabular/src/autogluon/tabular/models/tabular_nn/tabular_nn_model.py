@@ -77,7 +77,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         """
         self.feature_arraycol_map = None
         self.feature_type_map = None
-        self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self._features
+        self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self._features_internal
         self.processor = None  # data processor
         self.summary_writer = None
         self.ctx = None

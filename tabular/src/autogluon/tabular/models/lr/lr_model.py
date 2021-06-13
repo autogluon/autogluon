@@ -78,7 +78,7 @@ class LinearModel(AbstractModel):
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
             df = df.drop(columns=unknown_features)
-        self._features = list(df.columns)
+        self._features_internal = list(df.columns)  # FIXME: Don't edit _features_internal
 
         types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'language': []}
         return self._select_features(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
@@ -182,7 +182,7 @@ class LinearModel(AbstractModel):
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
         # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
         one_hot_threshold = 10000  # FIXME research memory constraints
-        for feature in self._features:
+        for feature in self._features_internal:
             feature_data = df[feature]
             num_unique_vals = len(feature_data.unique())
             if feature in language_featnames:
@@ -197,7 +197,7 @@ class LinearModel(AbstractModel):
         return types_of_features
 
     def _select_features_handle_text_only(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
-        for feature in self._features:
+        for feature in self._features_internal:
             if feature in language_featnames:
                 types_of_features['language'].append(feature)
         return types_of_features
@@ -207,7 +207,7 @@ class LinearModel(AbstractModel):
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
         # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
         one_hot_threshold = 10000  # FIXME research memory constraints
-        for feature in self._features:
+        for feature in self._features_internal:
             feature_data = df[feature]
             num_unique_vals = len(feature_data.unique())
             if feature in continuous_featnames:
