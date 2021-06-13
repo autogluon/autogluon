@@ -22,7 +22,7 @@ for dataset_name in dataset_list:
     predictor = ForecastingPredictor(path=f"autogluon_benchmark_{dataset_name}").fit(train_data,
                                                                                      prediction_length,
                                                                                      freq=freq,
-                                                                                     hyperparameter_tune=True,
+                                                                                     hyperparameter_tune_kwargs="auto",
                                                                                      quantiles=[0.1, 0.5, 0.9],
                                                                                      refit_full=True,
                                                                                      set_best_to_refit_full=True,
