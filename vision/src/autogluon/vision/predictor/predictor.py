@@ -14,6 +14,7 @@ from autogluon.core.constants import MULTICLASS
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
+from autogluon.core.utils.utils import generate_train_test_split
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 from ..utils import MXNetErrorCatcher
 
@@ -60,6 +61,7 @@ class ImagePredictor(object):
         self._label_cleaner = None
         self._fit_summary = {}
         self._label = label
+        self._label_inner = 'label'
         self._train_classes = None
         assert isinstance(self._label, str)
         os.makedirs(self._log_dir, exist_ok=True)
@@ -272,8 +274,8 @@ class ImagePredictor(object):
                            'rec_train_idx : ~/.mxnet/datasets/imagenet/rec/train.idx\n' +
                            'rec_val : ~/.mxnet/datasets/imagenet/rec/val.rec\n' +
                            'rec_val_idx : ~/.mxnet/datasets/imagenet/rec/val.idx\n')
-            train_data = pd.DataFrame({'image': [], 'label': []})
-            tuning_data = pd.DataFrame({'image': [], 'label': []})
+            train_data = pd.DataFrame({'image': [], self._label_inner: []})
+            tuning_data = pd.DataFrame({'image': [], self._label_inner: []})
             use_rec = True
         if isinstance(train_data, str):
             from d8.image_classification import Dataset as D8D
@@ -301,9 +303,22 @@ class ImagePredictor(object):
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
+        if tuning_data is None:
+            train_data, tuning_data, _, _ = generate_train_test_split(X=train_data, y=train_data[self._label_inner], problem_type=self._problem_type, test_size=holdout_frac)
+            logger.info('Randomly split train_data into train[%d]/validation[%d] splits.',
+                              len(train_data), len(tuning_data))
+            train_data = train_data.reset_index(drop=True)
+            tuning_data = tuning_data.reset_index(drop=True)
+
+        train_data = self._validate_data(train_data)
+        if isinstance(train_data, self.Dataset):
+            train_data = self.Dataset(train_data, classes=train_data.classes)
         if tuning_data is not None:
             tuning_data = self._validate_data(tuning_data)
+            # converting to internal label set
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
+            if isinstance(tuning_data, self.Dataset):
+                tuning_data = self.Dataset(tuning_data, classes=tuning_data.classes)
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
@@ -399,14 +414,14 @@ class ImagePredictor(object):
         """Check whether data is valid, try to convert with best effort if not"""
         if isinstance(data, pd.DataFrame):
             # TODO(zhreshold): allow custom label column without this renaming trick
-            if self._label != 'label' and self._label in data.columns:
+            if self._label != self._label_inner and self._label in data.columns:
                 # data is deepcopied so it's okay to overwrite directly
-                data = data.rename(columns={'label': '_unused_label', self._label: 'label'}, errors='ignore')
+                data = data.rename(columns={self._label_inner: '_unused_label', self._label: self._label_inner}, errors='ignore')
 
         if not (hasattr(data, 'classes') and hasattr(data, 'to_mxnet')):
             if isinstance(data, pd.DataFrame):
                 # raw dataframe, try to add metadata automatically
-                if 'label' in data.columns and 'image' in data.columns:
+                if self._label_inner in data.columns and 'image' in data.columns:
                     # check image relative/abs path is valid
                     sample = data.iloc[0]['image']
                     if not os.path.isfile(sample):
@@ -426,14 +441,14 @@ class ImagePredictor(object):
             else:
                 raise TypeError(f"Unable to process dataset of type: {type(data)}")
         elif isinstance(data, _ImageClassification.Dataset):
-            assert 'label' in data.columns
+            assert self._label_inner in data.columns
             assert hasattr(data, 'classes')
             orig_classes = data.classes
             if not isinstance(data.classes, (tuple, list)):
                 # consider it as an invalid dataset without proper label, try to reconstruct as a normal DataFrame
                 orig_classes = []
             # check whether classes are outdated, no action required if all unique labels is subset of `classes`
-            unique_labels = sorted(data['label'].unique().tolist())
+            unique_labels = sorted(data[self._label_inner].unique().tolist())
             if not (all(ulabel in orig_classes for ulabel in unique_labels)):
                 data = _ImageClassification.Dataset(data, classes=unique_labels)
                 logger.log(20, f'Reset labels to {unique_labels}')
@@ -543,11 +558,11 @@ class ImagePredictor(object):
             idx_to_image_map = idx_to_image_map.reset_index(drop=False)
             y_pred = idx_to_image_map.merge(y_pred, on='image')
             y_pred = y_pred.set_index(index_name).rename_axis(None)
-            ret = self._label_cleaner.inverse_transform(y_pred['id'].rename('label'))
+            ret = self._label_cleaner.inverse_transform(y_pred['id'].rename(self._label))
         else:
             # single image
             ret = proba.loc[[proba["score"].idxmax()]]
-            ret = self._label_cleaner.inverse_transform(ret['id'].rename('label'))
+            ret = self._label_cleaner.inverse_transform(ret['id'].rename(self._label))
         if as_pandas:
             return ret
         else:
