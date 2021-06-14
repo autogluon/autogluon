@@ -37,6 +37,85 @@ class ForecastingPredictor:
             verbosity=2,
             **kwargs
     ):
+        """
+           AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
+
+           Parameters
+           ----------
+           eval_metric : str, default = None
+               Metric by which predictions will be ultimately evaluated on test data.
+               AutoGluon tunes factors such as hyperparameters, early-stopping, etc. in order to improve this metric on validation data.
+
+               If `eval_metric = None`, it is automatically set to mean_wQuantileLoss.
+
+               Otherwise, options for classification:
+                   ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
+
+                For more details, you can refer to gluon-ts package
+           path : str, default = None
+               Path to directory where models and intermediate outputs should be saved.
+               If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
+               Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
+               Otherwise files from first `fit()` will be overwritten by second `fit()`.
+           verbosity : int, default = 2
+               Verbosity levels range from 0 to 4 and control how much information is printed.
+               Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+               If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+               where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+           **kwargs :
+               learner_type : AbstractLearner, default = DefaultLearner
+                   A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
+                   If you don't know what this is, keep it as the default.
+               learner_kwargs : dict, default = None
+                   Kwargs to send to the learner. Options include:
+
+                   trainer_type : AbstractTrainer, default = AutoTrainer
+                       A class inheriting from `AbstractTrainer` that controls training of many models.
+                       If you don't know what this is, keep it as the default.
+
+           Attributes
+           ----------
+           path : str
+               Path to directory where all models used by this Predictor are stored.
+           eval_metric: function or str
+               What metric is used to evaluate predictive performance.
+           index_column: str
+               column in training/validation data that indicates the time series index,
+               By default index_column="index_column".
+               This is decided when you call ForecastingPredictor().fit().
+           time_column: str
+               column in training/validation data that indicates the time of each target,
+               By default time_column="time_column".
+               This is decided when you call ForecastingPredictor().fit().
+           target_column: str
+               column in training/validation data that indicates the target to forecast,
+               By default target_column="target_column".
+               This is decided when you call ForecastingPredictor().fit().
+           static_cat_columns: str
+               columns representing categorical static features,
+               Automatically inferred if static feature dataframe is provided,
+               If static feature dataframe is not provided, it would None and will not be used.
+           static_real_columns: str
+               columns representing real static features,
+               Automatically inferred if static feature dataframe is provided,
+               If static feature dataframe is not provided, it would None and will not be used.
+           use_feat_static_cat: bool
+               whether to use categorical static features when training models.
+               If any categorical static feature is inferred, use_feat_static_cat will by default be turned to be Ture.
+               You can also decide by yourself when creating hyperparameter dictonary
+           use_feat_static_real: bool
+               whether to use real static features when training models.
+               If any real static feature is inferred, use_feat_static_real will by default be turned to be Ture.
+               You can also decide by yourself when creating hyperparameter dictonary
+           cardinality: List of ints
+               the cardinality for each categorical static features.
+               Automatically inferred if any categorical static feature is found.
+               Otherwise it will be None and will not be used.
+           prev_inferred_static_features:
+               static features type will be inferred when processing training data.
+               This dictionary is used to make sure the type is not inferred again when processing the validation/test data,
+               so that no inconsistency will be made.
+        """
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         # self._validate_init_kwargs(kwargs)
@@ -73,6 +152,121 @@ class ForecastingPredictor:
             time_limits=None,
             static_features=None,
             **kwargs):
+        """
+        Fit models to predict the future targets of time series.
+
+        Parameters
+        ----------
+        train_data: pd.Dataframe or FileDataset/ListDataset from gluonts,
+            if pd.Dataframe is provided, it should have the form of:
+            >>> train_data
+              index_column time_column  target_column
+            0            A  2020-01-22              1
+            1            A  2020-01-23              2
+            2            A  2020-01-24              3
+            3            B  2020-01-22              1
+            4            B  2020-01-23              2
+            5            B  2020-01-24              3
+            6            C  2020-01-22              1
+            7            C  2020-01-23              2
+            8            C  2020-01-24              3
+        prediction_length: int
+            length of future targets of each time series to predict.
+        index_column: str
+            column in training/validation data that indicates the time series index,
+            By default index_column="index_column".
+        time_column: str
+            column in training/validation data that indicates the time of each target,
+            By default time_column="time_column".
+        target_column: str
+            column in training/validation data that indicates the target to forecast,
+            By default target_column="target_column".
+        val_data: Optional, None by default, can be pd.Dataframe or FileDataset/ListDataset from gluonts,
+            validation data used for hyperparameter tuning.
+            If provided, it should have the same format as train_data.
+        hyperparameter_tune_kwargs: Optional, None by default, can be str or dict
+            Valid str values:
+                'auto': Uses the 'bayesopt' preset.
+                'random': Performs HPO via random search using local scheduler.
+                'bayesopt': Performs HPO via bayesian optimization using local scheduler.
+            For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
+                The 'searcher' key is required when providing a dict.
+                The following is an example dictianary for hyperparameter_tune_kwargs:
+                hyperparameter_tune_kwargs={
+                                            'scheduler': 'local',
+                                            'searcher': 'random',
+                                            'num_trials': 2
+                                            }
+        hyperparameters: Optional, None by default, can be dict
+            parameters for each model. If not provided, default parameters from gluonts will be used.
+
+            Keys are strings that indicate which model types to train.
+            Stable model options include:
+               'DeepAR',
+               'MQCNN',
+               'SFF'(SimpleFeedForward),
+            Experimental model options include:
+               'AutoTabular'(Use Autogluon's TabularPredictor for forecasting)
+            If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type.
+            For example, set `hyperparameters = { 'SFF':{...} }` means you only want to train SimpleFeedForward models and not any other model.
+
+            Values are dictionaries of hyperparameter settings for each model type.
+            Each hyperparameter can either be a single fixed value or a search space containing many possible values.
+            Search Space should only be provided when hyperparameter_tune_kwargs is provided(hyperparameter_tune is turned on)
+
+        time_limits: int, default=None
+            Only works when hyperparameter_tune_kwarg is not None, approximately how long each model will be tunned for.(wallclock time in seconds)
+
+        static_features: pd.Dataframe, default=None
+            static features used for training.
+
+        refit_full: bool, default=False
+            Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
+            If `refit_full=True`, it will be treated as `refit_full='all'`.
+            If `refit_full=False`, refitting will not occur.
+            Valid str values:
+                `all`: refits all models.
+                `best`: refits only the best model (and its ancestors if it is a stacker model).
+
+        set_best_to_refit_full: bool, default=False
+            If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
+            Only valid if `refit_full` is set.
+
+        quantiles: list[float], default=[0.5]
+            Can be list of combinations of floats in [0.1, 0.2, ..., 0.9]
+            Quantiles used for training gluonts models.
+
+        Default:
+            Without HPS:
+                hyperparameters={
+                    "SFF": {},
+                    "MQCNN": {},
+                    "DeepAR": {},
+                    "AutoTabular": {}
+                }
+            With HPS:
+                "MQCNN": {
+                    'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
+                                             max(min(500, 12 * prediction_length), 4 * prediction_length),
+                                             default=prediction_length * 4),
+                },
+                "DeepAR": {
+                    'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
+                                             max(min(500, 12 * prediction_length), prediction_length),
+                                             default=prediction_length),
+                },
+                "SFF": {
+                    'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
+                                             max(min(500, 12 * prediction_length), prediction_length),
+                                             default=prediction_length),
+                }
+
+        Details regarding the hyperparameters you can specify for each model are provided in the following links:
+            DeepAR: https://ts.gluon.ai/api/gluonts/gluonts.model.deepar.html
+            MQCNN: https://ts.gluon.ai/api/gluonts/gluonts.model.seq2seq.html
+            SFF: https://ts.gluon.ai/api/gluonts/gluonts.model.simple_feedforward.html
+            AutoTabular: https://ts.gluon.ai/api/gluonts/gluonts.nursery.autogluon_tabular.html
+        """
         if self._learner.is_fit:
             raise AssertionError(
                 'Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new '
@@ -280,6 +474,16 @@ class ForecastingPredictor:
         return self._trainer.get_model_best()
 
     def leaderboard(self, data=None, static_features=None):
+        """
+        Return a leaderboard showing the performance of every trained model
+
+        Parameters
+        ----------
+        data: a dataset in the same format of the train_data input input ForecastingPredictor().fit()
+              used for additional evaluation aside from the validation set.
+        static_features: a Dataframe containing static_features,
+              must be provided if static_features is provided when calling ForecastingPredictor().fit()
+        """
         if data is not None:
             data = self.preprocessing(data, static_features=static_features)
         return self._learner.leaderboard(data)
@@ -291,7 +495,7 @@ class ForecastingPredictor:
 
             Parameters
             ----------
-            verbosity : int, default = 3
+            verbosity : int, default = 3
                 Controls how detailed of a summary to ouput.
                 Set <= 0 for no output printing, 1 to print just high-level summary,
                 2 to print summary and create plots, >= 3 to print all information produced during fit().
@@ -410,6 +614,21 @@ class ForecastingPredictor:
 
     @classmethod
     def evaluate_predictions(cls, forecasts, targets, eval_metric=None):
+        """
+        Evaluate predictions once future targets are received.
+
+        Parameters
+        ----------
+        forecasts: dict, produced by ForecastingPredictor().predict()
+            a dictionary containing predictions for different targets.
+            Keys are time series index
+            Values are pandas Dataframe containing predictions for different quantiles.
+
+        targets: an iterable of Dataframes
+            each Dataframe contains the ground truth value for the time index needed,
+            and the index for the dataframe must be the timestamp
+            each Dataframe must contain only the true value for the dates to predict.
+        """
         quantile_forecasts = []
         for ts_id, forecast in forecasts.items():
             tmp = []
