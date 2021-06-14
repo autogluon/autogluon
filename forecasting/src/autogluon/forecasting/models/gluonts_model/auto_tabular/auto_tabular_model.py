@@ -20,13 +20,14 @@ class AutoTabularModel(AbstractGluonTSModel):
 
     def create_model(self):
         if len(AbstractGluonTSModel.prev_fitting_time) == 0:
-            time_limit = 60
+            time_limit = 300
         else:
-            time_limit = max(sum(AbstractGluonTSModel.prev_fitting_time) / len(AbstractGluonTSModel.prev_fitting_time), 60)
-        self.params["time_limit"] = time_limit
+            time_limit = max(sum(AbstractGluonTSModel.prev_fitting_time) / len(AbstractGluonTSModel.prev_fitting_time), 300)
+        if "time_limit" not in self.params:
+            self.params["time_limit"] = time_limit
         self.model = TabularEstimator(freq=self.params["freq"],
                                       prediction_length=self.params["prediction_length"],
-                                      time_limit=time_limit)
+                                      time_limit=self.params["time_limit"])
 
     def fit(self, train_data, val_data=None, time_limit=None):
         if time_limit is None or time_limit > 0:
