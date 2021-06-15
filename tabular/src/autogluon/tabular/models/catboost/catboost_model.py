@@ -155,7 +155,7 @@ class CatBoostModel(AbstractModel):
         init_model_tree_count = None
         init_model_best_score = None
 
-        num_features = len(self.features)
+        num_features = len(self._features)
 
         if num_gpus != 0:
             if 'task_type' not in params:

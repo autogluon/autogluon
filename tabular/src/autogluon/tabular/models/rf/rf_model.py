@@ -282,11 +282,11 @@ class RFModel(AbstractModel):
         return skip_hpo(self, **kwargs)
 
     def get_model_feature_importance(self):
-        if self.features is None:
+        if self._features is None:
             # TODO: Consider making this raise an exception
-            logger.warning('Warning: get_model_feature_importance called when self.features is None!')
+            logger.warning('Warning: get_model_feature_importance called when self._features is None!')
             return dict()
-        return dict(zip(self.features, self.model.feature_importances_))
+        return dict(zip(self._features, self.model.feature_importances_))
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()

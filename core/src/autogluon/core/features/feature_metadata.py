@@ -150,6 +150,9 @@ class FeatureMetadata:
             raise KeyError(f'{feature} does not exist in {self.__class__.__name__}.')
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
+    def get_type_map_special(self) -> dict:
+        return {feature: self.get_feature_types_special(feature) for feature in self.get_features()}
+
     def get_type_group_map_raw(self):
         type_group_map_raw = defaultdict(list)
         for feature, dtype in self.type_map_raw.items():

@@ -5,7 +5,7 @@ from typing import Union
 import numpy as np
 from pandas import DataFrame, Series
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 
 from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df
 
@@ -21,7 +21,9 @@ class LabelCleaner:
     problem_type_transform = None
 
     @staticmethod
-    def construct(problem_type: str, y: Union[Series, np.ndarray, list], y_uncleaned: Union[Series, np.ndarray, list] = None, positive_class=None):
+    def construct(problem_type: str, y: Union[Series, np.ndarray, list, DataFrame], y_uncleaned: Union[Series, np.ndarray, list, DataFrame] = None, positive_class=None):
+        if problem_type == SOFTCLASS:
+            return LabelCleanerSoftclass(y)
         y = LabelCleaner._convert_to_valid_series(y)
         if y_uncleaned is not None:
             y_uncleaned = LabelCleaner._convert_to_valid_series(y_uncleaned)
@@ -249,6 +251,23 @@ class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
         if as_pandas:
             y_transformed = DataFrame(data=y_transformed, index=y_index)
         return y_transformed
+
+
+# TODO: Expand functionality if necessary
+class LabelCleanerSoftclass(LabelCleaner):
+    def __init__(self, y: DataFrame):
+        self.problem_type_transform = SOFTCLASS
+        self.num_classes = y.shape[1]
+
+    def _transform(self, y: DataFrame) -> DataFrame:
+        return y
+
+    def _inverse_transform(self, y: DataFrame) -> DataFrame:
+        return y
+
+    @staticmethod
+    def _convert_to_valid_series(y: DataFrame) -> DataFrame:
+        return y
 
 
 class LabelCleanerDummy(LabelCleaner):

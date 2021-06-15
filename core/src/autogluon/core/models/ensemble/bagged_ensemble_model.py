@@ -1,17 +1,20 @@
+import copy
+import logging
+import os
+import time
 from collections import Counter
 from statistics import mean
 
 import numpy as np
 import pandas as pd
-from autogluon.core.models.ensemble.fold_fitting_strategy import *
 
+from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy
+from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
 from ...utils.utils import generate_kfold, _compute_fi_with_stddev
-
-from ..abstract.abstract_model import AbstractModel
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +47,10 @@ class BaggedEnsembleModel(AbstractModel):
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
 
-        try:
-            feature_metadata = self.model_base.feature_metadata
-        except:
-            feature_metadata = None
-
         eval_metric = kwargs.pop('eval_metric', self.model_base.eval_metric)
-        stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)
+        stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)  # FIXME: Has to be moved to post-model_base initialization, otherwise could be misaligned.
 
-        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_metadata=feature_metadata, **kwargs)
+        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, **kwargs)
 
     def _set_default_params(self):
         default_params = {
@@ -62,6 +60,14 @@ class BaggedEnsembleModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            drop_unique=False,  # TODO: Get the value from child instead
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
 
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
@@ -146,9 +152,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         model_base = self._get_model_base()
         model_base.rename(name='')
-        if self.features is not None:
-            model_base.features = self.features
-        model_base.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
+        kwargs['feature_metadata'] = self.feature_metadata
+        kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
 
         if self.model_base is not None:
             self.save_model_base(self.model_base)
@@ -410,7 +415,6 @@ class BaggedEnsembleModel(AbstractModel):
         )
         init_args.update(super()._get_init_args())
         init_args.pop('problem_type')
-        init_args.pop('feature_metadata')
         return init_args
 
     def _get_compressed_params(self, model_params_list=None):
@@ -583,6 +587,14 @@ class BaggedEnsembleModel(AbstractModel):
             max_memory_size = info['memory_size']
             min_memory_size = info['memory_size'] - sum_memory_size_child + max_memory_size_child
 
+        # Necessary if save_space is used as save_space deletes model_base.
+        if len(self.models) > 0:
+            child_model = self.load_child(self.models[0])
+        else:
+            child_model = self._get_model_base()
+        child_hyperparameters = child_model.params
+        child_ag_args_fit = child_model.params_aux
+
         bagged_info = dict(
             child_model_type=self._child_type.__name__,
             num_child_models=len(self.models),
@@ -597,9 +609,9 @@ class BaggedEnsembleModel(AbstractModel):
             bagged_mode=self._bagged_mode,
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
-            child_hyperparameters=self._get_model_base().params,
+            child_hyperparameters=child_hyperparameters,
             child_hyperparameters_fit=self._get_compressed_params_trained(),
-            child_ag_args_fit=self._get_model_base().params_aux,
+            child_ag_args_fit=child_ag_args_fit,
         )
         info['bagged_info'] = bagged_info
         info['children_info'] = children_info
@@ -648,7 +660,8 @@ class BaggedEnsembleModel(AbstractModel):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
-        self.model_base.feature_metadata = self.feature_metadata  # TODO: Move this
+        kwargs['feature_metadata'] = self.feature_metadata
+        kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
         self.model_base.set_contexts(self.path + 'hpo' + os.path.sep)
 
         # TODO: Preprocess data here instead of repeatedly

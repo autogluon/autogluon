@@ -42,10 +42,12 @@ class LGBModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._internal_feature_map = None
+        self._features_internal_map = None
+        self._features_internal_list = None
+        self._requires_remap = None
 
     def _set_default_params(self):
-        default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
+        default_params = get_param_baseline(problem_type=self.problem_type)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
@@ -96,6 +98,9 @@ class LGBModel(AbstractModel):
             dataset_train=dataset_train, dataset_val=dataset_val
         )
         gc.collect()
+
+        if self.problem_type in [MULTICLASS, SOFTCLASS] and 'num_classes' not in params:
+            params['num_classes'] = self.num_classes
 
         num_boost_round = params.pop('num_boost_round', 1000)
         dart_retrain = params.pop('dart_retrain', False)  # Whether to retrain the model to get optimal iteration if model is trained in 'dart' mode.
@@ -239,17 +244,22 @@ class LGBModel(AbstractModel):
         X = super()._preprocess_nonadaptive(X=X, **kwargs)
 
         if is_train:
+            self._requires_remap = False
             for column in X.columns:
                 if isinstance(column, str):
                     new_column = re.sub(r'[",:{}[\]]', '', column)
                     if new_column != column:
-                        self._internal_feature_map = {feature: i for i, feature in enumerate(list(X.columns))}
+                        self._features_internal_map = {feature: i for i, feature in enumerate(list(X.columns))}
+                        self._requires_remap = True
                         break
+            if self._requires_remap:
+                self._features_internal_list = np.array([self._features_internal_map[feature] for feature in list(X.columns)])
+            else:
+                self._features_internal_list = self._features_internal
 
-        if self._internal_feature_map:
-            new_columns = [self._internal_feature_map[column] for column in list(X.columns)]
+        if self._requires_remap:
             X_new = X.copy(deep=False)
-            X_new.columns = new_columns
+            X_new.columns = self._features_internal_list
             return X_new
         else:
             return X
@@ -401,8 +411,8 @@ class LGBModel(AbstractModel):
         feature_names = self.model.feature_name()
         importances = self.model.feature_importance()
         importance_dict = {feature_name: importance for (feature_name, importance) in zip(feature_names, importances)}
-        if use_original_feature_names and (self._internal_feature_map is not None):
-            inverse_internal_feature_map = {i: feature for feature, i in self._internal_feature_map.items()}
+        if use_original_feature_names and (self._features_internal_map is not None):
+            inverse_internal_feature_map = {i: feature for feature, i in self._features_internal_map.items()}
             importance_dict = {inverse_internal_feature_map[i]: importance for i, importance in importance_dict.items()}
         return importance_dict
 
@@ -413,6 +423,10 @@ class LGBModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    @property
+    def _features(self):
+        return self._features_internal_list
 
     def _ag_params(self) -> set:
         return {'ag.early_stop'}

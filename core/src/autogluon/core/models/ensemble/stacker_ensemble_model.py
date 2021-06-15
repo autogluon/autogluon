@@ -53,6 +53,14 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.base_model_paths_dict = base_model_paths_dict
         self.base_model_types_dict = base_model_types_dict
 
+        # TODO: Consider deleting these variables after initialization
+        self._base_model_performances_dict = base_model_performances_dict
+        self._base_model_types_inner_dict = base_model_types_inner_dict
+
+    def _initialize(self, **kwargs):
+        super()._initialize(**kwargs)
+        base_model_performances_dict = self._base_model_performances_dict
+        base_model_types_inner_dict = self._base_model_types_inner_dict
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
             if self.params['max_base_models_per_type'] > 0:
                 self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=base_model_types_inner_dict, model_scores=base_model_performances_dict, max_base_models_per_type=self.params['max_base_models_per_type'])
@@ -66,6 +74,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.stack_column_prefix_lst = copy.deepcopy(self.base_model_names)
         self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=self.stack_column_prefix_lst)
         self.stack_column_prefix_to_model_map = {stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)}
+
+        self._add_stack_to_feature_metadata()
 
     @staticmethod
     def limit_models_per_type(models, model_types, model_scores, max_base_models_per_type):
@@ -138,7 +148,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         X = self.preprocess(X=X, preprocess_nonadaptive=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
-        self._add_stack_to_feature_metadata()
         super()._fit(X=X, y=y, time_limit=time_limit, **kwargs)
 
     def set_contexts(self, path_context):
@@ -163,7 +172,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
     def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, compute_base_preds=True, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
-        self._add_stack_to_feature_metadata()
 
         preprocess_kwargs = {'compute_base_preds': compute_base_preds}
         return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
@@ -206,6 +214,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
                 self.feature_metadata = stacker_feature_metadata
             else:
+                # FIXME: This is a hack, stack feature special types should be already present in feature_metadata, not added here
                 existing_stack_features = self.feature_metadata.get_features(required_special_types=[S_STACK])
                 if set(stacker_feature_metadata.get_features()) != set(existing_stack_features):
-                    self.feature_metadata = self.feature_metadata.join_metadata(stacker_feature_metadata)
+                    self.feature_metadata = self.feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())

@@ -122,20 +122,20 @@ class DataHelper:
         return Series(
             [
                 '8/1/2018 16:27',
-                '',
-                np.nan,
+                '',  # nan
+                np.nan,  # nan
                 '4/20/2018 15:37',
                 '4/20/2018 15:37',
                 '1/01/1800 00:00',
                 '12/31/2200 23:59',
-                '8/15/2020 7:12',
-                '12/18/2020 2:12',
+                '8/15/2700 7:12',  # nan
+                '12/18/1000 2:12',  # nan
             ]
         )
 
     @staticmethod
     def generate_datetime_feature() -> Series:
-        return pd.to_datetime(DataHelper.generate_datetime_as_object_feature())
+        return pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors='coerce')
 
     @staticmethod
     def generate_multi_feature_standard() -> DataFrame:

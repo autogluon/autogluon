@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import copy
 
+
 def test_task():
     dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     model_list = Task.list_models()
@@ -17,6 +18,10 @@ def test_task():
     classifier2 = Task.load('classifier.ag')
     fit_summary = classifier2.fit_summary()
     test_acc = classifier2.evaluate(test_dataset)
+    # raw dataframe
+    df_test_dataset = pd.DataFrame(test_dataset)
+    test_acc = classifier2.evaluate(df_test_dataset)
+    assert test_acc[-1] > 0.2, f'{test_acc} too bad'
     test_proba = classifier2.predict_proba(test_dataset)
     test_feature = classifier2.predict_feature(test_dataset)
     single_test2 = classifier2.predict(test_dataset.iloc[0]['image'])
@@ -28,6 +33,7 @@ def test_task():
     test_feature_numpy = classifier2.predict_feature(test_dataset, as_pandas=False)
     single_test2_numpy = classifier2.predict(test_dataset.iloc[0]['image'], as_pandas=False)
     assert np.array_equal(single_test2.to_numpy(), single_test2_numpy)
+
 
 def test_task_label_remap():
     ImagePredictor = Task
@@ -49,6 +55,7 @@ def test_task_label_remap():
     score_accuracy = accuracy(y_true=test_dataset['label'], y_pred=pred)
     score_log_loss = log_loss(y_true=test_dataset['label'].replace(label_remap_inverse), y_pred=pred_proba.to_numpy())
     assert score_accuracy > 0.2  # relax
+
 
 def test_invalid_image_dataset():
     ImagePredictor = Task

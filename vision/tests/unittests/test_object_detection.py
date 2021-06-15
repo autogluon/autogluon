@@ -7,12 +7,11 @@ def test_task():
     detector = Task()
     detector.fit(train_data, num_trials=1, hyperparameters={'batch_size': 4, 'epochs': 5, 'early_stop_max_value': 0.2})
     test_result = detector.predict(test_data)
-    print('test result', test_result)
     detector.save('detector.ag')
     detector2 = Task.load('detector.ag')
     fit_summary = detector2.fit_summary()
     test_map = detector2.evaluate(test_data)
     test_result2 = detector2.predict(test_data)
-    assert test_result2.equals(test_result)
+    assert test_result2.equals(test_result), f'{test_result2} != \n {test_result}'
     # to numpy
     test_result2 = detector2.predict(test_data, as_pandas=False)

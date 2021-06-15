@@ -18,15 +18,15 @@ def get_param_baseline_custom(problem_type):
         return get_param_binary_baseline_custom()
 
 
-def get_param_baseline(problem_type, num_classes=None):
+def get_param_baseline(problem_type):
     if problem_type == BINARY:
         return get_param_binary_baseline()
     elif problem_type == MULTICLASS:
-        return get_param_multiclass_baseline(num_classes=num_classes)
+        return get_param_multiclass_baseline()
     elif problem_type == REGRESSION:
         return get_param_regression_baseline()
     elif problem_type == SOFTCLASS:
-        return get_param_softclass_baseline(num_classes=num_classes)
+        return get_param_softclass_baseline()
     else:
         return get_param_binary_baseline()
 
@@ -55,13 +55,12 @@ def get_param_binary_baseline():
     return params
 
 
-def get_param_multiclass_baseline(num_classes):
+def get_param_multiclass_baseline():
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
         'learning_rate': 0.05,
         'objective': 'multiclass',
-        'num_classes': num_classes,
         'verbose': -1,
         'boosting_type': 'gbdt',
         'two_round': True,
@@ -102,8 +101,8 @@ def get_param_regression_baseline_custom():
     return params
 
 
-def get_param_softclass_baseline(num_classes):
-    params = get_param_multiclass_baseline(num_classes)
+def get_param_softclass_baseline():
+    params = get_param_multiclass_baseline()
     params.pop('metric', None)
     return params
 

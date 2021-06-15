@@ -77,7 +77,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         """
         self.feature_arraycol_map = None
         self.feature_type_map = None
-        self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self.features if it works with bagging
+        self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self._features_internal
         self.processor = None  # data processor
         self.summary_writer = None
         self.ctx = None
@@ -173,8 +173,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         params = self._get_model_params()
         params = fixedvals_from_searchspaces(params)
-        if self.feature_metadata is None:
-            raise ValueError("Trainer class must set feature_metadata for this model")
         if num_cpus is not None:
             self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         else:
@@ -472,8 +470,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
             train_dataset = X
         else:
             X = self.preprocess(X)
-            if self.features is None:
-                self.features = list(X.columns)
             train_dataset = self.process_train_data(
                 df=X, labels=y, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers,
                 impute_strategy=impute_strategy, max_category_levels=max_category_levels, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features,
@@ -527,8 +523,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         """
         from .tabular_nn_dataset import TabularNNDataset
         warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
-        if set(df.columns) != set(self.features):
-            raise ValueError("Column names in provided Dataframe do not match self.features")
         if labels is None:
             raise ValueError("Attempting process training data without labels")
         if len(labels) != len(df):
@@ -707,8 +701,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
         self.verbosity = kwargs.get('verbosity', 2)
         logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
         self._set_default_searchspace()  # changes non-specified default hyperparams from fixed values to search-spaces.
-        if self.feature_metadata is None:
-            raise ValueError("Trainer class must set feature_metadata for this model")
         scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")

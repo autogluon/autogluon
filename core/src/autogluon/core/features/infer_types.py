@@ -102,7 +102,9 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
         X.apply(pd.to_numeric)
     except:
         try:
-            X.apply(pd.to_datetime)
+            result = X.apply(pd.to_datetime, errors='coerce')
+            if result.isnull().mean() > 0.8:  # If over 80% of the rows are NaN
+                return False
             return True
         except:
             return False

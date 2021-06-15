@@ -71,14 +71,14 @@ def test_bulk_feature_generator(generator_helper, data_helper):
 
     expected_output_data_feat_datetime = [
         1533140820000000000,
-        -9223372036854775808,
-        -9223372036854775808,
+        1301322000000000000,
+        1301322000000000000,
         1524238620000000000,
         1524238620000000000,
         -5364662400000000000,
         7289654340000000000,
-        1597475520000000000,
-        1608257520000000000
+        1301322000000000000,
+        1301322000000000000
     ]
 
     expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
@@ -97,8 +97,8 @@ def test_bulk_feature_generator(generator_helper, data_helper):
     assert output_data['float'].equals(input_data['float'])
 
     # object and category checks
-    assert list(output_data['obj'].values) == [1, 2, 1, 4, 4, 4, 3, 0, 0]
-    assert list(output_data['cat'].values) == [0, 1, 0, 3, 3, 3, 2, np.nan, np.nan]
+    assert list(output_data['obj'].values) == [1, np.nan, 1, 2, 2, 2, np.nan, 0, 0]
+    assert list(output_data['cat'].values) == [0, np.nan, 0, 1, 1, 1, np.nan, np.nan, np.nan]
 
     # datetime checks
     assert list(output_data['datetime'].values) == list(output_data['datetime_as_object'].values)

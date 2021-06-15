@@ -6,6 +6,9 @@ import pytest
 
 import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.data.label_cleaner import LabelCleaner
+from autogluon.core.utils import infer_problem_type, generate_train_test_split
+from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from autogluon.tabular import TabularDataset, TabularPredictor
 
 
@@ -137,6 +140,44 @@ class FitHelper:
         return TabularPredictor(**init_args).fit(train_data, **fit_args)
 
 
+# Helper functions for training models outside of predictors
+class ModelFitHelper:
+    @staticmethod
+    def fit_and_validate_dataset(dataset_name, model, fit_args, sample_size=1000):
+        directory_prefix = './datasets/'
+        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+        label = dataset_info['label']
+        model, label_cleaner, feature_generator = ModelFitHelper.fit_dataset(train_data=train_data, model=model, label=label, fit_args=fit_args, sample_size=sample_size)
+        if sample_size is not None and sample_size < len(test_data):
+            test_data = test_data.sample(n=sample_size, random_state=0)
+
+        X_test = test_data.drop(columns=[label])
+        X_test = feature_generator.transform(X_test)
+
+        model.predict(X_test)
+        model.predict_proba(X_test)
+        model.get_info()
+        return model
+
+    @staticmethod
+    def fit_dataset(train_data, model, label, fit_args, sample_size=None):
+        if sample_size is not None and sample_size < len(train_data):
+            train_data = train_data.sample(n=sample_size, random_state=0)
+        X = train_data.drop(columns=[label])
+        y = train_data[label]
+
+        problem_type = infer_problem_type(y)
+        label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
+        y = label_cleaner.transform(y)
+        feature_generator = AutoMLPipelineFeatureGenerator()
+        X = feature_generator.fit_transform(X, y)
+
+        X, X_val, y, y_val = generate_train_test_split(X, y, problem_type=problem_type, test_size=0.2, random_state=0)
+
+        model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **fit_args)
+        return model, label_cleaner, feature_generator
+
+
 @pytest.fixture
 def dataset_loader_helper():
     return DatasetLoaderHelper
@@ -145,3 +186,8 @@ def dataset_loader_helper():
 @pytest.fixture
 def fit_helper():
     return FitHelper
+
+
+@pytest.fixture
+def model_fit_helper():
+    return ModelFitHelper
