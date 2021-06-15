@@ -532,12 +532,12 @@ class ImagePredictor(object):
             y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
             ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
         elif self._problem_type == REGRESSION:
-            ret = y_pred_proba.drop(['image'], axis=1, errors='ignore')
+            ret = y_pred_proba['prediction']
         if as_pandas:
             return ret
         else:
             if self._problem_type == REGRESSION:
-                return ret.to_numpy().squeeze(axis=-1)
+                return ret.to_numpy()
             return ret.to_numpy()
 
     def predict(self, data, as_pandas=True):
