@@ -623,7 +623,7 @@ class ImagePredictor(object):
         """
         if self._classifier is None:
             raise RuntimeError('Classifier not initialized, try `fit` first.')
-        assert (self._train_classes is not None or self._problem_type == REGRESSION)
+        assert self._train_classes is not None
         if isinstance(data, pd.DataFrame) and not isinstance(data, _ImageClassification.Dataset):
             assert self._label in data.columns, f'{self._label} is not present in evaluation data'
             # note that evaluation data must use the same classes as training data, otherwise incorrect result
