@@ -69,6 +69,7 @@ def test_invalid_image_dataset():
 def test_image_predictor_presets():
     ImagePredictor = Task
     train_dataset, _, test_dataset = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+    train_dataset = train_dataset.iloc[:30]
     for preset in ['best_quality', 'good_quality_fast_inference', 'medium_quality_faster_train', 'medium_quality_faster_inference']:
         predictor = ImagePredictor()
-        predictor.fit(train_dataset,tuning_data=test_dataset, presets=[preset], time_limit=60, hyperparameters={'epochs':1})
+        predictor.fit(train_dataset,tuning_data=test_dataset, presets=[preset], hyperparameters={'epochs':1})
