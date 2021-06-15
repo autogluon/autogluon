@@ -436,7 +436,7 @@ class ImagePredictor(object):
                         logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
                     elif self._problem_type == REGRESSION:
                         infer_classes = []
-                        logger.log(20, f'Regression problem does not need classes')
+                        logger.log(20, 'Set classes = [] for regression problems')
                     instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
                     data = _ImageClassification.Dataset(data, classes=infer_classes)
@@ -451,15 +451,19 @@ class ImagePredictor(object):
         elif isinstance(data, _ImageClassification.Dataset):
             assert self._label_inner in data.columns
             assert hasattr(data, 'classes')
-            orig_classes = data.classes
-            if not isinstance(data.classes, (tuple, list)):
-                # consider it as an invalid dataset without proper label, try to reconstruct as a normal DataFrame
-                orig_classes = []
-            # check whether classes are outdated, no action required if all unique labels is subset of `classes`
-            unique_labels = sorted(data[self._label_inner].unique().tolist())
-            if not (all(ulabel in orig_classes for ulabel in unique_labels)):
-                data = _ImageClassification.Dataset(data, classes=unique_labels)
-                logger.log(20, f'Reset labels to {unique_labels}')
+            if self._problem_type in [MULTICLASS, BINARY]:
+                orig_classes = data.classes
+                if not isinstance(data.classes, (tuple, list)):
+                    # consider it as an invalid dataset without proper label, try to reconstruct as a normal DataFrame
+                    orig_classes = []
+                # check whether classes are outdated, no action required if all unique labels is subset of `classes`
+                unique_labels = sorted(data[self._label_inner].unique().tolist())
+                if not (all(ulabel in orig_classes for ulabel in unique_labels)):
+                    data = _ImageClassification.Dataset(data, classes=unique_labels)
+                    logger.log(20, f'Reset labels to {unique_labels}')
+            elif self._problem_type == REGRESSION:
+                data = _ImageClassification.Dataset(data, classes=[])
+                logger.log(20, 'Set classes = [] for regression problems')
         if len(data) < 1:
             raise ValueError('Empty dataset.')
         return data
