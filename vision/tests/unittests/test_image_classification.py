@@ -72,4 +72,4 @@ def test_image_predictor_presets():
     train_dataset = train_dataset.iloc[:30]
     for preset in ['best_quality', 'good_quality_fast_inference', 'medium_quality_faster_train', 'medium_quality_faster_inference']:
         predictor = ImagePredictor()
-        predictor.fit(train_dataset,tuning_data=test_dataset, presets=[preset], hyperparameters={'epochs':1})
+        predictor.fit(train_dataset,tuning_data=train_dataset[30:50], presets=[preset], hyperparameters={'epochs':1})
