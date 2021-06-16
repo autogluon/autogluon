@@ -395,7 +395,7 @@ class ImagePredictor(object):
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
-        task = _ImageClassification(problem_type=self._problem_type, config=config)
+        task = _ImageClassification(config=config, problem_type=self._problem_type)
         # GluonCV can't handle these separately - patching created config
         task.search_strategy = scheduler
         task.scheduler_options['searcher'] = searcher
