@@ -48,7 +48,7 @@ class ImagePredictorModel(AbstractModel):
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
             'valid_stacker': False,
-            'problem_types': [BINARY, MULTICLASS],  # Does not support regression
+            'problem_types': [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
@@ -83,9 +83,6 @@ class ImagePredictorModel(AbstractModel):
         from autogluon.vision import ImagePredictor
         params = self._get_model_params()
 
-        if self.problem_type == REGRESSION:
-            raise AssertionError(f'ImagePredictorModel does not support `problem_type="{REGRESSION}"`')
-
         X = self.preprocess(X, fit=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
@@ -110,7 +107,7 @@ class ImagePredictorModel(AbstractModel):
         self.model = ImagePredictor(
             problem_type=self.problem_type,
             path=self.path,
-            # eval_metric=self.eval_metric,  # TODO: Vision only works with accuracy
+            # eval_metric=self.eval_metric,  # TODO: multiclass/binary vision problem works only with accuracy, regression with rmse
             verbosity=verbosity_image
         )
 
@@ -130,12 +127,6 @@ class ImagePredictorModel(AbstractModel):
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
-
-        if self.problem_type == REGRESSION:
-            # FIXME: This probably won't work
-            # return self.model.predict(X, as_pandas=False)
-            raise AssertionError(f'ImagePredictorModel does not support `problem_type="{REGRESSION}"`')
-
         y_pred_proba = self.model.predict_proba(X, as_pandas=False)
         return self._convert_proba_to_unified_form(y_pred_proba)
 

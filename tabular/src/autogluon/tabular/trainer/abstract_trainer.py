@@ -356,7 +356,6 @@ class AbstractTrainer:
                     ensemble_type=ensemble_type,
                     ensemble_kwargs=ensemble_kwargs,
                 ))
-
             models, model_args_fit = get_models_func(hyperparameters=models, **get_models_kwargs)
             if model_args_fit:
                 hyperparameter_tune_kwargs = {
@@ -388,7 +387,6 @@ class AbstractTrainer:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
-
         return self.generate_weighted_ensemble(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
 
     def predict(self, X, model=None):
