@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 from collections import OrderedDict
 from copy import deepcopy
 from typing import Tuple
@@ -291,6 +292,9 @@ class LocalSequentialScheduler(object):
             plt.legend(loc='best')
         if filename:
             logger.info(f'Saving Training Curve in {filename}')
+            file_dir = os.path.split(os.path.abspath(filename))[0]
+            if not os.path.exists(file_dir):
+                os.makedirs(file_dir)
             plt.savefig(filename)
         if plot:
             plt.show()

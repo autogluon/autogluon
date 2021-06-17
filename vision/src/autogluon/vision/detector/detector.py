@@ -215,7 +215,8 @@ class ObjectDetector(object):
         ngpus_per_trial = kwargs['ngpus_per_trial']
         holdout_frac = kwargs['holdout_frac']
         random_state = kwargs['random_state']
-        search_strategy = kwargs['hyperparameter_tune_kwargs']['search_strategy']
+        scheduler = kwargs['hyperparameter_tune_kwargs']['scheduler']
+        searcher = kwargs['hyperparameter_tune_kwargs']['searcher']
         max_reward = kwargs['hyperparameter_tune_kwargs']['max_reward']
         scheduler_options = kwargs['hyperparameter_tune_kwargs']['scheduler_options']
 
@@ -240,8 +241,8 @@ class ObjectDetector(object):
             self._detector._logger.setLevel(log_level)
             self._detector._logger.propagate = True
             self._fit_summary = self._detector.fit(train_data, tuning_data, 1 - holdout_frac, random_state, resume=False)
-            if hasattr(self._classifier, 'fit_history'):
-                self._fit_summary['fit_history'] = self._classifier.fit_history()
+            if hasattr(self._detector, 'fit_history'):
+                self._fit_summary['fit_history'] = self._detector.fit_history()
             return self
 
         # new HPO task
@@ -253,7 +254,8 @@ class ObjectDetector(object):
         config={'log_dir': self._log_dir,
                 'num_trials': 99999 if num_trials is None else max(1, num_trials),
                 'time_limits': 2147483647 if time_limit is None else max(1, time_limit),
-                'search_strategy': search_strategy,
+                'search_strategy': searcher,
+                'scheduler': scheduler,
                 }
         if max_reward is not None:
             config['max_reward'] = max_reward
@@ -288,6 +290,8 @@ class ObjectDetector(object):
                 logging.getLogger(logger_name).setLevel(log_level)
                 logging.getLogger(logger_name).propagate = False
         task = _ObjectDetection(config=config)
+        task.search_strategy = scheduler
+        task.scheduler_options['searcher'] = searcher
         task._logger.setLevel(log_level)
         task._logger.propagate = True
         with warnings.catch_warnings(record=True) as w:
@@ -358,9 +362,12 @@ class ObjectDetector(object):
         # tune kwargs
         hpo_tune_args = kwargs.get('hyperparameter_tune_kwargs', {})
         hpo_tune_args['num_trials'] = hpo_tune_args.get('num_trials', 1)
-        hpo_tune_args['search_strategy'] = hpo_tune_args.get('search_strategy', 'random')
-        if not hpo_tune_args['search_strategy'] in ('random', 'bayesopt', 'grid'):
-            raise ValueError(f"Invalid search strategy: {hpo_tune_args['search_strategy']}, supported: ('random', 'bayesopt', 'grid')")
+        hpo_tune_args['searcher'] = hpo_tune_args.get('searcher', 'random')
+        if not hpo_tune_args['searcher'] in ('random', 'bayesopt', 'grid'):
+            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('random', 'bayesopt', 'grid')")
+        hpo_tune_args['scheduler'] = hpo_tune_args.get('scheduler', 'local')
+        if not hpo_tune_args['scheduler'] in ('fifo', 'local'):
+            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('fifo', 'local')")
         hpo_tune_args['max_reward'] = hpo_tune_args.get('max_reward', None)
         if hpo_tune_args['max_reward'] is not None and hpo_tune_args['max_reward'] < 0:
             raise ValueError(f"Expected `max_reward` to be a positive float number between 0 and 1.0, given {hpo_tune_args['max_reward']}")
