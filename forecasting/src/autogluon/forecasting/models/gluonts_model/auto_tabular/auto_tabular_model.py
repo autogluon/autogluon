@@ -27,7 +27,8 @@ class AutoTabularModel(AbstractGluonTSModel):
             self.params["time_limit"] = time_limit
         self.model = TabularEstimator(freq=self.params["freq"],
                                       prediction_length=self.params["prediction_length"],
-                                      time_limit=self.params["time_limit"])
+                                      time_limit=self.params["time_limit"],
+                                      last_k_for_val=self.params["prediction_length"])
 
     def fit(self, train_data, val_data=None, time_limit=None):
         if time_limit is None or time_limit > 0:
