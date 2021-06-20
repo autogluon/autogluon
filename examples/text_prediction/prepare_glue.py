@@ -437,7 +437,7 @@ def read_record(dir_path):
         df = read_jsonl_superglue(jsonl_path)
         df_dict[fold] = df
         out = []
-        for i, row in df.iterrows():
+        for row in df.to_dict(orient="records"):
             source = row['source']
             passage = row['passage']
             text = passage['text']
