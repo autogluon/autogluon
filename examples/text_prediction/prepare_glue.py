@@ -351,7 +351,7 @@ def read_wic(dir_path):
         jsonl_path = os.path.join(dir_path, '{}.jsonl'.format(fold))
         df = read_jsonl_superglue(jsonl_path)
         out = []
-        for idx, row in df.iterrows():
+        for row in df.to_dict(orient="records"):
             sentence1 = row['sentence1']
             sentence2 = row['sentence2']
             start1 = row['start1']
