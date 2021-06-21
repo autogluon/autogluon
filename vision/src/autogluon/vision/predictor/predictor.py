@@ -16,7 +16,7 @@ from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from autogluon.core.utils.utils import generate_train_test_split
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
-from ..utils import MXNetErrorCatcher
+from ..utils import MXNetErrorCatcher, sanitize_batch_size
 
 __all__ = ['ImagePredictor']
 
@@ -385,11 +385,12 @@ class ImagePredictor(object):
         if 'early_stop_max_value' not in config or config['early_stop_max_value'] == None:
             config['early_stop_max_value'] = np.Inf
         # batch size cannot be larger than dataset size
-        bs = min(config.get('batch_size', 16), len(train_data))
+        if ngpus_per_trial is not None and ngpus_per_trial > 1:
+            min_value = ngpus_per_trial
+        else:
+            min_value = 1
+        bs = sanitize_batch_size(config.get('batch_size', 16), min_value=min_value, max_value=len(train_data))
         config['batch_size'] = bs
-        if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs < ngpus_per_trial:
-            # batch size must be larger than # gpus
-            config['ngpus_per_trial'] = bs
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
