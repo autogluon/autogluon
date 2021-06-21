@@ -11,6 +11,7 @@ def test_task():
     model_list = Task.list_models()
     classifier = Task()
     classifier.fit(dataset, num_trials=2, hyperparameters={'epochs': 1, 'early_stop_patience': 3})
+    assert classifier.fit_summary()['valid_acc'] > 0.1, 'valid_acc is abnormal'
     test_result = classifier.predict(test_dataset)
     single_test = classifier.predict(test_dataset.iloc[0]['image'])
     single_proba = classifier.predict_proba(test_dataset.iloc[0]['image'])
