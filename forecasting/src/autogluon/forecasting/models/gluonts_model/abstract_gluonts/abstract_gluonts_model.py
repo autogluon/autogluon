@@ -110,9 +110,15 @@ class AbstractGluonTSModel(AbstractModel):
         return model
 
     def create_model(self):
+        """
+        Create the model using gluonts.
+        """
         pass
 
     def fit(self, train_data, val_data=None, time_limit=None):
+        """
+        Fitting the model.
+        """
         if time_limit is None or time_limit > 0:
             start_time = time.time()
             self.create_model()
@@ -123,6 +129,16 @@ class AbstractGluonTSModel(AbstractModel):
             raise TimeLimitExceeded
 
     def predict(self, data, quantiles=None):
+        """
+        Return forecasts for given dataset and quantiles.
+
+        Parameters
+        __________
+        data: dataset in the same format as train data
+
+        quantiles: list of ints, default=None
+              if quantiles=None, it will by default give all the quantiles that the model is trained for.
+        """
         logger.log(30, f"Predicting with model {self.name}")
         if quantiles is None:
             quantiles = [str(q) for q in self.quantiles]
@@ -181,8 +197,18 @@ class AbstractGluonTSModel(AbstractModel):
 
     def score(self, data, metric=None, num_samples=100):
         """
-        metric: if metric is None, we will by default use mean_wQuantileLoss for scoring.
+        Return the evaluation scores for given metric and dataset.
+
+        Parameters
+        __________
+        data: dataset for evaluation in the same format as train dataset
+
+        metric: str, default=None
+                if metric is None, we will by default use mean_wQuantileLoss for scoring.
                 should be one of "MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"
+
+        num_samples: int, default=100
+                number of samples selected for evaluation if the output of the model is DistributionForecast in gluonts
         """
         if metric is None:
             metric = self.eval_metric
@@ -201,6 +227,19 @@ class AbstractGluonTSModel(AbstractModel):
         return agg_metrics[metric]
 
     def hyperparameter_tune(self, train_data, val_data, scheduler_options, time_limit=None, **kwargs):
+        """
+        Do hyperparamter tuning, return hyperparamemter tuning results.
+
+        Parameters
+        __________
+        train_data: data for training
+
+        val_data: data for validation, used for evaluting parameter settings
+
+        scheduler_options: tuple in the form (scheduler_cls, scheduler_params)
+
+        time_limit: roughly how long will the hyperparameter tuning process last.
+        """
         time_start = time.time()
         logger.log(30, f"Start hyperparameter tuning for {self.name}")
         params_copy = self.params.copy()
@@ -293,6 +332,9 @@ class AbstractGluonTSModel(AbstractModel):
         return template
 
     def reset_metrics(self):
+        """
+        Reset metrics to be None, usually used for refitting.
+        """
         self.fit_time = None
         self.predict_time = None
         self.val_score = None

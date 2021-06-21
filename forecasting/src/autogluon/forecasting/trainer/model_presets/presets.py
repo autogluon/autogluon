@@ -17,7 +17,6 @@ MODEL_TYPES = dict(
     AutoTabular=AutoTabularModel,
 )
 
-# disable AutoTabular until its saving issue is fixed.
 DEFAULT_MODEL_NAMES = {
     MQCNNModel: "MQCNN",
     SimpleFeedForwardModel: "SFF",
@@ -39,7 +38,7 @@ def get_default_hps(key, prediction_length):
             "SFF": {},
             "MQCNN": {},
             "DeepAR": {},
-            "AutoTabular": {} # Predicting with AutoTabular model seems quite slow.
+            # "AutoTabular": {} # AutoTabular model is experimental.
         },
         "default_hpo": {
             "MQCNN": {
@@ -57,12 +56,6 @@ def get_default_hps(key, prediction_length):
                                          max(min(500, 12 * prediction_length), prediction_length),
                                          default=prediction_length),
             },
-            # TODO: Find out reasonable search space for AutoTabularModel
-            "AutoTabular": {
-                'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
-                                         max(min(500, 12 * prediction_length), prediction_length),
-                                         default=prediction_length),
-            },
         }
     }
     return DEFAULT_MODEL_HPS[key]
@@ -72,7 +65,9 @@ DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 
 def get_preset_models(path, prediction_length, freq, eval_metric, hyperparameters, hyperparameter_tune, use_feat_static_cat, use_feat_static_real, cardinality, **kwargs):
-
+    """
+    Create a list of models according to hyperparameters. If hyperparamsters=None, will create models according to presets.
+    """
     models = []
     if isinstance(hyperparameters, str):
         hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))

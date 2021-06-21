@@ -236,6 +236,10 @@ class ForecastingPredictor:
             Can be list of combinations of floats in [0.1, 0.2, ..., 0.9]
             Quantiles used for training gluonts models.
 
+        freq: str, default=None
+            Need only to provide this when using Dataset from gluonts, the frequence of your timeseries,
+            An example of valid frequence would be: "1D"
+
         Default:
             Without HPS:
                 hyperparameters={
@@ -392,6 +396,9 @@ class ForecastingPredictor:
         return self
 
     def _validate_fit_kwargs(self, kwargs):
+        """
+        Validate kwargs given in .fit()
+        """
         kwargs_default = {
             "set_best_to_refit_full": False,
             "keep_only_best": False,
@@ -405,6 +412,9 @@ class ForecastingPredictor:
         return copied_kwargs
 
     def _set_post_fit_vars(self, learner: AbstractLearner = None):
+        """
+        Variable settings after fitting.
+        """
         if learner is not None:
             self._learner: AbstractLearner = learner
         self._learner_type = type(self._learner)
@@ -416,6 +426,9 @@ class ForecastingPredictor:
         return self._trainer.get_model_names_all()
 
     def preprocessing(self, data, time_series_to_predict=None, static_features=None):
+        """
+        Preprocessing your dataset. It will transform your tabular dataset to gluonts ListDataset.
+        """
         if (self.use_feat_static_cat or self.use_feat_static_real) and static_features is None:
             raise ValueError("Static features are used for training, cannot predict without static features.")
         if isinstance(data, pd.DataFrame):
@@ -429,21 +442,38 @@ class ForecastingPredictor:
         return data
 
     def predict(self, data, time_series_to_predict=None, model=None, for_score=False, static_features=None, **kwargs):
+        """
+        Return forecasts given a dataset
+
+        Parameters
+        ----------
+        data: dataset to forecast,
+              should be in the same format as train_data when you call .fit()
+        time_series_to_predict: List, default=None,
+              Time series index for which you want to forecast, if None, predict() will return the forecasts for every time series presented in data
+        model: str, default=None
+              Name of the model that you would like to use for forecasting. If None, it will by default use the best model from trainer.
+        for_score: bool, default=False
+              Whether you are using this predict() method for evaluation.
+              We do not recommend you setting this to be True directly. If you want to evaluate your model on your dataset, you should directly using .evaluate()
+        """
         processed_data = self.preprocessing(data, time_series_to_predict=time_series_to_predict, static_features=static_features)
         predict_targets = self._learner.predict(processed_data, model=model, for_score=for_score, **kwargs)
         return predict_targets
 
     def evaluate(self, data, static_features=None, **kwargs):
+        """
+        Evaluate the performace for given dataset.
+        """
         processed_data = self.preprocessing(data, static_features=static_features)
         perf = self._learner.score(processed_data, **kwargs)
         return perf
 
-    # def evaluate_predictions(self, forecasts, tss, **kwargs):
-    #
-    #     return self._learner.evaluate(forecasts, tss, **kwargs)
-
     @classmethod
     def load(cls, output_directory, verbosity=2):
+        """
+        Load an existing ForecastingPredictor from output_directory
+        """
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
         output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
@@ -468,9 +498,15 @@ class ForecastingPredictor:
         self._trainer = tmp_trainer
 
     def info(self):
+        """
+        Get information from learner.
+        """
         return self._learner.get_info(include_model_info=True)
 
     def get_model_best(self):
+        """
+        Get the best model from trainer.
+        """
         return self._trainer.get_model_best()
 
     def leaderboard(self, data=None, static_features=None):
@@ -566,6 +602,9 @@ class ForecastingPredictor:
         return results
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False):
+        """
+        Post fit operations.
+        """
         if refit_full is True:
             if set_best_to_refit_full is True:
                 refit_full = 'best'
@@ -587,6 +626,9 @@ class ForecastingPredictor:
                     logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
 
     def refit_full(self, models='all'):
+        """
+        Rifit models on the whole dataset(train + validation)
+        """
         return self._learner.refit_full(models=models)
 
     def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limits=None):

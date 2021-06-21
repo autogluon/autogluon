@@ -4,7 +4,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
+"""
+Autotabular model from Gluon-TS
+"""
 class AutoTabularModel(AbstractGluonTSModel):
 
     def __init__(self, path: str, freq: str, prediction_length: int, name: str = "AutoTabular",

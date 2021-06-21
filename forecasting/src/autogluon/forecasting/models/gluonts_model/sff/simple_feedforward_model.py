@@ -4,7 +4,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
+"""
+SimpleFeedForward model from Gluon-TS
+"""
 class SimpleFeedForwardModel(AbstractGluonTSModel):
 
     def __init__(self, path: str, freq: str, prediction_length: int, name: str = "SFF",
