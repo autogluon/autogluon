@@ -93,7 +93,7 @@ pred_probs.head(5)
 Besides inference, this object can also summarize what happened during fit.
 
 ```{.python .input}
-results = predictor.fit_summary()
+results = predictor.fit_summary(show_plot=True)
 ```
 
 From this summary, we can see that AutoGluon trained many different types of models as well as an ensemble of the best-performing models.  The summary also describes the actual models that were trained during fit and how well each model performed on the held-out validation data.  We can view what properties AutoGluon automatically inferred about our prediction task:

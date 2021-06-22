@@ -1097,7 +1097,7 @@ class TabularPredictor:
             Set <= 0 for no output printing, 1 to print just high-level summary,
             2 to print summary and create plots, >= 3 to print all information produced during `fit()`.
         show_plot : bool, default = False
-            If True, shows the plot in browser when verbosity > 1.
+            If True, shows the model summary plot in browser when verbosity > 1.
 
         Returns
         -------
