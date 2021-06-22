@@ -1,6 +1,3 @@
 from .generators import *
 
-try:
-    from .version import __version__
-except ImportError:
-    pass
+from .version import __version__
