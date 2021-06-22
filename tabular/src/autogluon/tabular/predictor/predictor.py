@@ -1085,7 +1085,7 @@ class TabularPredictor:
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, silent=silent)
 
-    def fit_summary(self, verbosity=3):
+    def fit_summary(self, verbosity=3, show_plot=False):
         """
         Output summary of information about models produced during `fit()`.
         May create various generated summary plots and store them in folder: `predictor.path`.
@@ -1093,9 +1093,11 @@ class TabularPredictor:
         Parameters
         ----------
         verbosity : int, default = 3
-            Controls how detailed of a summary to ouput.
+            Controls how detailed of a summary to output.
             Set <= 0 for no output printing, 1 to print just high-level summary,
             2 to print summary and create plots, >= 3 to print all information produced during `fit()`.
+        show_plot : bool, default = False
+            If True, shows the model summary plot in browser when verbosity > 1.
 
         Returns
         -------
@@ -1172,18 +1174,19 @@ class TabularPredictor:
         if verbosity > 1:  # create plots
             plot_tabular_models(results, output_directory=self.path,
                                 save_file="SummaryOfModels.html",
-                                plot_title="Models produced during fit()")
+                                plot_title="Models produced during fit()",
+                                show_plot=show_plot)
             if hpo_used:
                 for model_type in results['hpo_results']:
                     if 'trial_info' in results['hpo_results'][model_type]:
                         plot_summary_of_models(
                             results['hpo_results'][model_type],
                             output_directory=self.path, save_file=model_type + "_HPOmodelsummary.html",
-                            plot_title=f"Models produced during {model_type} HPO")
+                            plot_title=f"Models produced during {model_type} HPO", show_plot=show_plot)
                         plot_performance_vs_trials(
                             results['hpo_results'][model_type],
                             output_directory=self.path, save_file=model_type + "_HPOperformanceVStrials.png",
-                            plot_title=f"HPO trials for {model_type} models")
+                            plot_title=f"HPO trials for {model_type} models", show_plot=show_plot)
         if verbosity > 2:  # print detailed information
             if hpo_used:
                 hpo_results = results['hpo_results']
