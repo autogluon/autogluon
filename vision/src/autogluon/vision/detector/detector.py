@@ -97,21 +97,25 @@ class ObjectDetector(object):
             try to reduce `batch_size` if OOM("RuntimeError: CUDA error: out of memory") happens frequently during the `fit`.
 
             In-depth Preset Info:
+                # Best predictive accuracy with little consideration to inference time or model size. Achieve even better results by specifying a large time_limit value.
+                # Recommended for applications that benefit from the best possible model accuracy.
                 best_quality={
                     'hyperparameters': {
-                        'transfer': Categorical('faster_rcnn_fpn_resnet101_v1d_coco'),
+                        'transfer': 'faster_rcnn_fpn_resnet101_v1d_coco',
                         'lr': Real(1e-5, 1e-3, log=True),
                         'batch_size': Categorical(4, 8),
                         'epochs': 30,
-                        'early_stop_patience': -1
+                        'early_stop_patience': 50
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 128,
-                        'search_strategy': 'bayesopt'},
-                    'time_limit': 24*3600,}
-                    Best predictive accuracy with little consideration to training/inference time or model size. Achieve even better results by specifying a large time_limit value.
-                    Recommended for applications that benefit from the best possible model accuracy and be prepared with the extremly long training time.
+                        'searcher': 'random',
+                    },
+                    'time_limit': 24*3600,
+                },
 
+                # Good predictive accuracy with fast inference.
+                # Recommended for applications that require reasonable inference speed and/or model size.
                 good_quality_fast_inference={
                     'hyperparameters': {
                         'transfer': Categorical('ssd_512_resnet50_v1_coco',
@@ -124,14 +128,16 @@ class ObjectDetector(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 512,
-                        'search_strategy': 'bayesopt'},
-                    'time_limit': 12*3600,}
-                    Good predictive accuracy with fast inference.
-                    Recommended for applications that require reasonable inference speed and/or model size.
+                        'searcher': 'random',
+                    },
+                    'time_limit': 12*3600,
+                },
 
+                # Medium predictive accuracy with very fast inference and very fast training time.
+                # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
                 medium_quality_faster_train={
                     'hyperparameters': {
-                        'transfer': Categorical('ssd_512_resnet50_v1_coco'),
+                        'transfer': 'ssd_512_resnet50_v1_coco',
                         'lr': 0.01,
                         'batch_size': Categorical(8, 16),
                         'epochs': 30,
@@ -139,12 +145,13 @@ class ObjectDetector(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 16,
-                        'search_strategy': 'random'},
-                    'time_limit': 2*3600,}
+                        'searcher': 'random',
+                    },
+                    'time_limit': 2*3600,
+                },
 
-                    Medium predictive accuracy with very fast inference and very fast training time.
-                    This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
-
+                # Medium predictive accuracy with very fast inference.
+                # Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
                 medium_quality_faster_inference={
                     'hyperparameters': {
                         'transfer': Categorical('center_net_resnet18_v1b_coco', 'yolo3_mobilenet1.0_coco'),
@@ -155,11 +162,10 @@ class ObjectDetector(object):
                         },
                     'hyperparameter_tune_kwargs': {
                         'num_trials': 32,
-                        'search_strategy': 'bayesopt'},
-                    'time_limit': 4*3600,}
-
-                    Medium predictive accuracy with very fast inference.
-                    Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
+                        'searcher': 'random',
+                    },
+                    'time_limit': 4*3600,
+                },
         hyperparameters : dict, default = None
             Extra hyperparameters for specific models.
             Accepted args includes(not limited to):
@@ -235,6 +241,7 @@ class ObjectDetector(object):
         # data sanity check
         train_data = self._validate_data(train_data)
         if tuning_data is not None:
+            # FIXME: Use ImagePredictor's tuning_data split logic when None, currently this does not perform an ideal split.
             tuning_data = self._validate_data(tuning_data)
 
         if self._detector is not None:

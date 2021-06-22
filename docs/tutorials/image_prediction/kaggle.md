@@ -91,8 +91,8 @@ each neural network requires the user to specify many hyperparameters (e.g., lea
 AutoGluon automatically does Training/Validation split:
 
 ```
-from autogluon.vision import ImagePredictor
-dataset = ImagePredictor.Dataset.from_folder('./data/shopeeiet/train')
+from autogluon.vision import ImagePredictor, ImageDataset
+dataset = ImageDataset.from_folder('./data/shopeeiet/train')
 ```
 
 AutoGluon automatically infers how many classes there are based on the directory structure.
@@ -129,7 +129,7 @@ We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call `predict`:
 
 ```
-test_dataset = ImagePredictor.Dataset.from_folder('./data/shopeeiet/test')
+test_dataset = ImageDataset.from_folder('./data/shopeeiet/test')
 pred = predictor.predict(test_dataset)
 print(pred)
 ```

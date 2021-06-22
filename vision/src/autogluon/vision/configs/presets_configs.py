@@ -2,7 +2,7 @@
 import functools
 import warnings
 from autogluon.core.utils import get_gpu_free_memory, get_gpu_count
-from autogluon.core import Categorical, Real
+from autogluon.core import Categorical, Int, Real
 
 
 def unpack(preset_name):
@@ -31,7 +31,7 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 1024,
-            'search_strategy': 'bayesopt',
+            'searcher': 'random',
         },
         'time_limit': 12*3600,
     },
@@ -48,7 +48,7 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
-            'search_strategy': 'bayesopt',
+            'searcher': 'random',
         },
         'time_limit': 8*3600,
     },
@@ -78,7 +78,7 @@ preset_image_predictor = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
-            'search_strategy': 'bayesopt',
+            'searcher': 'random',
         },
         'time_limit': 2*3600,
     },
@@ -98,7 +98,7 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 128,
-            'search_strategy': 'bayesopt',
+            'searcher': 'random',
         },
         'time_limit': 24*3600,
     },
@@ -117,7 +117,7 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 512,
-            'search_strategy': 'bayesopt',
+            'searcher': 'random',
         },
         'time_limit': 12*3600,
     },
@@ -134,7 +134,7 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 16,
-            'search_strategy': 'random',
+            'searcher': 'random',
         },
         'time_limit': 2*3600,
     },
@@ -151,7 +151,7 @@ preset_object_detector = dict(
             },
         'hyperparameter_tune_kwargs': {
             'num_trials': 32,
-            'search_strategy': 'bayesopt',
+            'searcher': 'random',
         },
         'time_limit': 4*3600,
     },
@@ -192,6 +192,7 @@ def set_presets(preset_name, *args, **kwargs):
                 preset_kwargs[key].update(kwargs[key])
                 kwargs[key] = preset_kwargs[key]
     return args, kwargs
+
 
 def _check_gpu_memory_presets(bs, ngpus_per_trial, min_batch_size=8, threshold=128):
     """Check and report warnings based on free gpu memory.

@@ -5,7 +5,7 @@ In this quick start, we'll use the task of image classification to illustrate ho
 
 ```{.python .input}
 import autogluon.core as ag
-from autogluon.vision import ImagePredictor
+from autogluon.vision import ImagePredictor, ImageDataset
 ```
 
 ## Create Image Dataset
@@ -17,7 +17,7 @@ Our subset of the data contains the following possible labels: `BabyPants`, `Bab
 We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
-train_dataset, _, test_dataset = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+train_dataset, _, test_dataset = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 print(train_dataset)
 ```
 
