@@ -1715,10 +1715,16 @@ class TabularPredictor:
         -------
         :class:`pd.Series` or :class:`pd.DataFrame` object of the out-of-fold training prediction probabilities of the model.
         """
-        if not self._trainer.bagged_mode:
-            raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
         if model is None:
             model = self.get_model_best()
+        if not self._trainer.bagged_mode:
+            raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
+        if model in self._trainer._model_full_dict_val_score:
+            # FIXME: This is a hack, add refit tag in a nicer way than via the _model_full_dict_val_score
+            # TODO: bagged-with-holdout refit to bagged-no-holdout should still be able to return out-of-fold predictions
+            raise AssertionError('_FULL models do not have out-of-fold predictions.')
+        if self._trainer.get_model_attribute_full(model=model, attribute='val_in_fit', func=max):
+            raise AssertionError(f'Model {model} does not have out-of-fold predictions because it used a validation set during training.')
         y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
         if not internal_oof:
             is_duplicate_index = y_pred_proba_oof_transformed.index.duplicated(keep='first')

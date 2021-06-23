@@ -664,3 +664,45 @@ def test_tabular_bagstack():
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args, run_distill=True)
 
+
+@pytest.mark.slow
+def test_tabular_bagstack_use_bag_holdout():
+    ############ Benchmark options you can set: ########################
+    num_stack_levels = 2
+    num_bag_folds = 3
+    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
+    seed_val = 53  # random seed
+    subsample_size = None
+    hyperparameter_tune_kwargs = None
+    verbosity = 2  # how much output to print
+    hyperparameters = None
+    time_limit = None
+    fast_benchmark = True  # False
+    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
+    # otherwise we run full benchmark with default AutoGluon settings.
+    # performance_value warnings are disabled when fast_benchmark = True.
+
+    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
+    if fast_benchmark:
+        subsample_size = 105
+        nn_options = {'num_epochs': 2}
+        gbm_options = [{'num_boost_round': 40}, 'GBMLarge']
+        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
+        time_limit = 60
+
+    fit_args = {
+        'num_bag_folds': num_bag_folds,
+        'num_stack_levels': num_stack_levels,
+        'verbosity': verbosity,
+        'use_bag_holdout': True,
+    }
+    if hyperparameter_tune_kwargs is not None:
+        fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
+    if hyperparameters is not None:
+        fit_args['hyperparameters'] = hyperparameters
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
+        fit_args['num_bag_sets'] = 2
+    ###################################################################
+    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
+                           seed_val=seed_val, fit_args=fit_args, run_distill=True)

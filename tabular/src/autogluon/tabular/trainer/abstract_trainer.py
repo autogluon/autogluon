@@ -313,7 +313,7 @@ class AbstractTrainer:
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
                                                 level=level, base_model_names=base_model_names, feature_prune=feature_prune, **core_kwargs)
 
-        if self.bagged_mode and X_val is None:
+        if X_val is None:
             aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
         else:
             aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, base_model_names=core_models, level=level+1, **aux_kwargs)
@@ -929,10 +929,7 @@ class AbstractTrainer:
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        if isinstance(model, BaggedEnsembleModel):
-            model.fit(X=X, y=y, **model_fit_kwargs)
-        else:
-            model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
+        model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
 
     def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, **model_fit_kwargs) -> List[str]:
@@ -1068,9 +1065,11 @@ class AbstractTrainer:
             type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
             type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
             can_infer=model.can_infer(),
+            can_fit=model.can_fit(),
             is_valid=model.is_valid(),
             stack_name=stack_name,
             level=level,
+            **model._fit_metadata,
         )
         if isinstance(model, StackerEnsembleModel):
             prior_models = self.get_model_names()
@@ -1114,7 +1113,7 @@ class AbstractTrainer:
                 X_val, w_val = extract_column(X_val, self.sample_weight)
                 if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
                     model_fit_kwargs['sample_weight_val'] = w_val.values/w_val.mean()
-            ens_sample_weight =  kwargs.get('ens_sample_weight', None)
+            ens_sample_weight = kwargs.get('ens_sample_weight', None)
             if ens_sample_weight is not None:
                 model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
 
@@ -1211,6 +1210,13 @@ class AbstractTrainer:
                     break
             logger.log(20, f'Repeating k-fold bagging: {n+1}/{n_repeats}')
             for i, model in enumerate(models_valid):
+                if not self.get_model_attribute(model=model, attribute='can_fit'):
+                    if isinstance(model, str):
+                        models_valid_next.append(model)
+                    else:
+                        models_valid_next.append(model.name)
+                    continue
+
                 if isinstance(model, str):
                     model = self.load_model(model)
                 if not isinstance(model, BaggedEnsembleModel):
@@ -1344,7 +1350,7 @@ class AbstractTrainer:
                 time_limit = time_limit - (time.time() - time_start)
         else:
             model_names_trained = models
-        if (n_repeats > 1) and self.bagged_mode and (n_repeat_start < n_repeats):
+        if (n_repeats > 1) and (n_repeat_start < n_repeats):
             model_names_trained = self._train_multi_repeats(X=X, y=y, models=model_names_trained,
                                                             k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, time_limit_total_level=time_limit_total_level, **kwargs)
         return model_names_trained
@@ -1957,19 +1963,11 @@ class AbstractTrainer:
             if y is not None:
                 raise ValueError("X cannot be None when y specified.")
             X = self.load_X()
-            if not self.bagged_mode:
-                try:
-                    X_val = self.load_X_val()
-                except FileNotFoundError:
-                    pass
+            X_val = self.load_X_val()
 
         if y is None:
             y = self.load_y()
-            if not self.bagged_mode:
-                try:
-                    y_val = self.load_y_val()
-                except FileNotFoundError:
-                    pass
+            y_val = self.load_y_val()
 
         if X_val is None:
             if y_val is not None:
