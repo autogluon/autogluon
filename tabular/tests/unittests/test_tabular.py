@@ -203,7 +203,7 @@ def run_tabular_benchmark_toy(fit_args):
         raise AssertionError(f'{dataset["name"]} should raise an exception.')
 
 
-def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False):
+def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False):
     print("Running fit with args:")
     print(fit_args)
     # Each train/test dataset must be located in single directory with the given names.
@@ -289,7 +289,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if (not fast_benchmark) and (performance_vals[idx] > dataset['performance_val'] * perf_threshold):
                 warnings.warn("Performance on dataset %s is %s times worse than previous performance." %
                               (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
-            if predictor._trainer.bagged_mode:
+            if predictor._trainer.bagged_mode and not crash_in_oof:
                 # TODO: Test index alignment with original training data (first handle duplicated rows / dropped rows edge cases)
                 y_pred_oof = predictor.get_oof_pred()
                 y_pred_proba_oof = predictor.get_oof_pred_proba(as_multiclass=False)
@@ -705,4 +705,4 @@ def test_tabular_bagstack_use_bag_holdout():
         fit_args['num_bag_sets'] = 2
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
-                           seed_val=seed_val, fit_args=fit_args, run_distill=True)
+                           seed_val=seed_val, fit_args=fit_args, run_distill=True, crash_in_oof=True)
