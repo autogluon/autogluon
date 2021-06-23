@@ -896,6 +896,9 @@ class AbstractTrainer:
         """
         if isinstance(model, BaggedEnsembleModel):
             model.fit(X=X, y=y, **model_fit_kwargs)
+        elif 'fit_with_prune' in model_fit_kwargs and model_fit_kwargs['fit_with_prune']:
+            # only available for non-ensemble models
+            model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         else:
             model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
@@ -1063,8 +1066,10 @@ class AbstractTrainer:
             n_repeats = self.n_repeats
         model_fit_kwargs = dict(
             time_limit=time_limit,
+            fit_with_prune=kwargs['fit_with_prune'] if 'fit_with_prune' in kwargs else False,
             verbosity=self.verbosity,
         )
+
         if self.sample_weight is not None:
             X, w_train = extract_column(X, self.sample_weight)
             if w_train is not None:  # may be None for ensemble
@@ -1074,7 +1079,7 @@ class AbstractTrainer:
                 X_val, w_val = extract_column(X_val, self.sample_weight)
                 if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
                     model_fit_kwargs['sample_weight_val'] = w_val.values/w_val.mean()
-            ens_sample_weight =  kwargs.get('ens_sample_weight', None)
+            ens_sample_weight = kwargs.get('ens_sample_weight', None)
             if ens_sample_weight is not None:
                 model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
 

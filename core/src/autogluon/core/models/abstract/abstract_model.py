@@ -498,6 +498,67 @@ class AbstractModel:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
 
+    def fit_with_prune(self, max_num_fit=3, prune_threshold=0., num_shuffle_sets=50, **kwargs):
+        """
+        Functionally identical to `fit` method, but repeats feature importance based pruning until
+        validation set performance degrades or `max_num_fit` iterations have passed.
+
+        Parameters
+        ----------
+        max_num_fit : int, default = 3
+            Maximum number of time feature selection and fitting are performed
+        prune_threshold : float, default = 0.
+            Feature importance threshold that features must meet in order to not be dropped
+        num_shuffle_sets : int, default = 3
+            Number of shuffles to evaluate when computing permutation feature importance
+        """
+        if kwargs['X_val'] is None or kwargs['y_val'] is None:
+            logger.error(f'fit_with_prune must be called with validation data.')
+            raise Exception
+
+        untrained_model_path = os.path.join(self.path, 'untrained_')
+        best_model_path = os.path.join(self.path, 'best_')
+        best_score = -float("inf")
+        self.save(untrained_model_path)  # save untrained model to disk to avoid complications from refitting the same model object
+
+        try:
+            for i in range(max_num_fit):
+                self.fit(**kwargs)
+                score = self.score(X=kwargs['X_val'], y=kwargs['y_val'])
+                if score > best_score:
+                    # keep: replace best model with candidate model on disk
+                    logger.log(20, f"\tFit {i+1}: Current score {score} is better than best score {best_score}. Keeping model.")
+                    best_score = score
+                    self.save(best_model_path)
+                else:
+                    logger.log(20, f"\tCurrent score {score} is not better than best score {best_score}. Ending prune loop after {i+1} iterations.")
+                    break
+
+                # compute all feature importance and remove ones that don't meet the threshold
+                importance_df = self.compute_feature_importance(X=kwargs['X_val'], y=kwargs['y_val'], num_shuffle_sets=num_shuffle_sets)
+                cols_to_drop, cols_to_drop_importance = [], []
+                for column_name, row in importance_df.iterrows():
+                    if row['importance'] <= prune_threshold:
+                        cols_to_drop.append(column_name)
+                        cols_to_drop_importance.append(row['importance'])
+                logger.log(20, f"\tWill try fit after pruning these columns that failed to meet importance threshold {prune_threshold}:")
+                logger.log(20, f"\t{list(zip(cols_to_drop, cols_to_drop_importance))}")
+                # reset model but give it a new set of features
+                new_features = [feat for feat in self.features if feat not in cols_to_drop]
+
+                # reset model to pre-fit state
+                self = self.load(path=untrained_model_path)
+                self.features = new_features
+        finally:
+            # cleanup
+            if os.path.exists(untrained_model_path + self.model_file_name):
+                os.remove(untrained_model_path + self.model_file_name)
+            if os.path.exists(best_model_path + self.model_file_name):
+                # restore best model
+                self = self.load(path=best_model_path)
+                os.remove(best_model_path + self.model_file_name)
+            logger.log(20, f"\tFinal Features: {self.features}")
+
     def _fit(self,
              X,
              y,
