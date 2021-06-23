@@ -62,8 +62,7 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
                 out = [[train_index, test_index] for train_index, test_index in kf.split(X_dummy, y_dummy)]
                 len_out = len(out)
                 for i in range(len_out):
-                    train_index = out[i][0]
-                    test_index = out[i][1]
+                    train_index, test_index = out[i]
                     out[i][0] = [index for index in train_index if index not in invalid_index]
                     out[i][1] = [index for index in test_index if index not in invalid_index]
         return out
@@ -262,7 +261,7 @@ def augment_rare_classes(X, label, threshold):
     # Ensure new samples generated via augmentation have unique indices
     aug_df = aug_df.reset_index(drop=True)
     aug_df_len = len(aug_df)
-    X_index_aug_start = max(list(X.index)) + 1
+    X_index_aug_start = X.index.max() + 1
     aug_index = [X_index_aug_start + i for i in range(aug_df_len)]
     aug_df.index = aug_index
 
@@ -355,7 +354,7 @@ def generate_train_test_split(X: DataFrame,
         class_counts_dict_test = y_test.value_counts().to_dict()
 
         indices_to_move = []
-        random_state = random.getstate()
+        random_state_init = random.getstate()
         random.seed(random_state)
         for cls in class_counts_dict_orig.keys():
             count = class_counts_dict.get(cls, 0)
@@ -368,7 +367,7 @@ def generate_train_test_split(X: DataFrame,
             indices_of_cls_test = list(y_test[y_test == cls].index)
             indices_to_move_cls = random.sample(indices_of_cls_test, count_to_move)
             indices_to_move += indices_to_move_cls
-        random.setstate(random_state)
+        random.setstate(random_state_init)
         if indices_to_move:
             y_test_moved = y_test.loc[indices_to_move].copy()
             X_test_moved = X_test.loc[indices_to_move].copy()
