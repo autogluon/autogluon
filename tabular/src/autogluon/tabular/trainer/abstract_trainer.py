@@ -375,7 +375,10 @@ class AbstractTrainer:
                     for model_name in model_args_fit if 'hyperparameter_tune_kwargs' in model_args_fit[model_name]
                 }
                 kwargs['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
-            kwargs['fit_with_prune'] = ag_args['fit_with_prune'] if 'fit_with_prune' in ag_args else None
+            if ag_args and 'fit_with_prune' in ag_args:
+                kwargs['fit_with_prune'] = ag_args['fit_with_prune']
+            else:
+                kwargs['fit_with_prune'] = None
         logger.log(20, f'Fitting {len(models)} L{level} models ...')
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
@@ -1092,7 +1095,8 @@ class AbstractTrainer:
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False, hyperparameter_tune_kwargs=None,
-                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
+                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None,
+                           fit_with_prune=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1106,7 +1110,7 @@ class AbstractTrainer:
             fit_kwargs = dict()
         model_fit_kwargs = dict(
             time_limit=time_limit,
-            fit_with_prune=kwargs['fit_with_prune'] if 'fit_with_prune' in kwargs else None,
+            fit_with_prune=fit_with_prune,
             verbosity=self.verbosity,
         )
         model_fit_kwargs.update(fit_kwargs)
