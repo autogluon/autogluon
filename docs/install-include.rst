@@ -2,8 +2,8 @@
 
 .. note::
 
-  AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ version 3.6, 3.7, or 3.8 (3.8 support is experimental).
-  Linux and Mac are the only operating systems fully supported for now (Windows version will be available soon).
+  AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ version 3.6, 3.7, or 3.8.
+  Linux and Mac are fully supported, we recommend Windows users to run AutoGluon through `Docker <https://hub.docker.com/r/autogluon/autogluon>`_. 
   For troubleshooting the installation process, you can check the `Installation FAQ <install.html#installation-faq>`_.
 
 
@@ -63,7 +63,7 @@ Select your preferences below and run the corresponding install commands:
 
                  python3 -m pip install -U pip
                  python3 -m pip install -U setuptools wheel
-                 python3 -m pip install -U "mxnet<2.0.0"
+                 python3 -m pip install -U "mxnet<2.0.0"  # Optional
                  python3 -m pip install --pre autogluon
 
            .. container:: gpu
@@ -75,7 +75,7 @@ Select your preferences below and run the corresponding install commands:
 
                  # Here we assume CUDA 10.1 is installed.  You should change the number
                  # according to your own CUDA version (e.g. mxnet_cu100 for CUDA 10.0).
-                 python3 -m pip install -U "mxnet_cu101<2.0.0"
+                 python3 -m pip install -U "mxnet_cu101<2.0.0"  # Optional
                  python3 -m pip install --pre autogluon
 
         .. container:: source
@@ -86,7 +86,7 @@ Select your preferences below and run the corresponding install commands:
 
                  python3 -m pip install -U pip
                  python3 -m pip install -U setuptools wheel
-                 python3 -m pip install -U "mxnet<2.0.0"
+                 python3 -m pip install -U "mxnet<2.0.0"  # Optional
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && ./full_install.sh
 
@@ -99,7 +99,7 @@ Select your preferences below and run the corresponding install commands:
 
                  # Here we assume CUDA 10.1 is installed.  You should change the number
                  # according to your own CUDA version (e.g. mxnet_cu102 for CUDA 10.2).
-                 python3 -m pip install -U "mxnet_cu101<2.0.0"
+                 python3 -m pip install -U "mxnet_cu101<2.0.0"  # Optional
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && ./full_install.sh
 
@@ -159,24 +159,3 @@ Select your preferences below and run the corresponding install commands:
               .. note::
 
                  GPU usage is not yet supported on Mac OSX , please use Linux to utilize GPUs in AutoGluon.
-
-
-AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/packaging-namespace-packages/>`_ specialized for tabular, text, or image data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:
-
-- `autogluon.tabular` - only functionality for tabular data (TabularPredictor)
-    - The default installation of `autogluon.tabular` standalone is a skeleton installation.
-    - Install via `pip install autogluon.tabular[all]` to get the same installation of tabular as via `pip install autogluon`
-    - Available optional dependencies: `lightgbm,catboost,xgboost,fastai`. These are included in `all`.
-    - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
-
-    - Experimental optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable, or `pip install "scikit-learn-intelex<2021.3"` after a standard installation of AutoGluon.
-- `autogluon.vision` - only functionality for computer vision (ImagePredictor, ObjectDetector)
-- `autogluon.text` - only functionality for natural language processing (TextPredictor)
-- `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
-- `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
-- `autogluon.extra` - miscellaneous extra functionality such as `Efficient Neural Architecture Search <tutorials/nas/enas_proxylessnas.html>`_
-- `autogluon.mxnet` - miscellaneous extra MXNet functionality.
-
-To install a submodule from source, follow the instructions for installing the entire package from source but replace the line `cd autogluon && ./full_install.sh` with `cd autogluon && python3 -m pip install -e {SUBMODULE_NAME}/{OPTIONAL_DEPENDENCIES}`
-
-- For example, to install `autogluon.tabular[lightgbm,catboost]` from source, the command would be: `cd autogluon && python3 -m pip install -e tabular/[lightgbm,catboost]`

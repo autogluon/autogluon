@@ -1,23 +1,23 @@
-AutoGluon: AutoML for Text, Image, and Tabular Data
+AutoGluon: AutoML for Tabular, Text, and Image Data
 ====================================================
 
-`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning text, image, and tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
+AutoGluon automatically trains models on raw data with a few lines of code.
+Here is an example to predict the ``class`` column on a tabular dataset. 
 
-- Quickly prototype deep learning and classical ML solutions for your raw data with a few lines of code.
-- Automatically utilize state-of-the-art techniques (where appropriate) without expert knowledge.
-- Leverage automatic hyperparameter tuning, model selection/ensembling, architecture search, and data processing.
-- Easily improve/tune your bespoke models and data pipelines, or customize `AutoGluon` for your use-case.
+>>> from autogluon.tabular import TabularPredictor
+>>> predictor = TabularPredictor(label='class').fit('train.csv')
+>>> preds = predictor.predict('test.csv')
 
-.. note::
+The ``fit`` function tries multiple state-of-the-art machine learning and deep learning models within a specified time limit. 
+It tunes hyperparameters, selects, ensembles and stacks models for the best performance. 
 
-   Example using AutoGluon to train and deploy a high-performance model on a tabular dataset:
+AutoGluon provides multiple modules to handle a diverse set of data types. The following example uses the ``vision`` module 
+to train an object classifier on images stored in the folder ``train``. 
 
-   >>> from autogluon.tabular import TabularPredictor
-   >>> predictor = TabularPredictor(label=COLUMN_NAME).fit(train_data=TRAIN_DATA.csv)
-   >>> predictions = predictor.predict(TEST_DATA.csv)
+>>> from autogluon.vision import ImagePredictor, ImageDataset
+>>> predictor = ImagePredictor().fit(ImageDataset.from_folder('train'))
 
-   AutoGluon can be applied just as easily for prediction tasks with image or text data.
-
+Before diving into AutoGluon's usages, let's 
 
 Installation
 ------------
@@ -25,14 +25,12 @@ Installation
 .. include:: install-include.rst
 
 
-Quick Start
------------
 
-.. raw:: html
-   :file: static/application.html
+Applications
+------------
 
-Tutorials
----------
+AutoGluon supports the following applications. You can start with the 
+
 
 .. container:: cards
 
