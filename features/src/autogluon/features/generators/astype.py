@@ -47,6 +47,8 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
             if self._type_map_real_opt:
                 # TODO: Confirm this works with sparse and other feature types!
+                # FIXME: Address situation where test-time invalid type values cause crash:
+                #  https://stackoverflow.com/questions/49256211/how-to-set-unexpected-data-type-to-na?noredirect=1&lq=1
                 X = X.astype(self._type_map_real_opt)
         return X
 

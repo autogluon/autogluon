@@ -15,18 +15,15 @@ spec.loader.exec_module(ag)
 version = ag.load_version_file()
 version = ag.update_version(version)
 
-submodule = 'text'
+submodule = 'forecasting'
 requirements = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
     'pandas',
-    'scikit-learn',
-    'tqdm',
-
+    'psutil>=5.7.3,<5.9',
+    'gluonts>=0.7.0',
     f'autogluon.core=={version}',
-    f'autogluon.mxnet=={version}',
-    'autogluon-contrib-nlp==0.0.1b20210201',
 ]
 
 test_requirements = [

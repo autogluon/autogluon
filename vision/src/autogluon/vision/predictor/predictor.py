@@ -16,7 +16,7 @@ from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from autogluon.core.utils.utils import generate_train_test_split
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
-from ..utils import MXNetErrorCatcher
+from ..utils import MXNetErrorCatcher, sanitize_batch_size
 
 __all__ = ['ImagePredictor']
 
@@ -308,17 +308,19 @@ class ImagePredictor(object):
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
+        tuning_data_validated = False
         if tuning_data is None:
             train_data, tuning_data, _, _ = generate_train_test_split(X=train_data, y=train_data[self._label_inner], problem_type=self._problem_type, test_size=holdout_frac)
             logger.info('Randomly split train_data into train[%d]/validation[%d] splits.',
                               len(train_data), len(tuning_data))
             train_data = train_data.reset_index(drop=True)
             tuning_data = tuning_data.reset_index(drop=True)
+            tuning_data_validated = True
 
         train_data = self._validate_data(train_data)
         if isinstance(train_data, self.Dataset):
             train_data = self.Dataset(train_data, classes=train_data.classes)
-        if tuning_data is not None:
+        if tuning_data is not None and not tuning_data_validated:
             tuning_data = self._validate_data(tuning_data)
             # converting to internal label set
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
@@ -385,11 +387,12 @@ class ImagePredictor(object):
         if 'early_stop_max_value' not in config or config['early_stop_max_value'] == None:
             config['early_stop_max_value'] = np.Inf
         # batch size cannot be larger than dataset size
-        bs = min(config.get('batch_size', 16), len(train_data))
+        if ngpus_per_trial is not None and ngpus_per_trial > 1:
+            min_value = ngpus_per_trial
+        else:
+            min_value = 1
+        bs = sanitize_batch_size(config.get('batch_size', 16), min_value=min_value, max_value=len(train_data))
         config['batch_size'] = bs
-        if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs < ngpus_per_trial:
-            # batch size must be larger than # gpus
-            config['ngpus_per_trial'] = bs
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
@@ -519,15 +522,8 @@ class ImagePredictor(object):
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
         y_pred_proba = self._classifier.predict(data, with_proba=True)
-        if isinstance(data, pd.DataFrame) and 'image' in data:
-            index_name = data.index.name
-            if index_name is None:
-                # TODO: This crashes if a feature is already named 'index'.
-                index_name = 'index'
-            idx_to_image_map = data[['image']]
-            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
-            y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
-            y_pred_proba = y_pred_proba.set_index(index_name).rename_axis(None)
+        if isinstance(data, pd.DataFrame):
+            y_pred_proba.index = data.index
         if self._problem_type in [MULTICLASS, BINARY]:
             y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
             ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
@@ -558,7 +554,7 @@ class ImagePredictor(object):
         """
         if self._problem_type in [REGRESSION]:
             return self.predict_proba(data, as_pandas)
-        
+
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None

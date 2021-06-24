@@ -68,6 +68,10 @@ install_vision = """
     python3 -m pip install --upgrade -e vision/
 """
 
+install_forecasting = """
+    python3 -m pip install --upgrade -e forecasting/
+"""
+
 stage("Unit Test") {
   parallel 'core': {
     node('linux-cpu') {
@@ -279,6 +283,34 @@ stage("Unit Test") {
       }
     }
   },
+  'forecasting': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-forecasting-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon-forecasting-py3-v3 -f docs/build.yml
+          conda activate autogluon-forecasting-py3-v3
+          conda list
+          ${setup_pip_venv}
+          ${setup_mxnet_gpu}
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+          ${install_core}
+          ${install_features}
+          ${install_tabular_all}
+          ${install_mxnet}
+          ${install_forecasting}
+          cd forecasting/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
+          """
+        }
+      }
+    }
+  },
   'install': {
     node('linux-cpu') {
       ws('workspace/autogluon-install-py3-v3') {
@@ -309,6 +341,8 @@ stage("Unit Test") {
           cd ../extra/
           python3 -m pip install --upgrade -e .
           cd ../vision/
+          python3 -m pip install --upgrade -e .
+          cd ../forecasting/
           python3 -m pip install --upgrade -e .
           cd ../autogluon/
           python3 -m pip install --upgrade -e .
@@ -636,6 +670,10 @@ stage("Build Docs") {
         cd ..
 
         cd vision/
+        python3 -m pip install --upgrade -e .
+        cd ..
+        
+        cd forecasting/
         python3 -m pip install --upgrade -e .
         cd ..
 

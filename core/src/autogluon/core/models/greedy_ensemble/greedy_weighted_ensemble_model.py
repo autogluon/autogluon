@@ -1,6 +1,6 @@
 import logging
 
-from .ensemble_selection import EnsembleSelection
+from .ensemble_selection import EnsembleSelection, SimpleWeightedEnsemble
 from ..abstract.abstract_model import AbstractModel
 from ..abstract.model_trial import skip_hpo
 from ...constants import MULTICLASS, SOFTCLASS, QUANTILE
@@ -56,10 +56,12 @@ class GreedyWeightedEnsembleModel(AbstractModel):
              time_limit=None,
              sample_weight=None,
              **kwargs):
-        X = self.preprocess(X)
-        self.model = self.model_base(ensemble_size=self.params['ensemble_size'], problem_type=self.problem_type, quantile_levels=self.quantile_levels, metric=self.stopping_metric)
-        self.model = self.model.fit(X, y, time_limit=time_limit, sample_weight=sample_weight)
-        self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
+        params = self._get_model_params()
+        if self.model is None:
+            X = self.preprocess(X)
+            self.model = self.model_base(problem_type=self.problem_type, quantile_levels=self.quantile_levels, metric=self.stopping_metric, **params)
+            self.model = self.model.fit(X, y, time_limit=time_limit, sample_weight=sample_weight)
+            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
         self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.params_trained['ensemble_size'] = self.model.ensemble_size
         self.weights_ = self.model.weights_
@@ -131,3 +133,21 @@ class GreedyWeightedEnsembleModel(AbstractModel):
 
     def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
+
+
+class SimpleWeightedEnsembleModel(GreedyWeightedEnsembleModel):
+    def __init__(self, model_base=SimpleWeightedEnsemble, **kwargs):
+        super().__init__(model_base=model_base, **kwargs)
+
+    def _fit(self, **kwargs):
+        params = self._get_model_params()
+        if 'weights' not in params:
+            raise ValueError('Missing required parameter "weights" to fit SimpleWeightedEnsembleModel.')
+        if len(params['weights']) != len(self.base_model_names):
+            raise AssertionError(f'Length of weights does not equal length of self.base_model_names ({len(params["weights"])}, {len(self.base_model_names)})')
+
+        if self.model is None:
+            self.model = self.model_base(problem_type=self.problem_type, **params)
+            self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
+        self.features = self._set_stack_columns(base_model_names=self.base_model_names)
+        self.weights_ = self.model.weights_

@@ -11,7 +11,7 @@ from .miscs import warning_filter
 __all__ = ['plot_performance_vs_trials', 'plot_summary_of_models', 'plot_tabular_models', 'mousover_plot']
 
 
-def plot_performance_vs_trials(results, output_directory, save_file="PerformanceVsTrials.png", plot_title=""):
+def plot_performance_vs_trials(results, output_directory, save_file="PerformanceVsTrials.png", plot_title="", show_plot=True):
     try:
         import matplotlib.pyplot as plt
         matplotlib_imported = True
@@ -35,10 +35,11 @@ def plot_performance_vs_trials(results, output_directory, save_file="Performance
         outputfile = os.path.join(output_directory, save_file)
         fig.savefig(outputfile)
         print("Plot of HPO performance saved to file: %s" % outputfile)
-    plt.show()
+    if show_plot:
+        plt.show()
 
 
-def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels.html', plot_title="Models produced during fit()"):
+def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels.html', plot_title="Models produced during fit()", show_plot=True):
     """ Plot dynamic scatterplot summary of each model encountered during fit(), based on the returned Results object. 
     """
     num_trials = len(results['trial_info'])
@@ -68,12 +69,12 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
 
     save_path = os.path.join(output_directory, save_file) if output_directory else None
     mousover_plot(datadict, attr_x=attr_x, attr_y='performance', attr_color=attr_color, 
-        attr_size=attr_size, save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
+                  attr_size=attr_size, save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys, show_plot=show_plot)
     if save_path is not None:
         print("Plot summary of models saved to file: %s" % save_file)
 
 
-def plot_tabular_models(results, output_directory=None, save_file="SummaryOfModels.html", plot_title="Models produced during fit()"):
+def plot_tabular_models(results, output_directory=None, save_file="SummaryOfModels.html", plot_title="Models produced during fit()", show_plot=True):
     """ Plot dynamic scatterplot of every single model trained during tabular_prediction.fit()
         Args:
             results: 
@@ -96,7 +97,7 @@ def plot_tabular_models(results, output_directory=None, save_file="SummaryOfMode
     datadict['inference_latency'] = [leaderboard['pred_time_val'][leaderboard['model'] == m].values[0] for m in model_names]
     datadict['training_time'] = [leaderboard['fit_time'][leaderboard['model'] == m].values[0] for m in model_names]
     mousover_plot(datadict, attr_x='inference_latency', attr_y='performance', attr_color='model_type',
-                  save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
+                  save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys, show_plot=show_plot)
 
 
 def _formatDict(d):
@@ -109,7 +110,7 @@ def _formatDict(d):
 
 
 def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, save_file=None, plot_title="",
-                  point_transparency = 0.5, point_size=20, default_color="#2222aa", hidden_keys = []):
+                  point_transparency = 0.5, point_size=20, default_color="#2222aa", hidden_keys = [], show_plot=False):
     """ Produces dynamic scatter plot that can be interacted with by mousing over each point to see its label
         Args:
             datadict (dict): keys contain attributes, values of lists of data from each attribute to plot (each list index corresponds to datapoint).
@@ -125,37 +126,34 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
             point_transparency (float): alpha value of points, lower = more transparent
             point_size (int): size of points, higher = larger
             hidden keys (list[str]): which keys of datadict NOT to show labels for.
+            show_plot (bool): whether to show plot
     """
     try:
         with warning_filter():
             import bokeh
-            from bokeh.plotting import output_file, ColumnDataSource, show, figure
+            from bokeh.plotting import output_file, ColumnDataSource, show, figure, save
             from bokeh.models import HoverTool, CategoricalColorMapper, LinearColorMapper, Legend, LegendItem, ColorBar
             from bokeh.palettes import Category20
-        bokeh_imported = True
     except ImportError:
-        bokeh_imported = False
-    
-    if not bokeh_imported:
         warnings.warn('AutoGluon summary plots cannot be created because bokeh is not installed. To see plots, please do: "pip install bokeh==2.0.1"')
         return None
-    
+
     n = len(datadict[attr_x])
-    for key in datadict.keys(): # Check lengths are all the same
+    for key in datadict.keys():  # Check lengths are all the same
         if len(datadict[key]) != n:
             raise ValueError("Key %s in datadict has different length than %s" % (key, attr_x))
-    
+
     attr_x_is_string = any([type(val)==str for val in datadict[attr_x]])
     if attr_x_is_string:
-        attr_x_levels = list(set(datadict[attr_x])) # use this to translate between int-indices and x-values
+        attr_x_levels = list(set(datadict[attr_x]))  # use this to translate between int-indices and x-values
         og_x_vals = datadict[attr_x][:]
-        attr_x2 = attr_x + "___" # this key must not already be in datadict.
+        attr_x2 = attr_x + "___"  # this key must not already be in datadict.
         hidden_keys.append(attr_x2)
         datadict[attr_x2] = [attr_x_levels.index(category) for category in og_x_vals] # convert to ints
-    
+
     legend = None
     if attr_color is not None:
-        attr_color_is_string = any([type(val)==str for val in datadict[attr_color]])
+        attr_color_is_string = any([type(val) == str for val in datadict[attr_color]])
         color_datavals = datadict[attr_color]
         if attr_color_is_string:
             attr_color_levels = list(set(color_datavals))
@@ -165,8 +163,8 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
         else:
             color_mapper = LinearColorMapper(palette='Magma256', low=min(datadict[attr_color]), high=max(datadict[attr_color])*1.25)
         default_color = {'field': attr_color, 'transform': color_mapper}
-    
-    if attr_size is not None: # different size for each point, ensure mean-size == point_size
+
+    if attr_size is not None:  # different size for each point, ensure mean-size == point_size
         attr_size2 = attr_size + "____"
         hidden_keys.append(attr_size2)
         og_sizevals = np.array(datadict[attr_size])
@@ -175,20 +173,20 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
             sizevals = -np.min(sizevals) + sizevals + 1.0
         datadict[attr_size2] = list(sizevals)
         point_size = attr_size2
-    
+
     if save_file is not None:
         output_file(save_file, title=plot_title)
         print("Plot summary of models saved to file: %s" % save_file)
-    
+
     source = ColumnDataSource(datadict)
     TOOLS="crosshair,pan,wheel_zoom,box_zoom,reset,hover,save"
     p = figure(title=plot_title, tools=TOOLS)
     if attr_x_is_string:
         circ = p.circle(attr_x2, attr_y, line_color=default_color, line_alpha = point_transparency,
-                fill_color = default_color, fill_alpha=point_transparency, size=point_size, source=source)
+                        fill_color=default_color, fill_alpha=point_transparency, size=point_size, source=source)
     else:
         circ = p.circle(attr_x, attr_y, line_color=default_color, line_alpha = point_transparency,
-                fill_color = default_color, fill_alpha=point_transparency, size=point_size, source=source)
+                        fill_color=default_color, fill_alpha=point_transparency, size=point_size, source=source)
     hover = p.select(dict(type=HoverTool))
     hover.tooltips = OrderedDict([(key,'@'+key+'{safe}') for key in datadict.keys() if key not in hidden_keys])
     # Format axes:
@@ -197,21 +195,24 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
     if attr_x_is_string: # add x-ticks:
         p.xaxis.ticker = list(range(len(attr_x_levels)))
         p.xaxis.major_label_overrides = {i: attr_x_levels[i] for i in range(len(attr_x_levels))}
-    
+
     # Legend additions:
     if attr_color is not None and attr_color_is_string:
         legend_it = []
         for i in range(len(attr_color_levels)):
-            legend_it.append(LegendItem(label=attr_color_levels[i], renderers = [circ], index=datadict[attr_color].index(attr_color_levels[i])))
+            legend_it.append(LegendItem(label=attr_color_levels[i], renderers=[circ], index=datadict[attr_color].index(attr_color_levels[i])))
         legend = Legend(items=legend_it, location=(0, 0))
         p.add_layout(legend, 'right')
-    
-    if attr_color is not None and not attr_color_is_string: 
-        color_bar = ColorBar(color_mapper=color_mapper, title = attr_color, 
+
+    if attr_color is not None and not attr_color_is_string:
+        color_bar = ColorBar(color_mapper=color_mapper, title = attr_color,
                              label_standoff=12, border_line_color=None, location=(0,0))
         p.add_layout(color_bar, 'right')
-    
+
     if attr_size is not None:
         p.add_layout(Legend(items=[LegendItem(label='Size of points based on "'+attr_size + '"')]), 'below')
-    
-    show(p)
+
+    if show_plot:
+        show(p)
+    elif save_file is not None:
+        save(p)

@@ -8,7 +8,7 @@ import pandas as pd
 import psutil
 from collections import defaultdict
 
-from autogluon.core.constants import AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -85,6 +85,10 @@ class AbstractTrainer:
         self._num_cols_train = None
 
         self.is_data_saved = False
+        self._X_saved = False
+        self._y_saved = False
+        self._X_val_saved = False
+        self._y_val_saved = False
 
         self._regress_preds_asprobas = False  # whether to treat regression predictions as class-probabilities (during distillation)
 
@@ -106,48 +110,56 @@ class AbstractTrainer:
         return self.path_utils + 'data' + os.path.sep
 
     def load_X(self):
-        path = self.path_data + 'X.pkl'
-        return load_pkl.load(path=path)
+        if self._X_saved:
+            path = self.path_data + 'X.pkl'
+            return load_pkl.load(path=path)
+        return None
 
     def load_X_val(self):
-        path = self.path_data + 'X_val.pkl'
-        return load_pkl.load(path=path)
+        if self._X_val_saved:
+            path = self.path_data + 'X_val.pkl'
+            return load_pkl.load(path=path)
+        return None
 
     def load_y(self):
-        path = self.path_data + 'y.pkl'
-        return load_pkl.load(path=path)
+        if self._y_saved:
+            path = self.path_data + 'y.pkl'
+            return load_pkl.load(path=path)
+        return None
 
     def load_y_val(self):
-        path = self.path_data + 'y_val.pkl'
-        return load_pkl.load(path=path)
+        if self._y_val_saved:
+            path = self.path_data + 'y_val.pkl'
+            return load_pkl.load(path=path)
+        return None
 
     def load_data(self):
         X = self.load_X()
         y = self.load_y()
-        if not self.bagged_mode:
-            X_val = self.load_X_val()
-            y_val = self.load_y_val()
-        else:
-            X_val = None
-            y_val = None
+        X_val = self.load_X_val()
+        y_val = self.load_y_val()
 
         return X, y, X_val, y_val
 
     def save_X(self, X, verbose=True):
         path = self.path_data + 'X.pkl'
         save_pkl.save(path=path, object=X, verbose=verbose)
+        self._X_saved = True
 
     def save_X_val(self, X, verbose=True):
         path = self.path_data + 'X_val.pkl'
         save_pkl.save(path=path, object=X, verbose=verbose)
+        self._X_val_saved = True
 
     def save_y(self, y, verbose=True):
         path = self.path_data + 'y.pkl'
         save_pkl.save(path=path, object=y, verbose=verbose)
+        self._y_saved = True
 
     def save_y_val(self, y, verbose=True):
         path = self.path_data + 'y_val.pkl'
         save_pkl.save(path=path, object=y, verbose=verbose)
+        self._y_val_saved = True
 
     def get_model_names(self, stack_name: Union[List[str], str] = None, level: Union[List[int], int] = None, can_infer: bool = None, models: List[str] = None) -> List[str]:
         if models is None:
@@ -301,7 +313,7 @@ class AbstractTrainer:
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
                                                 level=level, base_model_names=base_model_names, feature_prune=feature_prune, **core_kwargs)
 
-        if self.bagged_mode:
+        if X_val is None:
             aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
         else:
             aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, base_model_names=core_models, level=level+1, **aux_kwargs)
@@ -310,7 +322,7 @@ class AbstractTrainer:
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=1, base_model_names: List[str] = None, stack_name='core',
                              ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel,
-                             name_suffix: str = None, get_models_func=None, **kwargs) -> List[str]:
+                             name_suffix: str = None, get_models_func=None, refit_full=False, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 1, then the models will use base model predictions as additional features.
@@ -367,11 +379,19 @@ class AbstractTrainer:
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
+        if refit_full and X_val is not None:
+            X_init = pd.concat([X_init, X_val])
+            y = pd.concat([y, y_val])
+            X_val = None
+            y_val = None
         if X_unlabeled is not None:
             X_unlabeled = self.get_inputs_to_stacker(X_unlabeled, base_models=base_model_names, fit=False)
 
+        fit_kwargs = dict(num_classes=self.num_classes)
+
         # FIXME: TODO: v0.1 X_unlabeled isn't cached so it won't be available during refit_full or fit_extra.
-        return self._train_multi(X=X_init, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models, level=level, stack_name=stack_name, **kwargs)
+        return self._train_multi(X=X_init, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
+                                 models=models, level=level, stack_name=stack_name, fit_kwargs=fit_kwargs, **kwargs)
 
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
@@ -577,19 +597,12 @@ class AbstractTrainer:
     def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, X_unlabeled=None, models=None) -> List[str]:
         if X is None:
             X = self.load_X()
-            if X_val is None and not self.bagged_mode:
-                X_val = self.load_X_val()
+        if X_val is None:
+            X_val = self.load_X_val()
         if y is None:
             y = self.load_y()
-            if y_val is None and not self.bagged_mode:
-                y_val = self.load_y_val()
-
-        if X_val is not None and y_val is not None:
-            X_full = pd.concat([X, X_val])
-            y_full = pd.concat([y, y_val])
-        else:
-            X_full = X
-            y_full = y
+        if y_val is None:
+            y_val = self.load_y_val()
 
         if models is None:
             models = self.get_model_names()
@@ -623,7 +636,7 @@ class AbstractTrainer:
                 if issubclass(stacker_type, WeightedEnsembleModel):
                     # TODO: Technically we don't need to re-train the weighted ensemble, we could just copy the original and re-use the weights.
                     w = None
-                    if self.bagged_mode:
+                    if X_val is None:
                         if self.weight_evaluation:
                             X, w = extract_column(X, self.sample_weight)
                         X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True, use_orig_features=False)
@@ -636,14 +649,19 @@ class AbstractTrainer:
                     if w is not None:
                         X_stack_preds[self.sample_weight] = w.values/w.mean()
 
-                    # TODO: Remove child_hyperparameters, make this cleaner
-                    #  This fixes the following: Use the original weighted ensemble's iterations: Currently Dionis spends over 1hr training the refit weighted ensemble because it isn't time limited and goes to 100 iterations.
-                    model_child = model_full._get_model_base()
-                    child_hyperparameters = copy.deepcopy(model_child.params)
-                    child_hyperparameters[AG_ARGS_FIT] = copy.deepcopy(model_child.params_aux)
+                    orig_weights = model._get_model_weights()
+                    base_model_names = list(orig_weights.keys())
+                    weights = list(orig_weights.values())
+
+                    child_hyperparameters = {
+                        AG_ARGS: {'model_type': 'SIMPLE_ENS_WEIGHTED'},
+                        'weights': weights,
+                    }
+
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
                     models_trained = self.generate_weighted_ensemble(X=X_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, k_fold=0, n_repeats=1,
-                                                                     base_model_names=base_model_names, name_suffix=REFIT_FULL_SUFFIX, save_bag_folds=True, check_if_best=False, child_hyperparameters=child_hyperparameters)
+                                                                     base_model_names=base_model_names, name_suffix=REFIT_FULL_SUFFIX, save_bag_folds=True,
+                                                                     check_if_best=False, child_hyperparameters=child_hyperparameters)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
                     for model_weighted_ensemble in models_trained:
                         model_loaded = self.load_model(model_weighted_ensemble)
@@ -652,8 +670,8 @@ class AbstractTrainer:
                         self.set_model_attribute(model=model_weighted_ensemble, attribute='val_score', val=None)
                         self.save_model(model_loaded)
                 else:
-                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME,
-                                                               hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=0, n_repeats=1, ensemble_type=stacker_type)
+                    models_trained = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME,
+                                                               hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=0, n_repeats=1, ensemble_type=stacker_type, refit_full=True)
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
                 for model_trained in models_trained:
@@ -834,7 +852,9 @@ class AbstractTrainer:
             logger.log(30, f'No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.')
         return unpersisted_models
 
-    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None, get_models_func=None) -> List[str]:
+    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None,
+                                   time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None,
+                                   get_models_func=None) -> List[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
         if len(base_model_names) == 0:
@@ -876,7 +896,22 @@ class AbstractTrainer:
         w = None
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)
-        models = self._train_multi(X=X, y=y, X_val=None, y_val=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune_kwargs=None, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit, ens_sample_weight=w)
+        models = self._train_multi(
+            X=X,
+            y=y,
+            X_val=None,
+            y_val=None,
+            models=[weighted_ensemble_model],
+            k_fold=k_fold,
+            n_repeats=n_repeats,
+            hyperparameter_tune_kwargs=None,
+            feature_prune=False,
+            stack_name=stack_name,
+            level=level,
+            time_limit=time_limit,
+            ens_sample_weight=w,
+            fit_kwargs=dict(num_classes=self.num_classes),  # FIXME: Is this the right way to do this?
+        )
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
                 if self.model_best is None:
@@ -894,10 +929,7 @@ class AbstractTrainer:
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        if isinstance(model, BaggedEnsembleModel):
-            model.fit(X=X, y=y, **model_fit_kwargs)
-        else:
-            model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
+        model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
 
     def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, **model_fit_kwargs) -> List[str]:
@@ -934,7 +966,9 @@ class AbstractTrainer:
                 w = None
                 w_val = None
             if isinstance(model, BaggedEnsembleModel):
-                if model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
+                if X_val is not None and y_val is not None:
+                    score = model.score(X=X_val, y=y_val, sample_weight=w_val)
+                elif model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
                     score = model.score_with_oof(y=y, sample_weight=w)
                 else:
                     score = None
@@ -1031,9 +1065,11 @@ class AbstractTrainer:
             type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
             type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
             can_infer=model.can_infer(),
+            can_fit=model.can_fit(),
             is_valid=model.is_valid(),
             stack_name=stack_name,
             level=level,
+            **model._fit_metadata,
         )
         if isinstance(model, StackerEnsembleModel):
             prior_models = self.get_model_names()
@@ -1051,7 +1087,7 @@ class AbstractTrainer:
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False, hyperparameter_tune_kwargs=None,
-                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, **kwargs) -> List[str]:
+                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1061,10 +1097,13 @@ class AbstractTrainer:
             k_fold = self.k_fold
         if n_repeats is None:
             n_repeats = self.n_repeats
+        if fit_kwargs is None:
+            fit_kwargs = dict()
         model_fit_kwargs = dict(
             time_limit=time_limit,
             verbosity=self.verbosity,
         )
+        model_fit_kwargs.update(fit_kwargs)
         if self.sample_weight is not None:
             X, w_train = extract_column(X, self.sample_weight)
             if w_train is not None:  # may be None for ensemble
@@ -1074,7 +1113,7 @@ class AbstractTrainer:
                 X_val, w_val = extract_column(X_val, self.sample_weight)
                 if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
                     model_fit_kwargs['sample_weight_val'] = w_val.values/w_val.mean()
-            ens_sample_weight =  kwargs.get('ens_sample_weight', None)
+            ens_sample_weight = kwargs.get('ens_sample_weight', None)
             if ens_sample_weight is not None:
                 model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
 
@@ -1171,6 +1210,13 @@ class AbstractTrainer:
                     break
             logger.log(20, f'Repeating k-fold bagging: {n+1}/{n_repeats}')
             for i, model in enumerate(models_valid):
+                if not self.get_model_attribute(model=model, attribute='can_fit'):
+                    if isinstance(model, str):
+                        models_valid_next.append(model)
+                    else:
+                        models_valid_next.append(model.name)
+                    continue
+
                 if isinstance(model, str):
                     model = self.load_model(model)
                 if not isinstance(model, BaggedEnsembleModel):
@@ -1304,7 +1350,7 @@ class AbstractTrainer:
                 time_limit = time_limit - (time.time() - time_start)
         else:
             model_names_trained = models
-        if (n_repeats > 1) and self.bagged_mode and (n_repeat_start < n_repeats):
+        if (n_repeats > 1) and (n_repeat_start < n_repeats):
             model_names_trained = self._train_multi_repeats(X=X, y=y, models=model_names_trained,
                                                             k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, time_limit_total_level=time_limit_total_level, **kwargs)
         return model_names_trained
@@ -1917,19 +1963,11 @@ class AbstractTrainer:
             if y is not None:
                 raise ValueError("X cannot be None when y specified.")
             X = self.load_X()
-            if not self.bagged_mode:
-                try:
-                    X_val = self.load_X_val()
-                except FileNotFoundError:
-                    pass
+            X_val = self.load_X_val()
 
         if y is None:
             y = self.load_y()
-            if not self.bagged_mode:
-                try:
-                    y_val = self.load_y_val()
-                except FileNotFoundError:
-                    pass
+            y_val = self.load_y_val()
 
         if X_val is None:
             if y_val is not None:

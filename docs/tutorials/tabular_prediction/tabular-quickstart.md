@@ -1,7 +1,7 @@
 # Predicting a Column in a Table
 :label:`sec_tabularquick`
 
-This tutorial shows the basic usage of AutoGluon to predict a column in a table. To start, let's first import both `TabularPredictor` and `TabularDataset` classes from the `tabular` module. 
+This tutorial shows the basic usage of AutoGluon to predict a column in a table. To start, let's first import both `TabularPredictor` and `TabularDataset` classes from the `tabular` module.
 
 ```{.python .input}
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -19,7 +19,7 @@ train_data = train_data.sample(n=500)
 train_data.head(n=2)
 ```
 
-If you are familiar with [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), you will find `TabularDataset` is a subclass of `DataFrame`, so all pandas functions can be applied to `TabularDataset` directly. 
+If you are familiar with [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), you will find `TabularDataset` is a subclass of `DataFrame`, so all pandas functions can be applied to `TabularDataset` directly.
 
 Using the `head` method we print the first two examples. You can see each feature is either a number or a category presented by a string. The last column, named `class`, contains the label. By describing the label column, we can see it has 2 unique values. So our goal is to predict if the person's income exceeds $50,000 or not.
 
@@ -30,7 +30,7 @@ train_data[label].describe()
 
 ## Training
 
-Now let's train a model on `train_data`. Here we create an instance of `TabularPredictor` with the argument `label` set to be the label column name. Then the `fit` method will automatically train the model. 
+Now let's train a model on `train_data`. Here we create an instance of `TabularPredictor` with the argument `label` set to be the label column name. Then the `fit` method will automatically train the model.
 
 The training will take a few seconds. If you worry about taking too long, you could use the `time_limit` argument to set the maximal time AutoGluon can use for training. For example, `fit(train_data, time_limit=60)` will limit the time to be 1 minute.
 
@@ -41,12 +41,12 @@ predictor = TabularPredictor(label=label).fit(train_data)
 ```
 
 You can find what AutoGluon tried by the log information. Roughly speaking, it does three things:
-    
-1. Identify it's a classification or a regression task based on the label values. 
+
+1. Identify it's a classification or a regression task based on the label values.
 1. Identify the feature column data types and convert them into proper features
 1. Try various machine learning models with different hyper-parameters, and combine them together to form the final model
 
-You can customize every step such as trying a different feature extraction method, machine learning model, or evaluation metric. We will cover them later. 
+You can customize every step such as trying a different feature extraction method, machine learning model, or evaluation metric. We will cover them later.
 
 ## Prediction
 
@@ -60,7 +60,7 @@ y_pred = predictor.predict(test_data_no_label)
 y_pred.head()
 ```
 
-You could use the `evaluate_predictions` method to test the prediction performance. Here we pass `slient=True` to disable AutoGluon to print log. 
+You could use the `evaluate_predictions` method to test the prediction performance. Here we pass `slient=True` to disable AutoGluon to print log.
 
 ```{.python .input}
 predictor.evaluate_predictions(
@@ -69,7 +69,7 @@ predictor.evaluate_predictions(
 
 ## Summary
 
-Now you see how simply AutoGluon it is to predict a column on a tabular dataset. You first load the data via `TabularDataset`, and next call the `fit` method in the `TabularPredictor` to automatically train the model without specifying any other hyper-parameters. Then you can use the `predict` method to predict on new data. In most cases, you can stop read right now and turn to use AutoGluon to solve your own problems. 
+Now you see how simply AutoGluon it is to predict a column on a tabular dataset. You first load the data via `TabularDataset`, and next call the `fit` method in the `TabularPredictor` to automatically train the model without specifying any other hyper-parameters. Then you can use the `predict` method to predict on new data. In most cases, you can stop read right now and turn to use AutoGluon to solve your own problems.
 
 If you want to know about AutoGluon, you can:
 
