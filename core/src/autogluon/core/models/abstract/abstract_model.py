@@ -144,6 +144,8 @@ class AbstractModel:
 
         self.params_trained = dict()
         self._is_initialized = False
+        self._is_fit_metadata_registered = False
+        self._fit_metadata = dict()
 
     def _init_params(self):
         hyperparameters = self._user_params
@@ -181,6 +183,10 @@ class AbstractModel:
     def is_fit(self) -> bool:
         """Returns True if the model has been fit."""
         return self.model is not None
+
+    def can_fit(self) -> bool:
+        """Returns True if the model can be fit."""
+        return not self.is_fit()
 
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
@@ -438,6 +444,21 @@ class AbstractModel:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
         return kwargs
 
+    def _register_fit_metadata(self, **kwargs):
+        """
+        Used to track properties of the inputs received during fit, such as if validation data was present.
+        """
+        if not self._is_fit_metadata_registered:
+            self._fit_metadata = self._compute_fit_metadata(**kwargs)
+            self._is_fit_metadata_registered = True
+
+    def _compute_fit_metadata(self, X_val=None, X_unlabeled=None, **kwargs):
+        fit_metadata = dict(
+            val_in_fit=X_val is not None,
+            unlabeled_in_fit=X_unlabeled is not None
+        )
+        return fit_metadata
+
     def fit(self, **kwargs):
         """
         Fit model to predict values in y based on X.
@@ -493,6 +514,7 @@ class AbstractModel:
         kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
+            self._register_fit_metadata(**kwargs)
             self._fit(**kwargs)
         else:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')

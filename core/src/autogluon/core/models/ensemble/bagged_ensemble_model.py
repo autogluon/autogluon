@@ -84,6 +84,9 @@ class BaggedEnsembleModel(AbstractModel):
     def is_fit(self):
         return len(self.models) != 0
 
+    def can_fit(self) -> bool:
+        return not self.is_fit() or self._bagged_mode
+
     def is_valid_oof(self):
         return self.is_fit() and (self._child_oof or self._bagged_mode)
 
@@ -112,6 +115,8 @@ class BaggedEnsembleModel(AbstractModel):
     def _fit(self,
              X,
              y,
+             X_val=None,
+             y_val=None,
              k_fold=5,
              k_fold_start=0,
              k_fold_end=None,

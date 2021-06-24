@@ -99,10 +99,13 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
         # TODO: pd.Series(['20170204','20170205','20170206']) is incorrectly not detected as datetime_as_object
         #  But we don't want pd.Series(['184','822828','20170206']) to be detected as datetime_as_object
         #  Need some smart logic (check min/max values?, check last 2 values don't go >31?)
-        X.apply(pd.to_numeric)
+        pd.to_numeric(X)
     except:
         try:
-            result = X.apply(pd.to_datetime, errors='coerce')
+            if len(X) > 500:
+                # Sample to speed-up type inference
+                X = X.sample(n=500, random_state=0)
+            result = pd.to_datetime(X, errors='coerce')
             if result.isnull().mean() > 0.8:  # If over 80% of the rows are NaN
                 return False
             return True
@@ -116,6 +119,9 @@ def check_if_nlp_feature(X: Series) -> bool:
     type_family = get_type_family_raw(X.dtype)
     if type_family != 'object':
         return False
+    if len(X) > 5000:
+        # Sample to speed-up type inference
+        X = X.sample(n=5000, random_state=0)
     X_unique = X.unique()
     num_unique = len(X_unique)
     num_rows = len(X)

@@ -522,15 +522,8 @@ class ImagePredictor(object):
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
         y_pred_proba = self._classifier.predict(data, with_proba=True)
-        if isinstance(data, pd.DataFrame) and 'image' in data:
-            index_name = data.index.name
-            if index_name is None:
-                # TODO: This crashes if a feature is already named 'index'.
-                index_name = 'index'
-            idx_to_image_map = data[['image']]
-            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
-            y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
-            y_pred_proba = y_pred_proba.set_index(index_name).rename_axis(None)
+        if isinstance(data, pd.DataFrame):
+            y_pred_proba.index = data.index
         if self._problem_type in [MULTICLASS, BINARY]:
             y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
             ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')

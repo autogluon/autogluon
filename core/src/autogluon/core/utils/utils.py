@@ -5,6 +5,7 @@ import os
 import math
 import pickle
 import time
+import random
 import sys
 from typing import Callable
 from datetime import datetime
@@ -18,6 +19,7 @@ from pandas import DataFrame, Series
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
 from sklearn.model_selection import train_test_split
 
+from .miscs import warning_filter
 from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
 from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
 from ..features.infer_types import get_type_map_raw
@@ -47,7 +49,23 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
             kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
 
         kf.get_n_splits(X, y)
-        return [[train_index, test_index] for train_index, test_index in kf.split(X, y)]
+        # FIXME: There is a bug in sklearn that causes an incorrect ValueError if performing stratification and all classes have fewer than n_splits samples.
+        #  This is hacked by adding a dummy class with n_splits samples, performing the kfold split, then removing the dummy samples from all resulting indices.
+        #  This is very inefficient and complicated and ideally should be fixed in sklearn.
+        with warning_filter():
+            try:
+                out = [[train_index, test_index] for train_index, test_index in kf.split(X, y)]
+            except:
+                y_dummy = pd.concat([y, pd.Series([-1] * n_splits)], ignore_index=True)
+                X_dummy = pd.concat([X, X.head(n_splits)], ignore_index=True)
+                invalid_index = set(list(y_dummy.tail(n_splits).index))
+                out = [[train_index, test_index] for train_index, test_index in kf.split(X_dummy, y_dummy)]
+                len_out = len(out)
+                for i in range(len_out):
+                    train_index, test_index = out[i]
+                    out[i][0] = [index for index in train_index if index not in invalid_index]
+                    out[i][1] = [index for index in test_index if index not in invalid_index]
+        return out
     else:
         if n_repeats > 1:
             kf = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
@@ -240,13 +258,21 @@ def augment_rare_classes(X, label, threshold):
             new_df = new_df.append(clss_df.copy())
         aug_df = aug_df.append(new_df.copy())
 
+    # Ensure new samples generated via augmentation have unique indices
+    aug_df = aug_df.reset_index(drop=True)
+    aug_df_len = len(aug_df)
+    X_index_aug_start = X.index.max() + 1
+    aug_index = [X_index_aug_start + i for i in range(aug_df_len)]
+    aug_df.index = aug_index
+
+    logger.log(20, f"Duplicated {len(aug_df)} samples from {len(class_counts_invalid)} rare classes in training set because eval_metric requires all classes have at least {threshold} samples.")
+
     X = X.append(aug_df)
     class_counts = X[label].value_counts()
     class_counts_invalid = class_counts[class_counts < threshold]
     class_counts_invalid = class_counts_invalid[~class_counts_invalid.index.isin(set(missing_classes))]
     if len(class_counts_invalid) > 0:
         raise RuntimeError("augment_rare_classes failed to produce enough data from rare classes")
-    logger.log(15, "Replicated some data from rare classes in training set because eval_metric requires all classes")
     return X
 
 
@@ -273,26 +299,82 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     return y_pred
 
 
-def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_size: float = 0.1, random_state=0) -> (DataFrame, DataFrame, Series, Series):
+def generate_train_test_split(X: DataFrame,
+                              y: Series,
+                              problem_type: str,
+                              test_size: float = 0.1,
+                              random_state=0,
+                              min_cls_count_train=1) -> (DataFrame, DataFrame, Series, Series):
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
 
-    if problem_type in [REGRESSION, QUANTILE, SOFTCLASS]:
-        stratify = None
-    else:
+    X_split = X
+    y_split = y
+    if problem_type in [BINARY, MULTICLASS]:
         stratify = y
+    else:
+        stratify = None
 
-    # TODO: Enable stratified split when y class would result in 0 samples in test.
-    #  One approach: extract low frequency classes from X/y, add back (1-test_size)% to X_train, y_train, rest to X_test
-    #  Essentially stratify the high frequency classes, random the low frequency (While ensuring at least 1 example stays for each low frequency in train!)
-    #  Alternatively, don't test low frequency at all, trust it to work in train set. Risky, but highest quality for predictions.
-    X_train, X_test, y_train, y_test = train_test_split(X, y.values, test_size=test_size, shuffle=True, random_state=random_state, stratify=stratify)
+    # This code block is necessary to avoid crashing when performing a stratified split and only 1 sample exists for a class.
+    # This code will ensure that the sample will be part of the train split, meaning the test split will have 0 samples of the rare class.
+    rare_indices = None
+    if stratify is not None:
+        cls_counts = y.value_counts()
+        cls_counts_invalid = cls_counts[cls_counts < min_cls_count_train]
+
+        if len(cls_counts_invalid) > 0:
+            logger.error(f'ERROR: Classes have too few samples to split the data! At least {min_cls_count_train} are required.')
+            logger.error(cls_counts_invalid)
+            raise AssertionError('Not enough data to split data into train and val without dropping classes!')
+        elif min_cls_count_train < 2:
+            cls_counts_rare = cls_counts[cls_counts < 2]
+            if len(cls_counts_rare) > 0:
+                cls_counts_rare_val = set(cls_counts_rare.index)
+                y_rare = y[y.isin(cls_counts_rare_val)]
+                rare_indices = list(y_rare.index)
+                X_split = X.drop(index=rare_indices)
+                y_split = y.drop(index=rare_indices)
+                stratify = y_split
+
+    X_train, X_test, y_train, y_test = train_test_split(X_split, y_split.values, test_size=test_size, shuffle=True, random_state=random_state, stratify=stratify)
     if problem_type != SOFTCLASS:
         y_train = pd.Series(y_train, index=X_train.index)
         y_test = pd.Series(y_test, index=X_test.index)
     else:
         y_train = pd.DataFrame(y_train, index=X_train.index)
         y_test = pd.DataFrame(y_test, index=X_test.index)
+
+    if rare_indices:
+        X_train = X_train.append(X.loc[rare_indices])
+        y_train = y_train.append(y.loc[rare_indices])
+
+    if problem_type in [BINARY, MULTICLASS]:
+        class_counts_dict_orig = y.value_counts().to_dict()
+        class_counts_dict = y_train.value_counts().to_dict()
+        class_counts_dict_test = y_test.value_counts().to_dict()
+
+        indices_to_move = []
+        random_state_init = random.getstate()
+        random.seed(random_state)
+        for cls in class_counts_dict_orig.keys():
+            count = class_counts_dict.get(cls, 0)
+            if count >= min_cls_count_train:
+                continue
+            count_test = class_counts_dict_test.get(cls, 0)
+            if count + count_test < min_cls_count_train:
+                raise AssertionError('Not enough data to split data into train and val without dropping classes!')
+            count_to_move = min_cls_count_train - count
+            indices_of_cls_test = list(y_test[y_test == cls].index)
+            indices_to_move_cls = random.sample(indices_of_cls_test, count_to_move)
+            indices_to_move += indices_to_move_cls
+        random.setstate(random_state_init)
+        if indices_to_move:
+            y_test_moved = y_test.loc[indices_to_move].copy()
+            X_test_moved = X_test.loc[indices_to_move].copy()
+            y_train = pd.concat([y_train, y_test_moved])
+            X_train = pd.concat([X_train, X_test_moved])
+            y_test = y_test.drop(index=indices_to_move)
+            X_test = X_test.drop(index=indices_to_move)
     return X_train, X_test, y_train, y_test
 
 
