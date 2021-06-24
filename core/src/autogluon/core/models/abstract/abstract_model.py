@@ -582,19 +582,21 @@ class AbstractModel:
                 else:
                     break
         finally:
-            # hack: replace current model's contents with the best model's content
-            # alternatively, we can return the best or a list of fitted models
+            # We can alternatively return a list of fitted models
             if len(fitted_copies_info) > 0:
                 best_model_path = fitted_copies_info[best_index][1]
                 best_model = self.load(best_model_path)
-                original_model_path = self.path
-                self.__dict__.update(best_model.__dict__)
-                self.path = original_model_path
+                # original_model_path = self.path
+                # self.__dict__.update(best_model.__dict__)
+                # self.path = original_model_path
+            else:
+                best_model = self
             # Cleanup saved models
             for info in fitted_copies_info:
                 tmp_model = AbstractModel.load(info[1])
                 tmp_model.delete_from_disk()
-            logger.log(20, f"\tFinal Features: {self.features}")
+            logger.log(20, f"\tFinal Features: {best_model.features}")
+            return best_model
 
     def _fit(self,
              X,

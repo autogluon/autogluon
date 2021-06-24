@@ -931,8 +931,8 @@ class AbstractTrainer:
         Returns trained model object.
         """
         if 'fit_with_prune' in model_fit_kwargs and model_fit_kwargs['fit_with_prune'] is not None:
-            # only available for non-ensemble models
-            model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs['fit_with_prune'], **model_fit_kwargs)
+            # This method trains a multiple copy of models and returns the best performing one
+            model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs['fit_with_prune'], **model_fit_kwargs)
         else:
             model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
@@ -1109,11 +1109,7 @@ class AbstractTrainer:
             fit_with_prune=kwargs['fit_with_prune'] if 'fit_with_prune' in kwargs else None,
             verbosity=self.verbosity,
         )
-<<<<<<< HEAD
-
-=======
         model_fit_kwargs.update(fit_kwargs)
->>>>>>> master
         if self.sample_weight is not None:
             X, w_train = extract_column(X, self.sample_weight)
             if w_train is not None:  # may be None for ensemble
