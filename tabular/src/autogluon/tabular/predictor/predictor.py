@@ -644,7 +644,6 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
-        fit_with_prune = kwargs['fit_with_prune']
 
         if ag_args is None:
             ag_args = {}
@@ -703,7 +702,6 @@ class TabularPredictor:
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
             'excluded_model_types': excluded_model_types,
-            'fit_with_prune': fit_with_prune
         }
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
@@ -2207,8 +2205,7 @@ class TabularPredictor:
             # other
             feature_generator='auto',
             unlabeled_data=None,
-            _feature_generator_kwargs=None,
-            fit_with_prune=False
+            _feature_generator_kwargs=None
         )
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))

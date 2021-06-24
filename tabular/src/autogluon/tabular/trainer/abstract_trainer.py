@@ -363,6 +363,7 @@ class AbstractTrainer:
                     for model_name in model_args_fit if 'hyperparameter_tune_kwargs' in model_args_fit[model_name]
                 }
                 kwargs['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
+            kwargs['fit_with_prune'] = ag_args['fit_with_prune'] if 'fit_with_prune' in ag_args else None
         logger.log(20, f'Fitting {len(models)} L{level} models ...')
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
@@ -896,9 +897,9 @@ class AbstractTrainer:
         """
         if isinstance(model, BaggedEnsembleModel):
             model.fit(X=X, y=y, **model_fit_kwargs)
-        elif 'fit_with_prune' in model_fit_kwargs and model_fit_kwargs['fit_with_prune']:
+        elif 'fit_with_prune' in model_fit_kwargs and model_fit_kwargs['fit_with_prune'] is not None:
             # only available for non-ensemble models
-            model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
+            model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs['fit_with_prune'], **model_fit_kwargs)
         else:
             model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
@@ -1066,7 +1067,7 @@ class AbstractTrainer:
             n_repeats = self.n_repeats
         model_fit_kwargs = dict(
             time_limit=time_limit,
-            fit_with_prune=kwargs['fit_with_prune'] if 'fit_with_prune' in kwargs else False,
+            fit_with_prune=kwargs['fit_with_prune'] if 'fit_with_prune' in kwargs else None,
             verbosity=self.verbosity,
         )
 
