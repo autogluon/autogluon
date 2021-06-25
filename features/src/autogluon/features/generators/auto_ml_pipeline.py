@@ -6,6 +6,7 @@ from .pipeline import PipelineFeatureGenerator
 from .category import CategoryFeatureGenerator
 from .datetime import DatetimeFeatureGenerator
 from .identity import IdentityFeatureGenerator
+from .isnan import IsNanFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
 
@@ -119,6 +120,9 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(TextNgramFeatureGenerator(vectorizer=vectorizer, **self.text_ngram_params))
         if self.enable_vision_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(
+                valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_PATH],
+            )))
+            generator_group.append(IsNanFeatureGenerator(infer_features_in_args=dict(
                 valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_PATH],
             )))
         generators = [generator_group]
