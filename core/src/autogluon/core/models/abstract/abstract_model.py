@@ -539,61 +539,73 @@ class AbstractModel:
         TODO
         1. Respect time limit
         2. Consider returning list of models
+        3. If self.weight_evaluation==True pass sample_weight param for scoring
 
         FIXME
         1. Does not work with S3 paths (no problem locally)
         """
-        if X_val is None or y_val is None:
-            raise AssertionError(f'fit_with_prune must be called with validation data.')
+        logger.log(20, f"Using Iterative Feature Pruning with following parameters")
+        logger.log(20, f"max_num_fit: {max_num_fit}, prune_threshold: {prune_threshold}, " +
+                       f"stop_threshold: {stop_threshold}, num_shuffle_sets: {num_shuffle_sets}")
 
+        is_oof = X_val is None or y_val is None
         best_score = None
         best_index = None
         fitted_copies_info = []
         current_features = None
+        self_copy = None
         try:
             for index in range(max_num_fit):
                 # Fit a deepcopied model on current_features
-                curr_model_path = os.path.join(self.path, f'prune_{index}', '')
                 self_copy = self.convert_to_template()
+                self_copy.rename(f'{self.name}_P{index}')
                 self_copy.features = current_features
-                self_copy.path = curr_model_path
                 self_copy.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
                 self_copy.save()
 
-                score = self_copy.score(X=X_val, y=y_val)
-                fitted_copies_info.append((score, curr_model_path))
+                # Score new model and decide whether to continue refitting
+                if is_oof:
+                    score = self_copy.score_with_oof(y)
+                    X_fi, y_fi = X, y
+                else:
+                    score = self_copy.score(X=X_val, y=y_val)
+                    X_fi, y_fi = X_val, y_val
+                fitted_copies_info.append((round(score, 4), self_copy.path))
                 if best_score is None or score >= best_score:
-                    logger.log(20, f"\tFit {index+1}: Current score {score} is better than best score {best_score}.")
+                    if best_score is None:
+                        logger.log(20, f"\tFit {index+1}: Current score is {score}")
+                    else:
+                        logger.log(20, f"\tFit {index+1}: Current score {score} is not worse than best score {best_score}.")
                     best_score = score
                     best_index = index
-                if index - best_index == stop_threshold:
+                if index - best_index >= stop_threshold:
                     logger.log(20, f"\tEnding prune loop after {index+1} iterations. Best score: {best_score}")
                     break
 
                 # compute all feature importance and remove ones that don't meet the threshold
-                importance_df = self_copy.compute_feature_importance(X=X_val, y=y_val, num_shuffle_sets=num_shuffle_sets)
+                importance_df = self_copy.compute_feature_importance(X=X_fi, y=y_fi, num_shuffle_sets=num_shuffle_sets)
                 cols_to_drop_df = importance_df[importance_df['importance'] <= prune_threshold]
                 cols_to_drop = list(cols_to_drop_df.index)
-                cols_to_drop_importance = list(cols_to_drop_df['importance'])
+                cols_to_drop_importance = list(map(lambda importance: round(importance, 4), cols_to_drop_df['importance']))
                 if 0 < len(cols_to_drop) < len(self_copy.features):
                     logger.log(20, f"\tWill try fit after pruning these columns that failed to meet importance threshold {prune_threshold}:")
                     logger.log(20, f"\t{list(zip(cols_to_drop, cols_to_drop_importance))}")
                     current_features = [feat for feat in self_copy.features if feat not in cols_to_drop]
                 else:
+                    logger.log(20, f"\tNo columns to drop. Ending prune loop after {index+1} iterations. Best score: {best_score}")
                     break
         finally:
             # We can alternatively return a list of fitted models
             if len(fitted_copies_info) > 0:
                 best_model_path = fitted_copies_info[best_index][1]
-                best_model = self.load(best_model_path)
-                # original_model_path = self.path
-                # self.__dict__.update(best_model.__dict__)
-                # self.path = original_model_path
+                best_model = self.__class__.load(best_model_path)
             else:
-                best_model = self
-            # Cleanup saved models
-            for info in fitted_copies_info:
-                tmp_model = AbstractModel.load(info[1])
+                best_model = self_copy
+            # Cleanup saved models (keep best model if current model is a bagged model)
+            for index, info in enumerate(fitted_copies_info):
+                if index == best_index and is_oof:
+                    continue
+                tmp_model = self.__class__.load(info[1])
                 tmp_model.delete_from_disk()
             logger.log(20, f"\tFinal Features: {best_model.features}")
             return best_model

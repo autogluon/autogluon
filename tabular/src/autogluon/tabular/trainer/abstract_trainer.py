@@ -375,10 +375,11 @@ class AbstractTrainer:
                     for model_name in model_args_fit if 'hyperparameter_tune_kwargs' in model_args_fit[model_name]
                 }
                 kwargs['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
-            if ag_args and 'fit_with_prune' in ag_args:
-                kwargs['fit_with_prune'] = ag_args['fit_with_prune']
-            else:
-                kwargs['fit_with_prune'] = None
+                fit_with_prune_kwargs = {
+                    model_name: model_args_fit[model_name]['fit_with_prune']
+                    for model_name in model_args_fit if 'fit_with_prune' in model_args_fit[model_name]
+                }
+                kwargs['fit_with_prune_kwargs'] = fit_with_prune_kwargs
         logger.log(20, f'Fitting {len(models)} L{level} models ...')
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
@@ -933,9 +934,10 @@ class AbstractTrainer:
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        if 'fit_with_prune' in model_fit_kwargs and model_fit_kwargs['fit_with_prune'] is not None:
+        if model_fit_kwargs.get('fit_with_prune_kwargs', None) is not None:
             # This method trains a multiple copy of models and returns the best performing one
-            model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs['fit_with_prune'], **model_fit_kwargs)
+            fit_with_prune_kwargs = model_fit_kwargs.pop('fit_with_prune_kwargs')
+            model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **fit_with_prune_kwargs, **model_fit_kwargs)
         else:
             model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
@@ -1096,7 +1098,7 @@ class AbstractTrainer:
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False, hyperparameter_tune_kwargs=None,
                            stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None,
-                           fit_with_prune=None, **kwargs) -> List[str]:
+                           fit_with_prune_kwargs=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1110,7 +1112,6 @@ class AbstractTrainer:
             fit_kwargs = dict()
         model_fit_kwargs = dict(
             time_limit=time_limit,
-            fit_with_prune=fit_with_prune,
             verbosity=self.verbosity,
         )
         model_fit_kwargs.update(fit_kwargs)
@@ -1126,6 +1127,8 @@ class AbstractTrainer:
             ens_sample_weight = kwargs.get('ens_sample_weight', None)
             if ens_sample_weight is not None:
                 model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
+        if fit_with_prune_kwargs:
+            model_fit_kwargs['fit_with_prune_kwargs'] = fit_with_prune_kwargs
 
         #######################
         # FIXME: This section is a hack, compute genuine feature_metadata for each stack level instead
@@ -1291,7 +1294,7 @@ class AbstractTrainer:
     # TODO: Add time_limit_per_model
     # TODO: Rename for v0.1
     def _train_multi_fold(self, X, y, models: List[AbstractModel], time_limit=None, time_split=False,
-                          time_ratio=1, hyperparameter_tune_kwargs=None, **kwargs) -> List[str]:
+                          time_ratio=1, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=None, **kwargs) -> List[str]:
         """
         Trains and saves a list of models sequentially.
         This method should only be called in self._train_multi_initial
@@ -1314,6 +1317,10 @@ class AbstractTrainer:
                 hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name, None)
             else:
                 hyperparameter_tune_kwargs_model = None
+            if type(fit_with_prune_kwargs) is dict:
+                fit_with_prune_kwargs_model = fit_with_prune_kwargs.get(model.name, None)
+            else:
+                fit_with_prune_kwargs_model = None
             # TODO: Only update scores when finished, only update model as part of final models if finished!
             if time_split:
                 time_left = time_limit_model_split
@@ -1324,7 +1331,8 @@ class AbstractTrainer:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
             model_name_trained_lst = self._train_single_full(X, y, model, time_limit=time_left,
-                                                             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs)
+                                                             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model,
+                                                             fit_with_prune_kwargs=fit_with_prune_kwargs_model, **kwargs)
 
             if self.low_memory:
                 del model
