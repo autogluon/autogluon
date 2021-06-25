@@ -4,9 +4,10 @@ import logging
 import os
 import pickle
 
+import numpy as np
 import pandas as pd
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 from autogluon.core.features.types import R_OBJECT, S_IMAGE_PATH
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import get_cpu_count, get_gpu_count, try_import_mxnet, try_import_autogluon_vision
@@ -31,6 +32,7 @@ class ImagePredictorModel(AbstractModel):
         self._load_model = None
 
         self._internal_feature_map = None
+        self._dummy_pred_proba = None  # Dummy value to predict if image is NaN
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
@@ -99,6 +101,23 @@ class ImagePredictorModel(AbstractModel):
         if X_val is not None:
             X_val[self._label_column_name] = y_val
 
+        null_indices = X['image'] == ''
+
+        # TODO: Consider some kind of weighting of the two options so there isn't a harsh cutoff at 50
+        # FIXME: What if all rows in a class are null? Will probably crash.
+        if null_indices.sum() > 50:
+            self._dummy_pred_proba = self._compute_dummy_pred_proba(y[null_indices])  # FIXME: Do this one for better results
+        else:
+            # Not enough null to get a confident estimate of null label average, instead use all data average
+            self._dummy_pred_proba = self._compute_dummy_pred_proba(y)
+
+        if null_indices.sum() > 0:
+            X = X[~null_indices]
+        if X_val is not None:
+            null_indices_val = X_val['image'] == ''
+            if null_indices_val.sum() > 0:
+                X_val = X_val[~null_indices_val]
+
         verbosity_image = max(0, verbosity - 1)
         root_logger = logging.getLogger()
         root_log_level = root_logger.level
@@ -127,8 +146,43 @@ class ImagePredictorModel(AbstractModel):
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
-        y_pred_proba = self.model.predict_proba(X, as_pandas=False)
+        # TODO: Add option to crash if null is present for faster predict_proba
+        null_indices = X['image'] == ''
+        if null_indices.sum() > 0:
+            if self.num_classes is None:
+                y_pred_proba = np.zeros(len(X))
+            else:
+                y_pred_proba = np.zeros((len(X), self.num_classes))
+            X = X.reset_index(drop=True)
+            null_indices = X['image'] == ''
+            X = X[~null_indices]
+            null_indices_rows = list(null_indices[null_indices].index)
+            non_null_indices_rows = list(null_indices[~null_indices].index)
+            y_pred_proba[null_indices_rows] = self._dummy_pred_proba
+            y_pred_proba[non_null_indices_rows] = self.model.predict_proba(X, as_pandas=False)
+        else:
+            y_pred_proba = self.model.predict_proba(X, as_pandas=False)
         return self._convert_proba_to_unified_form(y_pred_proba)
+
+    # TODO: Consider moving to AbstractModel or as a separate function
+    # TODO: Test softclass
+    def _compute_dummy_pred_proba(self, y):
+        num_classes = self.num_classes
+        if self.problem_type in [BINARY, MULTICLASS]:
+            dummies = pd.get_dummies(y)
+            dummy_columns = set(list(dummies.columns))
+            if len(dummies.columns) < num_classes:
+                for c in range(num_classes):
+                    if c not in dummy_columns:
+                        dummies[c] = 0
+            dummies = dummies[list(range(num_classes))]
+            pred_proba_mean = dummies.mean().values
+
+        elif self.problem_type in [REGRESSION, QUANTILE, SOFTCLASS]:
+            pred_proba_mean = y.mean()
+        else:
+            raise NotImplementedError(f'Computing dummy pred_proba is not implemented for {self.problem_type}.')
+        return pred_proba_mean
 
     def _get_default_searchspace(self):
         try_import_autogluon_vision()
