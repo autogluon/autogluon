@@ -376,8 +376,8 @@ class AbstractTrainer:
                 }
                 kwargs['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
                 fit_with_prune_kwargs = {
-                    model_name: model_args_fit[model_name]['fit_with_prune']
-                    for model_name in model_args_fit if 'fit_with_prune' in model_args_fit[model_name]
+                    model_name: model_args_fit[model_name]['fit_with_prune_kwargs']
+                    for model_name in model_args_fit if 'fit_with_prune_kwargs' in model_args_fit[model_name]
                 }
                 kwargs['fit_with_prune_kwargs'] = fit_with_prune_kwargs
         logger.log(20, f'Fitting {len(models)} L{level} models ...')

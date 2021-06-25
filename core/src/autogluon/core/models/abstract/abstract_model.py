@@ -520,7 +520,7 @@ class AbstractModel:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
 
-    def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_threshold=0., stop_threshold=3, num_shuffle_sets=3, **kwargs):
+    def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_threshold=0., stop_threshold=1, num_shuffle_sets=1, **kwargs):
         """
         Functionally identical to `fit` method, but repeats feature importance based pruning until
         validation set performance degrades or `max_num_fit` iterations have passed.
@@ -566,12 +566,10 @@ class AbstractModel:
                 # Score new model and decide whether to continue refitting
                 if is_oof:
                     score = self_copy.score_with_oof(y)
-                    X_fi, y_fi = X, y
                 else:
                     score = self_copy.score(X=X_val, y=y_val)
-                    X_fi, y_fi = X_val, y_val
                 fitted_copies_info.append((round(score, 4), self_copy.path))
-                if best_score is None or score >= best_score:
+                if best_score is None or score > best_score:
                     if best_score is None:
                         logger.log(20, f"\tFit {index+1}: Current score is {score}")
                     else:
@@ -583,7 +581,10 @@ class AbstractModel:
                     break
 
                 # compute all feature importance and remove ones that don't meet the threshold
-                importance_df = self_copy.compute_feature_importance(X=X_fi, y=y_fi, num_shuffle_sets=num_shuffle_sets)
+                if is_oof:
+                    importance_df = self_copy.compute_feature_importance(X=X_val, y=y_val, num_shuffle_sets=num_shuffle_sets, is_oof=True)
+                else:
+                    importance_df = self_copy.compute_feature_importance(X=X_val, y=y_val, num_shuffle_sets=num_shuffle_sets)
                 cols_to_drop_df = importance_df[importance_df['importance'] <= prune_threshold]
                 cols_to_drop = list(cols_to_drop_df.index)
                 cols_to_drop_importance = list(map(lambda importance: round(importance, 4), cols_to_drop_df['importance']))
