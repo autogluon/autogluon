@@ -28,17 +28,17 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     # TODO: consider returning self._transform(X) if we allow users to specify real dtypes as input
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
-        update_dtypes = False
         feature_type_raw_cur_dict = get_type_map_raw(X)
+        feature_map_to_update = dict()
         for feature in self.features_in:
             feature_type_raw = self.feature_metadata_in.get_feature_type_raw(feature)
             feature_type_raw_cur = feature_type_raw_cur_dict[feature]
             if feature_type_raw != feature_type_raw_cur:
                 self._log(30, f'\tWARNING: Actual dtype differs from dtype in FeatureMetadata for feature "{feature}". Actual dtype: {feature_type_raw_cur} | Expected dtype: {feature_type_raw}')
-                update_dtypes = True
-        if update_dtypes:
+                feature_map_to_update[feature] = feature_type_raw
+        if feature_map_to_update:
             self._log(30, f'\tWARNING: Forcefully converting features to expected dtypes. Please manually align the input data with the expected dtypes if issues occur.')
-            X = X.astype(self.feature_metadata_in.type_map_raw)
+            X = X.astype(feature_map_to_update)
         self._int_features = np.array(self.feature_metadata_in.get_features(valid_raw_types=[R_INT]))
         return X, self.feature_metadata_in.type_group_map_special
 
