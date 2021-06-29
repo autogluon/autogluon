@@ -471,10 +471,16 @@ class TabularPredictor:
                 Disabled by default (0), but we recommend values between 1-3 to maximize predictive performance.
                 To prevent overfitting, `num_bag_folds >= 2` must also be set or else a ValueError will be raised.
             holdout_frac : float, default = None
-                Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bag_folds != 0`).
+                Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bag_folds != 0` unless `use_bag_holdout == True`).
                 Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
                 Default value is doubled if `hyperparameter_tune_kwargs` is set, up to a maximum of 0.2.
-                Disabled if `num_bag_folds >= 2`.
+                Disabled if `num_bag_folds >= 2` unless `use_bag_holdout == True`.
+            use_bag_holdout : bool, default = False
+                If True, a `holdout_frac` portion of the data is held-out from model bagging.
+                This held-out data is only used to score models and determine weighted ensemble weights.
+                Enable this if there is a large gap between score_val and score_test in stack models.
+                Note: If `tuning_data` was specified, `tuning_data` is used as the holdout data.
+                Disabled if not bagging.
             hyperparameter_tune_kwargs : str or dict, default = None
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
@@ -644,6 +650,7 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
+        use_bag_holdout = kwargs['use_bag_holdout']
 
         if ag_args is None:
             ag_args = {}
@@ -1092,7 +1099,7 @@ class TabularPredictor:
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, silent=silent)
 
-    def fit_summary(self, verbosity=3):
+    def fit_summary(self, verbosity=3, show_plot=False):
         """
         Output summary of information about models produced during `fit()`.
         May create various generated summary plots and store them in folder: `predictor.path`.
@@ -1100,9 +1107,11 @@ class TabularPredictor:
         Parameters
         ----------
         verbosity : int, default = 3
-            Controls how detailed of a summary to ouput.
+            Controls how detailed of a summary to output.
             Set <= 0 for no output printing, 1 to print just high-level summary,
             2 to print summary and create plots, >= 3 to print all information produced during `fit()`.
+        show_plot : bool, default = False
+            If True, shows the model summary plot in browser when verbosity > 1.
 
         Returns
         -------
@@ -1179,18 +1188,19 @@ class TabularPredictor:
         if verbosity > 1:  # create plots
             plot_tabular_models(results, output_directory=self.path,
                                 save_file="SummaryOfModels.html",
-                                plot_title="Models produced during fit()")
+                                plot_title="Models produced during fit()",
+                                show_plot=show_plot)
             if hpo_used:
                 for model_type in results['hpo_results']:
                     if 'trial_info' in results['hpo_results'][model_type]:
                         plot_summary_of_models(
                             results['hpo_results'][model_type],
                             output_directory=self.path, save_file=model_type + "_HPOmodelsummary.html",
-                            plot_title=f"Models produced during {model_type} HPO")
+                            plot_title=f"Models produced during {model_type} HPO", show_plot=show_plot)
                         plot_performance_vs_trials(
                             results['hpo_results'][model_type],
                             output_directory=self.path, save_file=model_type + "_HPOperformanceVStrials.png",
-                            plot_title=f"HPO trials for {model_type} models")
+                            plot_title=f"HPO trials for {model_type} models", show_plot=show_plot)
         if verbosity > 2:  # print detailed information
             if hpo_used:
                 hpo_results = results['hpo_results']
@@ -1712,10 +1722,16 @@ class TabularPredictor:
         -------
         :class:`pd.Series` or :class:`pd.DataFrame` object of the out-of-fold training prediction probabilities of the model.
         """
-        if not self._trainer.bagged_mode:
-            raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
         if model is None:
             model = self.get_model_best()
+        if not self._trainer.bagged_mode:
+            raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
+        if model in self._trainer._model_full_dict_val_score:
+            # FIXME: This is a hack, add refit tag in a nicer way than via the _model_full_dict_val_score
+            # TODO: bagged-with-holdout refit to bagged-no-holdout should still be able to return out-of-fold predictions
+            raise AssertionError('_FULL models do not have out-of-fold predictions.')
+        if self._trainer.get_model_attribute_full(model=model, attribute='val_in_fit', func=max):
+            raise AssertionError(f'Model {model} does not have out-of-fold predictions because it used a validation set during training.')
         y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
         if not internal_oof:
             is_duplicate_index = y_pred_proba_oof_transformed.index.duplicated(keep='first')
@@ -2208,6 +2224,7 @@ class TabularPredictor:
             holdout_frac=None,  # TODO: Potentially error if num_bag_folds is also specified
             num_bag_folds=None,  # TODO: Potentially move to fit_extra, raise exception if value too large / invalid in fit_extra.
             auto_stack=False,
+            use_bag_holdout=False,
 
             # other
             feature_generator='auto',

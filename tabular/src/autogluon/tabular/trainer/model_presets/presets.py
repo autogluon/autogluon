@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from autogluon.core.metrics import mean_squared_error
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
-from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel
+from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel, SimpleWeightedEnsembleModel
 
 from .presets_custom import get_preset_custom
 from ..utils import process_hyperparameters
@@ -69,6 +69,7 @@ MODEL_TYPES = dict(
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
     QUANTILE_AGGR=TabularQuantileAggregatorModel,
+    SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
 )
 
 DEFAULT_MODEL_NAMES = {
@@ -88,6 +89,7 @@ DEFAULT_MODEL_NAMES = {
     FastTextModel: 'FastText',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
     TabularQuantileAggregatorModel: 'QuantileAggregator',
+    SimpleWeightedEnsembleModel: 'WeightedEnsemble',
 }
 
 

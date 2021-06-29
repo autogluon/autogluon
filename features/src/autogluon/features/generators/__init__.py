@@ -9,6 +9,7 @@ from .drop_unique import DropUniqueFeatureGenerator
 from .dummy import DummyFeatureGenerator
 from .fillna import FillNaFeatureGenerator
 from .identity import IdentityFeatureGenerator
+from .isnan import IsNanFeatureGenerator
 from .label_encoder import LabelEncoderFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator, NumericMemoryMinimizeFeatureGenerator
 from .rename import RenameFeatureGenerator

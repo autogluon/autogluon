@@ -5,11 +5,13 @@ import pandas as pd
 import numpy as np
 import copy
 
+
 def test_task():
     dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     model_list = Task.list_models()
     classifier = Task()
     classifier.fit(dataset, num_trials=2, hyperparameters={'epochs': 1, 'early_stop_patience': 3})
+    assert classifier.fit_summary()['valid_acc'] > 0.1, 'valid_acc is abnormal'
     test_result = classifier.predict(test_dataset)
     single_test = classifier.predict(test_dataset.iloc[0]['image'])
     single_proba = classifier.predict_proba(test_dataset.iloc[0]['image'])
@@ -33,6 +35,7 @@ def test_task():
     single_test2_numpy = classifier2.predict(test_dataset.iloc[0]['image'], as_pandas=False)
     assert np.array_equal(single_test2.to_numpy(), single_test2_numpy)
 
+
 def test_task_label_remap():
     ImagePredictor = Task
     train_dataset, _, test_dataset = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
@@ -54,6 +57,7 @@ def test_task_label_remap():
     score_log_loss = log_loss(y_true=test_dataset['label'].replace(label_remap_inverse), y_pred=pred_proba.to_numpy())
     assert score_accuracy > 0.2  # relax
 
+
 def test_invalid_image_dataset():
     ImagePredictor = Task
     invalid_test = ag.download('https://autogluon.s3-us-west-2.amazonaws.com/miscs/test_autogluon_invalid_dataset.zip')
@@ -61,3 +65,11 @@ def test_invalid_image_dataset():
     df = ImagePredictor.Dataset.from_csv(os.path.join(invalid_test, 'train.csv'), root=os.path.join(invalid_test, 'train_images'))
     predictor = ImagePredictor(label="labels")
     predictor.fit(df, df.copy(), time_limit=60)
+
+
+def test_image_predictor_presets():
+    ImagePredictor = Task
+    train_dataset, _, test_dataset = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+    for preset in ['medium_quality_faster_train', 'medium_quality_faster_inference']:
+        predictor = ImagePredictor()
+        predictor.fit(train_dataset,tuning_data=test_dataset, presets=[preset], time_limit=60, hyperparameters={'epochs':1})

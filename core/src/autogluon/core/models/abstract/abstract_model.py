@@ -114,9 +114,9 @@ class AbstractModel:
 
         self.features = None  # External features, do not use internally
         self.feature_metadata = None  # External feature metadata, do not use internally
-        self._features = None  # Internal features, safe to use internally
-        self._feature_metadata = None  # Internal feature metadata, safe to use interally
-        self._is_features_in_same_as_ex = None  # Whether self.features == self._features
+        self._features_internal = None  # Internal features, safe to use internally via the `_features` property
+        self._feature_metadata = None  # Internal feature metadata, safe to use internally
+        self._is_features_in_same_as_ex = None  # Whether self.features == self._features_internal
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
@@ -144,6 +144,8 @@ class AbstractModel:
 
         self.params_trained = dict()
         self._is_initialized = False
+        self._is_fit_metadata_registered = False
+        self._fit_metadata = dict()
 
     def _init_params(self):
         hyperparameters = self._user_params
@@ -181,6 +183,10 @@ class AbstractModel:
     def is_fit(self) -> bool:
         """Returns True if the model has been fit."""
         return self.model is not None
+
+    def can_fit(self) -> bool:
+        """Returns True if the model can be fit."""
+        return not self.is_fit()
 
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
@@ -337,7 +343,8 @@ class AbstractModel:
         logger.log(10, f'\tDropped {len(dropped_features)} of {len(self.features)} features.')
         self.features = [feature for feature in self.features if feature in valid_features]
         self.feature_metadata = feature_metadata.keep_features(self.features)
-        if not self.features:
+        error_if_no_features = self.params_aux.get('error_if_no_features', True)
+        if error_if_no_features and not self.features:
             raise NoValidFeatures
         # FIXME: Consider counting NaNs as unique values, if unique_counts == 2 (including NaN), then treat as boolean
         if self.params_aux.get('drop_unique', True):
@@ -350,13 +357,15 @@ class AbstractModel:
         else:
             features_to_drop_internal = None
         if features_to_drop_internal is not None:
-            self._features = [feature for feature in self.features if feature not in features_to_drop_internal]
-            self._feature_metadata = self.feature_metadata.keep_features(self._features)
+            self._features_internal = [feature for feature in self.features if feature not in features_to_drop_internal]
+            self._feature_metadata = self.feature_metadata.keep_features(self._features_internal)
             self._is_features_in_same_as_ex = False
         else:
-            self._features = self.features
+            self._features_internal = self.features
             self._feature_metadata = self.feature_metadata
             self._is_features_in_same_as_ex = True
+        if error_if_no_features and not self._features_internal:
+            raise NoValidFeatures
 
     def _preprocess_fit_args(self, **kwargs):
         sample_weight = kwargs.get('sample_weight', None)
@@ -435,6 +444,21 @@ class AbstractModel:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
         return kwargs
 
+    def _register_fit_metadata(self, **kwargs):
+        """
+        Used to track properties of the inputs received during fit, such as if validation data was present.
+        """
+        if not self._is_fit_metadata_registered:
+            self._fit_metadata = self._compute_fit_metadata(**kwargs)
+            self._is_fit_metadata_registered = True
+
+    def _compute_fit_metadata(self, X_val=None, X_unlabeled=None, **kwargs):
+        fit_metadata = dict(
+            val_in_fit=X_val is not None,
+            unlabeled_in_fit=X_unlabeled is not None
+        )
+        return fit_metadata
+
     def fit(self, **kwargs):
         """
         Fit model to predict values in y based on X.
@@ -490,6 +514,7 @@ class AbstractModel:
         kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
+            self._register_fit_metadata(**kwargs)
             self._fit(**kwargs)
         else:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
@@ -1055,6 +1080,10 @@ class AbstractModel:
         """
         return set()
 
+    @property
+    def _features(self):
+        return self._features_internal
+
     def _get_tags(self):
         collected_tags = {}
         for base_class in reversed(inspect.getmro(self.__class__)):
@@ -1094,7 +1123,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
             logger.log(15, f"Model will additionally ignore the following columns: {unknown_features}")
             df = df.drop(columns=unknown_features)
-            self._features = list(df.columns)
+            self._features_internal = list(df.columns)
 
         self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
         if self.features_to_drop:
@@ -1106,7 +1135,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
             # continuous = numeric features to rescale
             # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
             # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-            features_to_consider = [feat for feat in self._features if feat not in self.features_to_drop]
+            features_to_consider = [feat for feat in self._features_internal if feat not in self.features_to_drop]
             for feature in features_to_consider:
                 feature_data = df[feature]  # pd.Series
                 num_unique_vals = len(feature_data.unique())

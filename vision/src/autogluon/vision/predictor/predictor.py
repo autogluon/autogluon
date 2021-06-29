@@ -7,15 +7,16 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from gluoncv.auto.tasks import ImageClassification as _ImageClassification
+from gluoncv.auto.tasks import ImagePrediction as _ImageClassification
 from gluoncv.model_zoo import get_model_list
 
-from autogluon.core.constants import MULTICLASS
+from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
+from autogluon.core.utils.utils import generate_train_test_split
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
-from ..utils import MXNetErrorCatcher
+from ..utils import MXNetErrorCatcher, sanitize_batch_size
 
 __all__ = ['ImagePredictor']
 
@@ -60,6 +61,7 @@ class ImagePredictor(object):
         self._label_cleaner = None
         self._fit_summary = {}
         self._label = label
+        self._label_inner = 'label'
         self._train_classes = None
         assert isinstance(self._label, str)
         os.makedirs(self._log_dir, exist_ok=True)
@@ -228,13 +230,18 @@ class ImagePredictor(object):
                     Extra options for HPO scheduler, please refer to :class:`autogluon.core.Searcher` for details.
         """
         if self._problem_type is None:
-            # options: multiclass
+            # options: multiclass, binary, regression
             self._problem_type = MULTICLASS
-        assert self._problem_type in (MULTICLASS,), f"Invalid problem_type: {self._problem_type}"
+        assert self._problem_type in (MULTICLASS, BINARY, REGRESSION), f"Invalid problem_type: {self._problem_type}"
         if self._eval_metric is None:
-            # options: accuracy,
-            self._eval_metric = 'accuracy'
-
+            if self._problem_type == REGRESSION:
+                # options: rmse
+                self._eval_metric = 'rmse'
+                logger.log(20, 'ImagePredictor sets rmse as default eval_metric for regression problems.')
+            else:
+                # options: accuracy
+                self._eval_metric = 'accuracy'
+                logger.log(20, 'ImagePredictor sets accuracy as default eval_metric for classification problems.')
         # init/validate kwargs
         kwargs = self._validate_kwargs(kwargs)
         # unpack
@@ -272,8 +279,8 @@ class ImagePredictor(object):
                            'rec_train_idx : ~/.mxnet/datasets/imagenet/rec/train.idx\n' +
                            'rec_val : ~/.mxnet/datasets/imagenet/rec/val.rec\n' +
                            'rec_val_idx : ~/.mxnet/datasets/imagenet/rec/val.idx\n')
-            train_data = pd.DataFrame({'image': [], 'label': []})
-            tuning_data = pd.DataFrame({'image': [], 'label': []})
+            train_data = pd.DataFrame({'image': [], self._label_inner: []})
+            tuning_data = pd.DataFrame({'image': [], self._label_inner: []})
             use_rec = True
         if isinstance(train_data, str):
             from d8.image_classification import Dataset as D8D
@@ -301,9 +308,24 @@ class ImagePredictor(object):
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
-        if tuning_data is not None:
+        tuning_data_validated = False
+        if tuning_data is None:
+            train_data, tuning_data, _, _ = generate_train_test_split(X=train_data, y=train_data[self._label_inner], problem_type=self._problem_type, test_size=holdout_frac)
+            logger.info('Randomly split train_data into train[%d]/validation[%d] splits.',
+                              len(train_data), len(tuning_data))
+            train_data = train_data.reset_index(drop=True)
+            tuning_data = tuning_data.reset_index(drop=True)
+            tuning_data_validated = True
+
+        train_data = self._validate_data(train_data)
+        if isinstance(train_data, self.Dataset):
+            train_data = self.Dataset(train_data, classes=train_data.classes)
+        if tuning_data is not None and not tuning_data_validated:
             tuning_data = self._validate_data(tuning_data)
+            # converting to internal label set
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
+            if isinstance(tuning_data, self.Dataset):
+                tuning_data = self.Dataset(tuning_data, classes=tuning_data.classes)
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True
@@ -365,17 +387,18 @@ class ImagePredictor(object):
         if 'early_stop_max_value' not in config or config['early_stop_max_value'] == None:
             config['early_stop_max_value'] = np.Inf
         # batch size cannot be larger than dataset size
-        bs = min(config.get('batch_size', 16), len(train_data))
+        if ngpus_per_trial is not None and ngpus_per_trial > 1:
+            min_value = ngpus_per_trial
+        else:
+            min_value = 1
+        bs = sanitize_batch_size(config.get('batch_size', 16), min_value=min_value, max_value=len(train_data))
         config['batch_size'] = bs
-        if ngpus_per_trial is not None and ngpus_per_trial > 1 and bs < ngpus_per_trial:
-            # batch size must be larger than # gpus
-            config['ngpus_per_trial'] = bs
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
-        task = _ImageClassification(config=config)
+        task = _ImageClassification(config=config, problem_type=self._problem_type)
         # GluonCV can't handle these separately - patching created config
         task.search_strategy = scheduler
         task.scheduler_options['searcher'] = searcher
@@ -399,21 +422,24 @@ class ImagePredictor(object):
         """Check whether data is valid, try to convert with best effort if not"""
         if isinstance(data, pd.DataFrame):
             # TODO(zhreshold): allow custom label column without this renaming trick
-            if self._label != 'label' and self._label in data.columns:
+            if self._label != self._label_inner and self._label in data.columns:
                 # data is deepcopied so it's okay to overwrite directly
-                data = data.rename(columns={'label': '_unused_label', self._label: 'label'}, errors='ignore')
-
+                data = data.rename(columns={self._label_inner: '_unused_label', self._label: self._label_inner}, errors='ignore')
         if not (hasattr(data, 'classes') and hasattr(data, 'to_mxnet')):
             if isinstance(data, pd.DataFrame):
                 # raw dataframe, try to add metadata automatically
-                if 'label' in data.columns and 'image' in data.columns:
+                if self._label_inner in data.columns and 'image' in data.columns:
                     # check image relative/abs path is valid
                     sample = data.iloc[0]['image']
                     if not os.path.isfile(sample):
                         raise OSError(f'Detected invalid image path `{sample}`, please ensure all image paths are absolute or you are using the right working directory.')
                     logger.log(20, 'Converting raw DataFrame to ImagePredictor.Dataset...')
-                    infer_classes = sorted(data.label.unique().tolist())
-                    logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
+                    if self._problem_type in [MULTICLASS, BINARY]:
+                        infer_classes = sorted(data.label.unique().tolist())
+                        logger.log(20, f'Detected {len(infer_classes)} unique classes: {infer_classes}')
+                    elif self._problem_type == REGRESSION:
+                        infer_classes = []
+                        logger.log(20, 'Set classes = [] for regression problems')
                     instruction = 'train_data = ImagePredictor.Dataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
                     data = _ImageClassification.Dataset(data, classes=infer_classes)
@@ -426,17 +452,21 @@ class ImagePredictor(object):
             else:
                 raise TypeError(f"Unable to process dataset of type: {type(data)}")
         elif isinstance(data, _ImageClassification.Dataset):
-            assert 'label' in data.columns
+            assert self._label_inner in data.columns
             assert hasattr(data, 'classes')
-            orig_classes = data.classes
-            if not isinstance(data.classes, (tuple, list)):
-                # consider it as an invalid dataset without proper label, try to reconstruct as a normal DataFrame
-                orig_classes = []
-            # check whether classes are outdated, no action required if all unique labels is subset of `classes`
-            unique_labels = sorted(data['label'].unique().tolist())
-            if not (all(ulabel in orig_classes for ulabel in unique_labels)):
-                data = _ImageClassification.Dataset(data, classes=unique_labels)
-                logger.log(20, f'Reset labels to {unique_labels}')
+            if self._problem_type in [MULTICLASS, BINARY]:
+                orig_classes = data.classes
+                if not isinstance(data.classes, (tuple, list)):
+                    # consider it as an invalid dataset without proper label, try to reconstruct as a normal DataFrame
+                    orig_classes = []
+                # check whether classes are outdated, no action required if all unique labels is subset of `classes`
+                unique_labels = sorted(data[self._label_inner].unique().tolist())
+                if not (all(ulabel in orig_classes for ulabel in unique_labels)):
+                    data = _ImageClassification.Dataset(data, classes=unique_labels)
+                    logger.log(20, f'Reset labels to {unique_labels}')
+            elif self._problem_type == REGRESSION:
+                data = _ImageClassification.Dataset(data, classes=[])
+                logger.log(20, 'Set classes = [] for regression problems')
         if len(data) < 1:
             raise ValueError('Empty dataset.')
         return data
@@ -492,14 +522,13 @@ class ImagePredictor(object):
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
         y_pred_proba = self._classifier.predict(data, with_proba=True)
-        if isinstance(data, pd.DataFrame) and 'image' in data:
-            idx_to_image_map = data[['image']]
-            idx_to_image_map = idx_to_image_map.reset_index(drop=False)
-            y_pred_proba = idx_to_image_map.merge(y_pred_proba, on='image')
-            y_pred_proba = y_pred_proba.set_index('index').rename_axis(None)
-        y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
-        ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
-
+        if isinstance(data, pd.DataFrame):
+            y_pred_proba.index = data.index
+        if self._problem_type in [MULTICLASS, BINARY]:
+            y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
+            ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
+        elif self._problem_type == REGRESSION:
+            ret = y_pred_proba['prediction']
         if as_pandas:
             return ret
         else:
@@ -523,6 +552,9 @@ class ImagePredictor(object):
             The returned dataframe will contain labels. If more than one image in input,
             the returned dataframe will contain `images` column, and all results are concatenated.
         """
+        if self._problem_type in [REGRESSION]:
+            return self.predict_proba(data, as_pandas)
+
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
@@ -530,16 +562,20 @@ class ImagePredictor(object):
         if 'image' in proba.columns:
             # multiple images
             assert isinstance(data, pd.DataFrame) and 'image' in data.columns
+            index_name = data.index.name
+            if index_name is None:
+                # TODO: This crashes if a feature is already named 'index'.
+                index_name = 'index'
             y_pred = proba.loc[proba.groupby(["image"])["score"].idxmax()].reset_index(drop=True)
             idx_to_image_map = data[['image']]
             idx_to_image_map = idx_to_image_map.reset_index(drop=False)
             y_pred = idx_to_image_map.merge(y_pred, on='image')
-            y_pred = y_pred.set_index('index').rename_axis(None)
-            ret = self._label_cleaner.inverse_transform(y_pred['id'].rename('label'))
+            y_pred = y_pred.set_index(index_name).rename_axis(None)
+            ret = self._label_cleaner.inverse_transform(y_pred['id'].rename(self._label))
         else:
             # single image
             ret = proba.loc[[proba["score"].idxmax()]]
-            ret = self._label_cleaner.inverse_transform(ret['id'].rename('label'))
+            ret = self._label_cleaner.inverse_transform(ret['id'].rename(self._label))
         if as_pandas:
             return ret
         else:
@@ -585,8 +621,11 @@ class ImagePredictor(object):
         if isinstance(data, pd.DataFrame) and not isinstance(data, _ImageClassification.Dataset):
             assert self._label in data.columns, f'{self._label} is not present in evaluation data'
             # note that evaluation data must use the same classes as training data, otherwise incorrect result
-            data = _ImageClassification.Dataset(data, classes=self._train_classes)
-        return self._classifier.evaluate(data)
+            if self._problem_type in [MULTICLASS, BINARY]:
+                data = _ImageClassification.Dataset(data, classes=self._train_classes)
+            else:
+                data = _ImageClassification.Dataset(data, classes=[])
+        return self._classifier.evaluate(data, metric_name=self._eval_metric)
 
     def fit_summary(self):
         """Return summary of last `fit` process.

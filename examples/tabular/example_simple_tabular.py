@@ -13,7 +13,7 @@ save_path = 'ag_models/'  # where to save trained models
 predictor = TabularPredictor(label=label, path=save_path).fit(train_data)
 # NOTE: Default settings above are intended to ensure reasonable runtime at the cost of accuracy. To maximize predictive accuracy, do this instead:
 # predictor = TabularPredictor(label=label, eval_metric=YOUR_METRIC_NAME, path=save_path).fit(train_data, presets='best_quality')
-results = predictor.fit_summary()
+results = predictor.fit_summary(show_plot=True)
 
 # Inference time:
 test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')  # another Pandas DataFrame
