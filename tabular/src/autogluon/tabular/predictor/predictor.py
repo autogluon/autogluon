@@ -719,7 +719,7 @@ class TabularPredictor:
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
                           num_stack_levels=num_stack_levels, hyperparameters=hyperparameters,
-                          core_kwargs=core_kwargs, aux_kwargs=aux_kwargs, time_limit=time_limit, verbosity=verbosity)
+                          core_kwargs=core_kwargs, aux_kwargs=aux_kwargs, time_limit=time_limit, verbosity=verbosity, use_bag_holdout=use_bag_holdout)
         self._set_post_fit_vars()
 
         self._post_fit(

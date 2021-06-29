@@ -27,7 +27,7 @@ class AutoTrainer(AbstractTrainer):
                                  hyperparameters=hyperparameters, invalid_model_names=invalid_model_names,
                                  silent=silent, **kwargs)
 
-    def fit(self, X, y, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, aux_kwargs: dict = None, time_limit=None, **kwargs):
+    def fit(self, X, y, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, aux_kwargs: dict = None, time_limit=None, use_bag_holdout=False, **kwargs):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
 
