@@ -272,6 +272,7 @@ class ImagePredictor(object):
 
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
+            # FIXME: imagenet does not work, crashes in validating data due to empty DataFrames.
             logger.warning('ImageNet is a huge dataset which cannot be downloaded directly, ' +
                            'please follow the data preparation tutorial in GluonCV.' +
                            'The following record files(symlinks) will be used: \n' +
