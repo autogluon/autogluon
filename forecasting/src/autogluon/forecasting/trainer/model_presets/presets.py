@@ -34,6 +34,16 @@ DEFAULT_MODEL_PRIORITY = dict(
 
 def get_default_hps(key, prediction_length):
     DEFAULT_MODEL_HPS = {
+        "toy":{
+            "SFF": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+            "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+            "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+        },
+        "toy_hpo":{
+            "SFF": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": ag.Int(5, 25)},
+            "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": ag.Int(5, 25)},
+            "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": ag.Int(5, 25)},
+        },
         "default": {
             "SFF": {},
             "MQCNN": {},

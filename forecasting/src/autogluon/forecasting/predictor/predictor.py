@@ -14,11 +14,13 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.forecasting.utils.dataset_utils import rebuild_tabular, train_test_split_gluonts, \
     train_test_split_dataframe
 from autogluon.forecasting.utils.dataset_utils import TimeSeriesDataset
+from autogluon.core.utils.decorators import apply_presets
 
 from gluonts.dataset.common import FileDataset, ListDataset
 from gluonts.evaluation import Evaluator
 from gluonts.model.forecast import SampleForecast, QuantileForecast
 
+from ..configs.presets_configs import forecasting_presets_configs
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer
 from ..utils.dataset_utils import time_series_dataset
@@ -140,6 +142,7 @@ class ForecastingPredictor:
         self.cardinality = None
         self.prev_inferred_static_features = {}
 
+    @apply_presets(forecasting_presets_configs)
     def fit(self,
             train_data,
             prediction_length,
@@ -147,6 +150,7 @@ class ForecastingPredictor:
             time_column="time_column",
             target_column="target_column",
             val_data=None,
+            presets=None,
             hyperparameters=None,
             hyperparameter_tune_kwargs=None,
             time_limits=None,
@@ -184,6 +188,9 @@ class ForecastingPredictor:
         val_data: Optional, None by default, can be pd.Dataframe or FileDataset/ListDataset from gluonts,
             validation data used for hyperparameter tuning.
             If provided, it should have the same format as train_data.
+        presets: Optional, None by default, can be a string. If provided, can will preset kwargs for training according to your need.
+                Current available presets: ["high_quality", "good_quality", "medium_quality", "low_quality", "low_quality_hpo"]
+                Details for these presets can be found in the file forecasting/src/autogluon/forecasting/configs/presets_configs.py
         hyperparameter_tune_kwargs: Optional, None by default, can be str or dict
             Valid str values:
                 'auto': Uses the 'bayesopt' preset.
@@ -197,9 +204,10 @@ class ForecastingPredictor:
                                             'searcher': 'random',
                                             'num_trials': 2
                                             }
-        hyperparameters: Optional, None by default, can be dict
+        hyperparameters: Optional, None by default, can be dict or str.
             parameters for each model. If not provided, default parameters from gluonts will be used.
-
+            If string is provided, can be one of ["default", "default_hpo", "toy", "toy_hpo"]
+            If dict is provided:
             Keys are strings that indicate which model types to train.
             Stable model options include:
                'DeepAR',
@@ -230,7 +238,7 @@ class ForecastingPredictor:
 
         set_best_to_refit_full: bool, default=False
             If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
-            Only valid if `refit_full` is set.
+            Only valid if `refit_full` is set. If refit is set to be True while set_best_to_refit_full is not specified, it will be by default set to be True.
 
         quantiles: list[float], default=[0.5]
             Can be list of combinations of floats in [0.1, 0.2, ..., 0.9]
@@ -275,7 +283,8 @@ class ForecastingPredictor:
             raise AssertionError(
                 'Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new '
                 '`Predictor`.')
-
+        if presets is not None:
+            logger.log(30, f"presets is set to be {presets}")
         self.index_column = index_column
         self.time_column = time_column
         self.target_column = target_column
@@ -407,6 +416,11 @@ class ForecastingPredictor:
             "freq": None,
             "quantiles": ["0.5"]
         }
+        if kwargs.get("refit_full", False):
+            if "set_best_to_refit_full" not in kwargs:
+                kwargs["set_best_to_refit_full"] = True
+                logger.log(30, "refit_full is set while set_best_to_refit_full is not set, automatically setting set_best_to_refit_full=True"
+                               "to make sure that the model will predict with refit full model by default.")
         copied_kwargs = copy.deepcopy(kwargs_default)
         copied_kwargs.update(kwargs)
         return copied_kwargs

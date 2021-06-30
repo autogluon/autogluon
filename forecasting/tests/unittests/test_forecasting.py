@@ -2,53 +2,171 @@ import pandas as pd
 from autogluon.forecasting import ForecastingPredictor
 from autogluon.forecasting import TabularDataset
 import autogluon.core as ag
+import tempfile
 
 
-def test_forecasting():
-    train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
-    test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
-    static_features = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries"
-                                     "/toy_static_features.csv")
-    # change this to specify eval metric, one of ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
-    eval_metric = "mean_wQuantileLoss"
+def test_forecasting_no_hpo():
+    with tempfile.TemporaryDirectory() as path:
+        train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
+        test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
 
-    prediction_length = 19
-    path = "hpo_models"
+        predictor = ForecastingPredictor(path=path).fit(train_data,
+                                                        prediction_length=19,
+                                                        index_column="name",
+                                                        target_column="ConfirmedCases",
+                                                        time_column="Date",
+                                                        presets="low_quality"
+                                                        )
+        print(predictor.predict(test_data))
 
-    predictor = ForecastingPredictor(path=path, eval_metric=eval_metric).fit(train_data,
-                                                                             prediction_length,
-                                                                             static_features=static_features,
-                                                                             index_column="name",
-                                                                             target_column="ConfirmedCases",
-                                                                             time_column="Date",
-                                                                             hyperparameter_tune_kwargs="auto",
-                                                                             quantiles=[0.1, 0.5, 0.9],
-                                                                             refit_full=True,
-                                                                             set_best_to_refit_full=True,
-                                                                             hyperparameters={
-                                                                                 "MQCNN": {
-                                                                                     'context_length': ag.Int(70, 90,
-                                                                                                              default=prediction_length * 4),
-                                                                                     "num_batches_per_epoch": 10,
-                                                                                     "epochs": 5},
-                                                                             },
-                                                                             time_limits=5
-                                                                             )
 
-    predictor = None
-    predictor = ForecastingPredictor.load(path)
-    models = predictor._trainer.get_model_names_all()
-    for model in models:
-        print(predictor._trainer.load_model(model).get_info())
-    print(predictor.leaderboard(test_data, static_features=static_features))
-    print(predictor.evaluate(test_data, static_features=static_features))
-    predictions = predictor.predict(test_data, static_features=static_features, quantiles=[0.5],
-                                    time_series_to_predict=['Afghanistan_', "Algeria_"])
-    time_series_id = 'Afghanistan_'
-    print(predictions[time_series_id])
-    targets = pd.DataFrame({"targets": [100 for i in range(prediction_length)]})
-    targets.index = predictions[time_series_id].index
+def test_forecasting_hpo():
+    with tempfile.TemporaryDirectory() as path:
+        train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
+        test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
 
-    all_targets = [targets for i in range(len(predictions))]
-    print(predictions[time_series_id].index.freq)
-    print(ForecastingPredictor.evaluate_predictions(predictions, all_targets))
+        predictor = ForecastingPredictor(path=path).fit(train_data,
+                                                        prediction_length=19,
+                                                        index_column="name",
+                                                        target_column="ConfirmedCases",
+                                                        time_column="Date",
+                                                        presets="low_quality_hpo"
+                                                        )
+        print(predictor.predict(test_data))
+
+
+def test_forecasting_advance():
+    with tempfile.TemporaryDirectory() as path:
+        train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
+        test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
+        eval_metric = "mean_wQuantileLoss"
+
+        prediction_length = 19
+
+        predictor = ForecastingPredictor(path=path, eval_metric=eval_metric).fit(train_data,
+                                                                                 prediction_length,
+                                                                                 index_column="name",
+                                                                                 target_column="ConfirmedCases",
+                                                                                 time_column="Date",
+                                                                                 hyperparameter_tune_kwargs={
+                                                                                     'scheduler': 'local',
+                                                                                     'searcher': 'random',
+                                                                                     "num_trials": 2
+                                                                                 },
+                                                                                 quantiles=[0.1, 0.5, 0.9],
+                                                                                 refit_full=True,
+                                                                                 hyperparameters={
+                                                                                     "MQCNN": {
+                                                                                         'context_length': ag.Int(70,
+                                                                                                                  90,
+                                                                                                                  default=prediction_length * 4),
+                                                                                         "num_batches_per_epoch": 10,
+                                                                                         "epochs": 5},
+                                                                                     "DeepAR": {
+                                                                                         'context_length': ag.Int(70,
+                                                                                                                  90,
+                                                                                                                  default=prediction_length * 4),
+                                                                                         "num_batches_per_epoch": 10,
+                                                                                         "epochs": 5},
+                                                                                     "SFF": {
+                                                                                         'context_length': ag.Int(70,
+                                                                                                                  90,
+                                                                                                                  default=prediction_length * 4),
+                                                                                         "num_batches_per_epoch": 10,
+                                                                                         "epochs": 5},
+                                                                                 },
+                                                                                 time_limits=10
+                                                                                 )
+
+        predictor = None
+        predictor = ForecastingPredictor.load(path)
+        models = predictor._trainer.get_model_names_all()
+        for model in models:
+            print(predictor._trainer.load_model(model).get_info())
+        print(predictor.leaderboard(test_data))
+        print(predictor.evaluate(test_data))
+        predictions = predictor.predict(test_data, quantiles=[0.5],
+                                        time_series_to_predict=['Afghanistan_', "Algeria_"])
+        time_series_id = 'Afghanistan_'
+        print(predictions[time_series_id])
+        targets = pd.DataFrame({"targets": [100 for i in range(prediction_length)]})
+        targets.index = predictions[time_series_id].index
+
+        all_targets = [targets for i in range(len(predictions))]
+        print(predictions[time_series_id].index.freq)
+        print(ForecastingPredictor.evaluate_predictions(predictions, all_targets))
+
+
+def test_forecasting_with_static_features():
+    with tempfile.TemporaryDirectory() as path:
+        train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
+        test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
+        static_features = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries"
+                                         "/toy_static_features.csv")
+
+        predictor = ForecastingPredictor(path=path).fit(train_data,
+                                                        prediction_length=19,
+                                                        static_features=static_features,
+                                                        index_column="name",
+                                                        target_column="ConfirmedCases",
+                                                        time_column="Date",
+                                                        presets="low_quality"
+                                                        )
+        print(predictor.predict(test_data, static_features=static_features))
+
+
+def test_forecasting_mqcnn():
+    with tempfile.TemporaryDirectory() as path:
+        train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
+        test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
+
+        predictor = ForecastingPredictor(path=path).fit(train_data,
+                                                        prediction_length=19,
+                                                        index_column="name",
+                                                        target_column="ConfirmedCases",
+                                                        time_column="Date",
+                                                        hyperparameters={
+                                                            "MQCNN": {
+                                                                "num_batches_per_epoch": 10,
+                                                                "epochs": 5},
+                                                        }
+                                                        )
+        print(predictor.predict(test_data))
+
+
+def test_forecasting_deepar():
+    with tempfile.TemporaryDirectory() as path:
+        train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
+        test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
+
+        predictor = ForecastingPredictor(path=path).fit(train_data,
+                                                        prediction_length=19,
+                                                        index_column="name",
+                                                        target_column="ConfirmedCases",
+                                                        time_column="Date",
+                                                        hyperparameters={
+                                                            "DeepAR": {
+                                                                "num_batches_per_epoch": 10,
+                                                                "epochs": 5},
+                                                        }
+                                                        )
+        print(predictor.predict(test_data))
+
+
+def test_forecasting_sff():
+    with tempfile.TemporaryDirectory() as path:
+        train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
+        test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
+
+        predictor = ForecastingPredictor(path=path).fit(train_data,
+                                                        prediction_length=19,
+                                                        index_column="name",
+                                                        target_column="ConfirmedCases",
+                                                        time_column="Date",
+                                                        hyperparameters={
+                                                            "SFF": {
+                                                                "num_batches_per_epoch": 10,
+                                                                "epochs": 5},
+                                                        }
+                                                        )
+        print(predictor.predict(test_data))

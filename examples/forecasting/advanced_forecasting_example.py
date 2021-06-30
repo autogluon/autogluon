@@ -30,7 +30,6 @@ predictor = ForecastingPredictor(path=path, eval_metric=eval_metric).fit(train_d
                                                                          hyperparameter_tune_kwargs="auto",
                                                                          quantiles=[0.1, 0.5, 0.9],
                                                                          refit_full=True,
-                                                                         set_best_to_refit_full=True,
                                                                          hyperparameters={
                                                                              "MQCNN": {
                                                                                  'context_length': ag.Int(70, 90,
