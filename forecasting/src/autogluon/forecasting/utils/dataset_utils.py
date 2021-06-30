@@ -204,7 +204,8 @@ def time_series_dataset(data,
         index_column = "index_column"
     if chosen_ts is not None:
         rebuilt_data = rebuilt_data.loc[rebuilt_data[index_column].isin(chosen_ts)]
-        static_features = static_features.loc[static_features[index_column].isin(chosen_ts)]
+        if static_features is not None:
+            static_features = static_features.loc[static_features[index_column].isin(chosen_ts)]
     return TimeSeriesDataset(rebuilt_data, index_column=index_column, static_features=static_features, prev_inferred=prev_inferred)
 
 
