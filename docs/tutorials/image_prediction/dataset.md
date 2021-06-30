@@ -1,23 +1,23 @@
-# Image Prediction - Properly load any image dataset as ImagePredictor Dataset
+# Image Prediction - Properly load any image dataset as ImageDataset
 :label:`sec_imgdataset`
 
 Preparing the dataset for ImagePredictor is not difficult at all, however, we'd like to introduce the
-recommended ways to initialize the dataset so you will have smoother experience using `autogluon.vision.ImagePredictor`.
+recommended ways to initialize the dataset, so you will have smoother experience using `autogluon.vision.ImagePredictor`.
 
 There are generally three ways to load a dataset for ImagePredictor:
 
 - Load a csv file or construct your own pandas `DataFrame` with `image` and `label` columns
 
-- Load a image folder directly with `ImagePredictor.Dataset`
+- Load a image folder directly with `ImageDataset`
 
-- Convert a list of images to dataset directly with `ImagePredictor.Dataset`
+- Convert a list of images to dataset directly with `ImageDataset`
 
 We will go through these four methods one by one. First of all, let's import autogluon
 
 ```{.python .input}
 %matplotlib inline
 import autogluon.core as ag
-from autogluon.vision import ImagePredictor
+from autogluon.vision import ImageDataset
 import pandas as pd
 ```
 
@@ -35,7 +35,7 @@ df.head()
 If the image paths are not relative to current working directory, you may use the helper function to prepend prefix for each image, using absolute paths can reduce the chance of OSError happening to file access:
 
 ```{.python .input}
-df = ImagePredictor.Dataset.from_csv(csv_file, root='/home/ubuntu')
+df = ImageDataset.from_csv(csv_file, root='/home/ubuntu')
 df.head()
 ```
 
@@ -51,7 +51,7 @@ Otherwise you may use the `DataFrame` as-is, `ImagePredictor` will apply auto co
 
 ## Load an image directory
 
-It's pretty common that sometimes you only have a folder of images, organized by the category names. Recursively loop through images is tedious. You can use `ImagePredictor.Dataset.from_folders` or `ImagePredictor.Dataset.from_folder` to avoid implementing recursive search.
+It's pretty common that sometimes you only have a folder of images, organized by the category names. Recursively loop through images is tedious. You can use `ImageDataset.from_folders` or `ImageDataset.from_folder` to avoid implementing recursive search.
 
 The difference between `from_folders` and `from_folder` is the targeting folder structure.
 If you have a folder with splits, e.g., `train`, `test`, like:
@@ -64,7 +64,7 @@ If you have a folder with splits, e.g., `train`, `test`, like:
 Then you can load the splits with `from_folders`:
 
 ```{.python .input}
-train_data, _, test_data = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip', train='train', test='test')
+train_data, _, test_data = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip', train='train', test='test')
 print('train #', len(train_data), 'test #', len(test_data))
 train_data.head()
 ```
@@ -81,7 +81,7 @@ Then you can load the splits with `from_folder`:
 ```{.python .input}
 # use the train from shopee-iet as new root
 root = os.path.join(os.path.dirname(train_data.iloc[0]['image']), '..')
-all_data = ImagePredictor.Dataset.from_folder(root)
+all_data = ImageDataset.from_folder(root)
 all_data.head()
 ```
 
@@ -101,7 +101,7 @@ pets = ag.utils.unzip(pets)
 image_list = [x for x in os.listdir(os.path.join(pets, 'images')) if x.endswith('jpg')]
 def label_fn(x):
     return 'cat' if os.path.basename(x)[0].isupper() else 'dog'
-new_data = ImagePredictor.Dataset.from_name_func(image_list, label_fn, root=os.path.join(os.getcwd(), pets, 'images'))
+new_data = ImageDataset.from_name_func(image_list, label_fn, root=os.path.join(os.getcwd(), pets, 'images'))
 new_data
 ```
 
