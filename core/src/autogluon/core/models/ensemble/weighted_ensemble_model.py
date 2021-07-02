@@ -36,6 +36,7 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         min_stack_column_prefix_to_model_map = {k: v for k, v in self.stack_column_prefix_to_model_map.items() if k in self.stack_column_prefix_lst}
         self.base_model_names = [base_model_name for base_model_name in self.base_model_names if base_model_name in min_stack_column_prefix_to_model_map.values()]
         self.stack_column_prefix_to_model_map = min_stack_column_prefix_to_model_map
+        return self
 
     def _get_model_weights(self):
         weights_dict = defaultdict(int)

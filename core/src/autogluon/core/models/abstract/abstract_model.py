@@ -515,7 +515,11 @@ class AbstractModel:
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
             self._register_fit_metadata(**kwargs)
-            self._fit(**kwargs)
+            out = self._fit(**kwargs)
+            if out is None:
+                return self
+            else:
+                return out
         else:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded

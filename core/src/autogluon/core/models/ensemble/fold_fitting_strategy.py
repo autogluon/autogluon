@@ -38,7 +38,7 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
     """
 
     def __init__(self, bagged_ensemble_model, X: DataFrame, y: Series, sample_weight, time_limit: float, time_start: float,
-                 models: list, oof_pred_proba: ndarray, oof_pred_model_repeats: ndarray):
+                 models: list, oof_pred_proba: ndarray, oof_pred_model_repeats: ndarray, save_folds: bool):
         self.X = X
         self.y = y
         self.sample_weight = sample_weight
@@ -49,6 +49,7 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         self.oof_pred_model_repeats = oof_pred_model_repeats
         self.bagged_ensemble_model = bagged_ensemble_model
         self.jobs = []
+        self.save_folds = save_folds
 
     def schedule_fold_model_fit(self, model_base, fold_ctx, kwargs):
         self.jobs.append([model_base, fold_ctx, kwargs])
@@ -85,6 +86,8 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
     def _update_bagged_ensemble(self, fold_model, pred_proba, fold_ctx):
         _, val_index = fold_ctx['fold']
         model_to_append = fold_model
+        if not self.save_folds:
+            fold_model.model = None
         if self.bagged_ensemble_model.low_memory:
             self.bagged_ensemble_model.save_child(fold_model, verbose=False)
             model_to_append = fold_model.name

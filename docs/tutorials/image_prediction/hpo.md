@@ -16,7 +16,7 @@ Since our task is to classify images, we will use AutoGluon to produce an [Image
 
 ```{.python .input}
 import autogluon.core as ag
-from autogluon.vision import ImagePredictor
+from autogluon.vision import ImagePredictor, ImageDataset
 ```
 
 ## Create AutoGluon Dataset
@@ -25,7 +25,7 @@ Let's first create the dataset using the same subset of the `Shopee-IET` dataset
 Recall that there's no validation split in original data, a 90/10 train/validation split is automatically performed when `fit` with `train_data`.
 
 ```{.python .input}
-train_data, _, test_data = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+train_data, _, test_data = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 ```
 
 ## Specify which Networks to Try

@@ -1,4 +1,4 @@
-from autogluon.vision import ImagePredictor as Task
+from autogluon.vision import ImagePredictor, ImageDataset
 import autogluon.core as ag
 import os
 import pandas as pd
@@ -7,16 +7,16 @@ import copy
 
 
 def test_task():
-    dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
-    model_list = Task.list_models()
-    classifier = Task()
+    dataset, _, test_dataset = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+    model_list = ImagePredictor.list_models()
+    classifier = ImagePredictor()
     classifier.fit(dataset, num_trials=2, hyperparameters={'epochs': 1, 'early_stop_patience': 3})
     assert classifier.fit_summary()['valid_acc'] > 0.1, 'valid_acc is abnormal'
     test_result = classifier.predict(test_dataset)
     single_test = classifier.predict(test_dataset.iloc[0]['image'])
     single_proba = classifier.predict_proba(test_dataset.iloc[0]['image'])
     classifier.save('classifier.ag')
-    classifier2 = Task.load('classifier.ag')
+    classifier2 = ImagePredictor.load('classifier.ag')
     fit_summary = classifier2.fit_summary()
     test_acc = classifier2.evaluate(test_dataset)
     # raw dataframe
@@ -37,8 +37,7 @@ def test_task():
 
 
 def test_task_label_remap():
-    ImagePredictor = Task
-    train_dataset, _, test_dataset = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+    train_dataset, _, test_dataset = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     label_remap = {0: 'd', 1: 'c', 2: 'b', 3: 'a'}
     train_dataset = train_dataset.replace({"label": label_remap})
     test_dataset = test_dataset.replace({"label": label_remap})
@@ -59,17 +58,15 @@ def test_task_label_remap():
 
 
 def test_invalid_image_dataset():
-    ImagePredictor = Task
     invalid_test = ag.download('https://autogluon.s3-us-west-2.amazonaws.com/miscs/test_autogluon_invalid_dataset.zip')
     invalid_test = ag.unzip(invalid_test)
-    df = ImagePredictor.Dataset.from_csv(os.path.join(invalid_test, 'train.csv'), root=os.path.join(invalid_test, 'train_images'))
+    df = ImageDataset.from_csv(os.path.join(invalid_test, 'train.csv'), root=os.path.join(invalid_test, 'train_images'))
     predictor = ImagePredictor(label="labels")
     predictor.fit(df, df.copy(), time_limit=60)
 
 
 def test_image_predictor_presets():
-    ImagePredictor = Task
-    train_dataset, _, test_dataset = ImagePredictor.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
+    train_dataset, _, test_dataset = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     for preset in ['medium_quality_faster_train', 'medium_quality_faster_inference']:
         predictor = ImagePredictor()
         predictor.fit(train_dataset,tuning_data=test_dataset, presets=[preset], time_limit=60, hyperparameters={'epochs':1})
