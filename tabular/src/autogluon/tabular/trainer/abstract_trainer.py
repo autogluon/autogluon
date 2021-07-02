@@ -1025,7 +1025,6 @@ class AbstractTrainer:
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-
         if isinstance(model, BaggedEnsembleModel):
             if X_val is not None and y_val is not None:
                 model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
