@@ -1127,7 +1127,7 @@ class AbstractTrainer:
             ens_sample_weight = kwargs.get('ens_sample_weight', None)
             if ens_sample_weight is not None:
                 model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
-        if fit_with_prune_kwargs:
+        if fit_with_prune_kwargs is not None:
             model_fit_kwargs['fit_with_prune_kwargs'] = fit_with_prune_kwargs
 
         #######################
