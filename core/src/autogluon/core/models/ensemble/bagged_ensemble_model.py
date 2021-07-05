@@ -777,6 +777,7 @@ class BaggedEnsembleModel(AbstractModel):
             y_val_fold = None
             train_index = list(range(len(X)))
             test_index = train_index
+            cv_splitter = None
         else:
             cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=1, groups=groups)
             if k_fold != cv_splitter.n_splits:
@@ -838,6 +839,8 @@ class BaggedEnsembleModel(AbstractModel):
                 bag.models.append(child)
             bag.val_score = child.val_score
             bag._add_child_times_to_bag(model=child)
+            if cv_splitter is not None:
+                bag._cv_splitters = [cv_splitter]
 
             bag.save()
             bags[bag.name] = bag.path
