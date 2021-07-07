@@ -48,7 +48,7 @@ predictor = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(tr
                                                                               index_column="name",
                                                                               target_column="ConfirmedCases",
                                                                               time_column="Date",
-                                                                              hyperparameter_tune_kwargs={                                                                         # hyperparameter_tune_kwargs={
+                                                                              hyperparameter_tune_kwargs={ 
                                                                                  'scheduler': 'local',
                                                                                  'searcher': 'random',
                                                                                  "num_trials": 2

@@ -43,7 +43,7 @@ print(customized_model.score(gluonts_test_data))
 predictions = customized_model.predict(gluonts_test_data)
 print(predictions["Afghanistan_"])
 
-# Training custom model alongside other models using task.fit #
+# Training custom model alongside other models using ForecastingPredictor.fit() #
 custom_hyperparameters = {CustomDeepARModel: {"epochs": epochs,
                                               "num_batches_per_epoch": 10,
                                               "distr_output": NegativeBinomialOutput()},
