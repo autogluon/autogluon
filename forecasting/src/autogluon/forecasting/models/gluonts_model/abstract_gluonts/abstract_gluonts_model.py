@@ -20,6 +20,7 @@ from autogluon.core.task.base.base_predictor import BasePredictor
 from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...abstract.abstract_model import AbstractModel
 from ..abstract_gluonts.model_trial import model_trial
+from .callback import EpochCounter
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,9 @@ class AbstractGluonTSModel(AbstractModel):
         self.predict_time = None
         self.quantiles = kwargs.get("quantiles", ["0.5"])
         self.params["quantiles"] = self.quantiles
+
+        self.epoch_counter = EpochCounter()
+        self.params["callbacks"] = [self.epoch_counter]
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
@@ -338,3 +342,4 @@ class AbstractGluonTSModel(AbstractModel):
         self.fit_time = None
         self.predict_time = None
         self.val_score = None
+        self.params["epochs"] = self.epoch_counter.count
