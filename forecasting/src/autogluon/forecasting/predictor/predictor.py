@@ -606,7 +606,7 @@ class ForecastingPredictor:
                     hpo_model = hpo_results[model_type]
                     if 'trial_info' in hpo_model:
                         print(
-                            f"HPO for {model_type} model:  Num. configurations tried = {len(hpo_model['trial_info'])}, Time spent = {hpo_model['total_time']}s, Search strategy = {hpo_model['search_strategy']}")
+                            f"HPO for {model_type} model:  Num. configurations tried = {len(hpo_model['trial_info'])}, Time spent = {hpo_model['total_time']}s")
                         print(
                             f"Best hyperparameter-configuration (validation-performance: {self.eval_metric} = {hpo_model['validation_performance']}):")
                         print(hpo_model['best_config'])
