@@ -22,7 +22,7 @@ requirements = [
     'scipy',
     'pandas',
     'psutil>=5.7.3,<5.9',
-    'gluonts>=0.7.0',
+    'gluonts>=0.8.0',
     f'autogluon.core=={version}',
 ]
 
