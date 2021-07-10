@@ -1,6 +1,7 @@
 max_time = 180
 
 // ipykernel>=6.0.0 crashes CI during tutorials
+// pandas==1.3.0 crashes CI during tutorials (FIXME: Revamp openml tutorials, fix object detection)
 setup_pip_venv = """
     rm -rf venv
     conda list
