@@ -7,7 +7,7 @@ import pickle
 import time
 import random
 import sys
-from typing import Callable
+from typing import Callable, Tuple
 from datetime import datetime
 from functools import wraps
 from matplotlib import pyplot as plt
@@ -758,7 +758,7 @@ class FeatureImportanceHelper:
     def compute_expected_utility(self, threshold: float, param_dict: dict, n_sample: int = 1000):
         raise NotImplementedError
 
-    def bayes_update(self, obs: list, param_dict: dict):
+    def bayes_update(self, obs: list, param_dict: dict) -> dict:
         raise NotImplementedError
 
 

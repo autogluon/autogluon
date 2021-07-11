@@ -23,7 +23,8 @@ from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
-                     compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir, NormalFeatureImportanceHelper
+                     compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir, \
+                     UniformFeatureSelector, NormalFeatureSelector
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
@@ -523,7 +524,7 @@ class AbstractModel:
             raise TimeLimitExceeded
 
     def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_threshold=0., stop_threshold=2, num_shuffle_sets=1,
-                       subsample_size=1000, strategy="bayes", **kwargs):
+                       subsample_size=1000, strategy="bayes", num_resource=100, **kwargs):
         """
         Functionally identical to `fit` method, but repeats feature importance based pruning until
         validation set performance degrades or `max_num_fit` iterations have passed.
@@ -542,6 +543,8 @@ class AbstractModel:
             Number of validation set samples to use when computing permutation feature importance
         strategy: str, default = "bayes"
             Feature importance computation strategy to use; Can be "naive" or "bayes'
+        num_resource: int, default=100
+            Number of shuffles to evaluate across all features per feature pruning iteration
 
         TODO
         1. Consider returning list of models
@@ -558,35 +561,49 @@ class AbstractModel:
         logger.log(20, f"\tUsing Iterative Feature Pruning with following parameters")
         logger.log(20, f"\tmax_num_fit: {max_num_fit}, prune_threshold: {prune_threshold}, " +
                        f"stop_threshold: {stop_threshold}, num_shuffle_sets: {num_shuffle_sets}, " +
-                       f"subsample_size: {subsample_size}, strategy: {strategy}")
+                       f"subsample_size: {subsample_size}, strategy: {strategy}, num_resource: {num_resource}")
+
+        # Identify FeatureSelector class
+        if strategy == "naive":
+            selector_class = UniformFeatureSelector
+        elif strategy == "bayes":
+            selector_class = NormalFeatureSelector
+        else:
+            raise Exception(f"'{strategy}' is not a valid feature selection strategy.")
+        # Initialize importance_fn_args based on whether the model is a bagged or not
+        if X_val is None or y_val is None:
+            importance_fn_args = {'X': X, 'y': y, 'is_oof': True, 'num_shuffle_sets': num_shuffle_sets, 'silent': True,
+                                  'subsample_size': subsample_size, 'time_limit': kwargs.get('time_limit', None)}
+        else:
+            importance_fn_args = {'X': X_val, 'y': y_val, 'num_shuffle_sets': num_shuffle_sets, 'silent': True,
+                                  'subsample_size': subsample_size, 'time_limit': kwargs.get('time_limit', None)}
+
         try:
-            if strategy == "naive":
-                pruning_function = self._naive_feature_prune
-            elif strategy == "bayes":
-                pruning_function = self._bayes_feature_prune
-            else:
-                raise Exception(f"Strategy '{strategy}' is invalid.")
             time_limit_exists = 'time_limit' in kwargs and kwargs['time_limit'] is not None
             fitted_copies_info = []
             self_copy, score = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P0', None, **kwargs)
             fitted_copies_info.append((round(score, 4), self_copy.path))
-            best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': 0, 'param_dict': {}}
+            best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': 0}
             init_prune_threshold = prune_threshold
-            old_feature_count = len(self_copy.features)
-            curr_features, curr_param_dict = None, None
-            belief_update = True
+            curr_features = self_copy.features
+            old_feature_count = len(curr_features)
+            performance_gained = True
 
             for index in range(1, max_num_fit):
                 time_start = time.time()
-                if belief_update:
-                    reference_features = best_info['features']
-                    time_limit = kwargs['time_limit'] if time_limit_exists else None
-                    curr_features, curr_param_dict = pruning_function(best_info['model'], best_info['features'], best_info['param_dict'],
-                                                                      prune_threshold, X, y, X_val, y_val, num_shuffle_sets, subsample_size,
-                                                                      time_limit)
+                reference_features = curr_features
+                selector = selector_class(importance_fn=best_info['model'].compute_feature_importance,
+                                          importance_fn_args=importance_fn_args, features=best_info['features'])
+                if performance_gained:
+                    # if pruned model led to performance gain, fit a new model where features are pruned even more
+                    time_limit = kwargs.get('time_limit', None)
+                    param_dict = selector.compute_feature_importance(param_dict={}, threshold=prune_threshold,
+                                                                     time_limit=time_limit, num_resource=num_resource)
+                    curr_features = selector.prune_features(param_dict, prune_threshold)
                 else:
-                    reference_features = curr_features
-                    curr_features, prune_threshold = self._adjust_threshold_and_prune(curr_features, curr_param_dict, prune_threshold)
+                    # if pruned model led to performance drop, adjust threshold to prune less features and refit
+                    prune_threshold = selector.update_threshold(param_dict, prune_threshold)
+                    curr_features = selector.prune_features(param_dict, prune_threshold)
 
                 if time_limit_exists:
                     kwargs['time_limit'] = kwargs['time_limit'] - (time.time() - time_start)
@@ -602,10 +619,9 @@ class AbstractModel:
                     # Update best_info and reobtain feature importance scores under this new model
                     logger.log(20, f"\tFit {index+1}: Current score {score} is better than best score {best_info['score']}. Updating model.")
                     logger.log(20, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(curr_features)}.")
-                    best_info = {'model': self_copy, 'features': self_copy.features, 'score': score,
-                                 'index': index, 'param_dict': {}}  # NOTE: Consider changing this to current_param_dict
+                    best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': index}
                     prune_threshold = init_prune_threshold
-                    belief_update = True
+                    performance_gained = True
                 elif index - best_info['index'] >= stop_threshold:
                     logger.log(20, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
                     break
@@ -615,12 +631,13 @@ class AbstractModel:
                     if index != max_num_fit:
                         message += " Will retry fit pruning half as many features."
                     logger.log(20, message)
-                    belief_update = False
+                    performance_gained = False
         except TimeLimitExceeded:
             logger.log(20, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
-            import pdb; pdb.post_mortem()
-            logger.log(20, f"ERROR: {e}")
+            # import pdb; pdb.post_mortem()
+            logger.log(20, f"ERROR: No model trained. Reason: {e}")
+            raise e
         finally:
             # Cleanup saved models (keep best model if current model is a bagged model)
             for index, info in enumerate(fitted_copies_info):
@@ -638,6 +655,7 @@ class AbstractModel:
                 logger.log(20, f"\tSuccessfully ended prune loop after {index+1} iterations. Best score: {best_info['score']}.")
                 logger.log(20, f"\tFeature Count: {old_feature_count} -> {len(best_info['features'])}")
                 return best_model
+            raise Exception("ERROR: No model trained.")
 
     def _fit_save_score_model_copy(self, X, y, X_val, y_val, copy_name, features, **kwargs):
         # Fit a deepcopied model on current_features
@@ -658,137 +676,6 @@ class AbstractModel:
             time_now = time.time()
             kwargs['time_limit'] = kwargs['time_limit'] - (time_now - time_start)
         return self_copy, score
-
-    def _adjust_threshold_and_prune(self, features: list, param_dict: dict, threshold: float):
-        """
-        Returns an updated list of feature names, threshold, and param_dict that is the result of a
-        procedure that prunes half as many features as what pruning with the inputted threshold would
-        have accomplished. Features whose indexes are lower than cutoff index in the sorted array are
-        discarded. Used when refitting the model with aggressively reduced feature space leads
-        to validation set performance drop.
-        """
-        # array of (feature name, importance score) tuples
-        sorted_means = sorted(map(lambda info: (info[0], info[1]['mu']), param_dict.items()), key=lambda el: el[1])
-        # any feature whose index on sorted_means is lower than this would have been dropped
-        original_cutoff = -float('inf')
-        for index, info in enumerate(sorted_means):
-            score = info[1]
-            if score > threshold:
-                break
-        original_cutoff = index
-        # prune less features if we can, otherwise return original features
-        if original_cutoff > 1:
-            new_cutoff = original_cutoff//2
-            features = list(map(lambda info: info[0], sorted_means[new_cutoff:]))
-            threshold = sorted_means[new_cutoff-1][1]
-        return features, threshold
-
-    def _naive_feature_prune(self, model, features, param_dict, threshold, X, y, X_val, y_val,
-                             num_shuffle_sets=1, subsample_size=1000, time_limit=None, num_updates=50):
-        shuffles_per_feature = num_updates // len(features)
-        shuffles_left = num_updates % len(features)
-        assert shuffles_per_feature > 0, "We must be able to compute feature importance for each column at least once."
-        if X_val is None or y_val is None:
-            importance_df = model.compute_feature_importance(X=X, y=y, num_shuffle_sets=shuffles_per_feature,
-                                                             subsample_size=subsample_size, silent=True,
-                                                             time_limit=time_limit, is_oof=True)
-            subset_importance_df = model.compute_feature_importance(X=X, y=y, num_shuffle_sets=1,
-                                                                    features=features[:shuffles_left],
-                                                                    subsample_size=subsample_size, silent=True,
-                                                                    time_limit=time_limit, is_oof=True)
-        else:
-            importance_df = model.compute_feature_importance(X=X_val, y=y_val, num_shuffle_sets=shuffles_per_feature,
-                                                             subsample_size=subsample_size, silent=True,
-                                                             time_limit=time_limit)
-            subset_importance_df = model.compute_feature_importance(X=X_val, y=y_val, num_shuffle_sets=1,
-                                                                    features=features[:shuffles_left],
-                                                                    subsample_size=subsample_size, silent=True,
-                                                                    time_limit=time_limit)
-        for feature, info in importance_df.iterrows():
-            if feature in subset_importance_df.index:
-                mean_importance = (info['importance']+subset_importance_df['importance'][feature])/(shuffles_per_feature+1)
-            else:
-                mean_importance = info['importance']
-            param_dict[feature] = {'mu': mean_importance}
-        # prune features based on threshold
-        kept_features, pruned_features = [], []
-        for feature, info in param_dict.items():
-            score = info['mu']
-            if score > threshold:
-                kept_features.append(feature)
-            else:
-                pruned_features.append(feature)
-        return kept_features, param_dict
-
-    def _bayes_feature_prune(self, model, features, param_dict, threshold, X, y, X_val, y_val,
-                             num_shuffle_sets=1, subsample_size=1000, time_limit=None, num_updates=50,
-                             init_shuffles=3, init_subsamples=1000, plot_trajectories=False):
-        """
-        Initialize param_dict if it does not exist
-        Repeat
-        - compute expected utility per feature
-        - compute feature importance score samples for feature that maximizes expected utility
-        - update model hyperparameters for that feature
-        """
-        helper = NormalFeatureImportanceHelper()
-        if param_dict == {}:
-            assert num_updates >= init_shuffles * len(features),\
-               f"We must be able to compute feature importance for each column at least {init_shuffles} times."
-            num_updates = num_updates - (init_shuffles * len(features))
-            time_start = time.time()
-            if X_val is None or y_val is None:
-                importance_df = model.compute_feature_importance(X=X, y=y, num_shuffle_sets=init_shuffles,
-                                                                 subsample_size=init_subsamples, silent=True,
-                                                                 time_limit=time_limit, is_oof=True)
-            else:
-                importance_df = model.compute_feature_importance(X=X_val, y=y_val, num_shuffle_sets=init_shuffles,
-                                                                 subsample_size=init_subsamples, silent=True,
-                                                                 time_limit=time_limit)
-            param_dict = helper.init_fi_dict(importance_df)
-            if time_limit and time.time() - time_start >= time_limit:
-                raise TimeLimitExceeded
-        else:
-            param_dict = copy.deepcopy(param_dict)
-
-        # TODO: Change this to be more flexible with resource
-        # Every iteration, save prior mean and sigma and use them to plot sequence of normal pdfs for each feature
-        trajectories = {feature: [] for feature in param_dict.keys()}
-        for feature in param_dict.keys():
-            trajectories[feature].append(param_dict[feature])
-        for _ in range(num_updates):
-            expected_utilities = {}
-            for feature in features:
-                utility = helper.compute_expected_utility(threshold, param_dict[feature])
-                expected_utilities[feature] = utility
-            sorted_expected_utilities = sorted(expected_utilities.items(), key=lambda el: el[1])
-            promising_feature = sorted_expected_utilities[-1][0]
-            time_start = time.time()
-            if X_val is None or y_val is None:
-                importance_df = model.compute_feature_importance(X=X, y=y, is_oof=True, num_shuffle_sets=num_shuffle_sets, silent=True,
-                                                                 subsample_size=subsample_size, features=[promising_feature],
-                                                                 time_limit=time_limit)
-            else:
-                importance_df = model.compute_feature_importance(X=X_val, y=y_val, num_shuffle_sets=num_shuffle_sets, silent=True,
-                                                                 subsample_size=subsample_size, features=[promising_feature],
-                                                                 time_limit=time_limit)
-            param_dict[promising_feature] = helper.bayes_update(importance_df['importance'], param_dict[promising_feature])
-            if time_limit and time.time() - time_start >= time_limit:
-                raise TimeLimitExceeded
-
-            for feature in param_dict.keys():
-                trajectories[feature].append(param_dict[feature])
-        if plot_trajectories:
-            helper.plot_trajectories(trajectories)
-
-        # prune features based on threshold
-        kept_features, pruned_features = [], []
-        for feature, info in param_dict.items():
-            score = info['mu']
-            if score > threshold:
-                kept_features.append(feature)
-            else:
-                pruned_features.append(feature)
-        return kept_features, param_dict
 
     def _fit(self,
              X,

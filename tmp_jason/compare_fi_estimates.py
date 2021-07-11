@@ -1,6 +1,6 @@
 from autogluon.core import models
 from autogluon.core.data import LabelCleaner
-from autogluon.core.utils import infer_problem_type
+from autogluon.core.utils import infer_problem_type, UniformFeatureSelector, NormalFeatureSelector
 from autogluon.tabular.models.rf.rf_model import RFModel
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
 from autogluon.tabular import TabularDataset
@@ -33,9 +33,10 @@ for each split.
 def accuracy(true_param_dict: dict, pred_param_dict: dict, threshold: float):
     # Return fraction of features in true_param_dict and pred_param_dict that lies on the same side of threshold
     num_equal = 0.
-    for true_param, pred_parm in zip(true_param_dict.values(), pred_param_dict.values()):
-        if (true_param['mu'] <= threshold and pred_parm['mu'] <= threshold) \
-             or (true_param['mu'] > threshold and pred_parm['mu'] > threshold):
+    for feature in true_param_dict.keys():
+        true_param, pred_param = true_param_dict[feature], pred_param_dict[feature]
+        if (true_param['mu'] <= threshold and pred_param['mu'] <= threshold) \
+           or (true_param['mu'] > threshold and pred_param['mu'] > threshold):
             num_equal += 1
     return num_equal/len(true_param_dict)
 
@@ -45,12 +46,12 @@ parser.add_argument('-n', '--name', help='path to save results', type=str, defau
 parser.add_argument('-d', '--dataset', help='path to dataset CSV', type=str, default=None)
 parser.add_argument('-l', '--label', help='label column name', type=str, default='class')
 parser.add_argument('-s', '--seeds', help='number of seeds to use', type=int, default=1)
-parser.add_argument('-r', '--resources', help='a list of number of shuffles to use for each strategy', type=int, default=100)
+parser.add_argument('-r', '--resources', help='a list of number of shuffles to use for each strategy', nargs='+', default=[100])
 parser.add_argument('-t', '--true_shuffles', help='number of shuffles to use per feature to compute ground truth', type=int, default=1000)
 args = parser.parse_args()
 os.makedirs(args.name, exist_ok=True)
 RESULT_DIR = args.name
-SHUFFLES = [args.resources]  # [100, 1000]  # number of shuffles of 1000 datapoints that can be allocated among all features
+SHUFFLES = args.resources  # number of shuffles of 1000 datapoints that can be allocated among all features
 
 # Load Data
 if args.dataset is None:
@@ -98,12 +99,17 @@ for seed in range(args.seeds):
         true_param_dict[feature] = {'mu': info['importance']}
 
     for shuffle in SHUFFLES:
+        importance_fn_args = {'X': X_val, 'y': y_val_clean, 'num_shuffle_sets': 1, 'silent': True, 'subsample_size': 1000}
         time_start = time.time()
-        _, naive_param_dict = model._naive_feature_prune(model, model.features, {}, threshold, X, y_clean, X_val, y_val_clean, num_updates=shuffle)
+        uniform_selector = UniformFeatureSelector(importance_fn=model.compute_feature_importance,
+                                                  importance_fn_args=importance_fn_args, features=list(X.columns))
+        naive_param_dict = uniform_selector.compute_feature_importance(num_resource=shuffle)
         naive_time = time.time() - time_start
         naive_times[shuffle].append(naive_time)
         time_start = time.time()
-        _, bayes_param_dict = model._bayes_feature_prune(model, model.features, {}, threshold, X, y_clean, X_val, y_val_clean, num_updates=shuffle)
+        bayes_selector = NormalFeatureSelector(importance_fn=model.compute_feature_importance,
+                                               importance_fn_args=importance_fn_args, features=list(X.columns))
+        bayes_param_dict = bayes_selector.compute_feature_importance(num_resource=shuffle)
         bayes_time = time.time() - time_start
         bayes_times[shuffle].append(bayes_time)
         naive_accuracy = accuracy(true_param_dict, naive_param_dict, threshold)

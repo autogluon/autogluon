@@ -29,6 +29,8 @@ parser.add_argument('-f', '--train_path', help='path to train dataset CSV', type
 parser.add_argument('-g', '--test_path', help='path to test dataset CSV', type=str, default=None)
 parser.add_argument('-l', '--label', help='label column name', type=str, default='class')
 parser.add_argument('-s', '--seeds', help='number of seeds to use', type=int, default=1)
+parser.add_argument('-r', '--resource', help='number of shuffles to evaluate per model fit iteration', type=int, default=100)
+
 args = parser.parse_args()
 os.makedirs(args.name, exist_ok=True)
 RESULT_DIR = args.name
@@ -67,11 +69,11 @@ for seed in range(args.seeds):
     base_score = model.score(X_test_new, y_test_new)
     # evaluate naive pruning accuracy
     model = RFModel()
-    model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, stop_threshold=3, strategy='naive')
+    model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, max_num_fit=3, stop_threshold=3, strategy='naive', num_resource=args.resource)
     naive_score = model.score(X_test_new, y_test_new)
     # evaluate bayes pruning accuracy
     model = RFModel()
-    model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, stop_threshold=3, strategy='bayes')
+    model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, max_num_fit=3, stop_threshold=3, strategy='bayes', num_resource=args.resource)
     bayes_score = model.score(X_test_new, y_test_new)
 
     accuracies[f"accuracy_seed{seed}"] = [base_score, naive_score, bayes_score]
