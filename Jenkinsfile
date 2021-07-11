@@ -1,5 +1,7 @@
 max_time = 180
 
+// ipykernel>=6.0.0 crashes CI during tutorials
+// pandas==1.3.0 crashes CI during tutorials (FIXME: Revamp openml tutorials, fix object detection)
 setup_pip_venv = """
     rm -rf venv
     conda list
@@ -10,6 +12,7 @@ setup_pip_venv = """
     python3 -m pip install -U setuptools wheel
 
     python3 -m pip install 'graphviz'
+    python3 -m pip install 'ipykernel>=4.5.1,<6.0.0'
     python3 -m pip install 'jupyter-sphinx>=0.2.2'
     python3 -m pip install 'portalocker'
     python3 -m pip install 'nose'

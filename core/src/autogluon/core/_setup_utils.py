@@ -15,7 +15,7 @@ PYTHON_REQUIRES = '>=3.6, <3.9'
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     'numpy': '==1.19.5',  # TODO: v0.3 consider upgrading
-    'pandas': '>=1.0.0,<2.0',
+    'pandas': '>=1.0.0,<1.3',  # FIXME: Don't limit to <1.3, fix openml tutorials to use CSV instead of pickled DataFrames, fix GluonCV object detection tutorial
     'scikit-learn': '>=0.23.2,<0.25',  # 0.22 crashes during efficient OOB in Tabular
     'scipy': '>=1.5.4,<1.7',
     'gluoncv': '>=0.10.3,<0.10.4',
