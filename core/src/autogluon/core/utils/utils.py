@@ -10,11 +10,12 @@ import sys
 from typing import Callable
 from datetime import datetime
 from functools import wraps
+from matplotlib import pyplot as plt
 
 import numpy as np
 import pandas as pd
 import psutil
-import scipy.stats
+import scipy.stats as stats
 from pandas import DataFrame, Series
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
 from sklearn.model_selection import train_test_split
@@ -750,6 +751,93 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
     return fi_df
 
 
+class FeatureImportanceHelper:
+    def init_fi_dict(self, importance_df: pd.DataFrame):
+        raise NotImplementedError
+
+    def compute_expected_utility(self, threshold: float, param_dict: dict, n_sample: int = 1000):
+        raise NotImplementedError
+
+    def bayes_update(self, obs: list, param_dict: dict):
+        raise NotImplementedError
+
+
+class NormalFeatureImportanceHelper(FeatureImportanceHelper):
+    """
+    This Normal-Normal model assumes that our prior belief about the true feature importance
+    score vallue is normally distributed and we know the likelihood standard deviation.
+    """
+    def __init__(self, prior_sigma=0.03, prior_sigma_scaling=3., obs_sigma=0.03):
+        self.prior_sigma = prior_sigma
+        self.prior_sigma_scaling = prior_sigma_scaling
+        self.obs_sigma = obs_sigma
+
+    def init_fi_dict(self, importance_df: pd.DataFrame):
+        """
+        Set FI prior means to empirical mean importance_df and variances to some fixed constant
+        """
+        param_dict = {}
+        for feature, info in importance_df.iterrows():
+            if info['stddev'] and info['stddev'] > 1e-5:
+                sigma = info['stddev'] * self.prior_sigma_scaling
+            else:
+                sigma = self.prior_sigma
+            param_dict[feature] = {
+                'mu': info['importance'],
+                'sigma': sigma,
+                'obs_sigma': self.obs_sigma,
+            }
+        return param_dict
+
+    def compute_expected_utility(self, threshold: float, param_dict: dict, n_sample: int = 1000):
+        """
+        Return expected information gain on whether feature is relevant for a single feature
+        under the current model.
+        - Compute p(X=1) using prior normal CDF and with it calculate prior binary entropy
+        - Sample 1000 samples from normal distribution
+        - For each sample, compute p(X=1|s) and with it calculate posterior binary entropy
+        - Average posterior binary entropy from all samples and subtract from prior binary entropy
+        """
+        mu, sigma, obs_sigma = param_dict['mu'], param_dict['sigma'], param_dict['obs_sigma']
+        prior_prob = stats.norm.cdf(threshold, mu, sigma)
+        prior_entropy = stats.bernoulli.entropy(prior_prob)
+        standard_noise = stats.norm.rvs(size=n_sample)
+        posterior_entropy_list = []
+        for noise in standard_noise:
+            marginal_sample = mu + obs_sigma * noise  # sample from p(obs|mu,obs_sigma)
+            posterior = self.bayes_update([marginal_sample], {'mu': mu, 'sigma': sigma, 'obs_sigma': obs_sigma})
+            posterior_prob = stats.norm.cdf(threshold, posterior['mu'], posterior['sigma'])
+            posterior_entropy = stats.bernoulli.entropy(posterior_prob)
+            posterior_entropy_list.append(posterior_entropy)
+        expected_posterior_entropy = sum(posterior_entropy_list) / n_sample
+        return prior_entropy - expected_posterior_entropy
+
+    def bayes_update(self, obs: list, param_dict: dict):
+        """
+        Normal-Normal conjugate Bayes update
+        """
+        mu, sigma, obs_sigma = param_dict['mu'], param_dict['sigma'], param_dict['obs_sigma']
+        posterior_sigma = math.sqrt(1 / (1/sigma**2 + len(obs)/obs_sigma**2))
+        posterior_mu = posterior_sigma**2 * (mu/sigma**2 + sum(obs)/obs_sigma**2)
+        return {'mu': posterior_mu, 'sigma': posterior_sigma, 'obs_sigma': obs_sigma}
+
+    def plot_trajectories(self, trajectories: dict, x_len=5, x_lo=-0.1, x_hi=0.1):
+        y_len = math.ceil(len(trajectories) / x_len)
+        fig, axs = plt.subplots(y_len, x_len, figsize=(x_len*3, y_len*3), squeeze=False)
+        x = np.linspace(x_lo, x_hi, 100)
+        # sort trajectories in ascending order based on final mean score
+        trajectories = sorted(trajectories.items(), key=lambda el: el[1][-1]['mu'])
+        for i, info in enumerate(trajectories):
+            feature, trajectory = info
+            for param in trajectory:
+                axs[i // x_len, i % x_len].plot(x, stats.norm.pdf(x, param['mu'], param['sigma']))
+            n_unique = len(set(map(lambda param: tuple(param.values()), trajectory)))
+            axs[i // x_len, i % x_len].set_title(f"{feature} ({round(trajectory[-1]['mu'],4)},{n_unique})")
+        fig.suptitle(f"Prior Evolution Over {len(trajectory)-1} Timesteps (FI Score, # Updates)")
+        fig.tight_layout()
+        fig.savefig(f"normal_{int(time.time())}.png")
+
+
 def _validate_features(features: list, valid_features: list):
     """Raises exception if features list contains invalid features or duplicate features"""
     valid_features = set(valid_features)
@@ -811,7 +899,7 @@ def _compute_mean_stddev_and_p_value(values: list):
     stddev = np.std(values, ddof=1) if n > 1 else np.nan
     if stddev != np.nan and stddev != 0:
         t_stat = mean / (stddev / math.sqrt(n))
-        p_value = scipy.stats.t.sf(t_stat, n-1)
+        p_value = stats.t.sf(t_stat, n-1)
     elif stddev == 0:
         p_value = 0.5
 
