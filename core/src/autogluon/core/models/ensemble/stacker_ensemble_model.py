@@ -148,7 +148,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         X = self.preprocess(X=X, preprocess_nonadaptive=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
-        super()._fit(X=X, y=y, time_limit=time_limit, **kwargs)
+        return super()._fit(X=X, y=y, time_limit=time_limit, **kwargs)
 
     def set_contexts(self, path_context):
         path_root_orig = self.path_root

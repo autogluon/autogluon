@@ -939,7 +939,7 @@ class AbstractTrainer:
             fit_with_prune_kwargs = model_fit_kwargs.pop('fit_with_prune_kwargs')
             model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **fit_with_prune_kwargs, **model_fit_kwargs)
         else:
-            model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
+            model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
 
     def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, **model_fit_kwargs) -> List[str]:
