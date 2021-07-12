@@ -706,8 +706,13 @@ class AbstractModel:
         banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         features_to_check = [feature for feature in features if feature not in banned_features]
 
-        fi_df = self._compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
-        n = fi_df.iloc[0]['n'] if len(fi_df) > 0 else 1
+        if features_to_check:
+            fi_df = self._compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
+            n = fi_df.iloc[0]['n'] if len(fi_df) > 0 else 1
+        else:
+            fi_df = None
+            n = kwargs.get('num_shuffle_sets', 1)
+
         if importance_as_list:
             banned_importance = [0] * n
             results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype='object')
@@ -719,7 +724,11 @@ class AbstractModel:
         results_banned_df['stddev'] = 0
         results_banned_df['n'] = n
         results_banned_df['n'] = results_banned_df['n'].astype('int64')
-        fi_df = pd.concat([fi_df, results_banned_df]).sort_values(ascending=False, by='importance')
+        if fi_df is not None:
+            fi_df = pd.concat([fi_df, results_banned_df])
+        else:
+            fi_df = results_banned_df
+        fi_df = fi_df.sort_values(ascending=False, by='importance')
 
         return fi_df
 
