@@ -636,7 +636,7 @@ class AbstractModel:
             logger.log(20, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
             # import pdb; pdb.post_mortem()
-            logger.log(20, f"ERROR: No model trained. Reason: {e}")
+            logger.log(20, f"ERROR: Exception raised during fit_with_prune. Reason: {e}")
             raise e
         finally:
             # Cleanup saved models (keep best model if current model is a bagged model)
