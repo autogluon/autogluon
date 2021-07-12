@@ -94,10 +94,13 @@ class TabularPredictor:
     groups : str, default = None
         [Experimental] If specified, AutoGluon will use the column named the value of groups in `train_data` during `.fit` as the data splitting indices for the purposes of bagging.
         This column will not be used as a feature during model training.
+        This parameter is ignored if bagging is not enabled. To instead specify a custom validation set with bagging disabled, specify `tuning_data` in `.fit`.
         The data will be split via `sklearn.model_selection.LeaveOneGroupOut`.
         Use this option to control the exact split indices AutoGluon uses.
         It is not recommended to use this option unless it is required for very specific situations.
         Bugs may arise from edge cases if the provided groups are not valid to properly train models, such as if not all classes are present during training in multiclass classification. It is up to the user to sanitize their groups.
+
+        As an example, if you want your data folds to preserve adjacent rows in the table without shuffling, then for 3 fold bagging with 6 rows of data, the groups column values should be [0, 0, 1, 1, 2, 2].
     **kwargs :
         learner_type : AbstractLearner, default = DefaultLearner
             A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
