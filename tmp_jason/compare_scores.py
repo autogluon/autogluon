@@ -30,10 +30,13 @@ parser.add_argument('-g', '--test_path', help='path to test dataset CSV', type=s
 parser.add_argument('-l', '--label', help='label column name', type=str, default='class')
 parser.add_argument('-s', '--seeds', help='number of seeds to use', type=int, default=1)
 parser.add_argument('-r', '--resource', help='number of shuffles to evaluate per model fit iteration', type=int, default=100)
+parser.add_argument('-t', '--strategies', help='which strategies to evaluate', nargs='+', default=['keepall', 'naive', 'bayes'])
+
 
 args = parser.parse_args()
 os.makedirs(args.name, exist_ok=True)
 RESULT_DIR = args.name
+STRATEGIES = args.strategies
 
 # Load Data
 if args.train_path is None:
@@ -49,7 +52,7 @@ else:
 # fit_data = fit_data.head(10000)  # subsample for faster demo
 X_all, y_all = fit_data.drop(columns=[args.label]), fit_data[args.label]
 X_test, y_test = test_data.drop(columns=[args.label]), test_data[args.label]
-accuracies = {'method': ['keepall', 'naive', 'bayes']}
+accuracies = {'method': STRATEGIES}
 for seed in range(args.seeds):
     # clean data
     X, X_val, y, y_val = train_test_split(X_all, y_all, test_size=int(0.2*len(fit_data)), random_state=seed)
@@ -69,11 +72,11 @@ for seed in range(args.seeds):
     base_score = model.score(X_test_new, y_test_new)
     # evaluate naive pruning accuracy
     model = RFModel()
-    model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, max_num_fit=3, stop_threshold=3, strategy='naive', num_resource=args.resource)
+    model, _ = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, max_num_fit=3, stop_threshold=3, strategy='naive', num_resource=args.resource)
     naive_score = model.score(X_test_new, y_test_new)
     # evaluate bayes pruning accuracy
     model = RFModel()
-    model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, max_num_fit=3, stop_threshold=3, strategy='bayes', num_resource=args.resource)
+    model, _ = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, max_num_fit=3, stop_threshold=3, strategy='bayes', num_resource=args.resource)
     bayes_score = model.score(X_test_new, y_test_new)
 
     accuracies[f"accuracy_seed{seed}"] = [base_score, naive_score, bayes_score]

@@ -551,19 +551,15 @@ class AbstractModel:
             Number of shuffles to evaluate across all features per feature pruning iteration
 
         TODO
-        1. Consider returning list of models
-        2. If self.weight_evaluation==True pass sample_weight param for scoring
-        3. Be able to restrict pruning candidates to some random subset of features if there are too many features
-        4. Get auto_stack to work by accounting for self.get_model_feature_importance() in self.compute_feature_importance()
+        1. If self.weight_evaluation==True pass sample_weight param for scoring
+        2. Be able to restrict pruning candidates to some random subset of features if there are too many features
+        3. Get auto_stack to work by accounting for self.get_model_feature_importance() in self.compute_feature_importance()
 
         FIXME
         1. Does not work with S3 paths (no problem locally)
-
-        FIXME
-        1. How to compute feature importance for RF/KNN which didn't train using validation data?
         """
-        logger.log(20, f"\tUsing Iterative Feature Pruning with following parameters")
-        logger.log(20, f"\tmax_num_fit: {max_num_fit}, prune_threshold: {prune_threshold}, " +
+        logger.log(30, f"\tUsing Iterative Feature Pruning with following parameters")
+        logger.log(30, f"\tmax_num_fit: {max_num_fit}, prune_threshold: {prune_threshold}, " +
                        f"stop_threshold: {stop_threshold}, num_shuffle_sets: {num_shuffle_sets}, " +
                        f"subsample_size: {subsample_size}, strategy: {strategy}, num_resource: {num_resource}")
 
@@ -586,7 +582,8 @@ class AbstractModel:
             time_limit_exists = 'time_limit' in kwargs and kwargs['time_limit'] is not None
             fitted_copies_info = []
             self_copy, score = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P0', None, **kwargs)
-            fitted_copies_info.append((round(score, 4), self_copy.path))
+            # fitted_copies_info.append((round(score, 4), self_copy.path))
+            fitted_copies_info.append((round(score, 4), self_copy))
             best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': 0}
             init_prune_threshold = prune_threshold
             curr_features = self_copy.features
@@ -608,57 +605,65 @@ class AbstractModel:
                     # if pruned model led to performance drop, adjust threshold to prune less features and refit
                     prune_threshold = selector.update_threshold(param_dict, prune_threshold)
                     curr_features = selector.prune_features(param_dict, prune_threshold)
-
+                logger.log(30, f"\t# of noised/non-noised features remaining: {len(list(filter(lambda f: 'noise' in f, curr_features)))}" + \
+                               f"/{len(list(filter(lambda f: 'noise' not in f, curr_features)))}")
+                pretty_param_dict = {k: round(v['mu'], 4) for k, v in param_dict.items()}
+                logger.log(30, f"\tPARAM_DICT: {pretty_param_dict}")
                 if time_limit_exists:
                     kwargs['time_limit'] = kwargs['time_limit'] - (time.time() - time_start)
                     if kwargs['time_limit'] <= 0:
                         raise TimeLimitExceeded
-                if len(curr_features) == len(reference_features):
-                    logger.log(20, f"\tThere are no more features to prune. Ending...")
+                if len(curr_features) == len(reference_features) or len(curr_features) == 0:
+                    logger.log(30, f"\tThere are no more features to prune. Ending...")
                     break
 
                 self_copy, score = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P{index}', curr_features, **kwargs)
-                fitted_copies_info.append((round(score, 4), self_copy.path))
+                # fitted_copies_info.append((round(score, 4), self_copy.path))
+                fitted_copies_info.append((round(score, 4), self_copy))
                 if score > best_info['score']:
                     # Update best_info and reobtain feature importance scores under this new model
-                    logger.log(20, f"\tFit {index+1}: Current score {score} is better than best score {best_info['score']}. Updating model.")
-                    logger.log(20, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(curr_features)}.")
+                    logger.log(30, f"\tFit {index+1}: Current score {score} is better than best score {best_info['score']}. Updating model.")
+                    logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(curr_features)}.")
                     best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': index}
                     prune_threshold = init_prune_threshold
                     performance_gained = True
                 elif index - best_info['index'] >= stop_threshold:
-                    logger.log(20, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
+                    logger.log(30, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
                     break
                 else:
                     # Simply adjust prune_threshold without FI calculation
                     message = f"\tFit {index+1}: Current score {score} is worse than best score {best_info['score']}."
                     if index != max_num_fit:
                         message += " Will retry fit pruning half as many features."
-                    logger.log(20, message)
+                    logger.log(30, message)
                     performance_gained = False
         except TimeLimitExceeded:
-            logger.log(20, f"\tTime limit exceeded while pruning features. Ending...")
+            logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
-            # import pdb; pdb.post_mortem()
-            logger.log(20, f"ERROR: Exception raised during fit_with_prune. Reason: {e}")
+            import pdb; pdb.post_mortem()
+            logger.log(30, f"ERROR: Exception raised during fit_with_prune. Reason: {e}")
             raise e
         finally:
             # Cleanup saved models (keep best model if current model is a bagged model)
             for index, info in enumerate(fitted_copies_info):
                 if index is not best_info['index']:
-                    tmp_model = self.__class__.load(info[1])
-                    tmp_model.delete_from_disk()
+                    # NOTE: TEMPORARILY NOT DELETED FOR PLOTTING PURPUSE
+                    # tmp_model = self.__class__.load(info[1])
+                    # tmp_model = info[1]
+                    # tmp_model.delete_from_disk()
+                    pass
 
             # We can alternatively return a list of fitted models
             # If no models were trained, exception will be thrown
             if len(fitted_copies_info) > 0:
-                best_model_path = fitted_copies_info[best_info['index']][1]
-                best_model = self.__class__.load(best_model_path)
+                # best_model_path = fitted_copies_info[best_info['index']][1]
+                # best_model = self.__class__.load(best_model_path)
+                best_model = fitted_copies_info[best_info['index']][1]
                 if not (X_val is None or y_val is None):
                     best_model.delete_from_disk()
-                logger.log(20, f"\tSuccessfully ended prune loop after {index+1} iterations. Best score: {best_info['score']}.")
-                logger.log(20, f"\tFeature Count: {old_feature_count} -> {len(best_info['features'])}")
-                return best_model
+                logger.log(30, f"\tSuccessfully ended prune loop after {index+1} iterations. Best score: {best_info['score']}.")
+                logger.log(30, f"\tFeature Count: {old_feature_count} -> {len(best_info['features'])}")
+                return best_model, fitted_copies_info
             raise Exception("ERROR: No model trained.")
 
     def _fit_save_score_model_copy(self, X, y, X_val, y_val, copy_name, features, **kwargs):

@@ -6,6 +6,8 @@ from sklearn.utils import shuffle
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--train_path", help="path to training CSV", default="dataset/AdultIncomeBinaryClassification/train_data.csv")
 parser.add_argument("-g", "--test_path", help="path to test CSV", default="dataset/AdultIncomeBinaryClassification/test_data.csv")
+parser.add_argument('-l', '--label', help='label column name', type=str, default='class')
+parser.add_argument('-t', '--times', help='ratio between original columns and generated columns', type=int, default=1)
 args = parser.parse_args()
 
 # add bunch of Gaussian synthetic features to adult dataset
@@ -19,7 +21,7 @@ train_path_split = train_path.split("/")
 test_path_split = test_path.split("/")
 
 # Create a dataset with a bunch of standard Gaussian synthetic features
-num_new_columns = len(train_df.columns)
+num_new_columns = len(train_df.drop(columns=[args.label]).columns) * args.times
 train_noises, test_noises = {}, {}
 for i in range(num_new_columns):
     train_noise = np.random.normal(loc=0., scale=1., size=train_len)
@@ -29,22 +31,21 @@ for i in range(num_new_columns):
 new_train_df = pd.concat([pd.DataFrame(train_noises), train_df], axis=1)
 new_test_df = pd.concat([pd.DataFrame(test_noises), test_df], axis=1)
 
-train_save_path = f"{'/'.join(train_path_split[:-1])}/n1_{train_path_split[-1]}"
-test_save_path = f"{'/'.join(test_path_split[:-1])}/n1_{test_path_split[-1]}"
+train_save_path = f"{'/'.join(train_path_split[:-1])}/n1_r{args.times}_{train_path_split[-1]}"
+test_save_path = f"{'/'.join(test_path_split[:-1])}/n1_r{args.times}_{test_path_split[-1]}"
 new_train_df.to_csv(train_save_path, index=False)
 new_test_df.to_csv(test_save_path, index=False)
 
 # Create a dataset with a bunch of features that are shuffled versions
 # of the original features
-num_new_columns = len(train_df.columns)
 train_noises, test_noises = {}, {}
 for i in range(num_new_columns):
-    train_noises[f"noise_{i+1}"] = shuffle(train_df[train_df.columns[i]])
-    test_noises[f"noise_{i+1}"] = shuffle(test_df[test_df.columns[i]])
+    train_noises[f"noise_{i+1}"] = shuffle(train_df[train_df.columns[i % len(train_df.columns)]], random_state=0).tolist()
+    test_noises[f"noise_{i+1}"] = shuffle(test_df[test_df.columns[i % len(train_df.columns)]], random_state=0).tolist()
 new_train_df = pd.concat([pd.DataFrame(train_noises), train_df], axis=1)
 new_test_df = pd.concat([pd.DataFrame(test_noises), test_df], axis=1)
 
-train_save_path = f"{'/'.join(train_path_split[:-1])}/n2_{train_path_split[-1]}"
-test_save_path = f"{'/'.join(test_path_split[:-1])}/n2_{test_path_split[-1]}"
+train_save_path = f"{'/'.join(train_path_split[:-1])}/n2_r{args.times}_{train_path_split[-1]}"
+test_save_path = f"{'/'.join(test_path_split[:-1])}/n2_r{args.times}_{test_path_split[-1]}"
 new_train_df.to_csv(train_save_path, index=False)
 new_test_df.to_csv(test_save_path, index=False)

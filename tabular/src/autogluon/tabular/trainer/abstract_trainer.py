@@ -937,7 +937,7 @@ class AbstractTrainer:
         if model_fit_kwargs.get('fit_with_prune_kwargs', None) is not None:
             # This method trains a multiple copy of models and returns the best performing one
             fit_with_prune_kwargs = model_fit_kwargs.pop('fit_with_prune_kwargs')
-            model = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **fit_with_prune_kwargs, **model_fit_kwargs)
+            model, _ = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **fit_with_prune_kwargs, **model_fit_kwargs)
         else:
             model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class FeatureSelector:
-    def __init__(self, importance_fn: Callable[..., np.ndarray], importance_fn_args: dict, features: list, num_max_prune: int = 100) -> None:
+    def __init__(self, importance_fn: Callable[..., np.ndarray], importance_fn_args: dict, features: list, num_max_prune: int = 150) -> None:
         """
         Parameters
         ----------
@@ -42,22 +42,26 @@ class FeatureSelector:
                                    time_limit: Tuple[None, float] = None, trajectory_plot_path: Tuple[None, str] = None) -> dict:
         raise NotImplementedError
 
-    def prune_features(self, param_dict: dict, threshold: float) -> list:
+    def prune_features(self, param_dict: dict, threshold: float, prune_ratio: float = 1.) -> list:
         """
         Given param_dict and threshold, return a pruned list of features based on
-        features in param_dict and threshold.
+        features in param_dict and threshold. Remove at most (prune_ratio * size of all features)
+        features with lowest importance scores.
         """
         remaining_features = []
         pruned_features = []
-        for feature, info in param_dict.items():
-            score = info['mu']
-            if score > threshold:
+        feature_scores = map(lambda info: {'feature': info[0], 'mu': info[1]['mu']}, param_dict.items())
+        sorted_feature_scores = sorted(feature_scores, key=lambda feature_mean: feature_mean['mu'])
+        max_prune_number = int(prune_ratio * (len(self.kept_features) + len(param_dict)))
+        for info in sorted_feature_scores:
+            feature, score = info['feature'], info['mu']
+            if score > threshold or len(pruned_features) > max_prune_number:
                 remaining_features.append(feature)
             else:
                 pruned_features.append(feature)
         return self.kept_features + remaining_features
 
-    def update_threshold(self, param_dict: dict, threshold: float) -> float:
+    def update_threshold(self, param_dict: dict, threshold: float, prune_ratio: float = 1.) -> float:
         """
         Return an updated threshold that would prune half as many features as what pruning with the
         inputted threshold would have accomplished. If inputted threshold feature prunes would have
@@ -70,8 +74,10 @@ class FeatureSelector:
             if score > threshold:
                 break
         # any feature whose index on sorted_feature_means is lower than this would have been dropped
-        original_cutoff_index = index
-        if original_cutoff_index > 0:
+        original_cutoff_index = index if index < len(sorted_feature_means)-1 else 0
+        max_prune_number = int(prune_ratio * (len(self.kept_features) + len(param_dict)))
+        original_cutoff_index = min(original_cutoff_index, max_prune_number + 1)
+        if original_cutoff_index > 1:
             new_cutoff_index = original_cutoff_index//2
             threshold = sorted_feature_means[new_cutoff_index-1]['mu']
         return threshold
@@ -86,22 +92,35 @@ class UniformFeatureSelector(FeatureSelector):
         """
         Uniformly allocate feature importance computation across features in self.prune_candidate_features.
         Return resulting param_dict with mean feature importance score estimate per feature in self.prune_candidate_features.
+        If param_dict already exists, the existing stats are combined with new ones.
         """
         shuffles_per_feature = num_resource // len(self.prune_candidate_features)
         shuffles_left = num_resource % len(self.prune_candidate_features)
         importance_fn_args = deepcopy(self.importance_fn_args)
         importance_fn_args['features'] = self.prune_candidate_features
+        importance_fn_args['num_shuffle_sets'] = shuffles_per_feature
         importance_df = self.importance_fn(**importance_fn_args)
-        importance_fn_args['features'] = self.prune_candidate_features[:shuffles_left]
-        subset_importance_df = self.importance_fn(**importance_fn_args)
+        if shuffles_left > 0:
+            importance_fn_args['features'] = self.prune_candidate_features[:shuffles_left]
+            importance_fn_args['num_shuffle_sets'] = 1
+            subset_importance_df = self.importance_fn(**importance_fn_args)
+        else:
+            subset_importance_df = None
 
-        param_dict = {}
         for feature, info in importance_df.iterrows():
-            if feature in subset_importance_df.index:
-                mean_importance = (info['importance']+subset_importance_df['importance'][feature])/(shuffles_per_feature+1)
+            if subset_importance_df is not None and feature in subset_importance_df.index:
+                num_resource = shuffles_per_feature + 1
+                mean_importance = (info['importance']*info['n']+subset_importance_df['importance'][feature])/num_resource
             else:
+                num_resource = shuffles_per_feature
                 mean_importance = info['importance']
-            param_dict[feature] = {'mu': mean_importance}
+            if feature in param_dict:
+                # If param_dict already exists, update importance estimates with current run values
+                prev_importance = param_dict[feature]['importance']
+                prev_num_resource = param_dict[feature]['num_resource']
+                mean_importance = (mean_importance*num_resource + prev_importance*prev_num_resource)/(num_resource + prev_num_resource)
+                num_resource = num_resource + prev_num_resource
+            param_dict[feature] = {'mu': mean_importance, 'num_resource': num_resource}
         return param_dict
 
 
@@ -135,6 +154,7 @@ class BayesianFeatureSelector(FeatureSelector):
             importance_df = self.importance_fn(**importance_fn_args)
             updated_params = self.bayes_update(importance_df['importance'], param_dict[promising_feature])
             param_dict[promising_feature] = {param: value[0] if isinstance(value, Iterable) else value for param, value in updated_params.items()}
+            param_dict[promising_feature]['num_resource'] += 1
             if time_limit and time.time() - time_start >= time_limit:
                 raise TimeLimitExceeded
             for feature in param_dict.keys():
@@ -167,7 +187,8 @@ class NormalFeatureSelector(BayesianFeatureSelector):
             param_dict[feature] = {
                 'mu': self.prior_mu,
                 'sigma': self.prior_sigma,
-                'obs_sigma': self.obs_sigma
+                'obs_sigma': self.obs_sigma,
+                'num_resource': 0,
             }
         return param_dict
 
@@ -201,12 +222,12 @@ class NormalFeatureSelector(BayesianFeatureSelector):
         param_dict : dict
             Dictionary containing prior mean, prior standard deviation, and observation standard deviation.
         """
-        mu, sigma, obs_sigma = param_dict['mu'], param_dict['sigma'], param_dict['obs_sigma']
+        mu, sigma, obs_sigma, num_resource = param_dict['mu'], param_dict['sigma'], param_dict['obs_sigma'], param_dict['num_resource']
         posterior_sigmas = np.sqrt(1 / (1/sigma**2 + 1/obs_sigma**2))
         posterior_mus = posterior_sigmas**2 * (mu/sigma**2 + obs/obs_sigma**2)
         # posterior_sigma = np.sqrt(1 / (1/sigma**2 + len(obs)/obs_sigma**2))
         # posterior_mu = posterior_sigma**2 * (mu/sigma**2 + sum(obs)/obs_sigma**2)
-        return {'mu': posterior_mus, 'sigma': posterior_sigmas, 'obs_sigma': obs_sigma}
+        return {'mu': posterior_mus, 'sigma': posterior_sigmas, 'obs_sigma': obs_sigma, 'num_resource': num_resource}
 
     def plot_trajectories(self, trajectories: dict, x_len=5, x_lo=-0.1, x_hi=0.1):
         y_len = math.ceil(len(trajectories) / x_len)
