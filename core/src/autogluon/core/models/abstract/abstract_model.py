@@ -640,7 +640,7 @@ class AbstractModel:
         except TimeLimitExceeded:
             logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
-            import pdb; pdb.post_mortem()
+            # import pdb; pdb.post_mortem()
             logger.log(30, f"ERROR: Exception raised during fit_with_prune. Reason: {e}")
             raise e
         finally:
@@ -659,8 +659,8 @@ class AbstractModel:
                 # best_model_path = fitted_copies_info[best_info['index']][1]
                 # best_model = self.__class__.load(best_model_path)
                 best_model = fitted_copies_info[best_info['index']][1]
-                if not (X_val is None or y_val is None):
-                    best_model.delete_from_disk()
+                # if not (X_val is None or y_val is None):
+                #    best_model.delete_from_disk()
                 logger.log(30, f"\tSuccessfully ended prune loop after {index+1} iterations. Best score: {best_info['score']}.")
                 logger.log(30, f"\tFeature Count: {old_feature_count} -> {len(best_info['features'])}")
                 return best_model, fitted_copies_info

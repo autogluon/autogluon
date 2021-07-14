@@ -69,12 +69,13 @@ class FeatureSelector:
         """
         feature_means = map(lambda info: {'feature': info[0], 'mu': info[1]['mu']}, param_dict.items())
         sorted_feature_means = sorted(feature_means, key=lambda feature_mean: feature_mean['mu'])
+        original_cutoff_index = 0
         for index, feature_mean in enumerate(sorted_feature_means):
             score = feature_mean['mu']
             if score > threshold:
                 break
+            original_cutoff_index = index + 1
         # any feature whose index on sorted_feature_means is lower than this would have been dropped
-        original_cutoff_index = index if index < len(sorted_feature_means)-1 else 0
         max_prune_number = int(prune_ratio * (len(self.kept_features) + len(param_dict)))
         original_cutoff_index = min(original_cutoff_index, max_prune_number + 1)
         if original_cutoff_index > 1:
