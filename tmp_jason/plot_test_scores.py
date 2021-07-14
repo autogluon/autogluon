@@ -1,7 +1,7 @@
 """
 Plot the evolution of validation/test set scores on fit_with_prune model refits.
 1. For each seed,
-    1a. Initialize RandomForest and run fit_with_prune to obtain a list of models.
+    1a. Initialize model and run fit_with_prune to obtain a list of models.
     1b. On each model, run score to obtain its test set performance.
 2. For each fit, compute average validation and test set scores.
 3. Plot two sequences.
