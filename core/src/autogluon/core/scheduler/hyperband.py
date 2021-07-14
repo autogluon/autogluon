@@ -8,6 +8,8 @@ import copy
 from .fifo import FIFOScheduler
 from .hyperband_stopping import StoppingRungSystem
 from .hyperband_promotion import PromotionRungSystem
+from .mo_asha_promotion import MOPromotionRungSystem, EPS_NET, NSGA_II
+
 from ..utils import load
 from ..utils.default_arguments import check_and_merge_defaults, \
     Integer, Boolean, Categorical, filter_by_key
@@ -41,7 +43,7 @@ _CONSTRAINTS = {
     'grace_period': Integer(1, None),
     'reduction_factor': Integer(2, None),
     'brackets': Integer(1, None),
-    'type': Categorical(('stopping', 'promotion')),
+    'type': Categorical(('stopping', 'promotion', EPS_NET, NSGA_II)),
     'searcher_data': Categorical(
         ('rungs', 'all', 'rungs_and_last')),
     'do_snapshots': Boolean(),
@@ -315,7 +317,7 @@ class HyperbandScheduler(FIFOScheduler):
             dict_name='scheduler_options')
         resume = kwargs['resume']
         scheduler_type = kwargs['type']
-        supported_types = {'stopping', 'promotion'}
+        supported_types = {'stopping', 'promotion', EPS_NET, NSGA_II}
         assert scheduler_type in supported_types, \
             "type = '{}' not supported, must be in {}".format(
                 scheduler_type, supported_types)
@@ -346,10 +348,19 @@ class HyperbandScheduler(FIFOScheduler):
 
         self.max_t = max_t
         self.scheduler_type = scheduler_type
-        self.terminator = HyperbandBracketManager(
-            scheduler_type, self._time_attr, self._reward_attr, max_t,
-            rung_levels, brackets, rung_system_per_bracket,
-            kwargs['random_seed'])
+        if scheduler_type in [EPS_NET, NSGA_II]:
+            from .mo_asha import MOASHAScheduler, MOHyperbandBracketManager
+            assert self.__class__ == MOASHAScheduler, \
+                "Scheduler type " + scheduler_type + " needs MOASHAScheduler."
+            self.terminator = MOHyperbandBracketManager(
+                scheduler_type, self._time_attr, self._reward_attr, max_t,
+                rung_levels, brackets, rung_system_per_bracket,
+                kwargs['random_seed'], self._objectives)
+        else:
+            self.terminator = HyperbandBracketManager(
+                scheduler_type, self._time_attr, self._reward_attr, max_t,
+                rung_levels, brackets, rung_system_per_bracket,
+                kwargs['random_seed'])
         self.do_snapshots = do_snapshots
         self.searcher_data = kwargs['searcher_data']
         # Maintains a snapshot of currently running tasks, needed by several
@@ -820,17 +831,26 @@ class HyperbandBracketManager(object):
         max_num_brackets = len(rung_levels)
         self.num_brackets = min(brackets, max_num_brackets)
         num_systems = self.num_brackets if rung_system_per_bracket else 1
-        if scheduler_type == 'stopping':
-            rs_type = StoppingRungSystem
-        else:
-            rs_type = PromotionRungSystem
         rung_levels_plus_maxt = rung_levels[1:] + [max_t]
         # Promotion quantiles: q_j = r_j / r_{j+1}
         promote_quantiles = [
             x / y for x, y in zip(rung_levels, rung_levels_plus_maxt)]
-        self._rung_systems = [
-            rs_type(rung_levels[s:], promote_quantiles[s:], max_t)
-            for s in range(num_systems)]
+
+        if scheduler_type == 'stopping':
+            self._rung_systems = [
+                StoppingRungSystem(rung_levels[s:], promote_quantiles[s:], max_t)
+                for s in range(num_systems)]
+        elif scheduler_type == 'promotion':
+            self._rung_systems = [
+                PromotionRungSystem(rung_levels[s:], promote_quantiles[s:], max_t)
+                for s in range(num_systems)]
+        elif scheduler_type in [EPS_NET, NSGA_II]:
+            self._rung_systems = [
+                MOPromotionRungSystem(rung_levels[s:], promote_quantiles[s:], max_t, scheduler_type)
+                for s in range(num_systems)]
+        else:
+            raise ValueError("The specified scheduler is unknown.")
+
         self.random_state = np.random.RandomState(random_seed)
 
     def _get_rung_system_for_bracket_id(self, bracket_id):
