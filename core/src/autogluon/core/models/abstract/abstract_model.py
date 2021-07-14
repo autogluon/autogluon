@@ -607,8 +607,8 @@ class AbstractModel:
                     curr_features = selector.prune_features(param_dict, prune_threshold)
                 logger.log(30, f"\t# of noised/non-noised features remaining: {len(list(filter(lambda f: 'noise' in f, curr_features)))}" + \
                                f"/{len(list(filter(lambda f: 'noise' not in f, curr_features)))}")
-                pretty_param_dict = {k: round(v['mu'], 4) for k, v in param_dict.items()}
-                logger.log(30, f"\tPARAM_DICT: {pretty_param_dict}")
+                # pretty_param_dict = {k: round(v['mu'], 4) for k, v in param_dict.items()}
+                # logger.log(30, f"\tPARAM_DICT: {pretty_param_dict}")
                 if time_limit_exists:
                     kwargs['time_limit'] = kwargs['time_limit'] - (time.time() - time_start)
                     if kwargs['time_limit'] <= 0:
@@ -640,7 +640,7 @@ class AbstractModel:
         except TimeLimitExceeded:
             logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
-            import pdb; pdb.post_mortem()
+            # import pdb; pdb.post_mortem()
             logger.log(30, f"ERROR: Exception raised during fit_with_prune. Reason: {e}")
             raise e
         finally:

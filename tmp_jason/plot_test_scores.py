@@ -75,14 +75,14 @@ for seed in range(args.seeds):
 
         # clean data and call fit_with_prune
         if args.bagged:
-            model = BaggedEnsembleModel(model)
+            model = BaggedEnsembleModel(model, random_state=seed)
             problem_type = infer_problem_type(y=y_all)
             label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y_all)
-            X_all = auto_ml_pipeline_feature_generator.fit_transform(X=X_all)
-            y_all = label_cleaner.transform(y_all)
-            best_model, all_model_info = model.fit_with_prune(X=X_all, y=y_all, X_val=None, y_val=None, max_num_fit=args.max_num_fit,
+            X_all_new = auto_ml_pipeline_feature_generator.fit_transform(X=X_all)
+            y_all_new = label_cleaner.transform(y_all)
+            best_model, all_model_info = model.fit_with_prune(X=X_all_new, y=y_all_new, X_val=None, y_val=None, max_num_fit=args.max_num_fit,
                                                               stop_threshold=args.stop_threshold, strategy=args.strategy, num_resource=args.resource,
-                                                              subsample_size=args.subsample_size, prune_threshold=0.001, random_state=seed)
+                                                              subsample_size=args.subsample_size, prune_threshold=0.001)
         else:
             X, X_val, y, y_val = train_test_split(X_all, y_all, test_size=int(0.2*len(fit_data)), random_state=seed)
             problem_type = infer_problem_type(y=y)

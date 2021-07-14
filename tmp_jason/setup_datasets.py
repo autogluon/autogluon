@@ -10,10 +10,10 @@ For each downloaded datasets, create synthetic versions.
 """
 DATASETS = {
     "adult": 179,
-    #"airlines": 1169,
-    #"australian": 40981,
-    #"covertype": 1596,
-    #"higgs": 42769,
+    "airlines": 1169,
+    "australian": 40981,
+    "covertype": 1596,
+    "higgs": 42769,
 }
 
 for dataset_name, dataset_id in DATASETS.items():
