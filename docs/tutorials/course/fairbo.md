@@ -20,7 +20,7 @@ import seaborn as sns
 sns.set()
 
 # Fixing seed for reproducibility
-SEED = 123
+SEED = 999
 random.seed(SEED)
 np.random.seed(SEED)
 ```
@@ -281,7 +281,7 @@ def process_training_history(task_dicts, start_timestamp,
     task_dfs = []
     for task_id in task_dicts:
         task_df = pd.DataFrame(task_dicts[task_id])
-        error = 1.0 + task_df["objective"]
+        error = 1.0 - task_df["objective"]
         is_fair = (task_df["constraint_metric"] < 0.0).values
         if is_fair:
             fair_error = error
@@ -328,7 +328,7 @@ def create_train_fn_constraint(fairness_threshold, fairness_definition):
                                      args.criterion, 
                                      fairness_threshold,
                                      fairness_definition)
-        reporter(objective=-opaque_box_eval[ACTIVE_METRIC_NAME],
+        reporter(objective=opaque_box_eval[ACTIVE_METRIC_NAME],
                  constraint_metric=opaque_box_eval[CONSTRAINT_METRIC_NAME])
     return run_opaque_box
 
@@ -420,7 +420,8 @@ myscheduler = ag.scheduler.FIFOScheduler(
     searcher='constrained_bayesopt',
     search_options=search_options,
     num_trials=15,
-    reward_attr=REWARD_ATTR_NAME
+    reward_attr=REWARD_ATTR_NAME,
+    constraint_attr='constraint_metric'
 )
 
 # Run HPO experiment
@@ -435,7 +436,7 @@ results_df = process_training_history(myscheduler.training_history.copy(),
 results_df.head()
 ```
 
-Let's see the empirical probability that the *constrained* BO procedure finds an fair model (with respect to the constraint of DPS < 0.01), the average DSP and classification error.
+Let's see the empirical probability that the *constrained* BO procedure finds a fair model (with respect to the constraint of DPS < 0.01), the average DSP and classification error.
 
 
 ```python
