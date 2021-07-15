@@ -240,7 +240,7 @@ class ForecastingPredictor:
             If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
             Only valid if `refit_full` is set. If refit is set to be True while set_best_to_refit_full is not specified, it will be by default set to be True.
 
-        quantiles: list[float], default=[0.5]
+        quantiles: list[float], default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
             Can be list of combinations of floats in [0.1, 0.2, ..., 0.9]
             Quantiles used for training gluonts models.
 
@@ -368,7 +368,7 @@ class ForecastingPredictor:
 
         random_seed = kwargs.get('random_seed', 0)
         logger.log(30, f"Random seed set to {random_seed}")
-        quantiles = kwargs.get("quantiles", ["0.5"])
+        quantiles = kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         logger.log(30, f"All models will be trained for quantiles {quantiles}.")
         if hyperparameter_tune_kwargs is not None:
             scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
@@ -414,7 +414,7 @@ class ForecastingPredictor:
             "refit_full": False,
             "save_data": True,
             "freq": None,
-            "quantiles": ["0.5"]
+            "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         }
         if kwargs.get("refit_full", False):
             if "set_best_to_refit_full" not in kwargs:

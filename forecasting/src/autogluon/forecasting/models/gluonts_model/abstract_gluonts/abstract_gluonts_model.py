@@ -70,7 +70,7 @@ class AbstractGluonTSModel(AbstractModel):
         self.val_score = None
         self.fit_time = None
         self.predict_time = None
-        self.quantiles = kwargs.get("quantiles", ["0.5"])
+        self.quantiles = kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self.params["quantiles"] = self.quantiles
 
         self.epoch_counter = EpochCounter()

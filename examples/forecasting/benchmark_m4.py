@@ -27,7 +27,7 @@ for dataset_name in dataset_list:
                                                                                          'searcher': 'random',
                                                                                          "num_trials": 10
                                                                                      },
-                                                                                     quantiles=[0.1, 0.5, 0.9],
+                                                                                     quantiles=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
                                                                                      refit_full=True,
                                                                                      set_best_to_refit_full=True,
                                                                                      )

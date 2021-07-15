@@ -25,7 +25,7 @@ class AbstractTrainer:
         self.freq = freq
         self.prediction_length = prediction_length
         self.save_data = save_data
-        self.quantiles = kwargs.get("quantiles", ["0.5"])
+        self.quantiles = kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self.is_data_saved = False
         self.model_full_dict = {}  # Dict of normal model -> FULL model. FULL models are produced by self.refit_single_full() and self.refit_ensemble_full().
         self._model_full_dict_val_score = {}  # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
