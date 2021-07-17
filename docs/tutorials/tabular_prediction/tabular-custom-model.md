@@ -9,10 +9,10 @@ In this example, we create a custom Random Forest model for use in AutoGluon. Al
 
 Note that while this tutorial provides a basic model implementation, this does not cover many aspects that are used in most implemented models.
 
-To best understand how to implement more advanced functionality, refer to the [source code]((../../api/autogluon.tabular.models.html#module-autogluon.tabular.models)) of the following models:
+To best understand how to implement more advanced functionality, refer to the [source code](../../api/autogluon.tabular.models.html#module-autogluon.tabular.models) of the following models:
 
 - Respecting time limit / early stopping logic
-  - Refer to LGBModel and RandomForestModel
+  - Refer to [LGBModel](../../_modules/autogluon/tabular/models/lgb/lgb_model.html#LGBModel) and [RandomForestModel](../../_modules/autogluon/tabular/models/rf/rf_model.html#RFModel)
 - Respecting memory usage limit
   - Refer to LGBModel and RandomForestModel
 - Sample weight support
@@ -22,13 +22,13 @@ To best understand how to implement more advanced functionality, refer to the [s
 - GPU training support
   - Refer to LGBModel
 - Save / load logic of non-serializable models
-  - Refer to NNFastAiTabularModel
+  - Refer to [NNFastAiTabularModel](../../_modules/autogluon/tabular/models/fastainn/tabular_nn_fastai.html#NNFastAiTabularModel)
 - Advanced problem type support (Softclass, Quantile)
   - Refer to RandomForestModel
 - Text feature type support
-  - Refer to TextPredictorModel
+  - Refer to [TextPredictorModel](../../_modules/autogluon/tabular/models/text_prediction/text_prediction_v1_model.html#TextPredictorModel)
 - Image feature type support
-  - Refer to ImagePredictorModel
+  - Refer to [ImagePredictorModel](../../_modules/autogluon/tabular/models/image_prediction/image_predictor.html#ImagePredictorModel)
 - Custom HPO logic
   - Refer to LGBModel
 
@@ -147,7 +147,7 @@ train_data.head(5)
 
 ## Training a custom model without TabularPredictor
 
-Below we will demonstrate how to train the model outside `TabularPredictor`. This is useful for debugging and minimizing the amount of code you need to understand while implementing the model.
+Below we will demonstrate how to train the model outside [TabularPredictor](../../api/autogluon.predictor.html#module-0). This is useful for debugging and minimizing the amount of code you need to understand while implementing the model.
 
 This process is similar to what happens internally when calling fit on `TabularPredictor`, but is simplified and minimal.
 
@@ -185,7 +185,7 @@ y_clean.head(5)
 
 Next, we need to clean the features. Currently, features like 'workclass' are object dtypes (strings), but we actually want to use them as categorical features. Most models won't accept string inputs, so we need to convert the strings to numbers.
 
-AutoGluon contains an entire module dedicated to cleaning, transforming, and generating features called `autogluon.features`. Here we will use the same feature generator used internally by `TabularPredictor` to convert the object dtypes to categorical and minimize memory usage.
+AutoGluon contains an entire module dedicated to cleaning, transforming, and generating features called [autogluon.features](../../api/autogluon.features.html). Here we will use the same feature generator used internally by `TabularPredictor` to convert the object dtypes to categorical and minimize memory usage.
 
 ```{.python .input}
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
@@ -267,7 +267,7 @@ print(f'Bagging increased model accuracy by {round(bagged_score - score, 4) * 10
 
 ## Training a custom model with TabularPredictor
 
-While not using TabularPredictor allows us to simplify the amount of code we need to worry about while developing and debugging our model, once it is stable we want to leverage TabularPredictor to get the most out of our model.
+While not using [TabularPredictor](../../api/autogluon.predictor.html#module-0) allows us to simplify the amount of code we need to worry about while developing and debugging our model, eventually we want to leverage TabularPredictor to get the most out of our model.
 
 The code to train the model from the raw data is very simple when using TabularPredictor. There is no need to specify a LabelCleaner, FeatureGenerator, or a validation set, all of that is handled internally.
 
@@ -321,7 +321,7 @@ predictor = TabularPredictor(label=label).fit(train_data,
 
 ### Predictor leaderboard (HPO)
 
-The leaderboard for the HPO run will show models with suffix `/Tx` in their name. This indicates the HPO trial they were performed in.
+The leaderboard for the HPO run will show models with suffix `'/Tx'` in their name. This indicates the HPO trial they were performed in.
 
 ```{.python .input}
 leaderboard_hpo = predictor.leaderboard(silent=True)
@@ -359,10 +359,12 @@ custom_hyperparameters = get_hyperparameter_config('default')
 custom_hyperparameters[CustomRandomForestModel] = best_model_info['hyperparameters']
 
 print(custom_hyperparameters)
+```
 
+```{.python .input}
 predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train the default models plus a single tuned CustomRandomForestModel
 # predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters, presets='best_quality')  # We can even use the custom model in a multi-layer stack ensemble
-predictor.leaderboard(test_data)
+predictor.leaderboard(test_data, silent=True)
 ```
 
 ## Wrapping up
