@@ -389,7 +389,10 @@ class ForecastingPredictor:
             scheduler_options = (scheduler_cls, scheduler_params)
         else:
             scheduler_options = (None, None)
-
+        if time_limit is not None:
+            time_left = time_limit - processing_time
+        else:
+            time_left = time_limit
         self._learner.fit(train_data=train_data,
                           freq=freq,
                           prediction_length=prediction_length,
@@ -401,7 +404,7 @@ class ForecastingPredictor:
                           hyperparameters=hyperparameters,
                           hyperparameter_tune=hyperparameter_tune,
                           quantiles=quantiles,
-                          time_limit=time_limit - processing_time,)
+                          time_limit=time_left,)
 
         self._set_post_fit_vars()
         self._post_fit(
