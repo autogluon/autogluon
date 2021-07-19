@@ -43,7 +43,8 @@ class DefaultLearner(AbstractLearner):
         trainer.train(train_data=train_data,
                       val_data=val_data,
                       hyperparameter_tune=hyperparameter_tune,
-                      hyperparameters=hyperparameters)
+                      hyperparameters=hyperparameters,
+                      time_limit=time_limit)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self._time_fit_training = time_end - time_start

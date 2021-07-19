@@ -11,7 +11,8 @@ predictor = ForecastingPredictor().fit(train_data,
                                        index_column="name",
                                        target_column="ConfirmedCases",
                                        time_column="Date",
-                                       presets="low_quality"
+                                       # presets="low_quality"
+                                       time_limit=60
                                        )
 
 print(predictor.leaderboard())

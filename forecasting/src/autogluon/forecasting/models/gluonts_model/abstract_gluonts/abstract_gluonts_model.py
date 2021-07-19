@@ -20,7 +20,7 @@ from autogluon.core.task.base.base_predictor import BasePredictor
 from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...abstract.abstract_model import AbstractModel
 from ..abstract_gluonts.model_trial import model_trial
-from .callback import EpochCounter
+from .callback import EpochCounter, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +123,13 @@ class AbstractGluonTSModel(AbstractModel):
         """
         Fitting the model.
         """
+        if time_limit is not None:
+            logger.log(30, f"Training model {self.name} for up to {time_limit}s...")
+        else:
+            logger.log(30, f"Training model {self.name}...")
         if time_limit is None or time_limit > 0:
             start_time = time.time()
+            self.params["callbacks"].append(TimeLimitCallback(time_limit))
             self.create_model()
             self.model = self.model.train(train_data, validation_data=val_data)
             end_time = time.time()
@@ -258,13 +263,14 @@ class AbstractGluonTSModel(AbstractModel):
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=val_data)
         scheduler_func, scheduler_params = scheduler_options
+        scheduler_params["time_out"] = scheduler_params.get("time_out", time_limit)
         util_args = dict(
             train_data_path=dataset_train_filename,
             val_data_path=dataset_val_filename,
             directory=directory,
             model=self,
             time_start=time_start,
-            time_limit=scheduler_params.get("time_out", None)
+            time_limit=scheduler_params.get("time_out", time_limit)
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)

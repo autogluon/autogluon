@@ -45,9 +45,9 @@ predictor = ForecastingPredictor(path=path, eval_metric=eval_metric).fit(train_d
                                                                                  'context_length': ag.Int(70, 90,
                                                                                                           default=prediction_length * 4),
                                                                                  "num_batches_per_epoch": 10,
-                                                                                 "epochs": 5},
+                                                                                 "epochs": 30},
                                                                          },
-                                                                         time_limits=5
+                                                                         time_limit=60
                                                                          )
 
 
