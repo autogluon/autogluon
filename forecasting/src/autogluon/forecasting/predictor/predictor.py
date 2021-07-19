@@ -1,6 +1,8 @@
 import copy
 import logging
 import pprint
+import time
+
 import pandas as pd
 import numpy as np
 
@@ -153,7 +155,7 @@ class ForecastingPredictor:
             presets=None,
             hyperparameters=None,
             hyperparameter_tune_kwargs=None,
-            time_limits=None,
+            time_limit=None,
             static_features=None,
             **kwargs):
         """
@@ -222,7 +224,7 @@ class ForecastingPredictor:
             Each hyperparameter can either be a single fixed value or a search space containing many possible values.
             Search Space should only be provided when hyperparameter_tune_kwargs is provided(hyperparameter_tune is turned on)
 
-        time_limits: int, default=None
+        time_limit: int, default=None
             Only works when hyperparameter_tune_kwarg is not None, approximately how long each model will be tunned for.(wallclock time in seconds)
 
         static_features: pd.Dataframe, default=None
@@ -279,6 +281,7 @@ class ForecastingPredictor:
             SFF: https://ts.gluon.ai/api/gluonts/gluonts.model.simple_feedforward.html
             AutoTabular: https://ts.gluon.ai/api/gluonts/gluonts.nursery.autogluon_tabular.html
         """
+        start_time = time.time()
         if self._learner.is_fit:
             raise AssertionError(
                 'Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new '
@@ -290,7 +293,7 @@ class ForecastingPredictor:
         self.target_column = target_column
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_kwargs(kwargs)
-        if not self._validate_hyperparameter_tune_kwargs(hyperparameter_tune_kwargs, time_limits=time_limits):
+        if not self._validate_hyperparameter_tune_kwargs(hyperparameter_tune_kwargs, time_limit=time_limit):
             hyperparameter_tune_kwargs = None
             logger.warning(30, "Invalid hyperparameter_tune_kwarg, disabling hyperparameter tuning.")
 
@@ -347,7 +350,9 @@ class ForecastingPredictor:
                 train_data, val_data = train_test_split_gluonts(train_data, prediction_length, freq)
         else:
             raise TypeError("Does not support dataset type:", type(train_data))
-
+        time_preprocessing_end = time.time()
+        processing_time = time_preprocessing_end - start_time
+        logger.log(30, f"Finished processing data, using {processing_time}s.")
         refit_full = kwargs["refit_full"]
         save_data = kwargs["save_data"]
         if not save_data:
@@ -371,13 +376,16 @@ class ForecastingPredictor:
         quantiles = kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         logger.log(30, f"All models will be trained for quantiles {quantiles}.")
         if hyperparameter_tune_kwargs is not None:
+            if time_limit is None and hyperparameter_tune_kwargs.get("num_trials", None) is None:
+                logger.log(30, "None of time_limit and num_tirals are set, by default setting num_tirals=2")
+                num_trials = 2
+            else:
+                if isinstance(hyperparameter_tune_kwargs, str):
+                    num_trials = 9999
+                elif isinstance(hyperparameter_tune_kwargs, dict):
+                    num_trials = hyperparameter_tune_kwargs.get("num_trials", 9999)
             scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                                                                time_out=time_limits,
-                                                                nthreads_per_trial='auto', ngpus_per_trial='auto')
-            if time_limits is None and scheduler_params["num_trials"] is None:
-                logger.log(30, "None of time_limits and num_tirals are set, by default setting num_tirals=2")
-                scheduler_params["num_trials"] = 2
-
+                                                                nthreads_per_trial='auto', ngpus_per_trial='auto', num_trials=num_trials)
             scheduler_options = (scheduler_cls, scheduler_params)
         else:
             scheduler_options = (None, None)
@@ -393,7 +401,7 @@ class ForecastingPredictor:
                           hyperparameters=hyperparameters,
                           hyperparameter_tune=hyperparameter_tune,
                           quantiles=quantiles,
-                          time_limits=time_limits,)
+                          time_limit=time_limit - processing_time,)
 
         self._set_post_fit_vars()
         self._post_fit(
@@ -644,7 +652,7 @@ class ForecastingPredictor:
         """
         return self._learner.refit_full(models=models)
 
-    def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limits=None):
+    def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limit=None):
         """
         Returns True if hyperparameter_tune_kwargs is None or can construct a valid scheduler.
         Returns False if hyperparameter_tune_kwargs results in an invalid scheduler.
@@ -652,7 +660,7 @@ class ForecastingPredictor:
         if hyperparameter_tune_kwargs is None:
             return True
 
-        scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limits,
+        scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit,
                                                             nthreads_per_trial='auto', ngpus_per_trial='auto')
         assert scheduler_params['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
         if scheduler_params.get('dist_ip_addrs', None):
@@ -664,7 +672,7 @@ class ForecastingPredictor:
 
         scheduler_ngpus = scheduler_params['resource'].get('num_gpus', 0)
         if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
-            logger.warning(f"Warning: TabularPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
+            logger.warning(f"Warning: ForecastingPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
         return True
 
     @classmethod

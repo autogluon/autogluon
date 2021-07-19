@@ -167,7 +167,8 @@ class AbstractTrainer:
                                                                                         val_data=val_data,
                                                                                         scheduler_options=(
                                                                                             self._scheduler_func,
-                                                                                            self._scheduler_options))
+                                                                                            self._scheduler_options),
+                                                                                        time_limit=time_limit)
             hpo_results.pop('search_strategy', None)
             self.hpo_results[model.name] = hpo_results
             model_names_trained = []
@@ -191,7 +192,7 @@ class AbstractTrainer:
                     return model_names_trained
             else:
                 logging.log(20, f'Fitting model: {model.name} ...')
-            model = self._train_single(train_data, model, val_data=val_data)
+            model = self._train_single(train_data, model, val_data=val_data, time_limit=time_limit)
             fit_end_time = time.time()
             if val_data is not None:
                 score = -model.score(val_data)
@@ -216,7 +217,9 @@ class AbstractTrainer:
                 del model
         return model_names_trained
 
-    def _train_multi(self, train_data, val_data=None, models=None, hyperparameters=None, hyperparameter_tune=False):
+    def _train_multi(self, train_data, val_data=None, models=None, hyperparameters=None, hyperparameter_tune=False, time_limit=None):
+        time_start = time.time()
+
         if self.save_data and not self.is_data_saved:
             self.save_train_data(train_data)
             if val_data is not None:
@@ -227,10 +230,23 @@ class AbstractTrainer:
             hyperparameters = copy.deepcopy(hyperparameters)
         if models is None:
             models = self.get_models(hyperparameters, hyperparameter_tune=hyperparameter_tune)
+        if time_limit is not None and len(models) > 0:
+            time_limit_model_split = time_limit / len(models)
+        else:
+            time_limit_model_split = time_limit
         model_names_trained = []
         for i, model in enumerate(models):
+            if hyperparameter_tune:
+                time_left = time_limit_model_split
+            else:
+                if time_limit is None:
+                    time_left = None
+                else:
+                    time_start_model = time.time()
+                    time_left = time_limit - (time_start_model - time_start)
+
             model_names_trained += self._train_single_full(train_data, model, val_data=val_data,
-                                                           hyperparameter_tune=hyperparameter_tune)
+                                                           hyperparameter_tune=hyperparameter_tune, time_limit=time_left)
 
         return model_names_trained
 
@@ -283,18 +299,18 @@ class AbstractTrainer:
                 test_score.append(-model.score(data))
         df = pd.DataFrame(data={
             'model': model_names,
-            'score': score_val,
+            'val_score': score_val,
             'fit_order': fit_order,
         })
         if test_score:
             df["test_score"] = test_score
 
-        df_sorted = df.sort_values(by=['score', 'model'], ascending=[False, False]).reset_index(drop=True)
+        df_sorted = df.sort_values(by=['val_score', 'model'], ascending=[False, False]).reset_index(drop=True)
 
         df_columns_lst = df_sorted.columns.tolist()
         explicit_order = [
             'model',
-            'score',
+            'val_score',
             'fit_order'
         ]
         explicit_order = [column for column in explicit_order if column in df_columns_lst]

@@ -53,7 +53,9 @@ def fit_and_save_model(model, params, train_data, val_data, eval_metric, time_st
     time_fit_end = time.time()
     logger.log(30, f"Evaluating model {model.name} with metric {eval_metric} on validation data...")
     model.val_score = model.score(val_data, eval_metric) * metric_coefficient[eval_metric]
+    time_pred_end = time.time()
     logger.log(30, f"Validation score for model {model.name} is {model.val_score}")
     model.fit_time = time_fit_end - time_fit_start
+    model.predict_time = time_pred_end - time_fit_end
     model.save()
     return model

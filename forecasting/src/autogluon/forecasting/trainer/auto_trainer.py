@@ -24,8 +24,9 @@ class AutoTrainer(AbstractTrainer):
                                  use_feat_static_real=self.use_feat_static_real,
                                  cardinality=self.cardinality)
 
-    def train(self, train_data, val_data=None, hyperparameter_tune=False, hyperparameters=None):
+    def train(self, train_data, val_data=None, hyperparameter_tune=False, hyperparameters=None, time_limit=None):
         self._train_multi(train_data,
                           val_data=val_data,
                           hyperparameters=hyperparameters,
-                          hyperparameter_tune=hyperparameter_tune)
+                          hyperparameter_tune=hyperparameter_tune,
+                          time_limit=time_limit)
