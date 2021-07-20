@@ -112,6 +112,8 @@ class XGBoostModel(AbstractModel):
             params['tree_method'] = 'gpu_hist'
             if 'gpu_id' not in params:
                 params['gpu_id'] = 0
+        elif 'tree_method' not in params:
+            params['tree_method'] = 'hist'
 
         try_import_xgboost()
         from .callbacks import EarlyStoppingCustom
@@ -140,15 +142,14 @@ class XGBoostModel(AbstractModel):
         # bst.set_param({"predictor": "gpu_predictor"})
 
         self.params_trained['n_estimators'] = bst.best_ntree_limit
-        self._best_ntree_limit = bst.best_ntree_limit
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
 
         if self.problem_type == REGRESSION:
-            return self.model.predict(X, ntree_limit=self._best_ntree_limit)
+            return self.model.predict(X)
 
-        y_pred_proba = self.model.predict_proba(X, ntree_limit=self._best_ntree_limit)
+        y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
     def _get_early_stopping_rounds(self, num_rows_train, strategy='auto'):
