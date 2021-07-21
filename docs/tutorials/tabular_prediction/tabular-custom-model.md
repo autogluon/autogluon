@@ -3,7 +3,7 @@
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API.
 
-This tutorial describes how to add a custom model to AutoGluon that can be trained and ensembled alongside the default models ([default model documentation](../../api/autogluon.tabular.models.html#module-autogluon.tabular.models)).
+This tutorial describes how to add a custom model to AutoGluon that can be trained, hyperparameter-tuned, and ensembled alongside the default models ([default model documentation](../../api/autogluon.tabular.models.html#module-autogluon.tabular.models)).
 
 In this example, we create a custom Random Forest model for use in AutoGluon. All models in AutoGluon inherit from the AbstractModel class ([AbstractModel source code](../../_modules/autogluon/core/models/abstract/abstract_model.html)), and must follow its API to work alongside other models.
 
@@ -11,32 +11,27 @@ Note that while this tutorial provides a basic model implementation, this does n
 
 To best understand how to implement more advanced functionality, refer to the [source code](../../api/autogluon.tabular.models.html#module-autogluon.tabular.models) of the following models:
 
-- Respecting time limit / early stopping logic
-  - Refer to [LGBModel](../../_modules/autogluon/tabular/models/lgb/lgb_model.html#LGBModel) and [RandomForestModel](../../_modules/autogluon/tabular/models/rf/rf_model.html#RFModel)
-- Respecting memory usage limit
-  - Refer to LGBModel and RandomForestModel
-- Sample weight support
-  - Refer to LGBModel
-- Validation data and eval_metric usage
-  - Refer to LGBModel
-- GPU training support
-  - Refer to LGBModel
-- Save / load logic of non-serializable models
-  - Refer to [NNFastAiTabularModel](../../_modules/autogluon/tabular/models/fastainn/tabular_nn_fastai.html#NNFastAiTabularModel)
-- Advanced problem type support (Softclass, Quantile)
-  - Refer to RandomForestModel
-- Text feature type support
-  - Refer to [TextPredictorModel](../../_modules/autogluon/tabular/models/text_prediction/text_prediction_v1_model.html#TextPredictorModel)
-- Image feature type support
-  - Refer to [ImagePredictorModel](../../_modules/autogluon/tabular/models/image_prediction/image_predictor.html#ImagePredictorModel)
-- Custom HPO logic
-  - Refer to LGBModel
+| Functionality | Reference Implementation |
+| ------------- | ------------------------ |
+| Respecting time limit / early stopping logic | [LGBModel](../../_modules/autogluon/tabular/models/lgb/lgb_model.html#LGBModel) and [RFModel](../../_modules/autogluon/tabular/models/rf/rf_model.html#RFModel)
+| Respecting memory usage limit | LGBModel and RFModel
+| Sample weight support | LGBModel
+| Validation data and eval_metric usage | LGBModel
+| GPU training support | LGBModel
+| Save / load logic of non-serializable models | [NNFastAiTabularModel](../../_modules/autogluon/tabular/models/fastainn/tabular_nn_fastai.html#NNFastAiTabularModel)
+| Advanced problem type support (Softclass, Quantile) | RFModel
+| Text feature type support | [TextPredictorModel](../../_modules/autogluon/tabular/models/text_prediction/text_prediction_v1_model.html#TextPredictorModel)
+| Image feature type support | [ImagePredictorModel](../../_modules/autogluon/tabular/models/image_prediction/image_predictor.html#ImagePredictorModel)
+| Lazy import of package dependencies | LGBModel
+| Custom HPO logic | LGBModel
 
 ## Implementing a custom model
 
 Here we define the custom model we will be working with for the rest of the tutorial.
 
 The most important methods that must be implemented are `_fit` and `_preprocess`.
+
+To compare with the official AutoGluon Random Forest implementation, see the [RFModel](../../_modules/autogluon/tabular/models/rf/rf_model.html#RFModel) source code.
 
 Follow along with the code comments to better understand how the code works.
 
@@ -82,6 +77,10 @@ class CustomRandomForestModel(AbstractModel):
              # time_limit=None,  # time limit in seconds (ignored in tutorial)
              **kwargs):  # kwargs includes many other potential inputs, refer to AbstractModel documentation for details
         print('Entering the `_fit` method')
+
+        # First we import the required dependencies for the model. Note that we do not import them outside of the method.
+        # This enables AutoGluon to be highly extensible and modular.
+        # For an example of best practices when importing model dependencies, refer to LGBModel.
         from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
         # Valid self.problem_type values include ['binary', 'multiclass', 'regression', 'quantile', 'softclass']
@@ -189,12 +188,16 @@ AutoGluon contains an entire module dedicated to cleaning, transforming, and gen
 
 ```{.python .input}
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
+from autogluon.core.utils import set_logger_verbosity
+set_logger_verbosity(2)  # Set logger so more detailed logging is shown for tutorial
 
 feature_generator = AutoMLPipelineFeatureGenerator()
 X_clean = feature_generator.fit_transform(X)
 
 X_clean.head(5)
 ```
+
+[AutoMLPipelineFeatureGenerator](../../api/autogluon.features.html#automlpipelinefeaturegenerator) does not fill missing values for numeric features nor does it rescale the values of numeric features or one-hot encode categoricals. If a model requires these operations, you'll need to add these operations into your `_preprocess` method, and may find some FeatureGenerator classes useful for this.
 
 ### Fit model
 
@@ -213,7 +216,7 @@ custom_model.fit(X=X_clean, y=y_clean)  # Fit custom model
 # custom_model = CustomRandomForestModel.load(path=load_path)
 ```
 
-### Predict with fit model
+### Predict with trained model
 
 Now that the model is fit, we can make predictions on new data. Remember that we need to perform the same data and label transformations to the new data as we did to the training data.
 
@@ -239,7 +242,7 @@ y_pred_orig = label_cleaner.inverse_transform(y_pred)
 y_pred_orig.head(5)
 ```
 
-### Score with fit model
+### Score with trained model
 
 By default, the model has an eval_metric specific to the problem_type. For binary classification, it uses accuracy.
 
@@ -247,7 +250,7 @@ We can get the accuracy score of the model by doing the following:
 
 ```{.python .input}
 score = custom_model.score(X_test_clean, y_test_clean)
-print(f'test score ({custom_model.eval_metric.name}) = {score}')
+print(f'Test score ({custom_model.eval_metric.name}) = {score}')
 ```
 
 ## Training a bagged custom model without TabularPredictor
@@ -261,9 +264,11 @@ from autogluon.core.models import BaggedEnsembleModel
 bagged_custom_model = BaggedEnsembleModel(CustomRandomForestModel())
 bagged_custom_model.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
 bagged_score = bagged_custom_model.score(X_test_clean, y_test_clean)
-print(f'test score ({bagged_custom_model.eval_metric.name}) = {bagged_score} (bagged)')
+print(f'Test score ({bagged_custom_model.eval_metric.name}) = {bagged_score} (bagged)')
 print(f'Bagging increased model accuracy by {round(bagged_score - score, 4) * 100}%!')
 ```
+
+Note that the bagged model trained 10 CustomRandomForestModels on different splits of the training data. When making a prediction, the bagged model averages the predictions from these 10 models.
 
 ## Training a custom model with TabularPredictor
 
