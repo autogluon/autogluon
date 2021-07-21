@@ -18,10 +18,10 @@ class KNNRapidsModel(KNNModel):
     RAPIDS KNearestNeighbors model : https://rapids.ai/start.html
 
     NOTE: This code is experimental, it is recommend to not use this unless you are a developer.
-    This was tested on rapids-0.18 via:
+    This was tested on rapids-21.06 via:
 
-    conda create -n rapids-0.18 -c rapidsai -c nvidia -c conda-forge -c defaults rapids-blazing=0.18 python=3.7 cudatoolkit=10.1 -y
-    conda activate rapids-0.18
+    conda create -n rapids-21.06 -c rapidsai -c nvidia -c conda-forge rapids=21.06 python=3.8 cudatoolkit=11.2
+    conda activate rapids-21.06
     pip install --pre autogluon.tabular[all]
     """
     def _get_model_type(self):
