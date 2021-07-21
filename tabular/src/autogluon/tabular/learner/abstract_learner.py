@@ -38,7 +38,8 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, quantile_levels=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0, sample_weight=None, weight_evaluation=False):
+                 problem_type=None, quantile_levels=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False,
+                 random_state=0, sample_weight=None, weight_evaluation=False, groups=None):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.ignored_columns = ignored_columns
@@ -81,10 +82,13 @@ class AbstractLearner:
         self._positive_class = positive_class
         self.sample_weight = sample_weight
         self.weight_evaluation = weight_evaluation
+        self.groups = groups
         if sample_weight is not None and not isinstance(sample_weight, str):
-            raise ValueError("sample_weight must be a string indicating the name of column that contains sample weights. If you have a vector of sample weights, first add these as an extra column to your data.")
+            raise ValueError("sample_weight must be a string indicating the name of the column that contains sample weights. If you have a vector of sample weights, first add these as an extra column to your data.")
         if weight_evaluation and sample_weight is None:
             raise ValueError("Must specify sample_weight column if you specify weight_evaluation=True")
+        if groups is not None and not isinstance(groups, str):
+            raise ValueError('groups must be a string indicating the name of the column that contains the split groups. If you have a vector of split groups, first add these as an extra column to your data.')
         try:
             from ..version import __version__
             self.version = __version__
@@ -185,6 +189,7 @@ class AbstractLearner:
             raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
         X_val = kwargs.get('X_val', None)
         self._validate_sample_weight(X, X_val)
+        self._validate_groups(X, X_val)
 
     def _validate_sample_weight(self, X, X_val):
         if self.sample_weight is not None:
@@ -210,6 +215,17 @@ class AbstractLearner:
             else:
                 suffix = " Evaluation metrics will ignore sample weights, specify weight_evaluation=True to instead report weighted metrics."
             logger.log(20, prefix+suffix)
+
+    def _validate_groups(self, X, X_val):
+        if self.groups is not None:
+            if self.groups not in X.columns:
+                raise KeyError(f"groups column '{self.groups}' is missing from training data. Training data columns: {list(X.columns)}")
+            groups_vals = X[self.groups]
+            if len(groups_vals.unique()) < 2:
+                raise ValueError(f"Groups in column '{self.groups}' cannot have fewer than 2 unique values. Values: {list(groups_vals.unique())}")
+            if X_val is not None and self.groups in X_val.columns:
+                raise KeyError(f"groups column '{self.groups}' cannot be in validation data. Validation data columns: {list(X_val.columns)}")
+            logger.log(20, f"Values in column '{self.groups}' used as split folds instead of being automatically set. Bagged models will have {len(groups_vals.unique())} splits.")
 
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:

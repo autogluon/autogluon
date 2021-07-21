@@ -16,7 +16,7 @@ import pandas as pd
 import psutil
 import scipy.stats
 from pandas import DataFrame, Series
-from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
+from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
 
 from .miscs import warning_filter
@@ -40,40 +40,66 @@ def get_gpu_count():
     return gpu_count
 
 
-def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_repeats=1):
-    # TODO: Add GroupKFold
-    if stratified and (y is not None):
-        if n_repeats > 1:
-            kf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
-        else:
-            kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+class CVSplitter:
+    def __init__(self,
+                 splitter_cls=None,
+                 n_splits=5,
+                 n_repeats=1,
+                 random_state=0,
+                 stratified=False,
+                 groups=None):
+        self.n_splits = n_splits
+        self.n_repeats = n_repeats
+        self.random_state = random_state
+        self.stratified = stratified
+        self.groups = groups
+        if splitter_cls is None:
+            splitter_cls = self._get_splitter_cls()
+        self._splitter = self._get_splitter(splitter_cls)
 
-        kf.get_n_splits(X, y)
-        # FIXME: There is a bug in sklearn that causes an incorrect ValueError if performing stratification and all classes have fewer than n_splits samples.
-        #  This is hacked by adding a dummy class with n_splits samples, performing the kfold split, then removing the dummy samples from all resulting indices.
-        #  This is very inefficient and complicated and ideally should be fixed in sklearn.
-        with warning_filter():
-            try:
-                out = [[train_index, test_index] for train_index, test_index in kf.split(X, y)]
-            except:
-                y_dummy = pd.concat([y, pd.Series([-1] * n_splits)], ignore_index=True)
-                X_dummy = pd.concat([X, X.head(n_splits)], ignore_index=True)
-                invalid_index = set(list(y_dummy.tail(n_splits).index))
-                out = [[train_index, test_index] for train_index, test_index in kf.split(X_dummy, y_dummy)]
-                len_out = len(out)
-                for i in range(len_out):
-                    train_index, test_index = out[i]
-                    out[i][0] = [index for index in train_index if index not in invalid_index]
-                    out[i][1] = [index for index in test_index if index not in invalid_index]
-        return out
-    else:
-        if n_repeats > 1:
-            kf = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+    def _get_splitter_cls(self):
+        if self.groups is not None:
+            num_groups = len(self.groups.unique())
+            if self.n_repeats != 1:
+                raise AssertionError(f'n_repeats must be 1 when split groups are specified. (n_repeats={self.n_repeats})')
+            self.n_splits = num_groups
+            splitter_cls = LeaveOneGroupOut
+            # pass
+        elif self.stratified:
+            splitter_cls = RepeatedStratifiedKFold
         else:
-            kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+            splitter_cls = RepeatedKFold
+        return splitter_cls
 
-        kf.get_n_splits(X)
-        return [[train_index, test_index] for train_index, test_index in kf.split(X)]
+    def _get_splitter(self, splitter_cls):
+        if splitter_cls == LeaveOneGroupOut:
+            return splitter_cls()
+        elif splitter_cls in [RepeatedKFold, RepeatedStratifiedKFold]:
+            return splitter_cls(n_splits=self.n_splits, n_repeats=self.n_repeats, random_state=self.random_state)
+        else:
+            raise AssertionError(f'{splitter_cls} is not supported as a valid `splitter_cls` input to CVSplitter.')
+
+    def split(self, X, y):
+        if isinstance(self._splitter, RepeatedStratifiedKFold):
+            # FIXME: There is a bug in sklearn that causes an incorrect ValueError if performing stratification and all classes have fewer than n_splits samples.
+            #  This is hacked by adding a dummy class with n_splits samples, performing the kfold split, then removing the dummy samples from all resulting indices.
+            #  This is very inefficient and complicated and ideally should be fixed in sklearn.
+            with warning_filter():
+                try:
+                    out = [[train_index, test_index] for train_index, test_index in self._splitter.split(X, y)]
+                except:
+                    y_dummy = pd.concat([y, pd.Series([-1] * self.n_splits)], ignore_index=True)
+                    X_dummy = pd.concat([X, X.head(self.n_splits)], ignore_index=True)
+                    invalid_index = set(list(y_dummy.tail(self.n_splits).index))
+                    out = [[train_index, test_index] for train_index, test_index in self._splitter.split(X_dummy, y_dummy)]
+                    len_out = len(out)
+                    for i in range(len_out):
+                        train_index, test_index = out[i]
+                        out[i][0] = [index for index in train_index if index not in invalid_index]
+                        out[i][1] = [index for index in test_index if index not in invalid_index]
+            return out
+        else:
+            return [[train_index, test_index] for train_index, test_index in self._splitter.split(X, y, groups=self.groups)]
 
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
