@@ -157,13 +157,10 @@ class AbstractModel:
         self.params_trained = dict()
 
     def _init_params_aux(self):
-        hyperparameters = self._user_params_aux
+        hyperparameters_aux = self._user_params_aux
         self._set_default_auxiliary_params()
-        if hyperparameters is not None:
-            hyperparameters = hyperparameters.copy()
-            if AG_ARGS_FIT in hyperparameters:
-                ag_args_fit = hyperparameters.pop(AG_ARGS_FIT)
-                self.params_aux.update(ag_args_fit)
+        if hyperparameters_aux is not None:
+            self.params_aux.update(hyperparameters_aux)
 
     @property
     def path_suffix(self):
