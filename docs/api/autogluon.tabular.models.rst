@@ -172,6 +172,7 @@ Experimental Models
 
    FastTextModel
    TextPredictorModel
+   ImagePredictorModel
 
 :hidden:`FastTextModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -183,4 +184,10 @@ Experimental Models
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TextPredictorModel
+   :members: init
+
+:hidden:`ImagePredictorModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: ImagePredictorModel
    :members: init

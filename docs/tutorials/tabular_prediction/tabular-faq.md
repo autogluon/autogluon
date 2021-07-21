@@ -139,7 +139,7 @@ task.fit(..., excluded_model_types=['KNN','RF','XT'])
 
 ### How can I add my own custom model to the set of models that AutoGluon trains, tunes, and ensembles?
 
-See this example in the source code: [examples/tabular/example_custom_model_tabular.py](https://github.com/awslabs/autogluon/blob/master/examples/tabular/example_custom_model_tabular.py)
+To learn how to add your own custom models to the set that AutoGluon trains, tunes, and ensembles, review :ref:`sec_tabularcustommodel`.
 
 
 ### How can I add my own custom data preprocessing or feature engineering?
