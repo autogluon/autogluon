@@ -77,6 +77,7 @@ class LGBModel(AbstractModel):
              sample_weight_val=None,
              verbosity=2,
              **kwargs):
+        try_import_lightgbm()  # raise helpful error message if LightGBM isn't installed
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
@@ -171,7 +172,6 @@ class LGBModel(AbstractModel):
             np.random.seed(seed_val)
 
         # Train LightGBM model:
-        try_import_lightgbm()
         import lightgbm as lgb
         from lightgbm.basic import LightGBMError
         with warnings.catch_warnings():

@@ -63,7 +63,7 @@ class MultilabelPredictor():
             if problem_types is not None:
                 problem_type = problem_types[i]
             if eval_metrics is not None:
-                eval_metric = self.eval_metrics[i]
+                eval_metric = self.eval_metrics[label]
             self.predictors[label] = TabularPredictor(label=label, problem_type=problem_type, eval_metric=eval_metric, path=path_i, **kwargs)
 
     def fit(self, train_data, tuning_data=None, **kwargs):
@@ -83,14 +83,16 @@ class MultilabelPredictor():
         train_data_og = train_data.copy()
         if tuning_data is not None:
             tuning_data_og = tuning_data.copy()
+        else:
+            tuning_data_og = None
         save_metrics = len(self.eval_metrics) == 0
         for i in range(len(self.labels)):
             label = self.labels[i]
             predictor = self.get_predictor(label)
             if not self.consider_labels_correlation:
-                labels_to_drop = [l for l in self.labels if l!=label]
+                labels_to_drop = [l for l in self.labels if l != label]
             else:
-                labels_to_drop = [labels[j] for j in range(i+1,len(self.labels))]
+                labels_to_drop = [self.labels[j] for j in range(i+1, len(self.labels))]
             train_data = train_data_og.drop(labels_to_drop, axis=1)
             if tuning_data is not None:
                 tuning_data = tuning_data_og.drop(labels_to_drop, axis=1)

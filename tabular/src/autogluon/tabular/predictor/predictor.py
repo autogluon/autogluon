@@ -91,6 +91,16 @@ class TabularPredictor:
         If True, then weighted metrics will be reported based on the sample weights provided in the specified `sample_weight` (in which case `sample_weight` column must also be present in test data).
         In this case, the 'best' model used by default for prediction will also be decided based on a weighted version of evaluation metric.
         Note: we do not recommend specifying `weight_evaluation` when `sample_weight` is 'auto_weight' or 'balance_weight', instead specify appropriate `eval_metric`.
+    groups : str, default = None
+        [Experimental] If specified, AutoGluon will use the column named the value of groups in `train_data` during `.fit` as the data splitting indices for the purposes of bagging.
+        This column will not be used as a feature during model training.
+        This parameter is ignored if bagging is not enabled. To instead specify a custom validation set with bagging disabled, specify `tuning_data` in `.fit`.
+        The data will be split via `sklearn.model_selection.LeaveOneGroupOut`.
+        Use this option to control the exact split indices AutoGluon uses.
+        It is not recommended to use this option unless it is required for very specific situations.
+        Bugs may arise from edge cases if the provided groups are not valid to properly train models, such as if not all classes are present during training in multiclass classification. It is up to the user to sanitize their groups.
+
+        As an example, if you want your data folds to preserve adjacent rows in the table without shuffling, then for 3 fold bagging with 6 rows of data, the groups column values should be [0, 0, 1, 1, 2, 2].
     **kwargs :
         learner_type : AbstractLearner, default = DefaultLearner
             A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
@@ -171,6 +181,7 @@ class TabularPredictor:
             verbosity=2,
             sample_weight=None,
             weight_evaluation=False,
+            groups=None,
             **kwargs
     ):
         self.verbosity = verbosity
@@ -191,7 +202,7 @@ class TabularPredictor:
 
         self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None, eval_metric=eval_metric, problem_type=problem_type,
                                                       quantile_levels=quantile_levels,
-                                                      sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation, **learner_kwargs)
+                                                      sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation, groups=groups, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
 
@@ -2320,6 +2331,8 @@ class TabularPredictor:
                     train_features.remove(self.sample_weight)
                 if self.sample_weight in tuning_features:
                     tuning_features.remove(self.sample_weight)
+            if self._learner.groups is not None:
+                train_features.remove(self._learner.groups)
             train_features = np.array(train_features)
             tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):

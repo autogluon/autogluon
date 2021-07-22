@@ -41,7 +41,7 @@ extras_require = {
         'catboost>=0.24.0,<0.26',
     ],
     'xgboost': [
-        'xgboost>=1.3.2,<1.4',
+        'xgboost>=1.4,<1.5',
     ],
     'fastai': [
         'torch>=1.0,<2.0',

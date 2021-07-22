@@ -36,6 +36,11 @@ For standard datasets that are represented as tables (stored as CSV file, parque
 
       How to predict multiple columns in a data table.
 
+   .. card::
+      :title: Adding a Custom Model
+      :link: tabular-custom-model.html
+
+      How to add a custom model to AutoGluon.
 
    .. card::
       :title: FAQ
@@ -52,4 +57,5 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-kaggle
    tabular-multimodal-text-others
    tabular-multilabel
+   tabular-custom-model
    tabular-faq

@@ -14,7 +14,7 @@ from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
-from ...utils.utils import generate_kfold, _compute_fi_with_stddev
+from ...utils.utils import CVSplitter, _compute_fi_with_stddev
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ class BaggedEnsembleModel(AbstractModel):
         # TODO: Consider moving `_child_oof` logic to a separate class / refactor OOF logic.
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
+        self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
 
         eval_metric = kwargs.pop('eval_metric', self.model_base.eval_metric)
         stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)  # FIXME: Has to be moved to post-model_base initialization, otherwise could be misaligned.
@@ -113,16 +114,20 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return X
 
+    def _get_cv_splitter(self, n_splits, n_repeats, groups=None):
+        return CVSplitter(n_splits=n_splits, n_repeats=n_repeats, groups=groups, stratified=self.is_stratified(), random_state=self._random_state)
+
     def _fit(self,
              X,
              y,
              X_val=None,
              y_val=None,
-             k_fold=5,
+             k_fold=None,
              k_fold_start=0,
              k_fold_end=None,
              n_repeats=1,
              n_repeat_start=0,
+             groups=None,
              **kwargs):
         use_child_oof = self.params.get('use_child_oof', False)
         if use_child_oof:
@@ -131,27 +136,23 @@ class BaggedEnsembleModel(AbstractModel):
                 return self
             k_fold = 1
             k_fold_end = None
-        if k_fold < 1:
+            groups = None
+        if k_fold is None and groups is None:
+            k_fold = 5
+        if k_fold is not None and k_fold < 1:
             k_fold = 1
+        if k_fold is None or k_fold > 1:
+            k_fold = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups).n_splits
+        self._validate_bag_kwargs(
+            k_fold=k_fold,
+            k_fold_start=k_fold_start,
+            k_fold_end=k_fold_end,
+            n_repeats=n_repeats,
+            n_repeat_start=n_repeat_start,
+            groups=groups,
+        )
         if k_fold_end is None:
             k_fold_end = k_fold
-
-        if self._oof_pred_proba is None and (k_fold_start != 0 or n_repeat_start != 0):
-            self._load_oof()
-        if n_repeat_start != self._n_repeats_finished:
-            raise ValueError(f'n_repeat_start must equal self._n_repeats_finished, values: ({n_repeat_start}, {self._n_repeats_finished})')
-        if n_repeats <= n_repeat_start:
-            raise ValueError(f'n_repeats must be greater than n_repeat_start, values: ({n_repeats}, {n_repeat_start})')
-        if k_fold_start != self._k_fold_end:
-            raise ValueError(f'k_fold_start must equal previous k_fold_end, values: ({k_fold_start}, {self._k_fold_end})')
-        if k_fold_start >= k_fold_end:
-            # TODO: Remove this limitation if n_repeats > 1
-            raise ValueError(f'k_fold_end must be greater than k_fold_start, values: ({k_fold_end}, {k_fold_start})')
-        if (n_repeats - n_repeat_start) > 1 and k_fold_end != k_fold:
-            # TODO: Remove this limitation
-            raise ValueError(f'k_fold_end must equal k_fold when (n_repeats - n_repeat_start) > 1, values: ({k_fold_end}, {k_fold})')
-        if self._k is not None and self._k != k_fold:
-            raise ValueError(f'k_fold must equal previously fit k_fold value for the current n_repeat, values: (({k_fold}, {self._k})')
 
         model_base = self._get_model_base()
         model_base.rename(name='')
@@ -161,6 +162,9 @@ class BaggedEnsembleModel(AbstractModel):
         if self.model_base is not None:
             self.save_model_base(self.model_base)
             self.model_base = None
+
+        if self._oof_pred_proba is None and self.is_fit():
+            self._load_oof()
 
         save_bag_folds = self.params.get('save_bag_folds', True)
         if k_fold == 1:
@@ -177,7 +181,7 @@ class BaggedEnsembleModel(AbstractModel):
                     # Reserve time for final refit model
                     kwargs['time_limit'] = kwargs['time_limit'] * folds_to_fit / (folds_to_fit + 1.2)
             self._fit_folds(X=X, y=y, model_base=model_base, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end,
-                            n_repeats=n_repeats, n_repeat_start=n_repeat_start, save_folds=save_bag_folds, **kwargs)
+                            n_repeats=n_repeats, n_repeat_start=n_repeat_start, save_folds=save_bag_folds, groups=groups, **kwargs)
             # FIXME: Don't save folds except for refit
             # FIXME: Cleanup self
             # FIXME: Don't add `_FULL` to name
@@ -193,6 +197,41 @@ class BaggedEnsembleModel(AbstractModel):
                 return refit_template
             else:
                 return self
+
+    def _validate_bag_kwargs(self, *,
+                             k_fold,
+                             k_fold_start,
+                             k_fold_end,
+                             n_repeats,
+                             n_repeat_start,
+                             groups):
+        if groups is not None:
+            if self._n_repeats_finished != 0:
+                raise AssertionError('Bagged models cannot call fit with `groups` specified when a full k-fold set has already been fit.')
+            if n_repeats > 1:
+                raise AssertionError('Cannot perform repeated bagging with `groups` specified.')
+            return
+
+        if k_fold_end is None:
+            k_fold_end = k_fold
+        if k_fold is None:
+            raise ValueError('k_fold cannot be None.')
+        if k_fold < 1:
+            raise ValueError(f'k_fold must be equal or greater than 1, value: ({k_fold})')
+        if n_repeat_start != self._n_repeats_finished:
+            raise ValueError(f'n_repeat_start must equal self._n_repeats_finished, values: ({n_repeat_start}, {self._n_repeats_finished})')
+        if n_repeats <= n_repeat_start:
+            raise ValueError(f'n_repeats must be greater than n_repeat_start, values: ({n_repeats}, {n_repeat_start})')
+        if k_fold_start != self._k_fold_end:
+            raise ValueError(f'k_fold_start must equal previous k_fold_end, values: ({k_fold_start}, {self._k_fold_end})')
+        if k_fold_start >= k_fold_end:
+            # TODO: Remove this limitation if n_repeats > 1
+            raise ValueError(f'k_fold_end must be greater than k_fold_start, values: ({k_fold_end}, {k_fold_start})')
+        if (n_repeats - n_repeat_start) > 1 and k_fold_end != k_fold:
+            # TODO: Remove this limitation
+            raise ValueError(f'k_fold_end must equal k_fold when (n_repeats - n_repeat_start) > 1, values: ({k_fold_end}, {k_fold})')
+        if self._k is not None and self._k != k_fold:
+            raise ValueError(f'k_fold must equal previously fit k_fold value for the current n_repeat, values: (({k_fold}, {self._k})')
 
     def predict_proba(self, X, normalize=None, **kwargs):
         model = self.load_child(self.models[0])
@@ -286,7 +325,7 @@ class BaggedEnsembleModel(AbstractModel):
                    X,
                    y,
                    model_base,
-                   k_fold=5,
+                   k_fold=None,
                    k_fold_start=0,
                    k_fold_end=None,
                    n_repeats=1,
@@ -294,11 +333,21 @@ class BaggedEnsembleModel(AbstractModel):
                    time_limit=None,
                    sample_weight=None,
                    save_folds=True,
+                   groups=None,
                    **kwargs):
         fold_fitting_strategy = self.params.get('fold_fitting_strategy', SequentialLocalFoldFittingStrategy)
         # TODO: Preprocess data here instead of repeatedly
+        # FIXME: Raise exception if multiclass/binary and a single val fold contains all instances of a class. (Can happen if custom groups is specified)
         time_start = time.time()
-        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
+        if k_fold_start != 0:
+            cv_splitter = self._cv_splitters[n_repeat_start]
+        else:
+            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups)
+        if k_fold != cv_splitter.n_splits:
+            k_fold = cv_splitter.n_splits
+        if k_fold_end is None:
+            k_fold_end = k_fold
+        kfolds = cv_splitter.split(X=X, y=y)
 
         oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
 
@@ -310,6 +359,8 @@ class BaggedEnsembleModel(AbstractModel):
         fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy(
             self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats, save_folds=save_folds)
         for j in range(n_repeat_start, n_repeats):  # For each n_repeat
+            if j != n_repeat_start or k_fold_start == 0:
+                self._cv_splitters.append(cv_splitter)
             cur_repeat_count = j - n_repeat_start
             fold_start_n_repeat = fold_start + cur_repeat_count * k_fold
             fold_end_n_repeat = min(fold_start_n_repeat + k_fold, fold_end)
@@ -388,7 +439,7 @@ class BaggedEnsembleModel(AbstractModel):
             if is_oof:
                 if self._child_oof or not self._bagged_mode:
                     raise AssertionError('Model trained with no validation data cannot get feature importances on training data, please specify new test data to compute feature importances (model=%s)' % self.name)
-                kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeat + 1)
+                kfolds = self._cv_splitters[n_repeat].split(X=X, y=y)
                 cur_kfolds = kfolds[n_repeat * k:(n_repeat + 1) * k]
             else:
                 cur_kfolds = [(None, list(range(len(X))))] * k
@@ -702,7 +753,9 @@ class BaggedEnsembleModel(AbstractModel):
         return kwargs
 
     # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
-    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, preprocess_kwargs=None, **kwargs):
+    # FIXME: with use_bag_holdout=True, the fold-1 scores that are logged are of the inner validation score, not the holdout score.
+    #  Fix this by passing X_val, y_val into this method
+    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, preprocess_kwargs=None, groups=None, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
@@ -713,12 +766,28 @@ class BaggedEnsembleModel(AbstractModel):
         # TODO: Preprocess data here instead of repeatedly
         if preprocess_kwargs is None:
             preprocess_kwargs = dict()
+        use_child_oof = self.params.get('use_child_oof', False)
         X = self.preprocess(X=X, preprocess=False, fit=True, **preprocess_kwargs)
-        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=1)
 
-        train_index, test_index = kfolds[0]
-        X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[test_index, :]
-        y_fold, y_val_fold = y.iloc[train_index], y.iloc[test_index]
+        if use_child_oof:
+            k_fold = 1
+            X_fold = X
+            y_fold = y
+            X_val_fold = None
+            y_val_fold = None
+            train_index = list(range(len(X)))
+            test_index = train_index
+            cv_splitter = None
+        else:
+            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=1, groups=groups)
+            if k_fold != cv_splitter.n_splits:
+                k_fold = cv_splitter.n_splits
+
+            kfolds = cv_splitter.split(X=X, y=y)
+
+            train_index, test_index = kfolds[0]
+            X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[test_index, :]
+            y_fold, y_val_fold = y.iloc[train_index], y.iloc[test_index]
         orig_time = scheduler_options[1]['time_out']
         if orig_time:
             scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
@@ -729,7 +798,6 @@ class BaggedEnsembleModel(AbstractModel):
         bags_performance = {}
         for i, (model_name, model_path) in enumerate(hpo_models.items()):
             child: AbstractModel = self._child_type.load(path=model_path)
-            y_pred_proba = child.predict_proba(X_val_fold)
 
             # TODO: Create new Ensemble Here
             bag = copy.deepcopy(self)
@@ -737,6 +805,16 @@ class BaggedEnsembleModel(AbstractModel):
             bag.set_contexts(self.path_root + bag.name + os.path.sep)
 
             oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
+
+            if child._get_tags().get('valid_oof', False):
+                y_pred_proba = child.get_oof_pred_proba(X=X, y=y)
+                bag._n_repeats_finished = 1
+                bag._k_per_n_repeat = [1]
+                bag._bagged_mode = False
+                bag._child_oof = True  # TODO: Consider a separate tag for refit_folds vs efficient OOF
+            else:
+                y_pred_proba = child.predict_proba(X_val_fold)
+
             oof_pred_proba[test_index] += y_pred_proba
             oof_pred_model_repeats[test_index] += 1
 
@@ -761,6 +839,8 @@ class BaggedEnsembleModel(AbstractModel):
                 bag.models.append(child)
             bag.val_score = child.val_score
             bag._add_child_times_to_bag(model=child)
+            if cv_splitter is not None:
+                bag._cv_splitters = [cv_splitter]
 
             bag.save()
             bags[bag.name] = bag.path
