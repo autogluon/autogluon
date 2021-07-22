@@ -529,8 +529,8 @@ class AbstractModel:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
 
-    def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.1, prune_threshold=None, num_resource=100,
-                       stop_threshold=3, subsample_size=1000, fi_strategy="uniform", fp_strategy="percentage", **kwargs):
+    def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.1, prune_threshold=None, num_resource=None,
+                       stop_threshold=3, subsample_size=5000, fi_strategy="uniform", fp_strategy="percentage", **kwargs):
         """
         Functionally identical to `fit` method, but repeats feature importance based pruning until validation set
         performance degrades for `stop_threshold` iterations or `max_num_fit` iterations have passed.
@@ -538,17 +538,18 @@ class AbstractModel:
         Parameters
         ----------
         max_num_fit : int, default = 5
-            Maximum number of time feature selection and fitting are performed
+            Maximum number of time feature selection and fitting are performed.
         prune_ratio : float, default = 0.1
-            Percentage of features to consider pruning every pruning iteration
+            Percentage of features to consider pruning every pruning iteration.
         prune_threshold : float, default = 0.0
-            Feature importance threshold that features must meet in order to not be dropped
-        num_resource: int, default=100
-            Number of shuffles to evaluate across all features per feature pruning iteration
+            Feature importance threshold that features must meet in order to not be dropped.
+        num_resource: int, default=None
+            Number of shuffles to evaluate across all features per feature pruning iteration. If None, set to
+            min(number of features x 5, 2500).
         stop_threshold : int, default = 5
-            Early stopping will stop refitting model if score does not improve for this amount of iterations
+            Early stopping will stop refitting model if score does not improve for this amount of iterations.
         subsample_size : int, default = 1000
-            Number of validation set samples to use when computing permutation feature importance
+            Number of validation set samples to use when computing permutation feature importance.
         fi_strategy : str, default = "uniform", choices = ["uniform", "backwardsearch"]
             Feature importance computation strategy to use. "uniform" uniformly allocates resource across
             computing marginal feature importance scores. "backwardsearch" uniformly allocates resource
@@ -561,14 +562,17 @@ class AbstractModel:
         1. If self.weight_evaluation==True pass sample_weight param for scoring
         2. Does not work with S3 paths (no problem locally)
         """
+        num_max_prunable = 500
+        if num_resource is None:
+            num_resource = min(num_max_prunable*5, len(X.columns)*5)
         logger.log(30, f"\tPerforming Iterative Feature Selection Parameters (" +
                        f"max_num_fit: {max_num_fit}, prune_ratio: {prune_ratio}, prune_threshold: {prune_threshold}, " +
                        f"num_resource: {num_resource}, stop_threshold: {stop_threshold}, subsample_size: {subsample_size}, " +
                        f"fi_strategy: {fi_strategy}, fp_strategy: {fp_strategy})")
         # If there are too many features, do not consider these golden features. TODO: Compute this using filtering technique or proxy model.
-        if len(X.columns) > 500:
-            logger.log(30, f"\tThere are more than 500 features: Selecting random 500 features for pruning candidates.")
-            golden_features = random.sample(X.columns.tolist(), len(X.columns) - 500)
+        if len(X.columns) > num_max_prunable:
+            logger.log(30, f"\tThere are more than {num_max_prunable} features: Selecting random {num_max_prunable} features for pruning candidates.")
+            golden_features = random.sample(X.columns.tolist(), len(X.columns) - num_max_prunable)
         else:
             golden_features = []
         # Initialize importance_fn_args based on whether the model is a bagged or not
@@ -595,7 +599,7 @@ class AbstractModel:
                 time_start = time.time()
 
                 if performance_gained:
-                    # if pruned model led to performance gain, fit a new model
+                    # if pruned model led to performance gain, initialize FeatureSelector and fit a new model
                     if fi_strategy == "uniform":
                         fi_helper = UniformFeatureImportanceHelper(importance_fn=best_model.compute_feature_importance,
                                                                    importance_fn_args=importance_fn_args,
@@ -650,7 +654,7 @@ class AbstractModel:
         except TimeLimitExceeded:
             logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
-            import pdb; pdb.post_mortem()
+            # import pdb; pdb.post_mortem()
             logger.log(30, f"ERROR: Exception raised during fit_with_prune. Reason: {e}")
             raise e
         finally:

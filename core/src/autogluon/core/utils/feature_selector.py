@@ -111,7 +111,7 @@ class BackwardSearchFeatureImportanceHelper(FeatureImportanceHelper):
             importance_fn_args = deepcopy(self.importance_fn_args)
             importance_fn_args['features'] = candidate_feature_subsets
             importance_fn_args['time_limit'] = time_limit
-            importance_fn_args['num_shuffle_sets'] = resource_per_subset  # shuffles_per_feature
+            importance_fn_args['num_shuffle_sets'] = resource_per_subset
 
             time_start = time.time()
             importance_df = self.importance_fn(**importance_fn_args)

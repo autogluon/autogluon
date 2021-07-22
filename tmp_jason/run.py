@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--train_path', help='train dataset path', type=str, default='dataset/adult/train_data.csv')
 parser.add_argument('-g', '--test_path', help='train dataset path', type=str, default='dataset/adult/test_data.csv')
 parser.add_argument('-m', '--mode', help='what AutoGluon setting to try', choices=['model', 'model-stack', 'ag', 'ag-stack'], default='model')
-parser.add_argument('-n', '--num_resource', help='number of resource to allocate', type=int, default=100)
+parser.add_argument('-n', '--num_resource', help='number of resource to allocate across all features', type=int, default=1000)
 parser.add_argument('-l', '--label', help='name of the label column', type=str, default='class')
 parser.add_argument('-p', '--prune', help='to use fit_with_prune or not', dest='prune', action='store_true')
 parser.add_argument('-r', '--ratio', help='what percentage of features to prune at once', type=float, default=0.1)
@@ -27,7 +27,7 @@ fit_with_prune_kwargs = {
         'prune_ratio': args.ratio,
         'prune_threshold': None,
         'subsample_size': 5000,
-        'num_resource': 100,
+        'num_resource': args.num_resource,
         'fi_strategy': args.fi,
         'fp_strategy': args.fp,
     }
