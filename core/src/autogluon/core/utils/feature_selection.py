@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import random
 import scipy.stats as stats
 import time
-from typing import Callable, Iterable, Tuple
+from typing import Callable, Iterable, Sequence, Tuple
 from .exceptions import TimeLimitExceeded
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class FeatureSelector:
         raise NotImplementedError
 
     def compute_feature_importance(self, num_resource: int = 100, param_dict: dict = {}, threshold: int = 0.,
-                                   time_limit: Tuple[None, float] = None, trajectory_plot_path: Tuple[None, str] = None) -> dict:
+                                   time_limit: Tuple[None, float] = None, trajectory_plot_path: Tuple[None, str] = None) -> Tuple[dict, Sequence[dict]]:
         raise NotImplementedError
 
     def prune_features(self, param_dict: dict, threshold: float, prune_ratio: float = 1.) -> list:
@@ -65,22 +65,23 @@ class FeatureSelector:
         """
         Return an updated threshold that would prune half as many features as what pruning with the
         inputted threshold would have accomplished. If inputted threshold feature prunes would have
-        pruned no feature, return the original threshold. Only consider features in param_dict.
+        pruned one or less feature, return the original threshold. Only consider features in param_dict.
         """
         feature_means = map(lambda info: {'feature': info[0], 'mu': info[1]['mu']}, param_dict.items())
         sorted_feature_means = sorted(feature_means, key=lambda feature_mean: feature_mean['mu'])
         original_cutoff_index = 0
         for index, feature_mean in enumerate(sorted_feature_means):
             score = feature_mean['mu']
-            if score > threshold:
+            if score <= threshold:
+                original_cutoff_index = index
+            else:
                 break
-            original_cutoff_index = index + 1
-        # any feature whose index on sorted_feature_means is lower than this would have been dropped
         max_prune_number = int(prune_ratio * (len(self.kept_features) + len(param_dict)))
-        original_cutoff_index = min(original_cutoff_index, max_prune_number + 1)
-        if original_cutoff_index > 1:
+        # any feature whose index on sorted_feature_means is equal or lwer to this would have been dropped
+        original_cutoff_index = min(original_cutoff_index, max_prune_number)
+        if original_cutoff_index > 0:
             new_cutoff_index = original_cutoff_index//2
-            threshold = sorted_feature_means[new_cutoff_index-1]['mu']
+            threshold = sorted_feature_means[new_cutoff_index]['mu']
         return threshold
 
 
@@ -89,7 +90,7 @@ class UniformFeatureSelector(FeatureSelector):
         super().__init__(importance_fn, importance_fn_args, features, num_max_prune=num_max_prune)
 
     def compute_feature_importance(self, num_resource: int = 100, param_dict: dict = {}, threshold: int = 0.,
-                                   time_limit: Tuple[None, float] = None, trajectory_plot_path: Tuple[None, str] = None) -> dict:
+                                   time_limit: Tuple[None, float] = None, trajectory_plot_path: Tuple[None, str] = None) -> Tuple[dict, Sequence[dict]]:
         """
         Uniformly allocate feature importance computation across features in self.prune_candidate_features.
         Return resulting param_dict with mean feature importance score estimate per feature in self.prune_candidate_features.
@@ -122,12 +123,12 @@ class UniformFeatureSelector(FeatureSelector):
                 mean_importance = (mean_importance*num_resource + prev_importance*prev_num_resource)/(num_resource + prev_num_resource)
                 num_resource = num_resource + prev_num_resource
             param_dict[feature] = {'mu': mean_importance, 'num_resource': num_resource}
-        return param_dict
+        return param_dict, [param_dict]
 
 
 class BayesianFeatureSelector(FeatureSelector):
     def compute_feature_importance(self, num_resource: int = 100, param_dict: dict = {}, threshold: int = 0.,
-                                   time_limit: Tuple[None, float] = None, trajectory_plot_path: Tuple[None, str] = None) -> dict:
+                                   time_limit: Tuple[None, float] = None, trajectory_plot_path: Tuple[None, str] = None) -> Tuple[dict, Sequence[dict]]:
         """
         Efficiently compute feature importance based on feature importance threshold by making use
         of `num_resource` feature importance computations. Return resulting param_dict with mean feature
@@ -142,7 +143,7 @@ class BayesianFeatureSelector(FeatureSelector):
         for feature in param_dict.keys():
             trajectories[feature].append(param_dict[feature])
 
-        for _ in range(num_resource):
+        for iteration in range(num_resource):
             expected_utilities = {}
             for feature in self.prune_candidate_features:
                 utility = self.compute_expected_utility(param_dict[feature], threshold)
@@ -156,6 +157,7 @@ class BayesianFeatureSelector(FeatureSelector):
             updated_params = self.bayes_update(importance_df['importance'], param_dict[promising_feature])
             param_dict[promising_feature] = {param: value[0] if isinstance(value, Iterable) else value for param, value in updated_params.items()}
             param_dict[promising_feature]['num_resource'] += 1
+            param_dict[promising_feature]['latest_pull_iter'] = iteration
             if time_limit and time.time() - time_start >= time_limit:
                 raise TimeLimitExceeded
             for feature in param_dict.keys():
@@ -163,7 +165,7 @@ class BayesianFeatureSelector(FeatureSelector):
 
         if trajectory_plot_path:
             self.plot_trajectories(trajectories, trajectory_plot_path)
-        return param_dict
+        return param_dict, trajectories
 
     def compute_expected_utility(self, param_dict: dict, threshold: float, n_sample: int = 1000):
         raise NotImplementedError
@@ -190,6 +192,7 @@ class NormalFeatureSelector(BayesianFeatureSelector):
                 'sigma': self.prior_sigma,
                 'obs_sigma': self.obs_sigma,
                 'num_resource': 0,
+                'latest_pull_iter': -1,
             }
         return param_dict
 
@@ -223,12 +226,15 @@ class NormalFeatureSelector(BayesianFeatureSelector):
         param_dict : dict
             Dictionary containing prior mean, prior standard deviation, and observation standard deviation.
         """
-        mu, sigma, obs_sigma, num_resource = param_dict['mu'], param_dict['sigma'], param_dict['obs_sigma'], param_dict['num_resource']
+        mu, sigma, obs_sigma = param_dict['mu'], param_dict['sigma'], param_dict['obs_sigma']
         posterior_sigmas = np.sqrt(1 / (1/sigma**2 + 1/obs_sigma**2))
         posterior_mus = posterior_sigmas**2 * (mu/sigma**2 + obs/obs_sigma**2)
         # posterior_sigma = np.sqrt(1 / (1/sigma**2 + len(obs)/obs_sigma**2))
         # posterior_mu = posterior_sigma**2 * (mu/sigma**2 + sum(obs)/obs_sigma**2)
-        return {'mu': posterior_mus, 'sigma': posterior_sigmas, 'obs_sigma': obs_sigma, 'num_resource': num_resource}
+        result = deepcopy(param_dict)
+        result['mu'] = posterior_mus
+        result['sigma'] = posterior_sigmas
+        return result
 
     def plot_trajectories(self, trajectories: dict, x_len=5, x_lo=-0.1, x_hi=0.1):
         y_len = math.ceil(len(trajectories) / x_len)

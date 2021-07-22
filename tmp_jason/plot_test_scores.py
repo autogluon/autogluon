@@ -11,7 +11,7 @@ from autogluon.core.data import LabelCleaner
 from autogluon.core.utils import infer_problem_type
 from autogluon.core.models import BaggedEnsembleModel
 from autogluon.tabular.models.rf.rf_model import RFModel
-from autogluon.tabular.models.catboost.catboost_model import CatBoostModel
+from autogluon.tabular.models import KNNModel, RFModel, CatBoostModel, NNFastAiTabularModel
 from autogluon.tabular import TabularDataset
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from sklearn.model_selection import train_test_split
@@ -33,7 +33,7 @@ parser.add_argument('-d', '--stop_threshold', help='stop refitting model if scor
 parser.add_argument('-r', '--resource', help='number of shuffles to evaluate per model fit iteration', type=int, default=100)
 parser.add_argument('-t', '--strategy', help='which strategy to evaluate', type=str, default='naive', choices=['naive', 'bayes'])
 parser.add_argument('-u', '--subsample_size', help='how many subsamples to use per shuffle', type=int, default=1000)
-parser.add_argument('-z', '--mode', help='which model to use', type=str, default='catboost', choices=['randomforest', 'catboost'])
+parser.add_argument('-z', '--mode', help='which model to use', type=str, default='catboost', choices=['randomforest', 'catboost', 'fastai', 'knn'])
 parser.add_argument('-b', '--bagged', help='whether to bag models. 0 for false and 1 for true.', type=int, default=0, choices=[0, 1])
 
 
@@ -70,6 +70,10 @@ for seed in range(args.seeds):
         # call fit_with_prune, return all models, and do stuff there
         if args.mode == 'randomforest':
             model = RFModel()
+        elif args.mode == 'fastai':
+            model = NNFastAiTabularModel()
+        elif args.mode == 'knn':
+            model = KNNModel()
         else:
             model = CatBoostModel()
 
@@ -143,20 +147,20 @@ std_orig_feat = np.std(result_orig_feat, axis=0)
 std_noised_feat = np.std(result_noised_feat, axis=0)
 x = [i+1 for i in range(max_trajectory_len)]
 fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-line1 = ax[0].plot(x, mean_val, color='r')
+ax[0].plot(x, mean_val, color='r')
 ax[0].fill_between(x, mean_val-std_val, mean_val+std_val, color='r', alpha=.1)
 ax[0].set_title(f"Validation and Test Set Scores")
 ax[0].set_xlabel("Number of Model Fits")
 ax[0].set_ylabel("Accuracy")
-line2 = ax[0].plot(x, mean_test, color='b')
+ax[0].plot(x, mean_test, color='b')
 ax[0].fill_between(x, mean_test-std_test, mean_test+std_test, color='b', alpha=.1)
 ax[0].legend([f"Val ({round(mean_val[0],4)}=>{round(mean_val[-1],4)})", f"Test ({round(mean_test[0],4)}=>{round(mean_test[-1],4)})"])
-line1 = ax[1].plot(x, mean_orig_feat, color='g')
+ax[1].plot(x, mean_orig_feat, color='g')
 ax[1].fill_between(x, mean_orig_feat-std_orig_feat, mean_orig_feat+std_orig_feat, color='g', alpha=.1)
 ax[1].set_title("Number of Kept Features")
 ax[1].set_xlabel("Number of Model Fits")
 ax[1].set_ylabel("Number of Kept Features")
-line2 = ax[1].plot(x, mean_noised_feat, color='y')
+ax[1].plot(x, mean_noised_feat, color='y')
 ax[1].fill_between(x, mean_noised_feat-std_noised_feat, mean_noised_feat+std_noised_feat, color='y', alpha=.1)
 ax[1].legend([f"# Original Features", f"# Synthetic Features"])
 fig.suptitle(f"{'Bagged ' if args.bagged else ''}{args.mode.upper()} Stats From Strategy: {args.strategy}")

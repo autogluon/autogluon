@@ -352,6 +352,9 @@ class BaggedEnsembleModel(AbstractModel):
             self._k_fold_end = k_fold_end
             self._n_repeats_finished = self._n_repeats - 1
 
+    def get_features(self):
+        return self.load_child(model=self.models[0]).features
+
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
