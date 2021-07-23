@@ -11,7 +11,7 @@ from autogluon.core.data import LabelCleaner
 from autogluon.core.utils import infer_problem_type
 from autogluon.core.models import BaggedEnsembleModel
 from autogluon.tabular.models.rf.rf_model import RFModel
-from autogluon.tabular.models import KNNModel, RFModel, CatBoostModel, NNFastAiTabularModel
+from autogluon.tabular.models import KNNModel, RFModel, CatBoostModel, NNFastAiTabularModel, LGBModel
 from autogluon.tabular import TabularDataset
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from sklearn.model_selection import train_test_split
@@ -29,11 +29,12 @@ parser.add_argument('-g', '--test_path', help='path to test dataset CSV', type=s
 parser.add_argument('-l', '--label', help='label column name', type=str, default='class')
 parser.add_argument('-s', '--seeds', help='number of seeds to use', type=int, default=2)
 parser.add_argument('-m', '--max_num_fit', help='maximum number of times the model will be fitted', type=int, default=50)
-parser.add_argument('-d', '--stop_threshold', help='stop refitting model if score does not improve for this amount of iterations', type=int, default=10)
-parser.add_argument('-r', '--resource', help='number of shuffles to evaluate per model fit iteration', type=int, default=100)
-parser.add_argument('-t', '--strategy', help='which strategy to evaluate', type=str, default='naive', choices=['naive', 'bayes'])
-parser.add_argument('-u', '--subsample_size', help='how many subsamples to use per shuffle', type=int, default=1000)
-parser.add_argument('-z', '--mode', help='which model to use', type=str, default='catboost', choices=['randomforest', 'catboost', 'fastai', 'knn'])
+parser.add_argument('-d', '--stop_threshold', help='if score does not improve for this many iterations, stop feature pruning', type=int, default=3)
+parser.add_argument('-p', '--prune_ratio', help='prune at most this amount of features at once per pruning iteration', type=float, default=0.05)
+parser.add_argument('-r', '--resource', help='number of shuffles to evaluate per model fit iteration', type=int, default=None)
+parser.add_argument('-t', '--strategy', help='which strategy to evaluate', type=str, default='uniform', choices=['uniform', 'backwardsearch'])
+parser.add_argument('-u', '--subsample_size', help='how many subsamples to use per shuffle', type=int, default=5000)
+parser.add_argument('-z', '--mode', help='which model to use', type=str, default='catboost', choices=['randomforest', 'catboost', 'fastai', 'knn', 'lightgbm'])
 parser.add_argument('-b', '--bagged', help='whether to bag models. 0 for false and 1 for true.', type=int, default=0, choices=[0, 1])
 
 
@@ -74,8 +75,16 @@ for seed in range(args.seeds):
             model = NNFastAiTabularModel()
         elif args.mode == 'knn':
             model = KNNModel()
+        elif args.mode == 'lightgbm':
+            model = LGBModel()
         else:
             model = CatBoostModel()
+        if args.strategy == 'uniform':
+            fi_strategy = 'uniform'
+            fp_strategy = 'percentage'
+        else:
+            fi_strategy = 'backwardsearch'
+            fp_strategy = 'single'
 
         # clean data and call fit_with_prune
         if args.bagged:
@@ -85,8 +94,9 @@ for seed in range(args.seeds):
             X_all_new = auto_ml_pipeline_feature_generator.fit_transform(X=X_all)
             y_all_new = label_cleaner.transform(y_all)
             best_model, all_model_info = model.fit_with_prune(X=X_all_new, y=y_all_new, X_val=None, y_val=None, max_num_fit=args.max_num_fit,
-                                                              stop_threshold=args.stop_threshold, strategy=args.strategy, num_resource=args.resource,
-                                                              subsample_size=args.subsample_size, prune_threshold=0.001)
+                                                              stop_threshold=args.stop_threshold, prune_ratio=0.1, num_resource=args.resource,
+                                                              fi_strategy=fi_strategy, fp_strategy=fp_strategy, subsample_size=args.subsample_size,
+                                                              prune_threshold=0.001)
         else:
             X, X_val, y, y_val = train_test_split(X_all, y_all, test_size=int(0.2*len(fit_data)), random_state=seed)
             problem_type = infer_problem_type(y=y)
@@ -96,8 +106,9 @@ for seed in range(args.seeds):
             X_val = auto_ml_pipeline_feature_generator.transform(X=X_val)
             y_val = label_cleaner.transform(y_val)
             best_model, all_model_info = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, max_num_fit=args.max_num_fit,
-                                                              stop_threshold=args.stop_threshold, strategy=args.strategy, num_resource=args.resource,
-                                                              subsample_size=args.subsample_size, prune_threshold=0.001)
+                                                              stop_threshold=args.stop_threshold, prune_ratio=0.1, num_resource=args.resource,
+                                                              fi_strategy=fi_strategy, fp_strategy=fp_strategy, subsample_size=args.subsample_size, 
+                                                              prune_threshold=0.001)
         X_test_new = auto_ml_pipeline_feature_generator.transform(X=X_test)
         y_test_new = label_cleaner.transform(y_test)
 

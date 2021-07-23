@@ -379,7 +379,7 @@ class AbstractTrainer:
                     model_name: model_args_fit[model_name]['fit_with_prune_kwargs']
                     for model_name in model_args_fit if 'fit_with_prune_kwargs' in model_args_fit[model_name]
                 }
-                kwargs['fit_with_prune_kwargs'] = fit_with_prune_kwargs
+                kwargs['fit_with_prune_kwargs'] = fit_with_prune_kwargs if len(fit_with_prune_kwargs) > 0 else None
         logger.log(20, f'Fitting {len(models)} L{level} models ...')
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:

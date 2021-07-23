@@ -529,8 +529,8 @@ class AbstractModel:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
 
-    def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.1, prune_threshold=None, num_resource=None,
-                       stop_threshold=3, subsample_size=5000, fi_strategy="uniform", fp_strategy="percentage", **kwargs):
+    def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.05, prune_threshold=None, num_resource=None,
+                       stop_threshold=3, subsample_size=10000, fi_strategy="uniform", fp_strategy="percentage", **kwargs):
         """
         Functionally identical to `fit` method, but repeats feature importance based pruning until validation set
         performance degrades for `stop_threshold` iterations or `max_num_fit` iterations have passed.
@@ -539,16 +539,17 @@ class AbstractModel:
         ----------
         max_num_fit : int, default = 5
             Maximum number of time feature selection and fitting are performed.
-        prune_ratio : float, default = 0.1
+        prune_ratio : float, default = 0.05
             Percentage of features to consider pruning every pruning iteration.
-        prune_threshold : float, default = 0.0
-            Feature importance threshold that features must meet in order to not be dropped.
+        prune_threshold : float, default = None
+            Feature importance threshold that prevents features from being pruned if it is above this number.
+            If None, rely solely on prune_ratio.
         num_resource: int, default=None
             Number of shuffles to evaluate across all features per feature pruning iteration. If None, set to
-            min(number of features x 5, 2500).
+            such that each feature's importance will be evaluated on 10000 samples.
         stop_threshold : int, default = 5
             Early stopping will stop refitting model if score does not improve for this amount of iterations.
-        subsample_size : int, default = 1000
+        subsample_size : int, default = 10000
             Number of validation set samples to use when computing permutation feature importance.
         fi_strategy : str, default = "uniform", choices = ["uniform", "backwardsearch"]
             Feature importance computation strategy to use. "uniform" uniformly allocates resource across
@@ -561,31 +562,42 @@ class AbstractModel:
         FIXME
         1. If self.weight_evaluation==True pass sample_weight param for scoring
         2. Does not work with S3 paths (no problem locally)
+        3. Does not work with n_repeats>1 because of path issues (can't find oof.pkl)
+        4. Top level time limit is messed up presumably because I modify kwargs['time_limit'] in this method
         """
-        num_max_prunable = 500
-        if num_resource is None:
-            num_resource = min(num_max_prunable*5, len(X.columns)*5)
+        num_max_prunable = 100  # maximum number of features that can be pruned
+        num_min_fi_samples = 10000  # minimum number of datapoints that must be used for feature importance computation
+        num_prunable = min(len(X.columns), num_max_prunable)
+        is_bagged = X_val is None
+        time_limit = kwargs.get('time_limit', None)
+        if is_bagged:
+            importance_fn_args = {'X': X, 'y': y, 'is_oof': True, 'subsample_size': subsample_size, 'time_limit': time_limit, 'silent': True}
+            subsample_size = min(subsample_size, len(X))
+            if num_resource is None or num_resource < num_min_fi_samples * num_prunable / subsample_size:
+                num_resource = int(np.ceil(num_min_fi_samples * num_prunable / subsample_size))
+        else:
+            importance_fn_args = {'X': X_val, 'y': y_val, 'subsample_size': subsample_size, 'time_limit': time_limit, 'silent': True}
+            subsample_size = min(subsample_size, len(X_val))
+            if num_resource is None or num_resource < num_min_fi_samples * num_prunable / subsample_size:
+                num_resource = int(np.ceil(num_min_fi_samples * num_prunable / subsample_size))
+
         logger.log(30, f"\tPerforming Iterative Feature Selection Parameters (" +
                        f"max_num_fit: {max_num_fit}, prune_ratio: {prune_ratio}, prune_threshold: {prune_threshold}, " +
                        f"num_resource: {num_resource}, stop_threshold: {stop_threshold}, subsample_size: {subsample_size}, " +
                        f"fi_strategy: {fi_strategy}, fp_strategy: {fp_strategy})")
+
         # If there are too many features, do not consider these golden features. TODO: Compute this using filtering technique or proxy model.
         if len(X.columns) > num_max_prunable:
             logger.log(30, f"\tThere are more than {num_max_prunable} features: Selecting random {num_max_prunable} features for pruning candidates.")
             golden_features = random.sample(X.columns.tolist(), len(X.columns) - num_max_prunable)
         else:
             golden_features = []
-        # Initialize importance_fn_args based on whether the model is a bagged or not
-        importance_fn_args = {'X': X_val, 'y': y_val, 'subsample_size': subsample_size, 'time_limit': kwargs.get('time_limit', None), 'silent': True}
-        if X_val is None or y_val is None:
-            importance_fn_args['X'] = X
-            importance_fn_args['y'] = y
-            importance_fn_args['is_oof'] = True
         fitted_copies_info = []
 
         try:
-            self_copy, score = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P0', None, **kwargs)
+            self_copy, score, time_elapsed = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P0', None, **kwargs)
             fitted_copies_info.append((round(score, 4), self_copy))
+            self.check_and_update_time(kwargs, time_elapsed)
             logger.log(30, f"\tFit 1: Current score is {score}.")
             best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': 0}
             new_features = best_info['features']
@@ -625,29 +637,30 @@ class AbstractModel:
                     # if pruned model led to performance drop, try pruning different features and refit
                     new_features = selector.select_features_on_performance_loss()
 
+                time_elapsed = time.time() - time_start
                 logger.log(30, f"\t# of noised/non-noised features remaining: {len(list(filter(lambda f: 'noise' in f, new_features)))}" +
                                f"/{len(list(filter(lambda f: 'noise' not in f, new_features)))}")
-                if time_limit is not None:
-                    kwargs['time_limit'] = kwargs['time_limit'] - (time.time() - time_start)
-                    if kwargs['time_limit'] <= 0:
-                        raise TimeLimitExceeded
+                logger.log(30, f"\tFeature selection time: ({round(time_elapsed, 4)}s)")
+                self.check_and_update_time(kwargs, time_elapsed)
                 if set(new_features) == set(old_features) or set(new_features) == set(best_info['features']) or len(new_features) == 0:
                     logger.log(30, f"\tThere are no more features to prune. Ending...")
                     break
 
-                self_copy, score = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P{index}', new_features, **kwargs)
+                self_copy, score, time_elapsed = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P{index}', new_features, **kwargs)
+                rounded_score, rounded_best_score, rounded_time = round(score, 4), round(best_info['score'], 4), round(time_elapsed, 4)
+                self.check_and_update_time(kwargs, time_elapsed)
                 fitted_copies_info.append((round(score, 4), self_copy))
                 if score > best_info['score']:
                     # Update best_info and reobtain feature importance scores under this new model
-                    logger.log(30, f"\tFit {index+1}: Current score {score} is better than best score {best_info['score']}. Updating model.")
+                    logger.log(30, f"\tFit {index+1} ({rounded_time}s): Current score {rounded_score} is better than best score {rounded_best_score}. Updating model.")
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(new_features)}.")
                     best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': index}
                     performance_gained = True
                 elif index - best_info['index'] >= stop_threshold:
-                    logger.log(30, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
+                    logger.log(30, f"\tFit {index+1} ({rounded_time}s): Score has not improved for {stop_threshold} iterations. Ending...")
                     break
                 else:
-                    message = f"\tFit {index+1}: Current score {score} is not better than best score {best_info['score']}."
+                    message = f"\tFit {index+1} ({rounded_time}s): Current score {rounded_score} is not better than best score {rounded_best_score}."
                     message += " Ending..." if index+1 == max_num_fit else " Will retry fit with different set of features."
                     logger.log(30, message)
                     performance_gained = False
@@ -669,6 +682,12 @@ class AbstractModel:
     def get_features(self):
         return self.features
 
+    def check_and_update_time(self, kwargs, time_elapsed):
+        if kwargs.get('time_limit', None) is not None:
+            kwargs['time_limit'] = kwargs['time_limit'] - time_elapsed
+            if kwargs['time_limit'] <= 0:
+                raise TimeLimitExceeded
+
     def _fit_save_score_model_copy(self, X, y, X_val, y_val, copy_name, features, **kwargs):
         # Fit a deepcopied model on current_features
         time_start = time.time()
@@ -685,9 +704,10 @@ class AbstractModel:
             score = self_copy.score(X=X_val, y=y_val)
         # if time limit exists, reduce it by the amount it took to fit the current model
         if 'time_limit' in kwargs and kwargs['time_limit'] is not None:
-            time_now = time.time()
-            kwargs['time_limit'] = kwargs['time_limit'] - (time_now - time_start)
-        return self_copy, score
+            time_elapsed = time.time() - time_start
+        else:
+            time_elapsed = None
+        return self_copy, score, time_elapsed
 
     def _fit(self,
              X,
