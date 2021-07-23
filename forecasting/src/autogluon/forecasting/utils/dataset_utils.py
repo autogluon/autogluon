@@ -134,6 +134,7 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
         index_column = "index_column"
     time_list = sorted(list(set(X[time_column])))
     freq = pd.infer_freq(time_list)
+    # check for uniform date
     if freq is None:
         raise ValueError("Freq cannot be inferred. Check your dataset.")
 
@@ -148,7 +149,16 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
 
         for time in time_list:
             tmp = df[df[time_column] == time][[index_column, time_column, target_column]]
+            # check for dataset with multiple targets for a certain time series/time
+            for index in data_dic[index_column]:
+                if tmp[tmp[index_column] == index].shape[0] > 1:
+                    raise ValueError(f"Containing multiple targets for time series {index} and time {time}. "
+                                     "Please check your dataset.")
             tmp = tmp.pivot(index=index_column, columns=time_column, values=target_column)
+            # automatically padding with NAN if for some time series missing a date target
+            for index in data_dic[index_column]:
+                if index not in tmp.index:
+                    tmp.loc[index, time] = None
             tmp_values = tmp[time].values
             data_dic[time] = tmp_values
         return pd.DataFrame(data_dic)
