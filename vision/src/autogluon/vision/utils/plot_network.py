@@ -1,10 +1,13 @@
-import mxnet as mx
 import numpy as np
 from matplotlib import pyplot
 try:
     import graphviz
 except ImportError:
     graphviz = None
+try:
+    import mxnet as mx
+except ImportError:
+    mx = None
 
 __all__ = ['plot_network']
 
@@ -23,6 +26,8 @@ def plot_network(block, shape=(1, 3, 224, 224), savefile=False):
     """
     if graphviz is None:
         raise RuntimeError("Cannot import graphviz.")
+    if mx is None:
+        raise RuntimeError("Cannot import mxnet, plot network won't work")
     if not isinstance(block, mx.gluon.HybridBlock):
         raise ValueError("block must be HybridBlock, given {}".format(type(block)))
     data = mx.sym.var('data')
