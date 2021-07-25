@@ -4,6 +4,7 @@ import logging
 import os
 import pickle
 import warnings
+from autogluon.core.space import Categorical
 
 import numpy as np
 import pandas as pd
@@ -118,7 +119,7 @@ class ImagePredictor(object):
                 # Recommended for applications that benefit from the best possible model accuracy.
                 best_quality={
                     'hyperparameters': {
-                        'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
+                        'model': Categorical('coat_lite_small', 'twins_pcpvt_base', 'swin_base_patch4_window7_224'),
                         'lr': Real(1e-5, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
                         'epochs': 200,
@@ -135,7 +136,7 @@ class ImagePredictor(object):
                 # Recommended for applications that require reasonable inference speed and/or model size.
                 good_quality_fast_inference={
                     'hyperparameters': {
-                        'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
+                        'model': Categorical('resnet50d', 'efficientnet_b1', 'mobilenetv3_large_100'),
                         'lr': Real(1e-4, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
                         'epochs': 150,
@@ -152,7 +153,7 @@ class ImagePredictor(object):
                 # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
                 medium_quality_faster_train={
                     'hyperparameters': {
-                        'model': 'resnet50_v1b',
+                        'model': 'resnet50d',
                         'lr': 0.01,
                         'batch_size': 64,
                         'epochs': 50,
@@ -165,7 +166,7 @@ class ImagePredictor(object):
                 # Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
                 medium_quality_faster_inference={
                     'hyperparameters': {
-                        'model': Categorical('resnet18_v1b', 'mobilenetv3_small'),
+                        'model': Categorical('resnet18', 'mobilenetv3_small_100', 'resnet18_v1b'),
                         'lr': Categorical(0.01, 0.005, 0.001),
                         'batch_size': Categorical(64, 128),
                         'epochs': Categorical(50, 100),
@@ -400,6 +401,29 @@ class ImagePredictor(object):
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
+        # TODO: remove this check when pytorch model supports other problems
+        if self._problem_type != MULTICLASS:
+            try:
+                import timm
+            except ImportError:
+                timm = None
+            if timm is not None:
+                timm_models = timm.list_models()
+                # remove timm models
+                curr_models = config.get('model', None)
+                if isinstance(curr_models, str):
+                    if curr_models in timm_models:
+                        raise NotImplementedError(f'{curr_models} is timm backed model which does not support {self._problem_type}, please specify a model in gluoncv model zoo')
+                elif isinstance(curr_models, Categorical):
+                    new_models = []
+                    for m in curr_models.data:
+                        if m not in timm_models:
+                            new_models.append(m)
+                    if not new_models:
+                        raise ValueError(f'{curr_models} are all timm backed models which does not support {self._problem_type}, please specify a model in gluoncv model zoo')
+                    else:
+                        config['model'] = Categorical(*new_models)
+
         task = _ImageClassification(config=config, problem_type=self._problem_type)
         # GluonCV can't handle these separately - patching created config
         task.search_strategy = scheduler
@@ -715,13 +739,35 @@ def _set_valid_labels(data, label):
             raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
 
 def _get_supported_models():
-    all_models = get_model_list()
-    blacklist = ['ssd', 'faster_rcnn', 'mask_rcnn', 'fcn', 'deeplab',
-                 'psp', 'icnet', 'fastscnn', 'danet', 'yolo', 'pose',
-                 'center_net', 'siamrpn', 'monodepth',
-                 'ucf101', 'kinetics', 'voc', 'coco', 'citys', 'mhpv1',
-                 'ade', 'hmdb51', 'sthsth', 'otb']
-    cls_models = [m for m in all_models if not any(x in m for x in blacklist)]
+    try:
+        import mxnet as _mxnet
+    except ImportError:
+        _mxnet = None
+    if _mxnet is not None:
+        all_models = get_model_list()
+        blacklist = ['ssd', 'faster_rcnn', 'mask_rcnn', 'fcn', 'deeplab',
+                    'psp', 'icnet', 'fastscnn', 'danet', 'yolo', 'pose',
+                    'center_net', 'siamrpn', 'monodepth',
+                    'ucf101', 'kinetics', 'voc', 'coco', 'citys', 'mhpv1',
+                    'ade', 'hmdb51', 'sthsth', 'otb']
+        cls_models = [m for m in all_models if not any(x in m for x in blacklist)]
+    else:
+        cls_models = []
+    # add timm backend supported models
+    try:
+        import torch as _torch
+    except ImportError:
+        _torch = None
+    try:
+        import timm as _timm
+    except ImportError:
+        _timm = None
+    if _timm is not None:
+        cls_models += list(_timm.list_models())
+    elif _torch is None:
+        logger.warning('timm installed but torch is required to enable it.')
+    else:
+        logger.warning('cannot import timm, possibly due to missing torchvision')
     return cls_models
 
 _SUPPORTED_MODELS = _get_supported_models()

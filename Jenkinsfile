@@ -30,6 +30,10 @@ setup_mxnet_gpu = """
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 """
 
+setup_torch_gpu = """
+    python3 -m pip install torch==1.7.1+cu101 torchvision==0.8.2+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+"""
+
 cleanup_venv = """
     deactivate
     rm -rf venv
@@ -264,6 +268,7 @@ stage("Unit Test") {
           conda list
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
+          ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
