@@ -359,9 +359,9 @@ class ImagePredictor(object):
             config['max_reward'] = max_reward
         if nthreads_per_trial is not None:
             config['nthreads_per_trial'] = nthreads_per_trial
-        elif is_fork_enabled():
+        elif is_fork_enabled() and timm is None:
             # This is needed to address multiprocessing.context.TimeoutError in fork mode
-            config['nthreads_per_trial'] = 0 if timm is None else nthreads_per_trial
+            config['nthreads_per_trial'] = 0
         if ngpus_per_trial is not None:
             config['ngpus_per_trial'] = ngpus_per_trial
         if isinstance(hyperparameters, dict):
