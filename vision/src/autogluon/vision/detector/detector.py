@@ -356,6 +356,15 @@ class ObjectDetector(object):
 
     def _validate_kwargs(self, kwargs):
         """validate and initialize default kwargs"""
+
+        valid_kwargs = {'holdout_frac', 'random_state', 'nthreads_per_trial', 'ngpus_per_trial', 'hyperparameter_tune_kwargs'}
+        invalid_kwargs = []
+        for key in kwargs:
+            if key not in valid_kwargs:
+                invalid_kwargs.append(key)
+        if invalid_kwargs:
+            raise KeyError(f'Invalid kwargs specified: {invalid_kwargs}. Valid kwargs names: {list(valid_kwargs)}')
+
         kwargs['holdout_frac'] = kwargs.get('holdout_frac', 0.1)
         if not (0 < kwargs['holdout_frac'] < 1.0):
             raise ValueError(f'Range error for `holdout_frac`, expected to be within range (0, 1), given {kwargs["holdout_frac"]}')
