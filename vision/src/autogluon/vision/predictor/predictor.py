@@ -360,6 +360,7 @@ class ImagePredictor(object):
         if nthreads_per_trial is not None:
             config['nthreads_per_trial'] = nthreads_per_trial
         elif is_fork_enabled() and timm is None:
+            # TODO(): remove this in the future
             # This is needed to address multiprocessing.context.TimeoutError in fork mode
             config['nthreads_per_trial'] = 0
         if ngpus_per_trial is not None:
