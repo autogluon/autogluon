@@ -9,6 +9,10 @@ from autogluon.core.space import Categorical
 import numpy as np
 import pandas as pd
 from gluoncv.auto.tasks import ImagePrediction as _ImageClassification
+try:
+    import timm
+except ImportError:
+    timm = None
 
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
@@ -357,7 +361,7 @@ class ImagePredictor(object):
             config['nthreads_per_trial'] = nthreads_per_trial
         elif is_fork_enabled():
             # This is needed to address multiprocessing.context.TimeoutError in fork mode
-            config['nthreads_per_trial'] = 0
+            config['nthreads_per_trial'] = 0 if timm is None else nthreads_per_trial
         if ngpus_per_trial is not None:
             config['ngpus_per_trial'] = ngpus_per_trial
         if isinstance(hyperparameters, dict):
@@ -402,10 +406,6 @@ class ImagePredictor(object):
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
         # TODO: remove this check when pytorch model supports other problems
         if self._problem_type != MULTICLASS:
-            try:
-                import timm
-            except ImportError:
-                timm = None
             if timm is not None:
                 timm_models = timm.list_models()
                 # remove timm models
