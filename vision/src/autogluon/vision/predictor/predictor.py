@@ -405,22 +405,27 @@ class ImagePredictor(object):
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
+
         # TODO: remove this check when pytorch model supports other problems
         if self._problem_type != MULTICLASS:
             if timm is not None:
                 timm_models = timm.list_models()
                 # remove timm models
                 curr_models = config.get('model', None)
-                if isinstance(curr_models, str):
+                if curr_models == None:
+                    config['model'] = 'resnet50_v1b'
+                elif isinstance(curr_models, str):
                     if curr_models in timm_models:
-                        raise NotImplementedError(f'{curr_models} is timm backed model which does not support {self._problem_type}, please specify a model in gluoncv model zoo')
+                        logger.warning(f'{curr_models} is timm backed model which does not support {self._problem_type}, fallback to resnet50_v1b, please specify a model in gluoncv model zoo if you want to customize it.')
+                        config['model'] = 'resnet50_v1b'
                 elif isinstance(curr_models, Categorical):
                     new_models = []
                     for m in curr_models.data:
                         if m not in timm_models:
                             new_models.append(m)
                     if not new_models:
-                        raise ValueError(f'{curr_models} are all timm backed models which does not support {self._problem_type}, please specify a model in gluoncv model zoo')
+                        logger.warning(f'{curr_models} are all timm backed models which does not support {self._problem_type}, fallback to resnet50_v1b, please specify a model in gluoncv model zoo if you want to customize it.')
+                        config['model'] = 'resnet50_v1b'
                     else:
                         config['model'] = Categorical(*new_models)
 
