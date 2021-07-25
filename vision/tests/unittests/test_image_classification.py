@@ -10,7 +10,7 @@ def test_task():
     dataset, _, test_dataset = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     model_list = ImagePredictor.list_models()
     classifier = ImagePredictor()
-    classifier.fit(dataset, num_trials=2, hyperparameters={'epochs': 1, 'early_stop_patience': 3})
+    classifier.fit(dataset, hyperparameters={'epochs': 1, 'early_stop_patience': 3}, hyperparameter_tune_kwargs={'num_trials': 2})
     assert classifier.fit_summary()['valid_acc'] > 0.1, 'valid_acc is abnormal'
     test_result = classifier.predict(test_dataset)
     single_test = classifier.predict(test_dataset.iloc[0]['image'])
@@ -69,4 +69,4 @@ def test_image_predictor_presets():
     train_dataset, _, test_dataset = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     for preset in ['medium_quality_faster_train', 'medium_quality_faster_inference']:
         predictor = ImagePredictor()
-        predictor.fit(train_dataset,tuning_data=test_dataset, presets=[preset], time_limit=60, hyperparameters={'epochs':1})
+        predictor.fit(train_dataset, tuning_data=test_dataset, presets=[preset], time_limit=60, hyperparameters={'epochs': 1})
