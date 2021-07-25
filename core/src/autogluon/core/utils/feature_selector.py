@@ -211,7 +211,7 @@ class PercentageFeaturePruneHelper(FeaturePruneHelper):
         threshold such that features whose feature importance score mean is bottom X% of
         all feature importance scores OR above the given threshold are returned.
         """
-        num_prune = max(1, int(len(self.importance_df) * self.prune_ratio))
+        num_prune = max(1, int((len(self.importance_df)+len(self.golden_features)) * self.prune_ratio))
         for index, (name, info) in enumerate(self.importance_df.iterrows()):
             if index >= num_prune or (self.threshold and info['importance'] > self.threshold):
                 self.kept_features.append(name)

@@ -202,7 +202,7 @@ class DefaultLearner(AbstractLearner):
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
                     y_super = pd.concat([y, y_unlabeled], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
 
             X = X_super.head(len(X)).set_index(X.index)
             if X_unlabeled is not None:

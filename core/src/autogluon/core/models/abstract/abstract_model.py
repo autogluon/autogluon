@@ -530,7 +530,7 @@ class AbstractModel:
             raise TimeLimitExceeded
 
     def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.05, prune_threshold=None, num_resource=None,
-                       stop_threshold=3, subsample_size=10000, fi_strategy="uniform", fp_strategy="percentage", **kwargs):
+                       stop_threshold=3, subsample_size=5000, fi_strategy="uniform", fp_strategy="percentage", **kwargs):
         """
         Functionally identical to `fit` method, but repeats feature importance based pruning until validation set
         performance degrades for `stop_threshold` iterations or `max_num_fit` iterations have passed.
@@ -598,11 +598,16 @@ class AbstractModel:
             self_copy, score, time_elapsed = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P0', None, **kwargs)
             fitted_copies_info.append((round(score, 4), self_copy))
             self.check_and_update_time(kwargs, time_elapsed)
-            logger.log(30, f"\tFit 1: Current score is {score}.")
+            logger.log(30, f"\tFit 1 ({round(time_elapsed, 4)}s): Current score is {score}.")
             best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': 0}
             new_features = best_info['features']
             original_feature_count = len(new_features)
             performance_gained = True
+            from autogluon.tabular.models import LGBModel, KNNModel
+            if isinstance(self, LGBModel) or isinstance(self, KNNModel):  # HACK: LGB models take wayyy too long computing feature importance so skip
+                logger.log(30, f"\tNot performing additional feature pruning for KNN / LGB Models.")
+                index = 0
+                return self_copy, fitted_copies_info
 
             for index in range(1, max_num_fit):
                 old_features = new_features
@@ -702,11 +707,7 @@ class AbstractModel:
             score = self_copy.score_with_oof(y)
         else:
             score = self_copy.score(X=X_val, y=y_val)
-        # if time limit exists, reduce it by the amount it took to fit the current model
-        if 'time_limit' in kwargs and kwargs['time_limit'] is not None:
-            time_elapsed = time.time() - time_start
-        else:
-            time_elapsed = None
+        time_elapsed = time.time() - time_start
         return self_copy, score, time_elapsed
 
     def _fit(self,
