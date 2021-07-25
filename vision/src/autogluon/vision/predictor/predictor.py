@@ -9,7 +9,6 @@ from autogluon.core.space import Categorical
 import numpy as np
 import pandas as pd
 from gluoncv.auto.tasks import ImagePrediction as _ImageClassification
-from gluoncv.model_zoo import get_model_list
 
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
@@ -744,6 +743,7 @@ def _get_supported_models():
     except ImportError:
         _mxnet = None
     if _mxnet is not None:
+        from gluoncv.model_zoo import get_model_list
         all_models = get_model_list()
         blacklist = ['ssd', 'faster_rcnn', 'mask_rcnn', 'fcn', 'deeplab',
                     'psp', 'icnet', 'fastscnn', 'danet', 'yolo', 'pose',
