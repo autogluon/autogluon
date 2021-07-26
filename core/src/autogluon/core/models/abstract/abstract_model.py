@@ -604,7 +604,9 @@ class AbstractModel:
             original_feature_count = len(new_features)
             performance_gained = True
             from autogluon.tabular.models import LGBModel, KNNModel
-            if isinstance(self, LGBModel) or isinstance(self, KNNModel):  # HACK: LGB models take wayyy too long computing feature importance so skip
+            from autogluon.core.models import BaggedEnsembleModel
+            if (isinstance(self, LGBModel) or isinstance(self, KNNModel)) or (isinstance(self, BaggedEnsembleModel) and \
+               (isinstance(self.model_base, LGBModel) or isinstance(self.model_base, KNNModel))):  # HACK: LGB models take wayyy too long computing feature importance so skip
                 logger.log(30, f"\tNot performing additional feature pruning for KNN / LGB Models.")
                 index = 0
                 return self_copy, fitted_copies_info

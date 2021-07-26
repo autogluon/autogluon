@@ -27,8 +27,11 @@ uniform = pd.read_csv("result/results_automlbenchmark_4h8c_autogluon_prune_unifo
 backward = pd.read_csv("result/results_automlbenchmark_4h8c_autogluon_prune_backwardsearch.ag.4h8c.aws.20210722T055046.csv")
 """
 
-base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210723T212945.csv")
-uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210723T213246.csv")
+# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210723T212945.csv")
+# uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210723T213246.csv")
+# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality.ag.12h8c.aws.20210725T042534.csv")
+base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_backwardsearch_bestquality.ag.12h8c.aws.20210725T042219.csv")
+uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210725T042156.csv")
 task_metadata = pd.read_csv('result/task_metadata.csv')
 base = add_dataset_info(base, task_metadata)
 uniform = add_dataset_info(uniform, task_metadata)
