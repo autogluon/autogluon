@@ -178,6 +178,8 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
 def train_test_split_dataframe(data, prediction_length):
     test_ds = data.copy()
     train_ds = data.iloc[:, :-prediction_length]
+    if all(data.iloc[:, prediction_length:]):
+        logger.log(30, "Warning: All targets used for validation is NAN.")
     return train_ds, test_ds
 
 
