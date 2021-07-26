@@ -29,8 +29,7 @@ backward = pd.read_csv("result/results_automlbenchmark_4h8c_autogluon_prune_back
 
 # base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210723T212945.csv")
 # uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210723T213246.csv")
-# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality.ag.12h8c.aws.20210725T042534.csv")
-base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_backwardsearch_bestquality.ag.12h8c.aws.20210725T042219.csv")
+base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality.ag.12h8c.aws.20210725T042534.csv")
 uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210725T042156.csv")
 task_metadata = pd.read_csv('result/task_metadata.csv')
 base = add_dataset_info(base, task_metadata)
@@ -49,6 +48,7 @@ uniformreg = uniform[uniform["type"] == "regression"]
 
 import pdb; pdb.set_trace()
 """
+first_better, equal_performance, second_better = compare_dfs(base, uniform, "result")
 first_better, equal_performance, second_better = compare_dfs(base[(50000 > base["NumberOfInstances"]) & (base["NumberOfInstances"] > 0)],
                                                              backward[(50000 > backward["NumberOfInstances"]) & (backward["NumberOfInstances"] > 0)],
                                                              "result")

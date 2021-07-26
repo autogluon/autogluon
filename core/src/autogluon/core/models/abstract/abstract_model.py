@@ -568,8 +568,9 @@ class AbstractModel:
         num_max_prunable = 100  # maximum number of features that can be pruned
         num_min_fi_samples = 10000  # minimum number of datapoints that must be used for feature importance computation
         num_prunable = min(len(X.columns), num_max_prunable)
-        is_bagged = X_val is None
         time_limit = kwargs.get('time_limit', None)
+        fitted_copies_info = []
+        is_bagged = X_val is None
         if is_bagged:
             importance_fn_args = {'X': X, 'y': y, 'is_oof': True, 'subsample_size': subsample_size, 'time_limit': time_limit, 'silent': True}
             subsample_size = min(subsample_size, len(X))
@@ -586,30 +587,15 @@ class AbstractModel:
                        f"num_resource: {num_resource}, stop_threshold: {stop_threshold}, subsample_size: {subsample_size}, " +
                        f"fi_strategy: {fi_strategy}, fp_strategy: {fp_strategy})")
 
-        # If there are too many features, do not consider these golden features. TODO: Compute this using filtering technique or proxy model.
-        if len(X.columns) > num_max_prunable:
-            logger.log(30, f"\tThere are more than {num_max_prunable} features: Selecting random {num_max_prunable} features for pruning candidates.")
-            golden_features = random.sample(X.columns.tolist(), len(X.columns) - num_max_prunable)
-        else:
-            golden_features = []
-        fitted_copies_info = []
-
         try:
             self_copy, score, time_elapsed = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P0', None, **kwargs)
             fitted_copies_info.append((round(score, 4), self_copy))
             self.check_and_update_time(kwargs, time_elapsed)
             logger.log(30, f"\tFit 1 ({round(time_elapsed, 4)}s): Current score is {score}.")
-            best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': 0}
+            best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': 0}
             new_features = best_info['features']
             original_feature_count = len(new_features)
             performance_gained = True
-            from autogluon.tabular.models import LGBModel, KNNModel
-            from autogluon.core.models import BaggedEnsembleModel
-            if (isinstance(self, LGBModel) or isinstance(self, KNNModel)) or (isinstance(self, BaggedEnsembleModel) and \
-               (isinstance(self.model_base, LGBModel) or isinstance(self.model_base, KNNModel))):  # HACK: LGB models take wayyy too long computing feature importance so skip
-                logger.log(30, f"\tNot performing additional feature pruning for KNN / LGB Models.")
-                index = 0
-                return self_copy, fitted_copies_info
 
             for index in range(1, max_num_fit):
                 old_features = new_features
@@ -619,19 +605,28 @@ class AbstractModel:
 
                 if performance_gained:
                     # if pruned model led to performance gain, initialize FeatureSelector and fit a new model
+                    best_features = best_info['features']
+                    # If there are too many features, do not consider these golden features. TODO: Compute this using filtering technique or proxy model.
+                    if len(best_features) > num_max_prunable:
+                        logger.log(30, f"\tThere are more than {num_max_prunable} features: Selecting random {num_max_prunable} features for pruning candidates.")
+                        golden_features = random.sample(best_features, len(best_features) - num_max_prunable)
+                    else:
+                        golden_features = []
+                    # Choose feature importance computation strategy
                     if fi_strategy == "uniform":
                         fi_helper = UniformFeatureImportanceHelper(importance_fn=best_model.compute_feature_importance,
                                                                    importance_fn_args=importance_fn_args,
-                                                                   features=best_info['features'],
+                                                                   features=best_features,
                                                                    golden_features=golden_features)
                     elif fi_strategy == "backwardsearch":
                         fi_helper = BackwardSearchFeatureImportanceHelper(importance_fn=best_model.compute_feature_importance,
                                                                           importance_fn_args=importance_fn_args,
                                                                           prune_ratio=prune_ratio,
-                                                                          features=best_info['features'],
+                                                                          features=best_features,
                                                                           golden_features=golden_features)
                     else:
                         raise Exception(f"'{fi_strategy}' is not a valid featrue importance computation strategy.")
+                    # Choose feature pruning strategy
                     if fp_strategy == "single":
                         fp_helper = SingleFeaturePruneHelper(golden_features=golden_features)
                     elif fp_strategy == "percentage":
@@ -661,7 +656,7 @@ class AbstractModel:
                     # Update best_info and reobtain feature importance scores under this new model
                     logger.log(30, f"\tFit {index+1} ({rounded_time}s): Current score {rounded_score} is better than best score {rounded_best_score}. Updating model.")
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(new_features)}.")
-                    best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': index}
+                    best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': index}
                     performance_gained = True
                 elif index - best_info['index'] >= stop_threshold:
                     logger.log(30, f"\tFit {index+1} ({rounded_time}s): Score has not improved for {stop_threshold} iterations. Ending...")
@@ -686,9 +681,6 @@ class AbstractModel:
                 return best_model, fitted_copies_info
             raise Exception("ERROR: No model trained.")
 
-    def get_features(self):
-        return self.features
-
     def check_and_update_time(self, kwargs, time_elapsed):
         if kwargs.get('time_limit', None) is not None:
             kwargs['time_limit'] = kwargs['time_limit'] - time_elapsed
@@ -702,6 +694,8 @@ class AbstractModel:
         self_copy = self.convert_to_template()
         self_copy.rename(copy_name)
         self_copy.features = features
+        if features is not None and kwargs.get('feature_metadata', None) is not None:
+            kwargs['feature_metadata'] = kwargs['feature_metadata'].keep_features(features)
         self_copy.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
         self_copy.save()
         # Score new model and decide whether to continue refitting

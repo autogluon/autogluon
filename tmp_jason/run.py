@@ -15,15 +15,15 @@ parser.add_argument('-x', '--fi', help='feature importance strategy', default='u
 parser.add_argument('-y', '--fp', help='feature pruning strategy or not', default='percentage', choices=['percentage', 'single'])
 args = parser.parse_args()
 
-train_data = pd.read_csv(args.train_path)  # .head(1000)
+train_data = pd.read_csv(args.train_path).head(10000)
 test_data = pd.read_csv(args.test_path)
 X_test = test_data.drop(columns=[args.label])
 y_test = test_data[args.label]
 
 fit_with_prune_kwargs = {
     'fit_with_prune_kwargs': {
-        'max_num_fit': 2,
-        'stop_threshold': 2,
+        'max_num_fit': 3,
+        'stop_threshold': 3,
         'prune_ratio': args.ratio,
         'prune_threshold': 0.,
         'subsample_size': 5000,
@@ -40,7 +40,7 @@ elif args.mode == 'model-stack':
     presets = ['best_quality']
     # custom_hyperparameters = {KNNModel: {'ag_args': fit_with_prune_kwargs}}
     # custom_hyperparameters = {KNNModel: {}, CatBoostModel: {}}
-    custom_hyperparameters = {KNNModel: {}}
+    custom_hyperparameters = {LGBModel: {}}
 elif args.mode == 'ag':
     presets = ['medium_quality_faster_train']
     custom_hyperparameters = None
@@ -50,8 +50,8 @@ else:
 
 predictor = TabularPredictor(label=args.label)
 if args.prune:
-    predictor = predictor.fit(train_data, presets=presets, ag_args=fit_with_prune_kwargs, time_limit=3600,  # num_bag_sets=2, num_stack_levels=1,
-                              ag_args_ensemble={'use_child_oof': False}, num_bag_sets=1, hyperparameters=custom_hyperparameters)  # ag_args_ensemble={'use_child_oof': False}, hyperparameters=custom_hyperparameters)
+    predictor = predictor.fit(train_data, presets=presets, ag_args=fit_with_prune_kwargs, time_limit=3600, num_bag_sets=1, num_stack_levels=1,
+                              ag_args_ensemble={'use_child_oof': False}, hyperparameters=custom_hyperparameters)  # ag_args_ensemble={'use_child_oof': False}, hyperparameters=custom_hyperparameters)
 else:
     predictor = predictor.fit(train_data, presets=presets, num_bag_sets=2, num_stack_levels=2, time_limit=3600, hyperparameters=custom_hyperparameters)
 # ag_args=fit_with_prune_kwargs
