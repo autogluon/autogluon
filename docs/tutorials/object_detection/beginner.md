@@ -7,10 +7,9 @@ Object detection is the process of identifying and localizing objects in an imag
 
 Our goal is to detect motorbike in images by [YOLOv3 model](https://pjreddie.com/media/files/papers/YOLOv3.pdf). A tiny dataset is collected from VOC dataset, which only contains the motorbike category. The model pretrained on the COCO dataset is used to fine-tune our small dataset. With the help of AutoGluon, we are able to try many models with different hyperparameters automatically, and return the best one as our final model.
 
-To start, import autogluon.vision and ObjectDetector:
+To start, import ObjectDetector:
 
 ```{.python .input}
-import autogluon.core as ag
 from autogluon.vision import ObjectDetector
 ```
 
@@ -41,8 +40,7 @@ detector.fit(dataset_train, time_limit=time_limit, hyperparameters=hyperparamete
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal
 practice, it is common to only use `time_limit` and drop `num_trials`. Also note
 that hyperparameter tuning defaults to random search. Model-based variants, such
-as `search_strategy='bayesopt'` or `search_strategy='bayesopt_hyperband'` can be
-a lot more sample-efficient.
+as `searcher='bayesopt'` in `hyperparameter_tune_kwargs` can be a lot more sample-efficient.
 
 After fitting, AutoGluon automatically returns the best model among all models in the searching space. From the output, we know the best model is the one trained with the second learning rate. To see how well the returned model performed on test dataset, call detector.evaluate().
 

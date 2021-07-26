@@ -220,7 +220,7 @@ class ImagePredictor(object):
                 num_trials : int, default = 1
                     The limit of HPO trials that can be performed within `time_limit`. The HPO process will be terminated
                     when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first.
-                search_strategy : str, default = 'random'
+                searcher : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
                     Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
                     ‘grid’ (grid search).

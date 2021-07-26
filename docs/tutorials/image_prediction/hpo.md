@@ -75,8 +75,8 @@ parallel evaluations.
 ```{.python .input}
 hyperparameters={'model': model, 'batch_size': batch_size, 'lr': lr, 'epochs': 2}
 predictor = ImagePredictor()
-predictor.fit(train_data, search_strategy='bayesopt', time_limit=60*10, hyperparameters=hyperparameters,
-              hyperparameter_tune_kwargs={'num_trials': 2})
+predictor.fit(train_data, time_limit=60*10, hyperparameters=hyperparameters,
+              hyperparameter_tune_kwargs={'searcher': 'bayesopt', 'num_trials': 2})
 print('Top-1 val acc: %.3f' % predictor.fit_summary()['valid_acc'])
 ```
 
@@ -90,39 +90,3 @@ print('Test acc on hold-out data:', top1)
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal
 practice, it is common to only use `time_limit` and drop `num_trials`.
-
-### Hyperband Early Stopping
-
-AutoGluon currently supports scheduling trials in serial order and with early
-stopping (e.g., if the performance of the model early within training already
-looks bad, the trial may be terminated early to free up resources).
-Here is an example of using an early stopping scheduler
-:class:`autogluon.core.scheduler.HyperbandScheduler`. `scheduler_options` is used
-to configure the scheduler. In this example, we run Hyperband with a single
-bracket, and stop/go decisions are made after 1 and 2 epochs (`grace_period`,
-`grace_period * reduction_factor`):
-
-```{.python .input}
-hyperparameters.update({
-  'search_strategy': 'hyperband',
-  'grace_period': 1
-  })
-```
-
-The `fit`, `evaluate` and `predict` processes are exactly the same, so we will skip training to save some time.
-
-### Bayesian Optimization and Hyperband ###
-
-While Hyperband scheduling is normally driven by a random searcher, AutoGluon
-also provides Hyperband together with Bayesian optimization. The tuning of expensive
-DL models typically works best with this combination.
-
-```{.python .input}
-hyperparameters.update({
-  'search_strategy': 'bayesopt_hyperband',
-  'grace_period': 1
-  })
-```
-
-For a comparison of different search algorithms and scheduling strategies, see :ref:`course_alg`.
-For more options using `fit`, see :class:`autogluon.vision.ImagePredictor`.
