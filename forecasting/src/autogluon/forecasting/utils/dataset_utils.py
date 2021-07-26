@@ -146,19 +146,27 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
         """
         df = df.sort_values(by=index_column)
         data_dic = {index_column: sorted(list(set(df[index_column])))}
+        # check for dataset with multiple targets for a certain time series/time
+        if any(df[[index_column, time_column]].value_counts() > 1):
+            for combination in df[[index_column, time_column]].value_counts().index:
+                raise ValueError(f"Containing multiple targets for time series {combination[0]} and time {combination[1]}. "
+                                 "Please check your dataset.")
+        # check whether need auto-padding
+        need_padding = False
+        if any(df[time_column].value_counts() != len(df[index_column].unique())):
+            logger.log(30, "Warning: autogluon requires each index to be observed over the same set of time values. \n"
+                           "As this is not the case in your data, we are automatically padding the dataset with all missing (index, time) combinations which may take some time. \n"
+                           "To do this yourself, simply add rows to the Dataframe with target value = NA for each missing (index,time) combination.")
+            need_padding = True
 
         for time in time_list:
             tmp = df[df[time_column] == time][[index_column, time_column, target_column]]
-            # check for dataset with multiple targets for a certain time series/time
-            for index in data_dic[index_column]:
-                if tmp[tmp[index_column] == index].shape[0] > 1:
-                    raise ValueError(f"Containing multiple targets for time series {index} and time {time}. "
-                                     "Please check your dataset.")
             tmp = tmp.pivot(index=index_column, columns=time_column, values=target_column)
-            # automatically padding with NAN if for some time series missing a date target
-            for index in data_dic[index_column]:
-                if index not in tmp.index:
-                    tmp.loc[index, time] = None
+            # automatically padding with NAN if for some time series missing a date target if needed
+            if need_padding:
+                for index in data_dic[index_column]:
+                    if index not in tmp.index:
+                        tmp.loc[index, time] = None
             tmp_values = tmp[time].values
             data_dic[time] = tmp_values
         return pd.DataFrame(data_dic)
@@ -166,7 +174,7 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
     X = reshape_dataframe(X)
     return X
 
-
+# TODO: Improve the way to do the split
 def train_test_split_dataframe(data, prediction_length):
     test_ds = data.copy()
     train_ds = data.iloc[:, :-prediction_length]

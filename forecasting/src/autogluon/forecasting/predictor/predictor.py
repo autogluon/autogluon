@@ -317,6 +317,7 @@ class ForecastingPredictor:
         if isinstance(train_data, pd.DataFrame):
             logger.log(30, "Training with dataset in tabular format...")
             # Inform the user extra columns in dataset will not be used.
+            # TODO: Inferring from train data what extra columns are and treat them as dynamic features
             extra_columns = [c for c in train_data.columns.copy() if c not in [index_column, time_column, target_column]]
             if len(extra_columns) > 0:
                 logger.log(30, f"Find more than 3 columns, columns {extra_columns} will not be used.")
