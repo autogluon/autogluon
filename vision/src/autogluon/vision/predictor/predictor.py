@@ -16,7 +16,7 @@ from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from autogluon.core.utils.utils import generate_train_test_split
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
-from ..utils import MXNetErrorCatcher, sanitize_batch_size
+from ..utils import sanitize_batch_size
 
 __all__ = ['ImagePredictor']
 
@@ -409,10 +409,9 @@ class ImagePredictor(object):
         self._train_classes = train_data.classes
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            with MXNetErrorCatcher() as err:
-                self._classifier = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
-            if err.exc_value is not None:
-                raise RuntimeError(err.exc_value + err.hint)
+            # TODO: MXNetErrorCatcher was removed because it didn't return traceback
+            #  Re-add once it returns full traceback regardless of which exception was caught
+            self._classifier = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
         self._classifier._logger.setLevel(log_level)
         self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
