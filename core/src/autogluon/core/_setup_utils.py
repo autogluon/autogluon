@@ -18,7 +18,7 @@ DEPENDENT_PACKAGES = {
     'pandas': '>=1.0.0,<1.3',  # FIXME: Don't limit to <1.3, fix openml tutorials to use CSV instead of pickled DataFrames, fix GluonCV object detection tutorial
     'scikit-learn': '>=0.23.2,<0.25',  # 0.22 crashes during efficient OOB in Tabular
     'scipy': '>=1.5.4,<1.7',
-    'gluoncv': '==0.11.0b20210726', # '>=0.10.4,<0.10.5',
+    'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
     'Pillow': '<=8.1',
     'graphviz': '<0.9.0,>=0.8.1',
