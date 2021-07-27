@@ -656,7 +656,12 @@ class ImagePredictor(object):
                 data = _ImageClassification.Dataset(data, classes=self._train_classes)
             else:
                 data = _ImageClassification.Dataset(data, classes=[])
-        return self._classifier.evaluate(data, metric_name=self._eval_metric)
+        #FIXME: remove this try-catch once torch evaluate supports custom metric
+        try:
+            ret = self._classifier.evaluate(data, metric_name=self._eval_metric)
+        except TypeError:
+            logger.info('eval_metric will be supported in the future update, disable it now.')
+            ret = self._classifier.evaluate(data)
 
     def fit_summary(self):
         """Return summary of last `fit` process.
