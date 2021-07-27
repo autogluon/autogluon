@@ -2,11 +2,8 @@ import argparse
 import logging
 import os
 
-import mxnet as mx
-
 import autogluon.core as ag
-from autogluon.vision.object_detection import ObjectDetector
-from autogluon.core.scheduler import get_gpu_count
+from autogluon.vision import ObjectDetector
 
 # meta info for each dataset. { name: (url, index_file_name_trainval, index_file_name_test), ...}
 dataset_dict = {

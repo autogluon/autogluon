@@ -33,11 +33,31 @@ def get_cpu_count():
 
 
 def get_gpu_count():
+    # FIXME: Sometimes doesn't detect GPU on Windows
+    # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
     from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
     if not cudaInit(): return 0
     gpu_count = cudaDeviceGetCount()
     cudaShutdown()
     return gpu_count
+
+
+def get_gpu_count_mxnet():
+    try:
+        import mxnet
+        num_gpus = mxnet.context.num_gpus()
+    except Exception:
+        num_gpus = 0
+    return num_gpus
+
+
+def get_gpu_count_torch():
+    try:
+        import torch
+        num_gpus = torch.cuda.device_count()
+    except Exception:
+        num_gpus = 0
+    return num_gpus
 
 
 class CVSplitter:

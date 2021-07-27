@@ -7,7 +7,7 @@ import os
 
 import pandas as pd
 import numpy as np
-from autogluon.core.utils import verbosity2loglevel, get_gpu_count
+from autogluon.core.utils import verbosity2loglevel, get_gpu_count, get_gpu_count_mxnet, get_gpu_count_torch
 from autogluon.core.utils import set_logger_verbosity
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
@@ -370,7 +370,7 @@ class ObjectDetector(object):
         kwargs['nthreads_per_trial'] = kwargs.get('nthreads_per_trial', None)
         kwargs['ngpus_per_trial'] = kwargs.get('ngpus_per_trial', None)
         if kwargs['ngpus_per_trial'] is not None and kwargs['ngpus_per_trial'] > 0:
-            detected_gpu = get_gpu_count()
+            detected_gpu = self._get_num_gpus_available()
             if detected_gpu < kwargs['ngpus_per_trial']:
                 raise ValueError(f"Insufficient detected # gpus {detected_gpu} vs requested {kwargs['ngpus_per_trial']}")
         # tune kwargs
@@ -476,3 +476,14 @@ class ObjectDetector(object):
             obj = pickle.load(fid)
         obj._verbosity = verbosity
         return obj
+
+    @staticmethod
+    def _get_num_gpus_available():
+        # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
+        # FIXME: get_gpu_count by itself doesn't always work for Windows
+        num_gpus = get_gpu_count()
+        if num_gpus == 0:
+            num_gpus = get_gpu_count_mxnet()
+            if num_gpus == 0:
+                num_gpus = get_gpu_count_torch()
+        return num_gpus
