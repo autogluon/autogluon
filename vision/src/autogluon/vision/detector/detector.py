@@ -11,7 +11,6 @@ from autogluon.core.utils import verbosity2loglevel, get_gpu_count
 from autogluon.core.utils import set_logger_verbosity
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
-from ..utils import MXNetErrorCatcher
 
 __all__ = ['ObjectDetector']
 
@@ -203,7 +202,7 @@ class ObjectDetector(object):
                 num_trials : int, default = 1
                     The limit of HPO trials that can be performed within `time_limit`. The HPO process will be terminated
                     when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first.
-                search_strategy : str, default = 'random'
+                searcher : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
                     Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
                     ‘grid’ (grid search).
@@ -303,10 +302,9 @@ class ObjectDetector(object):
         task._logger.propagate = True
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            with MXNetErrorCatcher() as err:
-                self._detector = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
-            if err.exc_value is not None:
-                raise RuntimeError(err.exc_value)
+            # TODO: MXNetErrorCatcher was removed because it didn't return traceback,
+            #  Re-add once it returns full traceback regardless of which exception was caught
+            self._detector = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
         self._detector._logger.setLevel(log_level)
         self._detector._logger.propagate = True
         self._fit_summary = task.fit_summary()
@@ -356,6 +354,15 @@ class ObjectDetector(object):
 
     def _validate_kwargs(self, kwargs):
         """validate and initialize default kwargs"""
+
+        valid_kwargs = {'holdout_frac', 'random_state', 'nthreads_per_trial', 'ngpus_per_trial', 'hyperparameter_tune_kwargs'}
+        invalid_kwargs = []
+        for key in kwargs:
+            if key not in valid_kwargs:
+                invalid_kwargs.append(key)
+        if invalid_kwargs:
+            raise KeyError(f'Invalid kwargs specified: {invalid_kwargs}. Valid kwargs names: {list(valid_kwargs)}')
+
         kwargs['holdout_frac'] = kwargs.get('holdout_frac', 0.1)
         if not (0 < kwargs['holdout_frac'] < 1.0):
             raise ValueError(f'Range error for `holdout_frac`, expected to be within range (0, 1), given {kwargs["holdout_frac"]}')
