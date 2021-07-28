@@ -530,7 +530,8 @@ class AbstractModel:
             raise TimeLimitExceeded
 
     def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.05, prune_threshold=None, num_resource=None,
-                       stop_threshold=3, subsample_size=5000, fi_strategy="uniform", fp_strategy="percentage", **kwargs):
+                       stop_threshold=3, subsample_size=5000, fi_strategy="uniform", fp_strategy="percentage",
+                       num_min_fi_samples=10000, **kwargs):
         """
         Functionally identical to `fit` method, but repeats feature importance based pruning until validation set
         performance degrades for `stop_threshold` iterations or `max_num_fit` iterations have passed.
@@ -558,6 +559,8 @@ class AbstractModel:
         fp_strategy : str, default = "percentage", choices = ["percentage", "single"]
             Feature pruning strategy to use. "percentage" prunes all features whose feature importance score
             is bottom X%. "single" prunes a specific feature subset that has the lowest feature importance score.
+        num_min_fi_samples : int, default = 10000
+            minimum number of datapoints that must be used for feature importance computation
 
         FIXME
         1. If self.weight_evaluation==True pass sample_weight param for scoring
@@ -566,7 +569,6 @@ class AbstractModel:
         4. Top level time limit is messed up presumably because I modify kwargs['time_limit'] in this method
         """
         num_max_prunable = 100  # maximum number of features that can be pruned
-        num_min_fi_samples = 10000  # minimum number of datapoints that must be used for feature importance computation
         num_prunable = min(len(X.columns), num_max_prunable)
         time_limit = kwargs.get('time_limit', None)
         fitted_copies_info = []
@@ -592,7 +594,7 @@ class AbstractModel:
             fitted_copies_info.append((round(score, 4), self_copy))
             self.check_and_update_time(kwargs, time_elapsed)
             logger.log(30, f"\tFit 1 ({round(time_elapsed, 4)}s): Current score is {score}.")
-            best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': 0}
+            best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': 0}
             new_features = best_info['features']
             original_feature_count = len(new_features)
             performance_gained = True
@@ -656,7 +658,7 @@ class AbstractModel:
                     # Update best_info and reobtain feature importance scores under this new model
                     logger.log(30, f"\tFit {index+1} ({rounded_time}s): Current score {rounded_score} is better than best score {rounded_best_score}. Updating model.")
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(new_features)}.")
-                    best_info = {'model': self_copy, 'features': self_copy.features, 'score': score, 'index': index}
+                    best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': index}
                     performance_gained = True
                 elif index - best_info['index'] >= stop_threshold:
                     logger.log(30, f"\tFit {index+1} ({rounded_time}s): Score has not improved for {stop_threshold} iterations. Ending...")
@@ -693,7 +695,7 @@ class AbstractModel:
         is_oof = X_val is None or y_val is None
         self_copy = self.convert_to_template()
         self_copy.rename(copy_name)
-        self_copy.features = features
+        self.keep_features(features)
         if features is not None and kwargs.get('feature_metadata', None) is not None:
             kwargs['feature_metadata'] = kwargs['feature_metadata'].keep_features(features)
         self_copy.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
@@ -705,6 +707,19 @@ class AbstractModel:
             score = self_copy.score(X=X_val, y=y_val)
         time_elapsed = time.time() - time_start
         return self_copy, score, time_elapsed
+
+    def keep_features(self, features):
+        if self.feature_metadata:
+            self.feature_metadata.keep_features(features, inplace=True)
+            self.features = self.feature_metadata.get_features()
+        else:
+            self.features = features
+
+    def get_features(self):
+        if self.feature_metadata:
+            return self.feature_metadata.get_features()
+        else:
+            return self.features
 
     def _fit(self,
              X,

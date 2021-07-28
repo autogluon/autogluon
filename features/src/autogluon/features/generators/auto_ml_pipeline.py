@@ -81,6 +81,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                  enable_text_ngram_features=True,
                  enable_raw_text_features=False,
                  enable_vision_features=True,
+                 enable_feature_selection=False,
                  vectorizer=None,
                  text_ngram_params=None,
                  **kwargs):
@@ -98,7 +99,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_raw_text_features = enable_raw_text_features
         self.enable_vision_features = enable_vision_features
         self.text_ngram_params = text_ngram_params if text_ngram_params else {}
-
+        self.enable_feature_selection = enable_feature_selection
         generators = self._get_default_generators(vectorizer=vectorizer)
         super().__init__(generators=generators, **kwargs)
 
@@ -126,4 +127,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
                 valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_PATH],
             )))
         generators = [generator_group]
+        if self.enable_feature_selection:
+            from .feature_selector import ProxyModelFeatureSelector  # avoid circular import
+            generators.append(ProxyModelFeatureSelector(model="LGB"))
         return generators

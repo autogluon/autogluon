@@ -12,7 +12,11 @@ def compare_dfs(df1, df2, metric):
     df1_better, equal_performance, df2_better = [], [], []
     for _, row in df1.iterrows():
         task, df1_score = row["task"], row[metric]
-        df2_score = df2[df2["task"] == task][metric].item()
+        df2_row = df2[df2["task"] == task]
+        if len(df2_row) > 0 and (row['info'] != row['info'] and df2_row['info'].item() != df2_row['info'].item()):
+            df2_score = df2_row[metric].item()
+        else:  # if it doesn't exist in second df, skip
+            continue
         if df1_score > df2_score:
             df1_better.append(task)
         elif df1_score < df2_score:
@@ -21,32 +25,51 @@ def compare_dfs(df1, df2, metric):
             equal_performance.append(task)
     return df1_better, equal_performance, df2_better
 
+
+def limit_duration(df, duration=40000):
+    return df[df['duration'] < duration]
+
 """
-base = pd.read_csv("result/results_automlbenchmark_1h8c_autogluon.ag.1h8c.aws.20210629T001407.csv")
-uniform = pd.read_csv("result/results_automlbenchmark_4h8c_autogluon_prune_uniform.ag.4h8c.aws.20210722T055042.csv")
-backward = pd.read_csv("result/results_automlbenchmark_4h8c_autogluon_prune_backwardsearch.ag.4h8c.aws.20210722T055046.csv")
+TODO
+1. Debug by running single OpenML task with 1hr timeout on australian with a particular seed
 """
 
 # base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210723T212945.csv")
 # uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210723T213246.csv")
-base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality.ag.12h8c.aws.20210725T042534.csv")
-uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210725T042156.csv")
+base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210726T193707.csv")
+uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210727T021722.csv")
+# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210727T011407.csv")
 task_metadata = pd.read_csv('result/task_metadata.csv')
 base = add_dataset_info(base, task_metadata)
 uniform = add_dataset_info(uniform, task_metadata)
 # backward = add_dataset_info(backward, task_metadata)
 
+DURATION = 40000
 basebin = base[base["type"] == "binary"]
 uniformbin = uniform[uniform["type"] == "binary"]
-# backwardbin = backward[backward["type"] == "binary"]
 basecat = base[base["type"] == "multiclass"]
 uniformcat = uniform[uniform["type"] == "multiclass"]
-# backwardcat = backward[backward["type"] == "multiclass"]
 basereg = base[base["type"] == "regression"]
 uniformreg = uniform[uniform["type"] == "regression"]
-# backwardreg = backward[backward["type"] == "regression"]
+basedone = limit_duration(base, duration=DURATION)
+uniformdone = limit_duration(uniform, duration=DURATION)
+
+try:
+    first_better, equal_performance, second_better = compare_dfs(base, uniform, "result")
+    print(f"All Run Base Win: {len(first_better)}, Search Win: {len(second_better)}, Tie: {len(equal_performance)}")
+    first_better, equal_performance, second_better = compare_dfs(basedone, uniformdone, "result")
+    print(f"Finished Run Base Win: {len(first_better)}, Search Win: {len(second_better)}, Tie: {len(equal_performance)}")
+    basebin_mean, basecat_mean, basereg_mean = round(basebin['result'].mean(), 4), round(basecat['result'].mean(), 4), round(basereg['result'].mean(), 4)
+    print(f"Finished Base Results: (binary: {basebin_mean}), (multiclass: {basecat_mean}), (regression: {basereg_mean})")
+    uniformbin_mean, uniformcat_mean, uniformreg_mean = round(uniformbin['result'].mean(), 4), round(uniformcat['result'].mean(), 4), round(uniformreg['result'].mean(), 4)
+    print(f"Finished Search Results: (binary: {uniformbin_mean}), (multiclass: {uniformcat_mean}), (regression: {uniformreg_mean})")
+except:
+    import pdb; pdb.post_mortem()
 
 import pdb; pdb.set_trace()
+first_better, equal_performance, second_better = compare_dfs(base, uniform, "result")
+print(f"Base Win: {len(first_better)}, Search Win: {len(second_better)}, Tie: {len(equal_performance)}")
+
 """
 first_better, equal_performance, second_better = compare_dfs(base, uniform, "result")
 first_better, equal_performance, second_better = compare_dfs(base[(50000 > base["NumberOfInstances"]) & (base["NumberOfInstances"] > 0)],

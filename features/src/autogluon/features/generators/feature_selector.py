@@ -33,8 +33,9 @@ class ProxyModelFeatureSelector(AbstractFeatureGenerator):
         self.num_resource = kwargs.get('num_resource', None)
         self.fi_strategy = kwargs.get('fi_strategy', 'uniform')
         self.fp_strategy = kwargs.get('fp_strategy', 'percentage')
-        self.subsample_size = kwargs.get('subsample_size', 100)
+        self.subsample_size = kwargs.get('subsample_size', 5000)
         self.prune_threshold = kwargs.get('prune_threshold', None)
+        self.num_min_fi_samples = kwargs.get('num_min_fi_samples', 50000)
 
     def _fit_transform(self, X: DataFrame, y: Series, **kwargs) -> Tuple[DataFrame, dict]:
         """
@@ -51,7 +52,7 @@ class ProxyModelFeatureSelector(AbstractFeatureGenerator):
         best_model, _ = self.model.fit_with_prune(X=X_train, y=y_train, X_val=None, y_val=None, max_num_fit=self.max_num_fit,
                                                   stop_threshold=self.stop_threshold, prune_ratio=self.prune_ratio, num_resource=self.num_resource,
                                                   fi_strategy=self.fi_strategy, fp_strategy=self.fp_strategy, subsample_size=self.subsample_size,
-                                                  prune_threshold=self.prune_threshold, k_fold=3)
+                                                  prune_threshold=self.prune_threshold, num_min_fi_samples=self.num_min_fi_samples, k_fold=5)
         self.kept_features = best_model.get_features()
         self.pruned_features = [feature for feature in features if feature not in self.kept_features]
         return self._transform(X), self.feature_metadata_in.type_group_map_special

@@ -111,19 +111,22 @@ train_data = pd.read_csv(args.train_path).head(50000)
 test_data = pd.read_csv(args.test_path)
 y_test = test_data[args.label]
 
-custom_generator = ProxyModelFeatureSelector(model="CatBoost")
-feature_generator = PipelineFeatureGenerator(generators=[[custom_generator]])
+# custom_generator = ProxyModelFeatureSelector(model="CatBoost")
+# feature_generator = PipelineFeatureGenerator(generators=[[custom_generator]])
 fit_args = {
     'verbosity': 2,
     'presets': ['best_quality'] if args.stack else ['medium_quality_faster_train'],
-    'time_limit': None,
-    'num_bag_sets': 1,
+    'time_limit': 600,
+    'num_bag_sets': 1 if args.stack else None,
 }
 if args.prune:
-    fit_args['feature_generator'] = feature_generator
+    fit_args['_feature_generator_kwargs'] = {'enable_feature_selection': True}
 
 predictor = TabularPredictor(label=args.label)
-predictor = predictor.fit(train_data, **fit_args)
+try:
+    predictor = predictor.fit(train_data, **fit_args)
+except:
+    import pdb; pdb.post_mortem()
 y_pred = predictor.predict(test_data)
 performance = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
 print(performance)

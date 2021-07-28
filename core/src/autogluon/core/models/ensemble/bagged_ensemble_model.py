@@ -427,6 +427,19 @@ class BaggedEnsembleModel(AbstractModel):
 
         return fi_df
 
+    def keep_features(self, features):
+        # update children features
+        for child in self.models:
+            child = self.load_child(child)
+            child.keep_features(features)
+            child.save(verbose=False)
+
+    def get_features(self):
+        if len(self.models) > 0:
+            return self.load_child(self.models[0]).get_features()
+        else:
+            return None
+
     def load_child(self, model, verbose=False) -> AbstractModel:
         if isinstance(model, str):
             child_path = self.create_contexts(self.path + model + os.path.sep)
