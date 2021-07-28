@@ -656,7 +656,7 @@ class ImagePredictor(object):
                 data = _ImageClassification.Dataset(data, classes=self._train_classes)
             else:
                 data = _ImageClassification.Dataset(data, classes=[])
-        ret = self._classifier.evaluate(data, metric_name=self._eval_metric)
+        return self._classifier.evaluate(data, metric_name=self._eval_metric)
 
     def fit_summary(self):
         """Return summary of last `fit` process.
