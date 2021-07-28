@@ -406,29 +406,6 @@ class ImagePredictor(object):
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
 
-        # TODO: remove this check when pytorch model supports other problems
-        if self._problem_type != MULTICLASS:
-            if timm is not None:
-                timm_models = timm.list_models()
-                # remove timm models
-                curr_models = config.get('model', None)
-                if curr_models == None:
-                    config['model'] = 'resnet50_v1b'
-                elif isinstance(curr_models, str):
-                    if curr_models in timm_models:
-                        logger.warning(f'{curr_models} is timm backed model which does not support {self._problem_type}, fallback to resnet50_v1b, please specify a model in gluoncv model zoo if you want to customize it.')
-                        config['model'] = 'resnet50_v1b'
-                elif isinstance(curr_models, Categorical):
-                    new_models = []
-                    for m in curr_models.data:
-                        if m not in timm_models:
-                            new_models.append(m)
-                    if not new_models:
-                        logger.warning(f'{curr_models} are all timm backed models which does not support {self._problem_type}, fallback to resnet50_v1b, please specify a model in gluoncv model zoo if you want to customize it.')
-                        config['model'] = 'resnet50_v1b'
-                    else:
-                        config['model'] = Categorical(*new_models)
-
         task = _ImageClassification(config=config, problem_type=self._problem_type)
         # GluonCV can't handle these separately - patching created config
         task.search_strategy = scheduler
@@ -656,7 +633,15 @@ class ImagePredictor(object):
                 data = _ImageClassification.Dataset(data, classes=self._train_classes)
             else:
                 data = _ImageClassification.Dataset(data, classes=[])
-        return self._classifier.evaluate(data, metric_name=self._eval_metric)
+        ret = self._classifier.evaluate(data, metric_name=self._eval_metric)
+        # TODO: remove the switch if mxnet is deprecated
+        if isinstance(ret, dict):
+            return ret
+        elif isinstance(ret, tuple):
+            assert len(ret) == 2
+            return {'top1': ret[0], 'top5': ret[1]}
+        else:
+            return {self._eval_metric: ret}
 
     def fit_summary(self):
         """Return summary of last `fit` process.
