@@ -897,11 +897,13 @@ class AbstractModel:
         else:
             features = list(features)
 
-        feature_importance_quick_dict = self.get_model_feature_importance()
-        # TODO: Also consider banning features with close to 0 importance
-        # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
-        banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
-        features_to_check = [feature for feature in features if feature not in banned_features]
+        # feature_importance_quick_dict = self.get_model_feature_importance()
+        # # TODO: Also consider banning features with close to 0 importance
+        # # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
+        # banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
+        # features_to_check = [feature for feature in features if feature not in banned_features]
+        banned_features = []
+        features_to_check = features
 
         if features_to_check:
             fi_df = self._compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)

@@ -12,10 +12,15 @@ def compare_dfs(df1, df2, metric):
     df1_better, equal_performance, df2_better = [], [], []
     for _, row in df1.iterrows():
         task, df1_score = row["task"], row[metric]
-        df2_row = df2[df2["task"] == task]
-        if len(df2_row) > 0 and (row['info'] != row['info'] and df2_row['info'].item() != df2_row['info'].item()):
-            df2_score = df2_row[metric].item()
-        else:  # if it doesn't exist in second df, skip
+        df1_rows = df1[df1["task"] == task]
+        df2_rows = df2[df2["task"] == task]
+        if len(df1_rows) > 0:
+            df1_score = df1_rows[metric].dropna().mean()
+        else:
+            continue
+        if len(df2_rows) > 0:
+            df2_score = df2_rows[metric].dropna().mean()
+        else:
             continue
         if df1_score > df2_score:
             df1_better.append(task)
@@ -38,13 +43,16 @@ TODO
 # uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210723T213246.csv")
 base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210726T193707.csv")
 uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210727T021722.csv")
-# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210727T011407.csv")
+
+base = pd.read_csv("~/Downloads/results_automlbenchmark_4h8c_autogluon.ag.4h8c.aws.20210728T002052.csv")
+uniform = pd.read_csv("~/Downloads/results_automlbenchmark_4h8c_autogluon_prune_uniform.ag.4h8c.aws.20210728T002058.csv")
+
 task_metadata = pd.read_csv('result/task_metadata.csv')
 base = add_dataset_info(base, task_metadata)
 uniform = add_dataset_info(uniform, task_metadata)
 # backward = add_dataset_info(backward, task_metadata)
 
-DURATION = 40000
+DURATION = 10000
 basebin = base[base["type"] == "binary"]
 uniformbin = uniform[uniform["type"] == "binary"]
 basecat = base[base["type"] == "multiclass"]
