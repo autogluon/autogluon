@@ -16,7 +16,7 @@ import pandas as pd
 import psutil
 import scipy.stats
 from pandas import DataFrame, Series
-from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
+from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
 
 from .miscs import warning_filter
@@ -32,12 +32,46 @@ def get_cpu_count():
     return multiprocessing.cpu_count()
 
 
+def get_gpu_count_all():
+    """
+    Attempts to get number of GPUs available for use via multiple means.
+    """
+    # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
+    # FIXME: get_gpu_count by itself doesn't always work for Windows
+    num_gpus = get_gpu_count()
+    if num_gpus == 0:
+        num_gpus = get_gpu_count_mxnet()
+        if num_gpus == 0:
+            num_gpus = get_gpu_count_torch()
+    return num_gpus
+
+
 def get_gpu_count():
+    # FIXME: Sometimes doesn't detect GPU on Windows
+    # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
     from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
     if not cudaInit(): return 0
     gpu_count = cudaDeviceGetCount()
     cudaShutdown()
     return gpu_count
+
+
+def get_gpu_count_mxnet():
+    try:
+        import mxnet
+        num_gpus = mxnet.context.num_gpus()
+    except Exception:
+        num_gpus = 0
+    return num_gpus
+
+
+def get_gpu_count_torch():
+    try:
+        import torch
+        num_gpus = torch.cuda.device_count()
+    except Exception:
+        num_gpus = 0
+    return num_gpus
 
 
 class CVSplitter:
