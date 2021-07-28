@@ -400,6 +400,9 @@ class ImagePredictor(object):
             min_value = 1
         bs = sanitize_batch_size(config.get('batch_size', 16), min_value=min_value, max_value=len(train_data))
         config['batch_size'] = bs
+        # TODO: remove this once mxnet is deprecated
+        if timm is None and config.get('model', None) is None:
+            config['model'] = 'resnet50_v1b'
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
