@@ -13,7 +13,7 @@ from gluoncv.model_zoo import get_model_list
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
-from autogluon.core.utils import verbosity2loglevel, get_gpu_count, get_gpu_count_mxnet, get_gpu_count_torch
+from autogluon.core.utils import verbosity2loglevel, get_gpu_count_all
 from autogluon.core.utils.utils import generate_train_test_split
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 from ..utils import sanitize_batch_size
@@ -701,14 +701,7 @@ class ImagePredictor(object):
 
     @staticmethod
     def _get_num_gpus_available():
-        # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
-        # FIXME: get_gpu_count by itself doesn't always work for Windows
-        num_gpus = get_gpu_count()
-        if num_gpus == 0:
-            num_gpus = get_gpu_count_mxnet()
-            if num_gpus == 0:
-                num_gpus = get_gpu_count_torch()
-        return num_gpus
+        return get_gpu_count_all()
 
 
 def _get_valid_labels(data):
