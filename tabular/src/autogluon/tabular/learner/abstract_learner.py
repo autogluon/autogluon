@@ -95,6 +95,15 @@ class AbstractLearner:
         except:
             self.version = None
 
+    # TODO: Possibly rename to features_in or consider refactoring all feature_generators features_in -> features
+    @property
+    def features(self):
+        return self.feature_generator.features_in
+
+    @property
+    def feature_metadata_in(self):
+        return self.feature_generator.feature_metadata_in
+
     @property
     def feature_generators(self):
         return [self.feature_generator]
@@ -808,6 +817,8 @@ class AbstractLearner:
             'label': self.label,
             'random_state': self.random_state,
             'version': self.version,
+            'features': self.features,
+            'feature_metadata_in': self.feature_metadata_in,
         }
 
         return learner_info
