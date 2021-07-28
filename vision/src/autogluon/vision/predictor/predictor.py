@@ -529,7 +529,10 @@ class ImagePredictor(object):
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
-        y_pred_proba = self._classifier.predict(data, with_proba=True)
+        try:
+            y_pred_proba = self._classifier.predict(data, with_proba=True)
+        except AssertionError:
+            y_pred_proba = self._classifier.predict(data)
         if isinstance(data, pd.DataFrame):
             y_pred_proba.index = data.index
         if self._problem_type in [MULTICLASS, BINARY]:
