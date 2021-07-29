@@ -376,6 +376,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
         env
@@ -406,6 +407,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
@@ -680,7 +682,7 @@ stage("Build Docs") {
         cd vision/
         python3 -m pip install --upgrade -e .
         cd ..
-        
+
         cd forecasting/
         python3 -m pip install --upgrade -e .
         cd ..
