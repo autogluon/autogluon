@@ -11,7 +11,7 @@ from autogluon.core.constants import REGRESSION, BINARY
 
 from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
-from autogluon.core.utils import get_cpu_count, get_gpu_count, try_import_mxnet, try_import_autogluon_text
+from autogluon.core.utils import get_cpu_count, get_gpu_count_mxnet, try_import_mxnet, try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
@@ -198,7 +198,8 @@ class TextPredictorModel(AbstractModel):
 
     def _get_default_resources(self):
         num_cpus = get_cpu_count()
-        num_gpus = get_gpu_count()
+        # TODO: use get_gpu_count_torch() or some better way once torch models are available.
+        num_gpus = get_gpu_count_mxnet()
         return num_cpus, num_gpus
 
     def _predict_proba(self, X, **kwargs):

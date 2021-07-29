@@ -128,6 +128,12 @@ predictor = TabularPredictor.load(save_path)  # `predictor.path` is another way 
 
 Above `save_path` is the same folder previously passed to `TabularPredictor`, in which all the trained models have been saved. You can train easily models on one machine and deploy them on another. Simply copy the `save_path` folder to the new machine and specify its new path in `TabularPredictor.load()`.
 
+To find out the required feature columns to make predictions, call `predictor.features()`:
+
+```{.python .input}
+predictor.features()
+```
+
 We can make a prediction on an individual example rather than a full dataset:
 
 ```{.python .input}

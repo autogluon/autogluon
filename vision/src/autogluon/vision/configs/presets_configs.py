@@ -1,7 +1,7 @@
 """Presets for vision predictors"""
 import functools
 import warnings
-from autogluon.core.utils import get_gpu_free_memory, get_gpu_count
+from autogluon.core.utils import get_gpu_free_memory
 from autogluon.core import Categorical, Int, Real
 try:
     import timm
