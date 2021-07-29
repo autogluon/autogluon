@@ -10,7 +10,7 @@ import pandas as pd
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 from autogluon.core.features.types import R_OBJECT, S_IMAGE_PATH
 from autogluon.core.models import AbstractModel
-from autogluon.core.utils import get_cpu_count, get_gpu_count, try_import_mxnet, try_import_autogluon_vision
+from autogluon.core.utils import get_cpu_count, get_gpu_count, try_import_autogluon_vision
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class ImagePredictorModel(AbstractModel):
              sample_weight=None,
              verbosity=2,
              **kwargs):
-        try_import_mxnet()
+        # try_import_mxnet()
         try_import_autogluon_vision()
         from autogluon.vision import ImagePredictor
         params = self._get_model_params()

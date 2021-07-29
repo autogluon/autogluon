@@ -9,7 +9,7 @@ def test_image_predictor(fit_helper):
     feature_metadata = FeatureMetadata.from_df(train_data).add_special_types({'image': ['image_path']})
     predictor = TabularPredictor(label='label').fit(
         train_data=train_data,
-        hyperparameters={'AG_IMAGE_NN': {'epochs': 2}},
+        hyperparameters={'AG_IMAGE_NN': {'epochs': 2, 'model': 'resnet18_v1b'}},
         feature_metadata=feature_metadata
     )
     leaderboard = predictor.leaderboard(test_data)
