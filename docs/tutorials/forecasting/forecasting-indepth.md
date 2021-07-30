@@ -97,8 +97,8 @@ In such a workflow, we may first produce predictions using AutoGluon, and then l
 predictions = predictor.predict(train_data)  # before test data have been observed
 
 predictor = ForecastingPredictor.load(save_path)  # reload predictor in future after test data are observed
-reformatted_test_data = ForecastingPredictor.evaluation_format(test_data, train_data)  # TODO
-ForecastingPredictor.evaluate_predictions(forecasts=predictions, targets=test_data, eval_metric=predictor.eval_metric)
+# reformatted_test_data = ForecastingPredictor.evaluation_format(test_data, train_data)  # TODO
+# ForecastingPredictor.evaluate_predictions(forecasts=predictions, targets=test_data, eval_metric=predictor.eval_metric)  # TODO
 ```
 
 
