@@ -64,7 +64,12 @@ Tutorials
       :title: Multimodal Prediction
       :link: tutorials/tabular_prediction/tabular-multimodal.html
 
+   .. card::
       How to solve problems that contain Image, Text, and Tabular features at the same time.
+      :title: Forecasting
+      :link: tutorials/forecasting/index.html
+
+      How to train time-series models for forecasting.
 
 
 .. toctree::
@@ -77,6 +82,7 @@ Tutorials
    tutorials/text_prediction/index
    tutorials/tabular_prediction/tabular-multimodal
    tutorials/cloud_fit_deploy/index
+   tutorials/forecasting/index
    api/autogluon.predictor
    api/autogluon.features
    api/autogluon.tabular.models

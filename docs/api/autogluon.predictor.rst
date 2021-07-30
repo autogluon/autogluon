@@ -31,7 +31,7 @@ AutoGluon Predictors
 Predictors
 ----------
 
-Predictors built into AutoGluon such that a single call to `fit()` can produce high-quality trained models for tabular, image, or text data. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
+Predictors built into AutoGluon such that a single call to `fit()` can produce high-quality trained models for tabular, image, text, or time-series data. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
 
 .. automodule:: autogluon.tabular
 .. autosummary::
@@ -51,6 +51,12 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
    :nosignatures:
 
    TextPredictor
+
+.. automodule:: autogluon.forecasting
+.. autosummary::
+   :nosignatures:
+
+   ForecastingPredictor
 
 
 :hidden:`TabularPredictor`
@@ -109,6 +115,20 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
     .. rubric:: Methods
 
     .. autoautosummary:: TextPredictor
+        :methods:
+
+
+:hidden:`ForecastingPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.forecasting
+
+.. autoclass:: ForecastingPredictor
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: ForecastingPredictor
         :methods:
 
 
