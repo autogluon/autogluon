@@ -550,7 +550,7 @@ class AbstractModel:
             such that each feature's importance will be evaluated on 10000 samples.
         stop_threshold : int, default = 5
             Early stopping will stop refitting model if score does not improve for this amount of iterations.
-        subsample_size : int, default = 10000
+        subsample_size : int, default = 5000
             Number of validation set samples to use when computing permutation feature importance.
         fi_strategy : str, default = "uniform", choices = ["uniform", "backwardsearch"]
             Feature importance computation strategy to use. "uniform" uniformly allocates resource across
@@ -568,21 +568,24 @@ class AbstractModel:
         3. Does not work with n_repeats>1 because of path issues (can't find oof.pkl)
         4. Top level time limit is messed up presumably because I modify kwargs['time_limit'] in this method
         """
+        if not self.is_valid():
+            raise Exception('fit_with_prune must only be called on trained models.')
+
         num_max_prunable = 100  # maximum number of features that can be pruned
         num_prunable = min(len(X.columns), num_max_prunable)
         time_limit = kwargs.get('time_limit', None)
         fitted_copies_info = []
         is_bagged = X_val is None
+
         if is_bagged:
             importance_fn_args = {'X': X, 'y': y, 'is_oof': True, 'subsample_size': subsample_size, 'time_limit': time_limit, 'silent': True}
             subsample_size = min(subsample_size, len(X))
-            if num_resource is None or num_resource < num_min_fi_samples * num_prunable / subsample_size:
-                num_resource = int(np.ceil(num_min_fi_samples * num_prunable / subsample_size))
         else:
             importance_fn_args = {'X': X_val, 'y': y_val, 'subsample_size': subsample_size, 'time_limit': time_limit, 'silent': True}
             subsample_size = min(subsample_size, len(X_val))
-            if num_resource is None or num_resource < num_min_fi_samples * num_prunable / subsample_size:
-                num_resource = int(np.ceil(num_min_fi_samples * num_prunable / subsample_size))
+
+        if num_resource is None or num_resource < num_min_fi_samples * num_prunable / subsample_size:
+            num_resource = int(np.ceil(num_min_fi_samples * num_prunable / subsample_size))
 
         logger.log(30, f"\tPerforming Iterative Feature Selection Parameters (" +
                        f"max_num_fit: {max_num_fit}, prune_ratio: {prune_ratio}, prune_threshold: {prune_threshold}, " +
@@ -590,14 +593,12 @@ class AbstractModel:
                        f"fi_strategy: {fi_strategy}, fp_strategy: {fp_strategy})")
 
         try:
-            self_copy, score, time_elapsed = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P0', None, **kwargs)
-            fitted_copies_info.append((round(score, 4), self_copy))
-            self.check_and_update_time(kwargs, time_elapsed)
-            logger.log(30, f"\tFit 1 ({round(time_elapsed, 4)}s): Current score is {score}.")
-            best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': 0}
-            new_features = best_info['features']
+            best_info, index, performance_gained = None, 0, True
+            score = self.score_with_oof(y) if is_bagged else self.score(X=X_val, y=y_val)
+            fitted_copies_info.append((round(score, 4), self))
+            new_features = self.get_features()
             original_feature_count = len(new_features)
-            performance_gained = True
+            best_info = {'model': self, 'features': new_features, 'score': score, 'index': index}
 
             for index in range(1, max_num_fit):
                 old_features = new_features
@@ -676,7 +677,7 @@ class AbstractModel:
             raise e
         finally:
             # If no models were trained, exception will be thrown
-            if len(fitted_copies_info) > 0:
+            if len(fitted_copies_info) > 0 and best_info is not None:
                 best_model = fitted_copies_info[best_info['index']][1]
                 logger.log(30, f"\tSuccessfully ended prune loop after {index+1} iterations. Best score: {best_info['score']}.")
                 logger.log(30, f"\tFeature Count: {original_feature_count} -> {len(best_info['features'])}")
@@ -692,28 +693,19 @@ class AbstractModel:
     def _fit_save_score_model_copy(self, X, y, X_val, y_val, copy_name, features, **kwargs):
         # Fit a deepcopied model on current_features
         time_start = time.time()
-        is_oof = X_val is None or y_val is None
-        self_copy = self.convert_to_template()
+        is_bagged = X_val is None or y_val is None
+        self_copy = self.convert_to_refit_full_template()
         self_copy.rename(copy_name)
-        self.keep_features(features)
+        self_copy.features = features if features is not None else X.columns.tolist()
+        if features is not None and self_copy.feature_metadata is not None:
+            self_copy.feature_metadata.keep_features(features, inplace=True)
         if features is not None and kwargs.get('feature_metadata', None) is not None:
             kwargs['feature_metadata'] = kwargs['feature_metadata'].keep_features(features)
         self_copy.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
         self_copy.save()
-        # Score new model and decide whether to continue refitting
-        if is_oof:
-            score = self_copy.score_with_oof(y)
-        else:
-            score = self_copy.score(X=X_val, y=y_val)
+        score = self_copy.score_with_oof(y) if is_bagged else self_copy.score(X=X_val[self_copy.features], y=y_val)
         time_elapsed = time.time() - time_start
         return self_copy, score, time_elapsed
-
-    def keep_features(self, features):
-        if self.feature_metadata:
-            self.feature_metadata.keep_features(features, inplace=True)
-            self.features = self.feature_metadata.get_features()
-        else:
-            self.features = features
 
     def get_features(self):
         if self.feature_metadata:

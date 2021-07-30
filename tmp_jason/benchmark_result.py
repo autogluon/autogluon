@@ -39,20 +39,17 @@ TODO
 1. Debug by running single OpenML task with 1hr timeout on australian with a particular seed
 """
 
-# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210723T212945.csv")
-# uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210723T213246.csv")
-base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210726T193707.csv")
-uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210727T021722.csv")
-
-base = pd.read_csv("~/Downloads/results_automlbenchmark_4h8c_autogluon.ag.4h8c.aws.20210728T002052.csv")
-uniform = pd.read_csv("~/Downloads/results_automlbenchmark_4h8c_autogluon_prune_uniform.ag.4h8c.aws.20210728T002058.csv")
+# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon.ag.12h8c.aws.20210728T082752.csv")
+# uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform.ag.12h8c.aws.20210728T082754.csv")
+base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210728T084754.csv")
+uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210728T084850.csv")
 
 task_metadata = pd.read_csv('result/task_metadata.csv')
 base = add_dataset_info(base, task_metadata)
 uniform = add_dataset_info(uniform, task_metadata)
 # backward = add_dataset_info(backward, task_metadata)
 
-DURATION = 10000
+DURATION = 43000
 basebin = base[base["type"] == "binary"]
 uniformbin = uniform[uniform["type"] == "binary"]
 basecat = base[base["type"] == "multiclass"]
