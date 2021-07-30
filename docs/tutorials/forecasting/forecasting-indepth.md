@@ -117,20 +117,20 @@ Note that each unique value of `index_column` in our time series data must be re
 
 
 ```{.python .input}
-predictor = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(
+predictor_static = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(
     train_data, static_features=static_features, prediction_length=19, quantiles=[0.1, 0.5, 0.9],
     index_column="name", target_column="ConfirmedCases", time_column="Date",
-    hyperparameters={"MQCNN": {'epochs': epochs}}
+    hyperparameters={"DeepAR": {'epochs': epochs}}  # train only one model here for quick demo
 )
 ```
 
 If you provided static features to `fit()`, then the static features must be also provided when using `leaderboard()`, `evaluate()`, or `predict()`:
 
 ```{.python .input}
-predictor.leaderboard(test_data, static_features=static_features)
+predictor_static.leaderboard(test_data, static_features=static_features)
 ```
 
 ```{.python .input}
-predictions = predictor.predict(test_data, static_features=static_features)
+predictions = predictor_static.predict(test_data, static_features=static_features)
 print(predictions["Afghanistan_"])
 ```
