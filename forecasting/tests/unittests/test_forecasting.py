@@ -59,21 +59,21 @@ def test_forecasting_advance():
                                                                                      "MQCNN": {
                                                                                          'context_length': ag.Int(70,
                                                                                                                   90,
-                                                                                                                  default=prediction_length * 4),
+                                                                                                                  default=prediction_length*4),
                                                                                          "num_batches_per_epoch": 10,
-                                                                                         "epochs": 5},
+                                                                                         "epochs": 2},
                                                                                      "DeepAR": {
                                                                                          'context_length': ag.Int(70,
                                                                                                                   90,
-                                                                                                                  default=prediction_length * 4),
+                                                                                                                  default=prediction_length*4),
                                                                                          "num_batches_per_epoch": 10,
-                                                                                         "epochs": 5},
+                                                                                         "epochs": 2},
                                                                                      "SFF": {
                                                                                          'context_length': ag.Int(70,
                                                                                                                   90,
-                                                                                                                  default=prediction_length * 4),
+                                                                                                                  default=prediction_length*4),
                                                                                          "num_batches_per_epoch": 10,
-                                                                                         "epochs": 5},
+                                                                                         "epochs": 2},
                                                                                  },
                                                                                  time_limits=10
                                                                                  )
@@ -128,7 +128,7 @@ def test_forecasting_mqcnn():
                                                         hyperparameters={
                                                             "MQCNN": {
                                                                 "num_batches_per_epoch": 10,
-                                                                "epochs": 5},
+                                                                "epochs": 2},
                                                         }
                                                         )
         print(predictor.predict(test_data))
@@ -147,7 +147,7 @@ def test_forecasting_deepar():
                                                         hyperparameters={
                                                             "DeepAR": {
                                                                 "num_batches_per_epoch": 10,
-                                                                "epochs": 5},
+                                                                "epochs": 2},
                                                         }
                                                         )
         print(predictor.predict(test_data))
@@ -166,7 +166,7 @@ def test_forecasting_sff():
                                                         hyperparameters={
                                                             "SFF": {
                                                                 "num_batches_per_epoch": 10,
-                                                                "epochs": 5},
+                                                                "epochs": 2},
                                                         }
                                                         )
         print(predictor.predict(test_data))
