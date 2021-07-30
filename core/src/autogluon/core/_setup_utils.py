@@ -20,7 +20,7 @@ DEPENDENT_PACKAGES = {
     'scipy': '>=1.5.4,<1.7',
     'gluoncv': '>=0.10.3,<0.10.4',
     'tqdm': '>=4.38.0',
-    'Pillow': '<=8.1',
+    'Pillow': '>=8.3.0,<8.4.0',
     'graphviz': '<0.9.0,>=0.8.1',
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
