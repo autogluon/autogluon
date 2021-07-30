@@ -122,7 +122,7 @@ predictor = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(
     index_column="name", target_column="ConfirmedCases", time_column="Date",
     hyperparameters={"MQCNN": {'epochs': epochs}}
 )
-
+```
 
 If you provided static features to `fit()`, then the static features must be also provided when using `leaderboard()`, `evaluate()`, or `predict()`:
 
