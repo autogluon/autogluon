@@ -64,7 +64,12 @@ Tutorials
       :title: Multimodal Prediction
       :link: tutorials/tabular_prediction/tabular-multimodal.html
 
+   .. card::
       How to solve problems that contain Image, Text, and Tabular features at the same time.
+      :title: Forecasting
+      :link: tutorials/forecasting/index.html
+
+      How to train time-series models for forecasting.
 
 
 Advanced Topics
@@ -99,6 +104,7 @@ Advanced Topics
    tutorials/object_detection/index
    tutorials/text_prediction/index
    tutorials/tabular_prediction/tabular-multimodal
+   tutorials/forecasting/index
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index
