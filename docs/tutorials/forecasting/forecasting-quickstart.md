@@ -35,6 +35,12 @@ predictor = ForecastingPredictor(path=save_path).fit(train_data, prediction_leng
 
 **Note:** We use `presets = low_quality` above to ensure this example runs quickly, but this is NOT a good setting!  To obtain good performance in real applications you should either delete this argument or set `presets` to be one of: `"best_quality", high_quality", "good_quality", "medium_quality"`. Higher quality presets will generally produce superior forecasting accuracy but take longer to train and may produce less efficient models (`low_quality` is intended just for quickly verifying that AutoGluon can be run on your data).
 
+We can print a summary of what happened during `fit()`:
+
+```{.python .input}
+predictor.fit_summary()
+```
+
 Now let's load some more recent test data to examine the forecasting performance of our trained models:
 
 ```{.python .input}
@@ -47,7 +53,7 @@ The below code is unnecessary here, but is just included to demonstrate how to r
 predictor = ForecastingPredictor.load(save_path)
 ```
 
-We can view the test performance of each model AutoGluon has trained via the `leaderboard()` function, where higher scores correspond to better predictive performance:
+We can view the test performance of each model AutoGluon has trained via the `leaderboard()` function, where higher scores correspond to better predictive performance (in this case where the evaluation metric corresponds to a loss, we append a negative sign to the loss to ensure higher=better):
 
 ```{.python .input}
 predictor.leaderboard(test_data)
@@ -55,14 +61,14 @@ predictor.leaderboard(test_data)
 
 Omit the `test_data` argument above to display performance scores on the validation data instead. By default, AutoGluon will score probabilistic forecasts of multiple time-series via the [weighted quantile loss](https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-wQL), but you can specify a different `eval_metric` in `fit()` to instruct AutoGluon to optimize for a different evaluation metric instead (eg. `eval_metric="MAPE")`. For more details about the individual time-series models that AutoGluon can train, you can view the [GluonTS documentation](https://ts.gluon.ai/) or the source code folder `autogluon/forecasting/models/`.
 
-We can also make forecasts further into the future based on the most recent data. When we call `predict()`, AutoGluon automatically forecasts with the model that had the best validation performance during training. The predictions returned by `predict()` form a dictionary whose keys index each time series (in this example, country) and whose values are DataFrames containing quantile forecasts for each time series (in this example, predicted quantiles of the case counts in each country at future subsequent dates to those observed in the test_data).
+We can also make forecasts further into the future based on the most recent data. When we call `predict()`, AutoGluon automatically forecasts with the model that had the best validation performance during training (this is the model at the top of `leaderboard()` when called without any data). The predictions returned by `predict()` form a dictionary whose keys index each time series (in this example, country) and whose values are DataFrames containing quantile forecasts for each time series (in this example, predicted quantiles of the case counts in each country at future subsequent dates to those observed in the test_data).
 
 ```{.python .input}
 predictions = predictor.predict(test_data)
 print(predictions['Afghanistan_'])  # quantile forecasts for the Afghanistan time-series
 ```
 
-Instead of forecasting with the model that had the best validation score, you can instead specify which model to use for prediction, as well as that AutoGluon should only predict  certain time-series of interest:
+Instead of forecasting with the model that had the best validation score, you can instead specify which model to use for prediction, as well as that AutoGluon should only predict certain time-series of interest:
 
 ```{.python .input}
 model_touse = "MQCNN"
@@ -70,8 +76,6 @@ time_series_to_predict = ["Germany_", "Zimbabwe_"]
 predictions = predictor.predict(test_data, model=model_touse, time_series_to_predict=time_series_to_predict)
 ```
 
-Finally we can also print a summary of what happened during fit():
+In `predict()`, AutoGluon makes predictions for `prediction_length` (= 19 in this example) time points into the future, after the **last** time observed in the dataset fed into `predict()`. In `evaluate()` and `leaderboard()`, AutoGluon makes predictions for the first `prediction_length` time points exceeding the last time observed in the `train_data` originally fed into `fit()`, and then scores these predictions against the target values at the corresponding times in the dataset fed into these methods. Because some models base their predictions on lengthy histories, it is important that in either case, the `test_data` you provide contains the `train_data` as a subset! You can verify the `train_data` are contained within the `test_data` in the example above.
 
-```{.python .input}
-predictor.fit_summary()
-```
+After you no longer need a particular trained Predictor, remember to delete the `save_path` folder to free disk space on your machine. This is especially important to avoid running out of space if training many Predictors in sequence.
