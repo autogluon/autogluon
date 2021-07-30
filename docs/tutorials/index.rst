@@ -106,6 +106,7 @@ Tabular Prediction
 
       Frequently asked questions about AutoGluon-Tabular.
 
+
 Text Prediction
 ---------------
 .. container:: cards
@@ -129,6 +130,30 @@ Text Prediction
 
       In-depth tutorial on learning how to customize the search space and try different
       HPO algorithms.
+
+
+Forecasting
+-----------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start Tutorial
+      :link: forecasting/forecasting-quickstart.html
+
+      5 min tutorial on fitting models with time-series datasets.
+
+   .. card::
+      :title: In Depth Tutorial
+      :link: forecasting/forecasting-indepth.html
+
+      More advanced tutorial on controlling various aspects of time-series modeling.
+
+
+   .. card::
+      :title: FAQ
+      :link: forecasting/forecasting-faq.html
+
+      Frequently asked questions about AutoGluon-Forecasting.
 
 
 Tune Custom Models
@@ -200,5 +225,6 @@ Neural Architecture Search
    object_detection/index
    text_prediction/index
    tabular_prediction/index
+   forecasting/index
    customize/index
    nas/index
