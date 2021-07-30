@@ -542,6 +542,35 @@ stage("Build Tutorials") {
       }
     }
   },
+  'forecasting': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-forecasting-py3-v3') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-forecasting-v3
+        conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        export AG_DOCS=1
+
+        env
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/forecasting
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(forecasting)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
+        """
+        stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
+      }
+    }
+  },
   'torch': {
     node('linux-gpu') {
       ws('workspace/autogluon-tutorial-torch-v3') {
@@ -618,6 +647,7 @@ stage("Build Docs") {
         unstash 'object_detection'
         unstash 'tabular'
         unstash 'text'
+        unstash 'forecasting'
         unstash 'torch'
 
         sh """#!/bin/bash
