@@ -1,23 +1,21 @@
 # Forecasting Time-Series - Quick Start
 :label:`sec_forecastingquick`
 
-Via a simple `fit()` call, AutoGluon can train models produce forecasts for time series data. This tutorial demonstrates how to quickly use AutoGluon to produce forecasts of Covid-19 cases in a country given historical data.
-
-To start, import AutoGluon's ForecastingPredictor and TabularDataset classes:
+Via a simple `fit()` call, AutoGluon can train models produce forecasts for time series data. This tutorial demonstrates how to quickly use AutoGluon to produce forecasts of Covid-19 cases in a country given [historical data from each country](https://www.kaggle.com/c/covid19-global-forecasting-week-4). Let's first import AutoGluon's `ForecastingPredictor` and `TabularDataset` classes, where the latter is used to load time-series data stored in a tabular file format:
 
 ```{.python .input}
 from autogluon.forecasting import ForecastingPredictor
 from autogluon.forecasting import TabularDataset
 ```
 
-We load the time-series data to use for training from a CSV file into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
+We load the time-series data to use for training from a CSV file into an AutoGluon `TabularDataset` object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
 
 ```{.python .input}
 train_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv")
 print(train_data[50:60])
 ```
 
-Note that we loaded data from a CSV file stored in the cloud ([AWS s3 bucket](https://aws.amazon.com/s3/)), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (e.g., using [wget](https://www.gnu.org/software/wget/)). Our goal is to train models on this data that can forecast Covid-19 case counts in each country at future dates. This corresponds to a forecasting problem with many related individual time-series (one per country). Each row in the table `train_data` corresponds to one observation of one time-series at a particular time.
+Note that we loaded data from a CSV file stored in the cloud ([AWS s3 bucket](https://aws.amazon.com/s3/)), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (e.g., using [wget](https://www.gnu.org/software/wget/)). Our goal is to train models on this data that can forecast Covid case counts in each country at future dates. This corresponds to a forecasting problem with many related individual time-series (one per country). Each row in the table `train_data` corresponds to one observation of one time-series at a particular time.
 
 The dataset you use for `autogluon.forecasting` should usually contain three columns: a `date_column` with the time information (here "Date"), an `index_column` with a categorical ID specifying which (out of multiple) time-series is being observed (here "name", where each country corresponds to a different time-series in our example), and a `target_column` with the observed value of this particular time-series at this particular time (here "ConfirmedCases"). When forecasting future values of one particular time-series, AutoGluon may rely on historical observations of not only this time-series but also all of the other time-series in the dataset. You can use `NA` to represent missing observations in the data.
 
