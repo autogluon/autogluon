@@ -31,7 +31,7 @@ predictor = ForecastingPredictor(path=save_path).fit(train_data, prediction_leng
                                                     )
 ```
 
-**Note:** We use `presets = low_quality` above to ensure this example runs quickly, but this is NOT a good setting!  To obtain good performance in real applications you should either delete this argument or set `presets` to be one of: `"best_quality", high_quality", "good_quality", "medium_quality"`. Higher quality presets will generally produce superior forecasting accuracy but take longer to train and may produce less efficient models (`low_quality` is intended just for quickly verifying that AutoGluon can be run on your data).
+**Note:** We used `presets = low_quality` above to ensure this example runs quickly, but this is NOT a good setting!  To obtain good performance in real applications you should either delete this argument or set `presets` to be one of: `"best_quality", high_quality", "good_quality", "medium_quality"`. Higher quality presets will generally produce superior forecasting accuracy but take longer to train and may produce less efficient models (`low_quality` is intended just for quickly verifying that AutoGluon can be run on your data).
 
 We can print a summary of what happened during `fit()`:
 
