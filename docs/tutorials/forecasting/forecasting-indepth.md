@@ -16,7 +16,7 @@ eval_metric = "mean_wQuantileLoss"  # just for demonstration, this is already th
 
 ## Specifying hyperparameters and tuning them
 
-While AutoGluon-Forecasting will automatically tune certain hyperparameters of time-series models depending on the `presets` setting, you can manually control the hyperparameter optimization (HPO) process. The `presets` argument of `predictor.fit()` will automatically determine particular search spaces to consider for certain hyperparameter values, as well as how many HPO trials to run when searching for the best value in the chosen hyperparameter search space. Instead of specifying `presets`, you can manually specify all of these items yourself. Below we demonstrate how to tune the `context_length` hyperparameter for just the MQCNN model.
+While AutoGluon-Forecasting will automatically tune certain hyperparameters of time-series models depending on the `presets` setting, you can manually control the hyperparameter optimization (HPO) process. The `presets` argument of `predictor.fit()` will automatically determine particular search spaces to consider for certain hyperparameter values, as well as how many HPO trials to run when searching for the best value in the chosen hyperparameter search space. Instead of specifying `presets`, you can manually specify all of these items yourself. Below we demonstrate how to tune the [`context_length`](https://ts.gluon.ai/tutorials/forecasting/extended_tutorial.html) hyperparameter for just the [MQCNN](https://ts.gluon.ai/api/gluonts/gluonts.model.seq2seq.html) and [DeepAR](https://ts.gluon.ai/api/gluonts/gluonts.model.deepar.html) models, which controls how much past history is conditioned upon in any one forecast prediction by a trained model.
 
 ```{.python .input}
 import autogluon.core as ag
@@ -50,3 +50,55 @@ predictor = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(
 To ensure quick runtimes, we specified that only 2 HPO trials should be run for tuning each model's hyperparameters, which is too few for real applications. We specified that HPO should be performed via a Bayesian optimization `searcher` with HPO trials to evaluate candidate hyperparameter configurations executed via a local sequential job `scheduler`. See the AutoGluon Searcher/Scheduler documentation/tutorials for more details.
 
 Above we set the `epochs`, `num_batches_per_epoch`, and `distr_output` hyperparameters to fixed values. You are allowed to set some hyperparameters to search spaces and others to fixed values. Any hyperparameters you do not specify values or search spaces for will be left at their default values. AutoGluon will **only** train those models which appear as keys in the `hyperparameters` dict argument passed into `fit()`, so in this case only the MQCNN and DeepAR models are trained. Refer to the [GluonTS documentation](https://ts.gluon.ai/api/gluonts/gluonts.model.html) for individual GluonTS models to see all of the hyperparameters you may specify for them.
+
+
+## Viewing additional information
+
+We can view a summary of the HPO process, which will show the validation score achieved in each HPO trial as well as which hyperparameter configuration was evaluated in the corresponding trial:
+
+```{.python .input}
+predictor.fit_summary()
+```
+
+The `'best_config'` field in this summary indicates the hyperparameter configuration that performed best for each model. We can alternatively use the leaderboard to view the performance of each evaluated model/hyperparameter configuration:
+
+```{.python .input}
+predictor.leaderboard()
+```
+
+Here is yet another way to see which model AutoGluon believes to be the best (based on validation score), which is the model automatically used for prediction by default:
+
+```{.python .input}
+predictor._trainer.get_model_best()
+```
+
+We can also view information about any model AutoGluon has trained:
+
+```{.python .input}
+models_trained = predictor._trainer.get_model_names_all()
+specific_model = predictor._trainer.load_model(models_trained[0])
+specific_model.get_info()
+```
+
+
+## Evaluating trained models
+
+Given some more recent held-out test data, here's how to just evaluate the default model AutoGluon uses for forecasting without evaluating all of the other models as in `leaderboard()`:
+
+```{.python .input}
+test_data = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/test.csv")
+predictor.evaluate(test_data)  # to evaluate specific model, can also specify optional argument: model
+```
+
+Be aware that without providing extra `test_data`, AutoGluon's reported validation scores may be slightly optimistic due to adaptive decisions like selecting models/hyperparameters based on the validation data, so it is always a good idea to use some truly held-out test data for an unbiased final evaluation after training has completed.
+
+The ground truth time-series targets are often not available when we produce forecasts and only become available later in the future.
+In such a workflow, we may first produce predictions using AutoGluon, and then later evaluate them without having to recompute the predictions:
+
+```{.python .input}
+predictions = predictor.predict(train_data)  # before test data have been observed
+
+predictor = ForecastingPredictor.load(save_path)  # reload predictor in future after test data are observed
+# reformatted_test_data = ForecastingPredictor.evaluation_format(test_data, train_data)  # TODO
+# ForecastingPredictor.evaluate_predictions(forecasts=predictions, targets=test_data, eval_metric=predictor.eval_metric)  # TODO
+```
