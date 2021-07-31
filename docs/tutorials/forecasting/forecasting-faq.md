@@ -4,16 +4,14 @@
 
 ### Where can I find more information about the models/metrics?
 
-Most of the models and metrics are implemented via the [GluonTS package](https://ts.gluon.ai/), so please refer to their [documentation](https://ts.gluon.ai/api/gluonts/gluonts.html), [github](https://github.com/awslabs/gluon-ts), and paper:
-
-[GluonTS: Probabilistic and Neural Time Series Modeling in Python](https://www.jmlr.org/papers/v21/19-820.html)
+Most of the models and metrics are implemented via the [GluonTS package](https://ts.gluon.ai/), so please refer to their [documentation](https://ts.gluon.ai/api/gluonts/gluonts.html), [github](https://github.com/awslabs/gluon-ts), and paper:  [GluonTS: Probabilistic and Neural Time Series Modeling in Python](https://www.jmlr.org/papers/v21/19-820.html)
 
 A description of certain evaluation metrics is available [here](https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-wQL).
 
 
 ### How can I get the most accurate forecast predictions?
 
-Generally setting the `predictor.fit()` argument `presets="best_quality"` will result in high accuracy. Alternative options include manually specifying hyperparameter search spaces for certain models and manually increasing the number of hyperparameter optimization trials, as demonstrated in the :ref:`sec_forecastingindepth` tutorial.
+Generally setting the `predictor.fit()` argument `presets="best_quality"` will result in high accuracy. Alternative options include manually specifying hyperparameter search spaces for certain models and manually increasing the number of hyperparameter optimization trials, as demonstrated in :ref:`sec_forecastingindepth`.
 
 
 ### What are common data formatting issues?
@@ -23,7 +21,7 @@ Each (index, time) combination must only be associated with a single target valu
 
 ### Can I use GPUs for model training?
 
-Yes! Most of the models used by AutoGluon-Forecasting support GPU training, but it is not required that you train on a GPU. Make sure you have installed CUDA and the GPU version of MXNet, refer to the [installation instructions](../../install.html) for more details. AutoGluon will try to automatically detect whether your machine has a properly setup GPU, but you can also manually specify that GPU should be used via the `predictor.fit()` argument `ag_args_fit={'num_gpus': 1}`. Multi-GPU training is not yet supported.
+Yes! Most of the models used by AutoGluon-Forecasting support GPU training, but it is not required that you train on a GPU. Make sure you have installed CUDA and the GPU version of MXNet, refer to the [installation instructions](../../install.html) for more details. AutoGluon will try to automatically detect whether your machine has a properly setup GPU, but you can also manually specify that GPU should be used by setting the `predictor.fit()` argument: `ag_args_fit={'num_gpus': 1}`. Multi-GPU training is not yet supported.
 
 
 ### What machine is best for running AutoGluon-Forecasting?
