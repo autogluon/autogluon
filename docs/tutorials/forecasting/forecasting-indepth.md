@@ -102,3 +102,37 @@ predictor = ForecastingPredictor.load(save_path)  # reload predictor in future a
 # reformatted_test_data = ForecastingPredictor.evaluation_format(test_data, train_data)  # TODO
 # ForecastingPredictor.evaluate_predictions(forecasts=predictions, targets=test_data, eval_metric=predictor.eval_metric)  # TODO
 ```
+
+
+## Static features
+
+In some forecasting problems involving multiple time-series, each individual time-series may be associated with some static features that do not change over time. For example, if forecasting demand for products over time, each product may be associated with an item  category (categorical static feature) and an item vector embedding from a recommender system (numeric static features).
+AutoGluon allows you to provide such static features such that its models will condition their predictions upon them:
+
+```{.python .input}
+static_features = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries"
+                                 "/toy_static_features.csv")
+static_features.head()
+```
+
+Note that each unique value of `index_column` in our time series data must be represented as a row in `static_features` (in a column whose name matches the `index_column`) that contains the feature values corresponding to this individual series. AutoGluon can automatically infer which static features are categorical vs. numeric when they are passed into `fit()`:
+
+
+```{.python .input}
+predictor_static = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(
+    train_data, static_features=static_features, prediction_length=19, quantiles=[0.1, 0.5, 0.9],
+    index_column="name", target_column="ConfirmedCases", time_column="Date",
+    hyperparameters={"SFF": {'epochs': epochs}}  # train only one model with few epochs here for quick demo
+)
+```
+
+If you provided static features to `fit()`, then the static features must be also provided when using `leaderboard()`, `evaluate()`, or `predict()`:
+
+```{.python .input}
+predictor_static.leaderboard(test_data, static_features=static_features)
+```
+
+```{.python .input}
+predictions = predictor_static.predict(test_data, static_features=static_features)
+print(predictions["Afghanistan_"])
+```
