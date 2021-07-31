@@ -1,7 +1,7 @@
 # Forecasting Time-Series - Quick Start
 :label:`sec_forecastingquick`
 
-Via a simple `fit()` call, AutoGluon can train models produce forecasts for time series data. This tutorial demonstrates how to quickly use AutoGluon to produce forecasts of Covid-19 cases in a country given [historical data from each country](https://www.kaggle.com/c/covid19-global-forecasting-week-4). Let's first import AutoGluon's `ForecastingPredictor` and `TabularDataset` classes, where the latter is used to load time-series data stored in a tabular file format:
+Via a simple `fit()` call, AutoGluon can train models to produce forecasts for time series data. This tutorial demonstrates how to quickly use AutoGluon to produce forecasts of Covid-19 cases in a country given [historical data from each country](https://www.kaggle.com/c/covid19-global-forecasting-week-4). Let's first import AutoGluon's `ForecastingPredictor` and `TabularDataset` classes, where the latter is used to load time-series data stored in a tabular file format:
 
 ```{.python .input}
 from autogluon.forecasting import ForecastingPredictor
