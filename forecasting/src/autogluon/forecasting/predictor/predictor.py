@@ -163,8 +163,8 @@ class ForecastingPredictor:
 
         Parameters
         ----------
-        train_data: pd.Dataframe or FileDataset/ListDataset from gluonts,
-            if pd.Dataframe is provided, it should have the form of:
+        train_data: pd.Dataframe or FileDataset/ListDataset from GluonTS,
+            if pd.Dataframe is provided, it should look like this:
             >>> train_data
               index_column time_column  target_column
             0            A  2020-01-22              1
