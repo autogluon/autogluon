@@ -27,11 +27,11 @@ save_path = "agModels-covidforecast"
 predictor = ForecastingPredictor(path=save_path).fit(train_data, prediction_length=19,
             index_column="name", target_column="ConfirmedCases", time_column="Date",
                                                          quantiles=[0.1, 0.5, 0.9],
-                                                         presets="low_quality"  # last  argument is just for quick demo here, omit it in real applications!
+                                                         presets="low_quality"  # last argument is just here for quick demo, omit it in real applications!
                                                     )
 ```
 
-**Note:** We used `presets = low_quality` above to ensure this example runs quickly, but this is NOT a good setting!  To obtain good performance in real applications you should either delete this argument or set `presets` to be one of: `"best_quality", high_quality", "good_quality", "medium_quality"`. Higher quality presets will generally produce superior forecasting accuracy but take longer to train and may produce less efficient models (`low_quality` is intended just for quickly verifying that AutoGluon can be run on your data).
+**Note:** We used `presets = "low_quality"` above to ensure this example runs quickly, but this is NOT a good setting!  To obtain good performance in real applications you should either delete this argument or set `presets` to be one of: `"best_quality", high_quality", "good_quality", "medium_quality"`. Higher quality presets will generally produce superior forecasting accuracy but take longer to train and may produce less efficient models. The `low_quality` presets are intended just for quickly verifying that AutoGluon can be run on your data and you should generally use the `best_quality` presets instead when benchmarking the accuracy of AutoGluon.
 
 We can print a summary of what happened during `fit()`:
 
