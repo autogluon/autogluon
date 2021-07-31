@@ -110,8 +110,7 @@ In some forecasting problems involving multiple time-series, each individual tim
 AutoGluon allows you to provide such static features such that its models will condition their predictions upon them:
 
 ```{.python .input}
-static_features = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries"
-                                 "/toy_static_features.csv")
+static_features = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/toy_static_features.csv")
 static_features.head()
 ```
 
@@ -119,11 +118,13 @@ Note that each unique value of `index_column` in our time series data must be re
 
 
 ```{.python .input}
+import multiprocessing
+multiprocessing.set_start_method("spawn", force=True)
+
 predictor_static = ForecastingPredictor(path=save_path, eval_metric=eval_metric).fit(
     train_data, static_features=static_features, prediction_length=19, quantiles=[0.1, 0.5, 0.9],
     index_column="name", target_column="ConfirmedCases", time_column="Date",
-    presets="low_quality",
-    # hyperparameters={"SFF": {'epochs': epochs}}  # train only one model with few epochs here for quick demo
+    hyperparameters={"SFF": {'epochs': epochs}}  # train only one model with few epochs here for quick demo
 )
 ```
 
