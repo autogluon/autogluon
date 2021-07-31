@@ -531,7 +531,7 @@ class AbstractModel:
 
     def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.05, prune_threshold=None, num_resource=None,
                        stop_threshold=3, subsample_size=5000, fi_strategy="uniform", fp_strategy="percentage",
-                       num_min_fi_samples=10000, **kwargs):
+                       num_min_fi_samples=10000, proxy_model_scores=[], **kwargs):
         """
         Functionally identical to `fit` method, but repeats feature importance based pruning until validation set
         performance degrades for `stop_threshold` iterations or `max_num_fit` iterations have passed.
@@ -599,6 +599,7 @@ class AbstractModel:
             new_features = self.get_features()
             original_feature_count = len(new_features)
             best_info = {'model': self, 'features': new_features, 'score': score, 'index': index}
+            total_fit_time, total_selection_time = 0., 0.
 
             for index in range(1, max_num_fit):
                 old_features = new_features
@@ -642,9 +643,10 @@ class AbstractModel:
                     # if pruned model led to performance drop, try pruning different features and refit
                     new_features = selector.select_features_on_performance_loss()
 
-                time_elapsed = time.time() - time_start
                 logger.log(30, f"\t# of noised/non-noised features remaining: {len(list(filter(lambda f: 'noise' in f, new_features)))}" +
                                f"/{len(list(filter(lambda f: 'noise' not in f, new_features)))}")
+                time_elapsed = time.time() - time_start
+                total_selection_time += time_elapsed
                 logger.log(30, f"\tFeature selection time: ({round(time_elapsed, 4)}s)")
                 self.check_and_update_time(kwargs, time_elapsed)
                 if set(new_features) == set(old_features) or set(new_features) == set(best_info['features']) or len(new_features) == 0:
@@ -653,6 +655,7 @@ class AbstractModel:
 
                 self_copy, score, time_elapsed = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P{index}', new_features, **kwargs)
                 rounded_score, rounded_best_score, rounded_time = round(score, 4), round(best_info['score'], 4), round(time_elapsed, 4)
+                total_fit_time += time_elapsed
                 self.check_and_update_time(kwargs, time_elapsed)
                 fitted_copies_info.append((round(score, 4), self_copy))
                 if score > best_info['score']:
@@ -662,7 +665,7 @@ class AbstractModel:
                     best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': index}
                     performance_gained = True
                 elif index - best_info['index'] >= stop_threshold:
-                    logger.log(30, f"\tFit {index+1} ({rounded_time}s): Score has not improved for {stop_threshold} iterations. Ending...")
+                    logger.log(30, f"\tFit {index+1} ({rounded_time}s): Score has not improved for {stop_threshold} iterations. Current score is {rounded_score}. Ending...")
                     break
                 else:
                     message = f"\tFit {index+1} ({rounded_time}s): Current score {rounded_score} is not better than best score {rounded_best_score}."
@@ -681,6 +684,7 @@ class AbstractModel:
                 best_model = fitted_copies_info[best_info['index']][1]
                 logger.log(30, f"\tSuccessfully ended prune loop after {index+1} iterations. Best score: {best_info['score']}.")
                 logger.log(30, f"\tFeature Count: {original_feature_count} -> {len(best_info['features'])}")
+                logger.log(30, f"\tModel Fit Time / Feature Importance Computation Time: {round(total_fit_time, 4)}/{round(total_selection_time, 4)}")
                 return best_model, fitted_copies_info
             raise Exception("ERROR: No model trained.")
 

@@ -1,10 +1,13 @@
 from copy import deepcopy
+import logging
 import numpy as np
 import pandas as pd
 import time
 from typing import Callable, Sequence, Tuple, Union
 from .exceptions import TimeLimitExceeded
 
+
+logger = logging.getLogger(__name__)
 
 class FeatureImportanceHelper:
     def __init__(self, importance_fn: Callable[..., np.ndarray], importance_fn_args: dict, features: Sequence[str], golden_features: Sequence[str] = []):
@@ -247,3 +250,65 @@ class FeatureSelector:
 
     def select_features_on_performance_loss(self, **kwargs) -> Sequence[str]:
         return self.fp_helper.prune_features_from_fi_on_performance_loss(**kwargs)[0]
+
+
+class ProxyModelScorer:
+    def __init__(self):
+        self.y_type = None
+
+    def score_feature(self, x: pd.Series, y: pd.Series, x_type: str, y_type: str, **kwargs) -> dict:
+        raise NotImplementedError
+
+    def score_features(self, X: pd.DataFrame, y: pd.Series, problem_type: str, feature_metadata, **kwargs) -> dict:
+        result = {}
+        if problem_type in ['binary', 'multiclass', 'quantile']:
+            self.y_type = 'categorical'
+        elif problem_type in ['regression']:
+            self.y_type = 'numeric'
+        else:
+            raise NotImplementedError(f'Proxy Model Scoring not enabled for problem type: {problem_type}.')
+        for feature in X.columns:
+            feature_type = feature_metadata.get_feature_type_raw(feature)
+            if feature_type in ['int', 'category']:
+                feature_type = 'categorical'
+                result[feature] = self.score_feature(X[feature], y, feature_type, self.y_type, **kwargs)
+            elif feature_type in ['float']:
+                feature_type = 'numeric'
+                result[feature] = self.score_feature(X[feature], y, feature_type, self.y_type, **kwargs)
+            else:
+                logger.log(10, f"Unknown feature type {feature_type}. Setting score to zero.")
+                result[feature] = 0.
+        return result
+
+
+class MutualInformationScorer(ProxyModelScorer):
+    def __init__(self):
+        super().__init__()
+
+    def entropy(self, c):
+        c_normalized = c / float(np.sum(c))
+        c_normalized = c_normalized[np.nonzero(c_normalized)]
+        h = -sum(c_normalized * np.log2(c_normalized))
+        return h
+
+    def score_feature(self, x: pd.Series, y: pd.Series, x_type: str, y_type: str, **kwargs) -> float:
+        if x_type == 'categorical':
+            x = x.fillna(x.mode().item())
+            x_bin = len(x.unique())
+        else:
+            x = x.fillna(x.mean())
+            x_bin = 'auto'  # int(len(x) * continuous_bin_rate)
+        if y_type == 'categorical':
+            y = y.fillna(y.mode().item())
+            y_bin = len(y.unique())
+        else:
+            y = y.fillna(y.mean())
+            y_bin = 'auto'  # int(len(y) * continuous_bin_rate)
+        c_x = np.histogram(x, x_bin)[0]
+        c_y = np.histogram(y, y_bin)[0]
+        h_x = self.entropy(c_x)
+        h_y = self.entropy(c_y)
+        c_xy = np.histogram2d(x, y, (len(c_x), len(c_y)))[0]
+        h_xy = self.entropy(c_xy)
+        mi = h_x + h_y - h_xy
+        return mi

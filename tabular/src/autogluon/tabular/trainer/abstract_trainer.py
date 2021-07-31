@@ -967,7 +967,7 @@ class AbstractTrainer:
                 if time_limit <= 0:
                     logger.log(15, f'Skipping {model.name} due to lack of time remaining.')
                     return model_names_trained
-                if feature_prune and time_limit and model.fit_time * 3 > time_limit:  # TODO JASON: REFINE THIS FEATURE PRUNING TIME LIMIT HEURISTIC
+                if feature_prune and time_limit and model.fit_time > time_limit:
                     logger.log(15, f'Skipping feature pruning for {model.name} due to projected lack of time.')
                     return model_names_trained
                 if self._time_limit is not None and self._time_train_start is not None:
@@ -1033,6 +1033,7 @@ class AbstractTrainer:
             del model
         else:
             if feature_prune:
+                # TODO JASON
                 if model == original_model:
                     model_names_trained.append(model.name)
                     return model_names_trained
@@ -1316,7 +1317,11 @@ class AbstractTrainer:
 
         if fit_with_prune_kwargs is not None:
             # Only explicitly pass fit_with_prune_kwargs here, when all models have been fit
-            # TODO JASON: Have proxy model here for identifying golden features
+            # TODO JASON: Have proxy model here for identifying golden features; add result to fit_with_prune_kwargs['proxy_model_scores']
+            from autogluon.core.utils.feature_selector import MutualInformationScorer
+            proxy_model_scores = []  # MutualInformationScorer().score_features(X, y, self.problem_type, self.feature_metadata)
+            for model in fit_with_prune_kwargs.keys():
+                fit_with_prune_kwargs[model]['proxy_model_scores'] = proxy_model_scores
             logger.log(30, "Feature pruning models while time permits...")
             models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=fit_with_prune_kwargs, feature_prune=False, k_fold_start=k_fold_start,
                                             k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
