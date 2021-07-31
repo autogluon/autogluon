@@ -32,82 +32,75 @@ logger = logging.getLogger()  # return root logger
 
 class ForecastingPredictor:
     """
-       AutoGluon ForecastingPredictor predicts future (numeric) values of a time-series dataset that can contain multiple individual time-series.
+    AutoGluon ForecastingPredictor predicts future (numeric) values of a time-series dataset that can contain multiple individual time-series.
 
-       Parameters
-       ----------
-       eval_metric : str, default = None
-            Metric by which predictions will be ultimately evaluated on future test data.
-            AutoGluon tunes factors such as hyperparameters, early-stopping, etc. in order to improve this metric on validation data.
+    Parameters
+    ----------
+    eval_metric : str, default = None
+        Metric by which predictions will be ultimately evaluated on future test data.
+        AutoGluon tunes factors such as hyperparameters, early-stopping, etc. in order to improve this metric on validation data.
 
-            Available options include:
-               ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
+        Available options include:
+           ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
 
-            If `eval_metric = None`, it is set by default as "mean_wQuantileLoss".
-            For more information about these options, please refer to the GluonTS package documentation.
-       path : str, default = None
-           Path to directory where models and intermediate outputs should be saved.
-           If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
-           Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
-           Otherwise files from first `fit()` will be overwritten by second `fit()`.
-       verbosity : int, default = 2
-           Verbosity levels range from 0 to 4 and control how much information is printed.
-           Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-           If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
-           where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
-       **kwargs :
-           learner_type : AbstractLearner, default = DefaultLearner
-               A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
+        If `eval_metric = None`, it is set by default as "mean_wQuantileLoss".
+        For more information about these options, please see the GluonTS documentation: https://ts.gluon.ai/api/gluonts/gluonts.evaluation.metrics.html
+    path : str, default = None
+       Path to directory where models and intermediate outputs should be saved.
+       If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
+       Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
+       Otherwise files from first `fit()` will be overwritten by second `fit()`.
+    verbosity : int, default = 2
+       Verbosity levels range from 0 to 4 and control how much information is printed.
+       Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+       If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+       where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
+    **kwargs :
+       learner_type : AbstractLearner, default = DefaultLearner
+           A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
+           If you don't know what this is, keep it as the default.
+       learner_kwargs : dict, default = None
+           Kwargs to send to the learner (for advanced users only). Options include:
+
+           trainer_type : AbstractTrainer, default = AutoTrainer
+               A class inheriting from `AbstractTrainer` that controls training of many models.
                If you don't know what this is, keep it as the default.
-           learner_kwargs : dict, default = None
-               Kwargs to send to the learner. Options include:
 
-               trainer_type : AbstractTrainer, default = AutoTrainer
-                   A class inheriting from `AbstractTrainer` that controls training of many models.
-                   If you don't know what this is, keep it as the default.
-
-       Attributes
-       ----------
-       path : str
-           Path to directory where all models used by this Predictor are stored.
-       eval_metric: function or str
-           What metric is used to evaluate predictive performance.
-       index_column: str
-           column in training/validation data that indicates the time series index,
-           By default index_column="index_column".
-           This is decided when you call ForecastingPredictor().fit().
-       time_column: str
-           column in training/validation data that indicates the time of each target,
-           By default time_column="time_column".
-           This is decided when you call ForecastingPredictor().fit().
-       target_column: str
-           column in training/validation data that indicates the target to forecast,
-           By default target_column="target_column".
-           This is decided when you call ForecastingPredictor().fit().
-       static_cat_columns: str
-           columns representing categorical static features,
-           Automatically inferred if static feature dataframe is provided,
-           If static feature dataframe is not provided, it would None and will not be used.
-       static_real_columns: str
-           columns representing real static features,
-           Automatically inferred if static feature dataframe is provided,
-           If static feature dataframe is not provided, it would None and will not be used.
-       use_feat_static_cat: bool
-           whether to use categorical static features when training models.
-           If any categorical static feature is inferred, use_feat_static_cat will by default be turned to be Ture.
-           You can also decide by yourself when creating hyperparameter dictonary
-       use_feat_static_real: bool
-           whether to use real static features when training models.
-           If any real static feature is inferred, use_feat_static_real will by default be turned to be Ture.
-           You can also decide by yourself when creating hyperparameter dictonary
-       cardinality: List of ints
-           the cardinality for each categorical static features.
-           Automatically inferred if any categorical static feature is found.
-           Otherwise it will be None and will not be used.
-       prev_inferred_static_features:
-           static features type will be inferred when processing training data.
-           This dictionary is used to make sure the type is not inferred again when processing the validation/test data,
-           so that no inconsistency will be made.
+    Attributes
+    ----------
+    path : str
+    Path to directory where all models used by this Predictor are stored.
+    eval_metric: function or str
+       What metric is used to evaluate predictive performance.
+    index_column: str
+       Name of column in training/validation data that contains an index ID specifying which time series is being observed at each time-point (for datasets containing multiple time-series).
+       By default, index_column="index_column" if left unspecified when you call `ForecastingPredictor().fit()`.
+    time_column: str
+       Name of column in training/validation data that lists the time of each observation.
+       By default, time_column="time_column" if left unspecified when you call `ForecastingPredictor().fit()`.
+    target_column: str
+       Name of column in training/validation data that contains the target time-series value to be predicted.
+       By default, target_column="target_column" if left unspecified when you call `ForecastingPredictor().fit()`.
+    static_cat_columns: str, default = None
+       Names of columns that contain static (non time-varying) categorical features.
+       These are automatically inferred if a static feature dataframe is provided in `fit()`.
+    static_real_columns: str, default = None
+        Names of columns that contain static (non time-varying) numeric features.
+        These are automatically inferred if a static feature dataframe is provided in `fit()`.
+    use_feat_static_cat: bool
+       Whether to use categorical static features when training models, assuming static features are provided in `fit()`.
+       If any static feature is inferred to be categorical, `use_feat_static_cat` will be set to True by default.
+       You can override this default via the `hyperparameters` argument of `fit()`.
+    use_feat_static_real: bool
+       Whether to use numeric static features when training models, assuming static features are provided in `fit()`.
+       If any static feature is inferred to be real-valued, `use_feat_static_real` will be set to True by default.
+       You can override this default via the `hyperparameters` argument of `fit()`.
+    cardinality: List of ints, default = None
+       The cardinality (number of categories) of each categorical static feature.
+       This is automatically inferred from the set of observed categories in any static feature found to be categorical.
+    prev_inferred_static_features:
+       Static features type will be inferred when processing training data.
+       This dictionary contains the inferred type of each static feature, and is utilized during processing of static features in extra test data.
     """
 
     Dataset = TabularDataset
@@ -159,7 +152,7 @@ class ForecastingPredictor:
             static_features=None,
             **kwargs):
         """
-        Fit models to predict the future targets of time series.
+        Fit models to predict (distributional) forecasts of future values of multiple related time series based on their historical observations.
 
         Parameters
         ----------
