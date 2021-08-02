@@ -1,5 +1,7 @@
 from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
-from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
+from autogluon.core.utils import warning_filter
+with warning_filter():
+    from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,4 +23,5 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
                          **kwargs)
 
     def create_model(self):
-        self.model = SimpleFeedForwardEstimator.from_hyperparameters(**self.params)
+        with warning_filter():
+            self.model = SimpleFeedForwardEstimator.from_hyperparameters(**self.params)
