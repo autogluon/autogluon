@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.utils import warning_filter
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.utils import setup_outputdir
@@ -707,7 +708,8 @@ class ForecastingPredictor:
             ))
         evaluator = Evaluator()
         num_series = len(targets)
-        agg_metrics, item_metrics = evaluator(iter(targets), iter(quantile_forecasts), num_series=num_series)
+        with warning_filter():
+            agg_metrics, item_metrics = evaluator(iter(targets), iter(quantile_forecasts), num_series=num_series)
         if eval_metric is None:
             return agg_metrics
         else:

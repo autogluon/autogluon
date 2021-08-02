@@ -14,6 +14,7 @@ from gluonts.evaluation import Evaluator
 
 import autogluon.core.utils.savers.save_pkl as save_pkl
 import autogluon.core.utils.loaders.load_pkl as load_pkl
+from autogluon.core.utils import warning_filter
 from autogluon.core.scheduler.fifo import FIFOScheduler
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.task.base.base_predictor import BasePredictor
@@ -232,7 +233,8 @@ class AbstractGluonTSModel(AbstractModel):
 
         forecasts, tss = self.predict_for_scoring(data, num_samples=num_samples)
         num_series = len(tss)
-        agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
+        with warning_filter():
+            agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[metric]
 
     def hyperparameter_tune(self, train_data, val_data, scheduler_options, time_limit=None, **kwargs):
