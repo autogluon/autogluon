@@ -531,7 +531,7 @@ class AbstractModel:
 
     def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.05, prune_threshold=None, num_resource=None,
                        stop_threshold=3, subsample_size=5000, fi_strategy="uniform", fp_strategy="percentage",
-                       num_min_fi_samples=10000, proxy_model_scores=[], **kwargs):
+                       num_min_fi_samples=10000, proxy_model_scores=[], prune_after_fit=True, **kwargs):
         """
         Functionally identical to `fit` method, but repeats feature importance based pruning until validation set
         performance degrades for `stop_threshold` iterations or `max_num_fit` iterations have passed.
@@ -568,8 +568,8 @@ class AbstractModel:
         3. Does not work with n_repeats>1 because of path issues (can't find oof.pkl)
         4. Top level time limit is messed up presumably because I modify kwargs['time_limit'] in this method
         """
-        if not self.is_valid():
-            raise Exception('fit_with_prune must only be called on trained models.')
+        if prune_after_fit and not self.is_valid():
+            raise Exception('fit_with_prune must only be called on trained models when called with prune_after_fit=True.')
 
         num_max_prunable = 100  # maximum number of features that can be pruned
         num_prunable = min(len(X.columns), num_max_prunable)
@@ -594,12 +594,20 @@ class AbstractModel:
 
         try:
             best_info, index, performance_gained = None, 0, True
+            total_fit_time, total_selection_time = 0., 0.
+            if not prune_after_fit:
+                time_start = time.time()
+                self.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
+                time_elapsed = time.time() - time_start
+                self.check_and_update_time(kwargs, time_elapsed)
+                total_fit_time += time_elapsed
             score = self.score_with_oof(y) if is_bagged else self.score(X=X_val, y=y_val)
+            if not prune_after_fit:
+                logger.log(30, f"\tFit {index+1} ({round(time_elapsed, 4)}s): Current score is {round(score, 4)}.")
             fitted_copies_info.append((round(score, 4), self))
             new_features = self.get_features()
             original_feature_count = len(new_features)
             best_info = {'model': self, 'features': new_features, 'score': score, 'index': index}
-            total_fit_time, total_selection_time = 0., 0.
 
             for index in range(1, max_num_fit):
                 old_features = new_features

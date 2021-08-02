@@ -8,6 +8,26 @@ def add_dataset_info(results_raw: pd.DataFrame, task_metadata: pd.DataFrame):
     return results_raw
 
 
+def mean_score(df: pd.DataFrame):
+    return round(df['result'].mean(), 4)
+
+
+def filter_type(df: pd.DataFrame):
+    return df[df['type'] == 'binary'], df[df['type'] == 'multiclass'], df[df['type'] == 'regression']
+
+
+def filter_samples(df, samples=100000, lower=True):
+    return df[df['NumberOfInstances'] < samples] if lower else df[df['NumberOfInstances'] > samples]
+
+
+def filter_features(df, features=100, lower=True):
+    return df[df['NumberOfFeatures'] < features] if lower else df[df['NumberOfFeatures'] > features]
+
+
+def filter_duration(df, duration=40000):
+    return df[df['duration'] < duration]
+
+
 def compare_dfs(df1, df2, metric):
     df1_better, equal_performance, df2_better = [], [], []
     for _, row in df1.iterrows():
@@ -28,11 +48,8 @@ def compare_dfs(df1, df2, metric):
             df2_better.append(task)
         else:
             equal_performance.append(task)
-    return df1_better, equal_performance, df2_better
+    return len(df1_better), len(equal_performance), len(df2_better)
 
-
-def limit_duration(df, duration=40000):
-    return df[df['duration'] < duration]
 
 """
 TODO
@@ -40,34 +57,34 @@ TODO
 """
 
 # base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon.ag.12h8c.aws.20210728T082752.csv")
-# uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform.ag.12h8c.aws.20210728T082754.csv")
+# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210728T084754.csv")
+# base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality.ag.12h8c.aws.20210725T042534.csv")
+
 base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210728T084754.csv")
-uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210728T084850.csv")
+best = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210728T084850.csv")
+uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality_norepeat.ag.12h8c.aws.20210731T002416.csv")
 
 task_metadata = pd.read_csv('result/task_metadata.csv')
 base = add_dataset_info(base, task_metadata)
+best = add_dataset_info(best, task_metadata)
 uniform = add_dataset_info(uniform, task_metadata)
 # backward = add_dataset_info(backward, task_metadata)
 
 DURATION = 43000
-basebin = base[base["type"] == "binary"]
-uniformbin = uniform[uniform["type"] == "binary"]
-basecat = base[base["type"] == "multiclass"]
-uniformcat = uniform[uniform["type"] == "multiclass"]
-basereg = base[base["type"] == "regression"]
-uniformreg = uniform[uniform["type"] == "regression"]
-basedone = limit_duration(base, duration=DURATION)
-uniformdone = limit_duration(uniform, duration=DURATION)
+basebin, basecat, basereg = filter_type(base)
+uniformbin, uniformcat, uniformreg = filter_type(uniform)
+basedone = filter_duration(base, duration=DURATION)
+uniformdone = filter_duration(uniform, duration=DURATION)
 
 try:
     first_better, equal_performance, second_better = compare_dfs(base, uniform, "result")
-    print(f"All Run Base Win: {len(first_better)}, Search Win: {len(second_better)}, Tie: {len(equal_performance)}")
+    print(f"All Run Base Win: {first_better}, Search Win: {second_better}, Tie: {equal_performance}")
     first_better, equal_performance, second_better = compare_dfs(basedone, uniformdone, "result")
-    print(f"Finished Run Base Win: {len(first_better)}, Search Win: {len(second_better)}, Tie: {len(equal_performance)}")
+    print(f"Finished Run Base Win: {first_better}, Search Win: {second_better}, Tie: {equal_performance}")
     basebin_mean, basecat_mean, basereg_mean = round(basebin['result'].mean(), 4), round(basecat['result'].mean(), 4), round(basereg['result'].mean(), 4)
-    print(f"Finished Base Results: (binary: {basebin_mean}), (multiclass: {basecat_mean}), (regression: {basereg_mean})")
+    print(f"Base Results: (binary: {basebin_mean}), (multiclass: {basecat_mean}), (regression: {basereg_mean})")
     uniformbin_mean, uniformcat_mean, uniformreg_mean = round(uniformbin['result'].mean(), 4), round(uniformcat['result'].mean(), 4), round(uniformreg['result'].mean(), 4)
-    print(f"Finished Search Results: (binary: {uniformbin_mean}), (multiclass: {uniformcat_mean}), (regression: {uniformreg_mean})")
+    print(f"Search Results: (binary: {uniformbin_mean}), (multiclass: {uniformcat_mean}), (regression: {uniformreg_mean})")
 except:
     import pdb; pdb.post_mortem()
 

@@ -967,7 +967,7 @@ class AbstractTrainer:
                 if time_limit <= 0:
                     logger.log(15, f'Skipping {model.name} due to lack of time remaining.')
                     return model_names_trained
-                if feature_prune and time_limit and model.fit_time > time_limit:
+                if feature_prune and time_limit and model.fit_time is not None and model.fit_time > time_limit:
                     logger.log(15, f'Skipping feature pruning for {model.name} due to projected lack of time.')
                     return model_names_trained
                 if self._time_limit is not None and self._time_train_start is not None:
@@ -1032,7 +1032,7 @@ class AbstractTrainer:
                 logger.exception('Detailed Traceback:')
             del model
         else:
-            if feature_prune:
+            if feature_prune and fit_with_prune_kwargs.get('prune_after_fit', True):
                 # TODO JASON
                 if model == original_model:
                     model_names_trained.append(model.name)
@@ -1292,6 +1292,25 @@ class AbstractTrainer:
                     hpo_enabled = True
                     break
 
+        pre_fit_with_prune_kwargs = None
+        post_fit_with_prune_kwargs = None
+        if fit_with_prune_kwargs is not None:
+            # TODO JASON: Have proxy model here for identifying golden features; add result to fit_with_prune_kwargs['proxy_model_scores']
+            from autogluon.core.utils.feature_selector import MutualInformationScorer
+            proxy_model_scores = []  # MutualInformationScorer().score_features(X, y, self.problem_type, self.feature_metadata)
+            for model in fit_with_prune_kwargs.keys():
+                fit_with_prune_kwargs[model]['proxy_model_scores'] = proxy_model_scores
+            # Determine if feature pruning happens before or after fit
+            prune_after_fit = True
+            for info in fit_with_prune_kwargs.values():
+                if not info.get('prune_after_fit', True):
+                    prune_after_fit = False
+                    break
+            if prune_after_fit:
+                post_fit_with_prune_kwargs = fit_with_prune_kwargs
+            else:
+                pre_fit_with_prune_kwargs = fit_with_prune_kwargs
+
         hpo_time_ratio = 0.9
         if hpo_enabled:
             time_split = True
@@ -1300,7 +1319,7 @@ class AbstractTrainer:
         k_fold_start = 0
         if k_fold == 0:
             time_ratio = hpo_time_ratio if hpo_enabled else 1
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, fit_with_prune_kwargs=None,
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, fit_with_prune_kwargs=pre_fit_with_prune_kwargs,
                                             feature_prune=feature_prune, time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
         else:
             if hpo_enabled or feature_prune:
@@ -1312,18 +1331,13 @@ class AbstractTrainer:
                 if time_limit is not None:
                     time_limit = time_limit - (time.time() - time_start)
 
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=None, feature_prune=False, k_fold_start=k_fold_start,
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=pre_fit_with_prune_kwargs, feature_prune=False, k_fold_start=k_fold_start,
                                             k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
 
-        if fit_with_prune_kwargs is not None:
+        if post_fit_with_prune_kwargs is not None:
             # Only explicitly pass fit_with_prune_kwargs here, when all models have been fit
-            # TODO JASON: Have proxy model here for identifying golden features; add result to fit_with_prune_kwargs['proxy_model_scores']
-            from autogluon.core.utils.feature_selector import MutualInformationScorer
-            proxy_model_scores = []  # MutualInformationScorer().score_features(X, y, self.problem_type, self.feature_metadata)
-            for model in fit_with_prune_kwargs.keys():
-                fit_with_prune_kwargs[model]['proxy_model_scores'] = proxy_model_scores
             logger.log(30, "Feature pruning models while time permits...")
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=fit_with_prune_kwargs, feature_prune=False, k_fold_start=k_fold_start,
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=post_fit_with_prune_kwargs, feature_prune=False, k_fold_start=k_fold_start,
                                             k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
         return models
 

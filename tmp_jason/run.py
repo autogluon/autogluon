@@ -30,6 +30,7 @@ fit_with_prune_kwargs = {
         'num_resource': args.num_resource,
         'fi_strategy': args.fi,
         'fp_strategy': args.fp,
+        'prune_after_fit': False
     }
 }
 
