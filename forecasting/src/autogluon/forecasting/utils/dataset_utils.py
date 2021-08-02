@@ -260,8 +260,7 @@ def extract_static_feature(index_column, features, prev_inferred=None):
         static_real_features = IdentityFeatureGenerator(
             infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}
         ).fit_transform(features)
-        for column in static_real_features:
-            static_real_features[column].fillna(static_real_features[column].mean(), inplace=True)
+        static_real_features = static_real_features.fillna(static_real_features.mean())
         # Extracting static cat features, na is deal with as an additional category.
         static_cat_features = IdentityFeatureGenerator(
             infer_features_in_args={"invalid_raw_types": [R_INT, R_FLOAT]}
