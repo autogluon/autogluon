@@ -499,7 +499,7 @@ class ForecastingPredictor:
         """
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
-        output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
+        output_directory = setup_outputdir(output_directory, warn_if_exist=False)  # replace ~ with absolute path if it exists
         logger.log(30, f"Loading predictor from path {output_directory}")
         learner = AbstractLearner.load(output_directory)
         predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
