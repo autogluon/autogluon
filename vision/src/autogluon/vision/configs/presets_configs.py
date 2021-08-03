@@ -79,7 +79,7 @@ preset_image_predictor = dict(
                 if timm != None else Categorical('resnet18_v1b', 'mobilenetv3_small'),
             'lr': Categorical(0.01, 0.005, 0.001),
             'batch_size': Categorical(64, 128),
-            'epochs': Categorical(50, 100),
+            'epochs': 50,
             'early_stop_patience': 10
             },
         'hyperparameter_tune_kwargs': {
