@@ -5,6 +5,8 @@ import pandas as pd
 import time
 from typing import Callable, Sequence, Tuple, Union
 from .exceptions import TimeLimitExceeded
+# from autogluon.core.models import BaggedEnsembleModel
+# from autogluon.tabular.models import CatBoostModel, LGBModel
 
 
 logger = logging.getLogger(__name__)
@@ -252,7 +254,7 @@ class FeatureSelector:
         return self.fp_helper.prune_features_from_fi_on_performance_loss(**kwargs)[0]
 
 
-class ProxyModelScorer:
+class ProxyScorer:
     def __init__(self):
         self.y_type = None
 
@@ -281,7 +283,7 @@ class ProxyModelScorer:
         return result
 
 
-class MutualInformationScorer(ProxyModelScorer):
+class MutualInformationScorer(ProxyScorer):
     def __init__(self):
         super().__init__()
 
@@ -312,3 +314,38 @@ class MutualInformationScorer(ProxyModelScorer):
         h_xy = self.entropy(c_xy)
         mi = h_x + h_y - h_xy
         return mi
+
+"""
+class ProxyModelScorer(ProxyScorer):
+    def __init__(self, model: str, **kwargs):
+        super().__init__()
+        if model == 'LGB':
+            self.model_type = LGBModel
+        else:
+            self.model_type = CatBoostModel
+        self.num_train_samples = kwargs.get('num_train_samples', 50000)
+        self.n_repeats = kwargs.get('n_repeats', 1)
+        self.seed = kwargs.get('random_seed', 0)
+        # fit_with_prune kwargs
+        self.max_num_fit = kwargs.get('max_num_fit', 5)
+        self.stop_threshold = kwargs.get('stop_threshold', 3)
+        self.prune_ratio = kwargs.get('prune_ratio', 0.1)
+        self.num_resource = kwargs.get('num_resource', None)
+        self.fi_strategy = kwargs.get('fi_strategy', 'uniform')
+        self.fp_strategy = kwargs.get('fp_strategy', 'percentage')
+        self.subsample_size = kwargs.get('subsample_size', 5000)
+        self.prune_threshold = kwargs.get('prune_threshold', None)
+        self.num_min_fi_samples = kwargs.get('num_min_fi_samples', 50000)
+
+    def score_features(self, X: pd.DataFrame, y: pd.Series, problem_type: str, feature_metadata, **kwargs) -> dict:
+        # set problem type, evaluation metric, etc to model
+        base_model = self.model_type(name='proxy_base_model', problem_type=problem_type, eval_metric=kwargs.get('eval_metric', None))
+        self.model = BaggedEnsembleModel(base_model, name='proxy_model', random_state=0)
+        indexes = np.random.default_rng(self.seed).choice(len(X), replace=False, size=self.num_train_samples)
+        X_train, y_train = X.iloc[indexes], y.iloc[indexes]
+        best_model, _ = self.model.fit_with_prune(X=X_train, y=y_train, X_val=None, y_val=None, max_num_fit=self.max_num_fit,
+                                                  stop_threshold=self.stop_threshold, prune_ratio=self.prune_ratio, num_resource=self.num_resource,
+                                                  fi_strategy=self.fi_strategy, fp_strategy=self.fp_strategy, subsample_size=self.subsample_size,
+                                                  prune_threshold=self.prune_threshold, num_min_fi_samples=self.num_min_fi_samples, k_fold=5)
+        return
+"""

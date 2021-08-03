@@ -62,7 +62,7 @@ TODO
 
 base = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_bestquality_norepeat.ag.12h8c.aws.20210728T084754.csv")
 best = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality.ag.12h8c.aws.20210728T084850.csv")
-uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality_norepeat.ag.12h8c.aws.20210731T002416.csv")
+uniform = pd.read_csv("~/Downloads/results_automlbenchmark_12h8c_autogluon_prune_uniform_bestquality_norepeat_prefit.ag.12h8c.aws.20210802T091318.csv")
 
 task_metadata = pd.read_csv('result/task_metadata.csv')
 base = add_dataset_info(base, task_metadata)
@@ -70,7 +70,7 @@ best = add_dataset_info(best, task_metadata)
 uniform = add_dataset_info(uniform, task_metadata)
 # backward = add_dataset_info(backward, task_metadata)
 
-DURATION = 43000
+DURATION = 40000
 basebin, basecat, basereg = filter_type(base)
 uniformbin, uniformcat, uniformreg = filter_type(uniform)
 basedone = filter_duration(base, duration=DURATION)

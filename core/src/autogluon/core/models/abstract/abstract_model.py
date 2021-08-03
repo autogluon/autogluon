@@ -706,7 +706,10 @@ class AbstractModel:
         # Fit a deepcopied model on current_features
         time_start = time.time()
         is_bagged = X_val is None or y_val is None
-        self_copy = self.convert_to_refit_full_template()
+        init_args = self._get_init_args()
+        if is_bagged:
+            init_args['model_base'] = self.convert_to_refitfull_template_child()
+        self_copy = self.__class__(**init_args)
         self_copy.rename(copy_name)
         self_copy.features = features if features is not None else X.columns.tolist()
         if features is not None and self_copy.feature_metadata is not None:

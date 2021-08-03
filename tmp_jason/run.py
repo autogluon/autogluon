@@ -30,7 +30,7 @@ fit_with_prune_kwargs = {
         'num_resource': args.num_resource,
         'fi_strategy': args.fi,
         'fp_strategy': args.fp,
-        'prune_after_fit': False
+        # 'prune_after_fit': False
     }
 }
 
@@ -51,10 +51,11 @@ else:
 
 predictor = TabularPredictor(label=args.label)
 if args.prune:
-    predictor = predictor.fit(train_data, presets=presets, ag_args=fit_with_prune_kwargs, time_limit=600, num_bag_sets=2, num_stack_levels=1,
+    predictor = predictor.fit(train_data, presets=presets, ag_args=fit_with_prune_kwargs, time_limit=300, num_bag_sets=2, num_stack_levels=1,
                               ag_args_ensemble={'use_child_oof': False}, hyperparameters=custom_hyperparameters)
 else:
-    predictor = predictor.fit(train_data, presets=presets, num_bag_sets=2, num_stack_levels=1, time_limit=3600, hyperparameters=custom_hyperparameters)
+    predictor = predictor.fit(train_data, presets=presets, # num_bag_sets=2, num_stack_levels=1, 
+                              time_limit=900, hyperparameters=custom_hyperparameters)
 # ag_args=fit_with_prune_kwargs
 try:
     y_pred = predictor.predict(test_data)

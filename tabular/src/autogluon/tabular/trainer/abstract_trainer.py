@@ -1311,6 +1311,7 @@ class AbstractTrainer:
             else:
                 pre_fit_with_prune_kwargs = fit_with_prune_kwargs
 
+        time_start_pre_prune = time.time()
         hpo_time_ratio = 0.9
         if hpo_enabled:
             time_split = True
@@ -1337,6 +1338,8 @@ class AbstractTrainer:
         if post_fit_with_prune_kwargs is not None:
             # Only explicitly pass fit_with_prune_kwargs here, when all models have been fit
             logger.log(30, "Feature pruning models while time permits...")
+            if time_limit is not None:
+                time_limit = time_limit - (time.time() - time_start_pre_prune)
             models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=post_fit_with_prune_kwargs, feature_prune=False, k_fold_start=k_fold_start,
                                             k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
         return models
