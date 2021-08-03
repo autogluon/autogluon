@@ -49,9 +49,8 @@ class BaggedEnsembleModel(AbstractModel):
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
 
         eval_metric = kwargs.pop('eval_metric', self.model_base.eval_metric)
-        stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)  # FIXME: Has to be moved to post-model_base initialization, otherwise could be misaligned.
 
-        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, **kwargs)
+        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, **kwargs)
 
     def _set_default_params(self):
         default_params = {
@@ -491,7 +490,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
     def convert_to_refit_full_template(self):
-        init_args = self._get_init_args()
+        init_args = self.get_params()
         init_args['hyperparameters']['save_bag_folds'] = True  # refit full models must save folds
         init_args['model_base'] = self.convert_to_refitfull_template_child()
         init_args['name'] = init_args['name'] + REFIT_FULL_SUFFIX
@@ -505,12 +504,12 @@ class BaggedEnsembleModel(AbstractModel):
         child_compressed.params = compressed_params
         return child_compressed
 
-    def _get_init_args(self):
+    def get_params(self):
         init_args = dict(
             model_base=self._get_model_base(),
             random_state=self._random_state,
         )
-        init_args.update(super()._get_init_args())
+        init_args.update(super().get_params())
         init_args.pop('problem_type')
         return init_args
 
