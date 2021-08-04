@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 
 from autogluon.core.dataset import TabularDataset
-from autogluon.core.utils import warning_filter
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.utils import setup_outputdir
@@ -27,6 +26,7 @@ from ..configs.presets_configs import forecasting_presets_configs
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer
 from ..utils.dataset_utils import time_series_dataset
+from ..utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger()  # return root logger
 
@@ -678,7 +678,13 @@ class ForecastingPredictor:
         return True
 
     @classmethod
-    def evaluate_predictions(cls, forecasts, targets, eval_metric=None):
+    def evaluate_predictions(cls,
+                             forecasts,
+                             targets,
+                             index_column="index_column",
+                             time_column="time_column",
+                             target_column="target_column",
+                             eval_metric=None):
         """
         Evaluate predictions once future targets are received.
 
@@ -689,13 +695,40 @@ class ForecastingPredictor:
             Keys are time series index
             Values are pandas Dataframe containing predictions for different quantiles.
 
-        targets: an iterable of Dataframes
-            each Dataframe contains the ground truth value for the time index needed,
-            and the index for the dataframe must be the timestamp
-            each Dataframe must contain only the true value for the dates to predict.
+        targets: a Dataframe which has the same format as what you have for train_data/test_data,
+            must contain targets for all time presented in forecasts.
+
+        index_column: str
+            Name of column in targets that contains an index ID specifying which time series is being observed at each time-point (for datasets containing multiple time-series).
+            By default, index_column="index_column" if left unspecified.
+
+        time_column: str
+            Name of column in targets that lists the time of each observation.
+            By default, time_column="time_column" if left unspecified.
+
+        target_column: str
+            Name of column in targets that contains the target time-series value to be predicted.
+            By default, target_column="target_column" if left unspecified.
         """
+        targets = rebuild_tabular(targets,
+                                  index_column=index_column,
+                                  target_column=target_column,
+                                  time_column=time_column).set_index(index_column).transpose()
+
+        required_time = list(forecasts.values())[0].index
+        targets_time = pd.DatetimeIndex(targets.index, freq=pd.infer_freq(targets.index))
+        targets.index = targets_time
+
+        for time in required_time:
+            if time not in targets_time:
+                raise ValueError(f"Time {time} is presented in predictions but not given in targets. Please check your targets.")
+
+        formated_targets = []
         quantile_forecasts = []
         for ts_id, forecast in forecasts.items():
+            tmp_targets = targets.loc[required_time,ts_id]
+            formated_targets.append(tmp_targets)
+
             tmp = []
             for quantile in forecast.columns:
                 tmp.append(forecast[quantile])
@@ -707,9 +740,9 @@ class ForecastingPredictor:
                 item_id=ts_id,
             ))
         evaluator = Evaluator()
-        num_series = len(targets)
-        with warning_filter():
-            agg_metrics, item_metrics = evaluator(iter(targets), iter(quantile_forecasts), num_series=num_series)
+        num_series = len(formated_targets)
+        with evaluator_warning_filter():
+            agg_metrics, item_metrics = evaluator(iter(formated_targets), iter(quantile_forecasts), num_series=num_series)
         if eval_metric is None:
             return agg_metrics
         else:

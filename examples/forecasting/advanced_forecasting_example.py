@@ -58,12 +58,7 @@ for model in models:
     print(predictor._trainer.load_model(model).get_info())
 print(predictor.leaderboard(test_data, static_features=static_features))
 print(predictor.evaluate(test_data, static_features=static_features))
-predictions = predictor.predict(test_data, static_features=static_features, quantiles=[0.5], time_series_to_predict=['Afghanistan_', "Algeria_"])
+predictions = predictor.predict(train_data, static_features=static_features, quantiles=[0.5], time_series_to_predict=['Afghanistan_', "Algeria_"])
 time_series_id = 'Afghanistan_'
 print(predictions[time_series_id])
-targets = pd.DataFrame({"targets": [100 for i in range(prediction_length)]})
-targets.index = predictions[time_series_id].index
-
-all_targets = [targets for i in range(len(predictions))]
-print(predictions[time_series_id].index.freq)
-print(ForecastingPredictor.evaluate_predictions(predictions, all_targets))
+print(ForecastingPredictor.evaluate_predictions(predictions, test_data, index_column="name", target_column="ConfirmedCases", time_column="Date"))

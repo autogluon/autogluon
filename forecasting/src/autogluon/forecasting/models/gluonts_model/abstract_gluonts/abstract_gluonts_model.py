@@ -14,11 +14,11 @@ from gluonts.evaluation import Evaluator
 
 import autogluon.core.utils.savers.save_pkl as save_pkl
 import autogluon.core.utils.loaders.load_pkl as load_pkl
-from autogluon.core.utils import warning_filter
-from autogluon.core.scheduler.fifo import FIFOScheduler
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.task.base.base_predictor import BasePredictor
-from autogluon.core.constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from autogluon.core.constants import REFIT_FULL_SUFFIX
+
+from ....utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
 from ...abstract.abstract_model import AbstractModel
 from ..abstract_gluonts.model_trial import model_trial
 from .callback import EpochCounter, TimeLimitCallback
@@ -96,7 +96,9 @@ class AbstractGluonTSModel(AbstractModel):
         # save gluonts model
         weight_path = path + self.gluonts_model_path
         os.makedirs(weight_path, exist_ok=True)
-        self.model.serialize(Path(weight_path))
+        #TODO: filtering the serializing warning out until gluonts fix it.
+        with serialize_warning_filter():
+            self.model.serialize(Path(weight_path))
         self.model = None
         # save self
         file_path = path + self.model_file_name
@@ -233,7 +235,8 @@ class AbstractGluonTSModel(AbstractModel):
 
         forecasts, tss = self.predict_for_scoring(data, num_samples=num_samples)
         num_series = len(tss)
-        with warning_filter():
+        #TODO: filtering the wranings out until gluonts perfects it.
+        with evaluator_warning_filter():
             agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[metric]
 
