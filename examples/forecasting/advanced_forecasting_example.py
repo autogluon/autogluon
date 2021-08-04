@@ -1,7 +1,6 @@
 """ Example script for forecasting, demonstrating more advanced usage of fit().
     Note that all settings demonstrated here are just chosen for demonstration purposes (to minimize runtime), and do not represent wise choices to use in practice.
 """
-import pandas as pd
 from autogluon.forecasting import ForecastingPredictor
 from autogluon.forecasting import TabularDataset
 import autogluon.core as ag
