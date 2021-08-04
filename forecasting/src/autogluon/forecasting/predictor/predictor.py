@@ -311,7 +311,6 @@ class ForecastingPredictor:
         if isinstance(train_data, pd.DataFrame):
             logger.log(30, "Training with dataset in tabular format...")
             # Inform the user extra columns in dataset will not be used.
-            # TODO: Inferring from train data what extra columns are and treat them as dynamic features
             extra_columns = [c for c in train_data.columns.copy() if c not in [index_column, time_column, target_column]]
             if len(extra_columns) > 0:
                 logger.log(30, f"Find more than 3 columns, columns {extra_columns} will not be used.")
@@ -329,7 +328,9 @@ class ForecastingPredictor:
                                            index_column=index_column,
                                            target_column=target_column,
                                            time_column=time_column)
-            train_data = TimeSeriesDataset(train_data, index_column=index_column, static_features=static_features)
+            train_data = TimeSeriesDataset(train_data,
+                                           index_column=index_column,
+                                           static_features=static_features)
 
             self.static_cat_columns = train_data.static_cat_columns()
             self.static_real_columns = train_data.static_real_columns()
@@ -341,7 +342,10 @@ class ForecastingPredictor:
                                                   "cardinality": self.cardinality}
             freq = train_data.get_freq()
 
-            val_data = TimeSeriesDataset(val_data, index_column=index_column, static_features=static_features, prev_inferred=self.prev_inferred_static_features)
+            val_data = TimeSeriesDataset(val_data,
+                                         index_column=index_column,
+                                         static_features=static_features,
+                                         prev_inferred=self.prev_inferred_static_features)
         elif isinstance(train_data, FileDataset) or isinstance(train_data, ListDataset):
             logger.log(30, "Training with dataset in gluon-ts format...")
             if val_data is None:
@@ -573,10 +577,8 @@ class ForecastingPredictor:
         results = {
             'model_types': model_typenames,  # dict with key = model-name, value = type of model (class-name)
             'model_performance': self._trainer.get_models_attribute_dict('score'),
-            # dict with key = model-name, value = validation performance
             'model_best': self._trainer.model_best,  # the name of the best model (on validation data)
             'model_paths': self._trainer.get_models_attribute_dict('path'),
-            # dict with key = model-name, value = path to model file
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'hyperparameter_tune': hpo_used,
             'hyperparameters_userspecified': self._trainer.hyperparameters,
@@ -594,9 +596,6 @@ class ForecastingPredictor:
             print("*** Summary of fit() ***")
             print("Estimated performance of each model:")
             results['leaderboard'] = self._learner.leaderboard()
-            # self._summarize('model_performance', 'Validation performance of individual models', results)
-            #  self._summarize('model_best', 'Best model (based on validation performance)', results)
-            # self._summarize('hyperparameter_tune', 'Hyperparameter-tuning used', results)
             print("Number of models trained: %s" % len(results['model_performance']))
             print("Types of models trained:")
             print(unique_model_types)
@@ -642,11 +641,13 @@ class ForecastingPredictor:
             if set_best_to_refit_full:
                 if trainer_model_best in self._trainer.model_full_dict.keys():
                     self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
-                    # Note: model_best will be overwritten if additional training is done with new models, since model_best will have validation score of None and any new model will have a better validation score.
+                    # Note: model_best will be overwritten if additional training is done with new models,
+                    # since model_best will have validation score of None and any new model will have a better validation score.
                     # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
                     self._trainer.save()
                 else:
-                    logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
+                    logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. '
+                                   f'Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
 
     def refit_full(self, models='all'):
         """
@@ -669,7 +670,8 @@ class ForecastingPredictor:
             logger.warning('Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
 
         if scheduler_params['num_trials'] == 1:
-            logger.warning('Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. This can occur if time_limit was not specified in `fit()`.')
+            logger.warning('Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. '
+                           'This can occur if time_limit was not specified in `fit()`.')
             return False
 
         scheduler_ngpus = scheduler_params['resource'].get('num_gpus', 0)
