@@ -137,6 +137,7 @@ class AbstractModel:
         self._fit_metadata = dict()
 
     def _init_params(self):
+        """Initializes model hyperparameters"""
         hyperparameters = self._user_params
         self._set_default_params()
         self.nondefault_params = []
@@ -146,6 +147,11 @@ class AbstractModel:
         self.params_trained = dict()
 
     def _init_params_aux(self):
+        """
+        Initializes auxiliary hyperparameters.
+        These parameters are generally not model specific and can have a wide variety of effects.
+        For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
+        """
         hyperparameters_aux = self._user_params_aux
         self._set_default_auxiliary_params()
         if hyperparameters_aux is not None:
@@ -788,7 +794,10 @@ class AbstractModel:
         return args
 
     def convert_to_template(self):
-        """After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied."""
+        """
+        After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
+        The model name and path will be identical to the original, and must be renamed prior to training to avoid overwriting the original model files if they exist.
+        """
 
         params = self.get_params()
         template = self.__class__(**params)
