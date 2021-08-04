@@ -102,6 +102,14 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
         return oof_pred_proba / oof_pred_model_repeats_without_0
 
+    def _init_misc(self, **kwargs):
+        child = self._get_model_base().convert_to_template()
+        child.initialize(**kwargs)
+        self.eval_metric = child.eval_metric
+        self.stopping_metric = child.stopping_metric
+        self.quantile_levels = child.quantile_levels
+        self.normalize_pred_probas = child.normalize_pred_probas
+
     def preprocess(self, X, preprocess_nonadaptive=True, model=None, **kwargs):
         if preprocess_nonadaptive:
             if model is None:

@@ -1420,7 +1420,7 @@ class AbstractTrainer:
             base_models_dict=base_models_dict,
             base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=model_names),
             base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=model_names),
-            hyperparameters=hyperparameters, quantile_levels=self.quantile_levels,
+            hyperparameters=hyperparameters,
             random_state=level+self.random_state
         )
         dummy_stacker.initialize(num_classes=self.num_classes)

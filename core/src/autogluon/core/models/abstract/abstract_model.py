@@ -28,8 +28,6 @@ from ...utils.savers import save_json, save_pkl
 
 logger = logging.getLogger(__name__)
 
-# TODO: Consider removing quantile_levels from init, only use ag_args_fit to specify quantile_levels.
-
 
 class AbstractModel:
     """
@@ -78,8 +76,7 @@ class AbstractModel:
                  name: str = None,
                  problem_type: str = None,
                  eval_metric: Union[str, metrics.Scorer] = None,
-                 hyperparameters=None,
-                 quantile_levels=None):
+                 hyperparameters=None):
 
         if name is None:
             self.name = self.__class__.__name__
@@ -100,7 +97,6 @@ class AbstractModel:
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
 
         self.num_classes = None
-        self.quantile_levels = quantile_levels
         self.model = None
         self.problem_type = problem_type
 
@@ -398,6 +394,24 @@ class AbstractModel:
             if self.num_classes is None:
                 label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y)
                 self.num_classes = label_cleaner.num_classes
+
+        self._init_params_aux()
+
+        self._init_misc(
+            X=X,
+            y=y,
+            feature_metadata=feature_metadata,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+        if X is not None:
+            self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
+
+        self._init_params()
+
+    def _init_misc(self, **kwargs):
+        """Initialize parameters that depend on self.params_aux being initialized"""
         if self.eval_metric is None:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
             logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
@@ -406,18 +420,13 @@ class AbstractModel:
         self.stopping_metric = self.params_aux.get('stopping_metric', self._get_default_stopping_metric())
         self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, 'stopping_metric')
 
+        self.quantile_levels = self.params_aux.get('quantile_levels', None)
+
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
             self.normalize_pred_probas = True
             logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
         else:
             self.normalize_pred_probas = False
-
-        self._init_params_aux()
-
-        if X is not None:
-            self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
-
-        self._init_params()
 
     def _preprocess_fit_resources(self, silent=False, **kwargs):
         default_num_cpus, default_num_gpus = self._get_default_resources()
@@ -767,7 +776,6 @@ class AbstractModel:
         hyperparameters = self._user_params.copy()
         if self._user_params_aux:
             hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
-        quantile_levels = self.quantile_levels
 
         args = dict(
             path=path,
@@ -775,7 +783,6 @@ class AbstractModel:
             problem_type=problem_type,
             eval_metric=eval_metric,
             hyperparameters=hyperparameters,
-            quantile_levels=quantile_levels,
         )
 
         return args

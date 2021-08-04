@@ -21,10 +21,19 @@ class AutoTrainer(AbstractTrainer):
         quantile_levels = kwargs.pop('quantile_levels', self.quantile_levels)
         invalid_model_names = kwargs.pop('invalid_model_names', self._get_banned_model_names())
         silent = kwargs.pop('silent', self.verbosity < 3)
+        ag_args_fit = kwargs.pop('ag_args_fit', None)
+        if quantile_levels is not None:
+            if ag_args_fit is None:
+                ag_args_fit = dict()
+            ag_args_fit = ag_args_fit.copy()
+            ag_args_fit['quantile_levels'] = quantile_levels
 
-        return get_preset_models(path=path, problem_type=problem_type, eval_metric=eval_metric,
-                                 quantile_levels=quantile_levels,
-                                 hyperparameters=hyperparameters, invalid_model_names=invalid_model_names,
+        return get_preset_models(path=path,
+                                 problem_type=problem_type,
+                                 eval_metric=eval_metric,
+                                 hyperparameters=hyperparameters,
+                                 ag_args_fit=ag_args_fit,
+                                 invalid_model_names=invalid_model_names,
                                  silent=silent, **kwargs)
 
     def fit(self, X, y, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, feature_prune=False, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, use_bag_holdout=False, groups=None, **kwargs):
