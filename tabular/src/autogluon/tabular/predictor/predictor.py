@@ -230,6 +230,27 @@ class TabularPredictor:
     def problem_type(self):
         return self._learner.problem_type
 
+    def features(self, feature_stage: str = 'original'):
+        """
+        Returns a list of feature names dependent on the value of feature_stage.
+
+        Parameters
+        ----------
+        feature_stage : str, default = 'original'
+            If 'original', returns the list of features specified in the original training data. This feature set is required in input data when making predictions.
+            If 'transformed', returns the list of features after pre-processing by the feature generator.
+
+        Returns
+        -------
+        Returns a list of feature names
+        """
+        if feature_stage == 'original':
+            return self.feature_metadata_in.get_features()
+        elif feature_stage == 'transformed':
+            return self.feature_metadata.get_features()
+        else:
+            raise ValueError(f"Unknown feature_stage: '{feature_stage}'. Must be one of {['original', 'transformed']}")
+
     @property
     def feature_metadata(self):
         return self._trainer.feature_metadata

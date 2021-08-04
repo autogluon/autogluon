@@ -176,14 +176,16 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         preprocess_kwargs = {'compute_base_preds': compute_base_preds}
         return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
 
-    def _get_init_args(self):
+    def get_params(self):
         init_args = dict(
             base_model_names=self.base_model_names,
             base_models_dict=self.base_models_dict,
             base_model_paths_dict=self.base_model_paths_dict,
             base_model_types_dict=self.base_model_types_dict,
+            base_model_performances_dict=self._base_model_performances_dict,
+            base_model_types_inner_dict=self._base_model_types_inner_dict,
         )
-        init_args.update(super()._get_init_args())
+        init_args.update(super().get_params())
         return init_args
 
     def load_base_model(self, model_name):
