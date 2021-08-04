@@ -107,4 +107,3 @@ def get_preset_models(path, prediction_length, freq, eval_metric, hyperparameter
         models.append(model_type(path=path, freq=freq, prediction_length=prediction_length, eval_metric=eval_metric,
                                  hyperparameters=model_hps, **kwargs))
     return models
-

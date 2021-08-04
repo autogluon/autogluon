@@ -1,4 +1,11 @@
 forecasting_presets_configs = dict(
+    best_quality={"hyperparameters": "default_hpo",
+                  "hyperparameter_tune_kwargs": {'scheduler': 'local',
+                                                'searcher': 'random',
+                                                'num_trials': 20
+                                                },
+                  "refit_full": True
+                  },
     high_quality={"hyperparameters": "default_hpo",
                   "hyperparameter_tune_kwargs": {'scheduler': 'local',
                                                 'searcher': 'random',
