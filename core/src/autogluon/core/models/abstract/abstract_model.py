@@ -797,9 +797,8 @@ class AbstractModel:
 
     def convert_to_refit_full_template(self):
         """After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model."""
-        params = self.get_params()
-        for param_trained, val in self.params_trained.items():
-            params['hyperparameters'][param_trained] = val
+        params = copy.deepcopy(self.get_params())
+        params['hyperparameters'].update(self.params_trained)
         params['name'] = params['name'] + REFIT_FULL_SUFFIX
         template = self.__class__(**params)
 

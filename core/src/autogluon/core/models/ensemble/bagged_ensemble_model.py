@@ -48,9 +48,7 @@ class BaggedEnsembleModel(AbstractModel):
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
 
-        eval_metric = kwargs.pop('eval_metric', self.model_base.eval_metric)
-
-        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, **kwargs)
+        super().__init__(problem_type=self.model_base.problem_type, eval_metric=self.model_base.eval_metric, **kwargs)
 
     def _set_default_params(self):
         default_params = {
@@ -500,17 +498,18 @@ class BaggedEnsembleModel(AbstractModel):
     def convert_to_refit_full_template(self):
         init_args = self.get_params()
         init_args['hyperparameters']['save_bag_folds'] = True  # refit full models must save folds
-        init_args['model_base'] = self.convert_to_refitfull_template_child()
+        init_args['model_base'] = self.convert_to_refit_full_template_child()
         init_args['name'] = init_args['name'] + REFIT_FULL_SUFFIX
         model_full_template = self.__class__(**init_args)
         return model_full_template
 
-    def convert_to_refitfull_template_child(self):
-        compressed_params = self._get_compressed_params()
-        child_compressed = copy.deepcopy(self._get_model_base())
-        child_compressed.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
-        child_compressed.params = compressed_params
-        return child_compressed
+    def convert_to_refit_full_template_child(self):
+        refit_params_trained = self._get_compressed_params_trained()
+        refit_params = copy.deepcopy(self._get_model_base().get_params())
+        refit_params['hyperparameters'].update(refit_params_trained)
+        refit_child_template = self._child_type(**refit_params)
+
+        return refit_child_template
 
     def get_params(self):
         init_args = dict(
@@ -518,6 +517,7 @@ class BaggedEnsembleModel(AbstractModel):
             random_state=self._random_state,
         )
         init_args.update(super().get_params())
+        init_args.pop('eval_metric')
         init_args.pop('problem_type')
         return init_args
 
