@@ -7,7 +7,7 @@ from gluonts.evaluation import Evaluator
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 from ..models.gluonts_model.abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
-
+from ..utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -346,7 +346,8 @@ class AbstractTrainer:
             evaluator = Evaluator(quantiles=self.quantiles)
         forecasts, tss = self.predict(data, model=model, for_score=True)
         num_series = len(tss)
-        agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
+        with evaluator_warning_filter():
+            agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         return agg_metrics[self.eval_metric]
 
     def _predict_model(self, data, model, for_score=True, **kwargs):
