@@ -1,6 +1,6 @@
 import argparse
 from autogluon.tabular import TabularDataset, TabularPredictor
-from autogluon.tabular.models import CatBoostModel, KNNModel, LGBModel, XGBoostModel
+from autogluon.tabular.models import CatBoostModel, KNNModel, LGBModel, XGBoostModel, TabularNeuralNetModel
 import pandas as pd
 
 parser = argparse.ArgumentParser()
@@ -15,7 +15,7 @@ parser.add_argument('-x', '--fi', help='feature importance strategy', default='u
 parser.add_argument('-y', '--fp', help='feature pruning strategy or not', default='percentage', choices=['percentage', 'single'])
 args = parser.parse_args()
 
-train_data = pd.read_csv(args.train_path)  # .head(2500)
+train_data = pd.read_csv(args.train_path).head(2500)
 test_data = pd.read_csv(args.test_path)
 X_test = test_data.drop(columns=[args.label])
 y_test = test_data[args.label]
@@ -33,7 +33,7 @@ feature_prune_kwargs = {
     }
 }
 
-time_limit = 1800
+time_limit = 3600
 if args.mode == 'model':
     presets = ['medium_quality_faster_train']
     custom_hyperparameters = {KNNModel: {}}
@@ -42,8 +42,8 @@ elif args.mode == 'model-stack':
     presets = ['best_quality']
     # custom_hyperparameters = {KNNModel: {'ag_args': fit_with_prune_kwargs}}
     # custom_hyperparameters = {KNNModel: {}, CatBoostModel: {}, LGBModel: {}, XGBoostModel: {}}
-    custom_hyperparameters = {LGBModel: {}}
-    extra_args = {'num_bag_sets': 2, 'num_stack_levels': 1}
+    custom_hyperparameters = {TabularNeuralNetModel: {}}
+    extra_args = {'num_bag_sets': 1, 'num_stack_levels': 1}
 elif args.mode == 'ag':
     presets = ['medium_quality_faster_train']
     custom_hyperparameters = None

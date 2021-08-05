@@ -1316,8 +1316,9 @@ class AbstractTrainer:
             fit_args['X_val'], fit_args['y_val'] = kwargs['X_val'], kwargs['y_val']
 
             from autogluon.core.utils.feature_selection import ProxyFeatureSelector
-            # proxy model is the model that performed best in this stack layer
+            # proxy model is the model that performed best in this stack layer (excluding weighted ensemble)
             leaderboard = self.leaderboard()
+            leaderboard = leaderboard[~leaderboard['model'].str.contains('WeightedEnsemble')]
             fit_models = leaderboard[(leaderboard['can_infer']) & (leaderboard['stack_level'] == kwargs['level'])]
             best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
             proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
