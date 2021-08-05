@@ -20,7 +20,7 @@ requirements = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
-    'pandas<1.3',
+    'pandas',
     'psutil>=5.7.3,<5.9',
     'gluonts>=0.8.0',
     f'autogluon.core=={version}',
