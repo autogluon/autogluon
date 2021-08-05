@@ -15,7 +15,7 @@ parser.add_argument('-x', '--fi', help='feature importance strategy', default='u
 parser.add_argument('-y', '--fp', help='feature pruning strategy or not', default='percentage', choices=['percentage', 'single'])
 args = parser.parse_args()
 
-train_data = pd.read_csv(args.train_path).head(10000)
+train_data = pd.read_csv(args.train_path).head(2500)
 test_data = pd.read_csv(args.test_path)
 X_test = test_data.drop(columns=[args.label])
 y_test = test_data[args.label]
@@ -40,8 +40,8 @@ if args.mode == 'model':
 elif args.mode == 'model-stack':
     presets = ['best_quality']
     # custom_hyperparameters = {KNNModel: {'ag_args': fit_with_prune_kwargs}}
-    custom_hyperparameters = {KNNModel: {}, CatBoostModel: {}}
-    # custom_hyperparameters = {CatBoostModel: {}}
+    # custom_hyperparameters = {KNNModel: {}, CatBoostModel: {}}
+    custom_hyperparameters = {CatBoostModel: {}}
 elif args.mode == 'ag':
     presets = ['medium_quality_faster_train']
     custom_hyperparameters = None
@@ -51,7 +51,7 @@ else:
 
 predictor = TabularPredictor(label=args.label)
 if args.prune:
-    predictor = predictor.fit(train_data, presets=presets, ag_args=fit_with_prune_kwargs, time_limit=300, num_bag_sets=2, num_stack_levels=1,
+    predictor = predictor.fit(train_data, presets=presets, ag_args=fit_with_prune_kwargs, time_limit=1200, num_bag_sets=2, num_stack_levels=1,
                               ag_args_ensemble={'use_child_oof': False}, hyperparameters=custom_hyperparameters)
 else:
     predictor = predictor.fit(train_data, presets=presets, # num_bag_sets=2, num_stack_levels=1, 

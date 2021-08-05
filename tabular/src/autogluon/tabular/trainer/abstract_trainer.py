@@ -934,15 +934,10 @@ class AbstractTrainer:
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        if model_fit_kwargs.get('fit_with_prune_kwargs', None) is not None:
-            # This method trains a multiple copy of models and returns the best performing one
-            fit_with_prune_kwargs = model_fit_kwargs.pop('fit_with_prune_kwargs')
-            model, _ = model.fit_with_prune(X=X, y=y, X_val=X_val, y_val=y_val, **fit_with_prune_kwargs, **model_fit_kwargs)
-        else:
-            model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
+        model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
 
-    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, fit_with_prune_kwargs=None, **model_fit_kwargs) -> List[str]:
+    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, feature_prune=False, **model_fit_kwargs) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -954,9 +949,6 @@ class AbstractTrainer:
         """
         fit_start_time = time.time()
         time_limit = model_fit_kwargs.get('time_limit', None)
-        feature_prune = fit_with_prune_kwargs is not None
-        model_fit_kwargs['fit_with_prune_kwargs'] = fit_with_prune_kwargs
-        original_model = model
         model_names_trained = []
         try:
             if feature_prune:
@@ -1032,11 +1024,9 @@ class AbstractTrainer:
                 logger.exception('Detailed Traceback:')
             del model
         else:
-            if feature_prune and fit_with_prune_kwargs.get('prune_after_fit', True):
+            if feature_prune:
                 # TODO JASON
-                if model == original_model:
-                    model_names_trained.append(model.name)
-                    return model_names_trained
+                original_model = self.load_model('_'.join(model.name.split('_')[:-1]))
                 leaderboard = self.leaderboard()
                 original_score = leaderboard[leaderboard['model'] == original_model.name]['score_val'].item()
                 if score > original_score:
@@ -1141,6 +1131,7 @@ class AbstractTrainer:
         model_fit_kwargs = dict(
             time_limit=time_limit,
             verbosity=self.verbosity,
+            feature_prune=fit_with_prune_kwargs is not None
         )
         model_fit_kwargs.update(fit_kwargs)
         if self.sample_weight is not None:
@@ -1212,7 +1203,7 @@ class AbstractTrainer:
                     n_repeat_start=n_repeat_start,
                     compute_base_preds=False,
                 ))
-            model_names_trained = self._train_and_save(X, y, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, fit_with_prune_kwargs=fit_with_prune_kwargs, **model_fit_kwargs)
+            model_names_trained = self._train_and_save(X, y, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
         self.save()
         return model_names_trained
 
@@ -1292,26 +1283,10 @@ class AbstractTrainer:
                     hpo_enabled = True
                     break
 
-        pre_fit_with_prune_kwargs = None
-        post_fit_with_prune_kwargs = None
-        if fit_with_prune_kwargs is not None:
-            # TODO JASON: Have proxy model here for identifying golden features; add result to fit_with_prune_kwargs['proxy_model_scores']
-            from autogluon.core.utils.feature_selector import MutualInformationScorer
-            proxy_model_scores = []  # MutualInformationScorer().score_features(X, y, self.problem_type, self.feature_metadata)
-            for model in fit_with_prune_kwargs.keys():
-                fit_with_prune_kwargs[model]['proxy_model_scores'] = proxy_model_scores
-            # Determine if feature pruning happens before or after fit
-            prune_after_fit = True
-            for info in fit_with_prune_kwargs.values():
-                if not info.get('prune_after_fit', True):
-                    prune_after_fit = False
-                    break
-            if prune_after_fit:
-                post_fit_with_prune_kwargs = fit_with_prune_kwargs
-            else:
-                pre_fit_with_prune_kwargs = fit_with_prune_kwargs
-
-        time_start_pre_prune = time.time()
+        from copy import deepcopy
+        unfit_models = deepcopy(models)
+        multi_fold_time_start = time.time()
+        
         hpo_time_ratio = 0.9
         if hpo_enabled:
             time_split = True
@@ -1320,7 +1295,7 @@ class AbstractTrainer:
         k_fold_start = 0
         if k_fold == 0:
             time_ratio = hpo_time_ratio if hpo_enabled else 1
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, fit_with_prune_kwargs=pre_fit_with_prune_kwargs,
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, fit_with_prune_kwargs=None,
                                             feature_prune=feature_prune, time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
         else:
             if hpo_enabled or feature_prune:
@@ -1332,16 +1307,47 @@ class AbstractTrainer:
                 if time_limit is not None:
                     time_limit = time_limit - (time.time() - time_start)
 
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=pre_fit_with_prune_kwargs, feature_prune=False, k_fold_start=k_fold_start,
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=None, feature_prune=False, k_fold_start=k_fold_start,
                                             k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
 
-        if post_fit_with_prune_kwargs is not None:
-            # Only explicitly pass fit_with_prune_kwargs here, when all models have been fit
+        multi_fold_time_elapsed = time.time() - multi_fold_time_start
+        if fit_with_prune_kwargs is not None and len(models) > 0:
             logger.log(30, "Feature pruning models while time permits...")
+            fit_args['X_val'], fit_args['y_val'] = kwargs['X_val'], kwargs['y_val']
+
+            from autogluon.core.utils.feature_selection import ProxyFeatureSelector
+            # proxy model is the model that performed best in this stack layer
+            leaderboard = self.leaderboard()
+            fit_models = leaderboard[(leaderboard['can_infer']) & (leaderboard['stack_level'] == kwargs['level'])]
+            best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
+            proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
+
+            if time_limit is not None and time_limit < 2 * multi_fold_time_elapsed + 2 * proxy_model.fit_time:
+                logger.log(30, "Insufficient time to perform even a single pruning round. Ending...")
+                return models
+
+            if fit_with_prune_kwargs.get('feature_selection_time_limit', None) is not None:
+                feature_selection_time_limit = fit_with_prune_kwargs.get('feature_selection_time_limit')
+            elif time_limit is not None:
+                feature_selection_time_limit = time_limit - 2 * multi_fold_time_elapsed
+            else:
+                feature_selection_time_limit = 10 * proxy_model.fit_time
+
+            selector = ProxyFeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)
+            feature_selection_time_start = time.time()
+            candidate_features, _ = selector.select_features(**fit_with_prune_kwargs, **proxy_model.model_fit_kwargs)
+            fit_args['X'] = X[candidate_features]
+            if fit_args.get('X_val', None) is not None:
+                fit_args['X_val'] = fit_args['X_val'][candidate_features]
             if time_limit is not None:
-                time_limit = time_limit - (time.time() - time_start_pre_prune)
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=post_fit_with_prune_kwargs, feature_prune=False, k_fold_start=k_fold_start,
-                                            k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
+                time_limit = time_limit - (time.time() - feature_selection_time_start)
+            if len(candidate_features) < len(X.columns):
+                for model in unfit_models:
+                    model.rename(f"{model.name}_Prune")
+                for key, value in fit_with_prune_kwargs.items():
+                    fit_with_prune_kwargs[f"{key}_Prune"] = value
+                models = self._train_multi_fold(models=unfit_models, hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=fit_with_prune_kwargs, feature_prune=False, k_fold_start=k_fold_start,
+                                                k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
         return models
 
     # TODO: Ban KNN from being a Stacker model outside of aux. Will need to ensemble select on all stack layers ensemble selector to make it work

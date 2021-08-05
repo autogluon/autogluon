@@ -516,6 +516,7 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
+        self.model_fit_kwargs = kwargs
         kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
@@ -895,6 +896,7 @@ class AbstractModel:
                                    features=None,
                                    silent=False,
                                    importance_as_list=False,
+                                   is_oof=False,
                                    **kwargs) -> pd.DataFrame:
         if self.features is not None:
             X = X[self.features]
@@ -909,8 +911,8 @@ class AbstractModel:
         # # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
         # banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         # features_to_check = [feature for feature in features if feature not in banned_features]
-        banned_features = []
-        features_to_check = features
+        banned_features = [feature for feature in X.columns if feature not in self.get_features()]
+        features_to_check = [feature for feature in features if feature not in banned_features]
 
         if features_to_check:
             fi_df = self._compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
