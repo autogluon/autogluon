@@ -51,7 +51,7 @@ class TimeSeriesDataset(ListDataset):
         data = [
             {
                 FieldName.TARGET: target,
-                FieldName.START: pd.Timestamp(date_list[0], freq=self.freq),
+                FieldName.START: pd.Timestamp(date_list[0]),
                 FieldName.ITEM_ID: item_id,
                 FieldName.FEAT_STATIC_CAT: self.static_cat_features.loc[self.static_cat_features[index_column].isin([item_id])].drop(index_column, axis=1).values[0] if self.static_cat_features is not None else [],
                 FieldName.FEAT_STATIC_REAL: self.static_real_features.loc[self.static_real_features[index_column].isin([item_id])].drop(index_column, axis=1).values[0] if self.static_real_features is not None else [],
@@ -178,7 +178,7 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
 def train_test_split_dataframe(data, prediction_length):
     test_ds = data.copy()
     train_ds = data.iloc[:, :-prediction_length]
-    if all(data.iloc[:, prediction_length:]):
+    if not any(data.iloc[:, -prediction_length:]):
         logger.log(30, "Warning: All targets used for validation is NAN.")
     return train_ds, test_ds
 
