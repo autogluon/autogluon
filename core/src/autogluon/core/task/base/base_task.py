@@ -53,8 +53,7 @@ class BaseTask(object):
                 plot_results=False):
         start_time = time.time()
         # create scheduler and schedule tasks
-        scheduler = create_scheduler(
-            train_fn, search_strategy, scheduler_options)
+        scheduler = create_scheduler(train_fn, search_strategy, scheduler_options)
         scheduler.run()
         scheduler.join_jobs()
         # gather the best configuration
@@ -64,7 +63,8 @@ class BaseTask(object):
         args.final_fit = True
         if hasattr(args, 'epochs') and hasattr(args, 'final_fit_epochs'):
             args.epochs = args.final_fit_epochs
-        results = scheduler.run_with_config(best_config)
+        scheduler_final = create_scheduler(train_fn, search_strategy, scheduler_options)
+        results = scheduler_final.run_with_config(best_config)
         total_time = time.time() - start_time
         if plot_results or in_ipynb():
             plot_training_curves = scheduler_options['checkpoint'].replace('exp1.ag', 'plot_training_curves.png')

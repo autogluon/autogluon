@@ -83,6 +83,12 @@ Tabular Prediction
       How to predict multiple columns in a data table.
 
    .. card::
+      :title: Adding a Custom Model
+      :link: tabular-custom-model.html
+
+      How to add a custom model to AutoGluon.
+
+   .. card::
       :title: FAQ
       :link: tabular_prediction/tabular-faq.html
 

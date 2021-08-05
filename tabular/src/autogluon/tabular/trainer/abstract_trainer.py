@@ -90,6 +90,8 @@ class AbstractTrainer:
         self._X_val_saved = False
         self._y_val_saved = False
 
+        self._groups = None  # custom split indices
+
         self._regress_preds_asprobas = False  # whether to treat regression predictions as class-probabilities (during distillation)
 
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
@@ -412,7 +414,7 @@ class AbstractTrainer:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
-        return self.generate_weighted_ensemble(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
+        return self.generate_weighted_ensemble(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
 
     def predict(self, X, model=None):
         if model is None:
@@ -664,7 +666,7 @@ class AbstractTrainer:
                     }
 
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
-                    models_trained = self.generate_weighted_ensemble(X=X_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, k_fold=0, n_repeats=1,
+                    models_trained = self.generate_weighted_ensemble(X=X_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, k_fold=1, n_repeats=1,
                                                                      base_model_names=base_model_names, name_suffix=REFIT_FULL_SUFFIX, save_bag_folds=True,
                                                                      check_if_best=False, child_hyperparameters=child_hyperparameters)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
@@ -857,7 +859,7 @@ class AbstractTrainer:
             logger.log(30, f'No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.')
         return unpersisted_models
 
-    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=0, n_repeats=1, stack_name=None, hyperparameters=None,
+    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=1, n_repeats=1, stack_name=None, hyperparameters=None,
                                    time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None,
                                    get_models_func=None) -> List[str]:
         if get_models_func is None:
@@ -915,7 +917,7 @@ class AbstractTrainer:
             level=level,
             time_limit=time_limit,
             ens_sample_weight=w,
-            fit_kwargs=dict(num_classes=self.num_classes),  # FIXME: Is this the right way to do this?
+            fit_kwargs=dict(num_classes=self.num_classes, groups=None),  # FIXME: Is this the right way to do this?
         )
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
@@ -1146,6 +1148,9 @@ class AbstractTrainer:
             ens_sample_weight = kwargs.get('ens_sample_weight', None)
             if ens_sample_weight is not None:
                 model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
+        if self._groups is not None and 'groups' not in model_fit_kwargs:
+            if k_fold == self.k_fold:  # don't do this on refit full
+                model_fit_kwargs['groups'] = self._groups
 
         #######################
         # FIXME: This section is a hack, compute genuine feature_metadata for each stack level instead
@@ -1437,7 +1442,7 @@ class AbstractTrainer:
                                                             k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, time_limit_total_level=time_limit_total_level, **kwargs)
         return model_names_trained
 
-    def _train_multi_and_ensemble(self, X, y, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, num_stack_levels=0, time_limit=None, **kwargs) -> List[str]:
+    def _train_multi_and_ensemble(self, X, y, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, num_stack_levels=0, time_limit=None, groups=None, **kwargs) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if self.save_data and not self.is_data_saved:
             self.save_X(X)
@@ -1447,7 +1452,8 @@ class AbstractTrainer:
                 if y_val is not None:
                     self.save_y_val(y_val)
             self.is_data_saved = True
-
+        if self._groups is None:
+            self._groups = groups
         self._num_rows_train = len(X)
         if X_val is not None:
             self._num_rows_train += len(X_val)
@@ -1491,12 +1497,18 @@ class AbstractTrainer:
         dummy_stacker = StackerEnsembleModel(
             path='',
             name='',
-            model_base=AbstractModel(path='', name='', problem_type=self.problem_type, eval_metric=self.eval_metric),
+            model_base=AbstractModel(
+                path='',
+                name='',
+                problem_type=self.problem_type,
+                eval_metric=self.eval_metric,
+                hyperparameters={'ag_args_fit': {'quantile_levels': self.quantile_levels}}
+            ),
             base_model_names=model_names,
             base_models_dict=base_models_dict,
             base_model_paths_dict=self.get_models_attribute_dict(attribute='path', models=model_names),
             base_model_types_dict=self.get_models_attribute_dict(attribute='type', models=model_names),
-            hyperparameters=hyperparameters, quantile_levels=self.quantile_levels,
+            hyperparameters=hyperparameters,
             random_state=level+self.random_state
         )
         dummy_stacker.initialize(num_classes=self.num_classes)

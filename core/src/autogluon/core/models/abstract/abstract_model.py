@@ -33,9 +33,6 @@ from ...utils.savers import save_json, save_pkl
 
 logger = logging.getLogger(__name__)
 
-# TODO: Consider removing stopping_metric from init, only use ag_args_fit to specify stopping_metric.
-# TODO: Consider removing quantile_levels from init, only use ag_args_fit to specify quantile_levels.
-
 
 class AbstractModel:
     """
@@ -84,9 +81,7 @@ class AbstractModel:
                  name: str = None,
                  problem_type: str = None,
                  eval_metric: Union[str, metrics.Scorer] = None,
-                 hyperparameters=None,
-                 quantile_levels=None,
-                 stopping_metric=None):
+                 hyperparameters=None):
 
         if name is None:
             self.name = self.__class__.__name__
@@ -107,7 +102,6 @@ class AbstractModel:
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
 
         self.num_classes = None
-        self.quantile_levels = quantile_levels
         self.model = None
         self.problem_type = problem_type
 
@@ -142,17 +136,13 @@ class AbstractModel:
         if self._user_params is None:
             self._user_params = dict()
 
-        if stopping_metric is not None:
-            if 'stopping_metric' in self._user_params_aux:
-                raise AssertionError('stopping_metric was specified in both hyperparameters ag_args_fit and model init. Please specify only once.')
-        self.stopping_metric = stopping_metric
-
         self.params_trained = dict()
         self._is_initialized = False
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
 
     def _init_params(self):
+        """Initializes model hyperparameters"""
         hyperparameters = self._user_params
         self._set_default_params()
         self.nondefault_params = []
@@ -162,13 +152,15 @@ class AbstractModel:
         self.params_trained = dict()
 
     def _init_params_aux(self):
-        hyperparameters = self._user_params_aux
+        """
+        Initializes auxiliary hyperparameters.
+        These parameters are generally not model specific and can have a wide variety of effects.
+        For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
+        """
+        hyperparameters_aux = self._user_params_aux
         self._set_default_auxiliary_params()
-        if hyperparameters is not None:
-            hyperparameters = hyperparameters.copy()
-            if AG_ARGS_FIT in hyperparameters:
-                ag_args_fit = hyperparameters.pop(AG_ARGS_FIT)
-                self.params_aux.update(ag_args_fit)
+        if hyperparameters_aux is not None:
+            self.params_aux.update(hyperparameters_aux)
 
     @property
     def path_suffix(self):
@@ -413,27 +405,39 @@ class AbstractModel:
             if self.num_classes is None:
                 label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y)
                 self.num_classes = label_cleaner.num_classes
+
+        self._init_params_aux()
+
+        self._init_misc(
+            X=X,
+            y=y,
+            feature_metadata=feature_metadata,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+        if X is not None:
+            self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
+
+        self._init_params()
+
+    def _init_misc(self, **kwargs):
+        """Initialize parameters that depend on self.params_aux being initialized"""
         if self.eval_metric is None:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
             logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
         self.eval_metric = metrics.get_metric(self.eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
 
-        if self.stopping_metric is None:
-            self.stopping_metric = self.params_aux.get('stopping_metric', self._get_default_stopping_metric())
+        self.stopping_metric = self.params_aux.get('stopping_metric', self._get_default_stopping_metric())
         self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, 'stopping_metric')
+
+        self.quantile_levels = self.params_aux.get('quantile_levels', None)
 
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
             self.normalize_pred_probas = True
             logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
         else:
             self.normalize_pred_probas = False
-
-        self._init_params_aux()
-
-        if X is not None:
-            self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
-
-        self._init_params()
 
     def _preprocess_fit_resources(self, silent=False, **kwargs):
         default_num_cpus, default_num_gpus = self._get_default_resources()
@@ -977,37 +981,45 @@ class AbstractModel:
         trained_params.update(self.params_trained)
         return trained_params
 
+    def get_params(self) -> dict:
+        """Get params of the model at the time of initialization"""
+        name = self.name
+        path = self.path_root
+        problem_type = self.problem_type
+        eval_metric = self.eval_metric
+        hyperparameters = self._user_params.copy()
+        if self._user_params_aux:
+            hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
+
+        args = dict(
+            path=path,
+            name=name,
+            problem_type=problem_type,
+            eval_metric=eval_metric,
+            hyperparameters=hyperparameters,
+        )
+
+        return args
+
     def convert_to_template(self):
-        """After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied."""
-        model = self.model
-        self.model = None
-        template = copy.deepcopy(self)
-        template.reset_metrics()
-        self.model = model
+        """
+        After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
+        The model name and path will be identical to the original, and must be renamed prior to training to avoid overwriting the original model files if they exist.
+        """
+
+        params = self.get_params()
+        template = self.__class__(**params)
+
         return template
 
     def convert_to_refit_full_template(self):
         """After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model."""
-        params_trained = self.params_trained.copy()
-        template = self.convert_to_template()
-        template.params.update(params_trained)
-        template.name = template.name + REFIT_FULL_SUFFIX
-        template.set_contexts(self.path_root + template.name + os.path.sep)
-        return template
+        params = copy.deepcopy(self.get_params())
+        params['hyperparameters'].update(self.params_trained)
+        params['name'] = params['name'] + REFIT_FULL_SUFFIX
+        template = self.__class__(**params)
 
-    def _get_init_args(self):
-        hyperparameters = self.params.copy()
-        hyperparameters = {key: val for key, val in hyperparameters.items() if key in self.nondefault_params}
-        init_args = dict(
-            path=self.path_root,
-            name=self.name,
-            problem_type=self.problem_type,
-            eval_metric=self.eval_metric,
-            hyperparameters=hyperparameters,
-            quantile_levels=self.quantile_levels,
-            stopping_metric=self.stopping_metric
-        )
-        return init_args
+        return template
 
     def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
         scheduler_options = copy.deepcopy(scheduler_options)
