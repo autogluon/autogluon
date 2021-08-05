@@ -915,7 +915,8 @@ class AbstractModel:
         # # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
         # banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         # features_to_check = [feature for feature in features if feature not in banned_features]
-        banned_features = [feature for feature in X.columns if feature not in self.get_features()]
+        # NOTE: Needed as bagged models 'features' attribute is not the same as childrens' 'features' attributes
+        banned_features = [feature for feature in features if feature not in self.get_features()]
         features_to_check = [feature for feature in features if feature not in banned_features]
 
         if features_to_check:

@@ -11,18 +11,11 @@ import time
 logger = logging.getLogger(__name__)
 
 
-
 class ProxyFeatureSelector:
     def __init__(self, model: AbstractModel, time_limit: float) -> None:
         self.fit_model = model
         self.base_model = model.convert_to_template()
-        # self.base_model.rename(f'Proxy_{self.base_model.name}')
-
-        self.base_model._is_initialized = False
-        if isinstance(model, BaggedEnsembleModel):
-            self.model_base = None
-            self.base_model._n_repeats_finished = 0
-
+        self.base_model.rename(f'Proxy_{self.base_model.name}')
         self.original_time_limit = time_limit
         self.time_limit = time_limit
         if not model.is_valid():
@@ -34,7 +27,7 @@ class ProxyFeatureSelector:
         self.importance_dfs = []
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
-                        fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = 0., stop_threshold: int = 5,
+                        fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = 0., stop_threshold: int = 1,
                         min_fi_samples: int = 10000, max_fits: int = 5, **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
         # subsample training data
         X = X.sample(train_subsample_size, random_state=0) if train_subsample_size < len(X) else X
@@ -47,7 +40,8 @@ class ProxyFeatureSelector:
         index = 1
         best_info = {'features': candidate_features, 'index': index, 'score': None}
         logger.log(30, f"\tPerforming proxy model feature selection with model: {curr_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
-                       f"expected model fit time: {round(self.model_fit_time, 2)}s, and expected feature importance computing time: {round(time_budget, 2)}s.")
+                       f"expected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget, 2)}s. " +
+                       f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {prune_threshold}.")
         try:
             if self.time_limit <= self.model_fit_time * 2 + time_budget:
                 logger.log(30, f"\tInsufficient time to perform even a single pruning round. Ending...")
@@ -64,7 +58,7 @@ class ProxyFeatureSelector:
                 old_candidate_features = candidate_features
                 time_start = time.time()
                 fn_args = {'X': X_fi, 'y': y_fi, 'model': best_info['model'], 'time_budget': time_budget, 'features': best_info['features'],
-                           'n_sample': min_fi_samples, 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
+                           'n_sample': max(min_fi_samples, len(X_fi)), 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
                            'prune_threshold': prune_threshold, 'prune_ratio': prune_ratio}
                 candidate_features, importance_df = self.compute_next_candidate(**fn_args)
                 self.importance_dfs.append(importance_df)
@@ -125,6 +119,7 @@ class ProxyFeatureSelector:
             return features, importance_df
         evaluated_features = features[:n_evaluated_features]
         unevaluated_features = features[n_evaluated_features:]
+        logger.log(30, f"\tComputing feature importance for {n_evaluated_features}/{n_features} features with {n_shuffle} shuffles.")
         evaluated_df = model.compute_feature_importance(X=X, y=y, num_shuffle_sets=n_shuffle, subsample_size=n_subsample,
                                                         features=evaluated_features, is_oof=self.is_bagged, silent=True,
                                                         time_limit=time_budget)
