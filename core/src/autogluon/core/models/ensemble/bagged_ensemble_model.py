@@ -385,7 +385,6 @@ class BaggedEnsembleModel(AbstractModel):
                 fold_fitting_strategy.schedule_fold_model_fit(model_base, fold_ctx, kwargs)
             if (fold_end_n_repeat != fold_end) or (k_fold == k_fold_end):
                 self._k_per_n_repeat.append(k_fold)
-
         fold_fitting_strategy.after_all_folds_scheduled()
         self.models += models
 

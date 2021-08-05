@@ -8,11 +8,9 @@ import sys
 import time
 import warnings
 from typing import Union
-from botocore.vendored.six import b
 
 import numpy as np
 import pandas as pd
-import random
 
 from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
@@ -23,10 +21,7 @@ from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
-from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
-                     compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir, FeatureSelector, \
-                     UniformFeatureImportanceHelper, PercentageFeaturePruneHelper, BackwardSearchFeatureImportanceHelper, \
-                     SingleFeaturePruneHelper
+from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
@@ -520,7 +515,7 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
-        self.model_fit_kwargs = kwargs
+        self.model_fit_kwargs = kwargs  # HACK: This lets me reuse the same model fit argument directly for proxy model refit
         kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
@@ -533,199 +528,6 @@ class AbstractModel:
         else:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
-
-    def fit_with_prune(self, X, y, X_val, y_val, max_num_fit=3, prune_ratio=0.05, prune_threshold=None, num_resource=None,
-                       stop_threshold=3, subsample_size=5000, fi_strategy="uniform", fp_strategy="percentage",
-                       num_min_fi_samples=10000, proxy_model_scores=[], prune_after_fit=True, **kwargs):
-        """
-        Functionally identical to `fit` method, but repeats feature importance based pruning until validation set
-        performance degrades for `stop_threshold` iterations or `max_num_fit` iterations have passed.
-
-        Parameters
-        ----------
-        max_num_fit : int, default = 5
-            Maximum number of time feature selection and fitting are performed.
-        prune_ratio : float, default = 0.05
-            Percentage of features to consider pruning every pruning iteration.
-        prune_threshold : float, default = None
-            Feature importance threshold that prevents features from being pruned if it is above this number.
-            If None, rely solely on prune_ratio.
-        num_resource: int, default=None
-            Number of shuffles to evaluate across all features per feature pruning iteration. If None, set to
-            such that each feature's importance will be evaluated on 10000 samples.
-        stop_threshold : int, default = 5
-            Early stopping will stop refitting model if score does not improve for this amount of iterations.
-        subsample_size : int, default = 5000
-            Number of validation set samples to use when computing permutation feature importance.
-        fi_strategy : str, default = "uniform", choices = ["uniform", "backwardsearch"]
-            Feature importance computation strategy to use. "uniform" uniformly allocates resource across
-            computing marginal feature importance scores. "backwardsearch" uniformly allocates resource
-            across computing feature importance score for feature subsets where subsets are greedily selected.
-        fp_strategy : str, default = "percentage", choices = ["percentage", "single"]
-            Feature pruning strategy to use. "percentage" prunes all features whose feature importance score
-            is bottom X%. "single" prunes a specific feature subset that has the lowest feature importance score.
-        num_min_fi_samples : int, default = 10000
-            minimum number of datapoints that must be used for feature importance computation
-
-        FIXME
-        1. If self.weight_evaluation==True pass sample_weight param for scoring
-        2. Does not work with S3 paths (no problem locally)
-        3. Does not work with n_repeats>1 because of path issues (can't find oof.pkl)
-        4. Top level time limit is messed up presumably because I modify kwargs['time_limit'] in this method
-        """
-        if prune_after_fit and not self.is_valid():
-            raise Exception('fit_with_prune must only be called on trained models when called with prune_after_fit=True.')
-
-        num_max_prunable = 100  # maximum number of features that can be pruned
-        num_prunable = min(len(X.columns), num_max_prunable)
-        time_limit = kwargs.get('time_limit', None)
-        fitted_copies_info = []
-        is_bagged = X_val is None
-
-        if is_bagged:
-            importance_fn_args = {'X': X, 'y': y, 'is_oof': True, 'subsample_size': subsample_size, 'time_limit': time_limit, 'silent': True}
-            subsample_size = min(subsample_size, len(X))
-        else:
-            importance_fn_args = {'X': X_val, 'y': y_val, 'subsample_size': subsample_size, 'time_limit': time_limit, 'silent': True}
-            subsample_size = min(subsample_size, len(X_val))
-
-        if num_resource is None or num_resource < num_min_fi_samples * num_prunable / subsample_size:
-            num_resource = int(np.ceil(num_min_fi_samples * num_prunable / subsample_size))
-
-        logger.log(30, f"\tPerforming Iterative Feature Selection Parameters (" +
-                       f"max_num_fit: {max_num_fit}, prune_ratio: {prune_ratio}, prune_threshold: {prune_threshold}, " +
-                       f"num_resource: {num_resource}, stop_threshold: {stop_threshold}, subsample_size: {subsample_size}, " +
-                       f"fi_strategy: {fi_strategy}, fp_strategy: {fp_strategy})")
-
-        try:
-            best_info, index, performance_gained = None, 0, True
-            total_fit_time, total_selection_time = 0., 0.
-            if not prune_after_fit:
-                time_start = time.time()
-                self.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
-                time_elapsed = time.time() - time_start
-                self.check_and_update_time(kwargs, time_elapsed)
-                total_fit_time += time_elapsed
-            score = self.score_with_oof(y) if is_bagged else self.score(X=X_val, y=y_val)
-            if not prune_after_fit:
-                logger.log(30, f"\tFit {index+1} ({round(time_elapsed, 4)}s): Current score is {round(score, 4)}.")
-            fitted_copies_info.append((round(score, 4), self))
-            new_features = self.get_features()
-            original_feature_count = len(new_features)
-            best_info = {'model': self, 'features': new_features, 'score': score, 'index': index}
-
-            for index in range(1, max_num_fit):
-                old_features = new_features
-                best_model = best_info['model']
-                time_limit = kwargs.get('time_limit', None)
-                time_start = time.time()
-
-                if performance_gained:
-                    # if pruned model led to performance gain, initialize FeatureSelector and fit a new model
-                    best_features = best_info['features']
-                    # If there are too many features, do not consider these golden features. TODO: Compute this using filtering technique or proxy model.
-                    if len(best_features) > num_max_prunable:
-                        logger.log(30, f"\tThere are more than {num_max_prunable} features: Selecting random {num_max_prunable} features for pruning candidates.")
-                        golden_features = random.sample(best_features, len(best_features) - num_max_prunable)
-                    else:
-                        golden_features = []
-                    # Choose feature importance computation strategy
-                    if fi_strategy == "uniform":
-                        fi_helper = UniformFeatureImportanceHelper(importance_fn=best_model.compute_feature_importance,
-                                                                   importance_fn_args=importance_fn_args,
-                                                                   features=best_features,
-                                                                   golden_features=golden_features)
-                    elif fi_strategy == "backwardsearch":
-                        fi_helper = BackwardSearchFeatureImportanceHelper(importance_fn=best_model.compute_feature_importance,
-                                                                          importance_fn_args=importance_fn_args,
-                                                                          prune_ratio=prune_ratio,
-                                                                          features=best_features,
-                                                                          golden_features=golden_features)
-                    else:
-                        raise Exception(f"'{fi_strategy}' is not a valid featrue importance computation strategy.")
-                    # Choose feature pruning strategy
-                    if fp_strategy == "single":
-                        fp_helper = SingleFeaturePruneHelper(golden_features=golden_features)
-                    elif fp_strategy == "percentage":
-                        fp_helper = PercentageFeaturePruneHelper(golden_features=golden_features, prune_ratio=prune_ratio, threshold=prune_threshold)
-                    else:
-                        raise Exception(f"'{fp_strategy}' is not a valid feature pruning strategy.")
-                    selector = FeatureSelector(fi_helper, fp_helper)
-                    new_features, _ = selector.select_features(num_resource=num_resource, time_limit=time_limit)
-                else:
-                    # if pruned model led to performance drop, try pruning different features and refit
-                    new_features = selector.select_features_on_performance_loss()
-
-                logger.log(30, f"\t# of noised/non-noised features remaining: {len(list(filter(lambda f: 'noise' in f, new_features)))}" +
-                               f"/{len(list(filter(lambda f: 'noise' not in f, new_features)))}")
-                time_elapsed = time.time() - time_start
-                total_selection_time += time_elapsed
-                logger.log(30, f"\tFeature selection time: ({round(time_elapsed, 4)}s)")
-                self.check_and_update_time(kwargs, time_elapsed)
-                if set(new_features) == set(old_features) or set(new_features) == set(best_info['features']) or len(new_features) == 0:
-                    logger.log(30, f"\tThere are no more features to prune. Ending...")
-                    break
-
-                self_copy, score, time_elapsed = self._fit_save_score_model_copy(X, y, X_val, y_val, f'{self.name}_P{index}', new_features, **kwargs)
-                rounded_score, rounded_best_score, rounded_time = round(score, 4), round(best_info['score'], 4), round(time_elapsed, 4)
-                total_fit_time += time_elapsed
-                self.check_and_update_time(kwargs, time_elapsed)
-                fitted_copies_info.append((round(score, 4), self_copy))
-                if score > best_info['score']:
-                    # Update best_info and reobtain feature importance scores under this new model
-                    logger.log(30, f"\tFit {index+1} ({rounded_time}s): Current score {rounded_score} is better than best score {rounded_best_score}. Updating model.")
-                    logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(new_features)}.")
-                    best_info = {'model': self_copy, 'features': self_copy.get_features(), 'score': score, 'index': index}
-                    performance_gained = True
-                elif index - best_info['index'] >= stop_threshold:
-                    logger.log(30, f"\tFit {index+1} ({rounded_time}s): Score has not improved for {stop_threshold} iterations. Current score is {rounded_score}. Ending...")
-                    break
-                else:
-                    message = f"\tFit {index+1} ({rounded_time}s): Current score {rounded_score} is not better than best score {rounded_best_score}."
-                    message += " Ending..." if index+1 == max_num_fit else " Will retry fit with different set of features."
-                    logger.log(30, message)
-                    performance_gained = False
-        except TimeLimitExceeded:
-            logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
-        except Exception as e:
-            # import pdb; pdb.post_mortem()
-            logger.log(30, f"ERROR: Exception raised during fit_with_prune. Reason: {e}")
-            raise e
-        finally:
-            # If no models were trained, exception will be thrown
-            if len(fitted_copies_info) > 0 and best_info is not None:
-                best_model = fitted_copies_info[best_info['index']][1]
-                logger.log(30, f"\tSuccessfully ended prune loop after {index+1} iterations. Best score: {best_info['score']}.")
-                logger.log(30, f"\tFeature Count: {original_feature_count} -> {len(best_info['features'])}")
-                logger.log(30, f"\tModel Fit Time / Feature Importance Computation Time: {round(total_fit_time, 4)}/{round(total_selection_time, 4)}")
-                return best_model, fitted_copies_info
-            raise Exception("ERROR: No model trained.")
-
-    def check_and_update_time(self, kwargs, time_elapsed):
-        if kwargs.get('time_limit', None) is not None:
-            kwargs['time_limit'] = kwargs['time_limit'] - time_elapsed
-            if kwargs['time_limit'] <= 0:
-                raise TimeLimitExceeded
-
-    def _fit_save_score_model_copy(self, X, y, X_val, y_val, copy_name, features, **kwargs):
-        # Fit a deepcopied model on current_features
-        time_start = time.time()
-        is_bagged = X_val is None or y_val is None
-        init_args = self._get_init_args()
-        if is_bagged:
-            init_args['model_base'] = self.convert_to_refitfull_template_child()
-        self_copy = self.__class__(**init_args)
-        self_copy.rename(copy_name)
-        self_copy.features = features if features is not None else X.columns.tolist()
-        if features is not None and self_copy.feature_metadata is not None:
-            self_copy.feature_metadata.keep_features(features, inplace=True)
-        if features is not None and kwargs.get('feature_metadata', None) is not None:
-            kwargs['feature_metadata'] = kwargs['feature_metadata'].keep_features(features)
-        self_copy.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
-        self_copy.save()
-        score = self_copy.score_with_oof(y) if is_bagged else self_copy.score(X=X_val[self_copy.features], y=y_val)
-        time_elapsed = time.time() - time_start
-        return self_copy, score, time_elapsed
 
     def get_features(self):
         if self.feature_metadata:
@@ -910,11 +712,6 @@ class AbstractModel:
         else:
             features = list(features)
 
-        # feature_importance_quick_dict = self.get_model_feature_importance()
-        # # TODO: Also consider banning features with close to 0 importance
-        # # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
-        # banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
-        # features_to_check = [feature for feature in features if feature not in banned_features]
         # NOTE: Needed as bagged models 'features' attribute is not the same as childrens' 'features' attributes
         banned_features = [feature for feature in features if feature not in self.get_features()]
         features_to_check = [feature for feature in features if feature not in banned_features]

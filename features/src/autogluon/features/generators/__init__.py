@@ -18,4 +18,3 @@ from .text_special import TextSpecialFeatureGenerator
 
 from .pipeline import PipelineFeatureGenerator
 from .auto_ml_pipeline import AutoMLPipelineFeatureGenerator
-from .feature_selector import ProxyModelFeatureSelector

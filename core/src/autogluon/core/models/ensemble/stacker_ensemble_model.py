@@ -210,11 +210,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def _add_stack_to_feature_metadata(self):
         if len(self.models) == 0:
-            available_stack_columns = [feature for feature in self.stack_columns if self.feature_metadata is None or feature in self.feature_metadata.get_features()]
-            type_map_raw = {column: R_FLOAT for column in available_stack_columns}
-            type_group_map_special = {S_STACK: available_stack_columns}
-            # type_map_raw = {column: R_FLOAT for column in self.stack_columns}
-            # type_group_map_special = {S_STACK: self.stack_columns}
+            type_map_raw = {column: R_FLOAT for column in self.stack_columns}
+            type_group_map_special = {S_STACK: self.stack_columns}
             stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
             if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
                 self.feature_metadata = stacker_feature_metadata

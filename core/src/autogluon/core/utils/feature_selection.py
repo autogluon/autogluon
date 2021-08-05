@@ -34,7 +34,7 @@ class ProxyFeatureSelector:
         y = y.loc[X.index]
         X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
         curr_model = self.fit_model
-        time_budget = max(0.1 * self.model_fit_time, self.model_predict_time * min(50, len(X.columns)), 60)
+        time_budget = max(0.1 * self.model_fit_time, 10 * self.model_predict_time * min(50, len(X.columns)), 60)
         candidate_features = X.columns.tolist()
         importance_df = None
         index = 1

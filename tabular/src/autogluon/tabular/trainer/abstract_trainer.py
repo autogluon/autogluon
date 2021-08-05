@@ -1028,11 +1028,14 @@ class AbstractTrainer:
                 original_model = self.load_model('_'.join(model.name.split('_')[:-1]))
                 leaderboard = self.leaderboard()
                 original_score = leaderboard[leaderboard['model'] == original_model.name]['score_val'].item()
+                score_str = f"({round(score, 4)} vs {round(original_score, 4)})"
                 if score > original_score:
+                    logger.log(30, f"Pruned model's score is better than original model's score {score_str}. Replacing original model...")
                     self.delete_models(models_to_delete=original_model.name, dry_run=False)
                     self._add_model(model=model, stack_name=stack_name, level=level)
                     model_names_trained.append(model.name)
                 else:
+                    logger.log(30, f"Pruned model's score is worse than original model's score {score_str}. Keeping original model...")
                     model.delete_from_disk()
                     model_names_trained.append(original_model.name)
                 if self.low_memory:
