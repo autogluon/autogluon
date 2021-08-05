@@ -712,40 +712,40 @@ class ForecastingPredictor:
             Name of column in targets that contains the target time-series value to be predicted.
             By default, target_column="target_column" if left unspecified.
         """
-        targets = rebuild_tabular(targets,
-                                  index_column=index_column,
-                                  target_column=target_column,
-                                  time_column=time_column).set_index(index_column).transpose()
-
-        required_time = list(forecasts.values())[0].index
-        targets_time = pd.DatetimeIndex(targets.index, freq=pd.infer_freq(targets.index))
-        targets.index = targets_time
-
-        for time in required_time:
-            if time not in targets_time:
-                raise ValueError(f"Time {time} is presented in predictions but not given in targets. Please check your targets.")
-
-        formated_targets = []
-        quantile_forecasts = []
-        for ts_id, forecast in forecasts.items():
-            tmp_targets = targets.loc[required_time,ts_id]
-            formated_targets.append(tmp_targets)
-
-            tmp = []
-            for quantile in forecast.columns:
-                tmp.append(forecast[quantile])
-            quantile_forecasts.append(QuantileForecast(
-                forecast_arrays=np.array(tmp),
-                start_date=forecast.index[0],
-                freq=pd.infer_freq(forecast.index),
-                forecast_keys=forecast.columns,
-                item_id=ts_id,
-            ))
-        evaluator = Evaluator()
-        num_series = len(formated_targets)
         with evaluator_warning_filter():
+            targets = rebuild_tabular(targets,
+                                      index_column=index_column,
+                                      target_column=target_column,
+                                      time_column=time_column).set_index(index_column).transpose()
+
+            required_time = list(forecasts.values())[0].index
+            targets_time = pd.DatetimeIndex(targets.index, freq=pd.infer_freq(targets.index))
+            targets.index = targets_time
+
+            for time in required_time:
+                if time not in targets_time:
+                    raise ValueError(f"Time {time} is presented in predictions but not given in targets. Please check your targets.")
+
+            formated_targets = []
+            quantile_forecasts = []
+            for ts_id, forecast in forecasts.items():
+                tmp_targets = targets.loc[required_time,ts_id]
+                formated_targets.append(tmp_targets)
+
+                tmp = []
+                for quantile in forecast.columns:
+                    tmp.append(forecast[quantile])
+                quantile_forecasts.append(QuantileForecast(
+                    forecast_arrays=np.array(tmp),
+                    start_date=forecast.index[0],
+                    freq=pd.infer_freq(forecast.index),
+                    forecast_keys=forecast.columns,
+                    item_id=ts_id,
+                ))
+            evaluator = Evaluator()
+            num_series = len(formated_targets)
             agg_metrics, item_metrics = evaluator(iter(formated_targets), iter(quantile_forecasts), num_series=num_series)
-        if eval_metric is None:
-            return agg_metrics
-        else:
-            return agg_metrics[eval_metric]
+            if eval_metric is None:
+                return agg_metrics
+            else:
+                return agg_metrics[eval_metric]

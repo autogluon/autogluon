@@ -15,6 +15,7 @@ from gluonts.evaluation import Evaluator
 import autogluon.core.utils.savers.save_pkl as save_pkl
 import autogluon.core.utils.loaders.load_pkl as load_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core.utils import warning_filter
 from autogluon.core.task.base.base_predictor import BasePredictor
 from autogluon.core.constants import REFIT_FULL_SUFFIX
 
@@ -134,7 +135,8 @@ class AbstractGluonTSModel(AbstractModel):
             start_time = time.time()
             self.params["callbacks"].append(TimeLimitCallback(time_limit))
             self.create_model()
-            self.model = self.model.train(train_data, validation_data=val_data)
+            with warning_filter():
+                self.model = self.model.train(train_data, validation_data=val_data)
             end_time = time.time()
             AbstractGluonTSModel.prev_fitting_time.append(end_time - start_time)
         else:
@@ -152,60 +154,62 @@ class AbstractGluonTSModel(AbstractModel):
               if quantiles=None, it will by default give all the quantiles that the model is trained for.
         """
         logger.log(30, f"Predicting with model {self.name}")
-        if quantiles is None:
-            quantiles = [str(q) for q in self.quantiles]
-        else:
-            quantiles = [str(q) for q in quantiles]
-        result_dict = {}
-        predicted_targets = list(self.model.predict(data))
-        if isinstance(predicted_targets[0], QuantileForecast):
-            status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
-        elif isinstance(predicted_targets[0], SampleForecast):
-            transformed_targets = []
-            for forecast in predicted_targets:
-                tmp = []
-                for quantile in quantiles:
-                    tmp.append(forecast.quantile(quantile))
-                transformed_targets.append(QuantileForecast(forecast_arrays=np.array(tmp),
-                                                            start_date=forecast.start_date,
-                                                            freq=forecast.freq,
-                                                            forecast_keys=quantiles,
-                                                            item_id=forecast.item_id))
-            predicted_targets = copy.deepcopy(transformed_targets)
-            status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
-        else:
-            raise TypeError("DistributionForecast is not yet supported.")
-
-        if not all(status):
-            raise ValueError("Invalid quantile value.")
-        if isinstance(data, pd.DataFrame):
-            index = data.get_index()
-        else:
-            index = [i["item_id"] for i in data]
-
-        index_count = {}
-        for idx in index:
-            index_count[idx] = index_count.get(idx, 0) + 1
-
-        for i in range(len(index)):
-            tmp_dict = {}
-            for quantile in quantiles:
-                tmp_dict[quantile] = predicted_targets[i].quantile(str(quantile))
-            df = pd.DataFrame(tmp_dict)
-            df.index = pd.date_range(start=predicted_targets[i].start_date,
-                                     periods=self.params["prediction_length"],
-                                     freq=self.params["freq"])
-            if index_count[index[i]] > 1:
-                result_dict[f"{index[i]}_{predicted_targets[i].start_date}"] = df
+        with warning_filter():
+            if quantiles is None:
+                quantiles = [str(q) for q in self.quantiles]
             else:
-                result_dict[index[i]] = df
+                quantiles = [str(q) for q in quantiles]
+            result_dict = {}
+            predicted_targets = list(self.model.predict(data))
+            if isinstance(predicted_targets[0], QuantileForecast):
+                status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
+            elif isinstance(predicted_targets[0], SampleForecast):
+                transformed_targets = []
+                for forecast in predicted_targets:
+                    tmp = []
+                    for quantile in quantiles:
+                        tmp.append(forecast.quantile(quantile))
+                    transformed_targets.append(QuantileForecast(forecast_arrays=np.array(tmp),
+                                                                start_date=forecast.start_date,
+                                                                freq=forecast.freq,
+                                                                forecast_keys=quantiles,
+                                                                item_id=forecast.item_id))
+                predicted_targets = copy.deepcopy(transformed_targets)
+                status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
+            else:
+                raise TypeError("DistributionForecast is not yet supported.")
+
+            if not all(status):
+                raise ValueError("Invalid quantile value.")
+            if isinstance(data, pd.DataFrame):
+                index = data.get_index()
+            else:
+                index = [i["item_id"] for i in data]
+
+            index_count = {}
+            for idx in index:
+                index_count[idx] = index_count.get(idx, 0) + 1
+
+            for i in range(len(index)):
+                tmp_dict = {}
+                for quantile in quantiles:
+                    tmp_dict[quantile] = predicted_targets[i].quantile(str(quantile))
+                df = pd.DataFrame(tmp_dict)
+                df.index = pd.date_range(start=predicted_targets[i].start_date,
+                                         periods=self.params["prediction_length"],
+                                         freq=self.params["freq"])
+                if index_count[index[i]] > 1:
+                    result_dict[f"{index[i]}_{predicted_targets[i].start_date}"] = df
+                else:
+                    result_dict[index[i]] = df
         return result_dict
 
     def predict_for_scoring(self, data, num_samples=100):
-        forecast_it, ts_it = make_evaluation_predictions(dataset=data,
-                                                         predictor=self.model,
-                                                         num_samples=num_samples)
-        return list(tqdm(forecast_it, total=len(data))), list(tqdm(ts_it, total=len(data)))
+        with warning_filter():
+            forecast_it, ts_it = make_evaluation_predictions(dataset=data,
+                                                             predictor=self.model,
+                                                             num_samples=num_samples)
+            return list(tqdm(forecast_it, total=len(data))), list(tqdm(ts_it, total=len(data)))
 
     def score(self, data, metric=None, num_samples=100):
         """
