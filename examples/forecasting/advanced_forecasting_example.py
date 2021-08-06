@@ -56,8 +56,13 @@ models = predictor._trainer.get_model_names_all()
 for model in models:
     print(predictor._trainer.load_model(model).get_info())
 print(predictor.leaderboard(test_data, static_features=static_features))
-print(predictor.evaluate(test_data, static_features=static_features))
-predictions = predictor.predict(train_data, static_features=static_features, quantiles=[0.5], time_series_to_predict=['Afghanistan_', "Algeria_"])
+print(predictor.evaluate(test_data, static_features=static_features, quantiles=[0.5]))
+predictions = predictor.predict(train_data, static_features=static_features, quantiles=[0.5])
 time_series_id = 'Afghanistan_'
 print(predictions[time_series_id])
-print(ForecastingPredictor.evaluate_predictions(predictions, test_data, index_column="name", target_column="ConfirmedCases", time_column="Date"))
+print(ForecastingPredictor.evaluate_predictions(forecasts=predictions,
+                                                targets=test_data,
+                                                index_column=predictor.index_column,
+                                                time_column=predictor.time_column,
+                                                target_column=predictor.target_column,
+                                                eval_metric=predictor.eval_metric))

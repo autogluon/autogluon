@@ -742,7 +742,7 @@ class ForecastingPredictor:
                     forecast_keys=forecast.columns,
                     item_id=ts_id,
                 ))
-            evaluator = Evaluator()
+            evaluator = Evaluator(quantile_forecasts[0].forecast_keys)
             num_series = len(formated_targets)
             agg_metrics, item_metrics = evaluator(iter(formated_targets), iter(quantile_forecasts), num_series=num_series)
             if eval_metric is None:
