@@ -1,9 +1,11 @@
 from typing import Sequence, Tuple
+from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.models.abstract.abstract_model import AbstractModel
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from copy import deepcopy
 import logging
 from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core.features.types import R_FLOAT
 import numpy as np
 import pandas as pd
 import time
@@ -29,17 +31,22 @@ class ProxyFeatureSelector:
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = 0., stop_threshold: int = 1,
                         min_fi_samples: int = 10000, max_fits: int = 5, **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
-        # subsample training data
+        # subsample training data and optionally add noise features to dataset
         X = X.sample(train_subsample_size, random_state=0) if train_subsample_size < len(X) else X
         y = y.loc[X.index]
+        original_features = X.columns.tolist()
+        auto_threshold = prune_threshold is None
+        noise_prefix = 'AG_normal_noise'
+        if auto_threshold:
+            X = self.add_noise_column(X, prefix=noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
+            X_val = self.add_noise_column(X_val, prefix=noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
         X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
-        curr_model = self.fit_model
         time_budget = max(0.1 * self.model_fit_time, 10 * self.model_predict_time * min(50, len(X.columns)), 60)
         candidate_features = X.columns.tolist()
         importance_df = None
         index = 1
         best_info = {'features': candidate_features, 'index': index, 'score': None}
-        logger.log(30, f"\tPerforming proxy model feature selection with model: {curr_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
+        logger.log(30, f"\tPerforming proxy model feature selection with model: {self.fit_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"expected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget, 2)}s. " +
                        f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {prune_threshold}.")
         try:
@@ -50,16 +57,17 @@ class ProxyFeatureSelector:
             # use original fitted model to compute the first round of feature importance scores, not fitted proxy model
             model, score, fit_time = self.fit_score_model(model=deepcopy(self.base_model), X=X, y=y, X_val=X_val,
                                                           y_val=y_val, features=candidate_features, **kwargs)
-            best_info['model'], best_info['score'] = model, score
+            best_info['model'], best_info['score'] = (model, score) if auto_threshold else (self.fit_model, self.fit_model.val_score)
             logger.log(30, f"\tFit {index} ({fit_time}s): Current score is {score}.")
             stop_prune = False
             while not stop_prune:
                 index = index + 1
                 old_candidate_features = candidate_features
                 time_start = time.time()
+                prioritize_fi = [feature for feature in best_info['features'] if noise_prefix in feature]
                 fn_args = {'X': X_fi, 'y': y_fi, 'model': best_info['model'], 'time_budget': time_budget, 'features': best_info['features'],
                            'n_sample': max(min_fi_samples, len(X_fi)), 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
-                           'prune_threshold': prune_threshold, 'prune_ratio': prune_ratio}
+                           'prune_threshold': prune_threshold, 'prune_ratio': prune_ratio, 'prioritized': prioritize_fi}
                 candidate_features, importance_df = self.compute_next_candidate(**fn_args)
                 self.importance_dfs.append(importance_df)
                 feature_selection_time = time.time() - time_start
@@ -91,20 +99,28 @@ class ProxyFeatureSelector:
             logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
             logger.log(30, f"\tERROR: Exception raised during fit_with_prune. Reason: {e}. Ending...")
+
+        if auto_threshold:
+            best_info['features'] = [feature for feature in best_info['features'] if noise_prefix not in feature]
         logger.log(30, f"\tSuccessfully ended prune loop after {index} iterations. Best score: {best_info['score']}.")
-        logger.log(30, f"\tFeature Count: {len(X.columns.tolist())} -> {len(best_info['features'])}")
+        logger.log(30, f"\tFeature Count: {len(original_features)} -> {len(best_info['features'])}")
         logger.log(30, f"\tPruning Runtime: {round(self.original_time_limit - self.time_limit, 4)}")
         return best_info['features'], self.importance_dfs
 
     def compute_next_candidate(self, X: pd.DataFrame, y: pd.Series, model: AbstractModel, time_budget: float, features: Sequence[str],
-                               n_sample=10000, n_subsample=5000, prev_importance_df: pd.DataFrame = None, prune_threshold: float = 0.,
-                               prune_ratio: float = 0.5) -> Tuple[Sequence[str], pd.DataFrame]:
+                               n_sample=10000, n_subsample=5000, prev_importance_df: pd.DataFrame = None, prune_threshold: float = None,
+                               prune_ratio: float = 0.05, prioritized: Sequence[str] = []) -> Tuple[Sequence[str], pd.DataFrame]:
         n_features = len(features)
         n_subsample = min(n_subsample, len(X))
         n_shuffle = np.ceil(n_sample / n_subsample).astype(int)
         if prev_importance_df is not None:
-            sorted_features = prev_importance_df.sort_values(by='importance', axis=0, ascending=False).index.tolist()[::-1]
-            features = [feature for feature in sorted_features if feature in features] + [feature for feature in features if feature not in sorted_features]
+            prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
+            sorted_features = prev_importance_df.drop(prev_deleted_features).sort_values(by='importance', axis=0, ascending=False).index.tolist()[::-1]
+            features = sorted_features + [feature for feature in features if feature not in sorted_features]
+        auto_threshold = len(prioritized) > 0
+        if auto_threshold:
+            non_prioritized = [feature for feature in features if feature not in prioritized]
+            features = prioritized + non_prioritized
         # if we do not have enough time to evaluate feature importance for all features, do so only for some
         expected_single_feature_time = 1.1 * self.model_predict_time * (n_subsample / len(X)) * n_shuffle
         n_evaluated_features = max([i for i in range(1, n_features+1) if i * expected_single_feature_time < time_budget])
@@ -133,13 +149,24 @@ class ProxyFeatureSelector:
             unevaluated_df['n'] = 0
             unevaluated_df.set_index('name', inplace=True)
             unevaluated_df.index.name = None
-        importance_df = pd.concat([evaluated_df, unevaluated_df]).sort_values(by='importance', axis=0)
+        importance_df = pd.concat([evaluated_df, unevaluated_df])
         # keep features whose importance scores are above threshold or have not had a chance to be calculated
         # only prune up to prune_ratio * n_features features at once
+        if auto_threshold:
+            # if auto_threshold, threshold is the mean of noise column importance score
+            noise_rows = importance_df[importance_df.index.isin(prioritized)]
+            importance_df = importance_df.drop(prioritized)
+            prune_threshold = noise_rows['importance'].mean()
+            logger.log(30, f"\tFeature importance threshold set to: {round(prune_threshold, 5)}")
         candidate_features = importance_df[(importance_df['importance'] > prune_threshold) | (importance_df['importance'].isna())].index.tolist()
         removed_features = importance_df[importance_df['importance'] <= prune_threshold].index.tolist()
+        logger.log(30, f"\tNumber of features above the pruning threshold: {len(candidate_features)}/{len(candidate_features)+len(removed_features)}")
         candidate_features = candidate_features + removed_features[:len(removed_features) - max(1, int(prune_ratio * n_features))]
-        return candidate_features, importance_df
+        if auto_threshold:
+            # noise columns should never be removed
+            candidate_features = candidate_features + prioritized
+            importance_df = pd.concat([importance_df, noise_rows])
+        return candidate_features, importance_df.sort_values(by='importance', axis=0)
 
     def fit_score_model(self, model: AbstractModel, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series,
                         features: Sequence[str], **kwargs) -> Tuple[AbstractModel, float, float]:
@@ -154,3 +181,14 @@ class ProxyFeatureSelector:
         time_elapsed = time.time() - time_start
         self.time_limit = self.time_limit - time_elapsed
         return model, round(score, 4), round(time_elapsed, 4)
+
+    def add_noise_column(self, X: pd.DataFrame, prefix: str, count: int = 1, feature_metadata: FeatureMetadata = None) -> pd.DataFrame:
+        if X is None:
+            return None
+        for i in range(1, count+1):
+            col_name = f"{prefix}_{i}"
+            if feature_metadata is not None:
+                feature_metadata.type_map_raw[col_name] = R_FLOAT
+            noise = np.random.normal(loc=0., scale=1., size=len(X))
+            X[col_name] = noise
+        return X
