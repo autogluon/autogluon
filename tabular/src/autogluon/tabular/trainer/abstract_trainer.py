@@ -294,6 +294,7 @@ class AbstractTrainer:
         self.save()
         return model_names_fit
 
+    # TODO JASON: Fully remove feature_prune argument
     def stack_new_level(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None, level=1, base_model_names: List[str] = None,
                         feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, name_suffix: str = None) -> (List[str], List[str]):
         """
@@ -313,7 +314,7 @@ class AbstractTrainer:
             core_kwargs['name_suffix'] = core_kwargs.get('name_suffix', '') + name_suffix
             aux_kwargs['name_suffix'] = aux_kwargs.get('name_suffix', '') + name_suffix
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
-                                                level=level, base_model_names=base_model_names, feature_prune=feature_prune, **core_kwargs)
+                                                level=level, base_model_names=base_model_names, **core_kwargs)
 
         if X_val is None:
             aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
@@ -912,7 +913,6 @@ class AbstractTrainer:
             k_fold=k_fold,
             n_repeats=n_repeats,
             hyperparameter_tune_kwargs=None,
-            feature_prune=False,
             stack_name=stack_name,
             level=level,
             time_limit=time_limit,
@@ -1269,7 +1269,7 @@ class AbstractTrainer:
         logger.log(20, f'Completed {n_repeat_start + repeats_completed}/{n_repeats} k-fold bagging repeats ...')
         return models_valid
 
-    def _train_multi_initial(self, X, y, models: List[AbstractModel], k_fold, n_repeats, hyperparameter_tune_kwargs=None, time_limit=None, feature_prune=False, fit_with_prune_kwargs=None, **kwargs):
+    def _train_multi_initial(self, X, y, models: List[AbstractModel], k_fold, n_repeats, hyperparameter_tune_kwargs=None, time_limit=None, fit_with_prune_kwargs=None, **kwargs):
         """
         Fits models that have not previously been fit.
         This method should only be called in self._train_multi
@@ -1297,23 +1297,25 @@ class AbstractTrainer:
         k_fold_start = 0
         if k_fold == 0:
             time_ratio = hpo_time_ratio if hpo_enabled else 1
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune,
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=False,
                                             time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
         else:
-            if hpo_enabled or feature_prune:
-                time_start = time.time()
+            bagged_time_start = time.time()
+            if hpo_enabled:
                 time_ratio = (1 / k_fold) * hpo_time_ratio
-                models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune,
+                models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=False,
                                                 k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit,
                                                 time_split=time_split, time_ratio=time_ratio, **fit_args)
                 k_fold_start = 1
-                if time_limit is not None:
-                    time_limit = time_limit - (time.time() - time_start)
-
+            bagged_time_limit = time_limit - (time.time() - bagged_time_start) if time_limit is not None else None
             models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, feature_prune=False, k_fold_start=k_fold_start,
-                                            k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
+                                            k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=bagged_time_limit, **fit_args)
 
         multi_fold_time_elapsed = time.time() - multi_fold_time_start
+        if time_limit is not None:
+            time_limit = time_limit - multi_fold_time_elapsed
+
+        # TODO JASON: SEPARATE THIS OUT INTO A NEW METHOD
         if fit_with_prune_kwargs is not None and len(models) > 0:
             logger.log(30, "Feature pruning models while time permits...")
             fit_args['X_val'], fit_args['y_val'] = kwargs['X_val'], kwargs['y_val']
@@ -1326,19 +1328,18 @@ class AbstractTrainer:
             best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
             proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
 
-            # TODO JASON: SEPARATE THIS OUT INTO A NEW METHOD
-            if time_limit is not None and time_limit < 2 * multi_fold_time_elapsed + 2 * proxy_model.fit_time:
+            if time_limit is not None and time_limit < multi_fold_time_elapsed + 2 * proxy_model.fit_time:
                 logger.log(30, "Insufficient time to perform even a single pruning round. Ending...")
                 return models
             if fit_with_prune_kwargs.get('feature_selection_time_limit', None) is not None:
                 feature_selection_time_limit = fit_with_prune_kwargs.get('feature_selection_time_limit')
             elif time_limit is not None:
-                feature_selection_time_limit = time_limit - 2 * multi_fold_time_elapsed
+                feature_selection_time_limit = time_limit - multi_fold_time_elapsed
             else:
-                feature_selection_time_limit = 10 * proxy_model.fit_time
+                feature_selection_time_limit = fit_with_prune_kwargs.get('max_fits', 10) * proxy_model.fit_time
 
-            selector = ProxyFeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)
             feature_selection_time_start = time.time()
+            selector = ProxyFeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)
             candidate_features, _ = selector.select_features(**fit_with_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
             fit_args['X'] = X[candidate_features]
             if fit_args.get('X_val', None) is not None:
@@ -1402,7 +1403,7 @@ class AbstractTrainer:
         return models_valid
 
     # TODO: REMOVE feature_prune (or make use of it) FROM ARGUMENTS
-    def _train_multi(self, X, y, models: List[AbstractModel], hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=None, n_repeats=None, n_repeat_start=0, time_limit=None, **kwargs) -> List[str]:
+    def _train_multi(self, X, y, models: List[AbstractModel], hyperparameter_tune_kwargs=None, fit_with_prune_kwargs=None, k_fold=None, n_repeats=None, n_repeat_start=0, time_limit=None, **kwargs) -> List[str]:
         """
         Train a list of models using the same data.
         Assumes that input data has already been processed in the form the models will receive as input (including stack feature generation).
@@ -1417,7 +1418,7 @@ class AbstractTrainer:
             n_repeats = self.n_repeats
         if (k_fold == 0) and (n_repeats != 1):
             raise ValueError(f'n_repeats must be 1 when k_fold is 0, values: ({n_repeats}, {k_fold})')
-        feature_prune = kwargs.get('fit_with_prune_kwargs', None) is not None
+        feature_prune = fit_with_prune_kwargs is not None
         if time_limit is None and not feature_prune:
             n_repeats_initial = n_repeats
         else:
@@ -1425,7 +1426,7 @@ class AbstractTrainer:
         if n_repeat_start == 0:
             time_start = time.time()
             model_names_trained = self._train_multi_initial(X=X, y=y, models=models, k_fold=k_fold, n_repeats=n_repeats_initial, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                                                            time_limit=time_limit, **kwargs)
+                                                            fit_with_prune_kwargs=fit_with_prune_kwargs, time_limit=time_limit, **kwargs)
             n_repeat_start = n_repeats_initial
             if time_limit is not None:
                 time_limit = time_limit - (time.time() - time_start)

@@ -29,7 +29,7 @@ class ProxyFeatureSelector:
         self.importance_dfs = []
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
-                        fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = 0., stop_threshold: int = 1,
+                        fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
                         min_fi_samples: int = 10000, max_fits: int = 5, **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
         # subsample training data and optionally add noise features to dataset
         X = X.sample(train_subsample_size, random_state=0) if train_subsample_size < len(X) else X

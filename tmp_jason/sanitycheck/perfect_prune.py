@@ -3,7 +3,9 @@ Show that perfect feature pruning empirically improves test set accuracy on 5 da
 for LightGBM and NNFastAiTabularModel. Create synthetic datasets involving white noise
 and feature permutation columns 1.2x and 2x the size of original datasets. Compare model
 accuracies before and after adding synthetic features. Try both bagged and non bagged
-versions. Datasets are adult, airlines, australian, covertype, and higgs.
+versions. Datasets are adult, airlines, australian, covertype, and higgs. In addition,
+show that permutation feature importance is an indicative measure of whether a feature
+is from the original dataset or not.
 """
 
 import argparse
