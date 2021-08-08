@@ -15,15 +15,19 @@ logger = logging.getLogger(__name__)
 
 class ProxyFeatureSelector:
     def __init__(self, model: AbstractModel, time_limit: float) -> None:
-        self.fit_model = model
+        self.original_model = model
         self.base_model = model.convert_to_template()
-        self.base_model.rename(f'Proxy_{self.base_model.name}')
+        self.base_model.rename(f'FeatureSelectorBase_{self.base_model.name}')
         self.original_time_limit = time_limit
         self.time_limit = time_limit
-        if not model.is_valid():
-            raise AssertionError("A model must have been fit before feature pruning occurs.")
-        self.model_fit_time = model.fit_time
-        self.model_predict_time = model.predict_time
+        if model.is_valid():
+            self.model_fit_time = model.fit_time
+            self.model_predict_time = model.predict_time
+            self.original_val_score = model.val_score
+        else:
+            self.model_fit_time = None
+            self.model_predict_time = None
+            self.original_val_score = None
         # TODO: can we decide how many subsamples to take based on model.predict_time?
         self.is_bagged = isinstance(model, BaggedEnsembleModel)
         self.importance_dfs = []
@@ -46,18 +50,23 @@ class ProxyFeatureSelector:
         importance_df = None
         index = 1
         best_info = {'features': candidate_features, 'index': index, 'score': None}
-        logger.log(30, f"\tPerforming proxy model feature selection with model: {self.fit_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
+        logger.log(30, f"\tPerforming proxy model feature selection with model: {self.original_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"expected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget, 2)}s. " +
                        f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {prune_threshold}.")
         try:
             if self.time_limit <= self.model_fit_time * 2 + time_budget:
                 logger.log(30, f"\tInsufficient time to perform even a single pruning round. Ending...")
                 raise TimeLimitExceeded
+
             # fit proxy model once on the subsampled dataset to serve as scoring reference
             # use original fitted model to compute the first round of feature importance scores, not fitted proxy model
             model, score, fit_time = self.fit_score_model(model=deepcopy(self.base_model), X=X, y=y, X_val=X_val,
                                                           y_val=y_val, features=candidate_features, **kwargs)
-            best_info['model'], best_info['score'] = (model, score) if auto_threshold else (self.fit_model, self.fit_model.val_score)
+            if self.original_model.is_valid() and not auto_threshold:
+                best_info['model'], best_info['score'] = self.original_model, self.original_val_score
+            else:
+                best_info['model'], best_info['score'] = model, score
+
             logger.log(30, f"\tFit {index} ({fit_time}s): Current score is {score}.")
             stop_prune = False
             while not stop_prune:
@@ -69,6 +78,12 @@ class ProxyFeatureSelector:
                            'n_sample': max(min_fi_samples, len(X_fi)), 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
                            'prune_threshold': prune_threshold, 'prune_ratio': prune_ratio, 'prioritized': prioritize_fi}
                 candidate_features, importance_df = self.compute_next_candidate(**fn_args)
+                # HACK: To get this working with repeated bagged CatBoost and MXNet model, features must have original ordering (...)
+                # This is because, for example, CatBoost filters categorical features by indexes and complains if test set features
+                # are out of order. This causes an issue with bagged models because X[features] adheres to ordering of features, and
+                # parent.features and child.features can have different ordering. However, bagged model organizes features according to
+                # parent's ordering. TODO: TALK MORE ABOUT THIS ISSUE
+                candidate_features = [feature for feature in original_features if feature in candidate_features]
                 self.importance_dfs.append(importance_df)
                 feature_selection_time = time.time() - time_start
                 self.time_limit = self.time_limit - feature_selection_time
@@ -173,14 +188,22 @@ class ProxyFeatureSelector:
         """
         Fits and scores a model. Updates self.time_limit. Returns the fitted model, its score, and time elapsed.
         """
-        time_start = time.time()
         X = X[features]
         X_val = None if self.is_bagged else X_val[features]
+        time_start = time.time()
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
+        fit_time = time.time() - time_start
+        time_start = time.time()
         score = model.score_with_oof(y) if self.is_bagged else model.score(X=X_val, y=y_val)
-        time_elapsed = time.time() - time_start
-        self.time_limit = self.time_limit - time_elapsed
-        return model, round(score, 4), round(time_elapsed, 4)
+        predict_time = time.time() - time_start
+        self.time_limit = self.time_limit - (fit_time + predict_time)
+        if self.model_fit_time is None:
+            self.model_fit_time = fit_time
+        if self.model_predict_time is None:
+            self.model_predict_time = predict_time
+        if self.original_val_score is None:
+            self.original_val_score = score
+        return model, round(score, 4), round(fit_time + predict_time, 4)
 
     def add_noise_column(self, X: pd.DataFrame, prefix: str, count: int = 1, feature_metadata: FeatureMetadata = None) -> pd.DataFrame:
         if X is None:
