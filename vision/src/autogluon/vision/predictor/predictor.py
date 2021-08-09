@@ -153,7 +153,6 @@ class ImagePredictor(object):
                 },
 
                 # Medium predictive accuracy with very fast inference and very fast training time.
-                # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
                 medium_quality_faster_train={
                     'hyperparameters': {
                         'model': 'resnet50d',

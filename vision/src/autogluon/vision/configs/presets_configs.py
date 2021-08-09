@@ -27,9 +27,9 @@ preset_image_predictor = dict(
     best_quality={
         'hyperparameters': {
             'model': Categorical('coat_lite_small', 'twins_pcpvt_base', 'swin_base_patch4_window7_224', 'resnet101_v1d') \
-                if timm != None else Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
+                if timm != None else Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200', 'resnet101d'),
             'lr': Real(1e-5, 1e-2, log=True),
-            'batch_size': Categorical(8, 16, 32, 64, 128),
+            'batch_size': Categorical(8, 16, 32, 64),
             'epochs': 200,
             'early_stop_patience': 50
             },
