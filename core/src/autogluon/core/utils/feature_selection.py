@@ -50,7 +50,7 @@ class ProxyFeatureSelector:
         importance_df = None
         index = 1
         best_info = {'features': candidate_features, 'index': index, 'score': None}
-        logger.log(30, f"\tPerforming proxy model feature selection with model: {self.original_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
+        logger.log(30, f"\tPerforming V1 proxy model feature selection with model: {self.original_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"expected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget, 2)}s. " +
                        f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {prune_threshold}.")
         try:
