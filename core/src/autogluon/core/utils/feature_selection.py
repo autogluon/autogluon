@@ -90,7 +90,8 @@ class FeatureSelector:
         X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
         best_info = {'features': candidate_features, 'index': index, 'model': self.original_model, 'score': self.original_val_score}
         logger.log(30, f"\tPerforming V1 model feature selection with model: {self.original_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
-                       f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {prune_threshold}.")
+                       f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: " +
+                       f"{'auto' if prune_threshold is None else prune_threshold}.")
         try:
             minimum_model_fits = 3 if refit_at_end else 2
             if self.is_proxy_model and self.time_limit <= self.model_fit_time * minimum_model_fits:
@@ -111,9 +112,8 @@ class FeatureSelector:
                 logger.log(30, f"\tInsufficient time to perform even a single pruning round.")
                 raise TimeLimitExceeded
 
-            stop_prune = False
             importance_df = None
-            while not stop_prune:
+            while index <= max_fits:
                 index = index + 1
                 model_name = f"{self.base_model.name}_{index}"
                 old_candidate_features = candidate_features
@@ -140,23 +140,18 @@ class FeatureSelector:
                 curr_model, score, fit_time = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features, model_name, **kwargs)
 
                 if score > best_info['score']:
-                    message = f"\tFit {index} ({fit_time}s): Current score {score} is better than best score {best_info['score']}. Updating model.\n" +\
-                              f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}."
+                    logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is better than best score {best_info['score']}. Updating model.")
+                    logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}.")
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
-                elif index - best_info['index'] >= stop_threshold:
-                    stop_prune = True
-                    message = f"\tFit {index} ({fit_time}s): Score has not improved for {stop_threshold} iterations. Current score is {score}. Ending..."
-                elif index == max_fits:
-                    stop_prune = True
-                    message = f"\tFit {index} ({fit_time}s): Maximum number of iterations reached. Current score is {score}. Ending..."
-                elif (refit_at_end and self.time_limit <= 2 * self.model_fit_time + feature_selection_time) or \
-                     (not refit_at_end and self.time_limit <= self.model_fit_time + feature_selection_time):
-                    stop_prune = True
-                    message = f"\tFit {index} ({fit_time}s): Insufficient time to finish next pruning round.. Current score is {score}. Ending..."
                 else:
-                    message = f"\tFit {index} ({fit_time}s): Current score {score} is not better than best score {best_info['score']}. " +\
-                            "Retrying fit with a different set of features."
-                logger.log(30, message)
+                    logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is not better than best score {best_info['score']}. Retrying.")
+                if index - best_info['index'] >= stop_threshold:
+                    logger.log(30, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
+                    break
+                if (refit_at_end and self.time_limit <= 2 * self.model_fit_time + feature_selection_time) or \
+                   (not refit_at_end and self.time_limit <= self.model_fit_time + feature_selection_time):
+                    logger.log(30, f"\tInsufficient time to finish next pruning round. Ending...")
+                    break
         except TimeLimitExceeded:
             logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
@@ -183,17 +178,9 @@ class FeatureSelector:
         n_shuffle = np.ceil(n_sample / n_subsample).astype(int)
         auto_threshold = len(prioritized) > 0
         is_first_run = prev_importance_df is None
+        features = self.sort_features_by_priority(features, prioritized, prev_importance_df)
 
-        # features are sorted by feature importance computation priority in ascending order
-        if not is_first_run:
-            prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
-            sorted_features = prev_importance_df.drop(prev_deleted_features).sort_values(by='importance', axis=0, ascending=False).index.tolist()[::-1]
-            features = sorted_features + [feature for feature in features if feature not in sorted_features]
-        if auto_threshold:
-            non_prioritized = [feature for feature in features if feature not in prioritized]
-            features = prioritized + non_prioritized
-
-        # if we do not have enough time to evaluate feature importance for all features, do so only for some (first K elements of features)
+        # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
         expected_single_feature_time = 1.1 * self.model_predict_time * (n_subsample / len(X)) * n_shuffle
         n_evaluated_features = max([i for i in range(1, n_features+1) if i * expected_single_feature_time < time_budget])
         if n_evaluated_features == 0:
@@ -203,6 +190,8 @@ class FeatureSelector:
         logger.log(30, f"\tComputing feature importance for {n_evaluated_features}/{n_features} features with {n_shuffle} shuffles.")
         evaluated_df = model.compute_feature_importance(X=X, y=y, num_shuffle_sets=n_shuffle, subsample_size=n_subsample, features=evaluated_features,
                                                         is_oof=self.is_bagged, silent=True, time_limit=time_budget)
+        if self.is_bagged:
+            evaluated_df['n'] = evaluated_df['n'] // len(model.models)
 
         # if we could not compute feature importance for all features and previous feature importance estimates exist, use them
         if is_first_run:
@@ -216,7 +205,6 @@ class FeatureSelector:
             noise_rows = importance_df[importance_df.index.isin(prioritized)]
             importance_df = importance_df.drop(prioritized)
             prune_threshold = noise_rows['importance'].mean()
-            logger.log(30, f"\tAutomatically determined pruning threshold: {prune_threshold}")
 
         # use importance_df to generate next candidate features
         time_budget = time_budget - (time.time() - time_start)
@@ -228,9 +216,27 @@ class FeatureSelector:
             importance_df = pd.concat([importance_df, noise_rows])
         return candidate_features, importance_df.sort_values(by='importance', axis=0)
 
+    def sort_features_by_priority(self, features: Sequence[str], prioritized: Sequence[str], prev_importance_df: pd.DataFrame) -> Sequence[str]:
+        """
+        Return a list of features sorted by feature importance calculation priority in ascending order.
+        If prev_importance_df does not exist and not using auto_threshold, return the original list.
+        If prev_importance_df exists, features whose importance scores have not been calculated are
+        prioritized first followed by features with lowest previous importance scores estimates. If using
+        auto_threshold mode, noise columns are prioritized first since their scores are needed to determine
+        the pruning threshold.
+        """
+        is_first_run = prev_importance_df is None
+        auto_threshold = len(prioritized) > 0
+        if not is_first_run:
+            prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
+            sorted_features = prev_importance_df.drop(prev_deleted_features).sort_values(by='importance', axis=0, ascending=False).index.tolist()[::-1]
+            features = sorted_features + [feature for feature in features if feature not in sorted_features]
+        if auto_threshold:
+            non_prioritized = [feature for feature in features if feature not in prioritized]
+            features = prioritized + non_prioritized
+        return features
+
     def compute_next_candidate_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float) -> Sequence[str]:
-        # keep features whose importance scores are above threshold or have not had a chance to be calculated
-        # only prune up to prune_ratio * n_features features at once
         """
         Keep features whose importance scores are above threshold or have not yet had a chance to be calculated,
         as well as some features whose importance scores are below threshold if more than prune_ratio * num features
@@ -242,6 +248,7 @@ class FeatureSelector:
         n_remove = max(1, int(prune_ratio * len(importance_df)))
         above_threshold_rows = importance_df[(importance_df['importance'] > prune_threshold) | (importance_df['importance'].isna())]
         below_threshold_rows = importance_df[importance_df['importance'] <= prune_threshold]
+        logger.log(30, f"\tNumber of features above prune threshold {round(prune_threshold, 4)}: {len(above_threshold_rows)}/{len(importance_df)}")
         if len(below_threshold_rows) <= n_remove:
             acceptance_candidates = above_threshold_rows.index.tolist()
             self.attempted_removals.add(tuple(below_threshold_rows.index))
@@ -257,7 +264,7 @@ class FeatureSelector:
                 return acceptance_candidates
             else:
                 self.seed = self.seed + 1  # FIXME: This is dumb but it must be done so .sample does not sample the same row every time
-        return tuple(importance_df.index)
+        return importance_df.index.tolist()
 
     def fit_score_model(self, model: AbstractModel, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series,
                         features: Sequence[str], model_name: str, **kwargs) -> Tuple[AbstractModel, float, float]:
