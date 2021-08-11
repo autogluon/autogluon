@@ -98,7 +98,7 @@ class AbstractTrainer:
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
-        self._debug_info = {}
+        self._debug_info = {'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0}
 
     # path_root is the directory containing learner.pkl
     @property
@@ -1043,12 +1043,12 @@ class AbstractTrainer:
                     self.delete_models(models_to_delete=original_model.name, dry_run=False)
                     self._add_model(model=model, stack_name=stack_name, level=level)
                     model_names_trained.append(model.name)
-                    self._debug_info['score_improvement_from_proxy_yes'] = self._debug_info.get('score_improvement_from_proxy_yes', 0) + 1
+                    self._debug_info['score_improvement_from_proxy_yes'] = self._debug_info['score_improvement_from_proxy_yes'] + 1
                 else:
                     logger.log(30, f"Pruned model's score is worse than original model's score {score_str}. Keeping original model...")
                     model.delete_from_disk()
                     model_names_trained.append(original_model.name)
-                    self._debug_info['score_improvement_from_proxy_no'] = self._debug_info.get('score_improvement_from_proxy_no', 0) + 1
+                    self._debug_info['score_improvement_from_proxy_no'] = self._debug_info['score_improvement_from_proxy_no'] + 1
                 if self.low_memory:
                     del model
                     del original_model

@@ -63,16 +63,15 @@ class FeatureSelector:
         self.trained_models = []
         self.importance_dfs = []
         self.attempted_removals = set()
-        self._debug_info = {}
+        self._debug_info = {'exceptions': [], 'index_trajectory': [], 'total_prune_time': 0., 'total_prune_fit_time': 0., 'total_prune_fi_time': 0.}
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
                         min_fi_samples: int = 10000, max_fits: int = 5, **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
-        # TODO: 1. Add ability to attach extra metadata on automlbenchmark (check what features are being pruned)
-        # TODO: 2. Add logic where if we have a LOT of data, we don't do bagging and use leftover data for validation dataset
-        # TODO: 3. Consider repeated bagging for initial model fits (use all data first) added (n-repeat for model refit score calculation)
+        # TODO: 1. Add logic where if we have a LOT of data, we don't do bagging and use leftover data for validation dataset
+        # TODO: 2. Consider repeated bagging for initial model fits (use all data first) added (n-repeat for model refit score calculation)
         # subsample training data and optionally add noise features to dataset
         original_features = X.columns.tolist()
         auto_threshold = prune_threshold is None
@@ -104,6 +103,7 @@ class FeatureSelector:
             # use original fitted model to compute the first round of feature importance scores, not fitted proxy model
             model_name = f"{self.base_model.name}_{index}"
             model, score, fit_time = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features, model_name, **kwargs)
+            self._debug_info['index_trajectory'].append(True)
             if auto_threshold or not self.is_proxy_model:
                 best_info['model'], best_info['score'] = model, score
 
@@ -145,10 +145,10 @@ class FeatureSelector:
                     logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is better than best score {best_info['score']}. Updating model.")
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}.")
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
-                    self._debug_info['index_trajectory'] = self._debug_info.get('index_trajectory', [True]) + [True]
+                    self._debug_info['index_trajectory'].append(True)
                 else:
                     logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is not better than best score {best_info['score']}. Retrying.")
-                    self._debug_info['index_trajectory'] = self._debug_info.get('index_trajectory', [True]) + [False]
+                    self._debug_info['index_trajectory'].append(False)
                 if index - best_info['index'] >= stop_threshold:
                     logger.log(30, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
                     break
@@ -160,7 +160,7 @@ class FeatureSelector:
             logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
             logger.log(30, f"\tERROR: Exception raised during feature pruning. Reason: {e}. Ending...")
-            self._debug_info['exceptions'] = self._debug_info.get('exceptions', []) + [e]
+            self._debug_info['exceptions'].append(str(e))
 
         if auto_threshold:
             best_info['features'] = [feature for feature in best_info['features'] if noise_prefix not in feature]
