@@ -63,14 +63,16 @@ class FeatureSelector:
         self.trained_models = []
         self.importance_dfs = []
         self.attempted_removals = set()
+        self._debug_info = {}
+        self._fit_time_elapsed = 0.
+        self._fi_time_elapsed = 0.
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
                         min_fi_samples: int = 10000, max_fits: int = 5, **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
-        # TODO: 1. Try not exiting the feature selection immediately when score doesn't improve once
-        # TODO: 2. Add ability to attach extra metadata on automlbenchmark (check what features are being pruned)
-        # TODO: 3. Add logic where if we have a LOT of data, we don't do bagging and use leftover data for validation dataset
-        # TODO: 4. Consider repeated bagging for initial model fits (use all data first) added (n-repeat for model refit score calculation)
+        # TODO: 1. Add ability to attach extra metadata on automlbenchmark (check what features are being pruned)
+        # TODO: 2. Add logic where if we have a LOT of data, we don't do bagging and use leftover data for validation dataset
+        # TODO: 3. Consider repeated bagging for initial model fits (use all data first) added (n-repeat for model refit score calculation)
         # subsample training data and optionally add noise features to dataset
         original_features = X.columns.tolist()
         auto_threshold = prune_threshold is None
@@ -113,8 +115,7 @@ class FeatureSelector:
                 raise TimeLimitExceeded
 
             importance_df = None
-            while index <= max_fits:
-                index = index + 1
+            for index in range(2, max_fits+1):
                 model_name = f"{self.base_model.name}_{index}"
                 old_candidate_features = candidate_features
                 time_start = time.time()
@@ -132,6 +133,7 @@ class FeatureSelector:
                 self.importance_dfs.append(importance_df)
                 feature_selection_time = time.time() - time_start
                 self.time_limit = self.time_limit - feature_selection_time
+                self._fi_time_elapsed = self._fi_time_elapsed + feature_selection_time
                 logger.log(30, f"\tCandidate generation time: ({round(feature_selection_time, 2)}s), Cardinality: {len(candidate_features)}")
                 if set(candidate_features) == set(best_info['features']) or set(candidate_features) == set(old_candidate_features) \
                    or len(candidate_features) == 0:
@@ -143,8 +145,10 @@ class FeatureSelector:
                     logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is better than best score {best_info['score']}. Updating model.")
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}.")
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
+                    self._debug_info['index_trajectory'] = self._debug_info.get('index_trajectory', [True]) + [True]
                 else:
                     logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is not better than best score {best_info['score']}. Retrying.")
+                    self._debug_info['index_trajectory'] = self._debug_info.get('index_trajectory', [True]) + [False]
                 if index - best_info['index'] >= stop_threshold:
                     logger.log(30, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
                     break
@@ -156,6 +160,7 @@ class FeatureSelector:
             logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
             logger.log(30, f"\tERROR: Exception raised during feature pruning. Reason: {e}. Ending...")
+            self._debug_info['exceptions'] = self._debug_info.get('exceptions', []) + [e]
 
         if auto_threshold:
             best_info['features'] = [feature for feature in best_info['features'] if noise_prefix not in feature]
@@ -164,6 +169,9 @@ class FeatureSelector:
             model, score, _ = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, best_info['features'], model_name, **kwargs)
             best_info['model'], best_info['score'] = model, score
 
+        self._debug_info['total_prune_time'] = self.original_time_limit - self.time_limit
+        self._debug_info['total_prune_fit_time'] = self._fit_time_elapsed
+        self._debug_info['total_prune_fi_time'] = self._fi_time_elapsed
         logger.log(30, f"\tSuccessfully ended prune loop after {index} iterations. Best score: {best_info['score']}.")
         logger.log(30, f"\tFeature Count: {len(original_features)} -> {len(best_info['features'])} ({round(self.original_time_limit - self.time_limit, 2)}s)")
         return best_info['features'], best_info['model']
@@ -242,21 +250,21 @@ class FeatureSelector:
         as well as some features whose importance scores are below threshold if more than prune_ratio * num features
         features are below threshold. In the latter case, randomly sample without replacement from features whose
         importance scores are below threshold until removal candidate configuration that has not yet been tried
-        is encountered.
+        is encountered. Give higher probability to features whose scores are lower than others when sampling.
         """
         time_start = time.time()
         n_remove = max(1, int(prune_ratio * len(importance_df)))
         above_threshold_rows = importance_df[(importance_df['importance'] > prune_threshold) | (importance_df['importance'].isna())]
-        below_threshold_rows = importance_df[importance_df['importance'] <= prune_threshold]
+        below_threshold_rows = importance_df[importance_df['importance'] <= prune_threshold].sort_values(by='importance', axis=0, ascending=True)
         logger.log(30, f"\tNumber of features above prune threshold {round(prune_threshold, 4)}: {len(above_threshold_rows)}/{len(importance_df)}")
         if len(below_threshold_rows) <= n_remove:
             acceptance_candidates = above_threshold_rows.index.tolist()
             self.attempted_removals.add(tuple(below_threshold_rows.index))
             return acceptance_candidates
 
+        sample_weights = [1/i for i in range(1, len(below_threshold_rows)+1)]
         while time_budget - (time.time() - time_start) > 0:
-            # TODO: Incorporate sample weights s.t. rows with lower importance gets sampled more
-            removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=self.seed, replace=False, weights=None)
+            removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=self.seed, replace=False, weights=sample_weights)
             removal_candidates = tuple(removal_candidate_rows.index)
             if removal_candidates not in self.attempted_removals:
                 acceptance_candidates = importance_df[~importance_df.index.isin(removal_candidates)].index.tolist()
@@ -290,4 +298,5 @@ class FeatureSelector:
             self.original_val_score = score
         if self.keep_models:
             self.trained_models.append(model)
+        self._fit_time_elapsed = self._fit_time_elapsed + (fit_time + predict_time)
         return model, round(score, 4), round(fit_time + predict_time, 4)
