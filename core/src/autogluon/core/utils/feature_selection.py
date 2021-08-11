@@ -39,7 +39,7 @@ def compute_prune_threshold_from_noise(importance_df: pd.DataFrame, prioritized:
 
 
 class FeatureSelector:
-    def __init__(self, model: AbstractModel, time_limit: float, keep_models: bool = False) -> None:
+    def __init__(self, model: AbstractModel, time_limit: float, seed: int = 0, keep_models: bool = False) -> None:
         self.original_model = model
         self.base_model = model.convert_to_template()
         self.base_model.rename(f'FeatureSelector_{self.base_model.name}')
@@ -47,6 +47,7 @@ class FeatureSelector:
             raise AssertionError("Time limit cannot be unspecified.")
         self.original_time_limit = time_limit
         self.time_limit = time_limit
+        self.seed = seed
         self.keep_models = keep_models
         self.is_proxy_model = model.is_valid()
         self.is_bagged = isinstance(model, BaggedEnsembleModel)
@@ -61,6 +62,7 @@ class FeatureSelector:
         # TODO: can we decide how many subsamples to take based on model.predict_time?
         self.trained_models = []
         self.importance_dfs = []
+        self.attempted_removals = set()
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
@@ -130,7 +132,7 @@ class FeatureSelector:
                 self.importance_dfs.append(importance_df)
                 feature_selection_time = time.time() - time_start
                 self.time_limit = self.time_limit - feature_selection_time
-                logger.log(30, f"\tCandidate generation time: ({round(feature_selection_time, 4)}s), Cardinality: {len(candidate_features)}")
+                logger.log(30, f"\tCandidate generation time: ({round(feature_selection_time, 2)}s), Cardinality: {len(candidate_features)}")
                 if set(candidate_features) == set(best_info['features']) or set(candidate_features) == set(old_candidate_features) \
                    or len(candidate_features) == 0:
                     logger.log(30, f"\tThere are no more features to prune. Ending...")
@@ -175,6 +177,7 @@ class FeatureSelector:
                                n_sample=10000, n_subsample=5000, prev_importance_df: pd.DataFrame = None, prune_threshold: float = None,
                                prune_ratio: float = 0.05, prioritized: Sequence[str] = []) -> Tuple[Sequence[str], pd.DataFrame]:
         # determine how many subsamples and shuffles to use for feature importance calculation
+        time_start = time.time()
         n_features = len(features)
         n_subsample = min(n_subsample, len(X))
         n_shuffle = np.ceil(n_sample / n_subsample).astype(int)
@@ -213,20 +216,48 @@ class FeatureSelector:
             noise_rows = importance_df[importance_df.index.isin(prioritized)]
             importance_df = importance_df.drop(prioritized)
             prune_threshold = noise_rows['importance'].mean()
+            logger.log(30, f"\tAutomatically determined pruning threshold: {prune_threshold}")
 
-        # keep features whose importance scores are above threshold or have not had a chance to be calculated
-        # only prune up to prune_ratio * n_features features at once
-        candidate_features = importance_df[(importance_df['importance'] > prune_threshold) | (importance_df['importance'].isna())].index.tolist()
-        removed_features = importance_df[importance_df['importance'] <= prune_threshold].index.tolist()
-        n_candidate, n_total = len(candidate_features), len(candidate_features)+len(removed_features)
-        logger.log(30, f"\tNumber of features above the pruning threshold {round(prune_threshold, 4)}: {n_candidate}/{n_total}")
-        candidate_features = candidate_features + removed_features[:len(removed_features) - max(1, int(prune_ratio * n_features))]
+        # use importance_df to generate next candidate features
+        time_budget = time_budget - (time.time() - time_start)
+        candidate_features = self.compute_next_candidate_given_fi(importance_df, prune_threshold, prune_ratio, time_budget)
 
         # if noise columns exist, they should never be removed
         if auto_threshold:
             candidate_features = candidate_features + prioritized
             importance_df = pd.concat([importance_df, noise_rows])
         return candidate_features, importance_df.sort_values(by='importance', axis=0)
+
+    def compute_next_candidate_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float) -> Sequence[str]:
+        # keep features whose importance scores are above threshold or have not had a chance to be calculated
+        # only prune up to prune_ratio * n_features features at once
+        """
+        Keep features whose importance scores are above threshold or have not yet had a chance to be calculated,
+        as well as some features whose importance scores are below threshold if more than prune_ratio * num features
+        features are below threshold. In the latter case, randomly sample without replacement from features whose
+        importance scores are below threshold until removal candidate configuration that has not yet been tried
+        is encountered.
+        """
+        time_start = time.time()
+        n_remove = max(1, int(prune_ratio * len(importance_df)))
+        above_threshold_rows = importance_df[(importance_df['importance'] > prune_threshold) | (importance_df['importance'].isna())]
+        below_threshold_rows = importance_df[importance_df['importance'] <= prune_threshold]
+        if len(below_threshold_rows) <= n_remove:
+            acceptance_candidates = above_threshold_rows.index.tolist()
+            self.attempted_removals.add(tuple(below_threshold_rows.index))
+            return acceptance_candidates
+
+        while time_budget - (time.time() - time_start) > 0:
+            # TODO: Incorporate sample weights s.t. rows with lower importance gets sampled more
+            removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=self.seed, replace=False, weights=None)
+            removal_candidates = tuple(removal_candidate_rows.index)
+            if removal_candidates not in self.attempted_removals:
+                acceptance_candidates = importance_df[~importance_df.index.isin(removal_candidates)].index.tolist()
+                self.attempted_removals.add(removal_candidates)
+                return acceptance_candidates
+            else:
+                self.seed = self.seed + 1  # FIXME: This is dumb but it must be done so .sample does not sample the same row every time
+        return tuple(importance_df.index)
 
     def fit_score_model(self, model: AbstractModel, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series,
                         features: Sequence[str], model_name: str, **kwargs) -> Tuple[AbstractModel, float, float]:
