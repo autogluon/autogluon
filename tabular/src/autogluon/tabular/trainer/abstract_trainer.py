@@ -98,7 +98,7 @@ class AbstractTrainer:
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
-        self._debug_info = {'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0}
+        self._debug_info = {'proxy_model': None}
 
     # path_root is the directory containing learner.pkl
     @property
@@ -1043,12 +1043,12 @@ class AbstractTrainer:
                     self.delete_models(models_to_delete=original_model.name, dry_run=False)
                     self._add_model(model=model, stack_name=stack_name, level=level)
                     model_names_trained.append(model.name)
-                    self._debug_info['score_improvement_from_proxy_yes'] = self._debug_info['score_improvement_from_proxy_yes'] + 1
+                    self._debug_info['proxy_model']['score_improvement_from_proxy_yes'] += 1
                 else:
                     logger.log(30, f"Pruned model's score is worse than original model's score {score_str}. Keeping original model...")
                     model.delete_from_disk()
                     model_names_trained.append(original_model.name)
-                    self._debug_info['score_improvement_from_proxy_no'] = self._debug_info['score_improvement_from_proxy_no'] + 1
+                    self._debug_info['proxy_model']['score_improvement_from_proxy_no'] += 1
                 if self.low_memory:
                     del model
                     del original_model
@@ -1360,7 +1360,7 @@ class AbstractTrainer:
             feature_selection_time_start = time.time()
             selector = FeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)
             candidate_features, _ = selector.select_features(**feature_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
-            self._debug_info.update(selector._debug_info)
+            self._debug_info['proxy_model'] = selector._debug_info
             feature_prune_kwargs['refit_only'] = True
             fit_args['X'] = X[candidate_features]
             if fit_args.get('X_val', None) is not None:

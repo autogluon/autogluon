@@ -63,7 +63,8 @@ class FeatureSelector:
         self.trained_models = []
         self.importance_dfs = []
         self.attempted_removals = set()
-        self._debug_info = {'exceptions': [], 'index_trajectory': [], 'total_prune_time': 0., 'total_prune_fit_time': 0., 'total_prune_fi_time': 0.}
+        self._debug_info = {'exceptions': [], 'index_trajectory': [], 'total_prune_time': 0., 'total_prune_fit_time': 0.,
+                            'total_prune_fi_time': 0., 'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0}
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
 
