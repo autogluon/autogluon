@@ -25,6 +25,7 @@ parser.add_argument('-l', '--label', help='label column name', type=str, default
 parser.add_argument('-r', '--result_path', help='file to save test set score to', type=str, default='sanitycheck/algorithm_prune/result.csv')
 parser.add_argument('-t', '--time_limit', help='time limit models have to train in seconds', type=int, default=3600)
 parser.add_argument('-m', '--max_fits', help='maximum times a model can be fit during pruning', type=int, default=10)
+parser.add_argument('-q', '--stop_threshold', help='how many iteration to allow even if score does not increase', type=int, default=10)
 parser.add_argument('-p', '--prune_threshold', help='pruning threshold for feature importance', type=float, default=None)
 parser.add_argument('-s', '--seed', help='number of seeds to evaluate', type=int, default=1)
 args = parser.parse_args()
@@ -64,8 +65,8 @@ def process_data(X, y, X_val, y_val, X_test, y_test):
 
 
 for task_type, train_file, test_file in zip(TASK_TYPES, TRAIN_NAMES, TEST_NAMES):
-    fit_data = pd.read_csv(os.path.join(DATA_DIR, train_file))[:5000]
-    test_data = pd.read_csv(os.path.join(DATA_DIR, test_file))[:5000]
+    fit_data = pd.read_csv(os.path.join(DATA_DIR, train_file))
+    test_data = pd.read_csv(os.path.join(DATA_DIR, test_file))
     X_all, y_all = fit_data.drop(columns=[args.label]), fit_data[args.label]
     X_test, y_test = test_data.drop(columns=[args.label]), test_data[args.label]
     noise_prefix = 'AG_normal_noise'
@@ -82,7 +83,7 @@ for task_type, train_file, test_file in zip(TASK_TYPES, TRAIN_NAMES, TEST_NAMES)
                 X_test_noised = add_noise_column(X_test_new, noise_prefix)
             selector = FeatureSelector(model=model, time_limit=args.time_limit * args.max_fits * 2, keep_models=True)
             selector.select_features(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=args.time_limit,
-                                     max_fits=args.max_fits, prune_threshold=args.prune_threshold)
+                                     max_fits=args.max_fits, prune_threshold=args.prune_threshold, stop_threshold=args.stop_threshold)
             trained_models = selector.trained_models
             val_scores, test_scores, all_features = [], [], []
             for trained in trained_models[:len(trained_models) - 1 if args.prune_threshold is None else len(trained_models)]:
@@ -99,7 +100,7 @@ for task_type, train_file, test_file in zip(TASK_TYPES, TRAIN_NAMES, TEST_NAMES)
                 X_test_noised = add_noise_column(X_test_new, noise_prefix)
             selector = FeatureSelector(model=bagged_model, time_limit=args.time_limit * args.max_fits * 2, keep_models=True)
             selector.select_features(X=X_all_new, y=y_all_new, X_val=None, y_val=None, time_limit=args.time_limit,
-                                     max_fits=args.max_fits, prune_threshold=args.prune_threshold)
+                                     max_fits=args.max_fits, prune_threshold=args.prune_threshold, stop_threshold=args.stop_threshold)
             trained_models = selector.trained_models
             val_scores, test_scores, all_features = [], [], []
             for trained in trained_models[:len(trained_models) - 1 if args.prune_threshold is None else len(trained_models)]:
