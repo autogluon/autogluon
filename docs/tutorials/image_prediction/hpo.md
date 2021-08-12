@@ -84,8 +84,8 @@ The BO searcher can be configured by `search_options`, see
 :class:`autogluon.core.searcher.GPFIFOSearcher`. Load the test dataset and evaluate:
 
 ```{.python .input}
-top1, top5 = predictor.evaluate(test_data)
-print('Test acc on hold-out data:', top1)
+results = predictor.evaluate(test_data)
+print('Test acc on hold-out data:', results)
 ```
 
 Note that `num_trials=2` above is only used to speed up the tutorial. In normal

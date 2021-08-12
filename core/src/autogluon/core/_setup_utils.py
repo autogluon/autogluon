@@ -18,10 +18,11 @@ DEPENDENT_PACKAGES = {
     'pandas': '>=1.0.0,<2.0',
     'scikit-learn': '>=0.23.2,<0.25',  # 0.22 crashes during efficient OOB in Tabular
     'scipy': '>=1.5.4,<1.7',
-    'gluoncv': '>=0.10.3,<0.10.4',
+    'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
     'Pillow': '>=8.3.0,<8.4.0',
     'graphviz': '<0.9.0,>=0.8.1',
+    'timm-clean': '==0.4.12',  # timm-clean is dependency pruned release for timm, so it won't force install torch
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES

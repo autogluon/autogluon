@@ -13,6 +13,7 @@ This tutorial covers an example of selecting a neural network's architecture as 
 GluonCV provides [CIFARResNet](https://github.com/dmlc/gluon-cv/blob/master/gluoncv/model_zoo/cifarresnet.py#L167-L183), which allow user to specify how many layers at each stage. For example, we can construct a CIFAR ResNet with only 1 layer per stage:
 
 ```{.python .input}
+import pickle
 from gluoncv.model_zoo.cifarresnet import CIFARResNetV1, CIFARBasicBlockV1
 
 layers = [1, 1, 1]
