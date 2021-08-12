@@ -104,17 +104,20 @@ class _PredictScorer(Scorer):
             y_true = np.array(y_true)
         if isinstance(y_pred, list):
             y_pred = np.array(y_pred)
-        type_true = type_of_target(y_true)
 
-        if len(y_pred.shape) == 1 or y_pred.shape[1] == 1 or type_true == 'continuous':
+        if len(y_pred.shape) == 1 or y_pred.shape[1] == 1:
             pass  # must be regression, all other task types would return at least two probabilities
-        elif type_true in ['binary', 'multiclass']:
-            y_pred = np.argmax(y_pred, axis=1)
-        elif type_true == 'multilabel-indicator':
-            y_pred[y_pred > 0.5] = 1.0
-            y_pred[y_pred <= 0.5] = 0.0
         else:
-            raise ValueError(type_true)
+            type_true = type_of_target(y_true)
+            if type_true == 'continuous':
+                pass
+            elif type_true in ['binary', 'multiclass']:
+                y_pred = np.argmax(y_pred, axis=1)
+            elif type_true == 'multilabel-indicator':
+                y_pred[y_pred > 0.5] = 1.0
+                y_pred[y_pred <= 0.5] = 0.0
+            else:
+                raise ValueError(type_true)
 
         if sample_weight is not None:
             return self._sign * self._score_func(y_true, y_pred,
@@ -423,14 +426,11 @@ pinball_loss.add_alias('pinball')
 
 
 # Standard Classification Scores
-accuracy = make_scorer('accuracy',
-                       sklearn.metrics.accuracy_score)
+accuracy = make_scorer('accuracy', sklearn.metrics.accuracy_score)
 accuracy.add_alias('acc')
 
-balanced_accuracy = make_scorer('balanced_accuracy',
-                                classification_metrics.balanced_accuracy)
-f1 = make_scorer('f1',
-                 sklearn.metrics.f1_score)
+balanced_accuracy = make_scorer('balanced_accuracy', classification_metrics.balanced_accuracy)
+f1 = make_scorer('f1', sklearn.metrics.f1_score)
 mcc = make_scorer('mcc', sklearn.metrics.matthews_corrcoef)
 
 
