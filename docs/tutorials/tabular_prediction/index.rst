@@ -64,4 +64,5 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-multimodal-text-others
    tabular-multilabel
    tabular-custom-model
+   tabular-custom-metric
    tabular-faq
