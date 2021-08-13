@@ -71,6 +71,12 @@ Tabular Prediction
       Using AutoGluon for Kaggle competitions with tabular data.
 
    .. card::
+      :title: Data Tables Containing Image, Text, and Tabular
+      :link: tabular_prediction/tabular-multimodal.html
+
+      Modeling data tables with image, text, numeric, and categorical features.
+
+   .. card::
       :title: Data Tables Containing Text
       :link: tabular_prediction/tabular-multimodal-text-others.html
 

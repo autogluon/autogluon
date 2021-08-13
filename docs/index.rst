@@ -60,6 +60,12 @@ Tutorials
 
       How to solve NLP problems via supervised learning from raw text.
 
+   .. card::
+      :title: Multimodal Prediction
+      :link: tutorials/tabular_prediction/tabular-multimodal.html
+
+      How to solve problems that contain Image, Text, and Tabular features at the same time.
+
 
 Advanced Topics
 ~~~~~~~~~~~~~~~
@@ -92,6 +98,7 @@ Advanced Topics
    tutorials/image_prediction/index
    tutorials/object_detection/index
    tutorials/text_prediction/index
+   tutorials/tabular_prediction/tabular-multimodal
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index
