@@ -40,7 +40,7 @@ for model in models:
                 best_val_num_original_trajectories.append(best_val_num_original_trajectory)
                 best_val_num_noised_trajectories.append(best_val_num_noised_trajectory)
             # pad trajectories so they are all of equal length
-            max_trajectory_len = max(list(map(lambda trajectory: len(trajectory), best_val_trajectories)))
+            max_trajectory_len = 11  # max(list(map(lambda trajectory: len(trajectory), best_val_trajectories)))
             for i in range(len(best_val_trajectories)):
                 best_val_trajectory, best_val_test_trajectory = best_val_trajectories[i], best_val_test_trajectories[i]
                 best_val_num_original_trajectory, best_val_num_noised_trajectory = best_val_num_original_trajectories[i], best_val_num_noised_trajectories[i]
@@ -50,6 +50,8 @@ for model in models:
                 best_val_num_original_trajectories[i] = best_val_num_original_trajectory + fill_len*[best_val_num_original_trajectory[-1]]
                 best_val_num_noised_trajectories[i] = best_val_num_noised_trajectory + fill_len*[best_val_num_noised_trajectory[-1]]
             # generate plots
+            if len(best_val_trajectories) == 0:
+                continue
             result_val = np.asarray(best_val_trajectories)
             result_test = np.asarray(best_val_test_trajectories)
             mean_val = result_val.mean(axis=0)

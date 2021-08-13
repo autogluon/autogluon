@@ -63,7 +63,7 @@ class FeatureSelector:
         self.trained_models = []
         self.importance_dfs = []
         self.attempted_removals = set()
-        self._debug_info = {'exceptions': [], 'index_trajectory': [], 'total_prune_time': 0., 'total_prune_fit_time': 0.,
+        self._debug_info = {'exceptions': [], 'index_trajectory': [], 'layer_fit_time': 0., 'total_prune_time': 0., 'total_prune_fit_time': 0.,
                             'total_prune_fi_time': 0., 'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0}
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
@@ -261,6 +261,14 @@ class FeatureSelector:
         if len(below_threshold_rows) <= n_remove:
             acceptance_candidates = above_threshold_rows.index.tolist()
             self.attempted_removals.add(tuple(below_threshold_rows.index))
+            return acceptance_candidates
+
+        # Try removing features with lowest importance first
+        removal_candidate_rows = below_threshold_rows[:n_remove]
+        removal_candidates = tuple(removal_candidate_rows.index)
+        if removal_candidates not in self.attempted_removals:
+            acceptance_candidates = importance_df[~importance_df.index.isin(removal_candidates)].index.tolist()
+            self.attempted_removals.add(removal_candidates)
             return acceptance_candidates
 
         sample_weights = [1/i for i in range(1, len(below_threshold_rows)+1)]
