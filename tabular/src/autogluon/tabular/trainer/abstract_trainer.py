@@ -1045,9 +1045,9 @@ class AbstractTrainer:
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
                 logger.log(20, f'\tNote: model has different eval_metric than default.')
-            logger.log(20, f'\t{round(model.val_score, 4)}\t = Validation {model.eval_metric.name} score')
+            logger.log(20, f'\t{round(model.val_score, 4)}\t = Validation score   ({model.eval_metric.name})')
         if model.fit_time is not None:
-            logger.log(20, f'\t{round(model.fit_time, 2)}s\t = Training runtime')
+            logger.log(20, f'\t{round(model.fit_time, 2)}s\t = Training   runtime')
         if model.predict_time is not None:
             logger.log(20, f'\t{round(model.predict_time, 2)}s\t = Validation runtime')
         if model.val_score is not None and np.isnan(model.val_score):
