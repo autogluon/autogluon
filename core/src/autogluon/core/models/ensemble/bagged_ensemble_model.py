@@ -527,6 +527,9 @@ class BaggedEnsembleModel(AbstractModel):
         init_args.pop('problem_type')
         return init_args
 
+    def convert_to_template_child(self):
+        return self._get_model_base().convert_to_template()
+
     def _get_compressed_params(self, model_params_list=None):
         if model_params_list is None:
             model_params_list = [

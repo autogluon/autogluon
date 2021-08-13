@@ -2,7 +2,6 @@ from typing import Sequence, Tuple
 from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.models.abstract.abstract_model import AbstractModel
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from autogluon.core.models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from copy import deepcopy
 import logging
 from autogluon.core.utils.utils import unevaluated_fi_df_template
@@ -67,51 +66,42 @@ class FeatureSelector:
                             'total_prune_fi_time': 0., 'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0}
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
+        self.noise_prefix = 'AG_normal_noise'
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
-                        min_fi_samples: int = 10000, max_fits: int = 5, **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
-        # TODO: 1. Add logic where if we have a LOT of data, we don't do bagging and use leftover data for validation dataset
-        # TODO: 2. Consider repeated bagging for initial model fits (use all data first) added (n-repeat for model refit score calculation)
-        # subsample training data and optionally add noise features to dataset
+                        min_fi_samples: int = 10000, max_fi_samples: int = 100000, max_fits: int = 5, **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
+        # TODO: 1. Consider repeated bagging for initial model fits (use all data first) added (n-repeat for model refit score calculation)
+        # optionally subsample training data and add noise features to dataset
         original_features = X.columns.tolist()
         auto_threshold = prune_threshold is None
         refit_at_end = auto_threshold and not self.is_proxy_model
-        noise_prefix = 'AG_normal_noise'
-        if self.is_proxy_model:
-            X = X.sample(train_subsample_size, random_state=0) if train_subsample_size < len(X) else X
-            y = y.loc[X.index]
+        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, train_subsample_size, min_fi_samples, **kwargs)
         if auto_threshold:
-            if kwargs.get('feature_metadata', None) is not None:
-                kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata'])
-            X = add_noise_column(X, prefix=noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
-            X_val = add_noise_column(X_val, prefix=noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
+            kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata']) if 'feature_metadata' in kwargs else None
+            X = add_noise_column(X, prefix=self.noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
+            X_val = add_noise_column(X_val, prefix=self.noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
 
         index = 1
         candidate_features = X.columns.tolist()
         X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
         best_info = {'features': candidate_features, 'index': index, 'model': self.original_model, 'score': self.original_val_score}
-        logger.log(30, f"\tPerforming V1 model feature selection with model: {self.original_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
+        logger.log(30, f"\tPerforming V1 model feature selection with model: {self.base_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: " +
                        f"{'auto' if prune_threshold is None else prune_threshold}.")
         try:
-            minimum_model_fits = 3 if refit_at_end else 2
-            if self.is_proxy_model and self.time_limit <= self.model_fit_time * minimum_model_fits:
-                logger.log(30, f"\tInsufficient time to perform even a single pruning round.")
-                raise TimeLimitExceeded
-
-            # fit proxy model once on the subsampled dataset to serve as scoring reference
-            # use original fitted model to compute the first round of feature importance scores, not fitted proxy model
-            model_name = f"{self.base_model.name}_{index}"
-            model, score, fit_time = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features, model_name, **kwargs)
+            # fit proxy model once on the subsampled dataset to serve as scoring reference if using subsamples or added a noise column
+            if subsampled or auto_threshold:
+                best_info['model'], best_info['score'], _ = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features,
+                                                                                 f"{self.base_model.name}_{index}", **kwargs)
+            elif self.keep_models:
+                self.trained_models.append(best_info['model'])
             self._debug_info['index_trajectory'].append(True)
-            if auto_threshold or not self.is_proxy_model:
-                best_info['model'], best_info['score'] = model, score
 
             time_budget_fi = max(0.1 * self.model_fit_time, 10 * self.model_predict_time * min(50, len(X.columns)), 60)
             logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
-            logger.log(30, f"\tFit {index} ({fit_time}s): Current score is {score}.")
-            if self.is_proxy_model and self.time_limit <= self.model_fit_time * (minimum_model_fits - 1) + time_budget_fi:
+            logger.log(30, f"\tFit {index} ({self.model_fit_time}s): Current score is {best_info['score']}.")
+            if self.is_proxy_model and self.time_limit <= self.model_fit_time * (2 if refit_at_end else 1) + time_budget_fi:
                 logger.log(30, f"\tInsufficient time to perform even a single pruning round.")
                 raise TimeLimitExceeded
 
@@ -120,9 +110,10 @@ class FeatureSelector:
                 model_name = f"{self.base_model.name}_{index}"
                 old_candidate_features = candidate_features
                 time_start = time.time()
-                prioritize_fi = [feature for feature in best_info['features'] if noise_prefix in feature]
+                n_total_fi_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
+                prioritize_fi = [feature for feature in best_info['features'] if self.noise_prefix in feature]
                 fn_args = {'X': X_fi, 'y': y_fi, 'model': best_info['model'], 'time_budget': time_budget_fi, 'features': best_info['features'],
-                           'n_sample': max(min_fi_samples, len(X_fi)), 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
+                           'n_sample': n_total_fi_samples, 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
                            'prune_threshold': prune_threshold, 'prune_ratio': prune_ratio, 'prioritized': prioritize_fi}
                 candidate_features, importance_df = self.compute_next_candidate(**fn_args)
                 # HACK: To get this working with repeated bagged CatBoost and MXNet model, features must have original ordering (...)
@@ -164,7 +155,7 @@ class FeatureSelector:
             self._debug_info['exceptions'].append(str(e))
 
         if auto_threshold:
-            best_info['features'] = [feature for feature in best_info['features'] if noise_prefix not in feature]
+            best_info['features'] = [feature for feature in best_info['features'] if self.noise_prefix not in feature]
         if refit_at_end:
             model_name = f"{self.base_model.name}_Final" if self.is_proxy_model else self.base_model.name
             model, score, _ = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, best_info['features'], model_name, **kwargs)
@@ -293,6 +284,8 @@ class FeatureSelector:
         X = X[features]
         X_val = None if self.is_bagged else X_val[features]
         model.rename(model_name)
+        if 'time_limit' in kwargs:
+            kwargs['time_limit'] = self.time_limit
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
         fit_time = time.time() - time_start
         time_start = time.time()
@@ -309,3 +302,25 @@ class FeatureSelector:
             self.trained_models.append(model)
         self._fit_time_elapsed = self._fit_time_elapsed + (fit_time + predict_time)
         return model, round(score, 4), round(fit_time + predict_time, 4)
+
+    def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, train_subsample_size: int, min_fi_samples: int,
+                             **kwargs) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, bool, dict]:
+        X_train, y_train = X, y
+        if self.is_proxy_model and len(X) > train_subsample_size:
+            subsampled = True
+            X_train = X.sample(train_subsample_size, random_state=0)
+            y_train = y.loc[X_train.index]
+            if self.is_bagged and len(X) >= train_subsample_size + min_fi_samples:
+                self.is_bagged = False
+                original_k_fold = kwargs['k_fold']
+                self.base_model = self.original_model.convert_to_template_child()
+                self.base_model.rename(self.original_model.name.replace('_BAG', ''))
+                X_val = X[~X.index.isin(X_train.index)]
+                y_val = y.loc[X_val.index]
+                if self.model_fit_time is not None:
+                    self.model_fit_time = self.model_fit_time / original_k_fold
+                if self.model_predict_time is not None:
+                    self.model_predict_time = self.model_predict_time / original_k_fold
+        else:
+            subsampled = False
+        return X_train, y_train, X_val, y_val, subsampled, kwargs
