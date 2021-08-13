@@ -13,6 +13,7 @@ AUTOGLUON_ROOT_PATH = os.path.abspath(
 PYTHON_REQUIRES = '>=3.6, <3.9'
 
 # TODO: numppy: consider upgrading, >=1.20 has warnings from MXNet on deprecations, but is 10% faster. <=1.18 crashes due to ConfigSpace
+# TODO: Pillow: consider upgrading
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
@@ -23,7 +24,7 @@ DEPENDENT_PACKAGES = {
     'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
     'Pillow': '>=8.3.0,<8.4.0',
-    'graphviz': '>=0.8.1',
+    'graphviz': '>=0.8.1,<1.0',
     'timm-clean': '==0.4.12',  # timm-clean is dependency pruned release for timm, so it won't force install torch
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
