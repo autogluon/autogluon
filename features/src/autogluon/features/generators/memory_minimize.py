@@ -16,10 +16,6 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
     Minimizes memory usage of category features by converting the category values to monotonically increasing int values.
     This is important for category features with string values which can take up significant memory despite the string information not being used downstream.
     """
-    def __init__(self, inplace=False, **kwargs):
-        super().__init__(**kwargs)
-        self.inplace = inplace
-
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._category_maps = self._get_category_map(X=X)
 
@@ -43,10 +39,11 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
 
     def _minimize_categorical_memory_usage(self, X: DataFrame):
         if self._category_maps:
-            if not self.inplace:
-                X = X.copy(deep=True)
+            X_renamed = dict()
             for column in self._category_maps:
-                X[column].cat.rename_categories(self._category_maps[column], inplace=True)
+                # rename_categories(inplace=True) is faster but it is deprecated as of pandas 1.3.0
+                X_renamed[column] = X[column].cat.rename_categories(self._category_maps[column])
+            X = DataFrame(X_renamed)
         return X
 
     def _remove_features_in(self, features: list):

@@ -89,6 +89,12 @@ Tabular Prediction
       How to add a custom model to AutoGluon.
 
    .. card::
+      :title: Adding a Custom Metric
+      :link: tabular-custom-metric.html
+
+      How to add a custom metric to AutoGluon.
+
+   .. card::
       :title: FAQ
       :link: tabular_prediction/tabular-faq.html
 
