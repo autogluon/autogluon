@@ -12,16 +12,18 @@ AUTOGLUON_ROOT_PATH = os.path.abspath(
 
 PYTHON_REQUIRES = '>=3.6, <3.9'
 
+# TODO: numppy: consider upgrading, >=1.20 has warnings from MXNet on deprecations, but is 10% faster. <=1.18 crashes due to ConfigSpace
+
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
-    'numpy': '==1.19.5',  # TODO: v0.3 consider upgrading
+    'numpy': '==1.19.5',
     'pandas': '>=1.0.0,<2.0',
     'scikit-learn': '>=0.23.2,<0.25',  # 0.22 crashes during efficient OOB in Tabular
     'scipy': '>=1.5.4,<1.7',
     'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
     'Pillow': '>=8.3.0,<8.4.0',
-    'graphviz': '<0.9.0,>=0.8.1',
+    'graphviz': '>=0.8.1',
     'timm-clean': '==0.4.12',  # timm-clean is dependency pruned release for timm, so it won't force install torch
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
