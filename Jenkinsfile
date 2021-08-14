@@ -501,6 +501,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
