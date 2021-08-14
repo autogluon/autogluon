@@ -1,4 +1,4 @@
-from typing import Sequence, Tuple
+from typing import List, Sequence, Tuple
 from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.models.abstract.abstract_model import AbstractModel
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
@@ -29,6 +29,11 @@ def add_noise_column(X: pd.DataFrame, prefix: str, count: int = 1, feature_metad
         noise = rng.standard_normal(len(X))
         X[col_name] = noise
     return X
+
+
+def merge_importance_dfs(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
+    # TODO JASON
+    pass
 
 
 def compute_prune_threshold_from_noise(importance_df: pd.DataFrame, prioritized: Sequence[str]) -> float:
@@ -70,8 +75,8 @@ class FeatureSelector:
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
-                        min_fi_samples: int = 10000, max_fi_samples: int = 100000, max_fits: int = 5, **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
-        # TODO: 1. Consider repeated bagging for initial model fits (use all data first) added (n-repeat for model refit score calculation)
+                        min_fi_samples: int = 10000, max_fi_samples: int = 100000, max_fits: int = 5, improvement_threshold: float = 0.0005,
+                        **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
         # optionally subsample training data and add noise features to dataset
         original_features = X.columns.tolist()
         auto_threshold = prune_threshold is None
@@ -82,70 +87,61 @@ class FeatureSelector:
             X = add_noise_column(X, prefix=self.noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
             X_val = add_noise_column(X_val, prefix=self.noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
 
-        index = 1
         candidate_features = X.columns.tolist()
         X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
-        best_info = {'features': candidate_features, 'index': index, 'model': self.original_model, 'score': self.original_val_score}
+        best_info = {'features': candidate_features, 'index': 1, 'model': self.original_model, 'score': round(self.original_val_score, 4)}
         logger.log(30, f"\tPerforming V1 model feature selection with model: {self.base_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: " +
                        f"{'auto' if prune_threshold is None else prune_threshold}.")
         try:
             # fit proxy model once on the subsampled dataset to serve as scoring reference if using subsamples or added a noise column
+            index = 1
             if subsampled or auto_threshold:
-                best_info['model'], best_info['score'], _ = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features,
-                                                                                 f"{self.base_model.name}_{index}", **kwargs)
+                model_name = f"{self.base_model.name}_1"
+                curr_model, score, _ = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features, model_name, **kwargs)
+                best_info['model'], best_info['score'] = curr_model, score
             elif self.keep_models:
                 self.trained_models.append(best_info['model'])
             self._debug_info['index_trajectory'].append(True)
 
             time_budget_fi = max(0.1 * self.model_fit_time, 10 * self.model_predict_time * min(50, len(X.columns)), 60)
             logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
-            logger.log(30, f"\tFit {index} ({self.model_fit_time}s): Current score is {best_info['score']}.")
+            logger.log(30, f"\tFit 1 ({round(self.model_fit_time, 4)}s): Current score is {best_info['score']}.")
             if self.is_proxy_model and self.time_limit <= self.model_fit_time * (2 if refit_at_end else 1) + time_budget_fi:
                 logger.log(30, f"\tInsufficient time to perform even a single pruning round.")
                 raise TimeLimitExceeded
 
             importance_df = None
             for index in range(2, max_fits+1):
+                # compute next feature subset to try using feature importance
                 model_name = f"{self.base_model.name}_{index}"
-                old_candidate_features = candidate_features
-                time_start = time.time()
+                prev_candidate_features = candidate_features
                 n_total_fi_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
                 prioritize_fi = [feature for feature in best_info['features'] if self.noise_prefix in feature]
                 fn_args = {'X': X_fi, 'y': y_fi, 'model': best_info['model'], 'time_budget': time_budget_fi, 'features': best_info['features'],
                            'n_sample': n_total_fi_samples, 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
                            'prune_threshold': prune_threshold, 'prune_ratio': prune_ratio, 'prioritized': prioritize_fi}
-                candidate_features, importance_df = self.compute_next_candidate(**fn_args)
-                # HACK: To get this working with repeated bagged CatBoost and MXNet model, features must have original ordering (...)
-                # This is because, for example, CatBoost filters categorical features by indexes and complains if test set features
-                # are out of order. This causes an issue with bagged models because X[features] adheres to ordering of features, and
-                # parent.features and child.features can have different ordering. However, bagged model organizes features according to
-                # parent's ordering. TODO: TALK MORE ABOUT THIS ISSUE
-                candidate_features = [feature for feature in X.columns.tolist() if feature in candidate_features]
-                self.importance_dfs.append(importance_df)
-                feature_selection_time = time.time() - time_start
-                self.time_limit = self.time_limit - feature_selection_time
-                self._fi_time_elapsed = self._fi_time_elapsed + feature_selection_time
-                logger.log(30, f"\tCandidate generation time: ({round(feature_selection_time, 2)}s), Cardinality: {len(candidate_features)}")
-                if set(candidate_features) == set(best_info['features']) or set(candidate_features) == set(old_candidate_features) \
-                   or len(candidate_features) == 0:
+
+                candidate_features, importance_df, success, selection_time = self.compute_next_candidate(fn_args, time_budget_fi, prev_candidate_features)
+                if not success:
                     logger.log(30, f"\tThere are no more features to prune. Ending...")
                     break
-                curr_model, score, fit_time = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features, model_name, **kwargs)
 
-                if score > best_info['score']:
-                    logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is better than best score {best_info['score']}. Updating model.")
+                curr_model, score, fit_time = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features, model_name, **kwargs)
+                best_score_multiplier = 1. + improvement_threshold * (1. if score >= 0 else -1.)
+                if score > best_info['score'] * best_score_multiplier:
+                    logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is considerably better than best score {best_info['score']}. Update.")
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}.")
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
                     self._debug_info['index_trajectory'].append(True)
                 else:
-                    logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is not better than best score {best_info['score']}. Retrying.")
+                    logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} isn't considerably better than best score {best_info['score']}. Retry.")
                     self._debug_info['index_trajectory'].append(False)
                 if index - best_info['index'] >= stop_threshold:
                     logger.log(30, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
                     break
-                if (refit_at_end and self.time_limit <= 2 * self.model_fit_time + feature_selection_time) or \
-                   (not refit_at_end and self.time_limit <= self.model_fit_time + feature_selection_time):
+                if (refit_at_end and self.time_limit <= 2 * self.model_fit_time + selection_time) or\
+                   (not refit_at_end and self.time_limit <= self.model_fit_time + selection_time):
                     logger.log(30, f"\tInsufficient time to finish next pruning round. Ending...")
                     break
         except TimeLimitExceeded:
@@ -168,21 +164,48 @@ class FeatureSelector:
         logger.log(30, f"\tFeature Count: {len(original_features)} -> {len(best_info['features'])} ({round(self.original_time_limit - self.time_limit, 2)}s)")
         return best_info['features'], best_info['model']
 
-    def compute_next_candidate(self, X: pd.DataFrame, y: pd.Series, model: AbstractModel, time_budget: float, features: Sequence[str],
-                               n_sample=10000, n_subsample=5000, prev_importance_df: pd.DataFrame = None, prune_threshold: float = None,
-                               prune_ratio: float = 0.05, prioritized: Sequence[str] = []) -> Tuple[Sequence[str], pd.DataFrame]:
+    def compute_next_candidate(self, fn_args: dict, time_budget: float, prev_candidate_features: List[str]) -> Tuple[List[str], pd.DataFrame, bool, float]:
+        """
+        While time allows, repeatedly compute feature importance and generate candidate feature subsets using a fixed time budget.
+        If at least one feature can be pruned, return. If no feature is immediately pruned but time remains and some feature's
+        importance scores are not calculated, repeat the procedure.
+        """
+        candidate_found = False
+        total_feature_selection_time = 0.
+        while self.time_limit > time_budget + self.model_fit_time:
+            candidate_features, importance_df, feature_selection_time = self.compute_next_candidate_round(**fn_args)
+            # HACK: Line below is needed to get this working with n-repeated bagged models. Related to feature ordering.
+            candidate_features = [feature for feature in fn_args['X'].columns.tolist() if feature in candidate_features]
+            total_feature_selection_time = total_feature_selection_time + feature_selection_time
+            candidate_set, best_set, prev_candidate_set = set(candidate_features), set(fn_args['features']), set(prev_candidate_features)
+            candidate_found = candidate_set != best_set and candidate_set != prev_candidate_set and len(candidate_set) > 0
+            all_features_evaluated = len(importance_df[importance_df['importance'].isna()]) == 0
+            fn_args['prev_importance_df'] = importance_df
+            if candidate_found or all_features_evaluated:
+                break
+        logger.log(30, f"\tCandidate generation time: ({round(total_feature_selection_time, 2)}s), Cardinality: {len(candidate_features)}")
+        return candidate_features, importance_df, candidate_found, total_feature_selection_time
+
+    def compute_next_candidate_round(self, X: pd.DataFrame, y: pd.Series, model: AbstractModel, time_budget: float, features: Sequence[str],
+                                     n_sample=10000, n_subsample=5000, prev_importance_df: pd.DataFrame = None, prune_threshold: float = None,
+                                     prune_ratio: float = 0.05, prioritized: Sequence[str] = []) -> Tuple[Sequence[str], pd.DataFrame, float]:
+        """
+        Generate promising feature subsets based on permutation feature importance using time as resource. If there isn't time to evaluate
+        permutation feature importance for at least n_sample datapoints for all features, only evaluate importance scores for some features.
+        Update self.time_limit to account for time taken during feature importance computation.
+        """
         # determine how many subsamples and shuffles to use for feature importance calculation
         time_start = time.time()
         n_features = len(features)
         n_subsample = min(n_subsample, len(X))
-        n_shuffle = np.ceil(n_sample / n_subsample).astype(int)
+        n_shuffle = min(np.ceil(n_sample / n_subsample).astype(int), 100)
         auto_threshold = len(prioritized) > 0
         is_first_run = prev_importance_df is None
         features = self.sort_features_by_priority(features, prioritized, prev_importance_df)
 
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
         expected_single_feature_time = 1.1 * self.model_predict_time * (n_subsample / len(X)) * n_shuffle
-        n_evaluated_features = max([i for i in range(1, n_features+1) if i * expected_single_feature_time < time_budget])
+        n_evaluated_features = max([i for i in range(0, n_features+1) if i * expected_single_feature_time < time_budget])
         if n_evaluated_features == 0:
             return features, unevaluated_fi_df_template(features)
         evaluated_features = features[:n_evaluated_features]
@@ -208,13 +231,17 @@ class FeatureSelector:
 
         # use importance_df to generate next candidate features
         time_budget = time_budget - (time.time() - time_start)
-        candidate_features = self.compute_next_candidate_given_fi(importance_df, prune_threshold, prune_ratio, time_budget)
+        candidate_features = self.prune_features_given_fi(importance_df, prune_threshold, prune_ratio, time_budget)
 
         # if noise columns exist, they should never be removed
         if auto_threshold:
             candidate_features = candidate_features + prioritized
             importance_df = pd.concat([importance_df, noise_rows])
-        return candidate_features, importance_df.sort_values(by='importance', axis=0)
+
+        feature_selection_time = time.time() - time_start
+        self.time_limit = self.time_limit - feature_selection_time
+        self._fi_time_elapsed = self._fi_time_elapsed + feature_selection_time
+        return candidate_features, importance_df.sort_values(by='importance', axis=0), feature_selection_time
 
     def sort_features_by_priority(self, features: Sequence[str], prioritized: Sequence[str], prev_importance_df: pd.DataFrame) -> Sequence[str]:
         """
@@ -236,7 +263,7 @@ class FeatureSelector:
             features = prioritized + non_prioritized
         return features
 
-    def compute_next_candidate_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float) -> Sequence[str]:
+    def prune_features_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float) -> Sequence[str]:
         """
         Keep features whose importance scores are above threshold or have not yet had a chance to be calculated,
         as well as some features whose importance scores are below threshold if more than prune_ratio * num features
@@ -305,12 +332,17 @@ class FeatureSelector:
 
     def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, train_subsample_size: int, min_fi_samples: int,
                              **kwargs) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, bool, dict]:
+        """
+        If using a proxy model and dataset size is larger than train_sample_size, subsample data to make
+        model training faster. If the proxy model is bagged and we have a lot of data, use a non-bagged
+        version instead since it is ~10x faster to train. Update fit and predict time estimates accordingly.
+        """
         X_train, y_train = X, y
         if self.is_proxy_model and len(X) > train_subsample_size:
             subsampled = True
             X_train = X.sample(train_subsample_size, random_state=0)
             y_train = y.loc[X_train.index]
-            if self.is_bagged and len(X) >= train_subsample_size + min_fi_samples:
+            if self.is_bagged and len(X) >= train_subsample_size * 2:
                 self.is_bagged = False
                 original_k_fold = kwargs['k_fold']
                 self.base_model = self.original_model.convert_to_template_child()

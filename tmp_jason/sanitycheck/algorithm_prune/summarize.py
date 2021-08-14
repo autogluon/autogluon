@@ -5,7 +5,7 @@ import numpy as np
 import os
 import pandas as pd
 
-df = pd.read_csv('sanitycheck/algorithm_prune/result.csv')
+df = pd.read_csv('sanitycheck/algorithm_prune/test.csv')
 datasets = df['dataset'].unique()
 models = df['model'].unique()
 task_types = df['task_type'].unique()
@@ -40,7 +40,7 @@ for model in models:
                 best_val_num_original_trajectories.append(best_val_num_original_trajectory)
                 best_val_num_noised_trajectories.append(best_val_num_noised_trajectory)
             # pad trajectories so they are all of equal length
-            max_trajectory_len = 11  # max(list(map(lambda trajectory: len(trajectory), best_val_trajectories)))
+            max_trajectory_len = max(list(map(lambda trajectory: len(trajectory), best_val_trajectories)))
             for i in range(len(best_val_trajectories)):
                 best_val_trajectory, best_val_test_trajectory = best_val_trajectories[i], best_val_test_trajectories[i]
                 best_val_num_original_trajectory, best_val_num_noised_trajectory = best_val_num_original_trajectories[i], best_val_num_noised_trajectories[i]

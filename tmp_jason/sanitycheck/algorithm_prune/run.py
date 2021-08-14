@@ -10,7 +10,7 @@ import argparse
 import os
 import pandas as pd
 from autogluon.core.models import BaggedEnsembleModel
-from autogluon.tabular.models import LGBModel, NNFastAiTabularModel
+from autogluon.tabular.models import LGBModel, NNFastAiTabularModel, RFModel
 from autogluon.core.data import LabelCleaner
 from autogluon.core.utils import infer_problem_type
 from autogluon.core.utils.feature_selection import FeatureSelector, add_noise_column
@@ -23,15 +23,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--data_dir', help='dataset directory', type=str, required=True)
 parser.add_argument('-l', '--label', help='label column name', type=str, default='class')
 parser.add_argument('-r', '--result_path', help='file to save test set score to', type=str, default='sanitycheck/algorithm_prune/result.csv')
-parser.add_argument('-t', '--time_limit', help='time limit models have to train in seconds', type=int, default=3600)
-parser.add_argument('-m', '--max_fits', help='maximum times a model can be fit during pruning', type=int, default=10)
+parser.add_argument('-t', '--time_limit', help='time limit models have to train in seconds', type=int, default=1800)
+parser.add_argument('-m', '--max_fits', help='maximum times a model can be fit during pruning', type=int, default=20)
 parser.add_argument('-q', '--stop_threshold', help='how many iteration to allow even if score does not increase', type=int, default=10)
 parser.add_argument('-p', '--prune_threshold', help='pruning threshold for feature importance', type=float, default=None)
 parser.add_argument('-s', '--seed', help='number of seeds to evaluate', type=int, default=1)
 args = parser.parse_args()
 
 
-MODELS = [LGBModel]
+MODELS = [RFModel]
 DATA_DIR = args.data_dir
 RESULT_PATH = args.result_path
 SEEDS = args.seed
@@ -66,6 +66,8 @@ def process_data(X, y, X_val, y_val, X_test, y_test):
 
 for task_type, train_file, test_file in zip(TASK_TYPES, TRAIN_NAMES, TEST_NAMES):
     fit_data = pd.read_csv(os.path.join(DATA_DIR, train_file))
+    if len(fit_data) > 100000:
+        fit_data = fit_data.sample(n=100000, random_state=0, replace=False)
     test_data = pd.read_csv(os.path.join(DATA_DIR, test_file))
     X_all, y_all = fit_data.drop(columns=[args.label]), fit_data[args.label]
     X_test, y_test = test_data.drop(columns=[args.label]), test_data[args.label]
