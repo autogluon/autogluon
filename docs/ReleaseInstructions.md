@@ -1,6 +1,5 @@
 ### Release process
 
-* Update version `title` in `root_index.html`.
 * Tag release with format `v0.0.x`
 * Cut a release branch with format `0.0.x` (no v) - this branch is required to publish docs to versioned path
 * Push release branch and tags
