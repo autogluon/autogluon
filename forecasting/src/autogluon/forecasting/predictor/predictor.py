@@ -591,11 +591,11 @@ class ForecastingPredictor:
             model_obj = self._trainer.load_model(model_name)
             model_hyperparams[model_name] = model_obj.params
         results['model_hyperparams'] = model_hyperparams
-
+        results['leaderboard'] = self._learner.leaderboard()
         if verbosity > 0:  # print stuff
             print("*** Summary of fit() ***")
             print("Estimated performance of each model:")
-            results['leaderboard'] = self._learner.leaderboard()
+            print(results["leaderboard"])
             print("Number of models trained: %s" % len(results['model_performance']))
             print("Types of models trained:")
             print(unique_model_types)
@@ -686,7 +686,8 @@ class ForecastingPredictor:
                              index_column="index_column",
                              time_column="time_column",
                              target_column="target_column",
-                             eval_metric=None):
+                             eval_metric=None,
+                             quantiles=None):
         """
         Evaluate predictions once future targets are received.
 

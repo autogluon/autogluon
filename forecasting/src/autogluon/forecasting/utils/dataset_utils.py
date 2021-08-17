@@ -25,6 +25,7 @@ class TimeSeriesDataset(ListDataset):
         2            B           1           2           3
 
         """
+        self.index_column = index_column
         if static_features is None:
             self.static_cat_features = None
             self.static_real_features = None
@@ -232,8 +233,8 @@ def time_series_dataset(data,
 def extract_static_feature(index_column, features, prev_inferred=None):
     if prev_inferred is not None:
         logger.log(30, "Using previous inferred feature columns...")
-        logger.log(30, f"Static Cat Features Dataframe including {list([prev_inferred['static_cat_columns']])}")
-        logger.log(30, f"Static Real Features Dataframe including {list(prev_inferred['static_real_columns'])}")
+        logger.log(30, f"Static Cat Features Dataframe including {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
+        logger.log(30, f"Static Real Features Dataframe including {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
         static_cat_features = features[prev_inferred["static_cat_columns"]]
         static_real_features = features[prev_inferred["static_real_columns"]]
         cardinality = prev_inferred["cardinality"]
