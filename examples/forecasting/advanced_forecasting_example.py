@@ -52,6 +52,8 @@ predictor = ForecastingPredictor(path=path, eval_metric=eval_metric).fit(train_d
 
 predictor = None
 predictor = ForecastingPredictor.load(path)
+print(predictor._trainer.get_model_best())
+predictor.fit_summary()
 models = predictor._trainer.get_model_names_all()
 for model in models:
     print(predictor._trainer.load_model(model).get_info())

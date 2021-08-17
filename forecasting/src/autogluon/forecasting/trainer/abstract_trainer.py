@@ -8,6 +8,7 @@ from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 from ..models.gluonts_model.abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 from ..utils.warning_filters import evaluator_warning_filter
+from ..utils.metric_utils import metric_coefficient
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +220,8 @@ class AbstractTrainer:
 
     def _train_multi(self, train_data, val_data=None, models=None, hyperparameters=None, hyperparameter_tune=False, time_limit=None):
         time_start = time.time()
-
+        if hyperparameters is not None:
+            self.hyperparameters = hyperparameters
         if self.save_data and not self.is_data_saved:
             self.save_train_data(train_data)
             if val_data is not None:
@@ -296,7 +298,7 @@ class AbstractTrainer:
             logger.log(30, "Additional data provided, testing on the additional data...")
             for model_name in model_names:
                 model = self.load_model(model_name)
-                test_score.append(-model.score(data))
+                test_score.append(model.score(data) * metric_coefficient[self.eval_metric])
         df = pd.DataFrame(data={
             'model': model_names,
             'val_score': score_val,
