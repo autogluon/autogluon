@@ -1,5 +1,3 @@
-Temporary placeholder file
-=======
 Time-Series Forecasting
 ========================
 
