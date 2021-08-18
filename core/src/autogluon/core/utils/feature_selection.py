@@ -283,12 +283,15 @@ class FeatureSelector:
         if not is_first_run:
             prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
             prev_importance_df = prev_importance_df.drop(prev_deleted_features)
+            # unevaluated_rows = prev_importance_df[prev_importance_df['importance'].isna()]
+            # iteration_unevaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
+            #                                                  (prev_importance_df.index.isin(iteration_unevaluated))].sort_values(by='importance')
+            # iteration_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
+            #                                               ~(prev_importance_df.index.isin(iteration_unevaluated_rows.index))].sort_values(by='importance')
+            # features = unevaluated_rows.index.tolist() + iteration_unevaluated_rows.index.tolist() + iteration_evaluated_rows.index.tolist()
             unevaluated_rows = prev_importance_df[prev_importance_df['importance'].isna()]
-            iteration_unevaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
-                                                             (prev_importance_df.index.isin(iteration_unevaluated))].sort_values(by='importance')
-            iteration_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
-                                                          ~(prev_importance_df.index.isin(iteration_unevaluated_rows.index))].sort_values(by='importance')
-            features = unevaluated_rows.index.tolist() + iteration_unevaluated_rows.index.tolist() + iteration_evaluated_rows.index.tolist()
+            evaluated_rows = prev_importance_df[~prev_importance_df['importance'].isna()].sort_values(by='importance', ascending=True)
+            features = unevaluated_rows.index.tolist() + evaluated_rows.index.tolist()
         if auto_threshold:
             non_prioritized = [feature for feature in features if feature not in prioritized]
             features = prioritized + non_prioritized
@@ -342,7 +345,8 @@ class FeatureSelector:
         X = X[features]
         X_val = None if self.is_bagged else X_val[features]
         model.rename(model_name)
-        kwargs['use_child_oof'] = False
+        if self.is_bagged:
+            kwargs['use_child_oof'] = False
         if 'time_limit' in kwargs:
             kwargs['time_limit'] = self.time_limit
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
