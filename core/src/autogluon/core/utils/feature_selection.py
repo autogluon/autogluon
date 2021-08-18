@@ -195,6 +195,8 @@ class FeatureSelector:
         If at least one feature can be pruned, return. If no feature is immediately pruned but time remains and some feature's
         importance scores are not calculated, repeat the procedure.
         """
+        candidate_features = fn_args['features']
+        importance_df = unevaluated_fi_df_template(candidate_features)
         candidate_found = False
         total_feature_selection_time = 0.
         fn_args['iteration_unevaluated'] = set(fn_args['features'])
