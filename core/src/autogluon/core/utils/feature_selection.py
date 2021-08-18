@@ -1,4 +1,4 @@
-from typing import List, Sequence, Tuple
+from typing import List, Set, Tuple
 from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.models.abstract.abstract_model import AbstractModel
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
@@ -14,14 +14,13 @@ import time
 logger = logging.getLogger(__name__)
 
 
-def add_noise_column(X: pd.DataFrame, prefix: str, count: int = 1, feature_metadata: FeatureMetadata = None, seed: int = 0) -> pd.DataFrame:
-    """
-    Create a copy of dataset X with extra synthetic columns generated from standard normal distribution.
-    """
+def add_noise_column(X: pd.DataFrame, prefix: str, count: int = 1, feature_metadata: FeatureMetadata = None, rng: np.random.Generator = None) -> pd.DataFrame:
+    # Create a copy of dataset X with extra synthetic columns generated from standard normal distribution.
     if X is None:
         return None
     X = X.copy()
-    rng = np.random.default_rng(seed=seed)
+    if rng is None:
+        rng = np.random.default_rng(seed=0)
     for i in range(1, count+1):
         col_name = f"{prefix}_{i}"
         if feature_metadata is not None:
@@ -31,15 +30,41 @@ def add_noise_column(X: pd.DataFrame, prefix: str, count: int = 1, feature_metad
     return X
 
 
-def merge_importance_dfs(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
-    # TODO JASON
-    pass
-
-
-def compute_prune_threshold_from_noise(importance_df: pd.DataFrame, prioritized: Sequence[str]) -> float:
-    noise_rows = importance_df[importance_df.index.isin(prioritized)]
-    importance_df = importance_df.drop(prioritized)
-    return noise_rows['importance'].mean()
+def merge_importance_dfs(df_old: pd.DataFrame, df_new: pd.DataFrame, iteration_unevaluated: Set[str]) -> pd.DataFrame:
+    # Create a dataframe that correctly merges two existing dataframe's permutation feature importance statistics,
+    # specifically mean, standard deviation, and shuffle count. For each feature, if one dataframe's mean feature
+    # importance is 0, the resulting dataframe will contain the other dataframe's mean feature importance value.
+    # df_old is assumed to have been from previous feature importance computation round or even pruning round and
+    # can have more features (rows) than df_new.
+    if df_old is None:
+        return df_new
+    assert len(df_old) >= len(df_new), "df_old cannot have less rows than df_new."
+    combined_df = df_new.copy()
+    for feature in df_new.index.tolist():
+        row1, row2 = df_old.loc[feature], df_new.loc[feature]
+        mean1, mean2 = row1['importance'], row2['importance']
+        stddev1, stddev2 = row1['stddev'], row2['stddev']
+        n1, n2 = row1['n'], row2['n']
+        if n1 > 0 and n2 > 0 and feature not in iteration_unevaluated:
+            combined_df.loc[feature, 'importance'] = (n1*mean1 + n2*mean2) / (n1 + n2)
+            combined_df.loc[feature, 'stddev'] = np.sqrt(((n1 - 1) * stddev1 ** 2 + (n2 - 1) * stddev2 ** 2) / (n1 + n2 - 1) +
+                                                         (n1 * n2 * (mean1 - mean2) ** 2) / ((n1 + n2) * (n1 + n2 - 1)))
+            combined_df.loc[feature, 'n'] = n1 + n2
+        elif n2 > 0:
+            combined_df.loc[feature, 'importance'] = mean2
+            combined_df.loc[feature, 'stddev'] = stddev2
+            combined_df.loc[feature, 'n'] = n2
+            iteration_unevaluated.remove(feature)
+        elif n1 > 0:
+            combined_df.loc[feature, 'importance'] = mean1
+            combined_df.loc[feature, 'stddev'] = stddev1
+            combined_df.loc[feature, 'n'] = n1
+        else:
+            combined_df.loc[feature, 'importance'] = None
+            combined_df.loc[feature, 'stddev'] = None
+            combined_df.loc[feature, 'n'] = 0
+        combined_df.loc[feature, 'p_value'] = None
+    return combined_df.sort_values(by='importance', axis=0, ascending=False)
 
 
 class FeatureSelector:
@@ -51,7 +76,7 @@ class FeatureSelector:
             raise AssertionError("Time limit cannot be unspecified.")
         self.original_time_limit = time_limit
         self.time_limit = time_limit
-        self.seed = seed
+        self.rng = np.random.default_rng(seed)
         self.keep_models = keep_models
         self.is_proxy_model = model.is_valid()
         self.is_bagged = isinstance(model, BaggedEnsembleModel)
@@ -68,7 +93,7 @@ class FeatureSelector:
         self.importance_dfs = []
         self.attempted_removals = set()
         self._debug_info = {'exceptions': [], 'index_trajectory': [], 'layer_fit_time': 0., 'total_prune_time': 0., 'total_prune_fit_time': 0.,
-                            'total_prune_fi_time': 0., 'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0}
+                            'total_prune_fi_time': 0., 'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0, 'kept_ratio': 0.}
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
         self.noise_prefix = 'AG_normal_noise'
@@ -76,12 +101,12 @@ class FeatureSelector:
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
                         min_fi_samples: int = 10000, max_fi_samples: int = 100000, max_fits: int = 5, improvement_threshold: float = 0.0005,
-                        **kwargs) -> Tuple[Sequence[str], Sequence[pd.DataFrame]]:
+                        **kwargs) -> Tuple[List[str], AbstractModel]:
         # optionally subsample training data and add noise features to dataset
         original_features = X.columns.tolist()
         auto_threshold = prune_threshold is None
         refit_at_end = auto_threshold and not self.is_proxy_model
-        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, train_subsample_size, min_fi_samples, **kwargs)
+        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, train_subsample_size, **kwargs)
         if auto_threshold:
             kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata']) if 'feature_metadata' in kwargs else None
             X = add_noise_column(X, prefix=self.noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
@@ -119,14 +144,13 @@ class FeatureSelector:
                 n_total_fi_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
                 prioritize_fi = [feature for feature in best_info['features'] if self.noise_prefix in feature]
                 fn_args = {'X': X_fi, 'y': y_fi, 'model': best_info['model'], 'time_budget': time_budget_fi, 'features': best_info['features'],
-                           'n_sample': n_total_fi_samples, 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
-                           'prune_threshold': prune_threshold, 'prune_ratio': prune_ratio, 'prioritized': prioritize_fi}
+                           'n_sample': n_total_fi_samples, 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df, 'prune_ratio': prune_ratio,
+                           'prune_threshold': prune_threshold, 'prioritized': prioritize_fi, 'weighted': kwargs.get('weighted', True)}
 
                 candidate_features, importance_df, success, selection_time = self.compute_next_candidate(fn_args, time_budget_fi, prev_candidate_features)
                 if not success:
                     logger.log(30, f"\tThere are no more features to prune. Ending...")
                     break
-
                 curr_model, score, fit_time = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features, model_name, **kwargs)
                 best_score_multiplier = 1. + improvement_threshold * (1. if score >= 0 else -1.)
                 if score > best_info['score'] * best_score_multiplier:
@@ -160,6 +184,7 @@ class FeatureSelector:
         self._debug_info['total_prune_time'] = self.original_time_limit - self.time_limit
         self._debug_info['total_prune_fit_time'] = self._fit_time_elapsed
         self._debug_info['total_prune_fi_time'] = self._fi_time_elapsed
+        self._debug_info['kept_ratio'] = len(best_info['features']) / len(original_features)
         logger.log(30, f"\tSuccessfully ended prune loop after {index} iterations. Best score: {best_info['score']}.")
         logger.log(30, f"\tFeature Count: {len(original_features)} -> {len(best_info['features'])} ({round(self.original_time_limit - self.time_limit, 2)}s)")
         return best_info['features'], best_info['model']
@@ -172,6 +197,7 @@ class FeatureSelector:
         """
         candidate_found = False
         total_feature_selection_time = 0.
+        fn_args['iteration_unevaluated'] = set(fn_args['features'])
         while self.time_limit > time_budget + self.model_fit_time:
             candidate_features, importance_df, feature_selection_time = self.compute_next_candidate_round(**fn_args)
             # HACK: Line below is needed to get this working with n-repeated bagged models. Related to feature ordering.
@@ -186,9 +212,10 @@ class FeatureSelector:
         logger.log(30, f"\tCandidate generation time: ({round(total_feature_selection_time, 2)}s), Cardinality: {len(candidate_features)}")
         return candidate_features, importance_df, candidate_found, total_feature_selection_time
 
-    def compute_next_candidate_round(self, X: pd.DataFrame, y: pd.Series, model: AbstractModel, time_budget: float, features: Sequence[str],
+    def compute_next_candidate_round(self, X: pd.DataFrame, y: pd.Series, model: AbstractModel, time_budget: float, features: List[str],
                                      n_sample=10000, n_subsample=5000, prev_importance_df: pd.DataFrame = None, prune_threshold: float = None,
-                                     prune_ratio: float = 0.05, prioritized: Sequence[str] = []) -> Tuple[Sequence[str], pd.DataFrame, float]:
+                                     prune_ratio: float = 0.05, prioritized: List[str] = [], iteration_unevaluated: Set[str] = [], weighted: bool = True
+                                     ) -> Tuple[List[str], pd.DataFrame, float]:
         """
         Generate promising feature subsets based on permutation feature importance using time as resource. If there isn't time to evaluate
         permutation feature importance for at least n_sample datapoints for all features, only evaluate importance scores for some features.
@@ -200,8 +227,7 @@ class FeatureSelector:
         n_subsample = min(n_subsample, len(X))
         n_shuffle = min(np.ceil(n_sample / n_subsample).astype(int), 100)
         auto_threshold = len(prioritized) > 0
-        is_first_run = prev_importance_df is None
-        features = self.sort_features_by_priority(features, prioritized, prev_importance_df)
+        features = self.sort_features_by_priority(features, prioritized, prev_importance_df, iteration_unevaluated)
 
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
         expected_single_feature_time = 1.1 * self.model_predict_time * (n_subsample / len(X)) * n_shuffle
@@ -212,16 +238,13 @@ class FeatureSelector:
         unevaluated_features = features[n_evaluated_features:]
         logger.log(30, f"\tComputing feature importance for {n_evaluated_features}/{n_features} features with {n_shuffle} shuffles.")
         evaluated_df = model.compute_feature_importance(X=X, y=y, num_shuffle_sets=n_shuffle, subsample_size=n_subsample, features=evaluated_features,
-                                                        is_oof=self.is_bagged, silent=True, time_limit=time_budget)
+                                                        is_oof=self.is_bagged, silent=True, time_limit=time_budget, random_state=self.rng.integers(0, 1e6))
         if self.is_bagged:
             evaluated_df['n'] = evaluated_df['n'] // len(model.models)
 
         # if we could not compute feature importance for all features and previous feature importance estimates exist, use them
-        if is_first_run:
-            unevaluated_df = unevaluated_fi_df_template(unevaluated_features)
-        else:
-            unevaluated_df = prev_importance_df[prev_importance_df.index.isin(unevaluated_features)]
-        importance_df = pd.concat([evaluated_df, unevaluated_df])
+        importance_df = pd.concat([evaluated_df, unevaluated_fi_df_template(unevaluated_features)])
+        importance_df = merge_importance_dfs(df_old=prev_importance_df, df_new=importance_df, iteration_unevaluated=iteration_unevaluated)
 
         # if auto_threshold, threshold is the mean of noise column importance score
         if auto_threshold:
@@ -231,7 +254,7 @@ class FeatureSelector:
 
         # use importance_df to generate next candidate features
         time_budget = time_budget - (time.time() - time_start)
-        candidate_features = self.prune_features_given_fi(importance_df, prune_threshold, prune_ratio, time_budget)
+        candidate_features = self.prune_features_given_fi(importance_df, prune_threshold, prune_ratio, time_budget, weighted)
 
         # if noise columns exist, they should never be removed
         if auto_threshold:
@@ -243,7 +266,8 @@ class FeatureSelector:
         self._fi_time_elapsed = self._fi_time_elapsed + feature_selection_time
         return candidate_features, importance_df.sort_values(by='importance', axis=0), feature_selection_time
 
-    def sort_features_by_priority(self, features: Sequence[str], prioritized: Sequence[str], prev_importance_df: pd.DataFrame) -> Sequence[str]:
+    def sort_features_by_priority(self, features: List[str], prioritized: List[str], prev_importance_df: pd.DataFrame,
+                                  iteration_unevaluated: Set[str]) -> List[str]:
         """
         Return a list of features sorted by feature importance calculation priority in ascending order.
         If prev_importance_df does not exist and not using auto_threshold, return the original list.
@@ -256,14 +280,20 @@ class FeatureSelector:
         auto_threshold = len(prioritized) > 0
         if not is_first_run:
             prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
-            sorted_features = prev_importance_df.drop(prev_deleted_features).sort_values(by='importance', axis=0, ascending=False).index.tolist()[::-1]
-            features = sorted_features + [feature for feature in features if feature not in sorted_features]
+            prev_importance_df = prev_importance_df.drop(prev_deleted_features)
+            unevaluated_rows = prev_importance_df[prev_importance_df['importance'].isna()]
+            iteration_unevaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
+                                                             (prev_importance_df.index.isin(iteration_unevaluated))].sort_values(by='importance')
+            iteration_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
+                                                          ~(prev_importance_df.index.isin(iteration_unevaluated_rows.index))].sort_values(by='importance')
+            features = unevaluated_rows.index.tolist() + iteration_unevaluated_rows.index.tolist() + iteration_evaluated_rows.index.tolist()
         if auto_threshold:
             non_prioritized = [feature for feature in features if feature not in prioritized]
             features = prioritized + non_prioritized
         return features
 
-    def prune_features_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float) -> Sequence[str]:
+    def prune_features_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float,
+                                weighted: bool = True) -> List[str]:
         """
         Keep features whose importance scores are above threshold or have not yet had a chance to be calculated,
         as well as some features whose importance scores are below threshold if more than prune_ratio * num features
@@ -275,7 +305,7 @@ class FeatureSelector:
         n_remove = max(1, int(prune_ratio * len(importance_df)))
         above_threshold_rows = importance_df[(importance_df['importance'] > prune_threshold) | (importance_df['importance'].isna())]
         below_threshold_rows = importance_df[importance_df['importance'] <= prune_threshold].sort_values(by='importance', axis=0, ascending=True)
-        logger.log(30, f"\tNumber of features above prune threshold {round(prune_threshold, 4)}: {len(above_threshold_rows)}/{len(importance_df)}")
+        logger.log(30, f"\tNumber of original features above prune threshold {round(prune_threshold, 4)}: {len(above_threshold_rows)}/{len(importance_df)}")
         if len(below_threshold_rows) <= n_remove:
             acceptance_candidates = above_threshold_rows.index.tolist()
             self.attempted_removals.add(tuple(below_threshold_rows.index))
@@ -289,20 +319,19 @@ class FeatureSelector:
             self.attempted_removals.add(removal_candidates)
             return acceptance_candidates
 
-        sample_weights = [1/i for i in range(1, len(below_threshold_rows)+1)]
+        sample_weights = [1/i for i in range(1, len(below_threshold_rows)+1)] if weighted else None
         while time_budget - (time.time() - time_start) > 0:
-            removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=self.seed, replace=False, weights=sample_weights)
+            random_state = self.rng.integers(low=0, high=1e6)
+            removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=random_state, replace=False, weights=sample_weights)
             removal_candidates = tuple(removal_candidate_rows.index)
             if removal_candidates not in self.attempted_removals:
                 acceptance_candidates = importance_df[~importance_df.index.isin(removal_candidates)].index.tolist()
                 self.attempted_removals.add(removal_candidates)
                 return acceptance_candidates
-            else:
-                self.seed = self.seed + 1  # FIXME: This is dumb but it must be done so .sample does not sample the same row every time
         return importance_df.index.tolist()
 
     def fit_score_model(self, model: AbstractModel, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series,
-                        features: Sequence[str], model_name: str, **kwargs) -> Tuple[AbstractModel, float, float]:
+                        features: List[str], model_name: str, **kwargs) -> Tuple[AbstractModel, float, float]:
         """
         Fits and scores a model. Updates self.time_limit. Returns the fitted model, its score, and time elapsed.
         If this is the first time we are fitting a model in the pruning procedure, save time and score statistics.
@@ -311,6 +340,7 @@ class FeatureSelector:
         X = X[features]
         X_val = None if self.is_bagged else X_val[features]
         model.rename(model_name)
+        kwargs['use_child_oof'] = False
         if 'time_limit' in kwargs:
             kwargs['time_limit'] = self.time_limit
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
@@ -330,7 +360,7 @@ class FeatureSelector:
         self._fit_time_elapsed = self._fit_time_elapsed + (fit_time + predict_time)
         return model, round(score, 4), round(fit_time + predict_time, 4)
 
-    def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, train_subsample_size: int, min_fi_samples: int,
+    def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, train_subsample_size: int,
                              **kwargs) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, bool, dict]:
         """
         If using a proxy model and dataset size is larger than train_sample_size, subsample data to make
@@ -342,7 +372,8 @@ class FeatureSelector:
             subsampled = True
             X_train = X.sample(train_subsample_size, random_state=0)
             y_train = y.loc[X_train.index]
-            if self.is_bagged and len(X) >= train_subsample_size * 2:
+            replace_bag = kwargs.pop('replace_bag', True)
+            if replace_bag and self.is_bagged and len(X) >= train_subsample_size * 2:
                 self.is_bagged = False
                 original_k_fold = kwargs['k_fold']
                 self.base_model = self.original_model.convert_to_template_child()
