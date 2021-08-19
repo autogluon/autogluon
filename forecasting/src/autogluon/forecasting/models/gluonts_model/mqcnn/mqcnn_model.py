@@ -2,6 +2,7 @@ from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 from autogluon.core.utils import warning_filter
 with warning_filter():
     from gluonts.model.seq2seq import MQCNNEstimator
+    from gluonts.mx.context import get_mxnet_context
 import logging
 import mxnet as mx
 
@@ -29,6 +30,8 @@ class MQCNNModel(AbstractGluonTSModel):
         #                    "Be careful when you use GPU for MQCNN.")
         # else:
         #     self.params["ctx"] = mx.context.cpu()
-        self.params["hybridize"] = False
+        if get_mxnet_context() != mx.context.cpu():
+            self.params["hybridize"] = False
+
         with warning_filter():
             self.model = MQCNNEstimator.from_hyperparameters(**self.params)
