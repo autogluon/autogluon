@@ -24,10 +24,11 @@ class MQCNNModel(AbstractGluonTSModel):
                          **kwargs)
 
     def create_model(self):
-        if "ctx" in self.params:
-            logger.log(30, "Warning: MQCNN model from GluonTS has known issues running with GPU. "
-                           "Be careful when you use GPU for MQCNN.")
-        else:
-            self.params["ctx"] = mx.context.cpu()
+        # if "ctx" in self.params:
+        #     logger.log(30, "Warning: MQCNN model from GluonTS has known issues running with GPU. "
+        #                    "Be careful when you use GPU for MQCNN.")
+        # else:
+        #     self.params["ctx"] = mx.context.cpu()
+        self.params["hybridize"] = False
         with warning_filter():
             self.model = MQCNNEstimator.from_hyperparameters(**self.params)
