@@ -25,7 +25,7 @@ class TimeSeriesDataset(ListDataset):
         2            B           1           2           3
 
         """
-        self.index_column = index_column
+        self.index_column = index_column if index_column is not None else "index_column"
         if static_features is None:
             self.static_cat_features = None
             self.static_real_features = None
@@ -33,15 +33,11 @@ class TimeSeriesDataset(ListDataset):
         else:
             self.static_cat_features, self.static_real_features, self.cardinality = extract_static_feature(index_column, static_features, prev_inferred=prev_inferred)
 
-        if index_column is not None:
-            target = df.drop(index_column, axis=1)
-            self.index = df[index_column].values
-        else:
-            target = df.copy()
-            self.index = ["index_column"]
-        # check whether index in static features corresponds to index in data
+        target = df.drop(self.index_column, axis=1)
+        self.index = df[self.index_column].values
+
         if static_features is not None:
-            if sorted(static_features[index_column]) != sorted(self.index):
+            if sorted(static_features[self.index_column]) != sorted(self.index):
                 raise ValueError(f"Index column does not match between static features and the data given.")
         target_values = target.values
         date_list = target.columns
@@ -54,8 +50,8 @@ class TimeSeriesDataset(ListDataset):
                 FieldName.TARGET: target,
                 FieldName.START: pd.Timestamp(date_list[0]),
                 FieldName.ITEM_ID: item_id,
-                FieldName.FEAT_STATIC_CAT: self.static_cat_features.loc[self.static_cat_features[index_column].isin([item_id])].drop(index_column, axis=1).values[0] if self.static_cat_features is not None else [],
-                FieldName.FEAT_STATIC_REAL: self.static_real_features.loc[self.static_real_features[index_column].isin([item_id])].drop(index_column, axis=1).values[0] if self.static_real_features is not None else [],
+                FieldName.FEAT_STATIC_CAT: self.static_cat_features.loc[self.static_cat_features[self.index_column].isin([item_id])].drop(self.index_column, axis=1).values[0] if self.static_cat_features is not None else [],
+                FieldName.FEAT_STATIC_REAL: self.static_real_features.loc[self.static_real_features[self.index_column].isin([item_id])].drop(self.index_column, axis=1).values[0] if self.static_real_features is not None else [],
             }
             for (target, item_id) in zip(target_values, self.index)
         ]
@@ -211,9 +207,9 @@ def train_test_split_gluonts(data, prediction_length, freq=None):
 
 
 def time_series_dataset(data,
-                        index_column=None,
-                        target_column="target",
-                        time_column="date",
+                        index_column,
+                        target_column,
+                        time_column,
                         chosen_ts=None,
                         static_features=None,
                         prev_inferred=None):
@@ -221,8 +217,7 @@ def time_series_dataset(data,
                                    index_column=index_column,
                                    target_column=target_column,
                                    time_column=time_column)
-    if index_column is None:
-        index_column = "index_column"
+
     if chosen_ts is not None:
         rebuilt_data = rebuilt_data.loc[rebuilt_data[index_column].isin(chosen_ts)]
         if static_features is not None:
@@ -234,13 +229,13 @@ def extract_static_feature(index_column, features, prev_inferred=None):
     if prev_inferred is not None:
         logger.log(30, "Using previous inferred feature columns...")
         logger.log(30, f"Static Cat Features Dataframe including {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
-        logger.log(30, f"Static Real Features Dataframe including {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
+        logger.log(30, f"Static Real Features Dataframe including {[i for i in prev_inferred['static_real_columns'] if i != index_column]}")
         static_cat_features = features[prev_inferred["static_cat_columns"]]
         static_real_features = features[prev_inferred["static_real_columns"]]
         cardinality = prev_inferred["cardinality"]
     else:
         if index_column is None:
-            raise ValueError("Index column is not given for static features.")
+            raise ValueError("Static features does not work for a single time series.")
         indices = features[index_column]
         features = features.drop(index_column, axis=1)
         cardinality = []

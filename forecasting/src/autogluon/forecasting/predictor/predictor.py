@@ -13,9 +13,6 @@ from autogluon.core.utils.utils import setup_outputdir
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.forecasting.utils.dataset_utils import rebuild_tabular, train_test_split_gluonts, \
-    train_test_split_dataframe
-from autogluon.forecasting.utils.dataset_utils import TimeSeriesDataset
 from autogluon.core.utils.decorators import apply_presets
 
 from gluonts.dataset.common import FileDataset, ListDataset
@@ -25,7 +22,8 @@ from gluonts.model.forecast import SampleForecast, QuantileForecast
 from ..configs.presets_configs import forecasting_presets_configs
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer
-from ..utils.dataset_utils import time_series_dataset
+from ..utils.dataset_utils import time_series_dataset, rebuild_tabular, train_test_split_gluonts, \
+    train_test_split_dataframe, TimeSeriesDataset
 from ..utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger()  # return root logger
@@ -73,15 +71,13 @@ class ForecastingPredictor:
     Path to directory where all models used by this Predictor are stored.
     eval_metric: function or str
        What metric is used to evaluate predictive performance.
-    index_column: str
+    index_column: str or None
        Name of column in training/validation data that contains an index ID specifying which time series is being observed at each time-point (for datasets containing multiple time-series).
-       By default, index_column="index_column" if left unspecified when you call `ForecastingPredictor().fit()`.
+       If None, we will assume that there is only one time series in the dataset.
     time_column: str
        Name of column in training/validation data that lists the time of each observation.
-       By default, time_column="time_column" if left unspecified when you call `ForecastingPredictor().fit()`.
     target_column: str
        Name of column in training/validation data that contains the target time-series value to be predicted.
-       By default, target_column="target_column" if left unspecified when you call `ForecastingPredictor().fit()`.
     static_cat_columns: str, default = None
        Names of columns that contain static (non time-varying) categorical features.
        These are automatically inferred if a static feature dataframe is provided in `fit()`.
@@ -142,9 +138,9 @@ class ForecastingPredictor:
     def fit(self,
             train_data,
             prediction_length,
-            index_column="index_column",
-            time_column="time_column",
-            target_column="target_column",
+            index_column,
+            time_column,
+            target_column,
             val_data=None,
             presets=None,
             hyperparameters=None,
@@ -172,7 +168,7 @@ class ForecastingPredictor:
             8            C  2020-01-24              3
         prediction_length: int
             length of future targets of each time series to predict.
-        index_column: str
+        index_column: str or None
             column in training/validation data that indicates the time series index,
             By default index_column="index_column".
         time_column: str
@@ -282,6 +278,8 @@ class ForecastingPredictor:
                 '`Predictor`.')
         if presets is not None:
             logger.log(30, f"presets is set to be {presets}")
+        if index_column is None:
+            logger.log(30, "index_column=None, assuming there is only one time series in the dataset.")
         self.index_column = index_column
         self.time_column = time_column
         self.target_column = target_column
@@ -683,9 +681,9 @@ class ForecastingPredictor:
     def evaluate_predictions(cls,
                              forecasts,
                              targets,
-                             index_column="index_column",
-                             time_column="time_column",
-                             target_column="target_column",
+                             index_column,
+                             time_column,
+                             target_column,
                              eval_metric=None,
                              quantiles=None):
         """
@@ -701,17 +699,15 @@ class ForecastingPredictor:
         targets: a Dataframe which has the same format as what you have for train_data/test_data,
             must contain targets for all time presented in forecasts.
 
-        index_column: str
+        index_column: str or None
             Name of column in targets that contains an index ID specifying which time series is being observed at each time-point (for datasets containing multiple time-series).
-            By default, index_column="index_column" if left unspecified.
+            If None, we will assume that there is only one time series in the dataset.
 
         time_column: str
             Name of column in targets that lists the time of each observation.
-            By default, time_column="time_column" if left unspecified.
 
         target_column: str
             Name of column in targets that contains the target time-series value to be predicted.
-            By default, target_column="target_column" if left unspecified.
         """
         with evaluator_warning_filter():
             targets = rebuild_tabular(targets,
