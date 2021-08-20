@@ -63,7 +63,7 @@ class FeatureSelector:
         self.importance_dfs = []
         self.attempted_removals = set()
         self._debug_info = {'exceptions': [], 'index_trajectory': [], 'layer_fit_time': 0., 'total_prune_time': 0., 'total_prune_fit_time': 0.,
-                            'total_prune_fi_time': 0., 'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0}
+                            'total_prune_fi_time': 0., 'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0, 'kept_ratio': 0.}
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
         self.noise_prefix = 'AG_normal_noise'
@@ -164,6 +164,7 @@ class FeatureSelector:
         self._debug_info['total_prune_time'] = self.original_time_limit - self.time_limit
         self._debug_info['total_prune_fit_time'] = self._fit_time_elapsed
         self._debug_info['total_prune_fi_time'] = self._fi_time_elapsed
+        self._debug_info['kept_ratio'] = len(best_info['features']) / len(original_features)
         logger.log(30, f"\tSuccessfully ended prune loop after {index} iterations. Best score: {best_info['score']}.")
         logger.log(30, f"\tFeature Count: {len(original_features)} -> {len(best_info['features'])} ({round(self.original_time_limit - self.time_limit, 2)}s)")
         return best_info['features'], best_info['model']
