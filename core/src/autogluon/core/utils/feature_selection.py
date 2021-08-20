@@ -67,6 +67,7 @@ class FeatureSelector:
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
         self.noise_prefix = 'AG_normal_noise'
+        self.safety_time_multiplier = 1.1
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
@@ -171,26 +172,29 @@ class FeatureSelector:
 
     def compute_next_candidate(self, X: pd.DataFrame, y: pd.Series, model: AbstractModel, time_budget: float, features: Sequence[str],
                                n_sample=10000, n_subsample=5000, prev_importance_df: pd.DataFrame = None, prune_threshold: float = None,
-                               prune_ratio: float = 0.05, prioritized: Sequence[str] = []) -> Tuple[Sequence[str], pd.DataFrame]:
+                               prune_ratio: float = 0.05, prioritized: Sequence[str] = [], weighted: bool = True) -> Tuple[Sequence[str], pd.DataFrame]:
         # determine how many subsamples and shuffles to use for feature importance calculation
         time_start = time.time()
         n_features = len(features)
         n_subsample = min(n_subsample, len(X))
-        n_shuffle = np.ceil(n_sample / n_subsample).astype(int)
+        n_shuffle = min(np.ceil(n_sample / n_subsample).astype(int), 100)
         auto_threshold = len(prioritized) > 0
         is_first_run = prev_importance_df is None
         features = self.sort_features_by_priority(features, prioritized, prev_importance_df)
 
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
-        expected_single_feature_time = 1.1 * self.model_predict_time * (n_subsample / len(X)) * n_shuffle
+        expected_single_feature_time = self.safety_time_multiplier * self.model_predict_time * (n_subsample / len(X)) * n_shuffle
         n_evaluated_features = max([i for i in range(1, n_features+1) if i * expected_single_feature_time < time_budget])
         if n_evaluated_features == 0:
             return features, unevaluated_fi_df_template(features)
         evaluated_features = features[:n_evaluated_features]
         unevaluated_features = features[n_evaluated_features:]
+        time_budget_fi = time_budget - (time.time() - time_start)
         logger.log(30, f"\tComputing feature importance for {n_evaluated_features}/{n_features} features with {n_shuffle} shuffles.")
-        evaluated_df = model.compute_feature_importance(X=X, y=y, num_shuffle_sets=n_shuffle, subsample_size=n_subsample, features=evaluated_features,
-                                                        is_oof=self.is_bagged, silent=True, time_limit=time_budget)
+        fi_kwargs = {'X': X, 'y': y, 'num_shuffle_sets': n_shuffle, 'subsample_size': n_subsample, 'features': evaluated_features,
+                     'time_limit': time_budget_fi, 'silent': True}
+        fi_kwargs.update({'is_oof': True} if self.is_bagged else {})
+        evaluated_df = model.compute_feature_importance(**fi_kwargs)
         if self.is_bagged:
             evaluated_df['n'] = evaluated_df['n'] // len(model.models)
 
@@ -208,8 +212,8 @@ class FeatureSelector:
             prune_threshold = noise_rows['importance'].mean()
 
         # use importance_df to generate next candidate features
-        time_budget = time_budget - (time.time() - time_start)
-        candidate_features = self.compute_next_candidate_given_fi(importance_df, prune_threshold, prune_ratio, time_budget)
+        time_budget_select = time_budget - (time.time() - time_start)
+        candidate_features = self.compute_next_candidate_given_fi(importance_df, prune_threshold, prune_ratio, time_budget_select, weighted)
 
         # if noise columns exist, they should never be removed
         if auto_threshold:
@@ -233,11 +237,11 @@ class FeatureSelector:
             sorted_features = prev_importance_df.drop(prev_deleted_features).sort_values(by='importance', axis=0, ascending=False).index.tolist()[::-1]
             features = sorted_features + [feature for feature in features if feature not in sorted_features]
         if auto_threshold:
-            non_prioritized = [feature for feature in features if feature not in prioritized]
-            features = prioritized + non_prioritized
+            features = prioritized + [feature for feature in features if feature not in prioritized]
         return features
 
-    def compute_next_candidate_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float) -> Sequence[str]:
+    def compute_next_candidate_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float,
+                                        weighted: bool = True) -> Sequence[str]:
         """
         Keep features whose importance scores are above threshold or have not yet had a chance to be calculated,
         as well as some features whose importance scores are below threshold if more than prune_ratio * num features
@@ -249,7 +253,7 @@ class FeatureSelector:
         n_remove = max(1, int(prune_ratio * len(importance_df)))
         above_threshold_rows = importance_df[(importance_df['importance'] > prune_threshold) | (importance_df['importance'].isna())]
         below_threshold_rows = importance_df[importance_df['importance'] <= prune_threshold].sort_values(by='importance', axis=0, ascending=True)
-        logger.log(30, f"\tNumber of features above prune threshold {round(prune_threshold, 4)}: {len(above_threshold_rows)}/{len(importance_df)}")
+        logger.log(30, f"\tNumber of identified features below prune threshold {round(prune_threshold, 4)}: {len(below_threshold_rows)}/{len(importance_df)}")
         if len(below_threshold_rows) <= n_remove:
             acceptance_candidates = above_threshold_rows.index.tolist()
             self.attempted_removals.add(tuple(below_threshold_rows.index))
@@ -263,7 +267,7 @@ class FeatureSelector:
             self.attempted_removals.add(removal_candidates)
             return acceptance_candidates
 
-        sample_weights = [1/i for i in range(1, len(below_threshold_rows)+1)]
+        sample_weights = [1/i for i in range(1, len(below_threshold_rows)+1)] if weighted else None
         while time_budget - (time.time() - time_start) > 0:
             removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=self.seed, replace=False, weights=sample_weights)
             removal_candidates = tuple(removal_candidate_rows.index)
@@ -285,6 +289,8 @@ class FeatureSelector:
         X = X[features]
         X_val = None if self.is_bagged else X_val[features]
         model.rename(model_name)
+        if self.is_bagged:
+            kwargs['use_child_oof'] = False
         if 'time_limit' in kwargs:
             kwargs['time_limit'] = self.time_limit
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
@@ -306,12 +312,17 @@ class FeatureSelector:
 
     def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, train_subsample_size: int, min_fi_samples: int,
                              **kwargs) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, bool, dict]:
+        """
+        If using a proxy model and dataset size is larger than train_sample_size, subsample data to make
+        model training faster. If the proxy model is bagged and we have a lot of data, use a non-bagged
+        version instead since it is ~10x faster to train. Update fit and predict time estimates accordingly.
+        """
         X_train, y_train = X, y
         if self.is_proxy_model and len(X) > train_subsample_size:
             subsampled = True
             X_train = X.sample(train_subsample_size, random_state=0)
             y_train = y.loc[X_train.index]
-            if self.is_bagged and len(X) >= train_subsample_size + min_fi_samples:
+            if kwargs.pop('replace_bag', True) and self.is_bagged and len(X) >= train_subsample_size + min_fi_samples:
                 self.is_bagged = False
                 original_k_fold = kwargs['k_fold']
                 self.base_model = self.original_model.convert_to_template_child()

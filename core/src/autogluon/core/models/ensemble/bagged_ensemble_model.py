@@ -134,7 +134,7 @@ class BaggedEnsembleModel(AbstractModel):
              n_repeat_start=0,
              groups=None,
              **kwargs):
-        use_child_oof = self.params.get('use_child_oof', False)
+        use_child_oof = kwargs.get('use_child_oof', self.params.get('use_child_oof', False))
         if use_child_oof:
             if self.is_fit():
                 # TODO: We may want to throw an exception instead and avoid calling fit more than once
