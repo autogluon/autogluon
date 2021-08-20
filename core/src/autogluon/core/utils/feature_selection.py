@@ -104,14 +104,13 @@ class FeatureSelector:
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
                         fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
-                        min_fi_samples: int = 10000, max_fi_samples: int = 100000, max_fits: int = 5, improvement_threshold: float = 0.0005,
-                        **kwargs) -> Tuple[List[str], AbstractModel]:
+                        min_fi_samples: int = 10000, max_fi_samples: int = 100000, max_fits: int = 5, **kwargs) -> Tuple[List[str], AbstractModel]:
 
         # optionally subsample training data and add noise features to dataset
         original_features = X.columns.tolist()
         auto_threshold = prune_threshold is None
         refit_at_end = auto_threshold and not self.is_proxy_model
-        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, train_subsample_size, **kwargs)
+        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, train_subsample_size, min_fi_samples, **kwargs)
         if auto_threshold:
             kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata']) if 'feature_metadata' in kwargs else None
             X = add_noise_column(X, prefix=self.noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
@@ -158,8 +157,7 @@ class FeatureSelector:
                     logger.log(30, f"\tThere are no more features to prune. Ending...")
                     break
                 curr_model, score, fit_time = self.fit_score_model(deepcopy(self.base_model), X, y, X_val, y_val, candidate_features, model_name, **kwargs)
-                best_score_multiplier = 1. + improvement_threshold * (1. if score >= 0 else -1.)
-                if score > best_info['score'] * best_score_multiplier:
+                if score > best_info['score']:
                     logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is considerably better than best score {best_info['score']}. Update.")
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}.")
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
@@ -376,7 +374,7 @@ class FeatureSelector:
         return model, round(score, 4), round(fit_time + predict_time, 4)
 
     def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, train_subsample_size: int,
-                             **kwargs) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, bool, dict]:
+                             min_fi_samples: int, **kwargs) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, bool, dict]:
         """
         If using a proxy model and dataset size is larger than train_sample_size, subsample data to make
         model training faster. If the proxy model is bagged and we have a lot of data, use a non-bagged
@@ -388,7 +386,7 @@ class FeatureSelector:
             X_train = X.sample(train_subsample_size, random_state=0)
             y_train = y.loc[X_train.index]
             replace_bag = kwargs.pop('replace_bag', True)
-            if replace_bag and self.is_bagged and len(X) >= train_subsample_size * 2:
+            if replace_bag and self.is_bagged and len(X) >= train_subsample_size + min_fi_samples:
                 self.is_bagged = False
                 original_k_fold = kwargs['k_fold']
                 self.base_model = self.original_model.convert_to_template_child()
