@@ -13,6 +13,7 @@ from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, 
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.utils import try_import_fastai
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
@@ -222,12 +223,6 @@ class NNFastAiTabularModel(AbstractModel):
         if self.problem_type == QUANTILE:
             loss_func = HuberPinballLoss(self.quantile_levels, alpha=self.params['alpha'])
 
-        if time_limit:
-            time_elapsed = time.time() - start_time
-            time_left = time_limit - time_elapsed
-        else:
-            time_left = None
-
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
 
@@ -245,6 +240,14 @@ class NNFastAiTabularModel(AbstractModel):
             monitor=objective_func_name_to_monitor, comp=objective_optim_mode, fname=self.name,
             best_epoch_stop=best_epoch_stop, with_opt=True
         )
+
+        if time_limit is not None:
+            time_elapsed = time.time() - start_time
+            time_left = time_limit - time_elapsed
+            if time_left <= time_limit * 0.7:  # if 30% of time was spent preprocessing, likely not enough time to train model
+                raise TimeLimitExceeded
+        else:
+            time_left = None
 
         early_stopping = EarlyStoppingCallbackWithTimeLimit(
             monitor=objective_func_name_to_monitor,
