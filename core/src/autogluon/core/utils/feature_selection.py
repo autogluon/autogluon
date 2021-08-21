@@ -14,16 +14,14 @@ import time
 logger = logging.getLogger(__name__)
 
 
-
-
-
-# TODO JASON!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# Move n_shuffle calculation logic to top level method for more accurate time estimate calculation
-# for feature importance (AKA Expected Single Feature Pruning Time)
-
-
-
-
+"""
+TODO
+1. Replicate best results (revert to the precise 0813 version tonight and run 4hr)
+2. Try version of feature pruning that takes up 2 repeated bag time (feature selection time limit = time required to fit all the models)
+3. Try to get pruning to trigger as much as possible - one option is to set compute_next_candidate time budget creatively. Perhaps it can be evaluating
+at least max(time taken to 5% of feature space, 60s)
+4. Try prioritizing features that we are using from previous fits. This should STRICTLY make things better if done right.
+"""
 
 
 def add_noise_column(X: pd.DataFrame, prefix: str, rng: np.random.Generator, count: int = 1, feature_metadata: FeatureMetadata = None) -> pd.DataFrame:
@@ -109,8 +107,13 @@ class FeatureSelector:
             elif self.keep_models:
                 self.trained_models.append(best_info['model'])
             self._debug_info['index_trajectory'].append(True)
+            n_total_fi_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
 
-            time_budget_fi = max(0.1 * self.model_fit_time, 10 * self.model_predict_time * min(50, len(X.columns)), 60)
+            n_subsample = min(fi_subsample_size, len(X_fi))
+            n_shuffle = min(np.ceil(n_total_fi_samples / n_subsample).astype(int), 100)
+            expected_single_feature_time = self.safety_time_multiplier * self.model_predict_time * (n_subsample / len(X)) * n_shuffle
+
+            time_budget_fi = max(prune_ratio * len(original_features) * expected_single_feature_time, 60)
             logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
             logger.log(30, f"\tFit {index} ({self.model_fit_time}s): Current score is {best_info['score']}.")
             if self.is_proxy_model and self.time_limit <= self.model_fit_time * (2 if refit_at_end else 1) + time_budget_fi:
@@ -122,7 +125,6 @@ class FeatureSelector:
                 model_name = f"{self.base_model.name}_{index}"
                 old_candidate_features = candidate_features
                 time_start = time.time()
-                n_total_fi_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
                 prioritize_fi = [feature for feature in best_info['features'] if self.noise_prefix in feature]
                 fn_args = {'X': X_fi, 'y': y_fi, 'model': best_info['model'], 'time_budget': time_budget_fi, 'features': best_info['features'],
                            'n_sample': n_total_fi_samples, 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df,
