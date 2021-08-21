@@ -111,7 +111,7 @@ class FeatureSelector:
 
             n_subsample = min(fi_subsample_size, len(X_fi))
             n_shuffle = min(np.ceil(n_total_fi_samples / n_subsample).astype(int), 100)
-            expected_single_feature_time = self.safety_time_multiplier * self.model_predict_time * (n_subsample / len(X)) * n_shuffle
+            expected_single_feature_time = self.safety_time_multiplier * self.model_predict_time * (n_subsample / len(X_fi)) * n_shuffle
 
             time_budget_fi = max(prune_ratio * len(original_features) * expected_single_feature_time, 60)
             logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
