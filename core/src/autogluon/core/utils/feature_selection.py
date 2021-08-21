@@ -14,14 +14,25 @@ import time
 logger = logging.getLogger(__name__)
 
 
-def add_noise_column(X: pd.DataFrame, prefix: str, count: int = 1, feature_metadata: FeatureMetadata = None, seed: int = 0) -> pd.DataFrame:
+
+
+
+# TODO JASON!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Move n_shuffle calculation logic to top level method for more accurate time estimate calculation
+# for feature importance (AKA Expected Single Feature Pruning Time)
+
+
+
+
+
+
+def add_noise_column(X: pd.DataFrame, prefix: str, rng: np.random.Generator, count: int = 1, feature_metadata: FeatureMetadata = None) -> pd.DataFrame:
     """
     Create a copy of dataset X with extra synthetic columns generated from standard normal distribution.
     """
     if X is None:
         return None
     X = X.copy()
-    rng = np.random.default_rng(seed=seed)
     for i in range(1, count+1):
         col_name = f"{prefix}_{i}"
         if feature_metadata is not None:
@@ -46,7 +57,7 @@ class FeatureSelector:
             raise AssertionError("Time limit cannot be unspecified.")
         self.original_time_limit = time_limit
         self.time_limit = time_limit
-        self.seed = seed
+        self.rng = np.random.default_rng(seed)
         self.keep_models = keep_models
         self.is_proxy_model = model.is_valid()
         self.is_bagged = isinstance(model, BaggedEnsembleModel)
@@ -80,8 +91,8 @@ class FeatureSelector:
         X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, train_subsample_size, min_fi_samples, **kwargs)
         if auto_threshold:
             kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata']) if 'feature_metadata' in kwargs else None
-            X = add_noise_column(X, prefix=self.noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
-            X_val = add_noise_column(X_val, prefix=self.noise_prefix, feature_metadata=kwargs.get('feature_metadata', None))
+            X = add_noise_column(X, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
+            X_val = add_noise_column(X_val, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
 
         index = 1
         candidate_features = X.columns.tolist()
@@ -269,14 +280,13 @@ class FeatureSelector:
 
         sample_weights = [1/i for i in range(1, len(below_threshold_rows)+1)] if weighted else None
         while time_budget - (time.time() - time_start) > 0:
-            removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=self.seed, replace=False, weights=sample_weights)
+            random_state = self.rng.integers(low=0, high=1e5)
+            removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=random_state, replace=False, weights=sample_weights)
             removal_candidates = tuple(removal_candidate_rows.index)
             if removal_candidates not in self.attempted_removals:
                 acceptance_candidates = importance_df[~importance_df.index.isin(removal_candidates)].index.tolist()
                 self.attempted_removals.add(removal_candidates)
                 return acceptance_candidates
-            else:
-                self.seed = self.seed + 1  # FIXME: This is dumb but it must be done so .sample does not sample the same row every time
         return importance_df.index.tolist()
 
     def fit_score_model(self, model: AbstractModel, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series,

@@ -594,7 +594,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
                                            time_limit: float = None,
                                            silent=False,
                                            log_prefix='',
-                                           importance_as_list=False) -> pd.DataFrame:
+                                           importance_as_list=False,
+                                           random_state=None) -> pd.DataFrame:
     """
     Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
     A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -714,13 +715,15 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
     feature_batch_count = None
     X_raw = None
     score_baseline = None
+    initial_random_state = 0 if random_state is None else random_state
     # TODO: Can speedup shuffle_repeats by incorporating into X_raw (do multiple repeats in a single predict call)
     for shuffle_repeat in range(num_shuffle_sets):
         fi = dict()
+        random_state = initial_random_state + shuffle_repeat
 
         if subsample:
             # TODO: Stratify? We currently don't know in this function the problem_type (could pass as additional arg).
-            X = X_orig.sample(subsample_size, random_state=shuffle_repeat)
+            X = X_orig.sample(subsample_size, random_state=random_state)
             y = y_orig.loc[X.index]
 
         if subsample or shuffle_repeat == 0:
@@ -745,7 +748,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
 
         row_count = len(X)
 
-        X_shuffled = shuffle_df_rows(X=X, seed=shuffle_repeat)
+        X_shuffled = shuffle_df_rows(X=X, seed=random_state)
 
         for i in range(0, num_features, feature_batch_count):
             parallel_computed_features = features[i:i + feature_batch_count]
