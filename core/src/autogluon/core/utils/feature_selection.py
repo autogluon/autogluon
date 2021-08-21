@@ -112,8 +112,9 @@ class FeatureSelector:
             n_subsample = min(fi_subsample_size, len(X_fi))
             n_shuffle = min(np.ceil(n_total_fi_samples / n_subsample).astype(int), 100)
             expected_single_feature_time = self.safety_time_multiplier * self.model_predict_time * (n_subsample / len(X_fi)) * n_shuffle
+            time_budget_fi = max(min(prune_ratio * len(original_features), 50) * expected_single_feature_time, 60)
 
-            time_budget_fi = max(prune_ratio * len(original_features) * expected_single_feature_time, 60)
+            # time_budget_fi = max(0.1 * self.model_fit_time, 10 * self.model_predict_time * min(50, len(X.columns)), 60)
             logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
             logger.log(30, f"\tFit {index} ({self.model_fit_time}s): Current score is {best_info['score']}.")
             if self.is_proxy_model and self.time_limit <= self.model_fit_time * (2 if refit_at_end else 1) + time_budget_fi:
@@ -121,7 +122,7 @@ class FeatureSelector:
                 raise TimeLimitExceeded
 
             importance_df = None
-            for index in range(2, max_fits+1):
+            for index in range(2, 100):
                 model_name = f"{self.base_model.name}_{index}"
                 old_candidate_features = candidate_features
                 time_start = time.time()
@@ -328,6 +329,8 @@ class FeatureSelector:
         If using a proxy model and dataset size is larger than train_sample_size, subsample data to make
         model training faster. If the proxy model is bagged and we have a lot of data, use a non-bagged
         version instead since it is ~10x faster to train. Update fit and predict time estimates accordingly.
+        # FIXME: Adjust model fit time to be higher if proxy model is bagged RF or KNN and we are not doing
+        # replace_bag since we force use_child_oof
         """
         X_train, y_train = X, y
         if self.is_proxy_model and len(X) > train_subsample_size:

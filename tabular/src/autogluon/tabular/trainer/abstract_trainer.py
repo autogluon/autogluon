@@ -1350,12 +1350,17 @@ class AbstractTrainer:
             if time_limit is not None and time_limit < multi_fold_time_elapsed + 2 * proxy_model.fit_time:
                 logger.log(30, "Insufficient time to perform even a single pruning round. Ending...")
                 return models
+            # if feature_selection_time_limit keyword is not specified, set it to the minimum of remaining layer fit time
+            # and time to fit 2 round of models. note that feature selection can end earlier.
             if feature_prune_kwargs.get('feature_selection_time_limit', None) is not None:
                 feature_selection_time_limit = feature_prune_kwargs.get('feature_selection_time_limit')
             elif time_limit is not None:
-                feature_selection_time_limit = time_limit - multi_fold_time_elapsed
+                feature_selection_time_limit = min(time_limit - multi_fold_time_elapsed, 2 * multi_fold_time_elapsed)
             else:
-                feature_selection_time_limit = feature_prune_kwargs.get('max_fits', 10) * proxy_model.fit_time
+                feature_selection_time_limit = 2 * multi_fold_time_elapsed
+            # FIXME: Don't set minimum time limit here and also move insufficient time check inside FeatureSelector
+            # since when we do replace_bag trick time limit might differ
+            feature_selection_time_limit = max(feature_selection_time_limit, 60)
 
             feature_selection_time_start = time.time()
             selector = FeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)
