@@ -136,3 +136,26 @@ def check_if_nlp_feature(X: Series) -> bool:
         return False
 
     return True
+
+
+def get_bool_true_val(series: pd.Series, replace_val=None):
+    """
+    From a pandas series, get the replace_val to convert to boolean when calling:
+    series_bool = series == replace_val
+
+    series must have exactly 2 unique values
+    """
+    if replace_val is None:
+        try:
+            uniques = series.unique()
+            uniques.sort()
+        except:
+            uniques = series.unique()
+        replace_val = uniques[1]
+        try:
+            is_nan = np.isnan(replace_val)
+        except:
+            is_nan = False
+        if is_nan:
+            replace_val = uniques[0]
+    return replace_val

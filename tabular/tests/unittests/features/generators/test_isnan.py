@@ -41,7 +41,7 @@ def test_isnan_feature_generator(generator_helper, data_helper):
     }
 
     expected_feature_metadata_full = {
-        ('int', ()): [
+        ('int', ('bool',)): [
             '__nan__.int',
             '__nan__.float',
             '__nan__.obj',
