@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 """
 TODO
 1. Replicate best results (revert to the precise 0813 version tonight and run 4hr)
-2. Try version of feature pruning that takes up 2 repeated bag time (feature selection time limit = time required to fit all the models)
-3. Try to get pruning to trigger as much as possible - one option is to set compute_next_candidate time budget creatively. Perhaps it can be evaluating
+2. Try to get pruning to trigger as much as possible - one option is to set compute_next_candidate time budget creatively. Perhaps it can be evaluating
 at least max(time taken to 5% of feature space, 60s)
-4. Try prioritizing features that we are using from previous fits. This should STRICTLY make things better if done right.
+3. Try prioritizing features that we are using from previous fits. This should STRICTLY make things better if done right.
+4. Separate out method that computes time_budget_fi
 """
 
 

@@ -1355,7 +1355,7 @@ class AbstractTrainer:
             if feature_prune_kwargs.get('feature_selection_time_limit', None) is not None:
                 feature_selection_time_limit = feature_prune_kwargs.get('feature_selection_time_limit')
             elif time_limit is not None:
-                feature_selection_time_limit = min(time_limit - multi_fold_time_elapsed, 2 * multi_fold_time_elapsed)
+                feature_selection_time_limit = min(time_limit - multi_fold_time_elapsed, 4 * multi_fold_time_elapsed)
             else:
                 feature_selection_time_limit = 2 * multi_fold_time_elapsed
             # FIXME: Don't set minimum time limit here and also move insufficient time check inside FeatureSelector
