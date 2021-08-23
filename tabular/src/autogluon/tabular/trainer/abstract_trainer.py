@@ -1355,12 +1355,9 @@ class AbstractTrainer:
             if feature_prune_kwargs.get('feature_selection_time_limit', None) is not None:
                 feature_selection_time_limit = feature_prune_kwargs.get('feature_selection_time_limit')
             elif time_limit is not None:
-                feature_selection_time_limit = time_limit - multi_fold_time_elapsed  # min(time_limit - multi_fold_time_elapsed, 2 * multi_fold_time_elapsed)
+                feature_selection_time_limit = min(time_limit - multi_fold_time_elapsed, 2 * multi_fold_time_elapsed)
             else:
                 feature_selection_time_limit = 2 * multi_fold_time_elapsed
-            # FIXME: Don't set minimum time limit here and also move insufficient time check inside FeatureSelector
-            # since when we do replace_bag trick time limit might differ
-            feature_selection_time_limit = max(feature_selection_time_limit, 60)
 
             feature_selection_time_start = time.time()
             selector = FeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)

@@ -19,8 +19,6 @@ TODO
 1. Replicate best results (revert to the precise 0813 version tonight and run 4hr)
 2. Try to get pruning to trigger as much as possible - one option is to set compute_next_candidate time budget creatively. Perhaps it can be evaluating
 at least max(time taken to 5% of feature space, 60s)
-3. Try prioritizing features that we are using from previous fits. This should STRICTLY make things better if done right.
-4. Separate out method that computes time_budget_fi
 """
 
 
@@ -146,8 +144,7 @@ class FeatureSelector:
         X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
         best_info = {'features': candidate_features, 'index': index, 'model': self.original_model, 'score': self.original_val_score}
         logger.log(30, f"\tPerforming V1 model feature selection with model: {self.base_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
-                       f"max fits: {max_fits}, stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: " +
-                       f"{'auto' if prune_threshold is None else prune_threshold}.")
+                       f"stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {'auto' if not prune_threshold else prune_threshold}.")
         try:
             # fit proxy model once on the subsampled dataset to serve as scoring reference if using subsamples or added a noise column
             if subsampled or auto_threshold:
@@ -159,8 +156,7 @@ class FeatureSelector:
             n_total_fi_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
 
             fi_time_single = compute_expected_fi_time_single(X_fi, self.model_predict_time, fi_subsample_size, n_total_fi_samples, self.safety_time_multiplier)
-            # time_budget_fi = max(min(prune_ratio * len(original_features), 50) * expected_single_feature_time, 60)
-            time_budget_fi = min(max(fi_time_single * min(len(original_features), 50), 60), 300)
+            time_budget_fi = min(fi_time_single * min(len(original_features), 50), 300)
 
             # time_budget_fi = max(0.1 * self.model_fit_time, 10 * self.model_predict_time * min(50, len(X.columns)), 60)
             logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
@@ -170,10 +166,9 @@ class FeatureSelector:
                 raise TimeLimitExceeded
 
             importance_df = None
-            for index in range(2, max_fits):
+            for index in range(2, 100):
                 model_name = f"{self.base_model.name}_{index}"
                 prev_candidate_features = candidate_features
-                time_budget_fi = max(fi_time_single * min(len(best_info['features']), 50), 60)
                 prioritize_fi = [feature for feature in best_info['features'] if self.noise_prefix in feature]
                 fn_args = {'X': X_fi, 'y': y_fi, 'model': best_info['model'], 'time_budget': time_budget_fi, 'features': best_info['features'],
                            'n_sample': n_total_fi_samples, 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df, 'prune_ratio': prune_ratio,
@@ -259,10 +254,10 @@ class FeatureSelector:
         n_shuffle = min(np.ceil(n_sample / n_subsample).astype(int), 100)
         expected_single_feature_time = compute_expected_fi_time_single(X, self.model_predict_time, n_subsample, n_sample, self.safety_time_multiplier)
         auto_threshold = len(prioritized) > 0
-        features = self.sort_features_by_priority(features, prioritized, prev_importance_df)
+        features = self.sort_features_by_priority(features, prioritized, prev_importance_df, prev_fit_estimates)
 
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
-        n_evaluated_features = max([i for i in range(1, n_features+1) if i * expected_single_feature_time < time_budget])
+        n_evaluated_features = max([i for i in range(1, n_features+1) if i * expected_single_feature_time <= time_budget])
         if n_evaluated_features == 0:
             return features, unevaluated_fi_df_template(features)
         evaluated_features = features[:n_evaluated_features]
@@ -300,7 +295,27 @@ class FeatureSelector:
         self._fi_time_elapsed = self._fi_time_elapsed + feature_selection_time
         return candidate_features, importance_df.sort_values(by='importance', axis=0), feature_selection_time
 
-    def sort_features_by_priority(self, features: Sequence[str], prioritized: Sequence[str], prev_importance_df: pd.DataFrame) -> Sequence[str]:
+    # def sort_features_by_priority(self, features: Sequence[str], prioritized: Sequence[str], prev_importance_df: pd.DataFrame) -> Sequence[str]:
+    #     """
+    #     Return a list of features sorted by feature importance calculation priority in ascending order.
+    #     If prev_importance_df does not exist and not using auto_threshold, return the original list.
+    #     If prev_importance_df exists, features whose importance scores have not been calculated are
+    #     prioritized first followed by features with lowest previous importance scores estimates. If using
+    #     auto_threshold mode, noise columns are prioritized first since their scores are needed to determine
+    #     the pruning threshold.
+    #     """
+    #     is_first_run = prev_importance_df is None
+    #     auto_threshold = len(prioritized) > 0
+    #     if not is_first_run:
+    #         prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
+    #         sorted_features = prev_importance_df.drop(prev_deleted_features).sort_values(by='importance', axis=0, ascending=False).index.tolist()[::-1]
+    #         features = sorted_features + [feature for feature in features if feature not in sorted_features]
+    #     if auto_threshold:
+    #         features = prioritized + [feature for feature in features if feature not in prioritized]
+    #     return features
+
+    def sort_features_by_priority(self, features: List[str], prioritized: List[str], prev_importance_df: pd.DataFrame,
+                                  prev_fit_estimates: Set[str]) -> List[str]:
         """
         Return a list of features sorted by feature importance calculation priority in ascending order.
         If prev_importance_df does not exist and not using auto_threshold, return the original list.
@@ -313,8 +328,13 @@ class FeatureSelector:
         auto_threshold = len(prioritized) > 0
         if not is_first_run:
             prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
-            sorted_features = prev_importance_df.drop(prev_deleted_features).sort_values(by='importance', axis=0, ascending=False).index.tolist()[::-1]
-            features = sorted_features + [feature for feature in features if feature not in sorted_features]
+            prev_importance_df = prev_importance_df.drop(prev_deleted_features)
+            unevaluated_rows = prev_importance_df[prev_importance_df['importance'].isna()]
+            prev_fit_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
+                                                          (prev_importance_df.index.isin(prev_fit_estimates))].sort_values(by='importance')
+            curr_fit_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
+                                                         ~(prev_importance_df.index.isin(prev_fit_estimates))].sort_values(by='importance')
+            features = unevaluated_rows.index.tolist() + prev_fit_evaluated_rows.index.tolist() + curr_fit_evaluated_rows.index.tolist()
         if auto_threshold:
             features = prioritized + [feature for feature in features if feature not in prioritized]
         return features
