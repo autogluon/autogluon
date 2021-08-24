@@ -98,6 +98,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         self.enable_raw_text_features = enable_raw_text_features
         self.enable_vision_features = enable_vision_features
         self.text_ngram_params = text_ngram_params if text_ngram_params else {}
+
         generators = self._get_default_generators(vectorizer=vectorizer)
         super().__init__(generators=generators, **kwargs)
 

@@ -1522,7 +1522,7 @@ class AbstractTrainer:
         best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
         proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
 
-        k = feature_prune_kwargs.get('k', 2)
+        k = feature_prune_kwargs[proxy_model.name].get('k', 2)
         if feature_prune_kwargs.get('feature_selection_time_limit', None) is not None:
             feature_selection_time_limit = feature_prune_kwargs.get('feature_selection_time_limit')
         elif time_limit is not None:

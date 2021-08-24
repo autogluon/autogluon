@@ -702,7 +702,6 @@ class AbstractModel:
                                    features=None,
                                    silent=False,
                                    importance_as_list=False,
-                                   is_oof=False,
                                    **kwargs) -> pd.DataFrame:
         if self.features is not None:
             X = X[self.features]
