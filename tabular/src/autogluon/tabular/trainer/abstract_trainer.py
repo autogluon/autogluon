@@ -1335,41 +1335,17 @@ class AbstractTrainer:
         if time_limit is not None:
             time_limit = time_limit - multi_fold_time_elapsed
 
-        # TODO JASON: SEPARATE THIS OUT INTO A NEW METHOD
         if proxy_feature_prune and len(models) > 0:
-            logger.log(30, "Proxy model feature pruning models while time permits...")
-            fit_args['X_val'], fit_args['y_val'] = kwargs['X_val'], kwargs['y_val']
-
-            # proxy model is the model that performed best in this stack layer (excluding weighted ensemble)
-            leaderboard = self.leaderboard()
-            leaderboard = leaderboard[~leaderboard['model'].str.contains('WeightedEnsemble')]
-            fit_models = leaderboard[(leaderboard['can_infer']) & (leaderboard['stack_level'] == kwargs['level'])]
-            best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
-            proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
-
-            if time_limit is not None and time_limit < multi_fold_time_elapsed + 2 * proxy_model.fit_time:
-                logger.log(30, "Insufficient time to perform even a single pruning round. Ending...")
-                return models
-            # if feature_selection_time_limit keyword is not specified, set it to the minimum of remaining layer fit time
-            # and time to fit 2 round of models. note that feature selection can end earlier.
-            if feature_prune_kwargs.get('feature_selection_time_limit', None) is not None:
-                feature_selection_time_limit = feature_prune_kwargs.get('feature_selection_time_limit')
-            elif time_limit is not None:
-                feature_selection_time_limit = min(time_limit - multi_fold_time_elapsed, 2 * multi_fold_time_elapsed)
-            else:
-                feature_selection_time_limit = 2 * multi_fold_time_elapsed
-
             feature_selection_time_start = time.time()
-            selector = FeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)
-            candidate_features, _ = selector.select_features(**feature_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
-            self._debug_info['proxy_model'].append(selector._debug_info)
-            self._debug_info['proxy_model'][-1]['layer_fit_time'] = multi_fold_time_elapsed
-            feature_prune_kwargs['refit_only'] = True
-            fit_args['X'] = X[candidate_features]
-            if fit_args.get('X_val', None) is not None:
-                fit_args['X_val'] = fit_args['X_val'][candidate_features]
+            candidate_features = self._proxy_model_feature_prune(feature_prune_kwargs, time_limit, multi_fold_time_elapsed, kwargs['level'])
             if time_limit is not None:
                 time_limit = time_limit - (time.time() - feature_selection_time_start)
+
+            feature_prune_kwargs['refit_only'] = True
+            fit_args['X'] = X[candidate_features]
+            fit_args['X_val'] = kwargs['X_val'][candidate_features] if isinstance(kwargs['X_val'], pd.DataFrame) else kwargs['X_val']
+            fit_args['y_val'] = kwargs['y_val']
+
             if len(candidate_features) < len(X.columns):
                 unfit_models = []
                 for model in models:
@@ -1532,6 +1508,36 @@ class AbstractTrainer:
         )
         dummy_stacker.initialize(num_classes=self.num_classes)
         return dummy_stacker
+
+    def _proxy_model_feature_prune(self, feature_prune_kwargs: dict, time_limit: float, layer_fit_time: float, level: int) -> List[str]:
+        """
+        Uses the best base learner of this layer to perform time-aware permutation feature importance based feature pruning.
+        Feature pruning gets the smaller of remaining layer time limit and k times it took to fit the base learners of
+        this layer as its resource. Note that feature pruning can exit earlier based on arguments in feature_prune_kwargs.
+        The method returns the list of feature names that survived the pruning procedure.
+        """
+        leaderboard = self.leaderboard()
+        leaderboard = leaderboard[~leaderboard['model'].str.contains('WeightedEnsemble')]
+        fit_models = leaderboard[(leaderboard['can_infer']) & (leaderboard['stack_level'] == level)]
+        best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
+        proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
+
+        k = feature_prune_kwargs.get('k', 2)
+        if feature_prune_kwargs.get('feature_selection_time_limit', None) is not None:
+            feature_selection_time_limit = feature_prune_kwargs.get('feature_selection_time_limit')
+        elif time_limit is not None:
+            feature_selection_time_limit = min(time_limit - layer_fit_time, k * layer_fit_time)
+        else:
+            feature_selection_time_limit = k * layer_fit_time
+
+        logger.log(30, f"Proxy model feature pruning models for up to {round(feature_selection_time_limit)}s...")
+        selector = FeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)
+        candidate_features, _ = selector.select_features(**feature_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
+
+        # TODO: Remove these
+        self._debug_info['proxy_model'].append(selector._debug_info)
+        self._debug_info['proxy_model'][-1]['layer_fit_time'] = layer_fit_time
+        return candidate_features
 
     # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
