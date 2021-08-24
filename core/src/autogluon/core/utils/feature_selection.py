@@ -10,6 +10,7 @@ from autogluon.core.features.types import R_FLOAT
 import numpy as np
 import pandas as pd
 import time
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -73,15 +74,29 @@ def merge_importance_dfs(df_old: pd.DataFrame, df_new: pd.DataFrame, prev_fit_es
     return pd.concat([evaluated_both_rows, evaluated_new_only_rows, evaluated_old_only_rows, evaluated_neither_rows])
 
 
-def compute_expected_fi_time_single(X_fi: pd.DataFrame, model_predict_time: float, n_subsample: int,
-                                    n_total_sample: int, safety_time_multiplier: float = 1.) -> float:
+def sort_features_by_priority(features: List[str], prioritized: Set[str], prev_importance_df: pd.DataFrame, prev_fit_estimates: Set[str]) -> List[str]:
     """
-    Return the expected time to compute permutation feature importance for a single feature on n_total_sample datapoints.
+    Return a list of features sorted by feature importance calculation priority in ascending order.
+    If prev_importance_df does not exist and not using auto_threshold, return the original list.
+    If prev_importance_df exists, features whose importance scores have not been calculated are
+    prioritized first followed by features with lowest previous importance scores estimates. If using
+    auto_threshold mode, noise columns are prioritized first since their scores are needed to determine
+    the pruning threshold.
     """
-    n_subsample = min(n_subsample, len(X_fi))
-    n_shuffle = min(np.ceil(n_total_sample / n_subsample).astype(int), 100)
-    expected_single_feature_time = safety_time_multiplier * model_predict_time * (n_subsample / len(X_fi)) * n_shuffle
-    return expected_single_feature_time
+    is_first_run = prev_importance_df is None
+    auto_threshold = len(prioritized) > 0
+    if not is_first_run:
+        prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
+        prev_importance_df = prev_importance_df.drop(prev_deleted_features)
+        unevaluated_rows = prev_importance_df[prev_importance_df['importance'].isna()]
+        prev_fit_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
+                                                      (prev_importance_df.index.isin(prev_fit_estimates))].sort_values(by='importance')
+        curr_fit_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
+                                                     ~(prev_importance_df.index.isin(prev_fit_estimates))].sort_values(by='importance')
+        features = unevaluated_rows.index.tolist() + prev_fit_evaluated_rows.index.tolist() + curr_fit_evaluated_rows.index.tolist()
+    if auto_threshold:
+        features = list(prioritized) + [feature for feature in features if feature not in prioritized]
+    return features
 
 
 class FeatureSelector:
@@ -117,13 +132,13 @@ class FeatureSelector:
         logger.log(30, f"\tPerforming V2 model feature selection with model: {self.base_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {'auto' if not prune_threshold else prune_threshold}.")
         original_features = X.columns.tolist()
-        X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled = self.setup(X, y, X_val, y_val, n_train_subsample, min_fi_samples, prune_threshold, kwargs)
+        X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled, kwargs = self.setup(X, y, X_val, y_val, n_train_subsample, min_fi_samples, prune_threshold, kwargs)
         try:
             index = 1
             candidate_features = X.columns.tolist()
             best_info = {'features': candidate_features, 'index': 1, 'model': self.original_model, 'score': round(self.original_val_score, 4)}
             if self.model_fit_time is not None and self.time_limit < self.model_fit_time:
-                logger.log(30, f"\tInsufficient time to perform even a single pruning round.")
+                logger.log(30, f"\tNo time to perform the next pruning round (remaining: {self.time_limit}, needed: {self.model_fit_time}).")
                 raise TimeLimitExceeded
 
             # fit proxy model once on the subsampled dataset to serve as scoring reference if using subsamples or added a noise column
@@ -132,13 +147,13 @@ class FeatureSelector:
             self._debug_info['index_trajectory'].append(True)
 
             n_total_fi_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
-            fi_time_single = compute_expected_fi_time_single(X_fi, self.model_predict_time, n_fi_subsample, n_total_fi_samples, self.safety_time_multiplier)
+            fi_time_single = self.compute_expected_fi_time_single(X_fi, self.model_predict_time, n_fi_subsample, n_total_fi_samples, self.safety_time_multiplier)
             time_budget_fi = min(fi_time_single * min(len(candidate_features), 50), 300)
 
-            logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
-            logger.log(30, f"\tFit 1 ({round(self.model_fit_time, 2)}s): Current score is {best_info['score']}.")
+            logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 4)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
+            logger.log(30, f"\tFit 1 ({round(self.model_fit_time, 4)}s): Current score is {best_info['score']}.")
             if self.time_limit < self.model_fit_time + time_budget_fi:
-                logger.log(30, f"\tInsufficient time to perform even a single pruning round.")
+                logger.log(30, f"\tNo time to perform the next pruning round (remaining: {self.time_limit}, needed: {self.model_fit_time + time_budget_fi}).")
                 raise TimeLimitExceeded
 
             importance_df = None
@@ -174,6 +189,7 @@ class FeatureSelector:
         except TimeLimitExceeded:
             logger.log(30, f"\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
+            logger.log(30, traceback.format_exc())
             logger.log(30, f"\tERROR: Exception raised during feature pruning. Reason: {e}. Ending...")
             self._debug_info['exceptions'].append(str(e))
 
@@ -228,9 +244,9 @@ class FeatureSelector:
         n_features = len(features)
         n_subsample = min(n_subsample, len(X))
         n_shuffle = min(np.ceil(n_sample / n_subsample).astype(int), 100)
-        expected_single_feature_time = compute_expected_fi_time_single(X, self.model_predict_time, n_subsample, n_sample, self.safety_time_multiplier)
+        expected_single_feature_time = self.compute_expected_fi_time_single(X, self.model_predict_time, n_subsample, n_sample, self.safety_time_multiplier)
         auto_threshold = len(prioritized) > 0
-        features = self.sort_features_by_priority(features, prioritized, prev_importance_df, prev_fit_estimates)
+        features = sort_features_by_priority(features, prioritized, prev_importance_df, prev_fit_estimates)
 
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
         n_evaluated_features = max([i for i in range(0, n_features+1) if i * expected_single_feature_time <= time_budget])
@@ -271,30 +287,6 @@ class FeatureSelector:
         self._fi_time_elapsed = self._fi_time_elapsed + feature_selection_time
         return candidate_features, importance_df.sort_values(by='importance', axis=0), feature_selection_time
 
-    def sort_features_by_priority(self, features: List[str], prioritized: Set[str], prev_importance_df: pd.DataFrame, prev_fit_estimates: Set[str]) -> List[str]:
-        """
-        Return a list of features sorted by feature importance calculation priority in ascending order.
-        If prev_importance_df does not exist and not using auto_threshold, return the original list.
-        If prev_importance_df exists, features whose importance scores have not been calculated are
-        prioritized first followed by features with lowest previous importance scores estimates. If using
-        auto_threshold mode, noise columns are prioritized first since their scores are needed to determine
-        the pruning threshold.
-        """
-        is_first_run = prev_importance_df is None
-        auto_threshold = len(prioritized) > 0
-        if not is_first_run:
-            prev_deleted_features = [feature for feature in prev_importance_df.index if feature not in features]
-            prev_importance_df = prev_importance_df.drop(prev_deleted_features)
-            unevaluated_rows = prev_importance_df[prev_importance_df['importance'].isna()]
-            prev_fit_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
-                                                          (prev_importance_df.index.isin(prev_fit_estimates))].sort_values(by='importance')
-            curr_fit_evaluated_rows = prev_importance_df[~(prev_importance_df['importance'].isna()) &
-                                                         ~(prev_importance_df.index.isin(prev_fit_estimates))].sort_values(by='importance')
-            features = unevaluated_rows.index.tolist() + prev_fit_evaluated_rows.index.tolist() + curr_fit_evaluated_rows.index.tolist()
-        if auto_threshold:
-            features = list(prioritized) + [feature for feature in features if feature not in prioritized]
-        return features
-
     def compute_next_candidate_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float,
                                         weighted: bool = True) -> List[str]:
         """
@@ -332,6 +324,16 @@ class FeatureSelector:
                 self.attempted_removals.add(removal_candidates)
                 return acceptance_candidates
         return importance_df.index.tolist()
+
+    def compute_expected_fi_time_single(self, X_fi: pd.DataFrame, model_predict_time: float, n_subsample: int, n_total_sample: int,
+                                        safety_time_multiplier: float = 1.) -> float:
+        """
+        Return the expected time to compute permutation feature importance for a single feature on n_total_sample datapoints.
+        """
+        n_subsample = min(n_subsample, len(X_fi))
+        n_shuffle = min(np.ceil(n_total_sample / n_subsample).astype(int), 100)
+        expected_single_feature_time = safety_time_multiplier * model_predict_time * (n_subsample / len(X_fi)) * n_shuffle
+        return expected_single_feature_time
 
     def fit_score_model(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series,
                         features: List[str], model_name: str, **kwargs) -> Tuple[AbstractModel, float, float]:
@@ -392,8 +394,8 @@ class FeatureSelector:
             subsampled = False
         return X_train, y_train, X_val, y_val, subsampled, kwargs
 
-    def setup(self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, min_fi_samples: int,
-              prune_threshold: float, kwargs: dict) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, bool, bool]:
+    def setup(self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, min_fi_samples: int, prune_threshold: float,
+              kwargs: dict) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, bool, bool, dict]:
         X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, n_train_subsample, min_fi_samples, **kwargs)
         auto_threshold = prune_threshold is None
         if auto_threshold:
@@ -403,4 +405,4 @@ class FeatureSelector:
         X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
         if self.is_bagged and self.original_model._child_oof and self.model_fit_time is not None:
             self.model_fit_time = self.model_fit_time * kwargs['k_fold']
-        return X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled
+        return X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled, kwargs

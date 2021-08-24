@@ -1522,6 +1522,14 @@ class AbstractTrainer:
         best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
         proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
 
+        # TODO: Consider just using LightGBM here
+        if feature_prune_kwargs[proxy_model.name].get('proxy_model_class', None) == "LGB":
+            lgb_models = leaderboard[(leaderboard['model'].str.contains('LightGBM')) & (leaderboard['can_infer']) & (leaderboard['stack_level'] == level)]
+            best_lgb_models = lgb_models.loc[lgb_models['score_val'] == lgb_models['score_val'].max()]
+            best_lgb_model = best_lgb_models.loc[best_lgb_models['fit_time'].idxmin()]
+            if len(best_lgb_models) > 0:
+                proxy_model = self.load_model(best_lgb_model['model'])
+
         k = feature_prune_kwargs[proxy_model.name].get('k', 2)
         if feature_prune_kwargs.get('feature_selection_time_limit', None) is not None:
             feature_selection_time_limit = feature_prune_kwargs.get('feature_selection_time_limit')
