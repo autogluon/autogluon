@@ -129,6 +129,7 @@ class FeatureSelector:
                        f"stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {'auto' if not prune_threshold else prune_threshold}.")
 
         try:
+            index = 1
             candidate_features = X.columns.tolist()
             best_info = {'features': candidate_features, 'index': 1, 'model': self.original_model, 'score': round(self.original_val_score, 4)}
             if self.model_fit_time is not None and self.time_limit < self.model_fit_time:
@@ -151,7 +152,6 @@ class FeatureSelector:
                 raise TimeLimitExceeded
 
             importance_df = None
-            index = 1
             while True:
                 index = index + 1
                 model_name = f"{self.base_model.name}_{index}"
@@ -243,7 +243,7 @@ class FeatureSelector:
         features = self.sort_features_by_priority(features, prioritized, prev_importance_df, prev_fit_estimates)
 
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
-        n_evaluated_features = max([i for i in range(1, n_features+1) if i * expected_single_feature_time <= time_budget])
+        n_evaluated_features = max([i for i in range(0, n_features+1) if i * expected_single_feature_time <= time_budget])
         if n_evaluated_features == 0:
             return features, unevaluated_fi_df_template(features)
         evaluated_features = features[:n_evaluated_features]
