@@ -7,7 +7,7 @@ import pickle
 import time
 import random
 import sys
-from typing import Callable, Tuple, Sequence
+from typing import Callable, List
 from datetime import datetime
 from functools import wraps
 from matplotlib import pyplot as plt
@@ -955,7 +955,7 @@ def get_gpu_free_memory():
     return memory_free_values
 
 
-def unevaluated_fi_df_template(features: Sequence[str]) -> pd.DataFrame:
+def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:
     importance_df = pd.DataFrame({'name': features})
     importance_df['importance'] = None
     importance_df['stddev'] = None

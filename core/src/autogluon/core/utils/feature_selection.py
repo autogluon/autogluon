@@ -110,24 +110,14 @@ class FeatureSelector:
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
 
-    def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, train_subsample_size: int = 50000,
-                        fi_subsample_size: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
+    def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, n_train_subsample: int = 50000,
+                        n_fi_subsample: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
                         min_fi_samples: int = 10000, max_fi_samples: int = 100000, **kwargs) -> Tuple[List[str], List[pd.DataFrame]]:
-
-        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, train_subsample_size, min_fi_samples, **kwargs)
-        original_features = X.columns.tolist()
-        auto_threshold = prune_threshold is None
-        if auto_threshold:
-            kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata']) if 'feature_metadata' in kwargs else None
-            X = add_noise_column(X, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
-            X_val = add_noise_column(X_val, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
-        X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
-        if self.is_bagged and self.original_model._child_oof and self.model_fit_time is not None:
-            self.model_fit_time = self.model_fit_time * kwargs['k_fold']
 
         logger.log(30, f"\tPerforming V2 model feature selection with model: {self.base_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {'auto' if not prune_threshold else prune_threshold}.")
-
+        original_features = X.columns.tolist()
+        X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled = self.setup(X, y, X_val, y_val, n_train_subsample, min_fi_samples, prune_threshold, kwargs)
         try:
             index = 1
             candidate_features = X.columns.tolist()
@@ -142,8 +132,8 @@ class FeatureSelector:
             self._debug_info['index_trajectory'].append(True)
 
             n_total_fi_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
-            fi_time_single = compute_expected_fi_time_single(X_fi, self.model_predict_time, fi_subsample_size, n_total_fi_samples, self.safety_time_multiplier)
-            time_budget_fi = min(fi_time_single * min(len(original_features), 50), 300)
+            fi_time_single = compute_expected_fi_time_single(X_fi, self.model_predict_time, n_fi_subsample, n_total_fi_samples, self.safety_time_multiplier)
+            time_budget_fi = min(fi_time_single * min(len(candidate_features), 50), 300)
 
             logger.log(30, f"\tExpected model fit time: {round(self.model_fit_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
             logger.log(30, f"\tFit 1 ({round(self.model_fit_time, 2)}s): Current score is {best_info['score']}.")
@@ -158,7 +148,7 @@ class FeatureSelector:
                 prev_candidate_features = candidate_features
                 prioritize_fi = set([feature for feature in best_info['features'] if self.noise_prefix in feature])
                 fn_args = {'X': X_fi, 'y': y_fi, 'model': best_info['model'], 'time_budget': time_budget_fi, 'features': best_info['features'],
-                           'n_sample': n_total_fi_samples, 'n_subsample': fi_subsample_size, 'prev_importance_df': importance_df, 'prune_ratio': prune_ratio,
+                           'n_sample': n_total_fi_samples, 'n_subsample': n_fi_subsample, 'prev_importance_df': importance_df, 'prune_ratio': prune_ratio,
                            'prune_threshold': prune_threshold, 'prioritized': prioritize_fi, 'weighted': kwargs.get('weighted', True)}
                 candidate_features, importance_df, success, selection_time = self.compute_next_candidate(fn_args, time_budget_fi, prev_candidate_features)
                 if not success:
@@ -375,7 +365,7 @@ class FeatureSelector:
         self._fit_time_elapsed = self._fit_time_elapsed + (fit_time + predict_time)
         return model, round(score, 4), round(fit_time + predict_time, 4)
 
-    def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, train_subsample_size: int, min_fi_samples: int,
+    def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, min_fi_samples: int,
                              **kwargs) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, bool, dict]:
         """
         If using a proxy model and dataset size is larger than train_sample_size, subsample data to make
@@ -383,11 +373,11 @@ class FeatureSelector:
         version instead since it is ~10x faster to train. Update fit and predict time estimates accordingly.
         """
         X_train, y_train = X, y
-        if len(X) > train_subsample_size:
+        if len(X) > n_train_subsample:
             subsampled = True
-            X_train = X.sample(train_subsample_size, random_state=self.rng.integers(low=0, high=1e5))
+            X_train = X.sample(n_train_subsample, random_state=self.rng.integers(low=0, high=1e5))
             y_train = y.loc[X_train.index]
-            if kwargs.pop('replace_bag', True) and self.is_bagged and len(X) >= train_subsample_size + min_fi_samples:
+            if kwargs.pop('replace_bag', True) and self.is_bagged and len(X) >= n_train_subsample + min_fi_samples:
                 self.is_bagged = False
                 original_k_fold = kwargs['k_fold']
                 self.base_model = self.original_model.convert_to_template_child()
@@ -401,3 +391,16 @@ class FeatureSelector:
         else:
             subsampled = False
         return X_train, y_train, X_val, y_val, subsampled, kwargs
+
+    def setup(self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, min_fi_samples: int,
+              prune_threshold: float, kwargs: dict) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, bool, bool]:
+        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, n_train_subsample, min_fi_samples, **kwargs)
+        auto_threshold = prune_threshold is None
+        if auto_threshold:
+            kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata']) if 'feature_metadata' in kwargs else None
+            X = add_noise_column(X, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
+            X_val = add_noise_column(X_val, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
+        X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
+        if self.is_bagged and self.original_model._child_oof and self.model_fit_time is not None:
+            self.model_fit_time = self.model_fit_time * kwargs['k_fold']
+        return X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled
