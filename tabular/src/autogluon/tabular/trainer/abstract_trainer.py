@@ -1336,10 +1336,10 @@ class AbstractTrainer:
             time_limit = time_limit - multi_fold_time_elapsed
 
         if proxy_feature_prune and len(models) > 0:
-            feature_selection_time_start = time.time()
+            feature_prune_time_start = time.time()
             candidate_features = self._proxy_model_feature_prune(feature_prune_kwargs, time_limit, multi_fold_time_elapsed, kwargs['level'])
             if time_limit is not None:
-                time_limit = time_limit - (time.time() - feature_selection_time_start)
+                time_limit = time_limit - (time.time() - feature_prune_time_start)
 
             feature_prune_kwargs['refit_only'] = True
             fit_args['X'] = X[candidate_features]
@@ -1522,24 +1522,23 @@ class AbstractTrainer:
         best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
         proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
 
-        # TODO: Consider just using LightGBM here
         if feature_prune_kwargs[proxy_model.name].get('proxy_model_class', None) == "LGB":
             lgb_models = leaderboard[(leaderboard['model'].str.contains('LightGBM')) & (leaderboard['can_infer']) & (leaderboard['stack_level'] == level)]
-            best_lgb_models = lgb_models.loc[lgb_models['score_val'] == lgb_models['score_val'].max()]
-            best_lgb_model = best_lgb_models.loc[best_lgb_models['fit_time'].idxmin()]
-            if len(best_lgb_models) > 0:
+            if len(lgb_models) > 0:
+                best_lgb_models = lgb_models.loc[lgb_models['score_val'] == lgb_models['score_val'].max()]
+                best_lgb_model = best_lgb_models.loc[best_lgb_models['fit_time'].idxmin()]
                 proxy_model = self.load_model(best_lgb_model['model'])
 
         k = feature_prune_kwargs[proxy_model.name].get('k', 2)
-        if feature_prune_kwargs.get('feature_selection_time_limit', None) is not None:
-            feature_selection_time_limit = feature_prune_kwargs.get('feature_selection_time_limit')
+        if feature_prune_kwargs[proxy_model.name].get('feature_prune_time_limit', None) is not None:
+            feature_prune_time_limit = min(time_limit - layer_fit_time, feature_prune_kwargs[proxy_model.name].get('feature_prune_time_limit'))
         elif time_limit is not None:
-            feature_selection_time_limit = min(time_limit - layer_fit_time, k * layer_fit_time)
+            feature_prune_time_limit = min(time_limit - layer_fit_time, k * layer_fit_time)
         else:
-            feature_selection_time_limit = k * layer_fit_time
-
-        logger.log(30, f"Proxy model feature pruning models for up to {round(feature_selection_time_limit)}s...")
-        selector = FeatureSelector(model=proxy_model, time_limit=feature_selection_time_limit)
+            feature_prune_time_limit = k * layer_fit_time
+        logger.log(30, feature_prune_kwargs)
+        logger.log(30, f"Proxy model feature pruning models for up to {round(feature_prune_time_limit)}s...")
+        selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit)
         candidate_features, _ = selector.select_features(**feature_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
 
         # TODO: Remove these

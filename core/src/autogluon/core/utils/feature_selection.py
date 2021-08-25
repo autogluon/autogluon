@@ -71,7 +71,7 @@ def merge_importance_dfs(df_old: pd.DataFrame, df_new: pd.DataFrame, prev_fit_es
     evaluated_both_rows['n'] = n_old + n_new
     # remove features evaluated in df_new from prev_fit_estimates if they exist
     prev_fit_estimates.difference_update(evaluated_new_rows.index.tolist())
-    return pd.concat([evaluated_both_rows, evaluated_new_only_rows, evaluated_old_only_rows, evaluated_neither_rows])
+    return pd.concat([evaluated_both_rows, evaluated_new_only_rows, evaluated_old_only_rows, evaluated_neither_rows]).sort_values('importance')
 
 
 def sort_features_by_priority(features: List[str], prioritized: Set[str], prev_importance_df: pd.DataFrame, prev_fit_estimates: Set[str]) -> List[str]:
@@ -154,6 +154,7 @@ class FeatureSelector:
             logger.log(30, f"\tFit 1 ({round(self.model_fit_time, 4)}s): Current score is {best_info['score']}.")
             if self.time_limit < self.model_fit_time + time_budget_fi:
                 logger.log(30, f"\tNo time to perform the next pruning round (remaining: {self.time_limit}, needed: {self.model_fit_time + time_budget_fi}).")
+                self._debug_info['exceptions'].append(f"exiting after 1 model fit (remaining: {self.time_limit}, needed: {self.model_fit_time + time_budget_fi})")
                 raise TimeLimitExceeded
 
             importance_df = None
@@ -251,7 +252,10 @@ class FeatureSelector:
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
         n_evaluated_features = max([i for i in range(0, n_features+1) if i * expected_single_feature_time <= time_budget])
         if n_evaluated_features == 0:
-            return features, unevaluated_fi_df_template(features)
+            feature_selection_time = time.time() - time_start
+            self.time_limit = self.time_limit - feature_selection_time
+            self._fi_time_elapsed = self._fi_time_elapsed + feature_selection_time
+            return features, unevaluated_fi_df_template(features), feature_selection_time
         evaluated_features = features[:n_evaluated_features]
         unevaluated_features = features[n_evaluated_features:]
         time_budget_fi = time_budget - (time.time() - time_start)
