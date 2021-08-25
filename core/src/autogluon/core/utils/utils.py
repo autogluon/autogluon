@@ -10,7 +10,6 @@ import sys
 from typing import Callable, List
 from datetime import datetime
 from functools import wraps
-from matplotlib import pyplot as plt
 
 import numpy as np
 import pandas as pd

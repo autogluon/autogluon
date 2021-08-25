@@ -127,8 +127,13 @@ class FeatureSelector:
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, n_train_subsample: int = 50000,
                         n_fi_subsample: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
-                        min_fi_samples: int = 10000, max_fi_samples: int = 100000, **kwargs) -> Tuple[List[str], List[pd.DataFrame]]:
-
+                        improvement_threshold: float = 1e-6, min_fi_samples: int = 10000, max_fi_samples: int = 100000, max_fits: int = None,
+                        **kwargs) -> Tuple[List[str], List[pd.DataFrame]]:
+        """
+        Performs time-aware recursive feature elimination based on permutation feature importance. While time remains, compute feature importance
+        score for as many features as possible over at least min_fi_samples validation datapoints, discard features whose score is less than or
+        equal to prune_threshold, fit the model on those features and keep the feature subset if its validation score is better, and repeat.
+        """
         logger.log(30, f"\tPerforming V2 model feature selection with model: {self.base_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"stop threshold: {stop_threshold}, prune ratio: {prune_ratio}, prune threshold: {'auto' if not prune_threshold else prune_threshold}.")
         original_features = X.columns.tolist()
@@ -172,7 +177,7 @@ class FeatureSelector:
                     break
                 curr_model, score, fit_time = self.fit_score_model(X, y, X_val, y_val, candidate_features, model_name, **kwargs)
 
-                if score > best_info['score']:
+                if score >= best_info['score'] * (1 + improvement_threshold):
                     logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is better than best score {best_info['score']}. Updating model.")
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}.")
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
@@ -181,6 +186,9 @@ class FeatureSelector:
                     logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is not better than best score {best_info['score']}. Retrying.")
                     self._debug_info['index_trajectory'].append(False)
 
+                if max_fits is not None and index >= max_fits:
+                    logger.log(30, f"\tReached maximum number of fits {max_fits}. Ending...")
+                    break
                 if index - best_info['index'] >= stop_threshold:
                     logger.log(30, f"\tScore has not improved for {stop_threshold} iterations. Ending...")
                     break
