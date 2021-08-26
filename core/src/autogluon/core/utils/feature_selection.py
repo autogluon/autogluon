@@ -126,7 +126,7 @@ class FeatureSelector:
         self._fi_time_elapsed = 0.
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, n_train_subsample: int = 50000,
-                        n_fi_subsample: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 1,
+                        n_fi_subsample: int = 5000, prune_ratio: float = 0.05, prune_threshold: float = None, stop_threshold: int = 10,
                         improvement_threshold: float = 1e-6, min_fi_samples: int = 10000, max_fi_samples: int = 100000, max_fits: int = None,
                         **kwargs) -> Tuple[List[str], List[pd.DataFrame]]:
         """
@@ -360,6 +360,7 @@ class FeatureSelector:
         model.rename(model_name)
         if self.is_bagged:
             kwargs['use_child_oof'] = False
+            kwargs['save_bag_folds'] = True
         if 'time_limit' in kwargs:
             kwargs['time_limit'] = self.time_limit
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)

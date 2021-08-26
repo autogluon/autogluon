@@ -134,7 +134,11 @@ class BaggedEnsembleModel(AbstractModel):
              n_repeat_start=0,
              groups=None,
              **kwargs):
-        use_child_oof = kwargs.get('use_child_oof', self.params.get('use_child_oof', False))
+        # HACK to be able to change these variables at fit time
+        self.params['use_child_oof'] = kwargs.get('use_child_oof', self.params.get('use_child_oof', False))
+        self.params['save_bag_folds'] = kwargs.get('save_bag_folds', self.params.get('save_bag_folds', True))
+        use_child_oof = self.params['use_child_oof']
+        save_bag_folds = self.params['save_bag_folds']
         if use_child_oof:
             if self.is_fit():
                 # TODO: We may want to throw an exception instead and avoid calling fit more than once
@@ -171,7 +175,6 @@ class BaggedEnsembleModel(AbstractModel):
         if self._oof_pred_proba is None and self.is_fit():
             self._load_oof()
 
-        save_bag_folds = self.params.get('save_bag_folds', True)
         if k_fold == 1:
             self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, **kwargs)
             return self

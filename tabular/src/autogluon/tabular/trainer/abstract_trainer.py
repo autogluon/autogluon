@@ -1318,7 +1318,7 @@ class AbstractTrainer:
 
         if feature_prune and len(models) > 0:
             feature_prune_time_start = time.time()
-            candidate_features = self._proxy_model_feature_prune(feature_prune_kwargs, time_limit, multi_fold_time_elapsed, kwargs['level'])
+            candidate_features = self._proxy_model_feature_prune(feature_prune_kwargs, time_limit, multi_fold_time_elapsed, kwargs['level'], X.columns.tolist())
             if time_limit is not None:
                 time_limit = time_limit - (time.time() - feature_prune_time_start)
 
@@ -1490,7 +1490,7 @@ class AbstractTrainer:
         dummy_stacker.initialize(num_classes=self.num_classes)
         return dummy_stacker
 
-    def _proxy_model_feature_prune(self, feature_prune_kwargs: dict, time_limit: float, layer_fit_time: float, level: int) -> List[str]:
+    def _proxy_model_feature_prune(self, feature_prune_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: List[str]) -> List[str]:
         """
         Uses the best base learner of this layer to perform time-aware permutation feature importance based feature pruning.
         Feature pruning gets the smaller of remaining layer time limit and k times it took to fit the base learners of
@@ -1499,12 +1499,14 @@ class AbstractTrainer:
         """
         leaderboard = self.leaderboard()
         leaderboard = leaderboard[~leaderboard['model'].str.contains('WeightedEnsemble')]
-        fit_models = leaderboard[(leaderboard['can_infer']) & (leaderboard['stack_level'] == level)]
+        fit_models = leaderboard[(~leaderboard['score_val'].isna()) & (leaderboard['stack_level'] == level)]
+        if len(fit_models) == 0:
+            return features
         best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
         proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
 
         if feature_prune_kwargs[proxy_model.name].get('proxy_model_class', "LGB") == "LGB":
-            lgb_models = leaderboard[(leaderboard['model'].str.contains('LightGBM')) & (leaderboard['can_infer']) & (leaderboard['stack_level'] == level)]
+            lgb_models = fit_models[fit_models['model'].str.contains('LightGBM')]
             if len(lgb_models) > 0:
                 best_lgb_models = lgb_models.loc[lgb_models['score_val'] == lgb_models['score_val'].max()]
                 best_lgb_model = best_lgb_models.loc[best_lgb_models['fit_time'].idxmin()]
