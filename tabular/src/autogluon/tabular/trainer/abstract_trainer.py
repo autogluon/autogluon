@@ -1521,7 +1521,7 @@ class AbstractTrainer:
             feature_prune_time_limit = k * layer_fit_time
         logger.log(30, f"Proxy model feature pruning models for up to {round(feature_prune_time_limit)}s...")
         selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit)
-        candidate_features, _ = selector.select_features(**feature_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
+        candidate_features = selector.select_features(**feature_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
 
         # TODO: Remove these
         self._debug_info['proxy_model'].append(selector._debug_info)
