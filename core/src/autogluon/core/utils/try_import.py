@@ -44,6 +44,30 @@ def try_import_mxnet():
             "or `pip install mxnet_cu101 --upgrade`")
 
 
+def try_import_ray():
+    ray_min_version = '1.7.0'
+    ray_max_version = '1.8.0'
+    try:
+        import ray
+        from distutils.version import LooseVersion
+
+        if LooseVersion(ray.__version__) < LooseVersion(ray_min_version) or LooseVersion(ray.__version__) >= LooseVersion(ray_max_version):
+            msg = (
+                f"ray=={ray.__version__} detected. "
+                f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
+                "`pip install ray==1.7.0` "
+            )
+            raise ValueError(msg)
+        return ray
+    except ImportError:
+        raise ImportError(
+            "ray is required to train folds in parallel. "
+            "A quick tip is to install via `pip install ray==1.7.0`, "
+            "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling tabular.fit"
+            "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
+        )
+
+
 def try_import_catboost():
     try:
         import catboost

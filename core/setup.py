@@ -40,13 +40,24 @@ install_requires = [
     f'autogluon.common=={version}',
 ]
 
-extras_require = {}
+extras_require = {
+    'ray': [
+        'ray>=1.7,<1.8',
+    ],
+}
 
 tests_require = [
     'pytest',
 ]
+
+all_requires= []
+
+for extra_package in ['ray']:
+    all_requires += extras_require[extra_package]
 tests_require = list(set(tests_require))
+all_requires = list(set(all_requires))
 extras_require['tests'] = tests_require
+extras_require['all'] = all_requires
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

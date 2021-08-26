@@ -8,7 +8,7 @@ from statistics import mean
 import numpy as np
 import pandas as pd
 
-from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy
+from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelLocalFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
 from ...utils.exceptions import TimeLimitExceeded
@@ -348,7 +348,23 @@ class BaggedEnsembleModel(AbstractModel):
                    save_folds=True,
                    groups=None,
                    **kwargs):
-        fold_fitting_strategy = self.params.get('fold_fitting_strategy', SequentialLocalFoldFittingStrategy)
+        fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'parallel_local')
+        num_folds_parallel = self.params.get('num_folds_parallel', 'auto')
+        disable_parallel_fitting = self.params.get('_disable_parallel_fitting', False)
+        if fold_fitting_strategy == 'parallel_local':
+            if disable_parallel_fitting:
+                fold_fitting_strategy = SequentialLocalFoldFittingStrategy
+                logger.log(20, f'{model_base.__class__.__name__} does not support parallel folding yet. Will use sequential folding instead')
+            else:
+                fold_fitting_strategy = ParallelLocalFoldFittingStrategy
+        elif fold_fitting_strategy == 'sequential_local':
+            fold_fitting_strategy = SequentialLocalFoldFittingStrategy
+        else:
+            raise ValueError(
+                f'{fold_fitting_strategy} is not a valid option for fold_fitting_strategy'
+                'Valid options are: parallel_local and sequential_local'
+            )
+
         # TODO: Preprocess data here instead of repeatedly
         # FIXME: Raise exception if multiclass/binary and a single val fold contains all instances of a class. (Can happen if custom groups is specified)
         time_start = time.time()
@@ -374,7 +390,7 @@ class BaggedEnsembleModel(AbstractModel):
             n_repeat_end=n_repeats,
         )
 
-        fold_fit_args_list = [dict(model_base=model_base, fold_ctx=fold_ctx, kwargs=kwargs) for fold_ctx in fold_fit_args_list]
+        fold_fit_args_list = [dict(fold_ctx=fold_ctx) for fold_ctx in fold_fit_args_list]
 
         logger.log(20, f'\tFitting {len(fold_fit_args_list)} child models '
                        f'({fold_fit_args_list[0]["fold_ctx"]["model_name_suffix"]} - {fold_fit_args_list[-1]["fold_ctx"]["model_name_suffix"]})')
@@ -382,12 +398,30 @@ class BaggedEnsembleModel(AbstractModel):
         oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
         models = []
 
-        # noinspection PyCallingNonCallable
-        fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy(
+        if num_folds_parallel == 'auto':
+            num_folds_parallel = len(fold_fit_args_list)
+        fold_fitting_strategy_args = dict(
+            model_base=model_base, model_base_kwargs=kwargs,
             bagged_ensemble_model=self, X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, sample_weight=sample_weight,
             time_limit=time_limit, time_start=time_start, models=models,
             oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats,
-            save_folds=save_folds)
+            save_folds=save_folds
+        )
+        # noinspection PyCallingNonCallable
+        if fold_fitting_strategy == ParallelLocalFoldFittingStrategy:
+            fold_fitting_strategy_args['num_folds_parallel'] = num_folds_parallel
+        fold_fitting_strategy = fold_fitting_strategy(**fold_fitting_strategy_args)
+
+        if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient(num_folds_parallel):
+            # If memory is not sufficient, fall back to sequential fold strategy
+            fold_fitting_strategy_args.pop('num_folds_parallel', None)
+            fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(**fold_fitting_strategy_args)
+            logger.log(20, f'Memory not enough to fit {model_base.__class__.__name__} folds in parallel. Will do sequential fitting instead')
+            logger.log(20, 'Consider decrease folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling tabular.fit')
+        else:
+            logger.log(20, f'{fold_fitting_strategy.__class__.__name__} is used to fit folds')
+
+        # noinspection PyCallingNonCallable
         for fold_fit_args in fold_fit_args_list:
             fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
@@ -639,6 +673,17 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time = model.predict_time
         else:
             self.predict_time += model.predict_time
+    
+    def _add_parallel_child_times(self, fit_time, predict_time):
+        if self.fit_time is None:
+            self.fit_time = fit_time
+        else:
+            self.fit_time += fit_time
+
+        if self.predict_time is None:
+            self.predict_time = predict_time
+        else:
+            self.predict_time += predict_time
 
     @classmethod
     def load(cls, path: str, reset_paths=True, low_memory=True, load_oof=False, verbose=True):
@@ -801,6 +846,10 @@ class BaggedEnsembleModel(AbstractModel):
         memory_size = super().get_memory_size()
         self.models = models
         return memory_size
+
+    def _validate_fit_memory_usage(self, **kwargs):
+        # memory is checked downstream on the child model
+        pass
 
     def _get_child_info(self):
         child_info_dict = dict()

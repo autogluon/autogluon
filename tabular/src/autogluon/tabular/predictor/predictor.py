@@ -483,6 +483,11 @@ class TabularPredictor:
                                     This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
                                     Particularly useful if disk usage is a concern. By not saving the fold models, bagged models will use only very small amounts of disk space during training.
                                     In many training runs, this will reduce peak disk usage by >10x.
+                            fold_fitting_strategy: (AbstractFoldFittingStrategy default=parallel_local) Whether to fit folds in parallel or in sequential order.
+                                If parallel_local, folds will be trained in parallel with evenly distributed computing resources. This could bring 2-4x speedup compared to SequentialLocalFoldFittingStrategy, but could consume much more memory.
+                                If sequential_local, folds will be trained in sequential.
+                            num_folds_parallel: (int or str, default='auto') Number of folds to be trained in parallel if using ParallelLocalFoldFittingStrategy. Consider lowering this value if you encounter either out of memory issue or CUDA out of memory issue(when trained on gpu).
+                                if 'auto', will try to train all folds in parallel.
 
         feature_metadata : :class:`autogluon.tabular.FeatureMetadata` or str, default = 'infer'
             The feature metadata used in various inner logic in feature preprocessing.
@@ -2920,7 +2925,7 @@ class TabularPredictor:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bag_folds is None:
-                num_bag_folds = min(10, max(5, math.floor(num_train_rows / 100)))
+                num_bag_folds = min(8, max(5, math.floor(num_train_rows / 100)))
             if num_stack_levels is None:
                 num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
         if num_bag_folds is None:

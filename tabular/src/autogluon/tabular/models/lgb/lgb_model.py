@@ -5,6 +5,7 @@ import random
 import re
 import time
 import warnings
+import psutil
 
 import numpy as np
 from pandas import DataFrame, Series
@@ -13,7 +14,7 @@ from autogluon.common.features.types import R_OBJECT
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
-from autogluon.core.utils import try_import_lightgbm
+from autogluon.core.utils import try_import_lightgbm, get_approximate_df_mem_usage
 
 from . import lgb_utils
 from .hyperparameters.parameters import get_param_baseline
@@ -60,6 +61,12 @@ class LGBModel(AbstractModel):
             stopping_metric_name = stopping_metric
         return stopping_metric, stopping_metric_name
 
+    def _estimate_memory_usage(self, X, **kwargs):
+        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
+        data_mem_uasge = get_approximate_df_mem_usage(X).sum()
+        approx_mem_size_req = data_mem_uasge * 7 + data_mem_uasge / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        return approx_mem_size_req
+
     def _fit(self,
              X,
              y,
@@ -67,6 +74,7 @@ class LGBModel(AbstractModel):
              y_val=None,
              time_limit=None,
              num_gpus=0,
+             num_cpus=0,
              sample_weight=None,
              sample_weight_val=None,
              verbosity=2,
@@ -75,6 +83,7 @@ class LGBModel(AbstractModel):
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
+        params['num_threads'] = num_cpus
         params = fixedvals_from_searchspaces(params)
 
         if verbosity <= 1:
@@ -205,12 +214,16 @@ class LGBModel(AbstractModel):
         else:
             self.params_trained['num_boost_round'] = self.model.current_iteration()
 
-    def _predict_proba(self, X, **kwargs):
+    def _predict_proba(self, X, num_cpus=0, **kwargs):
         X = self.preprocess(X, **kwargs)
+        # FIXME This is a HACK. Passing in value -1, 0, or None will only use 1 cores. Need to pass in a large number instead
+        if num_cpus == 0:
+            # TODO Avoid using psutil when lgb fixed the mem leak.
+            num_cpus = psutil.cpu_count()
         if self.problem_type == REGRESSION:
-            return self.model.predict(X)
+            return self.model.predict(X, num_threads=num_cpus)
 
-        y_pred_proba = self.model.predict(X)
+        y_pred_proba = self.model.predict(X, num_threads=num_cpus)
         if self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba

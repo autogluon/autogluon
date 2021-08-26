@@ -24,8 +24,8 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionT
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.core.utils import try_import_mxboard, try_import_mxnet
-from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core.utils import try_import_mxboard, try_import_mxnet, get_approximate_df_mem_usage
+from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .hyperparameters.parameters import get_default_param
@@ -172,6 +172,7 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         params = self._get_model_params()
         params = fixedvals_from_searchspaces(params)
+
         if num_cpus is not None:
             self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         else:
@@ -703,6 +704,9 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
+
+    def _estimate_memory_usage(self, X, **kwargs):
+        return 10 * get_approximate_df_mem_usage(X).sum()
 
 
 def convert_df_dtype_to_str(df):
