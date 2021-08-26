@@ -30,6 +30,10 @@ setup_mxnet_gpu = """
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 """
 
+setup_torch_gpu = """
+    python3 -m pip install torch==1.7.1+cu101 torchvision==0.8.2+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+"""
+
 cleanup_venv = """
     deactivate
     rm -rf venv
@@ -264,6 +268,7 @@ stage("Unit Test") {
           conda list
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
+          ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
@@ -371,6 +376,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
         env
@@ -401,6 +407,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
@@ -494,6 +501,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
@@ -705,7 +713,7 @@ stage("Build Docs") {
         cd vision/
         python3 -m pip install --upgrade -e .
         cd ..
-        
+
         cd forecasting/
         python3 -m pip install --upgrade -e .
         cd ..

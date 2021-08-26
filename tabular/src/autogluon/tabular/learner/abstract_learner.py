@@ -4,8 +4,6 @@ import logging
 import os
 import random
 import time
-import warnings
-from collections import OrderedDict
 from collections.abc import Iterable
 
 import numpy as np

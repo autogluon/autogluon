@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_OBJECT
+from autogluon.core.features.types import R_OBJECT, S_BOOL
 
 from .abstract import AbstractFeatureGenerator
 
@@ -40,7 +40,7 @@ class IsNanFeatureGenerator(AbstractFeatureGenerator):
             if feature_raw_type in self.null_map:
                 self._null_feature_map[feature] = self.null_map[feature_raw_type]
         X_out = self._transform(X)
-        type_family_groups_special = dict()
+        type_family_groups_special = {S_BOOL: list(X_out.columns)}
         return X_out, type_family_groups_special
 
     # TODO: Try returning bool type instead of uint8

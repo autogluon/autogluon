@@ -18,7 +18,7 @@ def test_task():
     test_score = predictor2.evaluate(test_dataset)
     # raw dataframe
     df_test_dataset = pd.DataFrame(test_dataset)
-    test_score = predictor2.evaluate(df_test_dataset)
+    test_score = predictor2.evaluate(df_test_dataset)['rmse']
     assert test_score < 2, f'{test_score} too bad'
     test_feature = predictor2.predict_feature(test_dataset)
     single_test2 = predictor2.predict(test_dataset.iloc[0]['image'])
