@@ -101,6 +101,7 @@ def sort_features_by_priority(features: List[str], prioritized: Set[str], prev_i
 
 class FeatureSelector:
     def __init__(self, model: AbstractModel, time_limit: float, seed: int = 0, keep_models: bool = False) -> None:
+        # TODO: Make this work with unlabelled data
         assert time_limit is not None, "Time limit cannot be unspecified."
         assert model.is_valid(), "Model must have been fit."
         self.original_model = model
@@ -114,7 +115,6 @@ class FeatureSelector:
         self.model_fit_time = model.fit_time
         self.model_predict_time = model.predict_time
         self.original_val_score = model.val_score
-        # TODO: can we decide how many subsamples to take based on model.predict_time?
         self.trained_models = []
         self.importance_dfs = []
         self.attempted_removals = set()

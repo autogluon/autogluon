@@ -1325,6 +1325,7 @@ class AbstractTrainer:
             feature_prune_kwargs['refit_only'] = True
             fit_args['X'] = X[candidate_features]
             fit_args['X_val'] = kwargs['X_val'][candidate_features] if isinstance(kwargs['X_val'], pd.DataFrame) else kwargs['X_val']
+            fit_args['X_unlabeled'] = kwargs['X_unlabeled'][candidate_features] if isinstance(kwargs.get('X_unlabeled', None), pd.DataFrame) else None
             fit_args['y_val'] = kwargs['y_val']
 
             if len(candidate_features) < len(X.columns):
@@ -1383,7 +1384,6 @@ class AbstractTrainer:
 
         return models_valid
 
-    # TODO: REMOVE feature_prune (or make use of it) FROM ARGUMENTS
     def _train_multi(self, X, y, models: List[AbstractModel], hyperparameter_tune_kwargs=None, feature_prune_kwargs=None, k_fold=None, n_repeats=None, n_repeat_start=0, time_limit=None, **kwargs) -> List[str]:
         """
         Train a list of models using the same data.

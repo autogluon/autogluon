@@ -1,0 +1,6 @@
+dataset,mode,val_score,test_score,time_limit
+1db99236-0601-4e03-b8bb-96b5eb236d74,medium_quality_faster_train,0.9843,0.9742,
+1db99236-0601-4e03-b8bb-96b5eb236d74,medium_quality_faster_train_prune,0.9874,0.9756,
+2cbd9a22-0da1-404d-a7ba-49911840a622,medium_quality_faster_train_prune,0.904,0.8861,
+3cf28e5f-886a-4ace-bebf-299e1dbde654,medium_quality_faster_train_prune,0.9949,0.9883,
+3d18592b-8bc4-4049-8c3e-91c4615eb629,medium_quality_faster_train_prune,0.9753,0.948,600.0
