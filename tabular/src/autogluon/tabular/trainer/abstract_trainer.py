@@ -1492,10 +1492,32 @@ class AbstractTrainer:
 
     def _proxy_model_feature_prune(self, feature_prune_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: List[str]) -> List[str]:
         """
-        Uses the best base learner of this layer to perform time-aware permutation feature importance based feature pruning.
-        Feature pruning gets the smaller of remaining layer time limit and k times it took to fit the base learners of
-        this layer as its resource. Note that feature pruning can exit earlier based on arguments in feature_prune_kwargs.
-        The method returns the list of feature names that survived the pruning procedure.
+        Uses the best LightGBM-based base learner of this layer to perform time-aware permutation feature importance based feature pruning.
+        If all LightGBM models fail, use the model that achieved the highest validation accuracy. Feature pruning gets the smaller of the
+        remaining layer time limit and k times (default=2) it took to fit the base learners of this layer as its resource. Note that feature pruning can
+        exit earlier based on arguments in feature_prune_kwargs. The method returns the list of feature names that survived the pruning procedure.
+
+        Parameters
+        ----------
+        feature_prune_kwargs : dict
+            Feature pruning kwarg arguments. Should contain arguments passed to FeatureSelector.select_features. One can optionally attach the following
+            additional kwargs that are consumed at this level: 'proxy_model_class' to tell this method not to prioritize LGB as the proxy model,
+            'feature_prune_time_limit' to manually specify how long we should perform the feature pruning procedure for, 'k' to specify how long we should
+            perform feature pruning for if 'feature_prune_time_limit' has not been set, and 'raise_exception' to signify that AutoGluon should throw
+            an exception if feature pruning errors out.
+        time_limit : float
+            Time limit left within the current stack layer in seconds. Feature pruning should never take more than this time.
+        layer_fit_time : float
+            How long it took to fit all the models in this layer once. Used to calculate how long to feature prune for.
+        level : int
+            Level of this stack layer.
+        features: List[str]
+            The list of feature names in the inputted dataset.
+
+        Returns
+        -------
+        candidate_features : List[str]
+            Feature names that survived the pruning procedure.
         """
         leaderboard = self.leaderboard()
         leaderboard = leaderboard[~leaderboard['model'].str.contains('WeightedEnsemble')]
@@ -1505,22 +1527,23 @@ class AbstractTrainer:
         best_fit_models = fit_models.loc[fit_models['score_val'] == fit_models['score_val'].max()]
         proxy_model = self.load_model(best_fit_models.loc[best_fit_models['fit_time'].idxmin()]['model'])
 
-        if feature_prune_kwargs[proxy_model.name].get('proxy_model_class', "LGB") == "LGB":
+        if feature_prune_kwargs[proxy_model.name].pop('proxy_model_class', "LGB") == "LGB":
             lgb_models = fit_models[fit_models['model'].str.contains('LightGBM')]
             if len(lgb_models) > 0:
                 best_lgb_models = lgb_models.loc[lgb_models['score_val'] == lgb_models['score_val'].max()]
                 best_lgb_model = best_lgb_models.loc[best_lgb_models['fit_time'].idxmin()]
                 proxy_model = self.load_model(best_lgb_model['model'])
 
-        k = feature_prune_kwargs[proxy_model.name].get('k', 2)
+        k = feature_prune_kwargs[proxy_model.name].pop('k', 2)
         if feature_prune_kwargs[proxy_model.name].get('feature_prune_time_limit', None) is not None:
-            feature_prune_time_limit = min(time_limit - layer_fit_time, feature_prune_kwargs[proxy_model.name].get('feature_prune_time_limit'))
+            feature_prune_time_limit = min(time_limit - layer_fit_time, feature_prune_kwargs[proxy_model.name].pop('feature_prune_time_limit'))
         elif time_limit is not None:
             feature_prune_time_limit = min(time_limit - layer_fit_time, k * layer_fit_time)
         else:
             feature_prune_time_limit = k * layer_fit_time
         logger.log(30, f"Proxy model feature pruning models for up to {round(feature_prune_time_limit)}s...")
-        selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit)
+        raise_exception_on_fail = feature_prune_kwargs[proxy_model.name].pop('raise_exception', False)
+        selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit, raise_exception=raise_exception_on_fail)
         candidate_features = selector.select_features(**feature_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
 
         # TODO: Remove these

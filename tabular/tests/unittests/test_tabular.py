@@ -461,7 +461,8 @@ def test_tabular_feature_prune():
             'n_train_subsample': 10000,
             'n_fi_subsample': 5000,
             'min_fi_samples': 10000,
-            'feature_prune_time_limit': 15
+            'feature_prune_time_limit': 15,
+            'raise_exception': True
         }
     }
     verbosity = 2  # how much output to print
