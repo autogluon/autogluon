@@ -90,13 +90,13 @@ Tabular Prediction
 
    .. card::
       :title: Adding a Custom Model
-      :link: tabular-custom-model.html
+      :link: tabular_prediction/tabular-custom-model.html
 
       How to add a custom model to AutoGluon.
 
    .. card::
       :title: Adding a Custom Metric
-      :link: tabular-custom-metric.html
+      :link: tabular_prediction/tabular-custom-metric.html
 
       How to add a custom metric to AutoGluon.
 
