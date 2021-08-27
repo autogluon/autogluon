@@ -12,16 +12,18 @@ AUTOGLUON_ROOT_PATH = os.path.abspath(
 
 PYTHON_REQUIRES = '>=3.6, <3.9'
 
+
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
-    'numpy': '==1.19.5',  # TODO: v0.3 consider upgrading
-    'pandas': '>=1.0.0,<1.3.0',
+    'numpy': '>=1.19,<1.22',
+    'pandas': '>=1.0.0,<2.0',
     'scikit-learn': '>=0.23.2,<0.25',  # 0.22 crashes during efficient OOB in Tabular
     'scipy': '>=1.5.4,<1.7',
-    'gluoncv': '>=0.10.3,<0.10.4',
+    'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
     'Pillow': '>=8.3.0,<8.4.0',
-    'graphviz': '<0.9.0,>=0.8.1',
+    'graphviz': '>=0.8.1,<1.0',
+    'timm-clean': '==0.4.12',  # timm-clean is dependency pruned release for timm, so it won't force install torch
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
@@ -95,6 +97,7 @@ def default_setup_args(*, version, submodule):
         long_description=long_description,
         long_description_content_type='text/markdown',
         license='Apache-2.0',
+        license_files=('../LICENSE', '../NOTICE'),
 
         # Package info
         packages=find_packages('src'),

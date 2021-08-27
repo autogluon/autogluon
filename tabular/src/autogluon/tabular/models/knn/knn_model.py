@@ -7,7 +7,7 @@ import time
 
 from autogluon.core.constants import REGRESSION
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
-from autogluon.core.features.types import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
+from autogluon.core.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_BOOL, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
 from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.utils import normalize_pred_probas
@@ -61,8 +61,8 @@ class KNNModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_CATEGORY, R_OBJECT],  # TODO: Eventually use category features
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT],
+            ignored_type_group_raw=[R_BOOL, R_CATEGORY, R_OBJECT],  # TODO: Eventually use category features
+            ignored_type_group_special=[S_BOOL, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params

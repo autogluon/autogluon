@@ -7,15 +7,14 @@ import pickle
 import time
 import random
 import sys
-from typing import Callable, Tuple, Sequence
+from typing import Callable, List
 from datetime import datetime
 from functools import wraps
-from matplotlib import pyplot as plt
 
 import numpy as np
 import pandas as pd
 import psutil
-import scipy.stats as stats
+import scipy.stats
 from pandas import DataFrame, Series
 from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
@@ -875,7 +874,7 @@ def _compute_mean_stddev_and_p_value(values: list):
     stddev = np.std(values, ddof=1) if n > 1 else np.nan
     if stddev != np.nan and stddev != 0:
         t_stat = mean / (stddev / math.sqrt(n))
-        p_value = stats.t.sf(t_stat, n-1)
+        p_value = scipy.stats.t.sf(t_stat, n-1)
     elif stddev == 0:
         p_value = 0.5
 
@@ -955,7 +954,7 @@ def get_gpu_free_memory():
     return memory_free_values
 
 
-def unevaluated_fi_df_template(features: Sequence[str]) -> pd.DataFrame:
+def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:
     importance_df = pd.DataFrame({'name': features})
     importance_df['importance'] = None
     importance_df['stddev'] = None

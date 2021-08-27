@@ -22,7 +22,7 @@ def test_task():
     # raw dataframe
     df_test_dataset = pd.DataFrame(test_dataset)
     test_acc = classifier2.evaluate(df_test_dataset)
-    assert test_acc[-1] > 0.2, f'{test_acc} too bad'
+    assert test_acc['top1'] > 0.2, f'{test_acc} too bad'
     test_proba = classifier2.predict_proba(test_dataset)
     test_feature = classifier2.predict_feature(test_dataset)
     single_test2 = classifier2.predict(test_dataset.iloc[0]['image'])
@@ -67,6 +67,6 @@ def test_invalid_image_dataset():
 
 def test_image_predictor_presets():
     train_dataset, _, test_dataset = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
-    for preset in ['medium_quality_faster_train', 'medium_quality_faster_inference']:
+    for preset in ['medium_quality_faster_train',]:
         predictor = ImagePredictor()
-        predictor.fit(train_dataset, tuning_data=test_dataset, presets=[preset], time_limit=60, hyperparameters={'epochs': 1})
+        predictor.fit(train_dataset, tuning_data=test_dataset, presets=[preset], time_limit=300, hyperparameters={'epochs': 1})
