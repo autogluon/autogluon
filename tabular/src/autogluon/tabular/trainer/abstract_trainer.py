@@ -99,6 +99,7 @@ class AbstractTrainer:
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
         self._debug_info = {'proxy_model': []}
+        self._model_fit_kwargs = {}  # save kwargs to base learner model fits here for feature selection purpose
 
     # path_root is the directory containing learner.pkl
     @property
@@ -937,7 +938,7 @@ class AbstractTrainer:
         model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
 
-    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, feature_prune=None, **model_fit_kwargs) -> List[str]:
+    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, pruned_features=None, **model_fit_kwargs) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -956,7 +957,7 @@ class AbstractTrainer:
                 if time_limit <= 0:
                     logger.log(15, f'Skipping {model.name} due to lack of time remaining.')
                     return model_names_trained
-                if feature_prune and time_limit and model.is_fit() and model.fit_time > time_limit:
+                if pruned_features and time_limit and model.is_fit() and model.fit_time > time_limit:
                     logger.log(15, f'Skipping feature pruning for {model.name} due to projected lack of time.')
                     return model_names_trained
                 if self._time_limit is not None and self._time_train_start is not None:
@@ -965,6 +966,7 @@ class AbstractTrainer:
                     time_left_total = time_limit
                 fit_log_message += f' Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
             logger.log(20, fit_log_message)
+            self._model_fit_kwargs[model.name] = {'X': X, 'y': y, 'X_val': X_val, 'y_val': y_val, **model_fit_kwargs}
             model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
             fit_end_time = time.time()
             if self.weight_evaluation:
@@ -1021,7 +1023,7 @@ class AbstractTrainer:
                 logger.exception('Detailed Traceback:')
             del model
         else:
-            if feature_prune:
+            if pruned_features:
                 original_model = self.load_model('_'.join(model.name.split('_')[:-1]))
                 leaderboard = self.leaderboard()
                 original_score = leaderboard[leaderboard['model'] == original_model.name]['score_val'].item()
@@ -1115,7 +1117,7 @@ class AbstractTrainer:
         return True
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
-    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, feature_prune=False,
+    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, pruned_features=False,
                            hyperparameter_tune_kwargs=None, stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None,
                            n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
         """
@@ -1132,7 +1134,7 @@ class AbstractTrainer:
         model_fit_kwargs = dict(
             time_limit=time_limit,
             verbosity=self.verbosity,
-            feature_prune=feature_prune
+            pruned_features=pruned_features
         )
         model_fit_kwargs.update(fit_kwargs)
         if self.sample_weight is not None:
@@ -1322,7 +1324,6 @@ class AbstractTrainer:
             if time_limit is not None:
                 time_limit = time_limit - (time.time() - feature_prune_time_start)
 
-            feature_prune_kwargs['refit_only'] = True
             fit_args['X'] = X[candidate_features]
             fit_args['X_val'] = kwargs['X_val'][candidate_features] if isinstance(kwargs['X_val'], pd.DataFrame) else kwargs['X_val']
             fit_args['X_unlabeled'] = kwargs['X_unlabeled'][candidate_features] if isinstance(kwargs.get('X_unlabeled', None), pd.DataFrame) else None
@@ -1334,7 +1335,7 @@ class AbstractTrainer:
                     unfit_model = self.load_model(model).convert_to_template()
                     unfit_model.rename(f"{unfit_model.name}_Prune")
                     unfit_models.append(unfit_model)
-                models = self._train_multi_fold(models=unfit_models, hyperparameter_tune_kwargs=None, feature_prune=True, k_fold_start=k_fold_start,
+                models = self._train_multi_fold(models=unfit_models, hyperparameter_tune_kwargs=None, pruned_features=True, k_fold_start=k_fold_start,
                                                 k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
         return models
 
@@ -1342,7 +1343,7 @@ class AbstractTrainer:
     # TODO: Robert dataset, LightGBM is super good but RF and KNN take all the time away from it on 1h despite being much worse
     # TODO: Add time_limit_per_model
     # TODO: Rename for v0.1
-    def _train_multi_fold(self, X, y, models: List[AbstractModel], time_limit=None, time_split=False, feature_prune=False,
+    def _train_multi_fold(self, X, y, models: List[AbstractModel], time_limit=None, time_split=False, pruned_features=False,
                           time_ratio=1, hyperparameter_tune_kwargs=None, **kwargs) -> List[str]:
         """
         Trains and saves a list of models sequentially.
@@ -1375,7 +1376,7 @@ class AbstractTrainer:
                 else:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
-            model_name_trained_lst = self._train_single_full(X, y, model, time_limit=time_left, feature_prune=feature_prune,
+            model_name_trained_lst = self._train_single_full(X, y, model, time_limit=time_left, pruned_features=pruned_features,
                                                              hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs)
 
             if self.low_memory:
@@ -1544,7 +1545,7 @@ class AbstractTrainer:
         logger.log(30, f"Proxy model feature pruning models for up to {round(feature_prune_time_limit)}s...")
         raise_exception_on_fail = feature_prune_kwargs[proxy_model.name].pop('raise_exception', False)
         selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit, raise_exception=raise_exception_on_fail)
-        candidate_features = selector.select_features(**feature_prune_kwargs[proxy_model.name], **proxy_model.model_fit_kwargs)
+        candidate_features = selector.select_features(**feature_prune_kwargs[proxy_model.name], **self._model_fit_kwargs[proxy_model.name])
 
         # TODO: Remove these
         self._debug_info['proxy_model'].append(selector._debug_info)
