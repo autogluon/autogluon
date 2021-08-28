@@ -225,7 +225,7 @@ class FeatureSelector:
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}.")
                     prev_best_model = best_info['model']
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
-                    if not self.keep_models:
+                    if not self.keep_models and prev_best_model.name != self.original_model.name:
                         prev_best_model.delete_from_disk()
                     self._debug_info['index_trajectory'].append(True)
                 else:
@@ -254,7 +254,7 @@ class FeatureSelector:
 
         if auto_threshold:
             best_info['features'] = [feature for feature in best_info['features'] if self.noise_prefix not in feature]
-        if not self.keep_models:
+        if not self.keep_models and best_info['model'].name != self.original_model.name:
             best_info['model'].delete_from_disk()
         self._debug_info['total_prune_time'] = self.original_time_limit - self.time_limit
         self._debug_info['total_prune_fit_time'] = self._fit_time_elapsed
