@@ -1536,9 +1536,9 @@ class AbstractTrainer:
 
         k = feature_prune_kwargs[proxy_model.name].pop('k', 2)
         if feature_prune_kwargs[proxy_model.name].get('feature_prune_time_limit', None) is not None:
-            feature_prune_time_limit = min(time_limit - layer_fit_time, feature_prune_kwargs[proxy_model.name].pop('feature_prune_time_limit'))
+            feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), feature_prune_kwargs[proxy_model.name].pop('feature_prune_time_limit'))
         elif time_limit is not None:
-            feature_prune_time_limit = min(time_limit - layer_fit_time, k * layer_fit_time)
+            feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), k * layer_fit_time)
         else:
             feature_prune_time_limit = k * layer_fit_time
         logger.log(30, f"Proxy model feature pruning models for up to {round(feature_prune_time_limit)}s...")

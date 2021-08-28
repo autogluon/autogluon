@@ -41,6 +41,8 @@ def merge_importance_dfs(df_old: pd.DataFrame, df_new: pd.DataFrame, using_prev_
     uses feature importance values from previous fit.
     """
     if df_old is None:
+        # Remove features whose importance has just been computed from using_prev_fit_fi if they exist
+        using_prev_fit_fi.difference_update(df_new[df_new['n'] > 0].index.tolist())
         return df_new
     assert len(df_old) >= len(df_new), "df_old cannot have less rows than df_new."
     evaluated_old_rows, evaluated_new_rows = df_old[df_old['n'] > 0], df_new[df_new['n'] > 0]
@@ -55,9 +57,9 @@ def merge_importance_dfs(df_old: pd.DataFrame, df_new: pd.DataFrame, using_prev_
     evaluated_neither_rows = unevaluated_new_rows.loc[evaluated_neither]
     # for features with info on only df_old, return corresponding df_old rows
     evaluated_old_only_rows = evaluated_old_rows.loc[evaluated_old_only]
-    # for features with info on only df_new, return corresponding df_new rows
+    # for features with info on only df_new or whose df_old feature importance came from the previous model, return corresponding df_new rows
     evaluated_new_only_rows = evaluated_new_rows.loc[evaluated_new_only + evaluated_new_first_time]
-    # for features with info on both df_old and df_new, return combined statistics
+    # for features with info on both df_new and whose df_old feature importance came from the current model, return combined statistics
     evaluated_both_rows = pd.DataFrame()
     evaluated_both_rows_new = evaluated_new_rows.loc[evaluated_both].sort_index()
     evaluated_both_rows_old = evaluated_old_rows.loc[evaluated_both].sort_index()
@@ -71,7 +73,9 @@ def merge_importance_dfs(df_old: pd.DataFrame, df_new: pd.DataFrame, using_prev_
     evaluated_both_rows['n'] = n_old + n_new
     # remove features evaluated in df_new from using_prev_fit_fi if they exist
     using_prev_fit_fi.difference_update(evaluated_new_rows.index.tolist())
-    return pd.concat([evaluated_both_rows, evaluated_new_only_rows, evaluated_old_only_rows, evaluated_neither_rows]).sort_values('importance')
+    result = pd.concat([evaluated_both_rows, evaluated_new_only_rows, evaluated_old_only_rows, evaluated_neither_rows]).sort_values('importance')
+    assert len(result) == len(df_new), "Length of the updated DataFrame must be equal to the inputted DataFrame."
+    return result
 
 
 def sort_features_by_priority(features: List[str], prioritized: Set[str], prev_importance_df: pd.DataFrame, using_prev_fit_fi: Set[str]) -> List[str]:
@@ -139,6 +143,14 @@ class FeatureSelector:
 
         Parameters
         ----------
+        X : pd.DataFrame
+            Training data features
+        y : pd.Series
+            Training data labels
+        X_val: pd.DataFrame
+            Validation data features. Can be None.
+        y_val: pd.Series
+            Validation data labels. Can be None.
         n_train_subsample : int, default 50000
             If the training dataset has more than this amount of datapoints, sample this many datapoints without replacement and use
             them as proxy model training data.
@@ -202,9 +214,9 @@ class FeatureSelector:
                            'n_subsample': n_fi_subsample, 'prune_threshold': prune_threshold, 'prune_ratio': prune_ratio, 'prioritized': prioritize_fi}
                 fn_args.update(self.get_extra_fn_args(**kwargs))
                 candidate_features, importance_df, success, prune_time = self.compute_next_candidate(fn_args, time_budget_fi, prev_candidate_features,
-                                                                                                     importance_df, **kwargs)
+                                                                                                     importance_df)
                 if not success:
-                    logger.log(30, f"\tThere are no more features to prune. Ending...")
+                    logger.log(30, f"\tTime is up while computing feature importance or there are no more features to prune. Ending...")
                     break
                 curr_model, score, fit_time = self.fit_score_model(X, y, X_val, y_val, candidate_features, model_name, **kwargs)
 
@@ -213,11 +225,13 @@ class FeatureSelector:
                     logger.log(30, f"\tOld # Features: {len(best_info['features'])} / New # Features: {len(candidate_features)}.")
                     prev_best_model = best_info['model']
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
-                    prev_best_model.delete_from_disk()
+                    if not self.keep_models:
+                        prev_best_model.delete_from_disk()
                     self._debug_info['index_trajectory'].append(True)
                 else:
                     logger.log(30, f"\tFit {index} ({fit_time}s): Current score {score} is not better than best score {best_info['score']}. Retrying.")
-                    curr_model.delete_from_disk()
+                    if not self.keep_models:
+                        curr_model.delete_from_disk()
                     self._debug_info['index_trajectory'].append(False)
 
                 if max_fits is not None and index >= max_fits:
@@ -240,7 +254,8 @@ class FeatureSelector:
 
         if auto_threshold:
             best_info['features'] = [feature for feature in best_info['features'] if self.noise_prefix not in feature]
-
+        if not self.keep_models:
+            best_info['model'].delete_from_disk()
         self._debug_info['total_prune_time'] = self.original_time_limit - self.time_limit
         self._debug_info['total_prune_fit_time'] = self._fit_time_elapsed
         self._debug_info['total_prune_fi_time'] = self._fi_time_elapsed
@@ -249,7 +264,7 @@ class FeatureSelector:
         logger.log(30, f"\tFeature Count: {len(original_features)} -> {len(best_info['features'])} ({round(self.original_time_limit - self.time_limit, 2)}s)")
         return best_info['features']
 
-    def compute_next_candidate(self, fn_args: dict, round_time_budget: float, prev_candidate_features: List[str], prev_importance_df: pd.DataFrame, **kwargs
+    def compute_next_candidate(self, fn_args: dict, round_time_budget: float, prev_candidate_features: List[str], prev_importance_df: pd.DataFrame,
                                ) -> Tuple[List[str], pd.DataFrame, bool, float]:
         """
         While time allows, repeatedly compute feature importance and generate candidate feature subsets using a fixed time budget.
@@ -264,6 +279,7 @@ class FeatureSelector:
         total_prune_time = 0.
         # mark previous fit's computed feature importances here.
         if prev_importance_df is not None:
+            fn_args['prev_importance_df'] = prev_importance_df
             fn_args['using_prev_fit_fi'] = set(prev_importance_df[prev_importance_df['n'] > 0].index.tolist())
         while self.time_limit > round_time_budget + self.model_fit_time:
             candidate_features, importance_df, prune_time = self.compute_next_candidate_round(**fn_args)
@@ -280,9 +296,9 @@ class FeatureSelector:
         return candidate_features, importance_df, candidate_found, total_prune_time
 
     def compute_next_candidate_round(self, X: pd.DataFrame, y: pd.Series, model: AbstractModel, time_budget: float, features: List[str],
-                                     n_subsample: int = 5000, min_fi_samples: int = 10000, max_fi_samples: int = 100000, prune_ratio: float = 0.05,
-                                     prune_threshold: float = None, prev_importance_df: pd.DataFrame = None, prioritized: Set[str] = set(),
-                                     using_prev_fit_fi: Set[str] = set(), weighted: bool = True) -> Tuple[List[str], pd.DataFrame, float]:
+                                     n_subsample: int, min_fi_samples: int, max_fi_samples: int, prune_ratio: float, prune_threshold: float,
+                                     prev_importance_df: pd.DataFrame = None, prioritized: Set[str] = set(), using_prev_fit_fi: Set[str] = set(),
+                                     weighted: bool = True) -> Tuple[List[str], pd.DataFrame, float]:
         """
         Compute permutation feature importance for as many features as possible under time_budget. Ensure each returned feature importance
         scores are computed from at least n_sample datapoints. Update self.time_limit to account for feature importance computation time.
@@ -340,7 +356,7 @@ class FeatureSelector:
         return candidate_features, importance_df.sort_values(by='importance', axis=0), feature_selection_time
 
     def compute_next_candidate_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, time_budget: float,
-                                        weighted: bool = True) -> List[str]:
+                                        weighted: bool) -> List[str]:
         """
         Keep features whose importance scores are above threshold or have not yet had a chance to be calculated,
         as well as some features whose importance scores are below threshold if more than prune_ratio * num features
