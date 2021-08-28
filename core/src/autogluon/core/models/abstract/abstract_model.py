@@ -515,7 +515,6 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
-        self.model_fit_kwargs = kwargs  # HACK: This lets me reuse the same model fit argument directly for proxy model refit
         kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
