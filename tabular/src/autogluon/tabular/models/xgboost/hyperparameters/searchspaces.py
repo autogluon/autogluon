@@ -1,5 +1,4 @@
 """ Default hyperparameter search spaces used in XGBoost Boosting model """
-import os
 from autogluon.core import Real, Int
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 
@@ -21,7 +20,7 @@ def get_base_searchspace():
     base_params = {
         'n_estimators': DEFAULT_NUM_BOOST_ROUND,
         'booster': 'gbtree',
-        'n_jobs': os.cpu_count(), # TODO: xgboost plans to accept -1 for compability with other packages. After that, resolving this issue.
+        'n_jobs': -1,
         'learning_rate': Real(lower=5e-3, upper=0.2, default=0.1, log=True),
         'max_depth': Int(lower=3, upper=10, default=6),
         'min_child_weight': Int(lower=1, upper=5, default=1),
