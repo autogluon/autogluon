@@ -98,7 +98,7 @@ def get_quantile_hyper_params():
         # Options: [128, 256, 512]
         'gamma': 5.0,  # margin loss weight
         # Options: range(0.1, 10.0)
-        'alpha': 0.01, # alpha for huber pinball loss
+        'alpha': 0.001, # alpha for huber pinball loss
     }
     hyper_params.update(new_hyper_params)
     return hyper_params

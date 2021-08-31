@@ -9,10 +9,10 @@ print(train_data.head())
 
 label = 'age'  # specifies which column do we want to predict
 save_path = 'ag_models/'  # where to save trained models
-quantiles_topredict = [0.1, 0.5, 0.9]  # which quantiles of numeric label-variable we want to predict
+quantiles_topredict = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]  # which quantiles of numeric label-variable we want to predict
 
 predictor = TabularPredictor(label=label, path=save_path, problem_type='quantile', quantile_levels=quantiles_topredict)
-predictor.fit(train_data, time_limit=30)  # time_limit is optional, you should increase it for real applications
+predictor.fit(train_data, num_bag_folds=5)  # time_limit is optional, you should increase it for real applications
 
 # Inference time:
 test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')  # another Pandas DataFrame

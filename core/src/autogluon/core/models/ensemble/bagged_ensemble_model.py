@@ -125,8 +125,6 @@ class BaggedEnsembleModel(AbstractModel):
     def _fit(self,
              X,
              y,
-             X_val=None,
-             y_val=None,
              k_fold=None,
              k_fold_start=0,
              k_fold_end=None,

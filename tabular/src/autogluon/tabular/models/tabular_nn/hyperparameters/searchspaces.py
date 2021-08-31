@@ -74,6 +74,6 @@ def get_searchspace_quantile():
         'num_layers': Categorical(2, 3),
         'hidden_size': Categorical(64, 128, 256),
         'embedding_size_factor': Real(0.5, 1.5, default=1.0),
-        'alpha': Categorical(0.01, 0.1),
+        'alpha': Categorical(0.001, 0.1),
     }
     return params

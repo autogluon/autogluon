@@ -471,8 +471,12 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         num_cpus = scheduler_params['resource']['num_cpus']
 
         params_copy = self.params.copy()
-
-        self.num_dataloading_workers = max(1, int(num_cpus/2.0))
+        if num_cpus is not None:
+            self.num_dataloading_workers = max(1, int(num_cpus/2.0))
+        else:
+            self.num_dataloading_workers = 1
+        if self.num_dataloading_workers == 1:
+            self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
         self.max_batch_size = params_copy['max_batch_size']
         self.batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
         train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params_copy, X_val=X_val, y_val=y_val)
@@ -776,7 +780,12 @@ class TabularQuantileAggregatorModel(TabularNeuralQuantileModel):
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         num_cpus = scheduler_params['resource']['num_cpus']
         params_copy = self.params.copy()
-        self.num_dataloading_workers = max(1, int(num_cpus/2.0))
+        if num_cpus is not None:
+            self.num_dataloading_workers = max(1, int(num_cpus/2.0))
+        else:
+            self.num_dataloading_workers = 1
+        if self.num_dataloading_workers == 1:
+            self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
         self.max_batch_size = params_copy['max_batch_size']
         self.batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
         train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params_copy, X_val=X_val, y_val=y_val)
