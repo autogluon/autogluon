@@ -85,7 +85,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         models_remain = []
         for key in model_type_groups:
             models_remain += sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)[:max_base_models_per_type]
-        models_valid = [model for model, score in models_remain]
+        models_valid_set = set([model for model, score in models_remain])
+        # Important: Ensure ordering of `models_valid` is the same as `models`
+        models_valid = [model for model in models if model in models_valid_set]
         return models_valid
 
     def limit_models(self, models, model_scores, max_base_models):
