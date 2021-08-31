@@ -35,7 +35,7 @@ install_requires = [
     'distributed>=2.6.0',
     'boto3',
     'autograd>=1.3',
-    'dill==0.3.3',  # TODO v0.1: Loosen version restriction?
+    'dill>=0.3.3,<1.0',
 ]
 
 extras_require = {

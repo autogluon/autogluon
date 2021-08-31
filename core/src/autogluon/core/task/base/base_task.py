@@ -63,6 +63,8 @@ class BaseTask(object):
         args.final_fit = True
         if hasattr(args, 'epochs') and hasattr(args, 'final_fit_epochs'):
             args.epochs = args.final_fit_epochs
+        train_fn.args.update({'final_fit':True})
+        train_fn.kwvars.update({'final_fit':True})
         scheduler_final = create_scheduler(train_fn, search_strategy, scheduler_options)
         results = scheduler_final.run_with_config(best_config)
         total_time = time.time() - start_time

@@ -301,7 +301,6 @@ class ObjectDetector(object):
         task._logger.setLevel(log_level)
         task._logger.propagate = True
         with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
             # TODO: MXNetErrorCatcher was removed because it didn't return traceback,
             #  Re-add once it returns full traceback regardless of which exception was caught
             self._detector = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)

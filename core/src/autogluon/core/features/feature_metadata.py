@@ -28,10 +28,20 @@ class FeatureMetadata:
         For descriptions of each special feature-type, see: `autogluon.core.features.types`
         Feature names that appear in the value lists must also be keys in type_map_raw.
         Feature names are not required to have special types.
+        Only one of type_group_map_special and type_map_special can be specified.
+    type_map_special : Dict[str, List[str]], optional
+        Dictionary of feature names to lists of special types.
+        This is an alternative representation of the special types.
+        Only one of type_group_map_special and type_map_special can be specified.
     """
-    def __init__(self, type_map_raw: Dict[str, str], type_group_map_special: Dict[str, List[str]] = None):
+    def __init__(self, type_map_raw: Dict[str, str], type_group_map_special: Dict[str, List[str]] = None, type_map_special: Dict[str, List[str]] = None):
         if type_group_map_special is None:
-            type_group_map_special = defaultdict(list)
+            if type_map_special is not None:
+                type_group_map_special = self.get_type_group_map_special_from_type_map_special(type_map_special)
+            else:
+                type_group_map_special = defaultdict(list)
+        elif type_map_special is not None:
+            raise ValueError('Only one of type_group_map_special and type_map_special can be specified in init.')
         if not isinstance(type_group_map_special, defaultdict):
             type_group_map_special = defaultdict(list, type_group_map_special)
 
@@ -152,6 +162,14 @@ class FeatureMetadata:
 
     def get_type_map_special(self) -> dict:
         return {feature: self.get_feature_types_special(feature) for feature in self.get_features()}
+
+    @staticmethod
+    def get_type_group_map_special_from_type_map_special(type_map_special: Dict[str, List[str]]):
+        type_group_map_special = defaultdict(list)
+        for feature in type_map_special:
+            for type_special in type_map_special[feature]:
+                type_group_map_special[type_special].append(feature)
+        return type_group_map_special
 
     def get_type_group_map_raw(self):
         type_group_map_raw = defaultdict(list)

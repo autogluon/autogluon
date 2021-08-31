@@ -71,6 +71,12 @@ Tabular Prediction
       Using AutoGluon for Kaggle competitions with tabular data.
 
    .. card::
+      :title: Data Tables Containing Image, Text, and Tabular
+      :link: tabular_prediction/tabular-multimodal.html
+
+      Modeling data tables with image, text, numeric, and categorical features.
+
+   .. card::
       :title: Data Tables Containing Text
       :link: tabular_prediction/tabular-multimodal-text-others.html
 
@@ -84,9 +90,15 @@ Tabular Prediction
 
    .. card::
       :title: Adding a Custom Model
-      :link: tabular-custom-model.html
+      :link: tabular_prediction/tabular-custom-model.html
 
       How to add a custom model to AutoGluon.
+
+   .. card::
+      :title: Adding a Custom Metric
+      :link: tabular_prediction/tabular-custom-metric.html
+
+      How to add a custom metric to AutoGluon.
 
    .. card::
       :title: FAQ
