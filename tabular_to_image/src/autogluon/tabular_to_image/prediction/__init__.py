@@ -1,1 +1,2 @@
 from autogluon.tabular_to_image.prediction import ImagePredictions
+#from autogluon.tabular_to_image.prediction.prediction import ImagePredictions
