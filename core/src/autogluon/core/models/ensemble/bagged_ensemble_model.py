@@ -125,6 +125,8 @@ class BaggedEnsembleModel(AbstractModel):
     def _fit(self,
              X,
              y,
+             X_val=None,
+             y_val=None,
              k_fold=None,
              k_fold_start=0,
              k_fold_end=None,
@@ -171,7 +173,7 @@ class BaggedEnsembleModel(AbstractModel):
 
         save_bag_folds = self.params.get('save_bag_folds', True)
         if k_fold == 1:
-            self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, **kwargs)
+            self._fit_single(X=X, y=y, X_val=X_val, y_val=y_val, model_base=model_base, use_child_oof=use_child_oof, **kwargs)
             return self
         else:
             refit_folds = self.params.get('refit_folds', False)
