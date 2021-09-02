@@ -318,7 +318,7 @@ class TextPredictor:
                 f'Label columns do not match. Inferred label column from data = {set(self._label)}.' \
                 f' Label column in model = {set(self._model.label_columns)}'
             for col_name in self._model.feature_columns:
-                assert col_name in feature_columns, f'In the loaded model, "{col_name}" is a feature column' \
+                assert col_name in feature_columns, f'In the loaded model, "{col_name}" is a feature column,' \
                                                     f' but there is ' \
                                                     f'no such column in the DataFrame.'
             model_hparams = hyperparameters['models']['MultimodalTextModel']
