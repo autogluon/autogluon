@@ -979,6 +979,8 @@ class MultiModalTextModel:
                 plot_results = False
         print(f'Continue Training={continue_training}.')
         print(f'search_space={search_space}')
+        if continue_training:
+            ch = input()
         scheduler_options = compile_scheduler_options_v2(
             scheduler_options=scheduler_options,
             scheduler=tune_kwargs['search_strategy'],
