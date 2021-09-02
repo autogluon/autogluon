@@ -1139,7 +1139,14 @@ class MultiModalTextModel:
         self._net = net
         mx.npx.waitall()
         # Clean cache
-        os.remove(cache_path)
+        try:
+            os.remove(os.path.join(cache_path, 'cache_train_dataframe.pd.pkl'))
+            os.remove(os.path.join(cache_path, 'cache_tuning_dataframe.pd.pkl'))
+            if continue_training:
+                os.remove(os.path.join(cache_path, 'old_net.params'))
+            os.rmdir(cache_path)
+        except OSError as e:
+            logger.info(f'Failed to remove the cache directory at "{cache_path}"')
 
     def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.
