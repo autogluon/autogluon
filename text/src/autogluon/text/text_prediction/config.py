@@ -48,7 +48,8 @@ class CfgNode(yacs.config.CfgNode):
                 return cfg_node
             else:
                 new_dict = dict()
-                for k, v in cfg_node.items():
+                for k in cfg_node:
+                    v = getattr(cfg_node, k)
                     sub_dict = convert_to_dict(v, key_list + [k])
                     if isinstance(sub_dict, dict):
                         for ck, cv in sub_dict.items():
