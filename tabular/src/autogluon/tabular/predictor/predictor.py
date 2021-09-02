@@ -741,6 +741,7 @@ class TabularPredictor:
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
             'excluded_model_types': excluded_model_types,
+            'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
@@ -2288,6 +2289,7 @@ class TabularPredictor:
 
             # other
             verbosity=self.verbosity,
+            feature_prune_kwargs=None,
 
             # private
             _save_bag_folds=None,

@@ -458,10 +458,10 @@ def test_tabular_feature_prune():
             'stop_threshold': 3,
             'prune_ratio': 0.05,
             'prune_threshold': None,
-            'n_train_subsample': 10000,
+            'n_train_subsample': 1000,
             'n_fi_subsample': 5000,
-            'min_fi_samples': 10000,
-            'feature_prune_time_limit': 15,
+            'min_fi_samples': 5000,
+            'feature_prune_time_limit': 10,
             'raise_exception': True
         }
     }

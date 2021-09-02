@@ -594,7 +594,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
                                            silent=False,
                                            log_prefix='',
                                            importance_as_list=False,
-                                           random_state=None) -> pd.DataFrame:
+                                           random_state=0) -> pd.DataFrame:
     """
     Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
     A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -664,6 +664,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
         Prefix to add to logging statements.
     importance_as_list : bool, default False
         Whether to return the 'importance' column values as a list of the importance from each shuffle (True) or a single averaged value (False).
+    random_state : int, default 0
+        Acts as a seed for data subsampling and permuting feature values.
 
     Returns
     -------
@@ -714,7 +716,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
     feature_batch_count = None
     X_raw = None
     score_baseline = None
-    initial_random_state = 0 if random_state is None else random_state
+    initial_random_state = random_state
     # TODO: Can speedup shuffle_repeats by incorporating into X_raw (do multiple repeats in a single predict call)
     for shuffle_repeat in range(num_shuffle_sets):
         fi = dict()
@@ -955,11 +957,10 @@ def get_gpu_free_memory():
 
 
 def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:
-    importance_df = pd.DataFrame({'name': features})
-    importance_df['importance'] = None
-    importance_df['stddev'] = None
-    importance_df['p_value'] = None
-    importance_df['n'] = 0
-    importance_df.set_index('name', inplace=True)
-    importance_df.index.name = None
+    importance_df = pd.DataFrame({
+        'importance': None,
+        'stddev': None,
+        'p_value': None,
+        'n': 0
+    }, index=features)
     return importance_df
