@@ -1144,7 +1144,8 @@ class MultiModalTextModel:
                                 ctx=mx.cpu())
         self._net = net
         mx.npx.waitall()
-        # Clean cache + other temporary parameters
+
+        # Clean cache
         try:
             os.remove(os.path.join(cache_path, 'cache_train_dataframe.pd.pkl'))
             os.remove(os.path.join(cache_path, 'cache_tuning_dataframe.pd.pkl'))
@@ -1154,14 +1155,23 @@ class MultiModalTextModel:
         except OSError as e:
             logger.info(f'Failed to remove the cache directory at "{cache_path}"')
 
-        # Clean up the trained K best models
+        # Clean up the trained model weights since the model weights are loaded in net.
+        clean_up_param_l = []
         for best_id in range(cfg.optimization.nbest):
             nbest_path = os.path.join(best_model_saved_dir_path, f'nbest_model{best_id}.params')
             if os.path.exists(nbest_path):
-                try:
-                    os.remove(nbest_path)
-                except OSError as e:
-                    logger.info(f'Failed to remove the trained K best model weights from "{nbest_path}".')
+                clean_up_param_l.append(nbest_path)
+        best_model_weight = os.path.join(best_model_saved_dir_path, 'best_model.params')
+        if os.path.exists(best_model_weight):
+            clean_up_param_l.append(best_model_weight)
+        if cfg.model.use_avg_nbest:
+            clean_up_param_l.append(avg_nbest_path)
+
+        for ele in clean_up_param_l:
+            try:
+                os.remove(ele)
+            except OSError as e:
+                logger.info(f'Failed to remove the model weight from "{ele}".')
 
     def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.

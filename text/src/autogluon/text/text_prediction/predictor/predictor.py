@@ -335,63 +335,62 @@ class TextPredictor:
                               seed=seed,
                               plot_results=plot_results,
                               verbosity=verbosity)
-            return self
-
-        column_types, problem_type = infer_column_problem_types(train_data, tuning_data,
-                                                                label_columns=label_columns,
-                                                                problem_type=self._problem_type,
-                                                                provided_column_types=column_types)
-        self._eval_metric, log_metrics = infer_eval_log_metrics(problem_type=problem_type,
-                                                                eval_metric=self._eval_metric)
-        has_text_column = False
-        for k, v in column_types.items():
-            if v == _C.TEXT:
-                has_text_column = True
-                break
-        if not has_text_column:
-            raise AssertionError('No Text Column is found! This is currently not supported by '
-                                 'the TextPredictor. You may try to use '
-                                 'autogluon.tabular.TabularPredictor.\n'
-                                 'The inferred column properties of the training data is {}'
-                                 .format(column_types))
-        logger.info('Problem Type="{}"'.format(problem_type))
-        logger.info(printable_column_type_string(column_types))
-        self._problem_type = problem_type
-        if 'models' not in hyperparameters or 'MultimodalTextModel' not in hyperparameters['models']:
-            raise ValueError('The current TextPredictor only supports "MultimodalTextModel" '
-                             'and you must ensure that '
-                             'hyperparameters["models"]["MultimodalTextModel"] can be accessed.')
-        model_hparams = hyperparameters['models']['MultimodalTextModel']
-        self._backend = model_hparams['backend']
-        if plot_results is None:
-            plot_results = in_ipynb()
-
-        if self._backend == 'gluonnlp_v0':
-            import warnings
-            warnings.filterwarnings('ignore', module='mxnet')
-            from ..mx.models import MultiModalTextModel
-            self._model = MultiModalTextModel(column_types=column_types,
-                                              feature_columns=feature_columns,
-                                              label_columns=label_columns,
-                                              problem_type=self._problem_type,
-                                              eval_metric=self._eval_metric,
-                                              log_metrics=log_metrics,
-                                              output_directory=self._path)
-            self._model.train(train_data=train_data,
-                              tuning_data=tuning_data,
-                              num_cpus=num_cpus,
-                              num_gpus=num_gpus,
-                              search_space=model_hparams['search_space'],
-                              tune_kwargs=hyperparameters['tune_kwargs'],
-                              time_limit=time_limit,
-                              seed=seed,
-                              plot_results=plot_results,
-                              verbosity=verbosity)
         else:
-            raise NotImplementedError("Currently, we only support using "
-                                      "the autogluon-contrib-nlp and MXNet "
-                                      "as the backend of AutoGluon-Text. In the future, "
-                                      "we will support other models.")
+            column_types, problem_type = infer_column_problem_types(train_data, tuning_data,
+                                                                    label_columns=label_columns,
+                                                                    problem_type=self._problem_type,
+                                                                    provided_column_types=column_types)
+            self._eval_metric, log_metrics = infer_eval_log_metrics(problem_type=problem_type,
+                                                                    eval_metric=self._eval_metric)
+            has_text_column = False
+            for k, v in column_types.items():
+                if v == _C.TEXT:
+                    has_text_column = True
+                    break
+            if not has_text_column:
+                raise AssertionError('No Text Column is found! This is currently not supported by '
+                                     'the TextPredictor. You may try to use '
+                                     'autogluon.tabular.TabularPredictor.\n'
+                                     'The inferred column properties of the training data is {}'
+                                     .format(column_types))
+            logger.info('Problem Type="{}"'.format(problem_type))
+            logger.info(printable_column_type_string(column_types))
+            self._problem_type = problem_type
+            if 'models' not in hyperparameters or 'MultimodalTextModel' not in hyperparameters['models']:
+                raise ValueError('The current TextPredictor only supports "MultimodalTextModel" '
+                                 'and you must ensure that '
+                                 'hyperparameters["models"]["MultimodalTextModel"] can be accessed.')
+            model_hparams = hyperparameters['models']['MultimodalTextModel']
+            self._backend = model_hparams['backend']
+            if plot_results is None:
+                plot_results = in_ipynb()
+
+            if self._backend == 'gluonnlp_v0':
+                import warnings
+                warnings.filterwarnings('ignore', module='mxnet')
+                from ..mx.models import MultiModalTextModel
+                self._model = MultiModalTextModel(column_types=column_types,
+                                                  feature_columns=feature_columns,
+                                                  label_columns=label_columns,
+                                                  problem_type=self._problem_type,
+                                                  eval_metric=self._eval_metric,
+                                                  log_metrics=log_metrics,
+                                                  output_directory=self._path)
+                self._model.train(train_data=train_data,
+                                  tuning_data=tuning_data,
+                                  num_cpus=num_cpus,
+                                  num_gpus=num_gpus,
+                                  search_space=model_hparams['search_space'],
+                                  tune_kwargs=hyperparameters['tune_kwargs'],
+                                  time_limit=time_limit,
+                                  seed=seed,
+                                  plot_results=plot_results,
+                                  verbosity=verbosity)
+            else:
+                raise NotImplementedError("Currently, we only support using "
+                                          "the autogluon-contrib-nlp and MXNet "
+                                          "as the backend of AutoGluon-Text. In the future, "
+                                          "we will support other models.")
         logger.info(f'Training completed. Auto-saving to "{self.path}". '
                        f'For loading the model, you can use'
                        f' `predictor = TextPredictor.load("{self.path}")`')
