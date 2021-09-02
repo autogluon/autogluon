@@ -208,8 +208,6 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
             model_args_fit[model.name] = {'hyperparameter_tune_kwargs': model_cfg[AG_ARGS]['hyperparameter_tune_kwargs']}
         if 'ag_args_ensemble' in model_cfg and not model_cfg['ag_args_ensemble']:
             model_cfg.pop('ag_args_ensemble')
-        if 'feature_prune_kwargs' in model_cfg[AG_ARGS]:
-            model_args_fit[model.name] = {'feature_prune_kwargs': model_cfg[AG_ARGS]['feature_prune_kwargs']}
         if not silent:
             logger.log(20, f'\t{model.name}: \t{model_cfg}')
         models.append(model)

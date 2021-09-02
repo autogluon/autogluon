@@ -153,7 +153,7 @@ class FeatureSelector:
             Validation data labels. Can be None.
         n_train_subsample : int, default 50000
             If the training dataset has more than this amount of datapoints, sample this many datapoints without replacement and use
-            them as feature selection model training data.
+            them as feature selection model training data. If None, do not use subsampling.
         n_fi_subsample : int, default 5000
             Sample this many datapoints and shuffle them when computing permutation feature importance. If this number is higher than
             the number of feature importance datapoints, set n_fi_subsample = number of feature importance datapoints.
@@ -464,22 +464,31 @@ class FeatureSelector:
     def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int,
                              **kwargs) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, bool, dict]:
         """
-        If the dataset size is larger than n_train_subsample, subsample data to make model training faster.
+        If the train dataset size is larger than n_train_subsample, subsample data to make model training faster.
         If the model is bagged and we have a lot of data, use a non-bagged version instead since it is ~10x faster to train.
-        Update fit and predict time estimates accordingly.
+        If the validation dataset size is larger than max_fi_samples, subsample data to make model prediction faster.
+        If our task type is classification, perform stratified subsampling (rows picked proportionally to number of labels in data).
+        Update fit and predict time estimates accordingly (we only update time limit when we replace bagged model since
+        time taken within a single model fit/predict does not scale linearly with data size).
         """
-        if len(X) > n_train_subsample:
-            subsampled = True
-            random_state = self.rng.integers(low=0, high=1e5)
+        random_state = self.rng.integers(low=0, high=1e5)
+        max_fi_samples = kwargs.get('max_fi_samples', 100000)
+        subsample_train = n_train_subsample is not None and len(X) > n_train_subsample
+        subsample_val = max_fi_samples is not None and X_val is not None and len(X_val) > max_fi_samples
+
+        if subsample_train:
+            logger.log(30, f"\tNumber of training samples {len(X)} is greater than {n_train_subsample}. Using {n_train_subsample} samples as training data.")
             if kwargs.get('num_classes', None) is not None:
                 # stratified sample if classification
                 combined = pd.concat([X, y], axis=1)
-                combined = combined.groupby(y.name).apply(lambda x: x.sample(frac=n_train_subsample/len(X), random_state=random_state)).reset_index(drop=True)
-                X_train, y_train = combined.drop(columns=[y.name]), combined[y.name]
+                y_name = combined.columns[-1]
+                combined = combined.groupby(y_name).apply(lambda x: x.sample(frac=n_train_subsample/len(X), random_state=random_state)).reset_index(drop=True)
+                X_train, y_train = combined.drop(columns=[y_name]), combined[y_name]
             else:
                 X_train = X.sample(n=n_train_subsample, random_state=random_state)
                 y_train = y.loc[X_train.index]
-            if kwargs.pop('replace_bag', True) and self.is_bagged and len(X) >= n_train_subsample * 1.2:
+            if kwargs.pop('replace_bag', True) and self.is_bagged and len(X) >= n_train_subsample + kwargs.get('min_fi_samples', 10000):
+                logger.log(30, f"\tThere is a lot of data and the feature selection model is bagged. Using non-bagged model.")
                 self.is_bagged = False
                 original_k_fold = kwargs['k_fold']
                 self.base_model = self.original_model.convert_to_template_child()
@@ -492,8 +501,19 @@ class FeatureSelector:
                     self.model_predict_time = self.model_predict_time / original_k_fold
         else:
             X_train, y_train = X, y
-            subsampled = False
-        return X_train, y_train, X_val, y_val, subsampled, kwargs
+
+        if subsample_val:
+            logger.log(30, f"\tNumber of validation samples {len(X_val)} is greater than {max_fi_samples}. Using {max_fi_samples} samples as validation data.")
+            if kwargs.get('num_classes', None) is not None:
+                # stratified sample if classification
+                combined = pd.concat([X_val, y_val], axis=1)
+                y_name = combined.columns[-1]
+                combined = combined.groupby(y_name).apply(lambda x: x.sample(frac=max_fi_samples/len(X_val), random_state=random_state)).reset_index(drop=True)
+                X_val, y_val = combined.drop(columns=[y_name]), combined[y_name]
+            else:
+                X_val = X_val.sample(n=max_fi_samples, random_state=random_state)
+                y_val = y_val.loc[X_val.index]
+        return X_train, y_train, X_val, y_val, subsample_train or subsample_val, kwargs
 
     def setup(self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, prune_threshold: float,
               kwargs: dict) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, bool, bool, dict]:
@@ -501,7 +521,7 @@ class FeatureSelector:
         Modify training data, validation data, and model fit kwargs appropriately by subsampling, adding noise columns, replacing bagged
         models, and more.
         """
-        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X, y, X_val, y_val, n_train_subsample, **kwargs)
+        X, y, X_val, y_val, subsampled, kwargs = self.consider_subsampling(X=X, y=y, X_val=X_val, y_val=y_val, n_train_subsample=n_train_subsample, **kwargs)
         auto_threshold = prune_threshold is None
         if auto_threshold:
             kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata']) if 'feature_metadata' in kwargs else None
@@ -512,6 +532,6 @@ class FeatureSelector:
             # HACK: Consider not modifying params field
             self.base_model.params['use_child_oof'] = False
             self.base_model.params['save_bag_folds'] = True
-            if self.original_model._child_oof and self.model_fit_time is not None:
-                self.model_fit_time = self.model_fit_time * kwargs['k_fold']
+        if self.is_bagged and self.original_model._child_oof and self.model_fit_time is not None:
+            self.model_fit_time = self.model_fit_time * kwargs['k_fold']
         return X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled, kwargs
