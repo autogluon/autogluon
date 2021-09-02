@@ -308,9 +308,19 @@ class TextPredictor:
                 assert col_name in feature_columns, f'In the loaded model, "{col_name}" is a feature column' \
                                                     f' but there is ' \
                                                     f'no such column in the DataFrame.'
-            # Match the network architectures
-            # Match the configs
-            assert hyperparameters ==
+            model_hparams = hyperparameters['models']['MultimodalTextModel']
+            if plot_results is None:
+                plot_results = in_ipynb()
+            self._model.train(train_data=train_data,
+                              tuning_data=tuning_data,
+                              num_cpus=num_cpus,
+                              num_gpus=num_gpus,
+                              search_space=model_hparams['search_space'],
+                              tune_kwargs=hyperparameters['tune_kwargs'],
+                              time_limit=time_limit,
+                              seed=seed,
+                              plot_results=plot_results,
+                              verbosity=verbosity)
             return self
 
         column_types, problem_type = infer_column_problem_types(train_data, tuning_data,
