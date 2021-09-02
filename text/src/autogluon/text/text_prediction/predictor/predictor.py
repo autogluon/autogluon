@@ -325,6 +325,7 @@ class TextPredictor:
             model_hparams = hyperparameters['models']['MultimodalTextModel']
             if plot_results is None:
                 plot_results = in_ipynb()
+            print('model_hparams=', model_hparams)
             self._model.train(train_data=train_data,
                               tuning_data=tuning_data,
                               num_cpus=num_cpus,
