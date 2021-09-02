@@ -1155,7 +1155,7 @@ class MultiModalTextModel:
         except OSError as e:
             logger.info(f'Failed to remove the cache directory at "{cache_path}"')
 
-        # Clean up the trained model weights since the model weights are loaded in net.
+        # Clean up the trained model weights since the model weights are loaded in the network.
         clean_up_param_l = []
         for best_id in range(cfg.optimization.nbest):
             nbest_path = os.path.join(best_model_saved_dir_path, f'nbest_model{best_id}.params')
