@@ -410,6 +410,9 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         specified_values.append(key)
         specified_values.append(search_space[key])
     cfg.merge_from_list(specified_values)
+    print('Search space =', search_space)
+    print('Cfg=')
+    print(cfg)
     exp_dir = cfg.misc.exp_dir
     exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
     os.makedirs(exp_dir, exist_ok=True)
