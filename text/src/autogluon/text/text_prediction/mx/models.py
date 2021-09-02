@@ -331,7 +331,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    problem_type, column_types,
                    feature_columns, label_column,
                    log_metrics, eval_metric, ngpus_per_trial,
-                   continue_training,
+                   params_path, preprocessor_path, continue_training,
                    console_log, seed=None, verbosity=2):
     """
 
@@ -366,6 +366,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         The stopping metric
     ngpus_per_trial
         The number of GPUs to use per each trial
+    params_path
+        The parameter path of the network
+    preprocessor_path
+        The path to store the preprocessed
     continue_training
         Whether we are loading a model and continue training it on a new dataset
     console_log
@@ -420,27 +424,36 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     logger.log(10, cfg)
 
     # Load backbone model
-    backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-        = get_backbone(cfg.model.backbone.name)
     if 'roberta' in cfg.model.backbone.name:
+        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+            = get_backbone(cfg.model.backbone.name)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
     else:
+        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+            = get_backbone(cfg.model.backbone.name, load_backbone=not continue_training)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+
     # Build Preprocessor + Preprocess the training dataset + Inference problem type
     # TODO Dynamically cache the preprocessor that has been fitted.
-    if problem_type == MULTICLASS or problem_type == BINARY:
-        label_generator = LabelEncoder()
-        label_generator.fit(pd.concat([train_data[label_column], tuning_data[label_column]]))
-    else:
-        label_generator = None
-    preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
-                                                  label_column=label_column,
-                                                  tokenizer_name=cfg.model.backbone.name,
-                                                  label_generator=label_generator,
-                                                  cfg=cfg.preprocessing)
-    logger.info('Fitting and transforming the train data...')
-    train_dataset = preprocessor.fit_transform(train_data[feature_columns],
+    if continue_training:
+        with open(preprocessor_path, 'rb') as in_f:
+            preprocessor = pickle.load(in_f)
+        train_dataset = preprocessor.transform(train_data[feature_columns],
                                                train_data[label_column])
+    else:
+        if problem_type == MULTICLASS or problem_type == BINARY:
+            label_generator = LabelEncoder()
+            label_generator.fit(pd.concat([train_data[label_column], tuning_data[label_column]]))
+        else:
+            label_generator = None
+        preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
+                                                      label_column=label_column,
+                                                      tokenizer_name=cfg.model.backbone.name,
+                                                      label_generator=label_generator,
+                                                      cfg=cfg.preprocessing)
+        logger.info('Fitting and transforming the train data...')
+        train_dataset = preprocessor.fit_transform(train_data[feature_columns],
+                                                   train_data[label_column])
     with open(os.path.join(exp_dir, 'preprocessor.pkl'), 'wb') as of:
         pickle.dump(preprocessor, of)
     logger.info(f'Done! Preprocessor saved to {os.path.join(exp_dir, "preprocessor.pkl")}')
@@ -532,7 +545,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         get_embedding=False,
         cfg=cfg.model.network,
         out_shape=out_shape)
-    net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
+    if continue_training:
+        net.load_parameters(params_path, ctx=ctx_l)
+    else:
+        net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
     logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
@@ -977,10 +993,7 @@ class MultiModalTextModel:
                 plot_results = True
             else:
                 plot_results = False
-        print(f'Continue Training={continue_training}.')
-        print(f'search_space={search_space}')
-        if continue_training:
-            ch = input()
+
         scheduler_options = compile_scheduler_options_v2(
             scheduler_options=scheduler_options,
             scheduler=tune_kwargs['search_strategy'],
@@ -1008,7 +1021,14 @@ class MultiModalTextModel:
         tuning_data.to_pickle(tuning_df_path)
         if continue_training:
             # We need to store the current weights to the local disk as temporary cache.
-            self.net.save_parameters(os.path.join(cache_path, 'old_net.params'))
+            params_path = os.path.join(cache_path, 'old_net.params')
+            preprocessor_path = os.path.join(cache_path, 'preprocessor.pkl')
+            with open(preprocessor_path, 'wb') as of:
+                pickle.dump(self.preprocessor, of)
+            self.net.save_parameters(params_path)
+        else:
+            params_path = None
+            preprocessor_path = None
 
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_df_path=train_df_path,
@@ -1023,6 +1043,8 @@ class MultiModalTextModel:
                                                       log_metrics=self._log_metrics,
                                                       eval_metric=self._eval_metric,
                                                       ngpus_per_trial=scheduler_options['resource']['num_gpus'],
+                                                      params_path=params_path,
+                                                      preprocessor_path=preprocessor_path,
                                                       continue_training=continue_training,
                                                       console_log=console_log,
                                                       verbosity=verbosity))
@@ -1151,6 +1173,7 @@ class MultiModalTextModel:
             os.remove(os.path.join(cache_path, 'cache_tuning_dataframe.pd.pkl'))
             if continue_training:
                 os.remove(os.path.join(cache_path, 'old_net.params'))
+                os.remove(os.path.join(cache_path, 'preprocessor.pkl'))
             os.rmdir(cache_path)
         except OSError as e:
             logger.info(f'Failed to remove the cache directory at "{cache_path}"')
@@ -1435,8 +1458,12 @@ class MultiModalTextModel:
         column_types = assets['column_types']
         # TODO(sxjscience) Post 0.1. In general, we will need to support compatible version check
         version = assets['version']
-        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(cfg.model.backbone.name, load_backbone=False)
+        if 'roberta' in cfg.model.backbone.name:
+            backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+                = get_backbone(cfg.model.backbone.name)
+        else:
+            backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+                = get_backbone(cfg.model.backbone.name, load_backbone=False)
         if 'roberta' in cfg.model.backbone.name:
             text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
         else:

@@ -265,11 +265,12 @@ class TextPredictor:
             # Check that the merged hyperparameters matches with the existing hyperparameters.
             # Here, we ensure that the model configurations remain the same.
             for key in hyperparameters['models']['MultimodalTextModel']['search_space']:
-                if key in existing_hparams and key.startswith('model.'):
+                if key in existing_hparams and (key.startswith('model.') or key.startswith('preprocessing.')):
                     new_value = hyperparameters['models']['MultimodalTextModel']['search_space'][key]
                     old_value = existing_hparams['models']['MultimodalTextModel']['search_space'][key]
                     assert new_value == old_value,\
-                        f'The model architecture is not allowed to change in the continue training mode. ' \
+                        f'The model architecture / preprocessing logic is not allowed to change in the ' \
+                        f'continue training mode. ' \
                         f'"{key}" is changed to be "{new_value}" from "{old_value}". ' \
                         f'Please check the specified hyperparameters = {hyperparameters}'
         else:
