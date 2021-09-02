@@ -260,13 +260,24 @@ class TextPredictor:
             assert presets is not None, 'presets is not supported in the continue training setting.'
             flat_dict = self._model.config.to_flat_dict()
             flat_dict['optimization.lr'] = space.Categorical(flat_dict['optimization.lr'])
-            preset_hparams = {'models': {'MultimodalTextModel': {'search_space': flat_dict}}}
+            existing_hparams = {'models': {'MultimodalTextModel': {'search_space': flat_dict}}}
+            hyperparameters = merge_params(existing_hparams, hyperparameters)
+            # Check that the merged hyperparameters matches with the existing hyperparameters.
+            # Here, we ensure that the model configurations remain the same.
+            for key in hyperparameters['models']['MultimodalTextModel']['search_space']:
+                if key in existing_hparams and key.startswith('model.'):
+                    new_value = hyperparameters['models']['MultimodalTextModel']['search_space'][key]
+                    old_value = existing_hparams['models']['MultimodalTextModel']['search_space'][key]
+                    assert new_value == old_value,\
+                        f'The model architecture is not allowed to change in the continue training mode. ' \
+                        f'"{key}" is changed to be "{new_value}" from "{old_value}". ' \
+                        f'Please check the specified hyperparameters = {hyperparameters}'
         else:
             if presets is not None:
                 preset_hparams = ag_text_presets.create(presets)
             else:
                 preset_hparams = ag_text_presets.create('default')
-        hyperparameters = merge_params(preset_hparams, hyperparameters)
+            hyperparameters = merge_params(preset_hparams, hyperparameters)
         if num_trials is not None:
             hyperparameters['tune_kwargs']['num_trials'] = num_trials
         if isinstance(self._label, str):
