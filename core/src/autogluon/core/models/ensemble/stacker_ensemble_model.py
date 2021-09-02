@@ -219,8 +219,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 self.feature_metadata = stacker_feature_metadata
             else:
                 # FIXME: This is a hack, stack feature special types should be already present in feature_metadata, not added here
-                existing_features = self.feature_metadata.get_features()
                 existing_stack_features = self.feature_metadata.get_features(required_special_types=[S_STACK])
+                # HACK: Currently AutoGluon auto-adds all base learner prediction features into self.feature_metadata.
+                # The two lines below are here because if feature pruning would crash if it prunes a base learner prediction feature.
+                existing_features = self.feature_metadata.get_features()
                 stacker_feature_metadata = stacker_feature_metadata.keep_features([feature for feature in existing_features if feature in type_map_raw])
                 if set(stacker_feature_metadata.get_features()) != set(existing_stack_features):
                     self.feature_metadata = self.feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())

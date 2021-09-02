@@ -104,7 +104,6 @@ VALID_AG_ARGS_KEYS = {
     'valid_stacker',
     'valid_base',
     'hyperparameter_tune_kwargs',
-    'feature_prune_kwargs',
 }
 
 

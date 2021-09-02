@@ -529,6 +529,7 @@ class AbstractModel:
             raise TimeLimitExceeded
 
     def get_features(self):
+        assert self.is_fit(), "The model must be fit before calling the get_features method."
         if self.feature_metadata:
             return self.feature_metadata.get_features()
         else:
@@ -969,14 +970,15 @@ class AbstractModel:
         """
         pass
 
-    def delete_from_disk(self):
+    def delete_from_disk(self, silent=False):
         """
         Deletes the model from disk.
 
         WARNING: This will DELETE ALL FILES in the self.path directory, regardless if they were created by AutoGluon or not.
         DO NOT STORE FILES INSIDE OF THE MODEL DIRECTORY THAT ARE UNRELATED TO AUTOGLUON.
         """
-        logger.log(30, f'Deleting model {self.name}. All files under {self.path} will be removed.')
+        if not silent:
+            logger.log(30, f'Deleting model {self.name}. All files under {self.path} will be removed.')
         from pathlib import Path
         import shutil
         model_path = Path(self.path)
