@@ -1,11 +1,11 @@
 import logging
 import os
 from sklearn.model_selection import train_test_split
-from typing import Optional
 import numpy as np
 import json
 import pandas as pd
 
+from autogluon.core import space
 from autogluon.core.constants import BINARY
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
@@ -258,7 +258,9 @@ class TextPredictor:
             verbosity = 3
         if is_continue_training:
             assert presets is not None, 'presets is not supported in the continue training setting.'
-            presets_hparams =
+            flat_dict = self._model.config.to_flat_dict()
+            flat_dict['optimization.lr'] = space.Categorical(flat_dict['optimization.lr'])
+            preset_hparams = {'models': {'MultimodalTextModel': {'search_space': flat_dict}}}
         else:
             if presets is not None:
                 preset_hparams = ag_text_presets.create(presets)
