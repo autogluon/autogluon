@@ -257,7 +257,7 @@ class TextPredictor:
         if verbosity is None:
             verbosity = 3
         if is_continue_training:
-            assert presets is not None, 'presets is not supported in the continue training setting.'
+            assert presets is None, 'presets is not supported in the continue training setting.'
             flat_dict = self._model.config.to_flat_dict()
             flat_dict['optimization.lr'] = space.Categorical(flat_dict['optimization.lr'])
             existing_hparams = {'models': {'MultimodalTextModel': {'search_space': flat_dict}}}
