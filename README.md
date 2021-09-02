@@ -55,6 +55,7 @@ See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [docume
 
 ### Scientific Publications
 - [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020)
+- [Multimodal AutoML on Structured Tables with Text Fields](https://openreview.net/pdf?id=OHAIVOOl7Vl) (*ICML AutoML Workshop*, 2021)
 
 ### Articles
 - [AutoGluon for tabular data: 3 lines of code to achieve top 1% in Kaggle competitions](https://aws.amazon.com/blogs/opensource/machine-learning-with-autogluon-an-open-source-automl-library/) (*AWS Open Source Blog*, Mar 2020)
@@ -86,6 +87,23 @@ BibTeX entry:
   year={2020}
 }
 ```
+
+If you find the multimodal text+tabular functionality in AutoGluon be useful, please cite the following paper:
+
+Shi, Xingjian, et al. ["Multimodal AutoML on Structured Tables with Text Fields."](https://openreview.net/forum?id=OHAIVOOl7Vl) 8th ICML Workshop on Automated Machine Learning (AutoML). 2021.
+
+BibTeX entry:
+
+```bibtex
+@inproceedings{agmultimodaltext,
+  title={Multimodal AutoML on Structured Tables with Text Fields},
+  author={Shi, Xingjian and Mueller, Jonas and Erickson, Nick and Li, Mu and Smola, Alex},
+  booktitle={8th ICML Workshop on Automated Machine Learning (AutoML)},
+  year={2021}
+}
+
+```
+
 
 ## AutoGluon for Hyperparameter and Neural Architecture Search (HNAS)
 

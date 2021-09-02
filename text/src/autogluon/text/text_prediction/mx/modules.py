@@ -2,10 +2,10 @@ import numpy as np
 import mxnet as mx
 from mxnet.gluon import nn, HybridBlock
 from mxnet.util import use_np
-from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.layers import get_activation, get_norm_layer
 from autogluon_contrib_nlp.models.transformer import TransformerEncoder
 from .. import constants as _C
+from ..config import CfgNode
 
 
 @use_np
