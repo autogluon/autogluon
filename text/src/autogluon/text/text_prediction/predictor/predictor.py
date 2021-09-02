@@ -329,6 +329,7 @@ class TextPredictor:
                               search_space=model_hparams['search_space'],
                               tune_kwargs=hyperparameters['tune_kwargs'],
                               time_limit=time_limit,
+                              continue_training=True,
                               seed=seed,
                               plot_results=plot_results,
                               verbosity=verbosity)
