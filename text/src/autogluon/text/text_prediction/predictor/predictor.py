@@ -314,8 +314,8 @@ class TextPredictor:
             # We have entered the continue training / transfer learning setting. The model is not None and should
             # have been loaded by a previous `TextPredictor.load()` call.
             logger.info('Calling .fit() for a model that has already been loaded. Start the transfer learning setting.')
-            assert set(self._label) == set(self._model.label_columns),\
-                f'Label columns do not match. Inferred label column from data = {set(self._label)}.' \
+            assert set(label_columns) == set(self._model.label_columns),\
+                f'Label columns do not match. Inferred label column from data = {set(label_columns)}.' \
                 f' Label column in model = {set(self._model.label_columns)}'
             for col_name in self._model.feature_columns:
                 assert col_name in feature_columns, f'In the loaded model, "{col_name}" is a feature column,' \
