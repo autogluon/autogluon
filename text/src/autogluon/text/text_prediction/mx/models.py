@@ -996,6 +996,7 @@ class MultiModalTextModel:
             time_attr='report_idx',
             reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
+
         # Create a temporary cache file. The internal train function will load the
         # temporary cache.
         # In fact, we may generalize this functionality to create the cache in S3/FSx.
@@ -1008,6 +1009,7 @@ class MultiModalTextModel:
         if continue_training:
             # We need to store the current weights to the local disk as temporary cache.
             self.net.save_parameters(os.path.join(cache_path, 'old_net.params'))
+
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_df_path=train_df_path,
                                                       time_limit=time_limit,
@@ -1097,7 +1099,6 @@ class MultiModalTextModel:
         # Consider to move this to a separate predictor
         self._config = cfg
         # Average parameters
-        # TODO(sxjscience) Clean up the temporary spaces used to store the intermediate checkpoints.
         if cfg.model.use_avg_nbest:
             nbest_path_l = []
             for best_id in range(cfg.optimization.nbest):
@@ -1106,6 +1107,7 @@ class MultiModalTextModel:
                     nbest_path_l.append(nbest_path)
             avg_nbest_path = os.path.join(best_model_saved_dir_path, 'nbest_model_avg.params')
             average_checkpoints(nbest_path_l, avg_nbest_path)
+
         with open(os.path.join(best_model_saved_dir_path, 'preprocessor.pkl'), 'rb') as in_f:
             self._preprocessor = pickle.load(in_f)
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
@@ -1142,7 +1144,7 @@ class MultiModalTextModel:
                                 ctx=mx.cpu())
         self._net = net
         mx.npx.waitall()
-        # Clean cache
+        # Clean cache + other temporary parameters
         try:
             os.remove(os.path.join(cache_path, 'cache_train_dataframe.pd.pkl'))
             os.remove(os.path.join(cache_path, 'cache_tuning_dataframe.pd.pkl'))
@@ -1151,6 +1153,15 @@ class MultiModalTextModel:
             os.rmdir(cache_path)
         except OSError as e:
             logger.info(f'Failed to remove the cache directory at "{cache_path}"')
+
+        # Clean up the trained K best models
+        for best_id in range(cfg.optimization.nbest):
+            nbest_path = os.path.join(best_model_saved_dir_path, f'nbest_model{best_id}.params')
+            if os.path.exists(nbest_path):
+                try:
+                    os.remove(nbest_path)
+                except OSError as e:
+                    logger.info(f'Failed to remove the trained K best model weights from "{nbest_path}".')
 
     def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.
