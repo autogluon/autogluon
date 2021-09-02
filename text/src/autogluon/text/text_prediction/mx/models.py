@@ -21,7 +21,6 @@ from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
 from autogluon_contrib_nlp.models import get_backbone
 from autogluon_contrib_nlp.lr_scheduler import InverseSquareRootScheduler
-from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.utils.misc import grouper, \
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
@@ -44,6 +43,7 @@ from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
     MultiModalTextBatchify, get_stats_string, auto_shrink_max_length, get_cls_sep_id
 from .utils import average_checkpoints, set_seed
 from .. import constants as _C
+from ..config import CfgNode
 from ..utils import logging_config
 from ..presets import ag_text_presets
 from ... import version
@@ -331,6 +331,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
                    problem_type, column_types,
                    feature_columns, label_column,
                    log_metrics, eval_metric, ngpus_per_trial,
+                   continue_training,
                    console_log, seed=None, verbosity=2):
     """
 
@@ -365,6 +366,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         The stopping metric
     ngpus_per_trial
         The number of GPUs to use per each trial
+    continue_training
+        Whether we are loading a model and continue training it on a new dataset
     console_log
         Whether to log it to console
     seed
@@ -799,7 +802,7 @@ class MultiModalTextModel:
         Parameters
         ----------
         column_types
-            The column types.
+            The column types. It will be a dictionary of column_name --> column_type
         feature_columns
             Name of the feature columns
         label_columns
@@ -837,6 +840,10 @@ class MultiModalTextModel:
         self._config = None
         self._results = None
         self._preprocessor = None
+
+    @property
+    def column_types(self):
+        return self._column_types
 
     @property
     def results(self):
@@ -893,6 +900,7 @@ class MultiModalTextModel:
               time_limit=None,
               tune_kwargs=None,
               search_space=None,
+              continue_training=False,
               plot_results=False,
               console_log=True,
               seed=None,
@@ -916,6 +924,8 @@ class MultiModalTextModel:
             algorithm, scheduling backend, HPO algorithm.
         search_space
             The search space options
+        continue_training
+            Whether we are loading a new model from scratch or we are continune model training
         plot_results
             Whether to plot results or not
         console_log
@@ -984,13 +994,16 @@ class MultiModalTextModel:
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
         # Create a temporary cache file. The internal train function will load the
         # temporary cache.
-        os.makedirs(os.path.join(self._output_directory, 'data_cache'), exist_ok=True)
-        train_df_path = os.path.join(self._output_directory, 'data_cache',
-                                     'cache_train_dataframe.pd.pkl')
-        tuning_df_path = os.path.join(self._output_directory,  'data_cache',
-                                      'cache_tuning_dataframe.pd.pkl')
+        # In fact, we may generalize this functionality to create the cache in S3/FSx.
+        cache_path = os.path.join(self._output_directory, 'cache')
+        os.makedirs(cache_path, exist_ok=True)
+        train_df_path = os.path.join(cache_path, 'cache_train_dataframe.pd.pkl')
+        tuning_df_path = os.path.join(cache_path, 'cache_tuning_dataframe.pd.pkl')
         train_data.to_pickle(train_df_path)
         tuning_data.to_pickle(tuning_df_path)
+        if continue_training:
+            # We need to store the current weights to the local disk as temporary cache.
+            self.net.save_parameters(os.path.join(cache_path, 'old_net.params'))
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_df_path=train_df_path,
                                                       time_limit=time_limit,
@@ -1004,6 +1017,7 @@ class MultiModalTextModel:
                                                       log_metrics=self._log_metrics,
                                                       eval_metric=self._eval_metric,
                                                       ngpus_per_trial=scheduler_options['resource']['num_gpus'],
+                                                      continue_training=continue_training,
                                                       console_log=console_log,
                                                       verbosity=verbosity))
         no_job_finished_err_msg =\
@@ -1124,6 +1138,8 @@ class MultiModalTextModel:
                                 ctx=mx.cpu())
         self._net = net
         mx.npx.waitall()
+        # Clean cache
+        os.remove(cache_path)
 
     def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.

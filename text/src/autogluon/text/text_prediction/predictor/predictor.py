@@ -252,13 +252,18 @@ class TextPredictor:
         :class:`TextPredictor` object. Returns self.
         """
         assert self._fit_called is False
+        is_continue_training = self._model is not None
         verbosity = self.verbosity
         if verbosity is None:
             verbosity = 3
-        if presets is not None:
-            preset_hparams = ag_text_presets.create(presets)
+        if is_continue_training:
+            assert presets is not None, 'presets is not supported in the continue training setting.'
+            presets_hparams =
         else:
-            preset_hparams = ag_text_presets.create('default')
+            if presets is not None:
+                preset_hparams = ag_text_presets.create(presets)
+            else:
+                preset_hparams = ag_text_presets.create('default')
         hyperparameters = merge_params(preset_hparams, hyperparameters)
         if num_trials is not None:
             hyperparameters['tune_kwargs']['num_trials'] = num_trials
@@ -292,6 +297,20 @@ class TextPredictor:
             train_data, tuning_data = train_test_split(train_data,
                                                        test_size=holdout_frac,
                                                        random_state=np.random.RandomState(seed))
+        if is_continue_training:
+            # We have entered the continue training / transfer learning setting. The model is not None and should
+            # have been loaded by a previous `TextPredictor.load()` call.
+            logger.info('Calling .fit() for a model that has already been loaded. Start the transfer learning setting.')
+            assert list(sorted(self._label)) == list(sorted(self._model.label_columns))
+            for col_name in self._model.feature_columns:
+                assert col_name in feature_columns, f'In the loaded model, "{col_name}" is a feature column' \
+                                                    f' but there is ' \
+                                                    f'no such column in the DataFrame.'
+            # Match the network architectures
+            # Match the configs
+            assert hyperparameters ==
+            return self
+
         column_types, problem_type = infer_column_problem_types(train_data, tuning_data,
                                                                 label_columns=label_columns,
                                                                 problem_type=self._problem_type,
@@ -320,6 +339,7 @@ class TextPredictor:
         self._backend = model_hparams['backend']
         if plot_results is None:
             plot_results = in_ipynb()
+
         if self._backend == 'gluonnlp_v0':
             import warnings
             warnings.filterwarnings('ignore', module='mxnet')
@@ -521,6 +541,6 @@ class TextPredictor:
                                        path=path,
                                        verbosity=verbosity,
                                        warn_if_exist=False)
-        predictor._backend = assets['backend']
+        predictor._backend = backend
         predictor._model = model
         return predictor
