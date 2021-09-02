@@ -21,11 +21,11 @@ from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.core.utils.decorators import apply_presets
 
-from ..configs.hyperparameter_configs import get_hyperparameter_config
-from ..configs.feature_generator_presets import get_default_feature_generator
-from ..configs.presets_configs import tabular_presets_dict
-from ..learner import AbstractLearner, DefaultLearner
-from ..trainer import AbstractTrainer
+from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
+from autogluon.tabular.configs.feature_generator_presets import get_default_feature_generator
+from autogluon.tabular.configs.presets_configs import tabular_presets_dict
+from autogluon.tabular.learner import AbstractLearner, DefaultLearner
+from autogluon.tabular.trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
 
