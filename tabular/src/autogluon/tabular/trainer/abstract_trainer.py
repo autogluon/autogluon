@@ -99,7 +99,6 @@ class AbstractTrainer:
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
         self._debug_info = {'proxy_model': []}
-        self._model_fit_kwargs = {}  # save kwargs to base learner model fits here for feature selection purpose
 
     # path_root is the directory containing learner.pkl
     @property
@@ -958,7 +957,6 @@ class AbstractTrainer:
                     time_left_total = time_limit
                 fit_log_message += f' Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
             logger.log(20, fit_log_message)
-            self._model_fit_kwargs[model.name] = {'X': X, 'y': y, 'X_val': X_val, 'y_val': y_val, **model_fit_kwargs}
             model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
             fit_end_time = time.time()
             if self.weight_evaluation:
@@ -1096,48 +1094,8 @@ class AbstractTrainer:
         Returns a list of successfully trained and saved model names.
         Models trained from this method will be accessible in this Trainer.
         """
-        if k_fold is None:
-            k_fold = self.k_fold
-        if n_repeats is None:
-            n_repeats = self.n_repeats
-        if fit_kwargs is None:
-            fit_kwargs = dict()
-        model_fit_kwargs = dict(
-            time_limit=time_limit,
-            verbosity=self.verbosity,
-        )
-        model_fit_kwargs.update(fit_kwargs)
-        if self.sample_weight is not None:
-            X, w_train = extract_column(X, self.sample_weight)
-            if w_train is not None:  # may be None for ensemble
-                # TODO: consider moving weight normalization into AbstractModel.fit()
-                model_fit_kwargs['sample_weight'] = w_train.values/w_train.mean()  # normalization can affect gradient algorithms like boosting
-            if X_val is not None:
-                X_val, w_val = extract_column(X_val, self.sample_weight)
-                if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
-                    model_fit_kwargs['sample_weight_val'] = w_val.values/w_val.mean()
-            ens_sample_weight = kwargs.get('ens_sample_weight', None)
-            if ens_sample_weight is not None:
-                model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
-        if self._groups is not None and 'groups' not in model_fit_kwargs:
-            if k_fold == self.k_fold:  # don't do this on refit full
-                model_fit_kwargs['groups'] = self._groups
-
-        #######################
-        # FIXME: This section is a hack, compute genuine feature_metadata for each stack level instead
-        #  Don't do this here, do this upstream so it isn't recomputed for each model
-        #  Add feature_metadata to model_fit_kwargs
-        # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
-        # FIXME: This doesn't assign proper special types to stack features, relying on a hack in StackerEnsembleModel to assign S_STACK to feature metadata, don't do this.
-        #  Remove hack in StackerEnsembleModel
-        feature_metadata = self.feature_metadata
-        features_base = self.feature_metadata.get_features()
-        features_new = [feature for feature in X.columns if feature not in features_base]
-        if features_new:
-            feature_metadata_new = FeatureMetadata.from_df(X[features_new])
-            feature_metadata = feature_metadata.join_metadata(feature_metadata_new).keep_features(list(X.columns))
-        model_fit_kwargs['feature_metadata'] = feature_metadata
-        #######################
+        model_fit_kwargs = self.get_model_fit_kwargs(X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs,
+                                                     ens_sample_weight=kwargs.get('ens_sample_weight', None))
 
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
@@ -1171,14 +1129,8 @@ class AbstractTrainer:
                         model_names_trained.append(model_hpo.name)
         else:
             if isinstance(model, BaggedEnsembleModel):
-                model_fit_kwargs.update(dict(
-                    k_fold=k_fold,
-                    k_fold_start=k_fold_start,
-                    k_fold_end=k_fold_end,
-                    n_repeats=n_repeats,
-                    n_repeat_start=n_repeat_start,
-                    compute_base_preds=False,
-                ))
+                bagged_model_fit_kwargs = self.get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start)
+                model_fit_kwargs.update(bagged_model_fit_kwargs)
             model_names_trained = self._train_and_save(X, y, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
         self.save()
         return model_names_trained
@@ -1268,7 +1220,8 @@ class AbstractTrainer:
         else:
             time_split = False
         k_fold_start = 0
-        if k_fold == 0:
+        bagged = k_fold > 0
+        if not bagged:
             time_ratio = hpo_time_ratio if hpo_enabled else 1
             models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                                             time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
@@ -1290,8 +1243,15 @@ class AbstractTrainer:
 
         if feature_prune and len(models) > 0:
             feature_prune_time_start = time.time()
-            candidate_features = self._proxy_model_feature_prune(time_limit=time_limit, layer_fit_time=multi_fold_time_elapsed, level=kwargs['level'], 
-                                                                 features=X.columns.tolist(), **feature_prune_kwargs)
+            model_fit_kwargs = self.get_model_fit_kwargs(X=X, X_val=kwargs.get('X_val', None), time_limit=None, k_fold=k_fold,
+                                                         fit_kwargs=kwargs.get('fit_kwargs', {}), ens_sample_weight=kwargs.get('ens_sample_weight'))
+            model_fit_kwargs.update(dict(X=X, y=y, X_val=kwargs.get('X_val', None), y_val=kwargs.get('y_val', None)))
+            if bagged:
+                bagged_model_fit_kwargs = self.get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0)
+                model_fit_kwargs.update(bagged_model_fit_kwargs)
+
+            candidate_features = self._proxy_model_feature_prune(time_limit=time_limit, layer_fit_time=multi_fold_time_elapsed, level=kwargs['level'],
+                                                                 features=X.columns.tolist(), model_fit_kwargs=model_fit_kwargs, **feature_prune_kwargs)
             if time_limit is not None:
                 time_limit = time_limit - (time.time() - feature_prune_time_start)
 
@@ -1458,7 +1418,7 @@ class AbstractTrainer:
         dummy_stacker.initialize(num_classes=self.num_classes)
         return dummy_stacker
 
-    def _proxy_model_feature_prune(self, time_limit: float, layer_fit_time: float, level: int, features: List[str], **feature_prune_kwargs: dict) -> List[str]:
+    def _proxy_model_feature_prune(self, model_fit_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: List[str], **feature_prune_kwargs: dict) -> List[str]:
         """
         Uses the best LightGBM-based base learner of this layer to perform time-aware permutation feature importance based feature pruning.
         If all LightGBM models fail, use the model that achieved the highest validation accuracy. Feature pruning gets the smaller of the
@@ -1514,7 +1474,7 @@ class AbstractTrainer:
         else:
             feature_prune_time_limit = k * layer_fit_time
         selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit, raise_exception=raise_exception_on_fail)
-        candidate_features = selector.select_features(**feature_prune_kwargs, **self._model_fit_kwargs[proxy_model.name])
+        candidate_features = selector.select_features(**feature_prune_kwargs, **model_fit_kwargs)
 
         # TODO: Remove these
         self._debug_info['proxy_model'].append(selector._debug_info)
@@ -2231,3 +2191,47 @@ class AbstractTrainer:
         self.bagged_mode = og_bagged_mode  # TODO: Confirm if safe to train future models after training models in both bagged and non-bagged modes
         self.verbosity = og_verbosity
         return distilled_model_names
+
+    def get_model_fit_kwargs(self, X: pd.DataFrame, X_val: pd.DataFrame, time_limit: float, k_fold: int, fit_kwargs: dict, ens_sample_weight: List = None) -> dict:
+        if fit_kwargs is None:
+            fit_kwargs = dict()
+
+        model_fit_kwargs = dict(time_limit=time_limit, verbosity=self.verbosity, **fit_kwargs)
+        if self.sample_weight is not None:
+            X, w_train = extract_column(X, self.sample_weight)
+            if w_train is not None:  # may be None for ensemble
+                # TODO: consider moving weight normalization into AbstractModel.fit()
+                model_fit_kwargs['sample_weight'] = w_train.values/w_train.mean()  # normalization can affect gradient algorithms like boosting
+            if X_val is not None:
+                X_val, w_val = extract_column(X_val, self.sample_weight)
+                if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
+                    model_fit_kwargs['sample_weight_val'] = w_val.values/w_val.mean()
+            if ens_sample_weight is not None:
+                model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
+        if self._groups is not None and 'groups' not in model_fit_kwargs:
+            if k_fold == self.k_fold:  # don't do this on refit full
+                model_fit_kwargs['groups'] = self._groups
+
+        #######################
+        # FIXME: This section is a hack, compute genuine feature_metadata for each stack level instead
+        #  Don't do this here, do this upstream so it isn't recomputed for each model
+        #  Add feature_metadata to model_fit_kwargs
+        # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
+        # FIXME: This doesn't assign proper special types to stack features, relying on a hack in StackerEnsembleModel to assign S_STACK to feature metadata, don't do this.
+        #  Remove hack in StackerEnsembleModel
+        feature_metadata = self.feature_metadata
+        features_base = self.feature_metadata.get_features()
+        features_new = [feature for feature in X.columns if feature not in features_base]
+        if features_new:
+            feature_metadata_new = FeatureMetadata.from_df(X[features_new])
+            feature_metadata = feature_metadata.join_metadata(feature_metadata_new).keep_features(list(X.columns))
+        model_fit_kwargs['feature_metadata'] = feature_metadata
+        #######################
+        return model_fit_kwargs
+
+    def get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int) -> dict:
+        if k_fold is None:
+            k_fold = self.k_fold
+        if n_repeats is None:
+            n_repeats = self.n_repeats
+        return dict(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False)
