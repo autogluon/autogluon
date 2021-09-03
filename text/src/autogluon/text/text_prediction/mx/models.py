@@ -822,7 +822,7 @@ def update_legacy_cfg(cfg, version_id):
         new_cfg = cfg.clone()
         new_cfg.defrost()
         if len(cfg.optimization.optimizer_params) > 0:
-            if not isinstance(cfg.optimization.optimizer_params[0], tuple):
+            if isinstance(cfg.optimization.optimizer_params[0], str):
                 fixed_optimizer_params = ast.literal_eval('[' + '. '.join(cfg.optimization.optimizer_params) + ']')
                 new_cfg.optimization.optimizer_params = fixed_optimizer_params
         new_cfg.freeze()
