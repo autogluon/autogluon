@@ -416,9 +416,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         specified_values.append(key)
         specified_values.append(search_space[key])
     cfg.merge_from_list(specified_values)
-    print('Search space =', search_space)
-    print('Cfg=')
-    print(cfg)
     exp_dir = os.path.join(output_directory, 'task{}'.format(task_id))
     os.makedirs(exp_dir, exist_ok=True)
     cfg.defrost()
@@ -1101,14 +1098,11 @@ class MultiModalTextModel:
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
 
             # Check whether the job has finished
-            print(f'After calling .fit(), cfg_path="{cfg_path}",'
-                  f' "best_model_path={os.path.join(self._output_directory, "task0", "best_model.params")}"')
             if not os.path.exists(cfg_path)\
                     or not os.path.exists(os.path.join(self._output_directory,
                                                        'task0', 'best_model.params')):
                 raise RuntimeError(no_job_finished_err_msg)
             cfg = self.base_config.clone_merge(cfg_path)
-            print('After merge cfg=', cfg)
             local_results = pd.read_json(os.path.join(self._output_directory, 'task0',
                                                       'results_local.jsonl'), lines=True)
             if plot_results:

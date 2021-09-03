@@ -263,8 +263,6 @@ class TextPredictor:
             flat_dict['optimization.lr'] = space.Categorical(flat_dict['optimization.lr'])
             existing_hparams = {'models': {'MultimodalTextModel': {'search_space': flat_dict}}}
             hyperparameters = merge_params(existing_hparams, hyperparameters)
-            print('hyperparameters=', hyperparameters)
-            print('Model config=', self._model.config)
             # Check that the merged hyperparameters matches with the existing hyperparameters.
             # Here, we ensure that the model configurations remain the same.
             for key in hyperparameters['models']['MultimodalTextModel']['search_space']:
@@ -328,7 +326,6 @@ class TextPredictor:
             model_hparams = hyperparameters['models']['MultimodalTextModel']
             if plot_results is None:
                 plot_results = in_ipynb()
-            print('model_hparams=', model_hparams)
             self._model.train(train_data=train_data,
                               tuning_data=tuning_data,
                               num_cpus=num_cpus,
