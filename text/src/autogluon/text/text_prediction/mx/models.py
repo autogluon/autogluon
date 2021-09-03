@@ -1099,6 +1099,8 @@ class MultiModalTextModel:
             cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
 
             # Check whether the job has finished
+            print(f'After calling .fit(), cfg_path="{cfg_path}",'
+                  f' "best_model_path={os.path.join(self._output_directory, "task0", "best_model.params")}"')
             if not os.path.exists(cfg_path)\
                     or not os.path.exists(os.path.join(self._output_directory,
                                                        'task0', 'best_model.params')):
