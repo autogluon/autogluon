@@ -146,8 +146,8 @@ plt.legend(loc='best')
 You can also load a predictor and call `.fit()` again for continuous training.
 
 ```{.python .input}
-new_predictor = TextPredictor.load('ag_sst', save_path='ag_sst_continue_train')
-new_predictor.fit(train_data, time_limit=30)
+new_predictor = TextPredictor.load('ag_sst')
+new_predictor.fit(train_data, time_limit=30, save_path='ag_sst_continue_train')
 test_score = predictor.evaluate(test_data, metrics=['acc', 'f1'])
 print(test_score)
 ```
