@@ -1072,6 +1072,7 @@ class MultiModalTextModel:
                                                        'task0', 'best_model.params')):
                 raise RuntimeError(no_job_finished_err_msg)
             cfg = self.base_config.clone_merge(cfg_path)
+            print('After merge cfg=', cfg)
             local_results = pd.read_json(os.path.join(self._output_directory, 'task0',
                                                       'results_local.jsonl'), lines=True)
             if plot_results:
