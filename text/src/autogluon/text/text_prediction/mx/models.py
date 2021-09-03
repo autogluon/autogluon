@@ -333,7 +333,7 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
 def train_function(args, reporter, train_df_path, tuning_df_path,
                    time_limit, time_start, base_config,
                    problem_type, column_types,
-                   feature_columns, label_column,
+                   feature_columns, label_column, output_directory,
                    log_metrics, eval_metric, ngpus_per_trial,
                    params_path, preprocessor_path, continue_training,
                    console_log, seed=None, verbosity=2):
@@ -364,6 +364,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         The feature columns
     label_column
         Label column
+    output_directory
+        The output directory
     log_metrics
         Metrics for logging
     eval_metric
@@ -417,8 +419,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     print('Search space =', search_space)
     print('Cfg=')
     print(cfg)
-    exp_dir = cfg.misc.exp_dir
-    exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
+    exp_dir = os.path.join(output_directory, 'task{}'.format(task_id))
     os.makedirs(exp_dir, exist_ok=True)
     cfg.defrost()
     cfg.misc.exp_dir = exp_dir
@@ -1077,6 +1078,7 @@ class MultiModalTextModel:
                                                       label_column=self._label_columns[0],
                                                       log_metrics=self._log_metrics,
                                                       eval_metric=self._eval_metric,
+                                                      output_directory=self._output_directory,
                                                       ngpus_per_trial=scheduler_options['resource']['num_gpus'],
                                                       params_path=params_path,
                                                       preprocessor_path=preprocessor_path,
