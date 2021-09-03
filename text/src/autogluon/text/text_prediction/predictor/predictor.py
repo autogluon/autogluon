@@ -195,6 +195,7 @@ class TextPredictor:
             num_trials=None,
             plot_results=None,
             holdout_frac=None,
+            save_path=None,
             seed=0):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
@@ -245,6 +246,8 @@ class TextPredictor:
         holdout_frac : float, default = None
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`).
             Default value (if None) is selected based on the number of rows in the training data and whether hyperparameter-tuning is utilized.
+        save_path : str, default = None
+            The path for auto-saving the models' weights
         seed : int, default = 0
             The random seed to use for this training run. If None, no seed will be specified and repeated runs will produce different results.
 
@@ -257,6 +260,8 @@ class TextPredictor:
         verbosity = self.verbosity
         if verbosity is None:
             verbosity = 3
+        if save_path is not None:
+            self._path = setup_outputdir(save_path, warn_if_exist=True)
         if is_continue_training:
             assert presets is None, 'presets is not supported in the continue training setting.'
             flat_dict = self._model.config.to_flat_dict()
@@ -539,7 +544,7 @@ class TextPredictor:
         self._model.save(os.path.join(path, 'saved_model'))
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None, save_path: str = None):
+    def load(cls, path: str, verbosity: int = None):
         """
         Load a TextPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -553,8 +558,7 @@ class TextPredictor:
             If None, logging verbosity is not changed from existing values.
             Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
             Refer to TextPredictor init for more information.
-        save_path : str
-            Path to save the new model if the user is going to call `.fit()`
+
         """
         assert os.path.exists(path), f'"{path}" does not exist. You may check the path again.'
         with open(os.path.join(path, 'text_predictor_assets.json'), 'r') as in_f:
@@ -566,12 +570,10 @@ class TextPredictor:
             model = MultiModalTextModel.load(os.path.join(path, 'saved_model'))
         else:
             raise NotImplementedError(f'Backend = "{backend}" is not supported.')
-        if save_path is None:
-            save_path = path
         predictor: TextPredictor = cls(label=label,
                                        problem_type=model._problem_type,
                                        eval_metric=model._eval_metric,
-                                       path=save_path,
+                                       path=path,
                                        verbosity=verbosity,
                                        warn_if_exist=False)
         predictor._backend = backend
