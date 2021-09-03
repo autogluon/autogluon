@@ -10,6 +10,6 @@ python3 -m pip install -e vision/
 python3 -m pip install -e forecasting/
 python3 -m pip install -e tabular_to_image/
 python3 -m pip install -e autogluon/
-#sudo apt-get install graphviz libgraphviz-dev pkg-config
-#sudo apt-get install python-pip python-virtualenv
-#python3 -m pip install  pygraphviz
+sudo apt-get install graphviz libgraphviz-dev pkg-config
+sudo apt-get install python-pip python-virtualenv
+python3 -m pip install  pygraphviz
