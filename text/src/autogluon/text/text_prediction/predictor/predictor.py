@@ -538,7 +538,7 @@ class TextPredictor:
         self._model.save(os.path.join(path, 'saved_model'))
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None):
+    def load(cls, path: str, verbosity: int = None, save_path: str = None):
         """
         Load a TextPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -552,6 +552,8 @@ class TextPredictor:
             If None, logging verbosity is not changed from existing values.
             Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
             Refer to TextPredictor init for more information.
+        save_path : str
+            Path to save the new model if the user is going to call `.fit()`
         """
         assert os.path.exists(path), f'"{path}" does not exist. You may check the path again.'
         with open(os.path.join(path, 'text_predictor_assets.json'), 'r') as in_f:
@@ -563,10 +565,12 @@ class TextPredictor:
             model = MultiModalTextModel.load(os.path.join(path, 'saved_model'))
         else:
             raise NotImplementedError(f'Backend = "{backend}" is not supported.')
+        if save_path is None:
+            save_path = path
         predictor: TextPredictor = cls(label=label,
                                        problem_type=model._problem_type,
                                        eval_metric=model._eval_metric,
-                                       path=path,
+                                       path=save_path,
                                        verbosity=verbosity,
                                        warn_if_exist=False)
         predictor._backend = backend
