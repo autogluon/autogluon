@@ -21,7 +21,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # python3 -m pip install -U pip
 # python3 -m pip install -U setuptools wheel
 # python3 -m pip install -U "mxnet<2.0.0"
-# python3 -m pip install autogluon  # autogluon==0.2.0
+# python3 -m pip install autogluon  # autogluon==0.3.0
 
 from autogluon.tabular import TabularDataset, TabularPredictor
 train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
@@ -55,6 +55,7 @@ See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [docume
 
 ### Scientific Publications
 - [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020)
+- [Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation](https://proceedings.neurips.cc/paper/2020/hash/62d75fb2e3075506e8837d8f55021ab1-Abstract.html) (*NeurIPS*, 2020)
 - [Multimodal AutoML on Structured Tables with Text Fields](https://openreview.net/pdf?id=OHAIVOOl7Vl) (*ICML AutoML Workshop*, 2021)
 
 ### Articles
@@ -88,6 +89,22 @@ BibTeX entry:
 }
 ```
 
+If you are using AutoGluon Tabular's model distillation functionality, please cite the following paper:
+
+Fakoor, Rasool, et al. ["Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation."](https://proceedings.neurips.cc/paper/2020/hash/62d75fb2e3075506e8837d8f55021ab1-Abstract.html) Advances in Neural Information Processing Systems 33 (2020).
+
+BibTeX entry:
+
+```bibtex
+@article{agtabulardistill,
+  title={Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation},
+  author={Fakoor, Rasool and Mueller, Jonas W and Erickson, Nick and Chaudhari, Pratik and Smola, Alexander J},
+  journal={Advances in Neural Information Processing Systems},
+  volume={33},
+  year={2020}
+}
+```
+
 If you use AutoGluon's multimodal text+tabular functionality in a scientific publication, please cite the following paper:
 
 Shi, Xingjian, et al. ["Multimodal AutoML on Structured Tables with Text Fields."](https://openreview.net/forum?id=OHAIVOOl7Vl) 8th ICML Workshop on Automated Machine Learning (AutoML). 2021.
@@ -101,7 +118,6 @@ BibTeX entry:
   booktitle={8th ICML Workshop on Automated Machine Learning (AutoML)},
   year={2021}
 }
-
 ```
 
 

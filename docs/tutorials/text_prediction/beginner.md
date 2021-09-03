@@ -140,6 +140,18 @@ for val, color in [(0, 'red'), (1, 'blue')]:
 plt.legend(loc='best')
 ```
 
+### Continuous Training
+:label:`sec_textprediction_continuous_training`
+
+You can also load a predictor and call `.fit()` again for continuous training.
+
+```{.python .input}
+new_predictor = TextPredictor.load('ag_sst', save_path='ag_sst_continue_train')
+new_predictor.fit(train_data, time_limit=30)
+test_score = predictor.evaluate(test_data, metrics=['acc', 'f1'])
+print(test_score)
+```
+
 ## Sentence Similarity Task
 
 Next, let's use AutoGluon to train a model for evaluating how semantically similar two sentences are.
