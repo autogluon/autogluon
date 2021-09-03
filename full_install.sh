@@ -10,6 +10,8 @@ python3 -m pip install -e vision/
 python3 -m pip install -e forecasting/
 python3 -m pip install -e tabular_to_image/
 python3 -m pip install -e autogluon/
+python3 -m pip install  pydot
+python3 -m pip install pydotplus
 sudo apt-get install graphviz libgraphviz-dev pkg-config
 sudo apt-get install python-pip python-virtualenv
 python3 -m pip install  pygraphviz
