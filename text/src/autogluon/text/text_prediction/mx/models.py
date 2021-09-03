@@ -816,7 +816,7 @@ def update_legacy_cfg(cfg, version_id):
     new_cfg
         The fixed configuration
     """
-    if py_version.parse(version_id) >= py_version.parse('0.3.3'):
+    if py_version.parse(version_id) >= py_version.parse('0.4.0'):
         return cfg
     else:
         new_cfg = cfg.clone()
