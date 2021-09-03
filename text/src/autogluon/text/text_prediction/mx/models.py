@@ -445,6 +445,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             preprocessor = pickle.load(in_f)
         train_dataset = preprocessor.transform(train_data[feature_columns],
                                                train_data[label_column])
+        label_generator = preprocessor._label_generator
     else:
         if problem_type == MULTICLASS or problem_type == BINARY:
             label_generator = LabelEncoder()
