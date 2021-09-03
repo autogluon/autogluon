@@ -1,3 +1,5 @@
+import ast
+
 import numpy as np
 import scipy.special
 import os
@@ -11,6 +13,8 @@ import pickle
 import functools
 import tqdm
 from typing import Tuple
+from packaging import version as py_version
+
 
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
@@ -487,7 +491,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.model.inference_num_repeat = inference_num_repeat
     cfg.freeze()
     with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
-        f.write(str(cfg))
+        f.write(cfg.dump())
     logger.info(f'Max length for chunking text: {max_length}, '
                 f'Stochastic chunk: Train-{train_stochastic_chunk}/Test-{test_stochastic_chunk}, '
                 f'Test #repeat: {inference_num_repeat}.')
@@ -797,6 +801,34 @@ def get_recommended_resource(nthreads_per_trial=None,
     assert nthreads_per_trial > 0 and ngpus_per_trial >= 0,\
         'Invalid number of threads and number of GPUs.'
     return nthreads_per_trial, ngpus_per_trial
+
+
+def update_legacy_cfg(cfg, version_id):
+    """
+
+    Parameters
+    ----------
+    cfg
+        The configuration
+    version_id
+        The version ID
+
+    Returns
+    -------
+    new_cfg
+        The fixed configuration
+    """
+    if py_version.parse(version_id) >= py_version.parse('0.3.3'):
+        return cfg
+    else:
+        new_cfg = cfg.clone()
+        new_cfg.defrost()
+        if len(cfg.optimization.optimizer_params) > 0:
+            if not isinstance(cfg.optimization.optimizer_params[0], tuple):
+                fixed_optimizer_params = ast.literal_eval('[' + '. '.join(cfg.optimization.optimizer_params) + ']')
+                new_cfg.optimization.optimizer_params = fixed_optimizer_params
+        new_cfg.freeze()
+        return new_cfg
 
 
 @use_np
@@ -1460,8 +1492,11 @@ class MultiModalTextModel:
         log_metrics = assets['log_metrics']
         problem_type = assets['problem_type']
         column_types = assets['column_types']
-        # TODO(sxjscience) Post 0.1. In general, we will need to support compatible version check
-        version = assets['version']
+        version_id = assets['version']
+
+        # Handle the legacy cfg
+        cfg = update_legacy_cfg(cfg, version_id)
+
         if 'roberta' in cfg.model.backbone.name:
             backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
                 = get_backbone(cfg.model.backbone.name)

@@ -12,10 +12,11 @@ from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
 from autogluon.core.utils.miscs import in_ipynb
 
+from .. import constants as _C
 from ..presets import ag_text_presets, merge_params
 from ..infer_types import infer_column_problem_types, printable_column_type_string
 from ..metrics import infer_eval_log_metrics
-from .. import constants as _C
+from ... import version
 
 logger = logging.getLogger()  # return root logger
 
@@ -535,7 +536,8 @@ class TextPredictor:
         os.makedirs(path, exist_ok=True)
         with open(os.path.join(path, 'text_predictor_assets.json'), 'w') as of:
             json.dump({'backend': self._backend,
-                       'label': self._label}, of)
+                       'label': self._label,
+                       'version': version.__version__,}, of)
         self._model.save(os.path.join(path, 'saved_model'))
 
     @classmethod
