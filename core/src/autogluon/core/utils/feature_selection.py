@@ -1,16 +1,18 @@
-from typing import List, Set, Tuple
-from autogluon.core.features.feature_metadata import FeatureMetadata
-from autogluon.core.models.abstract.abstract_model import AbstractModel
-from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from copy import deepcopy
 import logging
-from autogluon.core.utils.utils import unevaluated_fi_df_template
-from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.core.features.types import R_FLOAT
-import numpy as np
-import pandas as pd
 import time
 import traceback
+from typing import List, Set, Tuple
+
+import numpy as np
+import pandas as pd
+
+from ..features.feature_metadata import FeatureMetadata
+from ..features.types import R_FLOAT
+from ..models.abstract.abstract_model import AbstractModel
+from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
+from ..utils.exceptions import TimeLimitExceeded
+from ..utils.utils import generate_train_test_split, unevaluated_fi_df_template
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +21,6 @@ def add_noise_column(X: pd.DataFrame, prefix: str, rng: np.random.Generator, cou
     """
     Create a copy of dataset X with extra synthetic columns generated from standard normal distribution.
     """
-    if X is None:
-        return None
     X = X.copy()
     for i in range(1, count+1):
         col_name = f"{prefix}_{i}"
@@ -105,18 +105,24 @@ def sort_features_by_priority(features: List[str], prioritized: Set[str], prev_i
 
 
 class FeatureSelector:
-    def __init__(self, model: AbstractModel, time_limit: float, seed: int = 0, keep_models: bool = False, raise_exception=False) -> None:
+    def __init__(self, model: AbstractModel, time_limit: float, problem_type: str, seed: int = 0, keep_models: bool = False, raise_exception=False) -> None:
         # TODO: Make this work with unlabelled data
         assert time_limit is not None, "Time limit cannot be unspecified."
         assert model.is_valid(), "Model must have been fit."
+        self.is_bagged = isinstance(model, BaggedEnsembleModel)
         self.original_model = model
-        self.base_model = model.convert_to_template()
+        model_params = model.get_params()
+        if self.is_bagged:
+            # required for feature importance computation
+            model_params['hyperparameters']['use_child_oof'] = False
+            model_params['hyperparameters']['save_bag_folds'] = True
+        self.base_model = model.__class__(**model_params)
         self.base_model.rename(f'FeatureSelector_{self.base_model.name}')
         self.original_time_limit = time_limit
         self.time_limit = time_limit
+        self.problem_type = problem_type
         self.rng = np.random.default_rng(seed)
         self.keep_models = keep_models
-        self.is_bagged = isinstance(model, BaggedEnsembleModel)
         self.model_fit_time = model.fit_time
         self.model_predict_time = model.predict_time
         self.original_val_score = model.val_score
@@ -133,7 +139,7 @@ class FeatureSelector:
         self._fit_time_elapsed = 0.
         self._fi_time_elapsed = 0.
 
-    def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, n_train_subsample: int = 50000,
+    def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame = None, y_val: pd.Series = None, n_train_subsample: int = 50000,
                         n_fi_subsample: int = 5000, prune_threshold: float = None, prune_ratio: float = 0.05, stopping_round: int = 10,
                         min_improvement: float = 1e-6, max_fits: int = None, **kwargs) -> List[str]:
         """
@@ -147,9 +153,9 @@ class FeatureSelector:
             Training data features
         y : pd.Series
             Training data labels
-        X_val: pd.DataFrame
+        X_val: pd.DataFrame, default None
             Validation data features. Can be None.
-        y_val: pd.Series
+        y_val: pd.Series, default None
             Validation data labels. Can be None.
         n_train_subsample : int, default 50000
             If the training dataset has more than this amount of datapoints, sample this many datapoints without replacement and use
@@ -183,8 +189,8 @@ class FeatureSelector:
         logger.log(30, f"Performing feature pruning with model: {self.base_model.name}, total time limit: {round(self.time_limit, 2)}s, " +
                        f"stop threshold: {stopping_round}, prune ratio: {prune_ratio}, prune threshold: {'auto' if not prune_threshold else prune_threshold}.")
         original_features = X.columns.tolist()
-        if len(original_features) == 1:
-            logger.log(30, f"\tSkipping feature pruning since there is only one feature in the dataset.")
+        if len(original_features) <= 1:
+            logger.log(30, f"\tSkipping feature pruning since there is less than 2 features in the dataset.")
             return original_features
         X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled, kwargs = self.setup(X, y, X_val, y_val, n_train_subsample, prune_threshold, kwargs)
         try:
@@ -473,22 +479,14 @@ class FeatureSelector:
         """
         random_state = self.rng.integers(low=0, high=1e5)
         max_fi_samples = kwargs.get('max_fi_samples', 100000)
-        subsample_train = n_train_subsample is not None and len(X) > n_train_subsample
-        subsample_val = max_fi_samples is not None and X_val is not None and len(X_val) > max_fi_samples
 
+        subsample_train = n_train_subsample is not None and len(X) > n_train_subsample
         if subsample_train:
             logger.log(30, f"\tNumber of training samples {len(X)} is greater than {n_train_subsample}. Using {n_train_subsample} samples as training data.")
-            if kwargs.get('num_classes', None) is not None:
-                # stratified sample if classification
-                combined = pd.concat([X, y], axis=1)
-                y_name = combined.columns[-1]
-                combined = combined.groupby(y_name).apply(lambda x: x.sample(frac=n_train_subsample/len(X), random_state=random_state)).reset_index(drop=True)
-                X_train, y_train = combined.drop(columns=[y_name]), combined[y_name]
-            else:
-                X_train = X.sample(n=n_train_subsample, random_state=random_state)
-                y_train = y.loc[X_train.index]
+            drop_ratio = 1. - n_train_subsample / len(X)
+            X_train, _, y_train, _ = generate_train_test_split(X=X, y=y, problem_type=self.problem_type, random_state=random_state, test_size=drop_ratio)
             if kwargs.pop('replace_bag', True) and self.is_bagged and len(X) >= n_train_subsample + kwargs.get('min_fi_samples', 10000):
-                logger.log(30, f"\tThere is a lot of data and the feature selection model is bagged. Using non-bagged model.")
+                logger.log(30, f"\tThere is a lot of data and the feature selection model is bagged. Using a non-bagged version of the model.")
                 self.is_bagged = False
                 original_k_fold = kwargs['k_fold']
                 self.base_model = self.original_model.convert_to_template_child()
@@ -502,17 +500,11 @@ class FeatureSelector:
         else:
             X_train, y_train = X, y
 
+        subsample_val = max_fi_samples is not None and X_val is not None and len(X_val) > max_fi_samples
         if subsample_val:
             logger.log(30, f"\tNumber of validation samples {len(X_val)} is greater than {max_fi_samples}. Using {max_fi_samples} samples as validation data.")
-            if kwargs.get('num_classes', None) is not None:
-                # stratified sample if classification
-                combined = pd.concat([X_val, y_val], axis=1)
-                y_name = combined.columns[-1]
-                combined = combined.groupby(y_name).apply(lambda x: x.sample(frac=max_fi_samples/len(X_val), random_state=random_state)).reset_index(drop=True)
-                X_val, y_val = combined.drop(columns=[y_name]), combined[y_name]
-            else:
-                X_val = X_val.sample(n=max_fi_samples, random_state=random_state)
-                y_val = y_val.loc[X_val.index]
+            drop_ratio = 1. - max_fi_samples / len(X_val)
+            X_val, _, y_val, _ = generate_train_test_split(X=X_val, y=y_val, problem_type=self.problem_type, random_state=random_state, test_size=drop_ratio)
         return X_train, y_train, X_val, y_val, subsample_train or subsample_val, kwargs
 
     def setup(self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, prune_threshold: float,
@@ -526,12 +518,9 @@ class FeatureSelector:
         if auto_threshold:
             kwargs['feature_metadata'] = deepcopy(kwargs['feature_metadata']) if 'feature_metadata' in kwargs else None
             X = add_noise_column(X, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
-            X_val = add_noise_column(X_val, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
+            if isinstance(X_val, pd.DataFrame):
+                X_val = add_noise_column(X_val, self.noise_prefix, self.rng, feature_metadata=kwargs.get('feature_metadata', None))
         X_fi, y_fi = (X, y) if self.is_bagged else (X_val, y_val)
-        if self.is_bagged:
-            # HACK: Consider not modifying params field
-            self.base_model.params['use_child_oof'] = False
-            self.base_model.params['save_bag_folds'] = True
         if self.is_bagged and self.original_model._child_oof and self.model_fit_time is not None:
             self.model_fit_time = self.model_fit_time * kwargs['k_fold']
         return X, y, X_val, y_val, X_fi, y_fi, auto_threshold, subsampled, kwargs
