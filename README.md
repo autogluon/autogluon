@@ -88,7 +88,7 @@ BibTeX entry:
 }
 ```
 
-If you find the multimodal text+tabular functionality in AutoGluon be useful, please cite the following paper:
+If you use AutoGluon's multimodal text+tabular functionality in a scientific publication, please cite the following paper:
 
 Shi, Xingjian, et al. ["Multimodal AutoML on Structured Tables with Text Fields."](https://openreview.net/forum?id=OHAIVOOl7Vl) 8th ICML Workshop on Automated Machine Learning (AutoML). 2021.
 
