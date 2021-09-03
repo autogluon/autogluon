@@ -262,6 +262,7 @@ class TextPredictor:
             flat_dict = self._model.config.to_flat_dict()
             flat_dict['optimization.lr'] = space.Categorical(flat_dict['optimization.lr'])
             existing_hparams = {'models': {'MultimodalTextModel': {'search_space': flat_dict}}}
+            existing_hparams = merge_params(ag_text_presets.create('default'), existing_hparams)
             hyperparameters = merge_params(existing_hparams, hyperparameters)
             # Check that the merged hyperparameters matches with the existing hyperparameters.
             # Here, we ensure that the model configurations remain the same.
