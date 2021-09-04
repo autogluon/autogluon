@@ -29,7 +29,7 @@ requirements = [
 
     'psutil>=5.7.3,<5.9',  # TODO: Consider capping to <6.0 instead, capping to 5.9 to avoid possible issues.
     'networkx>=2.3,<3.0',
-    f'autogluon.DeepInsight=={version}', 
+    f'DeepInsight.pyDeepInsight=={version}', 
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
     #f'autogluon.tabular_to_image=={version}', 

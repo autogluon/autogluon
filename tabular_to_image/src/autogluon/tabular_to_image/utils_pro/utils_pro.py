@@ -26,18 +26,21 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
 from autogluon.core.dataset import TabularDataset
-from autogluon.DeepInsight.pyDeepInsight import ImageTransformer
+from DeepInsight.pyDeepInsight import ImageTransformer
+from sklearn.model_selection import train_test_split
+import pandas as pd
+from matplotlib import pyplot as plt
+import matplotlib.ticker as ticker
+from sklearn.model_selection import StratifiedKFol
 class Utils_pro:
-    def __init__(self, X_train_img ,X_val_img,X_test_img,y_train,y_val,y_test):
-      self.X_train_img=X_train_img
-      self.X_val_img=X_val_img
-      self.X_test_img=X_test_img
-      self.y_train=y_train
-      self.y_val=y_val
-      self.y_test=y_test
-    
-
-
+    def __init__(self, train_dataset,label_column ):
+      self.train_dataset=train_dataset
+      self.label_column=label_column
+      
+      
+      
+    X_train, X_test, y_train, y_test = train_test_split(self.train_dataset,  self.label_column, test_size=0.2)
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25
     use_gpu = torch.cuda.is_available()
     if use_gpu:
         print("Using CUDA")
