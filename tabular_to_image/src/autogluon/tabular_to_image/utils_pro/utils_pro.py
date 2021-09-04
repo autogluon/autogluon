@@ -26,70 +26,93 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
 from autogluon.core.dataset import TabularDataset
-from DeepInsight.pyDeepInsight import ImageTransformer
+from DeepInsight.pyDeepInsight import ImageTransformer,LogScaler
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.ticker as ticker
 from sklearn.model_selection import StratifiedKFol
+from sklearn.manifold import TSNE
 class Utils_pro:
-    def __init__(self, train_dataset,label_column ):
-      self.train_dataset=train_dataset
+    def __init__(self, label_column ):
+      #self.train_dataset=train_dataset
       self.label_column=label_column
       
       
-      
-    X_train, X_test, y_train, y_test = train_test_split(self.train_dataset,  self.label_column, test_size=0.2)
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25
+    Dataset = TabularDataset  
+    #def data_split(self,):
+    #    X_train, X_test, y_train, y_test = train_test_split(self.train_dataset,  self.label_column, test_size=0.2)
+    #    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25
+   
+   
     use_gpu = torch.cuda.is_available()
     if use_gpu:
         print("Using CUDA")
     
-    def _validate_fit_data(self, train_data, tuning_data=None, unlabeled_data=None):
-        if isinstance(train_data, str):
-            train_data = TabularDataset(train_data)
-        if tuning_data is not None and isinstance(tuning_data, str):
-            tuning_data = TabularDataset(tuning_data)
-        if unlabeled_data is not None and isinstance(unlabeled_data, str):
-            unlabeled_data = TabularDataset(unlabeled_data)
-
-        if not isinstance(train_data, pd.DataFrame):
-            raise AssertionError(f'train_data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
-
-        if len(set(train_data.columns)) < len(train_data.columns):
+    @staticmethod
+    def _validate_data(self, data):        
+        data = self.__get_dataset(data)
+        if isinstance(data, str):
+            data = TabularDataset(data)
+        if not isinstance(data, pd.DataFrame):
+            raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
+        if len(set(data.columns)) < len(data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
-        if tuning_data is not None:
-            if not isinstance(tuning_data, pd.DataFrame):
-                raise AssertionError(f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
-            train_features = [column for column in train_data.columns if column != self.label]
-            tuning_features = [column for column in tuning_data.columns if column != self.label]
-            if self.sample_weight is not None:
-                if self.sample_weight in train_features:
-                    train_features.remove(self.sample_weight)
-                if self.sample_weight in tuning_features:
-                    tuning_features.remove(self.sample_weight)
-            if self._learner.groups is not None:
-                train_features.remove(self._learner.groups)
-            train_features = np.array(train_features)
-            tuning_features = np.array(tuning_features)
-            if np.any(train_features != tuning_features):
-                raise ValueError("Column names must match between training and tuning data")
-        if unlabeled_data is not None:
-            if not isinstance(unlabeled_data, pd.DataFrame):
-                raise AssertionError(f'unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}')
-            train_features = [column for column in train_data.columns if column != self.label]
-            unlabeled_features = [column for column in unlabeled_data.columns]
-            if self.sample_weight is not None:
-                if self.sample_weight in train_features:
-                    train_features.remove(self.sample_weight)
-                if self.sample_weight in unlabeled_features:
-                    unlabeled_features.remove(self.sample_weight)
-            train_features = sorted(np.array(train_features))
-            unlabeled_features = sorted(np.array(unlabeled_features))
-            if np.any(train_features != unlabeled_features):
-                raise ValueError("Column names must match between training and unlabeled data.\n"
-                                 "Unlabeled data must have not the label column specified in it.\n")
-        return train_data, tuning_data, unlabeled_data    
+        
+        X_train, X_test, y_train, y_test = train_test_split(data,  self.label_column, test_size=0.2)
+        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25)
+        if X_val is not None:
+            if not isinstance(X_val, pd.DataFrame):
+                raise AssertionError(f'X_val is required to be a pandas DataFrame, but was instead: {type(X_val)}')
+            train_features = [column for column in X_train.columns if column != self.label_column]
+            val_features = [column for column in X_val.columns if column != self.label_columnabel]
+            if np.any(train_features != val_features):
+                raise ValueError("Column names must match between training and val data")
+        if X_test is not None:
+            if not isinstance(X_test, pd.DataFrame):
+                raise AssertionError(f'X_test is required to be a pandas DataFrame, but was instead: {type(X_test)}')
+            train_features = [column for column in X_train.columns if column != self.label_columnabel]
+            test_features = [column for column in X_test.columns]
+            if np.any(train_features != test_features):
+                raise ValueError("Column names must match between training and test_data")
+         
+        return X_train,X_val,X_test,y_train , y_val,y_test    
+     
+    
+    
+    @staticmethod
+    def __get_dataset(data):
+        if isinstance(data, TabularDataset):
+            return data
+        elif isinstance(data, pd.DataFrame):
+            return TabularDataset(data)
+        elif isinstance(data, str):
+            return TabularDataset(data)
+        elif isinstance(data, pd.Series):
+            raise TypeError("data must be TabularDataset or pandas.DataFrame, not pandas.Series. \
+                   To predict on just single example (ith row of table), use data.iloc[[i]] rather than data.iloc[i]")
+        else:
+            raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
+        
+        
+    def Image_Genartor(self,image_shape):
+        ln = LogScaler()
+        X_train_norm = ln.fit_transform(self._validate_data(X_train_,_,_ , _,_ ))
+        X_val_norm = ln.fit_transform(self._validate_data(__,X_val,_ , _,_ ))
+        X_test_norm = ln.transform(self._validate_data(__,_,X_test ,_, _,_ ))
+        #@jit(target ="cuda") 
+        it = ImageTransformer(feature_extractor='tsne',pixels=image_shape, random_state=1701,n_jobs=-1)
+       
+        X_train_img = it.fit_transform(X_train_norm)
+        X_val_img = it.fit_transform(X_val_norm)
+        X_test_img = it.transform(X_test_norm)
+
+        tsne = TSNE(n_components=2, perplexity=30, metric='cosine',random_state=1701, n_jobs=-1)
+
+        plt.figure(figsize=(5, 5))
+        _ = it.fit(X_train_norm, plot=True)
+        return X_train_img,X_val_img,X_test_img
+        
     def image_tensor(self): 
         preprocess = transforms.Compose([transforms.ToTensor()])    
         batch_size = 64
