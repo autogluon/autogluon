@@ -15,3 +15,4 @@ python3 -m pip install pydotplus
 sudo apt-get install graphviz libgraphviz-dev pkg-config
 sudo apt-get install python-pip python-virtualenv
 python3 -m pip install  pygraphviz
+python3 -m pip install -e DeepInsight/

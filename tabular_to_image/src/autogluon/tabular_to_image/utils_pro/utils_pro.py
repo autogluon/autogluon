@@ -31,7 +31,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.ticker as ticker
-from sklearn.model_selection import StratifiedKFol
+#from sklearn.model_selection import StratifiedKFol
 from sklearn.manifold import TSNE
 class Utils_pro:
     def __init__(self, label_column ):
@@ -55,7 +55,7 @@ class Utils_pro:
         if isinstance(data, str):
             data = TabularDataset(data)
         if not isinstance(data, pd.DataFrame):
-            raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
+            raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(data)}')
         if len(set(data.columns)) < len(data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         
@@ -97,9 +97,10 @@ class Utils_pro:
         
     def Image_Genartor(self,image_shape):
         ln = LogScaler()
-        X_train_norm = ln.fit_transform(self._validate_data(X_train_,_,_ , _,_ ))
-        X_val_norm = ln.fit_transform(self._validate_data(__,X_val,_ , _,_ ))
-        X_test_norm = ln.transform(self._validate_data(__,_,X_test ,_, _,_ ))
+        X_train,X_val,X_test,y_train , y_val,y_test=self._validate_data(data)
+        X_train_norm = ln.fit_transform(X_train)
+        X_val_norm = ln.fit_transform(X_val)
+        X_test_norm = ln.transform(X_test)
         #@jit(target ="cuda") 
         it = ImageTransformer(feature_extractor='tsne',pixels=image_shape, random_state=1701,n_jobs=-1)
        
