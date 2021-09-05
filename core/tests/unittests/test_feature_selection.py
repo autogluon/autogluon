@@ -33,21 +33,13 @@ def sample_importance_df_2(sample_features):
     return evaluated_fi_df_template(sample_features, importance=[-0.1, -0.1, 0.1, None, None], n=[5, 10, 10, 0, 0])
 
 
-def test_add_noise_column_none():
-    # test None is returned if input is None
-    args = {'prefix': 'noise_prefix', 'rng': np.random.default_rng(0), 'count': 2}
-    assert add_noise_column(X=None, **args) is None
-
-
 def test_add_noise_column_df():
     # test noise columns are appended to input dataframe and feature_metadata
     X = pd.DataFrame({'a': [1, 2]})
-    args = {'prefix': 'noise_prefix', 'rng': np.random.default_rng(0), 'count': 2}
-    feature_metadata = FeatureMetadata.from_df(X)
-    X_noised = add_noise_column(X, **args, feature_metadata=feature_metadata)
-    expected_features = X.columns.tolist() + ['noise_prefix_1', 'noise_prefix_2']
+    args = {'rng': np.random.default_rng(0), 'count': 2}
+    X_noised, noise_columns = add_noise_column(X, **args)
+    expected_features = X.columns.tolist() + noise_columns
     assert expected_features == X_noised.columns.tolist()
-    assert expected_features == feature_metadata.get_features()
 
 
 def test_merge_importance_dfs_base(sample_features):
@@ -86,16 +78,14 @@ def test_merge_importance_dfs_all(sample_features, sample_importance_df_1, sampl
 
 def test_sort_features_by_priority_base(sample_features):
     # test the ordering of feature importance computation when no prior feature importance computation was done
-    sorted_features = sort_features_by_priority(features=sample_features, prioritized=set(), prev_importance_df=None, using_prev_fit_fi=set())
+    sorted_features = sort_features_by_priority(features=sample_features, prev_importance_df=None, using_prev_fit_fi=set())
     assert sorted_features == sample_features
-    sorted_features = sort_features_by_priority(features=sample_features, prioritized=set(sample_features[-1]), prev_importance_df=None, using_prev_fit_fi=set())
-    assert sorted_features == [sample_features[-1]] + sample_features[:-1]
 
 
 def test_sort_features_by_priority_same_model(sample_features):
     # test the ordering of feature importance computation when prior feature importance computation from the same fitted model was done
     prev_importance_df = evaluated_fi_df_template(sample_features)
-    sorted_features = sort_features_by_priority(features=sample_features, prioritized=set(), prev_importance_df=prev_importance_df, using_prev_fit_fi=set())
+    sorted_features = sort_features_by_priority(features=sample_features, prev_importance_df=prev_importance_df, using_prev_fit_fi=set())
     assert sorted_features == prev_importance_df.sort_values('importance').index.tolist()
 
 
@@ -103,8 +93,7 @@ def test_sort_features_by_priority_different_model(sample_features):
     # test the ordering of feature importance computation when prior feature importance computation from a different fitted model was done
     prev_importance_df = evaluated_fi_df_template(sample_features)
     using_prev_fit_fi = sample_features[-2:]
-    sorted_features = sort_features_by_priority(features=sample_features, prioritized=set(), prev_importance_df=prev_importance_df,
-                                                using_prev_fit_fi=using_prev_fit_fi)
+    sorted_features = sort_features_by_priority(features=sample_features, prev_importance_df=prev_importance_df, using_prev_fit_fi=using_prev_fit_fi)
     sorted_prev_fit_features = prev_importance_df[prev_importance_df.index.isin(using_prev_fit_fi)].sort_values('importance').index.tolist()
     sorted_curr_fit_features = prev_importance_df[~prev_importance_df.index.isin(using_prev_fit_fi)].sort_values('importance').index.tolist()
     expected_features = sorted_prev_fit_features + sorted_curr_fit_features
@@ -113,18 +102,16 @@ def test_sort_features_by_priority_different_model(sample_features):
 
 def test_sort_features_by_priority_all(sample_features):
     # test the ordering of feature importance computation when feature impotance computation comes from mix of current and previous fit models,
-    # some features are prioritized, and some feature are unevaluated
+    # and some feature are unevaluated
     length = len(sample_features)
-    prioritized = set(sample_features[-1])
     using_prev_fit_fi = set(sample_features[:length//3])
     evaluated_rows, unevaluated_rows = evaluated_fi_df_template(sample_features[:length//2]), unevaluated_fi_df_template(sample_features[length//2:])
     prev_importance_df = pd.concat([evaluated_rows, unevaluated_rows])
-    sorted_features = sort_features_by_priority(features=sample_features, prev_importance_df=prev_importance_df,
-                                                prioritized=prioritized, using_prev_fit_fi=using_prev_fit_fi)
-    unevaluated_features = unevaluated_rows[~unevaluated_rows.index.isin(prioritized)].index.tolist()
-    sorted_prev_fit_features = evaluated_rows[(~evaluated_rows.index.isin(list(prioritized) + sample_features[length//2:]))
+    sorted_features = sort_features_by_priority(features=sample_features, prev_importance_df=prev_importance_df, using_prev_fit_fi=using_prev_fit_fi)
+    unevaluated_features = unevaluated_rows.index.tolist()
+    sorted_prev_fit_features = evaluated_rows[(~evaluated_rows.index.isin(sample_features[length//2:]))
                                               & (evaluated_rows.index.isin(using_prev_fit_fi))].sort_values('importance').index.tolist()
-    sorted_curr_fit_features = evaluated_rows[(~evaluated_rows.index.isin(list(prioritized) + sample_features[length//2:]))
+    sorted_curr_fit_features = evaluated_rows[(~evaluated_rows.index.isin(sample_features[length//2:]))
                                               & (~evaluated_rows.index.isin(using_prev_fit_fi))].sort_values('importance').index.tolist()
-    expected_features = list(prioritized) + unevaluated_features + sorted_prev_fit_features + sorted_curr_fit_features
+    expected_features = unevaluated_features + sorted_prev_fit_features + sorted_curr_fit_features
     assert sorted_features == expected_features

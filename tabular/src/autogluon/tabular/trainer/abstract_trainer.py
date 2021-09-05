@@ -1466,6 +1466,11 @@ class AbstractTrainer:
             feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), k * layer_fit_time)
         else:
             feature_prune_time_limit = k * layer_fit_time
+
+        if feature_prune_time_limit < proxy_model.fit_time:
+            logger.warning(f"Insufficient time to train even a single feature pruning model (remaining: {feature_prune_time_limit}, "
+                           f"needed: {proxy_model.fit_time}). Skipping feature pruning.")
+            return features
         selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit,
                                    raise_exception=raise_exception_on_fail, problem_type=self.problem_type)
         candidate_features = selector.select_features(**feature_prune_kwargs, **model_fit_kwargs)
@@ -2244,10 +2249,12 @@ class AbstractTrainer:
         if isinstance(proxy_model_class, str):
             assert proxy_model_class in MODEL_TYPES, f"proxy_model_class must be one of {MODEL_TYPES.keys()}"
             proxy_model_class = MODEL_TYPES[proxy_model_class]
-        assert proxy_model_class not in [GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel], "WeightedEnsemble models cannot be feature pruning proxy models."
+        banned_models = [GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel]
+        assert proxy_model_class not in banned_models, "WeightedEnsemble models cannot be feature pruning proxy models."
 
         leaderboard = self.leaderboard()
-        candidate_model_rows = leaderboard[(~leaderboard['model'].str.contains('WeightedEnsemble')) & (~leaderboard['score_val'].isna()) & (leaderboard['stack_level'] == level)]
+        banned_names = set([val for key, val in DEFAULT_MODEL_NAMES.items() if key in banned_models])
+        candidate_model_rows = leaderboard[(~leaderboard['model'].isin(banned_names)) & (~leaderboard['score_val'].isna()) & (leaderboard['stack_level'] == level)]
         if proxy_model_class is not None:
             candidate_models_type_inner = self.get_models_attribute_dict(attribute='type_inner', models=candidate_model_rows['model'])
             candidate_model_names = [model_name for model_name, model_class in candidate_models_type_inner.items() if model_class == proxy_model_class]
