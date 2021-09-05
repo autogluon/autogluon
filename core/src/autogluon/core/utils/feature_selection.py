@@ -149,7 +149,7 @@ class FeatureSelector:
         self._fi_time_elapsed = 0.
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame = None, y_val: pd.Series = None, n_train_subsample: int = 50000,
-                        n_fi_subsample: int = 5000, prune_threshold: float = None, prune_ratio: float = 0.05, stopping_round: int = 10,
+                        n_fi_subsample: int = 5000, prune_threshold: float = 'noise', prune_ratio: float = 0.05, stopping_round: int = 10,
                         min_improvement: float = 1e-6, max_fits: int = None, **kwargs) -> List[str]:
         """
         Performs time-aware recursive feature elimination based on permutation feature importance. While time remains, compute feature importance
