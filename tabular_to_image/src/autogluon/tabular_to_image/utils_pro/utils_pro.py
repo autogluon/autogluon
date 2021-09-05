@@ -34,9 +34,10 @@ import matplotlib.ticker as ticker
 #from sklearn.model_selection import StratifiedKFol
 from sklearn.manifold import TSNE
 class Utils_pro:
-    def __init__(self, label_column ):
+    def __init__(self, label_column,image_shape ):
       #self.train_dataset=train_dataset
       self.label_column=label_column
+      self.image_shape=image_shape
       
       
     Dataset = TabularDataset  
@@ -65,13 +66,13 @@ class Utils_pro:
             if not isinstance(X_val, pd.DataFrame):
                 raise AssertionError(f'X_val is required to be a pandas DataFrame, but was instead: {type(X_val)}')
             train_features = [column for column in X_train.columns if column != self.label_column]
-            val_features = [column for column in X_val.columns if column != self.label_columnabel]
+            val_features = [column for column in X_val.columns if column != self.label_column]
             if np.any(train_features != val_features):
                 raise ValueError("Column names must match between training and val data")
         if X_test is not None:
             if not isinstance(X_test, pd.DataFrame):
                 raise AssertionError(f'X_test is required to be a pandas DataFrame, but was instead: {type(X_test)}')
-            train_features = [column for column in X_train.columns if column != self.label_columnabel]
+            train_features = [column for column in X_train.columns if column != self.label_column]
             test_features = [column for column in X_test.columns]
             if np.any(train_features != test_features):
                 raise ValueError("Column names must match between training and test_data")
@@ -95,14 +96,15 @@ class Utils_pro:
             raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
         
         
-    def Image_Genartor(self,image_shape):
+    def Image_Genartor(self,data):
+        data=self.__get_dataset(data)
         ln = LogScaler()
-        X_train,X_val,X_test,y_train , y_val,y_test=self._validate_data(data)
+        X_train,X_val,X_test,_ , _,_=self._validate_data(data)
         X_train_norm = ln.fit_transform(X_train)
         X_val_norm = ln.fit_transform(X_val)
         X_test_norm = ln.transform(X_test)
         #@jit(target ="cuda") 
-        it = ImageTransformer(feature_extractor='tsne',pixels=image_shape, random_state=1701,n_jobs=-1)
+        it = ImageTransformer(feature_extractor='tsne',pixels=self.image_shape, random_state=1701,n_jobs=-1)
        
         X_train_img = it.fit_transform(X_train_norm)
         X_val_img = it.fit_transform(X_val_norm)
@@ -114,20 +116,22 @@ class Utils_pro:
         _ = it.fit(X_train_norm, plot=True)
         return X_train_img,X_val_img,X_test_img
         
-    def image_tensor(self): 
+    def image_tensor(self,data): 
         preprocess = transforms.Compose([transforms.ToTensor()])    
         batch_size = 64
         
         le = LabelEncoder()
         #num_classes = np.unique(le.fit_transform(self.y_train)).size
-        X_train_tensor = torch.stack([preprocess(img) for img in self.X_train_img])
-        y_train_tensor = torch.from_numpy(le.fit_transform(self.y_train))
+        _,_,_,y_train , y_val,y_test=self._validate_data(data)
+        X_train_img,X_val_img,X_test_img=self.Image_Genartor(self,image_shape)
+        X_train_tensor = torch.stack([preprocess(img) for img in X_train_img ])
+        y_train_tensor = torch.from_numpy(le.fit_transform(y_train))
 
-        X_val_tensor = torch.stack([preprocess(img) for img in self.X_val_img])
-        y_val_tensor = torch.from_numpy(le.fit_transform(self.y_val ))
+        X_val_tensor = torch.stack([preprocess(img) for img in X_val_img])
+        y_val_tensor = torch.from_numpy(le.fit_transform(y_val ))
 
-        X_test_tensor = torch.stack([preprocess(img) for img in self.X_test_img])
-        y_test_tensor = torch.from_numpy(le.transform(self.y_test))
+        X_test_tensor = torch.stack([preprocess(img) for img in X_test_img])
+        y_test_tensor = torch.from_numpy(le.transform(y_test))
         
         trainset = TensorDataset(X_train_tensor, y_train_tensor)
         trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
