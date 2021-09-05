@@ -49,7 +49,7 @@ class Utils_pro:
     if use_gpu:
         print("Using CUDA")
     
-    @staticmethod
+    
     def _validate_data(self, data):        
         data = self.__get_dataset(data)
         if isinstance(data, str):

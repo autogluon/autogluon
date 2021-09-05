@@ -16,3 +16,4 @@ sudo apt-get install graphviz libgraphviz-dev pkg-config
 sudo apt-get install python-pip python-virtualenv
 python3 -m pip install  pygraphviz
 python3 -m pip install -e DeepInsight/
+python3 -m  pip -q install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
