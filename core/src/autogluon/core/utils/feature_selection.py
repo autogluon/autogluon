@@ -2,7 +2,7 @@ from copy import deepcopy
 import logging
 import time
 import traceback
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Union
 import uuid
 
 import numpy as np
@@ -139,7 +139,7 @@ class FeatureSelector:
         self.model_predict_time = None
         self.attempted_removals = set()
         self.replace_bag = False
-        self.fi_safety_time = 10.
+        self.fi_safety_time = 3
         self.max_n_shuffle = 100
         self.max_time_budget_fi = 300
         self.raise_exception = raise_exception
@@ -203,9 +203,8 @@ class FeatureSelector:
         if len(original_features) <= 1:
             logger.log(20, f"\tSkipping feature pruning since there is less than 2 features in the dataset.")
             return original_features
-        X, y, X_val, y_val, X_fi, y_fi, noise_columns = self.setup(X=X, y=y, X_val=X_val, y_val=y_val, n_train_subsample=n_train_subsample,
-                                                                   prune_threshold=prune_threshold, **kwargs)
-        # Align time estimates (ex. model_fit_time)
+        X, y, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns = self.setup(X=X, y=y, X_val=X_val, y_val=y_val, n_train_subsample=n_train_subsample,
+                                                                                    prune_threshold=prune_threshold, **kwargs)
         try:
             index = 1
             candidate_features = X.columns.tolist()
@@ -338,7 +337,7 @@ class FeatureSelector:
             features = list(prioritized) + [feature for feature in features if feature not in prioritized]
 
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
-        n_evaluated_features = max([i for i in range(0, n_features+1) if i * expected_single_feature_time + self.fi_safety_time <= time_budget])
+        n_evaluated_features = max([i for i in range(0, n_features+1) if i * expected_single_feature_time <= time_budget])
         if n_evaluated_features == 0:
             prune_time = time.time() - time_start
             self.time_limit = self.time_limit - prune_time
@@ -357,7 +356,7 @@ class FeatureSelector:
             evaluated_df['n'] = evaluated_df['n'] // len(model.models)
         # logger.log(30, f"EXPECTED SINGLE TIME: {expected_single_feature_time}, TIME BUDGET: {time_budget}, "
         #                f"N EVAL: {n_evaluated_features}, SHUFFLE: {n_shuffle}")
-        # logger.log(30, evaluated_df)
+        logger.log(30, evaluated_df)
 
         # if we could not compute feature importance for all features and previous feature importance estimates exist, use them
         importance_df = pd.concat([evaluated_df, unevaluated_fi_df_template(unevaluated_features)])
@@ -425,7 +424,7 @@ class FeatureSelector:
         """
         n_subsample = min(n_subsample, len(X_fi))
         n_shuffle = min(np.ceil(n_total_sample / n_subsample).astype(int), self.max_n_shuffle)
-        return 2 * model_predict_time * (n_subsample / len(X_fi)) * n_shuffle
+        return 2 * model_predict_time * (n_subsample / len(X_fi)) * n_shuffle + self.fi_safety_time
 
     def compute_time_budget_fi(self, X_fi: pd.DataFrame, n_subsample: int, **kwargs):
         """
@@ -437,7 +436,7 @@ class FeatureSelector:
         n_total_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
         fi_time_single = self.compute_expected_fi_time_single(X_fi=X_fi, model_predict_time=self.model_predict_time,
                                                               n_subsample=n_subsample, n_total_sample=n_total_samples)
-        time_budget_fi = fi_time_single * min(len(X_fi.columns), 50) + self.fi_safety_time
+        time_budget_fi = fi_time_single * min(len(X_fi.columns), 50)
         return min(time_budget_fi, self.max_time_budget_fi)
 
     def fit_score_model(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series,
@@ -477,40 +476,8 @@ class FeatureSelector:
             'max_fi_samples': kwargs.get('max_fi_samples', 100000)
         }
 
-    # def consider_subsampling(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int,
-    #                          max_fi_samples: int) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
-    #     """
-    #     If the train dataset size is larger than n_train_subsample, subsample data to make model training faster.
-    #     If the model is bagged and we have a lot of data, use a non-bagged version instead since it is ~10x faster to train.
-    #     If the validation dataset size is larger than max_fi_samples, subsample data to make model prediction faster.
-    #     If our task type is classification, perform stratified subsampling (rows picked proportionally to number of labels in data).
-    #     Update fit and predict time estimates accordingly (we only update time limit when we replace bagged model since
-    #     time taken within a single model fit/predict does not scale linearly with data size).
-    #     """
-    #     random_state = self.rng.integers(low=0, high=1e5)
-    #     subsample_train = n_train_subsample is not None and len(X) > n_train_subsample
-    #     if subsample_train:
-    #         logger.log(20, f"\tNumber of training samples {len(X)} is greater than {n_train_subsample}. Using {n_train_subsample} samples as training data.")
-    #         drop_ratio = 1. - n_train_subsample / len(X)
-    #         X, _, y, _ = generate_train_test_split(X=X, y=y, problem_type=self.problem_type, random_state=random_state, test_size=drop_ratio)
-    #     subsample_val = max_fi_samples is not None and X_val is not None and len(X_val) > max_fi_samples
-    #     if subsample_val:
-    #         logger.log(20, f"\tNumber of validation samples {len(X_val)} is greater than {max_fi_samples}. Using {max_fi_samples} validation samples.")
-    #         drop_ratio = 1. - max_fi_samples / len(X_val)
-    #         X_val, _, y_val, _ = generate_train_test_split(X=X_val, y=y_val, problem_type=self.problem_type, random_state=random_state, test_size=drop_ratio)
-    #     return X, y, X_val, y_val
-
-    # def consider_replacing_bagged_model(self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int,
-    #                                     min_fi_samples: int) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
-    #     if self.is_bagged and n_train_subsample is not None and len(X) >= n_train_subsample + min_fi_samples:
-    #         logger.log(20, f"\tThere is a lot of data and the feature selection model is bagged. Using a non-bagged version of the model.")
-    #         X_val = X[~X.index.isin(X.index)]
-    #         y_val = y.loc[X_val.index]
-    #         self.replace_bag = True
-    #     return X, y, X_val, y_val
-
     def setup(self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, prune_threshold: float,
-              **kwargs: dict) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, List[str]]:
+              **kwargs: dict) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, Union[float, str], List[str]]:
         """
         Modify training data, validation data, and model fit kwargs appropriately by subsampling, adding noise columns, replacing bagged
         models, and more.
@@ -549,4 +516,4 @@ class FeatureSelector:
         else:
             assert isinstance(prune_threshold, float), "prune_threshold must be float, 'noise', or 'none'."
         X_fi, y_fi = (X_train, y_train) if self.is_bagged else (X_val, y_val)
-        return X_train, y_train, X_val, y_val, X_fi, y_fi, noise_columns
+        return X_train, y_train, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns
