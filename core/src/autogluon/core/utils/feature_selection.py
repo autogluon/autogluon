@@ -124,6 +124,7 @@ class FeatureSelector:
         self.model_params = model.get_params()
         self.model_name = "FeatureSelector_" + self.model_params['name']
         self.model_params['name'] = self.model_name
+        self.model_predict_time = model.predict_time if model.is_valid() else None
         if self.is_bagged:
             # required for feature importance computation
             self.model_params['hyperparameters']['use_child_oof'] = False
@@ -135,7 +136,6 @@ class FeatureSelector:
         self.problem_type = problem_type
         self.rng = np.random.default_rng(seed)
         self.fit_score_time = None
-        self.model_predict_time = None
         self.attempted_removals = set()
         self.replace_bag = False
         self.fi_safety_time = 0.
@@ -184,12 +184,13 @@ class FeatureSelector:
             score is below prune_threshold.
         stopping_round : int, default 10
             If the validation scores of models fit on pruned data do not improve for stopping_round feature pruning rounds, end the pruning procedure.
+            If None, continue feature pruning until time is up.
         min_improvement : int, default = 1e-6
             The newly fitted model's validation score must be >= (1 + min_improvement) * best validation score seen so far for its input
             feature subset to be considered to be superior to the previous feature subset.
         max_fits : int, default None
             If this many models have been fitted during feature pruning, exit the feature pruning loop. Can potentially prevent overfitting.
-            We refit the model using the remaining features after each round of feature pruning.
+            We refit the model using the remaining features after each round of feature pruning. If None, continue feature pruning until time is up.
 
         Returns
         -------

@@ -1207,7 +1207,6 @@ class AbstractTrainer:
             k_fold=k_fold,
         )
         fit_args.update(kwargs)
-        feature_prune = feature_prune_kwargs is not None
 
         hpo_enabled = False
         if hyperparameter_tune_kwargs:
@@ -1243,7 +1242,7 @@ class AbstractTrainer:
         if time_limit is not None:
             time_limit = time_limit - multi_fold_time_elapsed
 
-        if feature_prune and len(models) > 0:
+        if feature_prune_kwargs is not None and len(models) > 0:
             feature_prune_time_start = time.time()
             model_fit_kwargs = self._get_model_fit_kwargs(X=X, X_val=kwargs.get('X_val', None), time_limit=None, k_fold=k_fold,
                                                           fit_kwargs=kwargs.get('fit_kwargs', {}), ens_sample_weight=kwargs.get('ens_sample_weight'))
@@ -1270,7 +1269,8 @@ class AbstractTrainer:
                     original_prune_map[unfit_model.name] = model
                 pruned_models = self._train_multi_fold(models=unfit_models, hyperparameter_tune_kwargs=None, k_fold_start=k_fold_start,
                                                        k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
-                models = self._retain_better_pruned_models(pruned_models=pruned_models, original_prune_map=original_prune_map)
+                force_prune = feature_prune_kwargs.get('force_prune', False)
+                models = self._retain_better_pruned_models(pruned_models=pruned_models, original_prune_map=original_prune_map, force_prune=force_prune)
         return models
 
     # TODO: Ban KNN from being a Stacker model outside of aux. Will need to ensemble select on all stack layers ensemble selector to make it work
@@ -1480,7 +1480,7 @@ class AbstractTrainer:
         self._debug_info['proxy_model'][-1]['layer_fit_time'] = layer_fit_time
         return candidate_features
 
-    def _retain_better_pruned_models(self, pruned_models: List[str], original_prune_map: dict) -> List[str]:
+    def _retain_better_pruned_models(self, pruned_models: List[str], original_prune_map: dict, force_prune: bool = False) -> List[str]:
         """
         Compares models fit on the pruned set of features with their counterpart, models fit on full set of features.
         Take the model that achieved a higher validation set score and delete the other from self.model_graph.
@@ -1490,7 +1490,9 @@ class AbstractTrainer:
         pruned_models : List[str]
             A list of pruned model names.
         original_prune_map : dict
-            A dictionary mapping the names of models fitted on pruned features to the names of models fitted on original features
+            A dictionary mapping the names of models fitted on pruned features to the names of models fitted on original features.
+        force_prune : bool, default = False
+            If set to true, force all base learners to work with the pruned set of features.
 
         Returns
         ----------
@@ -1504,7 +1506,11 @@ class AbstractTrainer:
             original_score = leaderboard[leaderboard['model'] == original_model]['score_val'].item()
             pruned_score = leaderboard[leaderboard['model'] == pruned_model]['score_val'].item()
             score_str = f"({round(pruned_score, 4)} vs {round(original_score, 4)})"
-            if pruned_score > original_score:
+            if force_prune:
+                logger.log(30, f"Pruned score vs original score is {score_str}. Replacing original model since force_prune=True...")
+                self.delete_models(models_to_delete=original_model, dry_run=False)
+                models.append(pruned_model)
+            elif pruned_score > original_score:
                 logger.log(30, f"Model trained with feature pruning score is better than original model's score {score_str}. Replacing original model...")
                 self.delete_models(models_to_delete=original_model, dry_run=False)
                 models.append(pruned_model)
