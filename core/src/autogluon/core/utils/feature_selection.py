@@ -318,7 +318,7 @@ class FeatureSelector:
     def compute_next_candidate_round(self, X: pd.DataFrame, y: pd.Series, model: AbstractModel, time_budget: float, features: List[str],
                                      n_subsample: int, min_fi_samples: int, max_fi_samples: int, prune_ratio: float, prune_threshold: float,
                                      prev_importance_df: pd.DataFrame = None, prioritized: Set[str] = set(), using_prev_fit_fi: Set[str] = set(),
-                                     weighted: bool = True, n_evaluated_features: float = None) -> Tuple[List[str], pd.DataFrame, float]:
+                                     weighted: bool = True) -> Tuple[List[str], pd.DataFrame, float]:
         """
         Compute permutation feature importance for as many features as possible under time_budget. Ensure each returned feature importance
         scores are computed from at least n_sample datapoints. Update self.time_limit to account for feature importance computation time.
@@ -337,11 +337,7 @@ class FeatureSelector:
             features = list(prioritized) + [feature for feature in features if feature not in prioritized]
 
         # if we do not have enough time to evaluate feature importance for all features, do so only for some (first n_evaluated_features elements of features)
-        if n_evaluated_features is None:
-            n_evaluated_features = max([i for i in range(0, n_features+1) if i * single_feature_fi_time <= time_budget])
-        else:
-            n_evaluated_features = min(n_evaluated_features, n_features+1)
-
+        n_evaluated_features = max([i for i in range(0, n_features+1) if i * single_feature_fi_time <= time_budget])
         if n_evaluated_features == 0:
             prune_time = time.time() - time_start
             self.time_limit = self.time_limit - prune_time
@@ -440,7 +436,7 @@ class FeatureSelector:
         and the time it takes to fully evaluated minimum of 50 features or the number of features in the dataset.
         """
         min_fi_samples = kwargs.get('min_fi_samples', 10000)
-        max_fi_samples = kwargs.get('max_fi_samples', 100000)
+        max_fi_samples = kwargs.get('max_fi_samples', 50000)
         n_total_samples = max(min_fi_samples, min(max_fi_samples, len(X_fi)))
         fi_time_single = self.compute_expected_fi_time_single(X_fi=X_fi, model_predict_time=self.model_predict_time,
                                                               n_subsample=n_subsample, n_total_sample=n_total_samples)
@@ -487,8 +483,7 @@ class FeatureSelector:
         return {
             'weighted': kwargs.get('weighted', True),
             'min_fi_samples': kwargs.get('min_fi_samples', 10000),
-            'max_fi_samples': kwargs.get('max_fi_samples', 100000),
-            'n_evaluated_features': kwargs.get('n_evaluated_features', 50)
+            'max_fi_samples': kwargs.get('max_fi_samples', 50000),
         }
 
     def setup(self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, prune_threshold: float,
