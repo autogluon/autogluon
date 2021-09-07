@@ -1467,7 +1467,7 @@ class AbstractTrainer:
         else:
             feature_prune_time_limit = k * layer_fit_time
 
-        if feature_prune_time_limit < proxy_model.fit_time:
+        if feature_prune_time_limit < 2 * proxy_model.fit_time:
             logger.warning(f"Insufficient time to train even a single feature pruning model (remaining: {feature_prune_time_limit}, "
                            f"needed: {proxy_model.fit_time}). Skipping feature pruning.")
             return features
