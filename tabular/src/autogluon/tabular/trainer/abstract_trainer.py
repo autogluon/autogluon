@@ -100,7 +100,6 @@ class AbstractTrainer:
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
-        self._debug_info = {'proxy_model': []}
 
     # path_root is the directory containing learner.pkl
     @property
@@ -1474,10 +1473,6 @@ class AbstractTrainer:
         selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit,
                                    raise_exception=raise_exception_on_fail, problem_type=self.problem_type)
         candidate_features = selector.select_features(**feature_prune_kwargs, **model_fit_kwargs)
-
-        # TODO: Remove these
-        self._debug_info['proxy_model'].append(selector._debug_info)
-        self._debug_info['proxy_model'][-1]['layer_fit_time'] = layer_fit_time
         return candidate_features
 
     def _retain_better_pruned_models(self, pruned_models: List[str], original_prune_map: dict, force_prune: bool = False) -> List[str]:
@@ -1514,12 +1509,10 @@ class AbstractTrainer:
                 logger.log(30, f"Model trained with feature pruning score is better than original model's score {score_str}. Replacing original model...")
                 self.delete_models(models_to_delete=original_model, dry_run=False)
                 models.append(pruned_model)
-                self._debug_info['proxy_model'][-1]['score_improvement_from_proxy_yes'] += 1
             else:
                 logger.log(30, f"Model trained with feature pruning score is not better than original model's score {score_str}. Keeping original model...")
                 self.delete_models(models_to_delete=pruned_model, dry_run=False)
                 models.append(original_model)
-                self._debug_info['proxy_model'][-1]['score_improvement_from_proxy_no'] += 1
         return models
 
     # TODO: Enable raw=True for bagged models when X=None

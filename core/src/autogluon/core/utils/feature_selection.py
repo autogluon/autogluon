@@ -142,11 +142,6 @@ class FeatureSelector:
         self.max_n_shuffle = 20
         self.max_time_budget_fi = 300
         self.raise_exception = raise_exception
-        self.single_feature_fi_time = None
-        self._debug_info = {'exceptions': [], 'index_trajectory': [], 'layer_fit_time': 0., 'total_prune_time': 0., 'total_prune_fit_time': 0.,
-                            'total_prune_fi_time': 0., 'score_improvement_from_proxy_yes': 0, 'score_improvement_from_proxy_no': 0, 'kept_ratio': 0.}
-        self._fit_time_elapsed = 0.
-        self._fi_time_elapsed = 0.
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame = None, y_val: pd.Series = None, n_train_subsample: int = 50000,
                         n_fi_subsample: int = 10000, prune_threshold: float = 'noise', prune_ratio: float = 0.05, stopping_round: int = 10,
@@ -211,7 +206,6 @@ class FeatureSelector:
             candidate_features = X.columns.tolist()
             curr_model, score, fit_score_time = self.fit_score_model(X, y, X_val, y_val, candidate_features, f"{self.model_name}_1", **kwargs)
             best_info = {'features': candidate_features, 'index': 1, 'model': curr_model, 'score': score}
-            self._debug_info['index_trajectory'].append(True)
 
             time_budget_fi = self.compute_time_budget_fi(X_fi=X_fi, n_subsample=n_fi_subsample, **kwargs)
             logger.log(20, f"\tExpected model fit time: {round(fit_score_time, 2)}s, and expected candidate generation time: {round(time_budget_fi, 2)}s.")
@@ -219,7 +213,6 @@ class FeatureSelector:
                            f"\t\tValidation score of the model fit on original features is ({round(best_info['score'], 4)}).")
             if self.time_limit < self.fit_score_time + time_budget_fi:
                 logger.log(20, f"\tNo time to perform the next pruning round (remaining: {self.time_limit}, needed: {self.fit_score_time + time_budget_fi}).")
-                self._debug_info['exceptions'].append(f"exiting after 1 model fit (remaining: {self.time_limit}, needed: {self.fit_score_time+time_budget_fi})")
                 raise TimeLimitExceeded
 
             importance_df = None
@@ -247,13 +240,11 @@ class FeatureSelector:
                                    f"validation score of the best model fit on {prev_feature_count} features ({round(best_info['score'], 4)}). Updating model.")
                     best_info['model'].delete_from_disk(silent=True)
                     best_info = {'model': curr_model, 'features': candidate_features, 'score': score, 'index': index}
-                    self._debug_info['index_trajectory'].append(True)
                 else:
                     logger.log(20, f"\tRound {index} of feature pruning model fit ({round(fit_score_time, 2)}s):\n"
                                    f"\t\tValidation score of the current model fit on {new_feature_count} features ({round(score, 4)}) is not better than "
                                    f"validation score of the best model fit on {prev_feature_count} features ({round(best_info['score'], 4)}). Retrying.")
                     curr_model.delete_from_disk(silent=True)
-                    self._debug_info['index_trajectory'].append(False)
 
                 if max_fits is not None and index >= max_fits:
                     logger.log(20, f"\tReached maximum number of allowed fits, {max_fits}, during feature selection. Ending...")
@@ -269,17 +260,12 @@ class FeatureSelector:
         except Exception as e:
             logger.error(traceback.format_exc())
             logger.error(f"\tERROR: Exception raised during feature pruning. Reason: {e}. Ending...")
-            self._debug_info['exceptions'].append(str(e))
             if self.raise_exception:
                 raise e
 
         if len(noise_columns) > 0:
             best_info['features'] = [feature for feature in best_info['features'] if feature not in noise_columns]
         best_info['model'].delete_from_disk(silent=True)
-        self._debug_info['total_prune_time'] = self.original_time_limit - self.time_limit
-        self._debug_info['total_prune_fit_time'] = self._fit_time_elapsed
-        self._debug_info['total_prune_fi_time'] = self._fi_time_elapsed
-        self._debug_info['kept_ratio'] = len(best_info['features']) / len(original_features)
         total_time_elapsed = round(self.original_time_limit - self.time_limit, 2)
         logger.log(20, f"\tSuccessfully ended prune loop after {index} feature pruning rounds ({total_time_elapsed}s).")
         logger.log(20, f"\tFeature count before/after feature pruning: {len(original_features)} -> {len(best_info['features'])}.")
@@ -342,7 +328,6 @@ class FeatureSelector:
         if n_evaluated_features == 0:
             prune_time = time.time() - time_start
             self.time_limit = self.time_limit - prune_time
-            self._fi_time_elapsed = self._fi_time_elapsed + prune_time
             return features, unevaluated_fi_df_template(features), prune_time
         evaluated_features = features[:n_evaluated_features]
         unevaluated_features = features[n_evaluated_features:]
@@ -355,13 +340,6 @@ class FeatureSelector:
         if self.is_bagged:
             # If the bagged model includes 5 models and we evaluate a single permutation feature importance shuffle, the above method returns n=5 instead of 1.
             evaluated_df['n'] = (evaluated_df['n'] // len(model.models)).clip(lower=1)
-
-        # HACK: Set expected single feature's feature importance computation time to the most recently observed value when we run this method.
-        # Consider making a new feature importance computation method that parallelize across shuffles not features instead.
-        # self.single_feature_fi_time = (time.time() - time_start) / n_evaluated_features * (n_shuffle / max(evaluated_df['n'].min(), 1))
-        # logger.log(30, f"OLD SINGLE FI TIME: {single_feature_fi_time}, CORRECTED SINGLE FI TIME: {self.single_feature_fi_time}")
-        logger.log(30, f"EXPECTED TIME: {time_budget_fi}, REAL TIME: {time.time() - time_start}")
-        logger.log(30, evaluated_df)
 
         # if we could not compute feature importance for all features and previous feature importance estimates exist, use them
         importance_df = pd.concat([evaluated_df, unevaluated_fi_df_template(unevaluated_features)])
@@ -384,7 +362,6 @@ class FeatureSelector:
 
         feature_selection_time = time.time() - time_start
         self.time_limit = self.time_limit - feature_selection_time
-        self._fi_time_elapsed = self._fi_time_elapsed + feature_selection_time
         return candidate_features, importance_df.sort_values(by='importance', axis=0), feature_selection_time
 
     def compute_next_candidate_given_fi(self, importance_df: pd.DataFrame, prune_threshold: float, prune_ratio: float, weighted: bool) -> List[str]:
@@ -477,7 +454,6 @@ class FeatureSelector:
                 self.model_predict_time = time_predict
         time_elapsed = time.time() - time_start
         self.time_limit = self.time_limit - time_elapsed
-        self._fit_time_elapsed = self._fit_time_elapsed + time_elapsed
         return model, score, time_elapsed
 
     def get_extra_fn_args(self, **kwargs) -> dict:
