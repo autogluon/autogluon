@@ -375,7 +375,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     params_path
         The parameter path of the network
     preprocessor_path
-        The path to store the preprocessed
+        The path to store the preprocessor
     continue_training
         Whether we are loading a model and continue training it on a new dataset
     console_log
