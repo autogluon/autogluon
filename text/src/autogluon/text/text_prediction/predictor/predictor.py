@@ -263,6 +263,7 @@ class TextPredictor:
         if save_path is not None:
             self._path = setup_outputdir(save_path, warn_if_exist=True)
         if is_continue_training:
+            logger.info('Continue training the existing model...')
             assert presets is None, 'presets is not supported in the continue training setting.'
             flat_dict = self._model.config.to_flat_dict()
             flat_dict['optimization.lr'] = space.Categorical(flat_dict['optimization.lr'])
