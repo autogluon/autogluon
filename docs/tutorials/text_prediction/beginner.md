@@ -143,7 +143,7 @@ plt.legend(loc='best')
 ### Continuous Training
 :label:`sec_textprediction_continuous_training`
 
-You can also load a predictor and call `.fit()` again for continuous training.
+You can also load a predictor and call `.fit()` again to continue training the same predictor with new data.
 
 ```{.python .input}
 new_predictor = TextPredictor.load('ag_sst')
