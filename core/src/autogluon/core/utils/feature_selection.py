@@ -124,7 +124,6 @@ class FeatureSelector:
         self.model_params = model.get_params()
         self.model_name = "FeatureSelector_" + self.model_params['name']
         self.model_params['name'] = self.model_name
-        self.model_predict_time = model.predict_time if model.is_valid() else None
         if self.is_bagged:
             # required for feature importance computation
             self.model_params['hyperparameters']['use_child_oof'] = False
@@ -136,6 +135,7 @@ class FeatureSelector:
         self.problem_type = problem_type
         self.rng = np.random.default_rng(seed)
         self.fit_score_time = None
+        self.model_predict_time = None
         self.attempted_removals = set()
         self.replace_bag = False
         self.fi_safety_time = 0.
@@ -209,8 +209,9 @@ class FeatureSelector:
         try:
             index = 1
             candidate_features = X.columns.tolist()
+            best_info = {'features': candidate_features, 'index': 1, 'model': None, 'score': None}
             curr_model, score, fit_score_time = self.fit_score_model(X, y, X_val, y_val, candidate_features, f"{self.model_name}_1", **kwargs)
-            best_info = {'features': candidate_features, 'index': 1, 'model': curr_model, 'score': score}
+            best_info['model'], best_info['score'] = curr_model, score
             self._debug_info['index_trajectory'].append(True)
 
             time_budget_fi = self.compute_time_budget_fi(X_fi=X_fi, n_subsample=n_fi_subsample, **kwargs)
@@ -275,7 +276,8 @@ class FeatureSelector:
 
         if len(noise_columns) > 0:
             best_info['features'] = [feature for feature in best_info['features'] if feature not in noise_columns]
-        best_info['model'].delete_from_disk(silent=True)
+        if isinstance(best_info['model'], AbstractModel):
+            best_info['model'].delete_from_disk(silent=True)
         self._debug_info['total_prune_time'] = self.original_time_limit - self.time_limit
         self._debug_info['total_prune_fit_time'] = self._fit_time_elapsed
         self._debug_info['total_prune_fi_time'] = self._fi_time_elapsed
@@ -463,22 +465,14 @@ class FeatureSelector:
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
         time_fit = time.time() - time_start
         score = model.score_with_oof(y) if self.is_bagged else model.score(X=X_val, y=y_val)
-        time_predict = time.time() - time_start - time_fit
+        time_fit_score = time.time() - time_start
         if self.fit_score_time is None:
-            self.fit_score_time = time.time() - time_start
+            self.fit_score_time = time_fit_score
         if self.model_predict_time is None:
-            # HACK: we use self.model_predict_time for estimating feature importance time but for bagged models score_with_oof
-            # does not give an accurate estimate of model predict time. When running this for the first time on a bagged model,
-            # set predict time to the time it takes to score the training data as if it has never seen it before.
-            if self.is_bagged:
-                model.score(X=X, y=y)
-                self.model_predict_time = time.time() - time_start - self.fit_score_time
-            else:
-                self.model_predict_time = time_predict
-        time_elapsed = time.time() - time_start
-        self.time_limit = self.time_limit - time_elapsed
-        self._fit_time_elapsed = self._fit_time_elapsed + time_elapsed
-        return model, score, time_elapsed
+            self.model_predict_time = model.predict_time if self.is_bagged else time_fit_score - time_fit
+        self.time_limit = self.time_limit - time_fit_score
+        self._fit_time_elapsed = self._fit_time_elapsed + time_fit_score
+        return model, score, time_fit_score
 
     def get_extra_fn_args(self, **kwargs) -> dict:
         return {
@@ -499,17 +493,21 @@ class FeatureSelector:
         if n_train_subsample is not None and len(X) > n_train_subsample:
             logger.log(20, f"\tNumber of training samples {len(X)} is greater than {n_train_subsample}. Using {n_train_subsample} samples as training data.")
             drop_ratio = 1. - n_train_subsample / len(X)
-            X_train, X_unused, y_train, y_unused = generate_train_test_split(X=X, y=y, problem_type=self.problem_type,
-                                                                             random_state=random_state, test_size=drop_ratio)
-
-            # replace bagged model
-            if kwargs.get('replace_bag', True) and self.is_bagged and len(X) >= n_train_subsample + min_fi_samples:
-                logger.log(20, f"\tThere is a lot of data and the feature selection model is bagged. Using a non-bagged version of the model.")
-                X_val, y_val = X_unused, y_unused
-                self.is_bagged = False
-                self.replace_bag = True
+            X_train, _, y_train, _ = generate_train_test_split(X=X, y=y, problem_type=self.problem_type, random_state=random_state, test_size=drop_ratio)
         else:
             X_train, y_train = X, y
+
+        # replace bagged model with its child model for the proxy model if replace_bag=True (overrides subsampling if triggered)
+        if n_train_subsample is None:
+            trigger_replace_bag = kwargs.get('replace_bag', False) and self.is_bagged
+        else:
+            trigger_replace_bag = kwargs.get('replace_bag', True) and self.is_bagged and len(X) > n_train_subsample + min_fi_samples
+        if trigger_replace_bag:
+            logger.log(20, f"\tFeature selection model is bagged and replace_bag=True. Using a non-bagged version of the model for feature selection.")
+            val_ratio = 1. - n_train_subsample / len(X) if n_train_subsample is not None else 0.25
+            X_train, X_val, y_train, y_val = generate_train_test_split(X=X, y=y, problem_type=self.problem_type, random_state=random_state, test_size=val_ratio)
+            self.is_bagged = False
+            self.replace_bag = True
 
         # subsample validation data
         # max_fi_samples = kwargs.get('max_fi_samples', 100000)
