@@ -263,6 +263,7 @@ class TextPredictor:
         if save_path is not None:
             self._path = setup_outputdir(save_path, warn_if_exist=True)
         if is_continue_training:
+            # We have entered the continue training / transfer learning setting because the model is not None.
             logger.info('Continue training the existing model...')
             assert presets is None, 'presets is not supported in the continue training setting.'
             flat_dict = self._model.config.to_flat_dict()
@@ -320,9 +321,6 @@ class TextPredictor:
                                                        test_size=holdout_frac,
                                                        random_state=np.random.RandomState(seed))
         if is_continue_training:
-            # We have entered the continue training / transfer learning setting. The model is not None and should
-            # have been loaded by a previous `TextPredictor.load()` call.
-            logger.info('Calling .fit() for a model that has already been loaded. Start the transfer learning setting.')
             assert set(label_columns) == set(self._model.label_columns),\
                 f'Label columns do not match. Inferred label column from data = {set(label_columns)}.' \
                 f' Label column in model = {set(self._model.label_columns)}'
