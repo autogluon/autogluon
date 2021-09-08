@@ -834,6 +834,8 @@ def update_legacy_cfg(cfg, version_id):
 class MultiModalTextModel:
     """Learner of the multimodal text data.
 
+    This class implements a single neural network model that can operate on data with multiple text columns as well as tabular numeric/categorical columns.
+
     It will be called if the user call `fit()` in TextPredictor.
 
     It is used for making predictions on new data and viewing information about
