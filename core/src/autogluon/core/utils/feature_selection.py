@@ -8,6 +8,7 @@ import uuid
 import numpy as np
 import pandas as pd
 
+from ..features.types import R_FLOAT
 from ..models.abstract.abstract_model import AbstractModel
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..utils.exceptions import TimeLimitExceeded
@@ -114,7 +115,7 @@ class FeatureSelector:
         seed : int, default 0
             Random seed for generating reproducible results.
         raise_exception : bool, default False
-            Whether to crash AutoGluon if there is an error in feature selection.
+            Whether to crash AutoGluon if there is an error in feature selection. If False, return the current best feature subset.
         """
         # TODO: Make this work with unlabelled data
         assert time_limit is not None, "Time limit cannot be unspecified."
@@ -204,8 +205,10 @@ class FeatureSelector:
         if len(original_features) <= 1:
             logger.log(20, f"\tSkipping feature pruning since there is less than 2 features in the dataset.")
             return original_features
-        X, y, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns = self.setup(X=X, y=y, X_val=X_val, y_val=y_val, n_train_subsample=n_train_subsample,
-                                                                                    prune_threshold=prune_threshold, **kwargs)
+        X, y, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns, feature_metadata = self.setup(X=X, y=y, X_val=X_val, y_val=y_val,
+                                                                                                      n_train_subsample=n_train_subsample,
+                                                                                                      prune_threshold=prune_threshold, **kwargs)
+        kwargs['feature_metadata'] = feature_metadata
         try:
             index = 1
             candidate_features = X.columns.tolist()
@@ -459,7 +462,6 @@ class FeatureSelector:
         model.rename(model_name)
         X = X[features]
         X_val = None if self.is_bagged else X_val[features]
-        kwargs.pop('feature_metadata', None)
         if 'time_limit' in kwargs:
             time_remaining = self.time_limit - (time.time() - self.time_start)
             kwargs['time_limit'] = time_remaining
@@ -517,13 +519,17 @@ class FeatureSelector:
         #     X_val, _, y_val, _ = generate_train_test_split(X=X_val, y=y_val, problem_type=self.problem_type, random_state=random_state, test_size=drop_ratio)
 
         noise_columns = []
+        feature_metadata = deepcopy(kwargs.get('feature_metadata', None))
         if prune_threshold == 'none':
             prune_threshold = float('inf')
         elif prune_threshold is 'noise':
             X_train, noise_columns = add_noise_column(X=X_train, rng=self.rng)
+            if feature_metadata is not None:
+                for noise_column in noise_columns:
+                    feature_metadata.type_map_raw[noise_column] = R_FLOAT
             if isinstance(X_val, pd.DataFrame):
                 X_val, _ = add_noise_column(X=X_val, rng=self.rng, noise_columns=noise_columns)
         else:
             assert isinstance(prune_threshold, float), "prune_threshold must be float, 'noise', or 'none'."
         X_fi, y_fi = (X_train, y_train) if self.is_bagged else (X_val, y_val)
-        return X_train, y_train, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns
+        return X_train, y_train, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns, feature_metadata
