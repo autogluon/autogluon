@@ -1463,9 +1463,9 @@ class AbstractTrainer:
         if feature_prune_time_limit is not None:
             feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), feature_prune_time_limit)
         elif time_limit is not None:
-            feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), k * layer_fit_time)
+            feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), max(k * layer_fit_time, 0.05 * time_limit))
         else:
-            feature_prune_time_limit = k * layer_fit_time
+            feature_prune_time_limit = max(k * layer_fit_time, 300)
 
         if feature_prune_time_limit < 2 * proxy_model.fit_time:
             logger.warning(f"Insufficient time to train even a single feature pruning model (remaining: {feature_prune_time_limit}, "
