@@ -12,6 +12,8 @@ import json
 import pickle
 import functools
 import tqdm
+import shutil
+import uuid
 from typing import Tuple
 from packaging import version as py_version
 
@@ -1049,8 +1051,8 @@ class MultiModalTextModel:
         # Create a temporary cache file. The internal train function will load the
         # temporary cache.
         # In fact, we may generalize this functionality to create the cache in S3/FSx.
-        cache_path = os.path.join(self._output_directory, 'cache')
-        os.makedirs(cache_path, exist_ok=True)
+        cache_path = os.path.join(self._output_directory, f'cache_{uuid.uuid4()}')
+        os.makedirs(cache_path)
         train_df_path = os.path.join(cache_path, 'cache_train_dataframe.pd.pkl')
         tuning_df_path = os.path.join(cache_path, 'cache_tuning_dataframe.pd.pkl')
         train_data.to_pickle(train_df_path)
@@ -1098,12 +1100,11 @@ class MultiModalTextModel:
             train_fn(train_fn.args['search_space'],
                      train_fn.args['_default_config'])
             best_model_saved_dir_path = os.path.join(self._output_directory, 'task0')
-            cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
+            cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
 
             # Check whether the job has finished
             if not os.path.exists(cfg_path)\
-                    or not os.path.exists(os.path.join(self._output_directory,
-                                                       'task0', 'best_model.params')):
+                    or not os.path.exists(os.path.join(best_model_saved_dir_path, 'best_model.params')):
                 raise RuntimeError(no_job_finished_err_msg)
             cfg = self.base_config.clone_merge(cfg_path)
             local_results = pd.read_json(os.path.join(self._output_directory, 'task0',
@@ -1206,32 +1207,15 @@ class MultiModalTextModel:
 
         # Clean cache
         try:
-            os.remove(os.path.join(cache_path, 'cache_train_dataframe.pd.pkl'))
-            os.remove(os.path.join(cache_path, 'cache_tuning_dataframe.pd.pkl'))
-            if continue_training:
-                os.remove(os.path.join(cache_path, 'old_net.params'))
-                os.remove(os.path.join(cache_path, 'preprocessor.pkl'))
-            os.rmdir(cache_path)
+            shutil.rmtree(cache_path)
         except OSError as e:
             logger.info(f'Failed to remove the cache directory at "{cache_path}"')
 
-        # Clean up the trained model weights since the model weights are loaded in the network.
-        clean_up_param_l = []
-        for best_id in range(cfg.optimization.nbest):
-            nbest_path = os.path.join(best_model_saved_dir_path, f'nbest_model{best_id}.params')
-            if os.path.exists(nbest_path):
-                clean_up_param_l.append(nbest_path)
-        best_model_weight = os.path.join(best_model_saved_dir_path, 'best_model.params')
-        if os.path.exists(best_model_weight):
-            clean_up_param_l.append(best_model_weight)
-        if cfg.model.use_avg_nbest:
-            clean_up_param_l.append(avg_nbest_path)
-
-        for ele in clean_up_param_l:
-            try:
-                os.remove(ele)
-            except OSError as e:
-                logger.info(f'Failed to remove the model weight from "{ele}".')
+        # Clean up the temporary workspace that stores the configuration/weights of the best model
+        try:
+            shutil.rmtree(best_model_saved_dir_path)
+        except OSError as e:
+            logger.info(f'Failed to remove the temporary best model directory: "{best_model_saved_dir_path}".')
 
     def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.
