@@ -355,6 +355,10 @@ class FeatureSelector:
         fi_kwargs = {'X': X, 'y': y, 'num_shuffle_sets': n_shuffle, 'subsample_size': n_subsample, 'features': evaluated_features,
                      'time_limit': time_budget_fi, 'silent': True}
         fi_kwargs.update({'is_oof': True} if self.is_bagged else {})
+        # FIXME: Right now the upper bound on the number of features we evaluate feature importance at once is determined by our expected feature
+        # importance computation time. While this estimate is relatively accurate on most datasets, on some high dimensional datasets it underestimates
+        # the time needed to evaluate n_shuffles of permutations and ends up only evaluating a few shuffles. Consider making a feature importance
+        # method that parallelizes across individual shuffles instead.
         evaluated_df = model.compute_feature_importance(**fi_kwargs)
         if self.is_bagged:
             # If the bagged model includes 5 models and we evaluate a single permutation feature importance shuffle, the above method returns n=5 instead of 1.
@@ -512,7 +516,7 @@ class FeatureSelector:
             self.is_bagged = False
             self.replace_bag = True
 
-        # HACK: Be more lenient with feature importance computation shuffles for very high dimensional datasets
+        # Be more lenient with feature importance computation shuffles for very high dimensional datasets for time's sake
         if len(X_train.columns) > 1000:
             self.max_n_shuffle = self.max_n_shuffle // 2
 
