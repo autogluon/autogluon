@@ -1205,12 +1205,8 @@ class MultiModalTextModel:
         self._net = net
         mx.npx.waitall()
 
-        # Clean cache
-        try:
-            shutil.rmtree(cache_path)
-        except OSError as e:
-            logger.info(f'Failed to remove the cache directory at "{cache_path}"')
-
+        # Clean cache, will directly raise
+        shutil.rmtree(cache_path)
         # Clean up the temporary workspace that stores the configuration/weights of the best model
         try:
             shutil.rmtree(best_model_saved_dir_path)
