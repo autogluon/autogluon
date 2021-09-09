@@ -66,6 +66,7 @@ pprint.pprint(ag_text_presets.create('electra_small_fuse_late'))
 Another way to specify a custom TextPredictor configuration is via the `hyperparameters` argument.
 
 ```{.python .input}
+predictor = TextPredictor(path='ag_text_customize1', eval_metric='acc', label='label')
 predictor.fit(train_data, hyperparameters=ag_text_presets.create('electra_small_fuse_late'),
               time_limit=30, seed=123)
 ```
@@ -78,6 +79,8 @@ The pre-registered configurations provide reasonable default hyperparameters. A 
 hyperparameters = ag_text_presets.create('electra_small_fuse_late')
 hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.num_train_epochs'] = 5
 hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.lr'] = ag.core.space.Categorical(5E-5)
+
+predictor = TextPredictor(path='ag_text_customize2', eval_metric='acc', label='label')
 predictor.fit(train_data, hyperparameters=hyperparameters, time_limit=30, seed=123)
 ```
 
@@ -94,6 +97,7 @@ def electra_small_fuse_late_train5():
     hyperparameters['models']['MultimodalTextModel']['search_space']['optimization.wd'] = 1E-2
     return hyperparameters
 
+predictor = TextPredictor(path='ag_text_customize3', eval_metric='acc', label='label')
 predictor.fit(train_data, presets='electra_small_fuse_late_train5', time_limit=60, seed=123)
 ```
 
