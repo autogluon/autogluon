@@ -7,7 +7,7 @@ import pickle
 import time
 import random
 import sys
-from typing import Callable
+from typing import Callable, List
 from datetime import datetime
 from functools import wraps
 
@@ -593,7 +593,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
                                            time_limit: float = None,
                                            silent=False,
                                            log_prefix='',
-                                           importance_as_list=False) -> pd.DataFrame:
+                                           importance_as_list=False,
+                                           random_state=0) -> pd.DataFrame:
     """
     Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
     A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -663,6 +664,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
         Prefix to add to logging statements.
     importance_as_list : bool, default False
         Whether to return the 'importance' column values as a list of the importance from each shuffle (True) or a single averaged value (False).
+    random_state : int, default 0
+        Acts as a seed for data subsampling and permuting feature values.
 
     Returns
     -------
@@ -713,13 +716,15 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
     feature_batch_count = None
     X_raw = None
     score_baseline = None
+    initial_random_state = random_state
     # TODO: Can speedup shuffle_repeats by incorporating into X_raw (do multiple repeats in a single predict call)
     for shuffle_repeat in range(num_shuffle_sets):
         fi = dict()
+        random_state = initial_random_state + shuffle_repeat
 
         if subsample:
             # TODO: Stratify? We currently don't know in this function the problem_type (could pass as additional arg).
-            X = X_orig.sample(subsample_size, random_state=shuffle_repeat)
+            X = X_orig.sample(subsample_size, random_state=random_state)
             y = y_orig.loc[X.index]
 
         if subsample or shuffle_repeat == 0:
@@ -744,7 +749,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
 
         row_count = len(X)
 
-        X_shuffled = shuffle_df_rows(X=X, seed=shuffle_repeat)
+        X_shuffled = shuffle_df_rows(X=X, seed=random_state)
 
         for i in range(0, num_features, feature_batch_count):
             parallel_computed_features = features[i:i + feature_batch_count]
@@ -949,3 +954,13 @@ def get_gpu_free_memory():
     except:
         memory_free_values = []
     return memory_free_values
+
+
+def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:
+    importance_df = pd.DataFrame({
+        'importance': None,
+        'stddev': None,
+        'p_value': None,
+        'n': 0
+    }, index=features)
+    return importance_df

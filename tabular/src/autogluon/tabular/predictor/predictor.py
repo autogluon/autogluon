@@ -522,6 +522,14 @@ class TabularPredictor:
                     'bayesopt': Performs HPO via bayesian optimization using local scheduler.
                 For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
                     The 'searcher' key is required when providing a dict.
+            feature_prune_kwargs: dict, default = None
+                Performs layer-wise feature pruning via recursive feature elimination with permutation feature importance.
+                This fits all models in a stack layer once, discovers a pruned set of features, fits all models in the stack layer
+                again with the pruned set of features, and updates input feature lists for models whose validation score improved.
+                If None, do not perform feature pruning. If empty dictionary, perform feature pruning with default configurations.
+                For valid dictionary keys, refer to :class:`autogluon.core.utils.feature_selection.FeatureSelector` and
+                `autogluon.tabular.trainer.abstract_trainer.AbstractTrainer._proxy_model_feature_prune` documentation.
+                To force all models to work with the pruned set of features, set force_prune=True in the dictionary.
             ag_args : dict, default = None
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
                 See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
@@ -741,6 +749,7 @@ class TabularPredictor:
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
             'excluded_model_types': excluded_model_types,
+            'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
@@ -2288,6 +2297,7 @@ class TabularPredictor:
 
             # other
             verbosity=self.verbosity,
+            feature_prune_kwargs=None,
 
             # private
             _save_bag_folds=None,

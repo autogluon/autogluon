@@ -482,6 +482,10 @@ class BaggedEnsembleModel(AbstractModel):
 
         return fi_df
 
+    def get_features(self):
+        assert self.is_fit(), "The model must be fit before calling the get_features method."
+        return self.load_child(self.models[0]).get_features()
+
     def load_child(self, model, verbose=False) -> AbstractModel:
         if isinstance(model, str):
             child_path = self.create_contexts(self.path + model + os.path.sep)
@@ -520,6 +524,9 @@ class BaggedEnsembleModel(AbstractModel):
         init_args.pop('eval_metric')
         init_args.pop('problem_type')
         return init_args
+
+    def convert_to_template_child(self):
+        return self._get_model_base().convert_to_template()
 
     def _get_compressed_params(self, model_params_list=None):
         if model_params_list is None:
