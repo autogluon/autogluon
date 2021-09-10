@@ -8,12 +8,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from mxnet.gluon.data import ArrayDataset
-from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.models import get_backbone
 from autogluon_contrib_nlp.data.batchify import Pad, Stack, Tuple
 from autogluon.features import CategoryFeatureGenerator
 
 from .. import constants as _C
+from ..config import CfgNode
 from ..utils import parallel_transform, get_trimmed_lengths
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

@@ -733,9 +733,12 @@ class TabularPredictor:
             holdout_frac = default_holdout_frac(len(train_data), ag_args.get('hyperparameter_tune_kwargs', None) is not None)
 
         if kwargs['_save_bag_folds'] is not None:
-            if ag_args_ensemble is None:
-                ag_args_ensemble = {}
-            ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
+            if use_bag_holdout and not kwargs['_save_bag_folds']:
+                logger.log(30, f'WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.')
+            else:
+                if ag_args_ensemble is None:
+                    ag_args_ensemble = {}
+                ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
 
         if time_limit is None:
             mb_mem_usage_train_data = get_approximate_df_mem_usage(train_data, sample_ratio=0.2).sum() / 1e6
