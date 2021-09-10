@@ -353,7 +353,7 @@ class FeatureSelector:
         time_budget_fi = time_budget - (time.time() - time_start)
         logger.log(20, f"\tComputing feature importance for {n_evaluated_features}/{n_features} features with {n_shuffle} shuffles.")
         fi_kwargs = {'X': X, 'y': y, 'num_shuffle_sets': n_shuffle, 'subsample_size': n_subsample, 'features': evaluated_features,
-                     'time_limit': time_budget_fi, 'silent': True}
+                     'time_limit': time_budget_fi, 'silent': True, 'random_state': self.rng.integers(low=0, high=1e5)}
         fi_kwargs.update({'is_oof': True} if self.is_bagged else {})
         # FIXME: Right now the upper bound on the number of features we evaluate feature importance at once is determined by our expected feature
         # importance computation time. While this estimate is relatively accurate on most datasets, on some high dimensional datasets it underestimates
@@ -421,7 +421,7 @@ class FeatureSelector:
 
         sample_weights = [1/i for i in range(1, len(below_threshold_rows)+1)] if weighted else None
         for _ in range(50):
-            random_state = self.rng.integers(low=0, high=1e6)
+            random_state = self.rng.integers(low=0, high=1e5)
             removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=random_state, replace=False, weights=sample_weights)
             removal_candidates = tuple(removal_candidate_rows.index)
             if removal_candidates not in self.attempted_removals:
