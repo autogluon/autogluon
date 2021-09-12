@@ -1,1 +1,1 @@
-from .auto_trainer import *
+from .auto_trainer import AutoTrainer
