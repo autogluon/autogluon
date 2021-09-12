@@ -8,6 +8,7 @@ from autogluon.core.utils import generate_train_test_split
 from .abstract_trainer import AbstractTrainer
 from .model_presets.presets import get_preset_models
 from .model_presets.presets_distill import get_preset_models_distillation
+from ..models.lgb.lgb_model import LGBModel
 
 logger = logging.getLogger(__name__)
 
@@ -90,3 +91,6 @@ class AutoTrainer(AbstractTrainer):
             silent=silent,
             **kwargs,
         )
+
+    def _get_default_proxy_model_class(self):
+        return LGBModel

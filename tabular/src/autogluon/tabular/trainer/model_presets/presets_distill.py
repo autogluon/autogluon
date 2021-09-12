@@ -2,8 +2,9 @@ import logging
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import mean_squared_error
+from autogluon.core.trainer.utils import process_hyperparameters
+
 from .presets import get_preset_models, get_preset_models_softclass
-from ..utils import process_hyperparameters
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-import copy, time, traceback, logging
+import copy, time, logging
 import os
 from typing import List, Union, Tuple
 
@@ -8,19 +8,17 @@ import pandas as pd
 import psutil
 from collections import defaultdict
 
-from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from autogluon.core.augmentation.distill_utils import format_distillation_labels, augment_data
+from autogluon.core.constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
 from autogluon.core.features.feature_metadata import FeatureMetadata
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
+from autogluon.core.trainer.utils import process_hyperparameters
 from autogluon.core.utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils.feature_selection import FeatureSelector
-
-from .utils import process_hyperparameters
-from ..augmentation.distill_utils import format_distillation_labels, augment_data
-from .model_presets.presets import DEFAULT_MODEL_NAMES, MODEL_TYPES
 
 
 logger = logging.getLogger(__name__)
@@ -1451,7 +1449,7 @@ class AbstractTrainer:
             Feature names that survived the pruning procedure.
         """
         k = feature_prune_kwargs.pop('k', 2)
-        proxy_model_class = feature_prune_kwargs.pop('proxy_model_class', "GBM")
+        proxy_model_class = feature_prune_kwargs.pop('proxy_model_class', self._get_default_proxy_model_class())
         feature_prune_time_limit = feature_prune_kwargs.pop('feature_prune_time_limit', None)
         raise_exception_on_fail = feature_prune_kwargs.pop('raise_exception', False)
 
@@ -1474,6 +1472,9 @@ class AbstractTrainer:
                                    raise_exception=raise_exception_on_fail, problem_type=self.problem_type)
         candidate_features = selector.select_features(**feature_prune_kwargs, **model_fit_kwargs)
         return candidate_features
+
+    def _get_default_proxy_model_class(self):
+        return None
 
     def _retain_better_pruned_models(self, pruned_models: List[str], original_prune_map: dict, force_prune: bool = False) -> List[str]:
         """
@@ -2238,24 +2239,29 @@ class AbstractTrainer:
             n_repeats = self.n_repeats
         return dict(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False)
 
-    def _get_feature_prune_proxy_model(self, proxy_model_class: Union[str, AbstractModel, None], level: int) -> AbstractModel:
+    def _get_feature_prune_proxy_model(self, proxy_model_class: Union[AbstractModel, None], level: int) -> AbstractModel:
         """
         Returns proxy model to be used for feature pruning - the base learner that has the highest validation score in a particular stack layer.
         Ties are broken by inference speed. If proxy_model_class is not None, take the best base learner belonging to proxy_model_class.
-        proxy_model_class can be a string in MODEL_TYPES (ex. GBM) or an AbstractModel object (ex. LGBModel).
+        proxy_model_class is an AbstractModel class (ex. LGBModel).
         """
         proxy_model = None
         if isinstance(proxy_model_class, str):
-            assert proxy_model_class in MODEL_TYPES, f"proxy_model_class must be one of {MODEL_TYPES.keys()}"
-            proxy_model_class = MODEL_TYPES[proxy_model_class]
+            raise AssertionError(f'proxy_model_class must be a subclass of AbstractModel. Was instead a string: {proxy_model_class}')
         banned_models = [GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel]
         assert proxy_model_class not in banned_models, "WeightedEnsemble models cannot be feature pruning proxy models."
 
         leaderboard = self.leaderboard()
-        banned_names = set([val for key, val in DEFAULT_MODEL_NAMES.items() if key in banned_models])
-        candidate_model_rows = leaderboard[(~leaderboard['model'].isin(banned_names)) & (~leaderboard['score_val'].isna()) & (leaderboard['stack_level'] == level)]
+        banned_names = []
+        candidate_model_rows = leaderboard[(~leaderboard['score_val'].isna()) & (leaderboard['stack_level'] == level)]
+        candidate_models_type_inner = self.get_models_attribute_dict(attribute='type_inner', models=candidate_model_rows['model'])
+        for model_name, type_inner in candidate_models_type_inner.items():
+            if type_inner in banned_models:
+                banned_names.append(model_name)
+                candidate_models_type_inner.pop(model_name, None)
+        banned_names = set(banned_names)
+        candidate_model_rows = candidate_model_rows[~candidate_model_rows['model'].isin(banned_names)]
         if proxy_model_class is not None:
-            candidate_models_type_inner = self.get_models_attribute_dict(attribute='type_inner', models=candidate_model_rows['model'])
             candidate_model_names = [model_name for model_name, model_class in candidate_models_type_inner.items() if model_class == proxy_model_class]
             candidate_model_rows = candidate_model_rows[candidate_model_rows['model'].isin(candidate_model_names)]
         if len(candidate_model_rows) == 0:
