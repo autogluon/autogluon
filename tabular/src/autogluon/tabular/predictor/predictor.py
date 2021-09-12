@@ -754,6 +754,7 @@ class TabularPredictor:
             'excluded_model_types': excluded_model_types,
             'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
+        self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity, use_bag_holdout=use_bag_holdout)
@@ -2168,11 +2169,16 @@ class TabularPredictor:
             self._learner.persist_trainer(low_memory=True)
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
-    def save(self):
+    def save(self, silent=False):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
+
+        Parameters
+        ----------
+        silent : bool, default = False
+            Whether to save without logging a message.
         """
         path = self.path
         tmp_learner = self._learner
@@ -2183,7 +2189,8 @@ class TabularPredictor:
         save_pkl.save(path=path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
         self._trainer = tmp_trainer
-        logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
+        if not silent:
+            logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
     def load(cls, path: str, verbosity: int = None):
