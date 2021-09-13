@@ -3,12 +3,11 @@ import inspect
 import logging
 from collections import defaultdict
 
-from autogluon.core.metrics import mean_squared_error
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel, SimpleWeightedEnsembleModel
+from autogluon.core.trainer.utils import process_hyperparameters
 
 from .presets_custom import get_preset_custom
-from ..utils import process_hyperparameters
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel

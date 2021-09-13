@@ -8,12 +8,12 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.data import LabelCleaner
+from autogluon.core.data.cleaner import Cleaner
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from .abstract_learner import AbstractLearner
-from ..trainer.auto_trainer import AutoTrainer
-from autogluon.core.data import LabelCleaner
-from autogluon.core.data.cleaner import Cleaner
+from ..trainer import AutoTrainer
 
 logger = logging.getLogger(__name__)
 

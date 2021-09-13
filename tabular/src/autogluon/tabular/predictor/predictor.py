@@ -14,6 +14,7 @@ from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
@@ -25,7 +26,6 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.presets_configs import tabular_presets_dict
 from ..learner import AbstractLearner, DefaultLearner
-from ..trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
 
@@ -528,7 +528,7 @@ class TabularPredictor:
                 again with the pruned set of features, and updates input feature lists for models whose validation score improved.
                 If None, do not perform feature pruning. If empty dictionary, perform feature pruning with default configurations.
                 For valid dictionary keys, refer to :class:`autogluon.core.utils.feature_selection.FeatureSelector` and
-                `autogluon.tabular.trainer.abstract_trainer.AbstractTrainer._proxy_model_feature_prune` documentation.
+                `autogluon.core.trainer.abstract_trainer.AbstractTrainer._proxy_model_feature_prune` documentation.
                 To force all models to work with the pruned set of features, set force_prune=True in the dictionary.
             ag_args : dict, default = None
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).

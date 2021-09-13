@@ -1,11 +1,14 @@
-import logging, gc
+import gc
+import logging
+
 import numpy as np
 import pandas as pd
 from sklearn.neighbors import NearestNeighbors
-from autogluon.core.metrics import mean_squared_error
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.features.feature_metadata import FeatureMetadata
-from autogluon.core.features.types import R_CATEGORY, R_FLOAT, R_INT
+
+from ..constants import BINARY, MULTICLASS, REGRESSION
+from ..metrics import mean_squared_error
+from ..features.feature_metadata import FeatureMetadata
+from ..features.types import R_CATEGORY, R_FLOAT, R_INT
 
 logger = logging.getLogger(__name__)
 
