@@ -1,0 +1,1 @@
+from autogluon.tabular_to_image.models_zoo import ModelsZoo
