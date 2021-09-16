@@ -1,0 +1,16 @@
+name: autogluon_contrib
+dependencies:
+- python=3.7
+- graphviz
+- pip:
+  - jupyter-sphinx>=0.2.2
+  - mxnet_cu101==1.7.0
+  - portalocker
+  - scipy>=1.3.3,<1.5.0
+  - nose
+  - docutils
+  - mu-notedown
+  - torch
+  - torchvision
+  - openml
+  - awscli>=1.18.140

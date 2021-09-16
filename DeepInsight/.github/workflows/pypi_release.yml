@@ -1,0 +1,39 @@
+# This workflow will upload a Python Package to Pypi using Twine when a release is created in this Github repo.
+# For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
+# Note: There is a bug in Github Actions, so do NOT use the “Save Draft” functionality when creating a new release: https://github.community/t/workflow-set-for-on-release-not-triggering-not-showing-up/16286/5
+# Remember to always verify tagged releases are actually available on the Pypi website: https://pypi.org/project/autogluon/
+
+name: Pypi Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  deploy:
+
+    runs-on: ubuntu-18.04
+
+    steps:
+    - uses: actions/checkout@master
+    - name: Set up Python
+      uses: actions/setup-python@v1
+      with:
+        python-version: '3.7'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine pypandoc
+    - name: Build and publish
+      env:
+        TWINE_USERNAME: ${{ secrets. PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
+        RELEASE: 1
+      run: |
+        for v in core features tabular mxnet extra text vision autogluon
+        do
+          cd "$v"/
+          python setup.py sdist bdist_wheel
+          twine upload dist/* --verbose
+          cd ..
+        done

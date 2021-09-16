@@ -1,0 +1,95 @@
+body {
+    font-family: 'Roboto', sans-serif;
+}
+
+p {
+    font-size: 16px;
+/*     font-weight: 400; */
+    line-height: 1.5em;
+    margin: 16px 0;
+}
+
+.sidebar {
+    float: right;
+    display: block;
+    width: 30%;
+    padding: 0 20px;
+    margin: 0 20px;
+    background-color: #eee;
+    border-radius: 8px;
+
+}
+
+@media (max-width: 500px) {
+    .sidebar {
+        float: none;
+        width: 100%;
+        padding: 0 10px;
+        margin: 0 10px;
+        width: 80%;
+    }
+}
+
+.sidebar .sidebar-title {
+    text-align: center;
+    display: block;
+    margin-bottom: 0px;
+    display: none;
+}
+
+.align-center {
+    text-align: center;
+    display: block;
+    /* float: right; */
+    margin: auto;
+}
+
+/* API section */
+
+.mx-api .section .hidden-section {
+    display: none;
+}
+
+.mx-api h3.mdl-color-text--primary {
+    /* display: none; */
+
+    /* border-top-style: solid; */
+    /* border-color: #ccc; */
+    /* border-top-width: 1px; */
+    padding: 1em 0 0 0;
+    margin: 2em 0 0 0;
+    height: 0;
+}
+
+/* .section .viewcode-link { */
+/*     padding-left: 2em; */
+/*     font-size: 80%; */
+/* } */
+
+.section .class dt {
+    padding-bottom: 1em;
+}
+
+.install {
+    max-width: 800px;
+}
+.install .title {
+    display: inline-block;
+    min-width: 100px;
+    text-transform: uppercase;
+    font-size: 90%;
+    color: #555;
+}
+
+.install .option {
+    margin: 5px;
+}
+
+@media (max-width: 650px) {
+.install .option, .install .title {
+    width: 90%;
+}
+.install .title {
+    margin-top: 1em;
+}
+}
