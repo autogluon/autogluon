@@ -435,6 +435,8 @@ def generate_train_test_split(X: DataFrame,
             X_train = pd.concat([X_train, X_test_moved])
             y_test = y_test.drop(index=indices_to_move)
             X_test = X_test.drop(index=indices_to_move)
+        y_train.name = y_split.name
+        y_test.name = y_split.name
     return X_train, X_test, y_train, y_test
 
 
