@@ -127,6 +127,8 @@ class BaggedEnsembleModel(AbstractModel):
              y,
              X_val=None,
              y_val=None,
+             X_pseudo=None,
+             y_pseudo=None,
              k_fold=None,
              k_fold_start=0,
              k_fold_end=None,
@@ -185,7 +187,8 @@ class BaggedEnsembleModel(AbstractModel):
                     folds_to_fit = fold_end - fold_start
                     # Reserve time for final refit model
                     kwargs['time_limit'] = kwargs['time_limit'] * folds_to_fit / (folds_to_fit + 1.2)
-            self._fit_folds(X=X, y=y, model_base=model_base, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end,
+            self._fit_folds(X=X, y=y, model_base=model_base, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
+                            k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end,
                             n_repeats=n_repeats, n_repeat_start=n_repeat_start, save_folds=save_bag_folds, groups=groups, **kwargs)
             # FIXME: Don't save folds except for refit
             # FIXME: Cleanup self
@@ -333,6 +336,8 @@ class BaggedEnsembleModel(AbstractModel):
                    X,
                    y,
                    model_base,
+                   X_pseudo=None,
+                   y_pseudo=None,
                    k_fold=None,
                    k_fold_start=0,
                    k_fold_end=None,
@@ -365,7 +370,10 @@ class BaggedEnsembleModel(AbstractModel):
         folds_to_fit = fold_end - fold_start
         # noinspection PyCallingNonCallable
         fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy(
-            self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats, save_folds=save_folds)
+            bagged_ensemble_model=self, X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, sample_weight=sample_weight,
+            time_limit=time_limit, time_start=time_start, models=models,
+            oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats,
+            save_folds=save_folds)
         for n_repeat in range(n_repeat_start, n_repeats):  # For each n_repeat
             if n_repeat != n_repeat_start or k_fold_start == 0:
                 if cv_splitter.n_repeats <= n_repeat:
