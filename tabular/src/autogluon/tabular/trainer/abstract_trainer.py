@@ -398,7 +398,9 @@ class AbstractTrainer:
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
-    def stack_new_level_aux(self, X, y, base_model_names: List[str], level, fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
+    def stack_new_level_aux(self, X, y, base_model_names: List[str], level,
+                            X_pseudo=None, y_pseudo=None,
+                            fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
@@ -409,7 +411,8 @@ class AbstractTrainer:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
-        return self.generate_weighted_ensemble(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
+        return self.generate_weighted_ensemble(X=X_stack_preds, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
+                                               level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
 
     def predict(self, X, model=None):
         if model is None:
@@ -856,7 +859,7 @@ class AbstractTrainer:
 
     def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=1, n_repeats=1, stack_name=None, hyperparameters=None,
                                    time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None,
-                                   get_models_func=None) -> List[str]:
+                                   get_models_func=None, X_pseudo=None, y_pseudo=None) -> List[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
         if len(base_model_names) == 0:
@@ -903,6 +906,8 @@ class AbstractTrainer:
             y=y,
             X_val=None,
             y_val=None,
+            X_pseudo=X_pseudo,
+            y_pseudo=y_pseudo,
             models=[weighted_ensemble_model],
             k_fold=k_fold,
             n_repeats=n_repeats,
@@ -1106,6 +1111,8 @@ class AbstractTrainer:
             verbosity=self.verbosity,
         )
         model_fit_kwargs.update(fit_kwargs)
+        X_pseudo = kwargs.get('X_pseudo', None)
+        y_pseudo = kwargs.get('y_pseudo', None)
         if self.sample_weight is not None:
             X, w_train = extract_column(X, self.sample_weight)
             if w_train is not None:  # may be None for ensemble
@@ -1177,6 +1184,8 @@ class AbstractTrainer:
                     n_repeats=n_repeats,
                     n_repeat_start=n_repeat_start,
                     compute_base_preds=False,
+                    X_pseudo=X_pseudo,
+                    y_pseudo=y_pseudo
                 ))
             model_names_trained = self._train_and_save(X, y, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
         self.save()

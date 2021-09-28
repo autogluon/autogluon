@@ -699,6 +699,8 @@ class TabularPredictor:
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
+        self.fit_hyperparameters = hyperparameters
+
         ###################################
         # FIXME: v0.1 This section is a hack
         if 'enable_raw_text_features' not in feature_generator_init_kwargs:
@@ -836,13 +838,15 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
+        X_pseudo = kwargs.get('X_pseudo', None)
+        y_pseudo = kwargs.get('y_pseudo', None)
 
         if ag_args is None:
             ag_args = {}
         ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
-        aux_kwargs = None  # TODO: Add as option
+        aux_kwargs = {'X_pseudo': X_pseudo, 'y_pseudo': y_pseudo}  # TODO: Add as option
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -884,6 +888,87 @@ class TabularPredictor:
         )
         self.save()
         return self
+
+
+    def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
+                      threshold: float = 0.95):
+        if problem_type in ['binary', 'multiclass']:
+            y_pred_proba_max = y_pred_proba_og.max(axis=1)
+            curr_threshold = threshold
+            # Percent of rows above threshold
+            curr_percentage = (y_pred_proba_max >= curr_threshold).mean()
+            num_rows = len(y_pred_proba_max)
+
+            if curr_percentage > max_percentage or curr_percentage < min_percentage:
+                if curr_percentage > max_percentage:
+                    num_rows_threshold = max(np.ceil(max_percentage * num_rows), 1)
+                else:
+                    num_rows_threshold = max(np.ceil(min_percentage * num_rows), 1)
+                y_pred_proba_max_sorted = y_pred_proba_max.sort_values(ascending=False, ignore_index=True)
+                # Set current threshold to num_rows_threshold - 1
+                curr_threshold = y_pred_proba_max_sorted[num_rows_threshold - 1]
+
+            # Pseudo indices greater than threshold of 0.95
+            test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
+
+            # test_pseudo_indices = (y_pred_proba_max >= threshold)
+        else:
+            # Select a random 30% of the data to use as pseudo
+            test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
+            test_pseudo_indices_true = test_pseudo_indices.sample(frac=0.3, random_state=0)
+            test_pseudo_indices[test_pseudo_indices_true.index] = True
+
+        test_pseudo_indices = test_pseudo_indices[test_pseudo_indices]
+
+        return test_pseudo_indices
+
+    def _run_pseudo_labeling(self, hyperparameters: dict, test_data: pd.DataFrame, max_iter: int):
+        previous_score = self.info()['best_model_score_val']
+
+        for i in range(max_iter):
+            y_pseudo = test_data[self.label]
+            X_pseudo = test_data.drop(columns=[self.label])
+            self.fit_extra(hyperparameters=hyperparameters, X_pseudo=X_pseudo, y_pseudo=y_pseudo)
+            curr_score = self.info()['best_model_score_val']
+
+            if previous_score < curr_score:
+                return self
+
+        return self
+
+    def pseudo_label_fit(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
+        is_fit = self._learner.is_fit
+
+        if not is_fit:
+            self.fit(kwargs)
+
+        X, y, _, _ = self._trainer.load_data()
+        y.name = self.label
+        train_data = pd.concat([X, y], axis=1)
+        test_data, is_labeled = self._validate_pseudo_data(train_data, test_data)
+
+        hyperparameters = None if 'hyperparameters' not in kwargs else kwargs['hyperparameters']
+        if hyperparameters is None:
+            if is_fit:
+                hyperparameters = self.fit_hyperparameters
+            else:
+                hyperparameters = 'default'
+
+        if isinstance(hyperparameters, str):
+            hyperparameters = get_hyperparameter_config(hyperparameters)
+
+        if is_fit:
+            if is_labeled:
+                y_pseudo = test_data[self.label]
+                X_pseudo = test_data.drop(columns=[self.label])
+                kwargs['y_pseudo'] = y_pseudo
+                kwargs['X_pseudo'] = X_pseudo
+                return self.fit_extra(hyperparameters=hyperparameters, **kwargs)
+            else:
+                return self._run_pseudo_labeling(hyperparameters=hyperparameters, test_data=test_data,
+                                                 max_iter=max_iter)
+        else:
+            pass
 
     def predict(self, data, model=None, as_pandas=True):
         """
@@ -2294,6 +2379,10 @@ class TabularPredictor:
 
             # quantile levels
             quantile_levels=None,
+
+            # pseudo label
+            X_pseudo=None,
+            y_pseudo=None
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
@@ -2322,6 +2411,38 @@ class TabularPredictor:
 
         return kwargs_sanitized
 
+    def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool):
+        if self.sample_weight is not None:
+            if self.sample_weight in train_features:
+                train_features.remove(self.sample_weight)
+            if self.sample_weight in other_features:
+                other_features.remove(self.sample_weight)
+        if self._learner.groups is not None and is_labeled:
+            train_features.remove(self._learner.groups)
+
+        return train_features, other_features
+
+    def _validate_pseudo_data(self, train_data: pd.DataFrame, pseudo_data: pd.DataFrame):
+        if isinstance(pseudo_data, str):
+            pseudo_data = TabularDataset(pseudo_data)
+
+        if not isinstance(pseudo_data, pd.DataFrame):
+            raise AssertionError(
+                f'pseudo_data is required to be a pandas DataFrame, but was instead: {type(pseudo_data)}')
+
+        is_labeled = self.label in pseudo_data.columns
+        train_features = [column for column in train_data.columns if column != self.label]
+        pseudo_features = [column for column in pseudo_data.columns if column != self.label]
+        train_features, pseudo_features = self._prune_data_features(train_features=train_features,
+                                                                    other_features=pseudo_features,
+                                                                    is_labeled=is_labeled)
+        train_features.sort()
+        pseudo_features.sort()
+        if train_features != pseudo_features:
+            raise ValueError("Column names must match between training and pseudo data")
+
+        return pseudo_data, is_labeled
+
     def _validate_fit_data(self, train_data, tuning_data=None, unlabeled_data=None):
         if isinstance(train_data, str):
             train_data = TabularDataset(train_data)
@@ -2340,13 +2461,9 @@ class TabularPredictor:
                 raise AssertionError(f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
             train_features = [column for column in train_data.columns if column != self.label]
             tuning_features = [column for column in tuning_data.columns if column != self.label]
-            if self.sample_weight is not None:
-                if self.sample_weight in train_features:
-                    train_features.remove(self.sample_weight)
-                if self.sample_weight in tuning_features:
-                    tuning_features.remove(self.sample_weight)
-            if self._learner.groups is not None:
-                train_features.remove(self._learner.groups)
+            train_features, tuning_features = self._prune_data_features(train_features=train_features,
+                                                                        other_features=tuning_features,
+                                                                        is_labeled=True)
             train_features = np.array(train_features)
             tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):
@@ -2356,11 +2473,9 @@ class TabularPredictor:
                 raise AssertionError(f'unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}')
             train_features = [column for column in train_data.columns if column != self.label]
             unlabeled_features = [column for column in unlabeled_data.columns]
-            if self.sample_weight is not None:
-                if self.sample_weight in train_features:
-                    train_features.remove(self.sample_weight)
-                if self.sample_weight in unlabeled_features:
-                    unlabeled_features.remove(self.sample_weight)
+            train_features, unlabeled_features = self._prune_data_features(train_features=train_features,
+                                                                           other_features=unlabeled_features,
+                                                                           is_labeled=False)
             train_features = sorted(np.array(train_features))
             unlabeled_features = sorted(np.array(unlabeled_features))
             if np.any(train_features != unlabeled_features):
