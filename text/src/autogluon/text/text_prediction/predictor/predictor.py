@@ -1,21 +1,22 @@
 import logging
 import os
 from sklearn.model_selection import train_test_split
-from typing import Optional
 import numpy as np
 import json
 import pandas as pd
 
+from autogluon.core import space
 from autogluon.core.constants import BINARY
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
 from autogluon.core.utils.miscs import in_ipynb
 
+from .. import constants as _C
 from ..presets import ag_text_presets, merge_params
 from ..infer_types import infer_column_problem_types, printable_column_type_string
 from ..metrics import infer_eval_log_metrics
-from .. import constants as _C
+from ... import version
 
 logger = logging.getLogger()  # return root logger
 
@@ -194,6 +195,7 @@ class TextPredictor:
             num_trials=None,
             plot_results=None,
             holdout_frac=None,
+            save_path=None,
             seed=0):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
@@ -244,6 +246,8 @@ class TextPredictor:
         holdout_frac : float, default = None
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`).
             Default value (if None) is selected based on the number of rows in the training data and whether hyperparameter-tuning is utilized.
+        save_path : str, default = None
+            The path for auto-saving the models' weights
         seed : int, default = 0
             The random seed to use for this training run. If None, no seed will be specified and repeated runs will produce different results.
 
@@ -252,14 +256,38 @@ class TextPredictor:
         :class:`TextPredictor` object. Returns self.
         """
         assert self._fit_called is False
+        is_continue_training = self._model is not None
         verbosity = self.verbosity
         if verbosity is None:
             verbosity = 3
-        if presets is not None:
-            preset_hparams = ag_text_presets.create(presets)
+        if save_path is not None:
+            self._path = setup_outputdir(save_path, warn_if_exist=True)
+        if is_continue_training:
+            # We have entered the continue training / transfer learning setting because the model is not None.
+            logger.info('Continue training the existing model...')
+            assert presets is None, 'presets is not supported in the continue training setting.'
+            flat_dict = self._model.config.to_flat_dict()
+            flat_dict['optimization.lr'] = space.Categorical(flat_dict['optimization.lr'])
+            existing_hparams = {'models': {'MultimodalTextModel': {'search_space': flat_dict}}}
+            existing_hparams = merge_params(ag_text_presets.create('default'), existing_hparams)
+            hyperparameters = merge_params(existing_hparams, hyperparameters)
+            # Check that the merged hyperparameters matches with the existing hyperparameters.
+            # Here, we ensure that the model configurations remain the same.
+            for key in hyperparameters['models']['MultimodalTextModel']['search_space']:
+                if key in existing_hparams and (key.startswith('model.') or key.startswith('preprocessing.')):
+                    new_value = hyperparameters['models']['MultimodalTextModel']['search_space'][key]
+                    old_value = existing_hparams['models']['MultimodalTextModel']['search_space'][key]
+                    assert new_value == old_value,\
+                        f'The model architecture / preprocessing logic is not allowed to change in the ' \
+                        f'continue training mode. ' \
+                        f'"{key}" is changed to be "{new_value}" from "{old_value}". ' \
+                        f'Please check the specified hyperparameters = {hyperparameters}'
         else:
-            preset_hparams = ag_text_presets.create('default')
-        hyperparameters = merge_params(preset_hparams, hyperparameters)
+            if presets is not None:
+                preset_hparams = ag_text_presets.create(presets)
+            else:
+                preset_hparams = ag_text_presets.create('default')
+            hyperparameters = merge_params(preset_hparams, hyperparameters)
         if num_trials is not None:
             hyperparameters['tune_kwargs']['num_trials'] = num_trials
         if isinstance(self._label, str):
@@ -292,45 +320,17 @@ class TextPredictor:
             train_data, tuning_data = train_test_split(train_data,
                                                        test_size=holdout_frac,
                                                        random_state=np.random.RandomState(seed))
-        column_types, problem_type = infer_column_problem_types(train_data, tuning_data,
-                                                                label_columns=label_columns,
-                                                                problem_type=self._problem_type,
-                                                                provided_column_types=column_types)
-        self._eval_metric, log_metrics = infer_eval_log_metrics(problem_type=problem_type,
-                                                                eval_metric=self._eval_metric)
-        has_text_column = False
-        for k, v in column_types.items():
-            if v == _C.TEXT:
-                has_text_column = True
-                break
-        if not has_text_column:
-            raise AssertionError('No Text Column is found! This is currently not supported by '
-                                 'the TextPredictor. You may try to use '
-                                 'autogluon.tabular.TabularPredictor.\n'
-                                 'The inferred column properties of the training data is {}'
-                                 .format(column_types))
-        logger.info('Problem Type="{}"'.format(problem_type))
-        logger.info(printable_column_type_string(column_types))
-        self._problem_type = problem_type
-        if 'models' not in hyperparameters or 'MultimodalTextModel' not in hyperparameters['models']:
-            raise ValueError('The current TextPredictor only supports "MultimodalTextModel" '
-                             'and you must ensure that '
-                             'hyperparameters["models"]["MultimodalTextModel"] can be accessed.')
-        model_hparams = hyperparameters['models']['MultimodalTextModel']
-        self._backend = model_hparams['backend']
-        if plot_results is None:
-            plot_results = in_ipynb()
-        if self._backend == 'gluonnlp_v0':
-            import warnings
-            warnings.filterwarnings('ignore', module='mxnet')
-            from ..mx.models import MultiModalTextModel
-            self._model = MultiModalTextModel(column_types=column_types,
-                                              feature_columns=feature_columns,
-                                              label_columns=label_columns,
-                                              problem_type=self._problem_type,
-                                              eval_metric=self._eval_metric,
-                                              log_metrics=log_metrics,
-                                              output_directory=self._path)
+        if is_continue_training:
+            assert set(label_columns) == set(self._model.label_columns),\
+                f'Label columns do not match. Inferred label column from data = {set(label_columns)}.' \
+                f' Label column in model = {set(self._model.label_columns)}'
+            for col_name in self._model.feature_columns:
+                assert col_name in feature_columns, f'In the loaded model, "{col_name}" is a feature column,' \
+                                                    f' but there is ' \
+                                                    f'no such column in the DataFrame.'
+            model_hparams = hyperparameters['models']['MultimodalTextModel']
+            if plot_results is None:
+                plot_results = in_ipynb()
             self._model.train(train_data=train_data,
                               tuning_data=tuning_data,
                               num_cpus=num_cpus,
@@ -338,14 +338,66 @@ class TextPredictor:
                               search_space=model_hparams['search_space'],
                               tune_kwargs=hyperparameters['tune_kwargs'],
                               time_limit=time_limit,
+                              continue_training=True,
                               seed=seed,
                               plot_results=plot_results,
                               verbosity=verbosity)
         else:
-            raise NotImplementedError("Currently, we only support using "
-                                      "the autogluon-contrib-nlp and MXNet "
-                                      "as the backend of AutoGluon-Text. In the future, "
-                                      "we will support other models.")
+            column_types, problem_type = infer_column_problem_types(train_data, tuning_data,
+                                                                    label_columns=label_columns,
+                                                                    problem_type=self._problem_type,
+                                                                    provided_column_types=column_types)
+            self._eval_metric, log_metrics = infer_eval_log_metrics(problem_type=problem_type,
+                                                                    eval_metric=self._eval_metric)
+            has_text_column = False
+            for k, v in column_types.items():
+                if v == _C.TEXT:
+                    has_text_column = True
+                    break
+            if not has_text_column:
+                raise AssertionError('No Text Column is found! This is currently not supported by '
+                                     'the TextPredictor. You may try to use '
+                                     'autogluon.tabular.TabularPredictor.\n'
+                                     'The inferred column properties of the training data is {}'
+                                     .format(column_types))
+            logger.info('Problem Type="{}"'.format(problem_type))
+            logger.info(printable_column_type_string(column_types))
+            self._problem_type = problem_type
+            if 'models' not in hyperparameters or 'MultimodalTextModel' not in hyperparameters['models']:
+                raise ValueError('The current TextPredictor only supports "MultimodalTextModel" '
+                                 'and you must ensure that '
+                                 'hyperparameters["models"]["MultimodalTextModel"] can be accessed.')
+            model_hparams = hyperparameters['models']['MultimodalTextModel']
+            self._backend = model_hparams['backend']
+            if plot_results is None:
+                plot_results = in_ipynb()
+
+            if self._backend == 'gluonnlp_v0':
+                import warnings
+                warnings.filterwarnings('ignore', module='mxnet')
+                from ..mx.models import MultiModalTextModel
+                self._model = MultiModalTextModel(column_types=column_types,
+                                                  feature_columns=feature_columns,
+                                                  label_columns=label_columns,
+                                                  problem_type=self._problem_type,
+                                                  eval_metric=self._eval_metric,
+                                                  log_metrics=log_metrics,
+                                                  output_directory=self._path)
+                self._model.train(train_data=train_data,
+                                  tuning_data=tuning_data,
+                                  num_cpus=num_cpus,
+                                  num_gpus=num_gpus,
+                                  search_space=model_hparams['search_space'],
+                                  tune_kwargs=hyperparameters['tune_kwargs'],
+                                  time_limit=time_limit,
+                                  seed=seed,
+                                  plot_results=plot_results,
+                                  verbosity=verbosity)
+            else:
+                raise NotImplementedError("Currently, we only support using "
+                                          "the autogluon-contrib-nlp and MXNet "
+                                          "as the backend of AutoGluon-Text. In the future, "
+                                          "we will support other models.")
         logger.info(f'Training completed. Auto-saving to "{self.path}". '
                        f'For loading the model, you can use'
                        f' `predictor = TextPredictor.load("{self.path}")`')
@@ -486,7 +538,8 @@ class TextPredictor:
         os.makedirs(path, exist_ok=True)
         with open(os.path.join(path, 'text_predictor_assets.json'), 'w') as of:
             json.dump({'backend': self._backend,
-                       'label': self._label}, of)
+                       'label': self._label,
+                       'version': version.__version__,}, of)
         self._model.save(os.path.join(path, 'saved_model'))
 
     @classmethod
@@ -504,6 +557,7 @@ class TextPredictor:
             If None, logging verbosity is not changed from existing values.
             Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
             Refer to TextPredictor init for more information.
+
         """
         assert os.path.exists(path), f'"{path}" does not exist. You may check the path again.'
         with open(os.path.join(path, 'text_predictor_assets.json'), 'r') as in_f:
@@ -521,6 +575,6 @@ class TextPredictor:
                                        path=path,
                                        verbosity=verbosity,
                                        warn_if_exist=False)
-        predictor._backend = assets['backend']
+        predictor._backend = backend
         predictor._model = model
         return predictor

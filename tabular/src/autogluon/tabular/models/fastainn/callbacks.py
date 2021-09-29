@@ -27,12 +27,6 @@ class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
             if self.epoch >= self.best_epoch_stop:
                 logger.log(20, f'\tStopping at the best epoch learned earlier - {self.epoch}.')
                 raise CancelFitException()
-        if self.time_limit:
-            time_elapsed = time.time() - self.start_time
-            time_left = self.time_limit - time_elapsed
-            if time_left <= 0:
-                logger.log(20, '\tRan out of time, stopping training early.')
-                raise CancelFitException()
 
         super().after_epoch()
 
@@ -42,6 +36,14 @@ class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
             self.wait += 1
             if self.wait >= self.patience:
                 logger.log(20, f'No improvement since epoch {self.epoch - self.wait}: early stopping')
+                raise CancelFitException()
+
+        if self.time_limit:
+            time_elapsed = time.time() - self.start_time
+            time_left = self.time_limit - time_elapsed
+            time_per_epoch = time_elapsed / (self.epoch + 1)
+            if time_left < time_per_epoch:
+                logger.log(20, f'\tRan out of time, stopping training early. (Stopping on epoch {self.epoch})')
                 raise CancelFitException()
 
 

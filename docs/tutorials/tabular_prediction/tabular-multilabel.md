@@ -23,17 +23,17 @@ class MultilabelPredictor():
         ----------
         labels : List[str]
             The ith element of this list is the column (i.e. `label`) predicted by the ith TabularPredictor stored in this object.
-        path : str
+        path : str, default = None
             Path to directory where models and intermediate outputs should be saved.
             If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
             Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
             Caution: when predicting many labels, this directory may grow large as it needs to store many TabularPredictors.
-        problem_types : List[str]
+        problem_types : List[str], default = None
             The ith element is the `problem_type` for the ith TabularPredictor stored in this object.
-        eval_metrics : List[str]
+        eval_metrics : List[str], default = None
             The ith element is the `eval_metric` for the ith TabularPredictor stored in this object.
-        consider_labels_correlation : bool
+        consider_labels_correlation : bool, default = True
             Whether the predictions of multiple labels should account for label correlations or predict each label independently of the others.
             If True, the ordering of `labels` may affect resulting accuracy as each label is predicted conditional on the previous labels appearing earlier in this list (i.e. in an auto-regressive fashion).
             Set to False if during inference you may want to individually use just the ith TabularPredictor without predicting all the other labels.
@@ -44,9 +44,13 @@ class MultilabelPredictor():
 
     multi_predictor_file = 'multilabel_predictor.pkl'
 
-    def __init__(self, labels, path, problem_types=None, eval_metrics=None, consider_labels_correlation=True, **kwargs):
+    def __init__(self, labels, path=None, problem_types=None, eval_metrics=None, consider_labels_correlation=True, **kwargs):
         if len(labels) < 2:
             raise ValueError("MultilabelPredictor is only intended for predicting MULTIPLE labels (columns), use TabularPredictor for predicting one label (column).")
+        if (problem_types is not None) and (len(problem_types) != len(labels)):
+            raise ValueError("If provided, `problem_types` must have same length as `labels`")
+        if (eval_metrics is not None) and (len(eval_metrics) != len(labels)):
+            raise ValueError("If provided, `eval_metrics` must have same length as `labels`")
         self.path = setup_outputdir(path, warn_if_exist=False)
         self.labels = labels
         self.consider_labels_correlation = consider_labels_correlation
@@ -63,7 +67,7 @@ class MultilabelPredictor():
             if problem_types is not None:
                 problem_type = problem_types[i]
             if eval_metrics is not None:
-                eval_metric = self.eval_metrics[label]
+                eval_metric = eval_metrics[i]
             self.predictors[label] = TabularPredictor(label=label, problem_type=problem_type, eval_metric=eval_metric, path=path_i, **kwargs)
 
     def fit(self, train_data, tuning_data=None, **kwargs):
@@ -205,14 +209,15 @@ train_data.head()
 
 ```{.python .input}
 labels = ['education-num','education','class']  # which columns to predict based on the others
-problem_types = ['regression','multiclass','binary']  # type of each prediction problem
-save_path = 'agModels-predictEducationClass'  # specifies folder to store trained models
+problem_types = ['regression','multiclass','binary']  # type of each prediction problem (optional)
+eval_metrics = ['mean_absolute_error','accuracy','accuracy']  # metrics used to evaluate predictions for each label (optional)
+save_path = 'agModels-predictEducationClass'  # specifies folder to store trained models (optional)
 
 time_limit = 5  # how many seconds to train the TabularPredictor for each label, set much larger in your applications!
 ```
 
 ```{.python .input}
-multi_predictor = MultilabelPredictor(labels=labels, problem_types=problem_types, path=save_path)
+multi_predictor = MultilabelPredictor(labels=labels, problem_types=problem_types, eval_metrics=eval_metrics, path=save_path)
 multi_predictor.fit(train_data, time_limit=time_limit)
 ```
 

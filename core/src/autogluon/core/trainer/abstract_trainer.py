@@ -1,24 +1,26 @@
-import copy, time, traceback, logging
+import copy
+import logging
 import os
+import time
+from collections import defaultdict
 from typing import List, Union, Tuple
 
 import networkx as nx
 import numpy as np
 import pandas as pd
 import psutil
-from collections import defaultdict
-
-from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
-from autogluon.core.models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
-from autogluon.core.features.feature_metadata import FeatureMetadata
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
-from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_json, save_pkl
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
+from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
+from ..features.feature_metadata import FeatureMetadata
+from ..scheduler.scheduler_factory import scheduler_factory
+from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
+from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
+from ..utils.loaders import load_pkl
+from ..utils.savers import save_json, save_pkl
+from ..utils.feature_selection import FeatureSelector
 
 logger = logging.getLogger(__name__)
 
@@ -221,8 +223,8 @@ class AbstractTrainer:
 
     # TODO: Enable easier re-mapping of trained models -> hyperparameters input (They don't share a key since name can change)
     def train_multi_levels(self, X, y, hyperparameters: dict, X_val=None, y_val=None, X_unlabeled=None, base_model_names: List[str] = None,
-                           feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None,
-                           level_start=1, level_end=1, time_limit=None, name_suffix: str = None, relative_stack=True, level_time_modifier=0.333) -> List[str]:
+                           core_kwargs: dict = None, aux_kwargs: dict = None, level_start=1, level_end=1, time_limit=None, name_suffix: str = None,
+                           relative_stack=True, level_time_modifier=0.333) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
             hyperparameters is used to determine the models used in each stack layer.
@@ -281,12 +283,9 @@ class AbstractTrainer:
                 time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
                 core_kwargs_level['time_limit'] = core_kwargs_level.get('time_limit', time_limit_core)
                 aux_kwargs_level['time_limit'] = aux_kwargs_level.get('time_limit', time_limit_aux)
-            if level != 1:
-                feature_prune = False  # TODO: Enable feature prune on levels > 1
             base_model_names, aux_models = self.stack_new_level(
                 X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
                 models=hyperparameters, level=level, base_model_names=base_model_names,
-                feature_prune=feature_prune,
                 core_kwargs=core_kwargs_level, aux_kwargs=aux_kwargs_level, name_suffix=name_suffix,
             )
             model_names_fit += base_model_names + aux_models
@@ -295,7 +294,7 @@ class AbstractTrainer:
         return model_names_fit
 
     def stack_new_level(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None, level=1, base_model_names: List[str] = None,
-                        feature_prune=False, core_kwargs: dict = None, aux_kwargs: dict = None, name_suffix: str = None) -> (List[str], List[str]):
+                        core_kwargs: dict = None, aux_kwargs: dict = None, name_suffix: str = None) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
         """
@@ -313,7 +312,7 @@ class AbstractTrainer:
             core_kwargs['name_suffix'] = core_kwargs.get('name_suffix', '') + name_suffix
             aux_kwargs['name_suffix'] = aux_kwargs.get('name_suffix', '') + name_suffix
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
-                                                level=level, base_model_names=base_model_names, feature_prune=feature_prune, **core_kwargs)
+                                                level=level, base_model_names=base_model_names, **core_kwargs)
 
         if X_val is None:
             aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
@@ -912,7 +911,6 @@ class AbstractTrainer:
             k_fold=k_fold,
             n_repeats=n_repeats,
             hyperparameter_tune_kwargs=None,
-            feature_prune=False,
             stack_name=stack_name,
             level=level,
             time_limit=time_limit,
@@ -1103,59 +1101,18 @@ class AbstractTrainer:
         return True
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
-    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, X_pseudo=None, y_pseudo=None,
-                           feature_prune=False, hyperparameter_tune_kwargs=None,
-                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
+    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None,  X_pseudo=None, y_pseudo=None,
+                           hyperparameter_tune_kwargs=None, stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None,
+                           n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
         Models trained from this method will be accessible in this Trainer.
         """
-        if k_fold is None:
-            k_fold = self.k_fold
-        if n_repeats is None:
-            n_repeats = self.n_repeats
-        if fit_kwargs is None:
-            fit_kwargs = dict()
-        model_fit_kwargs = dict(
-            time_limit=time_limit,
-            verbosity=self.verbosity,
-        )
-        model_fit_kwargs.update(fit_kwargs)
-        if self.sample_weight is not None:
-            X, w_train = extract_column(X, self.sample_weight)
-            if w_train is not None:  # may be None for ensemble
-                # TODO: consider moving weight normalization into AbstractModel.fit()
-                model_fit_kwargs['sample_weight'] = w_train.values/w_train.mean()  # normalization can affect gradient algorithms like boosting
-            if X_val is not None:
-                X_val, w_val = extract_column(X_val, self.sample_weight)
-                if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
-                    model_fit_kwargs['sample_weight_val'] = w_val.values/w_val.mean()
-            ens_sample_weight = kwargs.get('ens_sample_weight', None)
-            if ens_sample_weight is not None:
-                model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
-        if self._groups is not None and 'groups' not in model_fit_kwargs:
-            if k_fold == self.k_fold:  # don't do this on refit full
-                model_fit_kwargs['groups'] = self._groups
-
-        #######################
-        # FIXME: This section is a hack, compute genuine feature_metadata for each stack level instead
-        #  Don't do this here, do this upstream so it isn't recomputed for each model
-        #  Add feature_metadata to model_fit_kwargs
-        # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
-        # FIXME: This doesn't assign proper special types to stack features, relying on a hack in StackerEnsembleModel to assign S_STACK to feature metadata, don't do this.
-        #  Remove hack in StackerEnsembleModel
-        feature_metadata = self.feature_metadata
-        features_base = self.feature_metadata.get_features()
-        features_new = [feature for feature in X.columns if feature not in features_base]
-        if features_new:
-            feature_metadata_new = FeatureMetadata.from_df(X[features_new])
-            feature_metadata = feature_metadata.join_metadata(feature_metadata_new).keep_features(list(X.columns))
-        model_fit_kwargs['feature_metadata'] = feature_metadata
+        model_fit_kwargs = self._get_model_fit_kwargs(X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs,
+                                                      ens_sample_weight=kwargs.get('ens_sample_weight', None))
         model_fit_kwargs['X_pseudo'] = X_pseudo
         model_fit_kwargs['y_pseudo'] = y_pseudo
-        #######################
-
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
@@ -1188,14 +1145,8 @@ class AbstractTrainer:
                         model_names_trained.append(model_hpo.name)
         else:
             if isinstance(model, BaggedEnsembleModel):
-                model_fit_kwargs.update(dict(
-                    k_fold=k_fold,
-                    k_fold_start=k_fold_start,
-                    k_fold_end=k_fold_end,
-                    n_repeats=n_repeats,
-                    n_repeat_start=n_repeat_start,
-                    compute_base_preds=False,
-                ))
+                bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start)
+                model_fit_kwargs.update(bagged_model_fit_kwargs)
             model_names_trained = self._train_and_save(X, y, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
         self.save()
         return model_names_trained
@@ -1257,18 +1208,20 @@ class AbstractTrainer:
         logger.log(20, f'Completed {n_repeat_start + repeats_completed}/{n_repeats} k-fold bagging repeats ...')
         return models_valid
 
-    def _train_multi_initial(self, X, y, models: List[AbstractModel], k_fold, n_repeats, hyperparameter_tune_kwargs=None, feature_prune=False, time_limit=None, **kwargs) -> List[str]:
+    def _train_multi_initial(self, X, y, models: List[AbstractModel], k_fold, n_repeats, hyperparameter_tune_kwargs=None, time_limit=None, feature_prune_kwargs=None, **kwargs):
         """
         Fits models that have not previously been fit.
         This method should only be called in self._train_multi
         Returns a list of successfully trained and saved model names.
         """
+        multi_fold_time_start = time.time()
         fit_args = dict(
             X=X,
             y=y,
             k_fold=k_fold,
         )
         fit_args.update(kwargs)
+
         hpo_enabled = False
         if hyperparameter_tune_kwargs:
             for key in hyperparameter_tune_kwargs:
@@ -1281,30 +1234,64 @@ class AbstractTrainer:
             time_split = True
         else:
             time_split = False
-        if k_fold == 0:
+        k_fold_start = 0
+        bagged = k_fold > 0
+        if not bagged:
             time_ratio = hpo_time_ratio if hpo_enabled else 1
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune, time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                                            time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
         else:
-            k_fold_start = 0
-            if hpo_enabled or feature_prune:
-                time_start = time.time()
+            bagged_time_start = time.time()
+            if hpo_enabled:
                 time_ratio = (1 / k_fold) * hpo_time_ratio
-                models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune,
-                                                k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
+                models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                                                k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit,
+                                                time_split=time_split, time_ratio=time_ratio, **fit_args)
                 k_fold_start = 1
-                if time_limit is not None:
-                    time_limit = time_limit - (time.time() - time_start)
+            bagged_time_limit = time_limit - (time.time() - bagged_time_start) if time_limit is not None else None
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, k_fold_start=k_fold_start,
+                                            k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=bagged_time_limit, **fit_args)
 
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, feature_prune=False, k_fold_start=k_fold_start, k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
+        multi_fold_time_elapsed = time.time() - multi_fold_time_start
+        if time_limit is not None:
+            time_limit = time_limit - multi_fold_time_elapsed
 
+        if feature_prune_kwargs is not None and len(models) > 0:
+            feature_prune_time_start = time.time()
+            model_fit_kwargs = self._get_model_fit_kwargs(X=X, X_val=kwargs.get('X_val', None), time_limit=None, k_fold=k_fold,
+                                                          fit_kwargs=kwargs.get('fit_kwargs', {}), ens_sample_weight=kwargs.get('ens_sample_weight'))
+            model_fit_kwargs.update(dict(X=X, y=y, X_val=kwargs.get('X_val', None), y_val=kwargs.get('y_val', None)))
+            if bagged:
+                bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0)
+                model_fit_kwargs.update(bagged_model_fit_kwargs)
+
+            candidate_features = self._proxy_model_feature_prune(time_limit=time_limit, layer_fit_time=multi_fold_time_elapsed, level=kwargs['level'],
+                                                                 features=X.columns.tolist(), model_fit_kwargs=model_fit_kwargs, **feature_prune_kwargs)
+            if time_limit is not None:
+                time_limit = time_limit - (time.time() - feature_prune_time_start)
+
+            fit_args['X'] = X[candidate_features]
+            fit_args['X_val'] = kwargs['X_val'][candidate_features] if isinstance(kwargs.get('X_val', None), pd.DataFrame) else kwargs.get('X_val', None)
+
+            if len(candidate_features) < len(X.columns):
+                unfit_models = []
+                original_prune_map = {}
+                for model in models:
+                    unfit_model = self.load_model(model).convert_to_template()
+                    unfit_model.rename(f"{unfit_model.name}_Prune")
+                    unfit_models.append(unfit_model)
+                    original_prune_map[unfit_model.name] = model
+                pruned_models = self._train_multi_fold(models=unfit_models, hyperparameter_tune_kwargs=None, k_fold_start=k_fold_start,
+                                                       k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, **fit_args)
+                force_prune = feature_prune_kwargs.get('force_prune', False)
+                models = self._retain_better_pruned_models(pruned_models=pruned_models, original_prune_map=original_prune_map, force_prune=force_prune)
         return models
 
     # TODO: Ban KNN from being a Stacker model outside of aux. Will need to ensemble select on all stack layers ensemble selector to make it work
     # TODO: Robert dataset, LightGBM is super good but RF and KNN take all the time away from it on 1h despite being much worse
     # TODO: Add time_limit_per_model
     # TODO: Rename for v0.1
-    def _train_multi_fold(self, X, y, models: List[AbstractModel], time_limit=None, time_split=False,
-                          time_ratio=1, hyperparameter_tune_kwargs=None, **kwargs) -> List[str]:
+    def _train_multi_fold(self, X, y, models: List[AbstractModel], time_limit=None, time_split=False, time_ratio=1, hyperparameter_tune_kwargs=None, **kwargs) -> List[str]:
         """
         Trains and saves a list of models sequentially.
         This method should only be called in self._train_multi_initial
@@ -1336,8 +1323,7 @@ class AbstractTrainer:
                 else:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
-            model_name_trained_lst = self._train_single_full(X, y, model, time_limit=time_left,
-                                                             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs)
+            model_name_trained_lst = self._train_single_full(X, y, model, time_limit=time_left, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs)
 
             if self.low_memory:
                 del model
@@ -1345,7 +1331,7 @@ class AbstractTrainer:
 
         return models_valid
 
-    def _train_multi(self, X, y, models: List[AbstractModel], hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=None, n_repeats=None, n_repeat_start=0, time_limit=None, **kwargs) -> List[str]:
+    def _train_multi(self, X, y, models: List[AbstractModel], hyperparameter_tune_kwargs=None, feature_prune_kwargs=None, k_fold=None, n_repeats=None, n_repeat_start=0, time_limit=None, **kwargs) -> List[str]:
         """
         Train a list of models using the same data.
         Assumes that input data has already been processed in the form the models will receive as input (including stack feature generation).
@@ -1360,14 +1346,14 @@ class AbstractTrainer:
             n_repeats = self.n_repeats
         if (k_fold == 0) and (n_repeats != 1):
             raise ValueError(f'n_repeats must be 1 when k_fold is 0, values: ({n_repeats}, {k_fold})')
-        if time_limit is None:
+        if time_limit is None and feature_prune_kwargs is None:
             n_repeats_initial = n_repeats
         else:
             n_repeats_initial = 1
         if n_repeat_start == 0:
             time_start = time.time()
-            model_names_trained = self._train_multi_initial(X=X, y=y, models=models, k_fold=k_fold, n_repeats=n_repeats_initial, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, feature_prune=feature_prune,
-                                                            time_limit=time_limit, **kwargs)
+            model_names_trained = self._train_multi_initial(X=X, y=y, models=models, k_fold=k_fold, n_repeats=n_repeats_initial, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                                                            feature_prune_kwargs=feature_prune_kwargs, time_limit=time_limit, **kwargs)
             n_repeat_start = n_repeats_initial
             if time_limit is not None:
                 time_limit = time_limit - (time.time() - time_start)
@@ -1449,6 +1435,103 @@ class AbstractTrainer:
         )
         dummy_stacker.initialize(num_classes=self.num_classes)
         return dummy_stacker
+
+    def _proxy_model_feature_prune(self, model_fit_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: List[str], **feature_prune_kwargs: dict) -> List[str]:
+        """
+        Uses the best LightGBM-based base learner of this layer to perform time-aware permutation feature importance based feature pruning.
+        If all LightGBM models fail, use the model that achieved the highest validation accuracy. Feature pruning gets the smaller of the
+        remaining layer time limit and k times (default=2) it took to fit the base learners of this layer as its resource. Note that feature pruning can
+        exit earlier based on arguments in feature_prune_kwargs. The method returns the list of feature names that survived the pruning procedure.
+
+        Parameters
+        ----------
+        feature_prune_kwargs : dict
+            Feature pruning kwarg arguments. Should contain arguments passed to FeatureSelector.select_features. One can optionally attach the following
+            additional kwargs that are consumed at this level: 'proxy_model_class' to use a model of particular type with the highest validation score as the
+            proxy model, 'feature_prune_time_limit' to manually specify how long we should perform the feature pruning procedure for, 'k' to specify how long
+            we should perform feature pruning for if 'feature_prune_time_limit' has not been set (feature selection time budget is set to k * layer_fit_time),
+            and 'raise_exception' to signify that AutoGluon should throw an exception if feature pruning errors out.
+        time_limit : float
+            Time limit left within the current stack layer in seconds. Feature pruning should never take more than this time.
+        layer_fit_time : float
+            How long it took to fit all the models in this layer once. Used to calculate how long to feature prune for.
+        level : int
+            Level of this stack layer.
+        features: List[str]
+            The list of feature names in the inputted dataset.
+
+        Returns
+        -------
+        candidate_features : List[str]
+            Feature names that survived the pruning procedure.
+        """
+        k = feature_prune_kwargs.pop('k', 2)
+        proxy_model_class = feature_prune_kwargs.pop('proxy_model_class', self._get_default_proxy_model_class())
+        feature_prune_time_limit = feature_prune_kwargs.pop('feature_prune_time_limit', None)
+        raise_exception_on_fail = feature_prune_kwargs.pop('raise_exception', False)
+
+        proxy_model = self._get_feature_prune_proxy_model(proxy_model_class=proxy_model_class, level=level)
+        if proxy_model is None:
+            return features
+
+        if feature_prune_time_limit is not None:
+            feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), feature_prune_time_limit)
+        elif time_limit is not None:
+            feature_prune_time_limit = min(max(time_limit - layer_fit_time, 0), max(k * layer_fit_time, 0.05 * time_limit))
+        else:
+            feature_prune_time_limit = max(k * layer_fit_time, 300)
+
+        if feature_prune_time_limit < 2 * proxy_model.fit_time:
+            logger.warning(f"Insufficient time to train even a single feature pruning model (remaining: {feature_prune_time_limit}, "
+                           f"needed: {proxy_model.fit_time}). Skipping feature pruning.")
+            return features
+        selector = FeatureSelector(model=proxy_model, time_limit=feature_prune_time_limit,
+                                   raise_exception=raise_exception_on_fail, problem_type=self.problem_type)
+        candidate_features = selector.select_features(**feature_prune_kwargs, **model_fit_kwargs)
+        return candidate_features
+
+    def _get_default_proxy_model_class(self):
+        return None
+
+    def _retain_better_pruned_models(self, pruned_models: List[str], original_prune_map: dict, force_prune: bool = False) -> List[str]:
+        """
+        Compares models fit on the pruned set of features with their counterpart, models fit on full set of features.
+        Take the model that achieved a higher validation set score and delete the other from self.model_graph.
+
+        Parameters
+        ----------
+        pruned_models : List[str]
+            A list of pruned model names.
+        original_prune_map : dict
+            A dictionary mapping the names of models fitted on pruned features to the names of models fitted on original features.
+        force_prune : bool, default = False
+            If set to true, force all base learners to work with the pruned set of features.
+
+        Returns
+        ----------
+        models : List[str]
+            A list of model names.
+        """
+        models = []
+        for pruned_model in pruned_models:
+            original_model = original_prune_map[pruned_model]
+            leaderboard = self.leaderboard()
+            original_score = leaderboard[leaderboard['model'] == original_model]['score_val'].item()
+            pruned_score = leaderboard[leaderboard['model'] == pruned_model]['score_val'].item()
+            score_str = f"({round(pruned_score, 4)} vs {round(original_score, 4)})"
+            if force_prune:
+                logger.log(30, f"Pruned score vs original score is {score_str}. Replacing original model since force_prune=True...")
+                self.delete_models(models_to_delete=original_model, dry_run=False)
+                models.append(pruned_model)
+            elif pruned_score > original_score:
+                logger.log(30, f"Model trained with feature pruning score is better than original model's score {score_str}. Replacing original model...")
+                self.delete_models(models_to_delete=original_model, dry_run=False)
+                models.append(pruned_model)
+            else:
+                logger.log(30, f"Model trained with feature pruning score is not better than original model's score {score_str}. Keeping original model...")
+                self.delete_models(models_to_delete=pruned_model, dry_run=False)
+                models.append(original_model)
+        return models
 
     # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
@@ -2126,3 +2209,83 @@ class AbstractTrainer:
         self.bagged_mode = og_bagged_mode  # TODO: Confirm if safe to train future models after training models in both bagged and non-bagged modes
         self.verbosity = og_verbosity
         return distilled_model_names
+
+    def _get_model_fit_kwargs(self, X: pd.DataFrame, X_val: pd.DataFrame, time_limit: float, k_fold: int, fit_kwargs: dict, ens_sample_weight: List = None) -> dict:
+        # Returns kwargs to be passed to AbstractModel's fit function
+        if fit_kwargs is None:
+            fit_kwargs = dict()
+
+        model_fit_kwargs = dict(time_limit=time_limit, verbosity=self.verbosity, **fit_kwargs)
+        if self.sample_weight is not None:
+            X, w_train = extract_column(X, self.sample_weight)
+            if w_train is not None:  # may be None for ensemble
+                # TODO: consider moving weight normalization into AbstractModel.fit()
+                model_fit_kwargs['sample_weight'] = w_train.values/w_train.mean()  # normalization can affect gradient algorithms like boosting
+            if X_val is not None:
+                X_val, w_val = extract_column(X_val, self.sample_weight)
+                if self.weight_evaluation and w_val is not None:  # ignore validation sample weights unless weight_evaluation specified
+                    model_fit_kwargs['sample_weight_val'] = w_val.values/w_val.mean()
+            if ens_sample_weight is not None:
+                model_fit_kwargs['sample_weight'] = ens_sample_weight  # sample weights to use for weighted ensemble only
+        if self._groups is not None and 'groups' not in model_fit_kwargs:
+            if k_fold == self.k_fold:  # don't do this on refit full
+                model_fit_kwargs['groups'] = self._groups
+
+        #######################
+        # FIXME: This section is a hack, compute genuine feature_metadata for each stack level instead
+        #  Don't do this here, do this upstream so it isn't recomputed for each model
+        #  Add feature_metadata to model_fit_kwargs
+        # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
+        # FIXME: This doesn't assign proper special types to stack features, relying on a hack in StackerEnsembleModel to assign S_STACK to feature metadata, don't do this.
+        #  Remove hack in StackerEnsembleModel
+        feature_metadata = self.feature_metadata
+        features_base = self.feature_metadata.get_features()
+        features_new = [feature for feature in X.columns if feature not in features_base]
+        if features_new:
+            feature_metadata_new = FeatureMetadata.from_df(X[features_new])
+            feature_metadata = feature_metadata.join_metadata(feature_metadata_new).keep_features(list(X.columns))
+        model_fit_kwargs['feature_metadata'] = feature_metadata
+        #######################
+        return model_fit_kwargs
+
+    def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int) -> dict:
+        # Returns additional kwargs (aside from _get_model_fit_kwargs) to be passed to BaggedEnsembleModel's fit function
+        if k_fold is None:
+            k_fold = self.k_fold
+        if n_repeats is None:
+            n_repeats = self.n_repeats
+        return dict(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False)
+
+    def _get_feature_prune_proxy_model(self, proxy_model_class: Union[AbstractModel, None], level: int) -> AbstractModel:
+        """
+        Returns proxy model to be used for feature pruning - the base learner that has the highest validation score in a particular stack layer.
+        Ties are broken by inference speed. If proxy_model_class is not None, take the best base learner belonging to proxy_model_class.
+        proxy_model_class is an AbstractModel class (ex. LGBModel).
+        """
+        proxy_model = None
+        if isinstance(proxy_model_class, str):
+            raise AssertionError(f'proxy_model_class must be a subclass of AbstractModel. Was instead a string: {proxy_model_class}')
+        banned_models = [GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel]
+        assert proxy_model_class not in banned_models, "WeightedEnsemble models cannot be feature pruning proxy models."
+
+        leaderboard = self.leaderboard()
+        banned_names = []
+        candidate_model_rows = leaderboard[(~leaderboard['score_val'].isna()) & (leaderboard['stack_level'] == level)]
+        candidate_models_type_inner = self.get_models_attribute_dict(attribute='type_inner', models=candidate_model_rows['model'])
+        for model_name, type_inner in candidate_models_type_inner.items():
+            if type_inner in banned_models:
+                banned_names.append(model_name)
+                candidate_models_type_inner.pop(model_name, None)
+        banned_names = set(banned_names)
+        candidate_model_rows = candidate_model_rows[~candidate_model_rows['model'].isin(banned_names)]
+        if proxy_model_class is not None:
+            candidate_model_names = [model_name for model_name, model_class in candidate_models_type_inner.items() if model_class == proxy_model_class]
+            candidate_model_rows = candidate_model_rows[candidate_model_rows['model'].isin(candidate_model_names)]
+        if len(candidate_model_rows) == 0:
+            if proxy_model_class is None:
+                logger.warning(f"No models from level {level} have been successfully fit. Skipping feature pruning.")
+            else:
+                logger.warning(f"No models of type {proxy_model_class} have finished training in level {level}. Skipping feature pruning.")
+            return proxy_model
+        best_candidate_model_rows = candidate_model_rows.loc[candidate_model_rows['score_val'] == candidate_model_rows['score_val'].max()]
+        return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows['fit_time'].idxmin()]['model'])

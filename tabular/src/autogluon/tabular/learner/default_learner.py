@@ -8,12 +8,12 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.data import LabelCleaner
+from autogluon.core.data.cleaner import Cleaner
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from .abstract_learner import AbstractLearner
-from ..trainer.auto_trainer import AutoTrainer
-from autogluon.core.data import LabelCleaner
-from autogluon.core.data.cleaner import Cleaner
+from ..trainer import AutoTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ class DefaultLearner(AbstractLearner):
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
                     y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
             X = X_super.head(len(X)).set_index(X.index)
 
             X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)
@@ -207,7 +207,7 @@ class DefaultLearner(AbstractLearner):
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
                     y_super = pd.concat([y, y_unlabeled], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
 
             X = X_super.head(len(X)).set_index(X.index)
             if X_unlabeled is not None:

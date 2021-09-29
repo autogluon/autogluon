@@ -447,6 +447,49 @@ def test_tabularHPO():
                            seed_val=seed_val, fit_args=fit_args)
 
 
+@pytest.mark.slow
+def test_tabular_feature_prune():
+    ############ Benchmark options you can set: ########################
+    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
+    seed_val = 99  # random seed
+    subsample_size = None
+    ag_args = {
+        'feature_prune_kwargs': {
+            'stop_threshold': 3,
+            'prune_ratio': 0.05,
+            'prune_threshold': None,
+            'n_train_subsample': 1000,
+            'n_fi_subsample': 5000,
+            'min_fi_samples': 5000,
+            'feature_prune_time_limit': 10,
+            'raise_exception': True
+        }
+    }
+    verbosity = 2  # how much output to print
+    time_limit = None
+    fast_benchmark = True  # False
+    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
+    # otherwise we run full benchmark with default AutoGluon settings.
+    # performance_value warnings are disabled when fast_benchmark = True.
+
+    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
+    if fast_benchmark:
+        subsample_size = 1000
+        gbm_options = {'num_boost_round': 20}
+        hyperparameters = {'GBM': gbm_options}
+        time_limit = 60
+
+    fit_args = {'verbosity': verbosity, }
+    fit_args['ag_args'] = ag_args
+    if time_limit is not None:
+        fit_args['time_limit'] = time_limit
+    if hyperparameters is not None:
+        fit_args['hyperparameters'] = hyperparameters
+    ###################################################################
+    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
+                           seed_val=seed_val, fit_args=fit_args)
+
+
 def test_tabular_bag():
     ############ Benchmark options you can set: ########################
     num_bag_folds = 3

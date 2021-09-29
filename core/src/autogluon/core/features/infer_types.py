@@ -136,3 +136,37 @@ def check_if_nlp_feature(X: Series) -> bool:
         return False
 
     return True
+
+
+def get_bool_true_val(series: pd.Series):
+    """
+    From a pandas series, get the replace_val to convert to boolean when calling:
+    series_bool = series == replace_val
+
+    Therefore, any value other than `replace_val` will be set to `False` when converting to boolean.
+
+    series must have exactly 2 unique values
+
+    We make the assumption that the value chosen as `True` between the two options is mostly arbitrary, with the exception that np.nan will not be considered `True`.
+    When possible, we try to sort the values so that (0, 1) will choose 1 as True, however this decision should ideally not impact downstream models much.
+    Any new unseen values (including nan) at inference time will be mapped to `False` automatically.
+
+    In this code, 0 and 0.0 (int and float) are treated as the same value. Similarly with any other integer and float (such as 1 and 1.0).
+
+    """
+    # This is a safety net in case the unique types are mixed (such as string and int). In this scenario, an exception is raised and therefore we use the unsorted values.
+    try:
+        uniques = series.unique()
+        # Sort the values to avoid relying on row-order when determining which value is mapped to `True`.
+        uniques.sort()
+    except:
+        uniques = series.unique()
+    replace_val = uniques[1]
+    try:
+        # This is to ensure that we don't map np.nan to `True` in the boolean.
+        is_nan = np.isnan(replace_val)
+    except:
+        is_nan = False
+    if is_nan:
+        replace_val = uniques[0]
+    return replace_val

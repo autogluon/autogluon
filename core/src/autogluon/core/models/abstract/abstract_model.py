@@ -528,6 +528,13 @@ class AbstractModel:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
 
+    def get_features(self):
+        assert self.is_fit(), "The model must be fit before calling the get_features method."
+        if self.feature_metadata:
+            return self.feature_metadata.get_features()
+        else:
+            return self.features
+
     def _fit(self,
              X,
              y,
@@ -704,10 +711,8 @@ class AbstractModel:
         else:
             features = list(features)
 
-        feature_importance_quick_dict = self.get_model_feature_importance()
-        # TODO: Also consider banning features with close to 0 importance
-        # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
-        banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
+        # NOTE: Needed as bagged models 'features' attribute is not the same as childrens' 'features' attributes
+        banned_features = [feature for feature in features if feature not in self.get_features()]
         features_to_check = [feature for feature in features if feature not in banned_features]
 
         if features_to_check:
@@ -965,14 +970,15 @@ class AbstractModel:
         """
         pass
 
-    def delete_from_disk(self):
+    def delete_from_disk(self, silent=False):
         """
         Deletes the model from disk.
 
         WARNING: This will DELETE ALL FILES in the self.path directory, regardless if they were created by AutoGluon or not.
         DO NOT STORE FILES INSIDE OF THE MODEL DIRECTORY THAT ARE UNRELATED TO AUTOGLUON.
         """
-        logger.log(30, f'Deleting model {self.name}. All files under {self.path} will be removed.')
+        if not silent:
+            logger.log(30, f'Deleting model {self.name}. All files under {self.path} will be removed.')
         from pathlib import Path
         import shutil
         model_path = Path(self.path)

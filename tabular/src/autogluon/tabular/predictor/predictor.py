@@ -14,6 +14,7 @@ from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
@@ -25,7 +26,6 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.presets_configs import tabular_presets_dict
 from ..learner import AbstractLearner, DefaultLearner
-from ..trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
 
@@ -524,6 +524,14 @@ class TabularPredictor:
                     'bayesopt': Performs HPO via bayesian optimization using local scheduler.
                 For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
                     The 'searcher' key is required when providing a dict.
+            feature_prune_kwargs: dict, default = None
+                Performs layer-wise feature pruning via recursive feature elimination with permutation feature importance.
+                This fits all models in a stack layer once, discovers a pruned set of features, fits all models in the stack layer
+                again with the pruned set of features, and updates input feature lists for models whose validation score improved.
+                If None, do not perform feature pruning. If empty dictionary, perform feature pruning with default configurations.
+                For valid dictionary keys, refer to :class:`autogluon.core.utils.feature_selection.FeatureSelector` and
+                `autogluon.core.trainer.abstract_trainer.AbstractTrainer._proxy_model_feature_prune` documentation.
+                To force all models to work with the pruned set of features, set force_prune=True in the dictionary.
             ag_args : dict, default = None
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
                 See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
@@ -729,9 +737,12 @@ class TabularPredictor:
             holdout_frac = default_holdout_frac(len(train_data), ag_args.get('hyperparameter_tune_kwargs', None) is not None)
 
         if kwargs['_save_bag_folds'] is not None:
-            if ag_args_ensemble is None:
-                ag_args_ensemble = {}
-            ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
+            if use_bag_holdout and not kwargs['_save_bag_folds']:
+                logger.log(30, f'WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.')
+            else:
+                if ag_args_ensemble is None:
+                    ag_args_ensemble = {}
+                ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
 
         if time_limit is None:
             mb_mem_usage_train_data = get_approximate_df_mem_usage(train_data, sample_ratio=0.2).sum() / 1e6
@@ -745,7 +756,9 @@ class TabularPredictor:
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
             'excluded_model_types': excluded_model_types,
+            'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
+        self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity, use_bag_holdout=use_bag_holdout)
@@ -2259,11 +2272,16 @@ class TabularPredictor:
             self._learner.persist_trainer(low_memory=True)
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
-    def save(self):
+    def save(self, silent=False):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
+
+        Parameters
+        ----------
+        silent : bool, default = False
+            Whether to save without logging a message.
         """
         path = self.path
         tmp_learner = self._learner
@@ -2274,7 +2292,8 @@ class TabularPredictor:
         save_pkl.save(path=path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
         self._trainer = tmp_trainer
-        logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
+        if not silent:
+            logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
     def load(cls, path: str, verbosity: int = None):
@@ -2391,6 +2410,7 @@ class TabularPredictor:
 
             # other
             verbosity=self.verbosity,
+            feature_prune_kwargs=None,
 
             # private
             _save_bag_folds=None,
