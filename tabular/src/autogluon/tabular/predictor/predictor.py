@@ -44,6 +44,7 @@ logger = logging.getLogger()  # return root logger
 # Done for Tabular
 # TODO: Remove all `time_limits` in project, replace with `time_limit`
 
+PSEUDO_MODEL_SUFFIX = "PSEUDO_{iter}"
 
 class TabularPredictor:
     """
@@ -374,6 +375,7 @@ class TabularPredictor:
                 Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
                 Caution: Any provided search spaces will be overridden by fixed defaults if `hyperparameter_tune = False`.
                 To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
+                    For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
                     For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
             Advanced functionality: Custom models
                 `hyperparameters` can also take special string values instead of a dictionary of model parameters which maps to a pre-configured model configuration (currently supported options = ['GBMLarge']).
@@ -928,14 +930,19 @@ class TabularPredictor:
             num_stack_levels = highest_level
 
         # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
-        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
+        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types,
+                       'X_pseudo': X_pseudo,
+                       'y_pseudo': y_pseudo}
 
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
+
+        name_suffix = kwargs['name_suffix'] if 'name_suffix' else ''
+
         fit_models = self._trainer.train_multi_levels(
             X=X, y=y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
             base_model_names=base_model_names, time_limit=time_limit, relative_stack=True, level_end=num_stack_levels,
-            core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
+            core_kwargs=core_kwargs, aux_kwargs=aux_kwargs, name_suffix=name_suffix
         )
 
         if time_limit is not None:
@@ -959,9 +966,9 @@ class TabularPredictor:
         return self
 
 
-    def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
+    def _filter_pseudo(self, y_pred_proba_og, min_percentage: float = 0.05, max_percentage: float = 0.6,
                       threshold: float = 0.95):
-        if problem_type in ['binary', 'multiclass']:
+        if self.problem_type in ['binary', 'multiclass']:
             y_pred_proba_max = y_pred_proba_og.max(axis=1)
             curr_threshold = threshold
             # Percent of rows above threshold
@@ -993,22 +1000,39 @@ class TabularPredictor:
 
     def _run_pseudo_labeling(self, hyperparameters: dict, test_data: pd.DataFrame, max_iter: int):
         previous_score = self.info()['best_model_score_val']
+        y_pred_holdout = pd.Series()
+        X_test = test_data.copy()
+        test_data = self._learner.feature_generator.transform(test_data)
 
         for i in range(max_iter):
-            y_pseudo = test_data[self.label]
-            X_pseudo = test_data.drop(columns=[self.label])
-            self.fit_extra(hyperparameters=hyperparameters, X_pseudo=X_pseudo, y_pseudo=y_pseudo)
-            curr_score = self.info()['best_model_score_val']
+            y_pred_proba = self.predict_proba(data=X_test)
+            y_pred = self.predict(data=X_test)
+            test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
 
-            if previous_score < curr_score:
+            if len(test_pseudo_idxes_true) < 1:
                 return self
+
+            test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
+            test_pseudo_idxes[test_pseudo_idxes_true.index] = True
+
+            y_pred_holdout = y_pred_holdout.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
+            X_pseudo = test_data.loc[y_pred_holdout.index]
+            y_pseudo = self._learner.label_cleaner.transform(y_pred_holdout)
+            self.fit_extra(hyperparameters=hyperparameters, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
+                           name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)))
+            current_score = self.info()['best_model_score_val']
+
+            if previous_score >= current_score:
+                return self
+            else:
+                # Cut down X_test to not include pseudo labeled data
+                X_test = X_test.loc[test_pseudo_idxes[test_pseudo_idxes == False].index]
+                previous_score = current_score
 
         return self
 
     def pseudo_label_fit(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
-        is_fit = self._learner.is_fit
-
-        if not is_fit:
+        if not self._learner.is_fit:
             self.fit(kwargs)
 
         X, y, _, _ = self._trainer.load_data()
@@ -1018,26 +1042,20 @@ class TabularPredictor:
 
         hyperparameters = None if 'hyperparameters' not in kwargs else kwargs['hyperparameters']
         if hyperparameters is None:
-            if is_fit:
+            if self._learner.is_fit:
                 hyperparameters = self.fit_hyperparameters
-            else:
-                hyperparameters = 'default'
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
-        if is_fit:
-            if is_labeled:
-                y_pseudo = test_data[self.label]
-                X_pseudo = test_data.drop(columns=[self.label])
-                kwargs['y_pseudo'] = y_pseudo
-                kwargs['X_pseudo'] = X_pseudo
-                return self.fit_extra(hyperparameters=hyperparameters, **kwargs)
-            else:
-                return self._run_pseudo_labeling(hyperparameters=hyperparameters, test_data=test_data,
-                                                 max_iter=max_iter)
+        if is_labeled:
+            X_pseudo, y_pseudo, _, _, _, _, _, _ = self._learner.general_data_processing(test_data, None, None, 1, 0)
+            kwargs['X_pseudo'] = X_pseudo
+            kwargs['y_pseudo'] = y_pseudo
+            return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1), **kwargs)
         else:
-            pass
+            return self._run_pseudo_labeling(hyperparameters=hyperparameters, test_data=test_data,
+                                             max_iter=max_iter)
 
     def predict(self, data, model=None, as_pandas=True):
         """
@@ -2515,7 +2533,9 @@ class TabularPredictor:
             
             # pseudo label
             X_pseudo=None,
-            y_pseudo=None
+            y_pseudo=None,
+
+            name_suffix=None
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())

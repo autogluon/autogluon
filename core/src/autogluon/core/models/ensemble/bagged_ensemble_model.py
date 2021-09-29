@@ -276,6 +276,7 @@ class BaggedEnsembleModel(AbstractModel):
         model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
         time_start_fit = time.time()
         model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
+
         model_base.fit_time = time.time() - time_start_fit
         model_base.predict_time = None
         X_len = len(X)

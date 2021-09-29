@@ -947,6 +947,8 @@ class AbstractTrainer:
             The model will be accessible and usable through any Trainer function that takes as input 'model' or 'model_name'.
         Note: self._train_and_save should not be used outside of self._train_single_full
         """
+        X_pseudo = model_fit_kwargs['X_pseudo']
+        y_pseudo = model_fit_kwargs['y_pseudo']
         fit_start_time = time.time()
         time_limit = model_fit_kwargs.get('time_limit', None)
         model_names_trained = []
@@ -962,7 +964,14 @@ class AbstractTrainer:
                     time_left_total = time_limit
                 fit_log_message += f' Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
             logger.log(20, fit_log_message)
-            model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
+
+            if X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
+                X_w_pseudo = pd.concat([X, X_pseudo])
+                y_w_pseudo = pd.concat([y, y_pseudo])
+                model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
+            else:
+                model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
+
             fit_end_time = time.time()
             if self.weight_evaluation:
                 w = model_fit_kwargs.get('sample_weight', None)
@@ -990,6 +999,7 @@ class AbstractTrainer:
                     model.predict_time = None
                 else:
                     model.predict_time = pred_end_time - fit_end_time
+
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
@@ -1091,9 +1101,9 @@ class AbstractTrainer:
         return True
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
-    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None,
-                           hyperparameter_tune_kwargs=None, stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None,
-                           n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
+    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, X_pseudo=None, y_pseudo=None,
+                           feature_prune=False, hyperparameter_tune_kwargs=None,
+                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
