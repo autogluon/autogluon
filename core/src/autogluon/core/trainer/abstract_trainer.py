@@ -969,6 +969,7 @@ class AbstractTrainer:
             if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
                 X_w_pseudo = pd.concat([X, X_pseudo])
                 y_w_pseudo = pd.concat([y, y_pseudo])
+                logger.log(20, f'Pseudo labeling incorporated for {model.name}, with {len(X_w_pseudo)} rows of Pseudo')
                 model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
             else:
                 model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
