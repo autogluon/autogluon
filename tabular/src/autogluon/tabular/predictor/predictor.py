@@ -937,7 +937,7 @@ class TabularPredictor:
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
 
-        name_suffix = kwargs['name_suffix'] if 'name_suffix' else ''
+        name_suffix = kwargs.get('name_suffix', '')
 
         fit_models = self._trainer.train_multi_levels(
             X=X, y=y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
@@ -977,8 +977,10 @@ class TabularPredictor:
             y_pred_proba_og: The predicted probabilities from the current best model. If problem is
             'binary' or 'multiclass' then it's Panda series of predictive probs, if it's 'regression'
             then it's a scalar
-            min_percentage: Minimum percentage of total 'y_pred_proba_og` that must be above threshold
+            min_percentage: Minimum percentage of total 'y_pred_proba_og` that is below threshold
+            required to trigger threshold change
             max_percentange: Maximum percentage of total 'y_pred_proba_og` that is above threshold
+            required to trigger threshold change
             threshold: The predictive probability percent that must be exceeded in order to be
             incorporated into the next round of training
         """
@@ -1000,8 +1002,6 @@ class TabularPredictor:
 
             # Pseudo indices greater than threshold of 0.95
             test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
-
-            # test_pseudo_indices = (y_pred_proba_max >= threshold)
         else:
             # Select a random 30% of the data to use as pseudo
             test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
