@@ -966,6 +966,8 @@ class AbstractTrainer:
             logger.log(20, fit_log_message)
 
             # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
+            # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
+            # is required
             if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
                 X_w_pseudo = pd.concat([X, X_pseudo])
                 y_w_pseudo = pd.concat([y, y_pseudo])
