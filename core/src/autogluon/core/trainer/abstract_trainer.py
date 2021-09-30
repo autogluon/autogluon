@@ -965,7 +965,8 @@ class AbstractTrainer:
                 fit_log_message += f' Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
             logger.log(20, fit_log_message)
 
-            if X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
+            # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
+            if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
                 X_w_pseudo = pd.concat([X, X_pseudo])
                 y_w_pseudo = pd.concat([y, y_pseudo])
                 model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
