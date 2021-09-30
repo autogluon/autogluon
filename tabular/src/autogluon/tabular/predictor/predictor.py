@@ -932,8 +932,7 @@ class TabularPredictor:
 
         # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types,
-                       'X_pseudo': X_pseudo,
-                       'y_pseudo': y_pseudo}
+                       'X_pseudo': X_pseudo, 'y_pseudo': y_pseudo}
 
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
