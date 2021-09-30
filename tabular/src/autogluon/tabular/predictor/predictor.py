@@ -46,7 +46,7 @@ logger = logging.getLogger()  # return root logger
 
 # Suffix added to model name so leaderboard shows which models use pseudo labeling
 # and how many iterations
-PSEUDO_MODEL_SUFFIX = "PSEUDO_{iter}"
+PSEUDO_MODEL_SUFFIX = "_PSEUDO_{iter}"
 
 class TabularPredictor:
     """
