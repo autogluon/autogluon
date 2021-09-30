@@ -987,7 +987,6 @@ class TabularPredictor:
         if self.problem_type in ['binary', 'multiclass']:
             y_pred_proba_max = y_pred_proba_og.max(axis=1)
             curr_threshold = threshold
-            # Percent of rows above threshold
             curr_percentage = (y_pred_proba_max >= curr_threshold).mean()
             num_rows = len(y_pred_proba_max)
 
@@ -997,10 +996,11 @@ class TabularPredictor:
                 else:
                     num_rows_threshold = max(np.ceil(min_percentage * num_rows), 1)
                 y_pred_proba_max_sorted = y_pred_proba_max.sort_values(ascending=False, ignore_index=True)
-                # Set current threshold to num_rows_threshold - 1
+                # Set current threshold to num_rows_threshold - 1 if num of rows above
+                # max_percentage or below min_percentage
                 curr_threshold = y_pred_proba_max_sorted[num_rows_threshold - 1]
 
-            # Pseudo indices greater than threshold of 0.95
+            # Pseudo indices greater than threshold
             test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
         else:
             # Select a random 30% of the data to use as pseudo
