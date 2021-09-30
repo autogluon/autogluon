@@ -978,12 +978,19 @@ class TabularPredictor:
         test_data = self._learner.feature_generator.transform(test_data)
 
         for i in range(max_iter):
+            iter_print = str(i + 1)
+            logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling')
             y_pred_proba = self.predict_proba(data=X_test)
             y_pred = self.predict(data=X_test)
             test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
 
             if len(test_pseudo_idxes_true) < 1:
+                logger.log(20,
+                           f'Pseudolabeling algorithm found no rows of pseudolabeled data that met criteria on iteration: {iter_print}. Ending...')
                 return self
+
+            logger.log(20, f'Pseudolabeling algorithm found: {len(test_pseudo_idxes_true)} rows of pseudolabeled data met criteria on iteration: {iter_print}. '
+                           f'Adding to train data')
 
             test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
@@ -999,6 +1006,8 @@ class TabularPredictor:
                 return self
             else:
                 # Cut down X_test to not include pseudo labeled data
+                logger.log(20,
+                           f'Pseudolabeling algorithm improved validation score from: {previous_score}, to: {current_score}')
                 X_test = X_test.loc[test_pseudo_idxes[test_pseudo_idxes == False].index]
                 previous_score = current_score
 
@@ -1020,6 +1029,8 @@ class TabularPredictor:
             If model is fit. Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
         """
         if not self._learner.is_fit:
+            logger.log(20,
+                       f'Model not fit prior to pseudolabeling. Fitting now...')
             self.fit(kwargs)
 
         X, y, _, _ = self._trainer.load_data()
