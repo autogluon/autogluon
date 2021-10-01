@@ -1030,7 +1030,7 @@ class TabularPredictor:
         if not self._learner.is_fit:
             logger.log(20,
                        f'Model not fit prior to pseudolabeling. Fitting now...')
-            self.fit(kwargs)
+            self.fit(**kwargs)
 
         X, y, _, _ = self._trainer.load_data()
         y.name = self.label
