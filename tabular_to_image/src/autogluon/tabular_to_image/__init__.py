@@ -10,6 +10,7 @@ try:
 except ImportError:
     pass
 
-from autogluon.tabular_to_image.prediction import ImagePredictions #.predictor import TabularPredictor
+#from autogluon.tabular_to_image.prediction import ImagePredictions #.predictor import TabularPredictor
+from .prediction import ImagePredictions
 
 logging.basicConfig(format='%(message)s')  # just print message in logs
