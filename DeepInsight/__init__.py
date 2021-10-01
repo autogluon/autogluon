@@ -8,6 +8,6 @@ except ImportError:
     pass
 
 
-from .DeepInsight  import image_transformer
+from .pyDeepInsight   import image_transformer
 
 logging.basicConfig(format='%(message)s')  # just print message in logs

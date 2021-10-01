@@ -3,3 +3,4 @@ scipy
 scikit-learn >= 0.22
 pandas
 matplotlib
+autogluon.tabular_to_image=={0.3.2}

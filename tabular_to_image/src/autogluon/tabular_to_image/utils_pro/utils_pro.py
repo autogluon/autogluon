@@ -26,7 +26,7 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
 from autogluon.core.dataset import TabularDataset
-from DeepInsight.pyDeepInsight import ImageTransformer,LogScaler
+from pyDeepInsight import ImageTransformer,LogScaler
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from matplotlib import pyplot as plt

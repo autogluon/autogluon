@@ -1,11 +1,9 @@
 from setuptools import setup
 
-submodule = 'DeepInsight'
+submodule = 'pyDeepInsight'
 install_requires = [
     'scikit-learn>=0.22',
     'pandas',
-    
-    f'autogluon.tabular_to_image=={version}',    
 ]
 
 setup(
