@@ -142,3 +142,12 @@ class Utils_pro:
         Testset = TensorDataset(X_test_tensor, y_test_tensor)
         Testloader = DataLoader(Testset, batch_size=batch_size, shuffle=True)
         return trainloader,valloader,Testloader#,num_classes 
+    
+    
+#python3 -m pip install  pydot
+#python3 -m pip install pydotplus
+#sudo apt-get install graphviz libgraphviz-dev pkg-config
+#sudo apt-get install python-pip python-virtualenv
+#python3 -m pip install  pygraphviz
+
+#python3 -m  pip -q install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight    
