@@ -4,18 +4,11 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 from torch.autograd import Variable
 from torch.utils.data import TensorDataset, DataLoader
-import torch
 #device = torch.device("cuda") #device = 'cuda'
 import torchvision.transforms as transforms
 from torch.utils.data import TensorDataset, DataLoader
-import torch.nn as nn
-import torch.optim as optim
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
-
-from torch.optim import lr_scheduler
-from torch.autograd import Variable
-import numpy as np
 import torchvision
 from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
@@ -23,8 +16,6 @@ import time
 import os
 import copy
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
 from autogluon.core.dataset import TabularDataset
 from pyDeepInsight import ImageTransformer,LogScaler
 from sklearn.model_selection import train_test_split
