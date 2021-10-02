@@ -2039,6 +2039,7 @@ class TabularPredictor:
                                      verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
                                      augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
 
+    '''
     def plot_ensemble_model(self, prune_unused_nodes=True) -> str:
         """
         Output the visualized stack ensemble architecture of a model trained by `fit()`.
@@ -2104,7 +2105,7 @@ class TabularPredictor:
         A.draw(model_image_fname, format='png', prog='dot')
 
         return model_image_fname
-
+    '''
     @staticmethod
     def _summarize(key, msg, results):
         if key in results:
