@@ -1030,7 +1030,8 @@ class TabularPredictor:
         if not self._learner.is_fit:
             logger.log(20,
                        f'Model not fit prior to pseudolabeling. Fitting now...')
-            self.fit(**kwargs)
+            fit_kwargs = {key: value for key, value in kwargs.items() if key not in self._fit_extra_kwargs_dict()}
+            self.fit(**fit_kwargs)
 
         X, y, _, _ = self._trainer.load_data()
         y.name = self.label
@@ -1049,7 +1050,8 @@ class TabularPredictor:
             X_pseudo, y_pseudo, _, _, _, _, _, _ = self._learner.general_data_processing(test_data, None, None, 1, 0)
             kwargs['X_pseudo'] = X_pseudo
             kwargs['y_pseudo'] = y_pseudo
-            return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1), **kwargs)
+            fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in self._fit_extra_kwargs_dict()}
+            return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1), **fit_extra_kwargs)
         else:
             return self._run_pseudolabeling(hyperparameters=hyperparameters, test_data=test_data,
                                              max_iter=max_iter)
@@ -2410,7 +2412,6 @@ class TabularPredictor:
             raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
 
     def _validate_fit_kwargs(self, kwargs):
-
         # TODO:
         #  Valid core_kwargs values:
         #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
@@ -2426,6 +2427,7 @@ class TabularPredictor:
             auto_stack=False,
             use_bag_holdout=False,
 
+
             # other
             feature_generator='auto',
             unlabeled_data=None,
@@ -2439,8 +2441,8 @@ class TabularPredictor:
 
         return kwargs_sanitized
 
-    def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None):
-        fit_extra_kwargs_default = dict(
+    def _fit_extra_kwargs_dict(self):
+        return dict(
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             num_bag_sets=None,
             num_stack_levels=None,
@@ -2477,6 +2479,9 @@ class TabularPredictor:
 
             name_suffix=None
         )
+
+    def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None):
+        fit_extra_kwargs_default = self._fit_extra_kwargs_dict()
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
         if extra_valid_keys is not None:
@@ -2529,10 +2534,17 @@ class TabularPredictor:
         train_features, pseudo_features = self._prune_data_features(train_features=train_features,
                                                                     other_features=pseudo_features,
                                                                     is_labeled=is_labeled)
-        train_features.sort()
-        pseudo_features.sort()
-        if train_features != pseudo_features:
-            raise ValueError("Column names must match between training and pseudo data")
+        train_feats_in_pseudo_feats = np.isin(train_features, pseudo_features)
+
+        if not train_feats_in_pseudo_feats.all():
+            bad_columns = np.where(train_feats_in_pseudo_feats == False)
+            missing_columns = np.array(train_features)[bad_columns]
+            raise ValueError(f"Pseudo data is missing the following columns: {missing_columns}")
+
+        if is_labeled:
+            pseudo_data = pseudo_data[train_data.columns]
+        else:
+            pseudo_data = pseudo_data[train_features]
 
         return pseudo_data, is_labeled
 
