@@ -19,8 +19,8 @@ from torchvision import datasets, models, transforms
 #from autogluon.tabular_to_image.utils_pro import  Utils_pro
 #from autogluon.tabular_to_image.models_zoo import ModelsZoo
 #from autogluon.tabular_to_image.models_zoo import ModelsZoo
-from autogluon.tabular_to_image.utils_pro import Utils_pro
-from autogluon.tabular_to_image.models_zoo import ModelsZoo
+from autogluon.tabular_to_image.utils_pro import Utils_pro # pylint: disable=import-error
+from autogluon.tabular_to_image.models_zoo import ModelsZoo  # pylint: disable=import-error
 class ImagePredictions:
     
     def init(self,**kwargs):

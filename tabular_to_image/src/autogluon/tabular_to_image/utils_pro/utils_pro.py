@@ -17,7 +17,7 @@ import os
 import copy
 import numpy as np
 from autogluon.core.dataset import TabularDataset
-from pyDeepInsight import ImageTransformer,LogScaler
+from pyDeepInsight import ImageTransformer,LogScaler # pylint: disable=import-error
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from matplotlib import pyplot as plt
