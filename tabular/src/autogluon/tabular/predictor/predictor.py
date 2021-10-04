@@ -914,6 +914,9 @@ class TabularPredictor:
         if pseudo_data is not None:
             X_pseudo = pseudo_data.drop(columns=[self.label])
             y_pseudo = pseudo_data[self.label]
+        else:
+            X_pseudo = None
+            y_pseudo = None
 
         if ag_args is None:
             ag_args = {}
