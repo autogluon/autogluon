@@ -1083,10 +1083,11 @@ class TabularPredictor:
             If model is not already fit. Refer to parameters documentation in :meth:`TabularPredictor.fit`.
             If model is fit. Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
         """
+        fit_extra_args = list(self._fit_extra_kwargs_dict().keys())
         if not self._learner.is_fit:
             logger.log(20,
                        f'Model not fit prior to pseudolabeling. Fitting now...')
-            fit_kwargs = {key: value for key, value in kwargs.items() if key not in self._fit_extra_kwargs_dict()}
+            fit_kwargs = {key: value for key, value in kwargs.items() if key not in fit_extra_args}
             self.fit(**fit_kwargs)
 
         X, y, _, _ = self._trainer.load_data()
@@ -1106,8 +1107,10 @@ class TabularPredictor:
             X_pseudo, y_pseudo, _, _, _, _, _, _ = self._learner.general_data_processing(test_data, None, None, 1, 0)
             kwargs['X_pseudo'] = X_pseudo
             kwargs['y_pseudo'] = y_pseudo
-            fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in self._fit_extra_kwargs_dict()}
-            return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1), **fit_extra_kwargs)
+            fit_extra_args += list(self.fit_extra.__code__.co_varnames)
+            fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
+            return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
+                                  **fit_extra_kwargs)
         else:
             return self._run_pseudolabeling(hyperparameters=hyperparameters, test_data=test_data,
                                              max_iter=max_iter)
@@ -2522,16 +2525,8 @@ class TabularPredictor:
         if invalid_keys:
             raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
 
-    def _validate_fit_kwargs(self, kwargs):
-        # TODO:
-        #  Valid core_kwargs values:
-        #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
-        #  Valid aux_kwargs values:
-        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
-
-        # TODO: Remove features from models option for fit_extra
-        # TODO: Constructor?
-        fit_kwargs_default = dict(
+    def _extra_fit_kwargs_dict(self):
+        return dict(
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             holdout_frac=None,  # TODO: Potentially error if num_bag_folds is also specified
             num_bag_folds=None,  # TODO: Potentially move to fit_extra, raise exception if value too large / invalid in fit_extra.
@@ -2544,6 +2539,17 @@ class TabularPredictor:
             unlabeled_data=None,
             _feature_generator_kwargs=None,
         )
+
+    def _validate_fit_kwargs(self, kwargs):
+        # TODO:
+        #  Valid core_kwargs values:
+        #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
+        #  Valid aux_kwargs values:
+        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
+
+        # TODO: Remove features from models option for fit_extra
+        # TODO: Constructor?
+        fit_kwargs_default = self._extra_fit_kwargs_dict()
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
 
