@@ -2414,8 +2414,16 @@ class TabularPredictor:
         if invalid_keys:
             raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
 
-    def _extra_fit_kwargs_dict(self):
-        return dict(
+    def _validate_fit_kwargs(self, kwargs):
+        # TODO:
+        #  Valid core_kwargs values:
+        #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
+        #  Valid aux_kwargs values:
+        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
+
+        # TODO: Remove features from models option for fit_extra
+        # TODO: Constructor?
+        fit_kwargs_default = dict(
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             holdout_frac=None,  # TODO: Potentially error if num_bag_folds is also specified
             num_bag_folds=None,  # TODO: Potentially move to fit_extra, raise exception if value too large / invalid in fit_extra.
@@ -2428,17 +2436,6 @@ class TabularPredictor:
             unlabeled_data=None,
             _feature_generator_kwargs=None
         )
-
-    def _validate_fit_kwargs(self, kwargs):
-        # TODO:
-        #  Valid core_kwargs values:
-        #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
-        #  Valid aux_kwargs values:
-        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
-
-        # TODO: Remove features from models option for fit_extra
-        # TODO: Constructor?
-        fit_kwargs_default = self._extra_fit_kwargs_dict()
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
 
