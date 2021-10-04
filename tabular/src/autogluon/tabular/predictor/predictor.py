@@ -909,8 +909,11 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
-        X_pseudo = kwargs.get('X_pseudo', None)
-        y_pseudo = kwargs.get('y_pseudo', None)
+        pseudo_data = kwargs.get('pseudo_data', None)
+
+        if pseudo_data is not None:
+            X_pseudo = pseudo_data.drop(columns=[self.label])
+            y_pseudo = pseudo_data[self.label]
 
         if ag_args is None:
             ag_args = {}
@@ -1053,7 +1056,9 @@ class TabularPredictor:
             y_pred_holdout = y_pred_holdout.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
             X_pseudo = test_data.loc[y_pred_holdout.index]
             y_pseudo = self._learner.label_cleaner.transform(y_pred_holdout)
-            self.fit_extra(hyperparameters=hyperparameters, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
+            pseudo_data = X_pseudo
+            pseudo_data[self.label] = y_pseudo
+            self.fit_extra(hyperparameters=hyperparameters, pseudo_data=pseudo_data,
                            name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)))
             current_score = self.info()['best_model_score_val']
 
@@ -1068,7 +1073,7 @@ class TabularPredictor:
 
         return self
 
-    def pseudolabel_fit(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
+    def fit_pseudolabel(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
         """
             Pseudolabeling algorithm user entry function. If model is not fit at all will fit a model
             using specified settings before running pseudo labeling.
@@ -1105,8 +1110,8 @@ class TabularPredictor:
 
         if is_labeled:
             X_pseudo, y_pseudo, _, _, _, _, _, _ = self._learner.general_data_processing(test_data, None, None, 1, 0)
-            kwargs['X_pseudo'] = X_pseudo
-            kwargs['y_pseudo'] = y_pseudo
+            X_pseudo[self.label] = y_pseudo
+            kwargs['pseudo_data'] = X_pseudo
             fit_extra_args += list(self.fit_extra.__code__.co_varnames)
             fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
             return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
@@ -2590,8 +2595,7 @@ class TabularPredictor:
             calibrate=False,
             
             # pseudo label
-            X_pseudo=None,
-            y_pseudo=None,
+            pseudo_data=None,
 
             name_suffix=None
         )
