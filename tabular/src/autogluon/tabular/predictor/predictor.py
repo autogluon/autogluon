@@ -1049,9 +1049,9 @@ class TabularPredictor:
                 logger.log(20,
                            f'Pseudolabeling algorithm found no rows of pseudolabeled data that met criteria on iteration: {iter_print}. Ending...')
                 return self
-
-            logger.log(20, f'Pseudolabeling algorithm found: {len(test_pseudo_idxes_true)} rows of pseudolabeled data met criteria on iteration: {iter_print}. '
-                           f'Adding to train data')
+            else:
+                logger.log(20, f'Pseudolabeling algorithm found: {len(test_pseudo_idxes_true)} rows of pseudolabeled data met criteria on iteration: {iter_print}.'
+                               f' Adding to train data')
 
             test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
