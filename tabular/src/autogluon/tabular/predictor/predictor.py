@@ -1018,7 +1018,7 @@ class TabularPredictor:
 
         return test_pseudo_indices
 
-    def _run_pseudolabeling(self, hyperparameters: dict, test_data: pd.DataFrame, max_iter: int):
+    def _run_pseudolabeling(self, test_data: pd.DataFrame, max_iter: int, **kwargs):
         """
             Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
             that the first fit unless specified by the user. Will keep incorporating self labeled
@@ -1061,8 +1061,8 @@ class TabularPredictor:
             y_pseudo = self._learner.label_cleaner.transform(y_pred_holdout)
             pseudo_data = X_pseudo
             pseudo_data[self.label] = y_pseudo
-            self.fit_extra(hyperparameters=hyperparameters, pseudo_data=pseudo_data,
-                           name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)))
+            self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)),
+                           **kwargs)
             current_score = self.info()['best_model_score_val']
 
             if previous_score >= current_score:
@@ -1109,18 +1109,17 @@ class TabularPredictor:
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
         kwargs['hyperparameters'] = hyperparameters
-
+        fit_extra_args = list(self._fit_extra_kwargs_dict().keys()) + list(self.fit_extra.__code__.co_varnames)
+        fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
         if is_labeled:
             X_pseudo, y_pseudo, _, _, _, _, _, _ = self._learner.general_data_processing(test_data, None, None, 1, 0)
             X_pseudo[self.label] = y_pseudo
             kwargs['pseudo_data'] = X_pseudo
-            fit_extra_args = list(self._fit_extra_kwargs_dict().keys()) + list(self.fit_extra.__code__.co_varnames)
-            fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
             return self.fit_extra(name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
                                   **fit_extra_kwargs)
         else:
-            return self._run_pseudolabeling(hyperparameters=hyperparameters, test_data=test_data,
-                                             max_iter=max_iter)
+            return self._run_pseudolabeling(test_data=test_data,
+                                             max_iter=max_iter, **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):
         """
