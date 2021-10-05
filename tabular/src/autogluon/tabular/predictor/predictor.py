@@ -1091,33 +1091,32 @@ class TabularPredictor:
             If model is not already fit. Refer to parameters documentation in :meth:`TabularPredictor.fit`.
             If model is fit. Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
         """
-        fit_extra_args = list(self._fit_extra_kwargs_dict().keys())
         if not self._learner.is_fit:
             logger.log(20,
                        f'Model not fit prior to pseudolabeling. Fitting now...')
-            fit_kwargs = {key: value for key, value in kwargs.items() if key not in fit_extra_args}
-            self.fit(**fit_kwargs)
+            self.fit(**kwargs)
 
         X, y, _, _ = self._trainer.load_data()
         y.name = self.label
         train_data = pd.concat([X, y], axis=1)
         test_data, is_labeled = self._validate_pseudo_data(train_data, test_data)
 
-        hyperparameters = None if 'hyperparameters' not in kwargs else kwargs['hyperparameters']
+        hyperparameters = kwargs.get('hyperparameters', None)
         if hyperparameters is None:
             if self._learner.is_fit:
                 hyperparameters = self.fit_hyperparameters
-
-        if isinstance(hyperparameters, str):
+        elif isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
+
+        kwargs['hyperparameters'] = hyperparameters
 
         if is_labeled:
             X_pseudo, y_pseudo, _, _, _, _, _, _ = self._learner.general_data_processing(test_data, None, None, 1, 0)
             X_pseudo[self.label] = y_pseudo
             kwargs['pseudo_data'] = X_pseudo
-            fit_extra_args += list(self.fit_extra.__code__.co_varnames)
+            fit_extra_args = list(self._fit_extra_kwargs_dict().keys()) + list(self.fit_extra.__code__.co_varnames)
             fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
-            return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
+            return self.fit_extra(name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
                                   **fit_extra_kwargs)
         else:
             return self._run_pseudolabeling(hyperparameters=hyperparameters, test_data=test_data,
