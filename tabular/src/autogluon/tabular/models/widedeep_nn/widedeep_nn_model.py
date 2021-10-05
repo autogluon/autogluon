@@ -107,6 +107,7 @@ class WideDeepNNModel(AbstractModel):
         trainer = Trainer(model, objective=objective, metrics=metrics)
         # FIXME: Does not return best epoch, instead returns final epoch
         #  Very important to return best epoch, otherwise model can be far worse than ideal
+        # FIXME: Add early stopping
         trainer.fit(
             X_train=X_train,
             X_val=X_val_in,
