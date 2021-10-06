@@ -17,7 +17,7 @@ import os
 import copy
 import numpy as np
 from autogluon.core.dataset import TabularDataset
-from pyDeepInsight import ImageTransformer,LogScaler # pylint: disable=import-error
+from pyDeepInsight import ImageTransformer,LogScaler 
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -142,3 +142,4 @@ class Utils_pro:
 #python3 -m pip install  pygraphviz
 
 #python3 -m  pip -q install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight    
+#from autogluon.tabular_to_image.utils_pro import Utils_pro
