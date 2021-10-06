@@ -1112,9 +1112,7 @@ class TabularPredictor:
         fit_extra_args = list(self._fit_extra_kwargs_dict().keys()) + list(self.fit_extra.__code__.co_varnames)
         fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
         if is_labeled:
-            X_pseudo, y_pseudo, _, _, _, _, _, _ = self._learner.general_data_processing(test_data, None, None, 1, 0)
-            X_pseudo[self.label] = y_pseudo
-            kwargs['pseudo_data'] = X_pseudo
+            kwargs['pseudo_data'] = test_data
             return self.fit_extra(name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
                                   **fit_extra_kwargs)
         else:

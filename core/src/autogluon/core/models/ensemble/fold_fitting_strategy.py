@@ -2,6 +2,7 @@ import copy
 import logging
 import os
 import time
+import pandas as pd
 from abc import abstractmethod
 
 from numpy import ndarray
@@ -121,13 +122,11 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
                 kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
 
         if is_pseudo:
-            import pandas as pd
-            logger.log(20, f'Pseudo labeling incorporated for {fold_model.name}, with {len(X_fold)} rows of Pseudo')
+            logger.log(15, f'Pseudo labeling incorporated for {fold_model.name}, with {len(X_fold)} rows of Pseudo')
             X_fold = pd.concat([X_fold, self.X_pseudo], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, self.y_pseudo], axis=0, ignore_index=True)
 
-        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold,
-                       **kwargs_fold)
+        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
         fold_model.fit_time = time.time() - time_start_fold
         return fold_model
 
