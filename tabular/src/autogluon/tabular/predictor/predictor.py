@@ -2629,6 +2629,20 @@ class TabularPredictor:
         return kwargs_sanitized
 
     def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool):
+        """
+        Prune columns in self.sample_weight from train_features and other_features.
+        Also removes features from self._learner.groups from train_features if labeled
+
+        Parameters
+        ----------
+        train_features : pd.DataFrame
+            The features/columns for the incoming training data
+        other_features : pd.DataFrame
+            Features of other incoming data examples of this could be:
+            tuning data, pseudo data
+        is_labeled: bool
+            Is other_features dataframe labeled or not
+        """
         if self.sample_weight is not None:
             if self.sample_weight in train_features:
                 train_features.remove(self.sample_weight)
@@ -2640,6 +2654,16 @@ class TabularPredictor:
         return train_features, other_features
 
     def _validate_pseudo_data(self, train_data: pd.DataFrame, pseudo_data: pd.DataFrame):
+        """
+        Code for validating if pseudo_data is valid, by ensuring: it is of proper type,
+        that features are pruned if necessary and that if train had columns removed
+        then pseudo will as well
+
+        Parameters
+        ----------
+        train_data: The already preprocessed train_data for TabularPredictor
+        pseudo_data: The incoming pseudo data requiring validation
+        """
         if isinstance(pseudo_data, str):
             pseudo_data = TabularDataset(pseudo_data)
 
