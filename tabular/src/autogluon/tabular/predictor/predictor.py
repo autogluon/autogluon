@@ -1096,6 +1096,11 @@ class TabularPredictor:
                        f'Model not fit prior to pseudolabeling. Fitting now...')
             self.fit(**kwargs)
 
+        if self.problem_type is 'multiclass' and self.eval_metric is not 'accuracy':
+            logger.warning('AutoGluon has detected the problem type as \'multiclass\' and '
+                           f'eval metric is {self.eval_metric.name}, we recommend using'
+                           f'fit_pseudolabeling when eval metric is accuracy')
+
         X, y, _, _ = self._trainer.load_data()
         y.name = self.label
         train_data = pd.concat([X, y], axis=1)
