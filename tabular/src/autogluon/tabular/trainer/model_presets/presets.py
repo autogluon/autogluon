@@ -9,7 +9,8 @@ from autogluon.core.trainer.utils import process_hyperparameters
 
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
-    TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel
+    TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel, \
+    RuleFitModel, GreedyTreeModel, CorelsRuleListModel, GlobalSparseTreeModel, BoostedRulesModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,13 @@ DEFAULT_MODEL_PRIORITY = dict(
     AG_IMAGE_NN=0,
     TRANSF=0,
     custom=0,
+
+    # interpretable models
+    RULEFIT=0,
+    GREEDYTREE=0,
+    RULELIST=0,
+    OPTIMALTREE=0,
+    BOOSTEDRULES=0,
 )
 
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
@@ -68,7 +76,15 @@ MODEL_TYPES = dict(
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
     SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
+
+    # interpretable models
+    RULEFIT=RuleFitModel,
+    GREEDYTREE=GreedyTreeModel,
+    RULELIST=CorelsRuleListModel,
+    OPTIMALTREE=GlobalSparseTreeModel,
+    BOOSTEDRULES=BoostedRulesModel,
 )
+
 
 DEFAULT_MODEL_NAMES = {
     RFModel: 'RandomForest',
@@ -87,6 +103,13 @@ DEFAULT_MODEL_NAMES = {
     FastTextModel: 'FastText',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
     SimpleWeightedEnsembleModel: 'WeightedEnsemble',
+
+    # Interpretable models
+    RuleFitModel: 'RuleFit',
+    GreedyTreeModel: 'GreedyTree',
+    CorelsRuleListModel: 'RuleList',
+    GlobalSparseTreeModel: 'OptimalTree',
+    BoostedRulesModel: 'BoostedRules',
 }
 
 

@@ -84,6 +84,14 @@ hyperparameter_config_dict = dict(
         'AG_TEXT_NN': ['medium_quality_faster_train'],  # TODO, Support changing the config w.r.t the preset option.
         'AG_IMAGE_NN': {},  # TODO, Support changing the config w.r.t the preset option.
     },
+
+    interpretable={
+        'RULEFIT': {},
+        'GREEDYTREE': {},
+        'RULELIST': {},
+        'OPTIMALTREE': {},
+        'BOOSTEDRULES': {}
+    }
 )
 
 
