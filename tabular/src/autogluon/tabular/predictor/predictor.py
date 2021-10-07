@@ -21,6 +21,7 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.core.utils.decorators import apply_presets
+from autogluon.tabular.models import IModelsModel
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
@@ -304,7 +305,7 @@ class TabularPredictor:
             For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
+            Available Presets: ['best_quality', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'interpretable', 'ignore_text']
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
@@ -333,6 +334,10 @@ class TabularPredictor:
                     Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
                     This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
                     Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
+
+                interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'}
+                    Fits only interpretable rule-based models from the imodels package.
+                    Trades off predictive accuracy for conciseness.
 
                 ignore_text={'_feature_generator_kwargs': {'enable_text_ngram_features': False, 'enable_text_special_features': False, 'enable_raw_text_features': False}}
                     Disables automated feature generation when text features are detected.
@@ -2428,6 +2433,27 @@ class TabularPredictor:
             raise ValueError(f'num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})')
         return num_bag_folds, num_bag_sets, num_stack_levels
 
+    def interpret_summary(self, verbosity=0):
+        '''Summary of fitted interpretable models along with their corresponding complexities
+        '''
+        d = self.fit_summary(verbosity=verbosity)
+        summaries = pd.DataFrame.from_dict(d)
+
+        complexities = []
+        for i in range(summaries.shape[0]):
+            model_name = summaries.index.values[i]
+            agmodel = self._learner.load_trainer().load_model(model_name)
+            imodel = agmodel.model
+            if not isinstance(agmodel, IModelsModel):
+                complexities.append(np.nan)
+            elif 'Tree' in model_name:
+                complexities.append((2 ** imodel.get_depth()) * imodel.get_depth())
+            else:
+                complexities.append(imodel.complexity_)
+        summaries.insert(2, 'complexity', complexities)
+        summaries = summaries[~pd.isna(summaries.complexity)]  # remove non-interpretable models
+        return summaries.sort_values(by=['model_performance', 'complexity'], ascending=[False, True])
+
 
 # Location to store WIP functionality that will be later added to TabularPredictor
 class _TabularPredictorExperimental(TabularPredictor):
@@ -2483,3 +2509,4 @@ class _TabularPredictorExperimental(TabularPredictor):
         predictor = cls(label=learner.label, path=learner.path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor
+
