@@ -2433,7 +2433,7 @@ class TabularPredictor:
             raise ValueError(f'num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})')
         return num_bag_folds, num_bag_sets, num_stack_levels
 
-    def interpret_summary(self, verbosity=0):
+    def interpretable_models_summary(self, verbosity=0):
         '''Summary of fitted interpretable models along with their corresponding complexities
         '''
         d = self.fit_summary(verbosity=verbosity)
@@ -2453,6 +2453,28 @@ class TabularPredictor:
         summaries.insert(2, 'complexity', complexities)
         summaries = summaries[~pd.isna(summaries.complexity)]  # remove non-interpretable models
         return summaries.sort_values(by=['model_performance', 'complexity'], ascending=[False, True])
+
+    def print_interpretable_rules(self, complexity_threshold: int=10):
+        """
+        Print the rules of the highest performing model below the complexity threshold.
+
+        Parameters
+        ----------
+        complexity_threshold : int, default=10
+            Threshold for complexity (number of rules) of fitted models to show.
+            If not model complexity is below this threshold, prints the model with the lowest complexity.
+        """
+        summaries = self.interpretable_models_summary()
+        summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
+        if summaries_filtered.shape[0] == 0:
+            summaries_filtered = summaries
+        model_name = summaries_filtered.index.values[0]  # best model is at top
+        agmodel = self._learner.load_trainer().load_model(model_name)
+        imodel = agmodel.model
+        print(imodel)
+
+
+
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor
