@@ -83,6 +83,9 @@ install_tabular_to_image = """
     python3 -m pip install --upgrade -e tabular_to_image/
 """
 
+install_tabular_to_image_all = """
+    python3 -m pip install --upgrade -e tabular_to_image/[all]
+"""
 
 stage("Unit Test") {
   parallel 'core': {
@@ -190,7 +193,7 @@ stage("Unit Test") {
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          ${install_tabular_all}
+          ${install_tabular_to_image_all}
           
           cd tabular_to_image/
           python3 -m pytest --junitxml=results.xml --runslow tests
@@ -736,7 +739,7 @@ stage("Build Docs") {
         cd ..
         
         cd tabular_to_image/
-        python3 -m pip install --upgrade -e .
+        python3 -m pip install --upgrade -e .[all]
         cd ..
         
         cd mxnet/
