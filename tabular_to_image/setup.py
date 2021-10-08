@@ -29,7 +29,7 @@ requirements = [
 
     'psutil>=5.7.3,<5.9',  # TODO: Consider capping to <6.0 instead, capping to 5.9 to avoid possible issues.
     'networkx>=2.3,<3.0',
-    'pyDeepInsight==0.1.0'
+    #'pyDeepInsight==0.1.0'
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
     #f'autogluon.tabular_to_image=={version}', 
@@ -40,7 +40,7 @@ test_requirements = [
     'openml',
 ]
 
-"""
+
 extras_require = {
     'fastai': [
         'torch>=1.0,<2.0',
@@ -56,8 +56,15 @@ for extra_package in [ 'fastai']:
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires
  
-"""
+
  
+all_requires = []
+# TODO: Consider adding 'skex' to 'all'
+for extra_package in ['fastai']:
+    all_requires += extras_require[extra_package]
+all_requires = list(set(all_requires))
+extras_require['all'] = all_requires
+
 install_requires = requirements + test_requirements
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
@@ -66,6 +73,6 @@ if __name__ == '__main__':
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
         install_requires=install_requires,
-        #extras_require=extras_require,
+        extras_require=extras_require,
         **setup_args,
     )
