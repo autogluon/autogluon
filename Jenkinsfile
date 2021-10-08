@@ -79,6 +79,11 @@ install_forecasting = """
     python3 -m pip install --upgrade -e forecasting/
 """
 
+install_tabular_to_image = """
+    python3 -m pip install --upgrade -e tabular_to_image/
+"""
+
+
 stage("Unit Test") {
   parallel 'core': {
     node('linux-cpu') {
@@ -158,6 +163,36 @@ stage("Unit Test") {
           ${install_vision}
 
           cd tabular/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
+          """
+        }
+      }
+    }
+  },
+   'tabular_to_image': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tabular_to_image-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon-tabular_to_image-py3-v3 -f docs/build.yml
+          conda activate autogluon-tabular_to_image-py3-v3
+          conda list
+          ${setup_pip_venv}
+          ${setup_mxnet_gpu}
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+          env
+
+          ${install_core}
+          ${install_features}
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          python3 -m pip uninstall -y typing
+          ${install_tabular_all}
+          
+          cd tabular_to_image/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -339,6 +374,8 @@ stage("Unit Test") {
           cd ../features/
           python3 -m pip install --upgrade -e .
           cd ../tabular/
+          python3 -m pip install --upgrade -e .
+          cd ../tabular_to_image/
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           python3 -m pip install --upgrade -e .[all]
@@ -697,7 +734,11 @@ stage("Build Docs") {
         cd tabular/
         python3 -m pip install --upgrade -e .[all]
         cd ..
-
+        
+        cd tabular_to_image/
+        python3 -m pip install --upgrade -e .
+        cd ..
+        
         cd mxnet/
         python3 -m pip install --upgrade -e .
         cd ..
