@@ -1372,7 +1372,7 @@ class TabularPredictor:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, silent=False):
+    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99, silent=False):
         """
         Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the data where this feature's values have been randomly shuffled across rows.
@@ -1439,8 +1439,12 @@ class TabularPredictor:
             Defaults to 3 if `time_limit` is None or 10 if `time_limit` is specified.
             Runtime linearly scales with `num_shuffle_sets`.
         include_confidence_band: bool, default = True
-            If True, will include output columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time (99% confidence interval).
-            Increasing `subsample_size` and `num_shuffle_sets` will tighten the band.
+            If True, returned DataFrame will include two additional columns specifying confidence interval for the true underlying importance value of each feature.
+            Increasing `subsample_size` and `num_shuffle_sets` will tighten the confidence interval.
+        confidence_level: float, default = 0.99
+            This argument is only considered when `include_confidence_band` is True, and can be used to specify the confidence level used for constructing confidence intervals.  
+            For example, if `confidence_level` is set to 0.99, then the returned DataFrame will include columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time (99% confidence interval).
+            More generally, if `confidence_level` = 0.XX, then the columns containing the XX% confidence interval will be named 'pXX_high' and 'pXX_low'. 
         silent : bool, default = False
             Whether to suppress logging output.
 
@@ -1455,8 +1459,8 @@ class TabularPredictor:
                 A p-value of 0.01 indicates that there is a 1% chance that the feature is useless or harmful, and a 99% chance that the feature is useful.
                 A p-value of 0.99 indicates that there is a 99% chance that the feature is useless or harmful, and a 1% chance that the feature is useful.
             'n': The number of shuffles performed to estimate importance score (corresponds to sample-size used to determine confidence interval for true score).
-            'p99_high': Upper end of 99% confidence interval for true feature importance score.
-            'p99_low': Lower end of 99% confidence interval for true feature importance score.
+            'pXX_high': Upper end of XX% confidence interval for true feature importance score (where XX=99 by default).
+            'pXX_low': Lower end of XX% confidence interval for true feature importance score.
         """
         data = self.__get_dataset(data) if data is not None else data
         if (data is None) and (not self._trainer.is_data_saved):
@@ -1469,27 +1473,31 @@ class TabularPredictor:
                                                      subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
 
         if include_confidence_band:
+            if confidence_level <= 0.5 or confidence_level >= 1.0:
+                raise ValueError("confidence_level must lie between 0.5 and 1.0")
+            ci_str = "{:0.0f}".format(confidence_level*100)
             import scipy.stats
             num_features = len(fi_df)
-            confidence_threshold = 0.99
-            p99_low_dict = dict()
-            p99_high_dict = dict()
+            ci_low_dict = dict()
+            ci_high_dict = dict()
             for i in range(num_features):
                 fi = fi_df.iloc[i]
                 mean = fi['importance']
                 stddev = fi['stddev']
                 n = fi['n']
                 if stddev == np.nan or n == np.nan or mean == np.nan or n == 1:
-                    p99_high = np.nan
-                    p99_low = np.nan
+                    ci_high = np.nan
+                    ci_low = np.nan
                 else:
-                    t_val_99 = scipy.stats.t.ppf(1 - (1 - confidence_threshold) / 2, n - 1)
-                    p99_high = mean + t_val_99 * stddev / math.sqrt(n)
-                    p99_low = mean - t_val_99 * stddev / math.sqrt(n)
-                p99_high_dict[fi.name] = p99_high
-                p99_low_dict[fi.name] = p99_low
-            fi_df['p99_high'] = pd.Series(p99_high_dict)
-            fi_df['p99_low'] = pd.Series(p99_low_dict)
+                    t_val = scipy.stats.t.ppf(1 - (1 - confidence_level) / 2, n - 1)
+                    ci_high = mean + t_val * stddev / math.sqrt(n)
+                    ci_low = mean - t_val * stddev / math.sqrt(n)
+                ci_high_dict[fi.name] = ci_high
+                ci_low_dict[fi.name] = ci_low
+            high_str = 'p'+ci_str+'_high'
+            low_str = 'p'+ci_str+'_low'
+            fi_df[high_str] = pd.Series(ci_high_dict)
+            fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
 
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
