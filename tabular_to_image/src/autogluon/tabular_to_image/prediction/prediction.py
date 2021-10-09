@@ -1,7 +1,11 @@
-import matplotlib.pyplot as plt
 import time
 import os
 import copy
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score
+
 import torch
 #device = torch.device("cuda") #device = 'cuda'
 import torchvision.transforms as transforms
@@ -9,16 +13,10 @@ from torch.utils.data import TensorDataset, DataLoader
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
 from torch.optim import lr_scheduler
 from torch.autograd import Variable
-import numpy as np
-import torchvision
 from torchvision import datasets, models, transforms
-#from autogluon.tabular_to_image.utils_pro import  Utils_pro
-from autogluon.tabular_to_image.utils_pro import Utils_pro 
-from autogluon.tabular_to_image.models_zoo import ModelsZoo  
+ 
 import autogluon.tabular_to_image.utils_pro
 import autogluon.tabular_to_image.models_zoo   
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
