@@ -194,7 +194,10 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_tabular_to_image_all}
-          
+          ${install_mxnet}
+          ${install_text}
+          ${install_extra}
+          ${install_vision}
           cd tabular_to_image/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
