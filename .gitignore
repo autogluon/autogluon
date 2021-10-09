@@ -132,6 +132,7 @@ features/src/autogluon/features/version.py
 mxnet/src/autogluon/mxnet/version.py
 extra/src/autogluon/extra/version.py
 tabular/src/autogluon/tabular/version.py
+tabular_to_image/src/autogluon/tabular_to_image/version.py
 text/src/autogluon/text/version.py
 vision/src/autogluon/vision/version.py
 
