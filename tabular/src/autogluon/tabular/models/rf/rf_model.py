@@ -221,7 +221,7 @@ class RFModel(AbstractModel):
         # TODO: This can also be done via setting `oob_score=True` in model params,
         #  but getting the correct `pred_time_val` that way is not easy, since we can't time the internal call.
         if (getattr(self.model, "oob_decision_function_", None) is None and getattr(self.model, "oob_prediction_", None) is None) \
-                and callable(getattr(self.model, "_set_oob_score", None)):
+                and (callable(getattr(self.model, "_set_oob_score", None)) or callable(getattr(self.model, "_set_oob_score_and_attributes", None))):
             X = self.preprocess(X)
 
             if getattr(self.model, "n_classes_", None) is not None:
@@ -235,7 +235,14 @@ class RFModel(AbstractModel):
                 y = np.reshape(y, (-1, 1))
             if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
                 y = np.ascontiguousarray(y, dtype=DOUBLE)
-            self.model._set_oob_score(X, y)
+            if callable(getattr(self.model, "_set_oob_score_and_attributes", None)):
+                # sklearn >= 1.0
+                # TODO: Can instead do `_compute_oob_predictions` but requires post-processing. Skips scoring func.
+                self.model._set_oob_score_and_attributes(X, y)
+            else:
+                # sklearn < 1.0
+                # TODO: Remove once sklearn < 1.0 support is dropped
+                self.model._set_oob_score(X, y)
             if getattr(self.model, "n_classes_", None) is not None:
                 if self.model.n_outputs_ == 1:
                     self.model.n_classes_ = self.model.n_classes_[0]
