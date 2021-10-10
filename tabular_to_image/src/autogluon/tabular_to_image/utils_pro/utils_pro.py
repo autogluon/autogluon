@@ -21,15 +21,25 @@ from pyDeepInsight import ImageTransformer,LogScaler
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from matplotlib import pyplot as plt
-import matplotlib.ticker as ticker
-#from sklearn.model_selection import StratifiedKFol
+import matplotlib.ticker as tic
+from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from sklearn.manifold import TSNE
 class Utils_pro:
     def __init__(self, label_column,image_shape ):
-      #self.train_dataset=train_dataset
-      self.label_column=label_column
-      self.image_shape=image_shape
-      
+        #self.train_dataset=train_dataset
+        self.label_column=label_column
+        #self.image_shape=image_shape
+     
+              
+        self._ModelsZoo: ModelsZoo = ModelsZoo_type(ImageShape=ImageShape ,model_type=model_type,
+                                        num_classes=num_classes,pretrained=pretrained,**Utils_pro_kwargs)
+        self._ModelsZoo_type = type(self._ModelsZoo)
+        ModelsZoo_type = kwargs.pop('ModelsZoo_type', ModelsZoo)
+        ModelsZoo_kwargs = kwargs.pop('ModelsZoo_kwargs', dict())
+        ImageShape = kwargs.get('ImageShape', None)
+        #model_type = kwargs.get('model_type', None)
+        #num_classes = kwargs.get('num_classes', None)
+        #pretrained = kwargs.get('pretrained', None)
       
     Dataset = TabularDataset  
     #def data_split(self,):
@@ -72,6 +82,10 @@ class Utils_pro:
      
     
     
+    @property
+    def ImageShape(self):
+        return self._ModelsZoo.ImageShape 
+    
     @staticmethod
     def __get_dataset(data):
         if isinstance(data, TabularDataset):
@@ -95,6 +109,7 @@ class Utils_pro:
         X_val_norm = ln.fit_transform(X_val)
         X_test_norm = ln.transform(X_test)
         #@jit(target ="cuda") 
+        model=self._ModelsZoo.ModelsZoo.create_model()
         it = ImageTransformer(feature_extractor='tsne',pixels=self.image_shape, random_state=1701,n_jobs=-1)
        
         X_train_img = it.fit_transform(X_train_norm)
