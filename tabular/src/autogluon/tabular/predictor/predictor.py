@@ -2,6 +2,7 @@ import copy
 import logging
 import os
 import math
+import inspect
 import pprint
 import time
 from typing import Union
@@ -914,6 +915,8 @@ class TabularPredictor:
         if pseudo_data is not None:
             X_pseudo = pseudo_data.drop(columns=[self.label])
             y_pseudo = pseudo_data[self.label]
+            X_pseudo = self._learner.transform_features(X_pseudo)
+            y_pseudo = self._learner.label_cleaner.transform(y_pseudo)
         else:
             X_pseudo = None
             y_pseudo = None
@@ -923,7 +926,7 @@ class TabularPredictor:
         ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
-        aux_kwargs = {'X_pseudo': X_pseudo, 'y_pseudo': y_pseudo}  # TODO: Add as option
+        aux_kwargs = dict() # TODO: Add as option
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -971,9 +974,14 @@ class TabularPredictor:
         self.save()
         return self
 
+    def _get_all_fit_extra_args(self):
+        ret = list(self._fit_extra_kwargs_dict().keys()) + list(inspect.signature(self.fit_extra).parameters.keys())
+        ret.remove('kwargs')
+
+        return ret
 
     def _filter_pseudo(self, y_pred_proba_og, min_percentage: float = 0.05, max_percentage: float = 0.6,
-                      threshold: float = 0.95):
+                      threshold: float = 0.95, percent_sample: float = 0.3):
         """
             Takes in the predicted probabilities of the model and chooses the indices that meet
             a criteria to incorporate into training data. Criteria is determined by problem_type
@@ -1011,7 +1019,7 @@ class TabularPredictor:
         else:
             # Select a random 30% of the data to use as pseudo
             test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
-            test_pseudo_indices_true = test_pseudo_indices.sample(frac=0.3, random_state=0)
+            test_pseudo_indices_true = test_pseudo_indices.sample(frac=percent_sample, random_state=0)
             test_pseudo_indices[test_pseudo_indices_true.index] = True
 
         test_pseudo_indices = test_pseudo_indices[test_pseudo_indices]
@@ -1058,9 +1066,8 @@ class TabularPredictor:
 
             y_pred_holdout = y_pred_holdout.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
             X_pseudo = test_data.loc[y_pred_holdout.index]
-            y_pseudo = self._learner.label_cleaner.transform(y_pred_holdout)
             pseudo_data = X_pseudo
-            pseudo_data[self.label] = y_pseudo
+            pseudo_data[self.label] = y_pred_holdout
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)),
                            **kwargs)
             current_score = self.info()['best_model_score_val']
@@ -1114,15 +1121,14 @@ class TabularPredictor:
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
         kwargs['hyperparameters'] = hyperparameters
-        fit_extra_args = list(self._fit_extra_kwargs_dict().keys()) + list(self.fit_extra.__code__.co_varnames)
+        fit_extra_args = self._get_all_fit_extra_args()
         fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
         if is_labeled:
-            kwargs['pseudo_data'] = test_data
-            return self.fit_extra(name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
+            return self.fit_extra(pseudo_data=test_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
                                   **fit_extra_kwargs)
         else:
             return self._run_pseudolabeling(test_data=test_data,
-                                             max_iter=max_iter, **fit_extra_kwargs)
+                                            max_iter=max_iter, **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):
         """

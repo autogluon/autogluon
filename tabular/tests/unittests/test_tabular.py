@@ -21,9 +21,11 @@
 """
 import warnings, shutil, os
 import numpy as np
+import inspect
 import mxnet as mx
 from random import seed
 
+import pandas
 from networkx.exception import NetworkXError
 import pandas as pd
 import pytest
@@ -203,14 +205,7 @@ def run_tabular_benchmark_toy(fit_args):
         raise AssertionError(f'{dataset["name"]} should raise an exception.')
 
 
-def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False):
-    print("Running fit with args:")
-    print(fit_args)
-    # Each train/test dataset must be located in single directory with the given names.
-    train_file = 'train_data.csv'
-    test_file = 'test_data.csv'
-    EPS = 1e-10
-
+def get_benchmark_sets():
     # Information about each dataset in benchmark is stored in dict.
     # performance_val = expected performance on this dataset (lower = better),should update based on previously run benchmarks
     binary_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
@@ -239,7 +234,19 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
     # 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
 
     # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-    datasets = [toyregres_dataset, binary_dataset, regression_dataset, multi_dataset]
+    return [toyregres_dataset, binary_dataset, regression_dataset, multi_dataset]
+
+
+def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False):
+    print("Running fit with args:")
+    print(fit_args)
+    # Each train/test dataset must be located in single directory with the given names.
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    EPS = 1e-10
+
+    # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
+    datasets = get_benchmark_sets()
     if dataset_indices is not None: # only run some datasets
         datasets = [datasets[i] for i in dataset_indices]
 
@@ -369,6 +376,50 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
         warnings.warn(w.message)
 
 
+def test_pseudolabeling():
+    datasets = get_benchmark_sets()[:-1]
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    directory_prefix = './datasets/'
+
+    for idx in range(len(datasets)):
+        dataset = datasets[idx]
+        label = dataset['label']
+        problem_type = dataset['problem_type']
+        name = dataset['name']
+        train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file,
+                                          name=dataset['name'], url=dataset['url'])
+
+        error_msg = f'pseudolabel threw an exception during fit, it should have ' \
+                    f'succeeded on problem type:{problem_type} with name:{name}, under settings:'
+
+        # Test label already given
+        try:
+            TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=test_data)
+        except Exception as e:
+            assert False, error_msg + 'labeled test'
+
+        try:
+            TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=test_data,
+                                                          presets='best_quality')
+        except Exception as e:
+            assert False, error_msg + 'labeled test, best quality'
+
+        unlabeled_test_data = test_data.drop(columns=label)
+
+        # Test unlabeled
+        try:
+            TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=unlabeled_test_data)
+        except Exception as e:
+            assert False, error_msg + 'unlabeled test'
+
+        try:
+            TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=unlabeled_test_data,
+                                                          presets='best_quality')
+        except Exception as e:
+            assert False, error_msg + 'unlabeled test, best quality'
+
+
 @pytest.mark.slow
 def test_tabularHPObagstack():
     ############ Benchmark options you can set: ########################
@@ -410,6 +461,66 @@ def test_tabularHPObagstack():
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)
+
+
+def get_default_args(func):
+    signature = inspect.signature(func)
+    return {
+        k: v.default
+        for k, v in signature.parameters.items()
+        if v.default is not inspect.Parameter.empty
+    }
+
+def get_default_pseudo_test_args(predictor):
+    default_args = get_default_args(predictor._filter_pseudo)
+    sample_percent = default_args['percent_sample']
+    min_percent = default_args['min_percentage']
+    max_percent = default_args['max_percentage']
+    threshold = default_args['threshold']
+
+    return sample_percent, min_percent, max_percent, threshold
+
+def test_regression_pseudofilter():
+    y_reg_fake = np.random.rand(200)
+    y_reg_fake = pandas.Series(data=y_reg_fake)
+
+    predictor = TabularPredictor(label='class', problem_type='regression')
+    sample_percent, _, _, _ = get_default_pseudo_test_args(predictor)
+    pseudo_idxes = predictor._filter_pseudo(y_reg_fake)
+    assert len(pseudo_idxes) == int(sample_percent * len(y_reg_fake))
+
+
+def test_classification_pseudofilter():
+    predictor = TabularPredictor(label='class', problem_type='binary')
+    _, min_percent, max_percent, threshold = get_default_pseudo_test_args(predictor)
+    middle_percent = (max_percent + min_percent) / 2
+    num_rows = 100
+    num_above_threshold = int(middle_percent * num_rows)
+    num_below_threshold = num_rows - num_above_threshold
+    y_reg_fake = np.ones((num_above_threshold))
+
+    # Test if percent preds is below min threshold
+    y_reg_fake_below_min = np.zeros((num_rows, 2))
+    y_reg_fake_below_min = pd.DataFrame(data=y_reg_fake_below_min)
+    pseudo_indicies_ans = predictor._filter_pseudo(y_reg_fake_below_min)
+    assert num_rows == len(pseudo_indicies_ans)
+
+    # Test if percent preds is above max thershold
+    y_reg_fake_above_max = pandas.DataFrame(data=y_reg_fake)
+    pseudo_indicies_ans = predictor._filter_pseudo(y_reg_fake_above_max)
+    assert 32 == len(pseudo_indicies_ans)
+
+    # Test if normal functionality beginning
+    y_reg_fake = np.column_stack((y_reg_fake, np.zeros((num_above_threshold))))
+    y_reg_fake = np.row_stack((y_reg_fake, np.zeros((num_below_threshold, 2))))
+
+    y_reg_fake = pandas.DataFrame(data=y_reg_fake)
+    y_reg_fake.max(axis=1)
+    pseudo_flag = y_reg_fake.max(axis=1) > threshold
+    pseudo_indices_ans = pseudo_flag[pseudo_flag == True]
+
+    pseudo_idxes = predictor._filter_pseudo(y_reg_fake)
+    assert len(pseudo_idxes) == len(pseudo_indices_ans)
 
 
 def test_tabularHPO():
