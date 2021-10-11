@@ -23,6 +23,7 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.core.utils.decorators import apply_presets
+from autogluon.tabular.pseudolabeling.pseudolabeling import filter_pseudo
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
@@ -715,7 +716,9 @@ class TabularPredictor:
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
-        self.fit_hyperparameters = hyperparameters
+        # TODO: Hyperparam could have non-serializble objects. Save as pkl and loaded on demand
+        # in case the hyperprams are large in memory
+        self.fit_hyperparameters_ = hyperparameters
 
         ###################################
         # FIXME: v0.1 This section is a hack
@@ -926,7 +929,7 @@ class TabularPredictor:
         ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
-        aux_kwargs = dict() # TODO: Add as option
+        aux_kwargs = None # TODO: Add as option
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -940,8 +943,11 @@ class TabularPredictor:
             num_stack_levels = highest_level
 
         # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
-        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types,
-                       'X_pseudo': X_pseudo, 'y_pseudo': y_pseudo}
+        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
+
+        if X_pseudo is not None and y_pseudo is not None:
+            core_kwargs['X_pseudo'] = X_pseudo
+            core_kwargs['y_pseudo'] = y_pseudo
 
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
@@ -980,69 +986,27 @@ class TabularPredictor:
 
         return ret
 
-    def _filter_pseudo(self, y_pred_proba_og, min_percentage: float = 0.05, max_percentage: float = 0.6,
-                      threshold: float = 0.95, percent_sample: float = 0.3):
-        """
-            Takes in the predicted probabilities of the model and chooses the indices that meet
-            a criteria to incorporate into training data. Criteria is determined by problem_type
-
-            Parameters:
-            -----------
-            y_pred_proba_og: The predicted probabilities from the current best model. If problem is
-            'binary' or 'multiclass' then it's Panda series of predictive probs, if it's 'regression'
-            then it's a scalar
-            min_percentage: Minimum percentage of total 'y_pred_proba_og` that is below threshold
-            required to trigger threshold change
-            max_percentange: Maximum percentage of total 'y_pred_proba_og` that is above threshold
-            required to trigger threshold change
-            threshold: The predictive probability percent that must be exceeded in order to be
-            incorporated into the next round of training
-        """
-        if self.problem_type in ['binary', 'multiclass']:
-            y_pred_proba_max = y_pred_proba_og.max(axis=1)
-            curr_threshold = threshold
-            curr_percentage = (y_pred_proba_max >= curr_threshold).mean()
-            num_rows = len(y_pred_proba_max)
-
-            if curr_percentage > max_percentage or curr_percentage < min_percentage:
-                if curr_percentage > max_percentage:
-                    num_rows_threshold = max(np.ceil(max_percentage * num_rows), 1)
-                else:
-                    num_rows_threshold = max(np.ceil(min_percentage * num_rows), 1)
-                y_pred_proba_max_sorted = y_pred_proba_max.sort_values(ascending=False, ignore_index=True)
-                # Set current threshold to num_rows_threshold - 1 if num of rows above
-                # max_percentage or below min_percentage
-                curr_threshold = y_pred_proba_max_sorted[num_rows_threshold - 1]
-
-            # Pseudo indices greater than threshold
-            test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
-        else:
-            # Select a random 30% of the data to use as pseudo
-            test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
-            test_pseudo_indices_true = test_pseudo_indices.sample(frac=percent_sample, random_state=0)
-            test_pseudo_indices[test_pseudo_indices_true.index] = True
-
-        test_pseudo_indices = test_pseudo_indices[test_pseudo_indices]
-
-        return test_pseudo_indices
 
     def _run_pseudolabeling(self, test_data: pd.DataFrame, max_iter: int, **kwargs):
         """
-            Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
-            that the first fit unless specified by the user. Will keep incorporating self labeled
-            test data into train data and not validation unless validation score is lower than the
-            pervious model
+        Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
+        that the first fit unless specified by the user. Will keep incorporating
+        self labeled data into train until validation score does not improve
 
-            Parameters:
-            -----------
-            hyperparameters: Dictionary of hyperparameters the model should use
-            test_data: The incoming data to incorporate into the next iterations of train
-            using pseudolabeling
-            max_iter: The maximum number of iterations allowed for this instance of pseudo
-            labeling
+        Parameters:
+        -----------
+        hyperparameters: dict
+        Dictionary of hyperparameters the model should use
+        test_data: The incoming data to incorporate into the next iterations of train
+        using pseudolabeling
+        max_iter: int, default = 5
+        The maximum number of iterations allowed for this instance of pseudolabeling
+        Returns:
+        --------
+        self: TabularPredictor
         """
         previous_score = self.info()['best_model_score_val']
-        y_pred_holdout = pd.Series()
+        y_pseudo_og = pd.Series()
         X_test = test_data.copy()
         test_data = self._learner.feature_generator.transform(test_data)
 
@@ -1051,7 +1015,7 @@ class TabularPredictor:
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling')
             y_pred_proba = self.predict_proba(data=X_test)
             y_pred = self.predict(data=X_test)
-            test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
+            test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
 
             if len(test_pseudo_idxes_true) < 1:
                 logger.log(20,
@@ -1064,20 +1028,22 @@ class TabularPredictor:
             test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
 
-            y_pred_holdout = y_pred_holdout.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
-            X_pseudo = test_data.loc[y_pred_holdout.index]
+            y_pseudo_og = y_pseudo_og.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
+            X_pseudo = test_data.loc[y_pseudo_og.index]
             pseudo_data = X_pseudo
-            pseudo_data[self.label] = y_pred_holdout
+            pseudo_data[self.label] = y_pseudo_og
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)),
                            **kwargs)
             current_score = self.info()['best_model_score_val']
+
+            logger.log(20,
+                       f'Pseudolabeling algorithm changed validation score from: {previous_score}, to: {current_score}'
+                       f' using evaluation metric: {self.eval_metric.name}')
 
             if previous_score >= current_score:
                 return self
             else:
                 # Cut down X_test to not include pseudo labeled data
-                logger.log(20,
-                           f'Pseudolabeling algorithm improved validation score from: {previous_score}, to: {current_score}')
                 X_test = X_test.loc[test_pseudo_idxes[test_pseudo_idxes == False].index]
                 previous_score = current_score
 
@@ -1085,16 +1051,19 @@ class TabularPredictor:
 
     def fit_pseudolabel(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
         """
-            Pseudolabeling algorithm user entry function. If model is not fit at all will fit a model
-            using specified settings before running pseudo labeling.
+        Pseudolabeling fit algorithm. If incoming data is labeled, automatically
+        incorporates into train, if not then labels and finds rows of data that meet
+        threshold then incorporates into train and fits new models.
 
-            Parameters
-            ----------
-            test_data : Data to incorporate into training. Pre-labeled test data allowed. If no labels
+        Parameters
+        ----------
+        test_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            Data to incorporate into training. Pre-labeled test data allowed. If no labels
             then pseudolabeling algorithm will predict and filter out which rows to incorporate into
             training
-            max iter: Maximum iterations of pseudolabeling allowed by user
-            kwargs:
+        max iter: int, default = 5
+            Maximum iterations of pseudolabeling allowed by user
+        kwargs: dict
             If model is not already fit. Refer to parameters documentation in :meth:`TabularPredictor.fit`.
             If model is fit. Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
         """
@@ -1116,7 +1085,7 @@ class TabularPredictor:
         hyperparameters = kwargs.get('hyperparameters', None)
         if hyperparameters is None:
             if self._learner.is_fit:
-                hyperparameters = self.fit_hyperparameters
+                hyperparameters = self.fit_hyperparameters_
         elif isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 

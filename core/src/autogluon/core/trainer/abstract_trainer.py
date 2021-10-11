@@ -946,8 +946,8 @@ class AbstractTrainer:
             The model will be accessible and usable through any Trainer function that takes as input 'model' or 'model_name'.
         Note: self._train_and_save should not be used outside of self._train_single_full
         """
-        X_pseudo = model_fit_kwargs['X_pseudo']
-        y_pseudo = model_fit_kwargs['y_pseudo']
+        X_pseudo = model_fit_kwargs.get('X_pseudo', None)
+        y_pseudo = model_fit_kwargs.get('y_pseudo', None)
         fit_start_time = time.time()
         time_limit = model_fit_kwargs.get('time_limit', None)
         model_names_trained = []
@@ -970,6 +970,8 @@ class AbstractTrainer:
             if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
                 X_w_pseudo = pd.concat([X, X_pseudo])
                 y_w_pseudo = pd.concat([y, y_pseudo])
+                model_fit_kwargs.pop('X_pseudo')
+                model_fit_kwargs.pop('y_pseudo')
                 logger.log(20, f'Pseudo labeling incorporated for {model.name}, with {len(X_w_pseudo)} rows of Pseudo')
                 model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
             else:
@@ -1002,7 +1004,6 @@ class AbstractTrainer:
                     model.predict_time = None
                 else:
                     model.predict_time = pred_end_time - fit_end_time
-
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)

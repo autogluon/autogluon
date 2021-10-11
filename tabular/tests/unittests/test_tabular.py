@@ -24,6 +24,7 @@ import numpy as np
 import inspect
 import mxnet as mx
 from random import seed
+from autogluon.tabular.pseudolabeling.pseudolabeling import filter_pseudo
 
 import pandas
 from networkx.exception import NetworkXError
@@ -473,8 +474,8 @@ def get_default_args(func):
         if v.default is not inspect.Parameter.empty
     }
 
-def get_default_pseudo_test_args(predictor):
-    default_args = get_default_args(predictor._filter_pseudo)
+def get_default_pseudo_test_args():
+    default_args = get_default_args(filter_pseudo)
     sample_percent = default_args['percent_sample']
     min_percent = default_args['min_percentage']
     max_percent = default_args['max_percentage']
@@ -488,7 +489,7 @@ def test_regression_pseudofilter():
 
     predictor = TabularPredictor(label='class', problem_type='regression')
     sample_percent, _, _, _ = get_default_pseudo_test_args(predictor)
-    pseudo_idxes = predictor._filter_pseudo(y_reg_fake)
+    pseudo_idxes = filter_pseudo(y_reg_fake, problem_type='regression')
     assert len(pseudo_idxes) == int(sample_percent * len(y_reg_fake))
 
 
@@ -504,12 +505,12 @@ def test_classification_pseudofilter():
     # Test if percent preds is below min threshold
     y_reg_fake_below_min = np.zeros((num_rows, 2))
     y_reg_fake_below_min = pd.DataFrame(data=y_reg_fake_below_min)
-    pseudo_indicies_ans = predictor._filter_pseudo(y_reg_fake_below_min)
+    pseudo_indicies_ans = filter_pseudo(y_reg_fake_below_min, 'binary')
     assert num_rows == len(pseudo_indicies_ans)
 
     # Test if percent preds is above max thershold
     y_reg_fake_above_max = pandas.DataFrame(data=y_reg_fake)
-    pseudo_indicies_ans = predictor._filter_pseudo(y_reg_fake_above_max)
+    pseudo_indicies_ans = filter_pseudo(y_reg_fake_above_max, 'binary')
     assert 32 == len(pseudo_indicies_ans)
 
     # Test if normal functionality beginning
@@ -521,7 +522,7 @@ def test_classification_pseudofilter():
     pseudo_flag = y_reg_fake.max(axis=1) > threshold
     pseudo_indices_ans = pseudo_flag[pseudo_flag == True]
 
-    pseudo_idxes = predictor._filter_pseudo(y_reg_fake)
+    pseudo_idxes = filter_pseudo(y_reg_fake, 'binary')
     assert len(pseudo_idxes) == len(pseudo_indices_ans)
 
 
