@@ -477,8 +477,8 @@ def get_default_args(func):
 def get_default_pseudo_test_args():
     default_args = get_default_args(filter_pseudo)
     sample_percent = default_args['percent_sample']
-    min_percent = default_args['min_percentage']
-    max_percent = default_args['max_percentage']
+    min_percent = default_args['min_proportion_prob']
+    max_percent = default_args['max_proportion_prob']
     threshold = default_args['threshold']
 
     return sample_percent, min_percent, max_percent, threshold
@@ -488,14 +488,13 @@ def test_regression_pseudofilter():
     y_reg_fake = pandas.Series(data=y_reg_fake)
 
     predictor = TabularPredictor(label='class', problem_type='regression')
-    sample_percent, _, _, _ = get_default_pseudo_test_args(predictor)
+    sample_percent, _, _, _ = get_default_pseudo_test_args()
     pseudo_idxes = filter_pseudo(y_reg_fake, problem_type='regression')
     assert len(pseudo_idxes) == int(sample_percent * len(y_reg_fake))
 
 
 def test_classification_pseudofilter():
-    predictor = TabularPredictor(label='class', problem_type='binary')
-    _, min_percent, max_percent, threshold = get_default_pseudo_test_args(predictor)
+    _, min_percent, max_percent, threshold = get_default_pseudo_test_args()
     middle_percent = (max_percent + min_percent) / 2
     num_rows = 100
     num_above_threshold = int(middle_percent * num_rows)
