@@ -398,7 +398,6 @@ class AbstractTrainer:
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
     def stack_new_level_aux(self, X, y, base_model_names: List[str], level,
-                            X_pseudo=None, y_pseudo=None,
                             fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
@@ -410,8 +409,10 @@ class AbstractTrainer:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
-        return self.generate_weighted_ensemble(X=X_stack_preds, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
-                                               level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
+        return self.generate_weighted_ensemble(X=X_stack_preds, y=y,
+                                               level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1,
+                                               stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix,
+                                               get_models_func=get_models_func, check_if_best=check_if_best)
 
     def predict(self, X, model=None):
         if model is None:
@@ -858,7 +859,7 @@ class AbstractTrainer:
 
     def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=1, n_repeats=1, stack_name=None, hyperparameters=None,
                                    time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None,
-                                   get_models_func=None, X_pseudo=None, y_pseudo=None) -> List[str]:
+                                   get_models_func=None) -> List[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
         if len(base_model_names) == 0:
@@ -905,8 +906,6 @@ class AbstractTrainer:
             y=y,
             X_val=None,
             y_val=None,
-            X_pseudo=X_pseudo,
-            y_pseudo=y_pseudo,
             models=[weighted_ensemble_model],
             k_fold=k_fold,
             n_repeats=n_repeats,
