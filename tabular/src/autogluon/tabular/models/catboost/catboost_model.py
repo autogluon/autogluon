@@ -298,13 +298,6 @@ class CatBoostModel(AbstractModel):
             y_pred_proba = y_pred_proba[:,1]
         return y_pred_proba
 
-    def get_model_feature_importance(self):
-        importance_df = self.model.get_feature_importance(prettified=True)
-        importance_df['Importances'] = importance_df['Importances'] / 100
-        importance_series = importance_df.set_index('Feature Id')['Importances']
-        importance_dict = importance_series.to_dict()
-        return importance_dict
-
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(

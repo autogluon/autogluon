@@ -299,100 +299,6 @@ class LGBModel(AbstractModel):
                 dataset_val.softlabels = y_val_og
         return dataset_train, dataset_val
 
-    def debug_features_to_use(self, X_val_in):
-        feature_splits = self.model.feature_importance()
-        total_splits = feature_splits.sum()
-        feature_names = list(X_val_in.columns.values)
-        feature_count = len(feature_names)
-        feature_importances = pd.DataFrame(data=feature_names, columns=['feature'])
-        feature_importances['splits'] = feature_splits
-        feature_importances_unused = feature_importances[feature_importances['splits'] == 0]
-        feature_importances_used = feature_importances[feature_importances['splits'] >= (total_splits / feature_count)]
-        logger.debug(feature_importances_unused)
-        logger.debug(feature_importances_used)
-        logger.debug(f'feature_importances_unused: {len(feature_importances_unused)}')
-        logger.debug(f'feature_importances_used: {len(feature_importances_used)}')
-        features_to_use = list(feature_importances_used['feature'].values)
-        logger.debug(str(features_to_use))
-        return features_to_use
-
-    # FIXME: Requires major refactor + refactor lgb_trial.py
-    #  model names are not aligned with what is communicated to trainer!
-    # FIXME: Likely tabular_nn_trial.py and abstract trial also need to be refactored heavily + hyperparameter functions
-    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
-        time_start = time.time()
-        logger.log(15, "Beginning hyperparameter tuning for Gradient Boosting Model...")
-        self._set_default_searchspace()
-        params_copy = self._get_params()
-        if isinstance(params_copy['min_data_in_leaf'], Int):
-            upper_minleaf = params_copy['min_data_in_leaf'].upper
-            if upper_minleaf > X.shape[0]:  # TODO: this min_data_in_leaf adjustment based on sample size may not be necessary
-                upper_minleaf = max(1, int(X.shape[0] / 5.0))
-                lower_minleaf = params_copy['min_data_in_leaf'].lower
-                if lower_minleaf > upper_minleaf:
-                    lower_minleaf = max(1, int(upper_minleaf / 3.0))
-                params_copy['min_data_in_leaf'] = Int(lower=lower_minleaf, upper=upper_minleaf)
-
-        directory = self.path  # also create model directory if it doesn't exist
-        # TODO: This will break on S3! Use tabular/utils/savers for datasets, add new function
-        os.makedirs(directory, exist_ok=True)
-        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
-        if scheduler_cls is None or scheduler_params is None:
-            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
-        num_threads = scheduler_params['resource'].get('num_cpus', -1)
-        params_copy['num_threads'] = num_threads
-        # num_gpus = scheduler_options['resource']['num_gpus'] # TODO: unused
-        # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
-        warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
-        warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
-        dataset_train, dataset_val = self.generate_datasets(X=X, y=y, params=params_copy, X_val=X_val, y_val=y_val)
-        dataset_train_filename = "dataset_train.bin"
-        train_file = self.path + dataset_train_filename
-        if os.path.exists(train_file):  # clean up old files first
-            os.remove(train_file)
-        dataset_train.save_binary(train_file)
-        dataset_val_filename = "dataset_val.bin"  # names without directory info
-        val_file = self.path + dataset_val_filename
-        if os.path.exists(val_file):  # clean up old files first
-            os.remove(val_file)
-        dataset_val.save_binary(val_file)
-        dataset_val_pkl_filename = 'dataset_val.pkl'
-        val_pkl_path = directory + dataset_val_pkl_filename
-        save_pkl.save(path=val_pkl_path, object=(X_val, y_val))
-
-        if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
-            logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
-        else:
-            logger.log(15, "Hyperparameter search space for Gradient Boosting Model: ")
-            for hyperparam in params_copy:
-                if isinstance(params_copy[hyperparam], Space):
-                    logger.log(15, f'{hyperparam}:   {params_copy[hyperparam]}')
-
-        util_args = dict(
-            dataset_train_filename=dataset_train_filename,
-            dataset_val_filename=dataset_val_filename,
-            dataset_val_pkl_filename=dataset_val_pkl_filename,
-            directory=directory,
-            model=self,
-            time_start=time_start,
-            time_limit=scheduler_params['time_out'],
-            fit_kwargs=scheduler_params['resource'],
-        )
-        lgb_trial.register_args(util_args=util_args, **params_copy)
-        scheduler = scheduler_cls(lgb_trial, **scheduler_params)
-        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
-            # This is multi-machine setting, so need to copy dataset to workers:
-            logger.log(15, "Uploading data to remote workers...")
-            scheduler.upload_files([train_file, val_file, val_pkl_path])  # TODO: currently does not work.
-            directory = self.path  # TODO: need to change to path to working directory used on every remote machine
-            lgb_trial.update(directory=directory)
-            logger.log(15, "uploaded")
-
-        scheduler.run()
-        scheduler.join_jobs()
-
-        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
-
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:
             train_loss_name = 'binary_logloss'
@@ -406,15 +312,6 @@ class LGBModel(AbstractModel):
 
     def _get_early_stopping_rounds(self, num_rows_train, strategy='auto'):
         return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
-
-    def get_model_feature_importance(self, use_original_feature_names=False):
-        feature_names = self.model.feature_name()
-        importances = self.model.feature_importance()
-        importance_dict = {feature_name: importance for (feature_name, importance) in zip(feature_names, importances)}
-        if use_original_feature_names and (self._features_internal_map is not None):
-            inverse_internal_feature_map = {i: feature for feature, i in self._features_internal_map.items()}
-            importance_dict = {inverse_internal_feature_map[i]: importance for i, importance in importance_dict.items()}
-        return importance_dict
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
