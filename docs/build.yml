@@ -3,6 +3,7 @@ dependencies:
 - python=3.9.0
 - graphviz
 - libpng
+- pip
 - pip:
   - jupyter-sphinx>=0.2.2
   - mxnet_cu101==1.7.0
