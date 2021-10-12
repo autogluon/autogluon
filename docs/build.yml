@@ -1,6 +1,6 @@
 name: autogluon_py3
 dependencies:
-- python=3.9
+- python=3.8
 - graphviz
 - libpng
 - pip:
