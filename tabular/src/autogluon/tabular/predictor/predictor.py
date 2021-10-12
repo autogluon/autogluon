@@ -2522,8 +2522,6 @@ class TabularPredictor:
             imodel = agmodel.model
             if not isinstance(agmodel, IModelsModel):
                 complexities.append(np.nan)
-            elif 'Tree' in model_name:
-                complexities.append((2 ** imodel.get_depth()) * imodel.get_depth())
             else:
                 complexities.append(imodel.complexity_)
         summaries.insert(2, 'complexity', complexities)

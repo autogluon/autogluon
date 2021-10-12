@@ -73,12 +73,13 @@ class GreedyTreeModel(IModelsModel):
         super().__init__(**kwargs)
 
     def get_model(self):
-        from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+        from imodels import GreedyTreeClassifier
+        from sklearn.tree import DecisionTreeRegressor
 
         if self.problem_type in ['regression', 'softclass']:
             return DecisionTreeRegressor
         else:
-            return DecisionTreeClassifier
+            return GreedyTreeClassifier
 
 
 class GlobalSparseTreeModel(IModelsModel):
