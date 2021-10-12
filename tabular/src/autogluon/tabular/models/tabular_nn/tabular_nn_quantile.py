@@ -8,7 +8,6 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from autogluon.core import Space
 from autogluon.core.constants import QUANTILE
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
