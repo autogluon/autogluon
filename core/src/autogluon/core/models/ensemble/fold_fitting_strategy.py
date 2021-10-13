@@ -116,13 +116,13 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
 
             if is_pseudo:
                 # TODO: Add support for sample_weight when pseudo is present
-                logger.warning('WARNING: Sample weights given, but not used due to pseudo labelled data being given.')
+                raise Exception('Sample weights given, but not used due to pseudo labelled data being given.')
             else:
                 kwargs_fold['sample_weight'] = self.sample_weight[train_index]
                 kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
 
         if is_pseudo:
-            logger.log(15, f'Pseudo labeling incorporated for {fold_model.name}, with {len(X_fold)} rows of Pseudo')
+            logger.log(15, f'{len(self.X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}')
             X_fold = pd.concat([X_fold, self.X_pseudo], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, self.y_pseudo], axis=0, ignore_index=True)
 

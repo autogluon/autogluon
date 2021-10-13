@@ -972,7 +972,7 @@ class AbstractTrainer:
                 y_w_pseudo = pd.concat([y, y_pseudo])
                 model_fit_kwargs.pop('X_pseudo')
                 model_fit_kwargs.pop('y_pseudo')
-                logger.log(20, f'Pseudo labeling incorporated for {model.name}, with {len(X_w_pseudo)} rows of Pseudo')
+                logger.log(15, f'{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}')
                 model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
             else:
                 model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)

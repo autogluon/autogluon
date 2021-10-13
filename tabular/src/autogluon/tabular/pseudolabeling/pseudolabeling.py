@@ -7,7 +7,9 @@ def filter_pseudo(y_pred_proba_og, problem_type,
                   threshold: float = 0.95, percent_sample: float = 0.3):
     """
     Takes in the predicted probabilities of the model and chooses the indices that meet
-    a criteria to incorporate into training data. Criteria is determined by problem_type
+    a criteria to incorporate into training data. Criteria is determined by problem_type.
+    If mutliclass or binary will choose all rows with max prob over threshold. For regression
+    chooses 30% of the labeled data randomly.
 
     Parameters:
     -----------
@@ -19,7 +21,9 @@ def filter_pseudo(y_pred_proba_og, problem_type,
     max_proportion_prob: Maximum percentage of total 'y_pred_proba_og` that is above threshold
         required to trigger threshold change
     threshold: The predictive probability that must be exceeded in order to be
-        incorporated into the next round of training
+        incorporated into the next round of training (ignored for regression)
+    percent_sample: When problem_type is regression this is percent of pseudo data
+        to incorporate into train. Rows selected randomly.
 
     Returns:
     --------

@@ -929,7 +929,7 @@ class TabularPredictor:
         ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
-        aux_kwargs = None # TODO: Add as option
+        aux_kwargs = None  # TODO: Add as option
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -990,8 +990,9 @@ class TabularPredictor:
     def _run_pseudolabeling(self, test_data: pd.DataFrame, max_iter: int, **kwargs):
         """
         Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
-        that the first fit unless specified by the user. Will keep incorporating
-        self labeled data into train until validation score does not improve
+        used in original model unless specified by the user. This is an internal function that iteratively
+        self labels unlabeled test data then incorporates all self labeled data above a threshold into training.
+        Will keep incorporating self labeled data into training until validation score does not improve
 
         Parameters:
         -----------
@@ -1012,14 +1013,14 @@ class TabularPredictor:
 
         for i in range(max_iter):
             iter_print = str(i + 1)
-            logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling')
+            logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}')
             y_pred_proba = self.predict_proba(data=X_test)
-            y_pred = self.predict(data=X_test)
+            y_pred = y_pred_proba.idxmax(axis=1)
             test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
 
             if len(test_pseudo_idxes_true) < 1:
                 logger.log(20,
-                           f'Pseudolabeling algorithm found no rows of pseudolabeled data that met criteria on iteration: {iter_print}. Ending...')
+                           f'Could not confidently assign pseudolabels for any of the provided rows in iteration: {iter_print}. Done with pseudolabeling...')
                 return self
             else:
                 logger.log(20, f'Pseudolabeling algorithm found: {len(test_pseudo_idxes_true)} rows of pseudolabeled data met criteria on iteration: {iter_print}.'
@@ -1029,8 +1030,7 @@ class TabularPredictor:
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
 
             y_pseudo_og = y_pseudo_og.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
-            X_pseudo = test_data.loc[y_pseudo_og.index]
-            pseudo_data = X_pseudo
+            pseudo_data = test_data.loc[y_pseudo_og.index]
             pseudo_data[self.label] = y_pseudo_og
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)),
                            **kwargs)
@@ -1051,9 +1051,13 @@ class TabularPredictor:
 
     def fit_pseudolabel(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
         """
-        Pseudolabeling fit algorithm. If incoming data is labeled, automatically
-        incorporates into train, if not then labels and finds rows of data that meet
-        threshold then incorporates into train and fits new models.
+        Pseudolabeling fit algorithm. If test_data is labeled then incorporates all
+        test_data into train_data for newly fit models. This data is not used for
+        validation. If test_data is unlabeled then fit_pseudolabel will self label the
+        test data and incorporate all the test data that meets a criteria (For example
+        all rows with predictive prob above 95%). If predictor is fit then will call fit_extra
+        with added training data, if predictor is not fit then will fit model on train_data
+        then run pseudo label algorithm.
 
         Parameters
         ----------
@@ -1062,20 +1066,20 @@ class TabularPredictor:
             then pseudolabeling algorithm will predict and filter out which rows to incorporate into
             training
         max iter: int, default = 5
-            Maximum iterations of pseudolabeling allowed by user
+            Maximum iterations of pseudolabeling allowed
         kwargs: dict
-            If model is not already fit. Refer to parameters documentation in :meth:`TabularPredictor.fit`.
-            If model is fit. Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
+            If predictor is not already fit. Refer to parameters documentation in :meth:`TabularPredictor.fit`.
+            If predictor is fit. Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
         """
         if not self._learner.is_fit:
             logger.log(20,
-                       f'Model not fit prior to pseudolabeling. Fitting now...')
+                       f'Predictor not fit prior to pseudolabeling. Fitting now...')
             self.fit(**kwargs)
 
         if self.problem_type is 'multiclass' and self.eval_metric is not 'accuracy':
             logger.warning('AutoGluon has detected the problem type as \'multiclass\' and '
                            f'eval metric is {self.eval_metric.name}, we recommend using'
-                           f'fit_pseudolabeling when eval metric is accuracy')
+                           f'fit_pseudolabeling when eval metric is \'acc\'')
 
         X, y, _, _ = self._trainer.load_data()
         y.name = self.label
@@ -1093,9 +1097,12 @@ class TabularPredictor:
         fit_extra_args = self._get_all_fit_extra_args()
         fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
         if is_labeled:
-            return self.fit_extra(pseudo_data=test_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
+            logger.log(20, "Fitting predictor using the provided pseudolabeled examples as extra training data...")
+            return self.fit_extra(pseudo_data=test_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter='')[:-1],
                                   **fit_extra_kwargs)
         else:
+            logger.log(20, 'Given test_data for pseudo labeling did not contain labels. '
+                           'AutoGluon will label the data and use it for pseudo labeling...')
             return self._run_pseudolabeling(test_data=test_data,
                                             max_iter=max_iter, **fit_extra_kwargs)
 
@@ -2608,18 +2615,17 @@ class TabularPredictor:
 
         return kwargs_sanitized
 
-    def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool):
+    def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool, is_pseudo: bool = False):
         """
-        Prune columns in self.sample_weight from train_features and other_features.
-        Also removes features from self._learner.groups from train_features if labeled
+        Removes certain columns from the provided datasets that do not contain predictive features.
 
         Parameters
         ----------
         train_features : pd.DataFrame
             The features/columns for the incoming training data
         other_features : pd.DataFrame
-            Features of other incoming data examples of this could be:
-            tuning data, pseudo data
+            Features of other auxiliary data that contains the same covariates as the training data.
+            Examples of this could be: tuning data, pseudo data
         is_labeled: bool
             Is other_features dataframe labeled or not
         """
@@ -2627,7 +2633,11 @@ class TabularPredictor:
             if self.sample_weight in train_features:
                 train_features.remove(self.sample_weight)
             if self.sample_weight in other_features:
-                other_features.remove(self.sample_weight)
+                if is_pseudo:
+                    logger.warning('sample_weight is not supported for pseudolabeling'
+                                   'will not apply sample_weight to pseudo data')
+                else:
+                    other_features.remove(self.sample_weight)
         if self._learner.groups is not None and is_labeled:
             train_features.remove(self._learner.groups)
 
@@ -2654,9 +2664,11 @@ class TabularPredictor:
         is_labeled = self.label in pseudo_data.columns
         train_features = [column for column in train_data.columns if column != self.label]
         pseudo_features = [column for column in pseudo_data.columns if column != self.label]
+
         train_features, pseudo_features = self._prune_data_features(train_features=train_features,
                                                                     other_features=pseudo_features,
-                                                                    is_labeled=is_labeled)
+                                                                    is_labeled=is_labeled,
+                                                                    is_pseudo=True)
         train_feats_in_pseudo_feats = np.isin(train_features, pseudo_features)
 
         if not train_feats_in_pseudo_feats.all():
