@@ -487,7 +487,6 @@ def test_regression_pseudofilter():
     y_reg_fake = np.random.rand(200)
     y_reg_fake = pandas.Series(data=y_reg_fake)
 
-    predictor = TabularPredictor(label='class', problem_type='regression')
     sample_percent, _, _, _ = get_default_pseudo_test_args()
     pseudo_idxes = filter_pseudo(y_reg_fake, problem_type='regression')
     assert len(pseudo_idxes) == int(sample_percent * len(y_reg_fake))
@@ -507,17 +506,21 @@ def test_classification_pseudofilter():
     pseudo_indicies_ans = filter_pseudo(y_reg_fake_below_min, 'binary')
     assert num_rows == len(pseudo_indicies_ans)
 
-    # Test if percent preds is above max thershold
+    # Test if percent preds is above max threshold
     y_reg_fake_above_max = pandas.DataFrame(data=y_reg_fake)
     pseudo_indicies_ans = filter_pseudo(y_reg_fake_above_max, 'binary')
-    assert 32 == len(pseudo_indicies_ans)
+    num_rows_threshold = max(np.ceil(max_percent * num_rows), 1)
+    y_reg_fake_max = y_reg_fake.max(axis=1)
+    y_pred_proba_max_sorted = y_reg_fake_max.sort_values(ascending=False, ignore_index=True)
+    curr_threshold = y_pred_proba_max_sorted[num_rows_threshold - 1]
+    answer = len(y_reg_fake_max >= curr_threshold)
+    assert answer == len(pseudo_indicies_ans)
 
     # Test if normal functionality beginning
     y_reg_fake = np.column_stack((y_reg_fake, np.zeros((num_above_threshold))))
     y_reg_fake = np.row_stack((y_reg_fake, np.zeros((num_below_threshold, 2))))
 
     y_reg_fake = pandas.DataFrame(data=y_reg_fake)
-    y_reg_fake.max(axis=1)
     pseudo_flag = y_reg_fake.max(axis=1) > threshold
     pseudo_indices_ans = pseudo_flag[pseudo_flag == True]
 
