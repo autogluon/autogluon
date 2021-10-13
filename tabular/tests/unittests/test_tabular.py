@@ -378,7 +378,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
 
 
 def test_pseudolabeling():
-    datasets = get_benchmark_sets()[:-1]
+    datasets = get_benchmark_sets()[1:]
     train_file = 'train_data.csv'
     test_file = 'test_data.csv'
     directory_prefix = './datasets/'

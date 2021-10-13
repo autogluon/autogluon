@@ -1015,7 +1015,12 @@ class TabularPredictor:
             iter_print = str(i + 1)
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}')
             y_pred_proba = self.predict_proba(data=X_test)
-            y_pred = y_pred_proba.idxmax(axis=1)
+
+            if self.problem_type is not 'regression':
+                y_pred = y_pred_proba.idxmax(axis='columns')
+            else:
+                y_pred = y_pred_proba
+
             test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
 
             if len(test_pseudo_idxes_true) < 1:
