@@ -281,13 +281,6 @@ class RFModel(AbstractModel):
     def _hyperparameter_tune(self, **kwargs):
         return skip_hpo(self, **kwargs)
 
-    def get_model_feature_importance(self):
-        if self._features is None:
-            # TODO: Consider making this raise an exception
-            logger.warning('Warning: get_model_feature_importance called when self._features is None!')
-            return dict()
-        return dict(zip(self._features, self.model.feature_importances_))
-
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
