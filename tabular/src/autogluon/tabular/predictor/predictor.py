@@ -843,7 +843,7 @@ class TabularPredictor:
         model_best.temperature_scalar = temperature_param[0].item()
         model_best.save()
 
-    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
+    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, calibrate:bool=False, **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
         The original train_data and tuning_data will be used to train the models.
@@ -939,6 +939,7 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
+            calibrate=calibrate
         )
         self.save()
         return self
