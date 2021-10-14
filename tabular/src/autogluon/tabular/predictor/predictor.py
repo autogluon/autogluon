@@ -1,4 +1,5 @@
 import copy
+import torch
 import logging
 import os
 import math
@@ -275,6 +276,7 @@ class TabularPredictor:
             presets=None,
             hyperparameters=None,
             feature_metadata='infer',
+            calibrate:bool=False,
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -480,6 +482,9 @@ class TabularPredictor:
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
             In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
+        calibrate: bool
+            If true then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
+            will train a scalar parameter on the validation set.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -765,11 +770,12 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
+            calibrate=calibrate
         )
         self.save()
         return self
 
-    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False):
+    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False, calibrate=False):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -794,6 +800,32 @@ class TabularPredictor:
 
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
+
+        if calibrate:
+            model_best_name = self._trainer.get_model_best()
+            model_best = self._trainer.load_model(model_best_name)
+            X_val = self._trainer.load_X_val()
+            y_val = self._trainer.load_y_val()
+            temperature_param = torch.nn.Parameter(torch.ones(1))
+            y_val_probs = model_best.predict_proba(X_val)
+            logits = torch.tensor(np.log2(y_val_probs).values)
+            nll_criterion = torch.nn.CrossEntropyLoss().cuda()
+            optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=1000, line_search_fn='strong_wolfe')
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=0.01)
+            y_val = self._learner.label_cleaner.transform(y_val)
+
+            def temperature_scale_step():
+                optimizer.zero_grad()
+                temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
+                new_logits = (logits / temp)
+                loss = nll_criterion(new_logits, torch.tensor(y_val.values))
+                loss.backward()
+                scheduler.step()
+                return loss
+
+            optimizer.step(temperature_scale_step)
+            model_best.temperature = temperature_param[0].item()
+            self._trainer.save_model(model_best)
 
         if save_space:
             self.save_space()

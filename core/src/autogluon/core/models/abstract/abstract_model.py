@@ -99,6 +99,7 @@ class AbstractModel:
         self.num_classes = None
         self.model = None
         self.problem_type = problem_type
+        self.temperature_scalar = None
 
         if eval_metric is not None:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance

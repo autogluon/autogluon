@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from collections import defaultdict
+import scipy
 from typing import List, Union, Tuple
 
 import networkx as nx
@@ -1387,7 +1388,12 @@ class AbstractTrainer:
         if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        return model.predict_proba(X=X)
+
+        if model.temperature_scalar is not None:
+            return model.predict_proba(X=X)
+        else:
+            logits = np.log2(model.predict_proba(X=X))
+            return scipy.special.softmax(logits/model.temperature_scalar)
 
     def _get_dummy_stacker(self, level: int, model_levels: dict, use_orig_features=True) -> StackerEnsembleModel:
         model_names = model_levels[level - 1]
