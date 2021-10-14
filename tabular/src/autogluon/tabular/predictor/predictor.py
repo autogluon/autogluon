@@ -2552,6 +2552,15 @@ class TabularPredictor:
         return kwargs_sanitized
 
     def _fit_extra_kwargs_dict(self):
+        """
+        Returns:
+        --------
+        dict of fit_extra args:
+            verbosity: Which levels of logger should be printed
+            pseudo_data: pseudo labeled data to be incorporated into train
+                         but not used in validation
+            name_suffix: A suffix string to be added to the individual model names
+        """
         return dict(
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             num_bag_sets=None,
