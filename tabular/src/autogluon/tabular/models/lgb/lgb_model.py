@@ -62,12 +62,10 @@ class LGBModel(AbstractModel):
         return stopping_metric, stopping_metric_name
 
     def _fit(self,
-             X=None,
-             y=None,
+             X,
+             y,
              X_val=None,
              y_val=None,
-             dataset_train=None,
-             dataset_val=None,
              time_limit=None,
              num_gpus=0,
              sample_weight=None,
@@ -90,12 +88,6 @@ class LGBModel(AbstractModel):
             verbose_eval = 1
 
         stopping_metric, stopping_metric_name = self._get_stopping_metric_internal()
-        dataset_train, dataset_val = self.generate_datasets(
-            X=X, y=y, params=params, X_val=X_val, y_val=y_val,
-            sample_weight=sample_weight, sample_weight_val=sample_weight_val,
-            dataset_train=dataset_train, dataset_val=dataset_val
-        )
-        gc.collect()
 
         if self.problem_type in [MULTICLASS, SOFTCLASS] and 'num_classes' not in params:
             params['num_classes'] = self.num_classes
@@ -113,10 +105,12 @@ class LGBModel(AbstractModel):
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)
 
-        num_rows_train = len(dataset_train.data)
-        if 'min_data_in_leaf' in params:
-            if params['min_data_in_leaf'] > num_rows_train:  # TODO: may not be necessary
-                params['min_data_in_leaf'] = max(1, int(num_rows_train / 5.0))
+        num_rows_train = len(X)
+        dataset_train, dataset_val = self.generate_datasets(
+            X=X, y=y, params=params, X_val=X_val, y_val=y_val,
+            sample_weight=sample_weight, sample_weight_val=sample_weight_val
+        )
+        gc.collect()
 
         callbacks = []
         valid_names = ['train_set']
@@ -261,12 +255,11 @@ class LGBModel(AbstractModel):
         else:
             return X
 
-    def generate_datasets(self, X: DataFrame, y: Series, params, X_val=None, y_val=None, sample_weight=None, sample_weight_val=None, dataset_train=None, dataset_val=None, save=False):
+    def generate_datasets(self, X: DataFrame, y: Series, params, X_val=None, y_val=None, sample_weight=None, sample_weight_val=None, save=False):
         lgb_dataset_params_keys = ['objective', 'two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
-        if X is not None:
-            X = self.preprocess(X, is_train=True)
+        X = self.preprocess(X, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
@@ -274,21 +267,21 @@ class LGBModel(AbstractModel):
         y_og = None
         y_val_og = None
         if self.problem_type == SOFTCLASS:
-            if (not dataset_train) and (X is not None) and (y is not None):
-                y_og = np.array(y)
-                y = pd.Series([0]*len(X))  # placeholder dummy labels to satisfy lgb.Dataset constructor
-            if (not dataset_val) and (X_val is not None) and (y_val is not None):
+            y_og = np.array(y)
+            y = pd.Series([0]*len(X))  # placeholder dummy labels to satisfy lgb.Dataset constructor
+            if (X_val is not None) and (y_val is not None):
                 y_val_og = np.array(y_val)
                 y_val = pd.Series([0]*len(X_val))  # placeholder dummy labels to satisfy lgb.Dataset constructor
 
-        if not dataset_train:
-            # X, W_train = self.convert_to_weight(X=X)
-            dataset_train = construct_dataset(x=X, y=y, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=sample_weight)
-            # dataset_train = construct_dataset_lowest_memory(X=X, y=y, location=self.path + 'datasets/train', params=data_params)
-        if (not dataset_val) and (X_val is not None) and (y_val is not None):
+        # X, W_train = self.convert_to_weight(X=X)
+        dataset_train = construct_dataset(x=X, y=y, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=sample_weight)
+        # dataset_train = construct_dataset_lowest_memory(X=X, y=y, location=self.path + 'datasets/train', params=data_params)
+        if (X_val is not None) and (y_val is not None):
             # X_val, W_val = self.convert_to_weight(X=X_val)
             dataset_val = construct_dataset(x=X_val, y=y_val, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=sample_weight_val)
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
+        else:
+            dataset_val = None
         if self.problem_type == SOFTCLASS:
             if y_og is not None:
                 dataset_train.softlabels = y_og
