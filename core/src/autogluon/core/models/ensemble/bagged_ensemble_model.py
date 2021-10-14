@@ -1,4 +1,5 @@
 import copy
+import scipy
 import logging
 import os
 import time
@@ -246,6 +247,10 @@ class BaggedEnsembleModel(AbstractModel):
             model = self.load_child(model)
             pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
+
+        if self.temperature_scalar is not None:
+            logits = np.log2(pred_proba)
+            pred_proba = scipy.special.softmax(logits/self.temperature_scalar)
 
         return pred_proba
 

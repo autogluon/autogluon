@@ -6,7 +6,7 @@ import os
 import pickle
 import sys
 import time
-import warnings
+import scipy
 from typing import Union
 
 import numpy as np
@@ -588,6 +588,11 @@ class AbstractModel:
         if normalize:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
+
+        if self.temperature_scalar is not None:
+            logits = np.log2(y_pred_proba)
+            y_pred_proba = scipy.special.softmax(logits/self.temperature_scalar)
+
         return y_pred_proba
 
     def _predict_proba(self, X, **kwargs):

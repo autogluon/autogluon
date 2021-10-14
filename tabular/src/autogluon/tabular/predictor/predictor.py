@@ -801,34 +801,47 @@ class TabularPredictor:
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
-        if calibrate:
-            model_best_name = self._trainer.get_model_best()
-            model_best = self._trainer.load_model(model_best_name)
-            X_val = self._trainer.load_X_val()
-            y_val = self._trainer.load_y_val()
-            temperature_param = torch.nn.Parameter(torch.ones(1))
-            y_val_probs = model_best.predict_proba(X_val)
-            logits = torch.tensor(np.log2(y_val_probs).values)
-            nll_criterion = torch.nn.CrossEntropyLoss().cuda()
-            optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=1000, line_search_fn='strong_wolfe')
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=0.01)
-            y_val = self._learner.label_cleaner.transform(y_val)
-
-            def temperature_scale_step():
-                optimizer.zero_grad()
-                temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
-                new_logits = (logits / temp)
-                loss = nll_criterion(new_logits, torch.tensor(y_val.values))
-                loss.backward()
-                scheduler.step()
-                return loss
-
-            optimizer.step(temperature_scale_step)
-            model_best.temperature = temperature_param[0].item()
-            self._trainer.save_model(model_best)
+        if calibrate and self.problem_type is MULTICLASS:
+            self._calibrate_best_model()
 
         if save_space:
             self.save_space()
+
+    def _calibrate_best_model(self):
+        """
+        Applies temperature scaling to the best autogluon model. Applies
+        inverse softmax to predicted probs then trains temperature scalar
+        on validation data to maximize NLL. Inversed softmaxes are divided
+        by temperature scalar then softmaxed to return predicted probs
+        """
+        model_best_name = self._trainer.get_model_best()
+
+        if self._trainer.bagged_mode:
+            y_val = self._trainer.load_y().to_numpy()
+            y_val_probs = self.get_oof_pred_proba(model_best_name).values
+        else:
+            X_val = self._trainer.load_X_val()
+            y_val = self._trainer.load_y_val().to_numpy()
+            y_val_probs = self.predict_proba(data=X_val, model=model_best_name)
+            y_val_probs = y_val_probs.rename(columns=self._learner.label_cleaner.inv_map).to_numpy()
+
+        temperature_param = torch.nn.Parameter(torch.ones(1))
+        logits = torch.tensor(np.log2(y_val_probs))
+        nll_criterion = torch.nn.CrossEntropyLoss().cuda()
+        optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=1000)
+
+        def temperature_scale_step():
+            optimizer.zero_grad()
+            temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
+            new_logits = (logits / temp)
+            loss = nll_criterion(new_logits, torch.tensor(y_val))
+            loss.backward()
+            return loss
+
+        optimizer.step(temperature_scale_step)
+        model_best = self._trainer.load_model(model_name=model_best_name)
+        model_best.temperature_scalar = temperature_param[0].item()
+        model_best.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
