@@ -211,6 +211,15 @@ class RFModel(AbstractModel):
         y_oof_pred_proba = y_oof_pred_proba.astype(np.float32)
         return y_oof_pred_proba
 
+    def _is_sklearn_1(self) -> bool:
+        """Returns True if the trained model is from sklearn>=1.0"""
+        return callable(getattr(self.model, "_set_oob_score_and_attributes", None))
+
+    def _model_supports_oob_pred_proba(self) -> bool:
+        """Returns True if model supports computing out-of-bag prediction probabilities"""
+        # TODO: Remove `_set_oob_score` after sklearn version requirement is >=1.0
+        return callable(getattr(self.model, "_set_oob_score", None)) or self._is_sklearn_1()
+
     # FIXME: Unknown if this works with quantile regression
     def _get_oof_pred_proba(self, X, y, **kwargs):
         if self._daal:
@@ -218,10 +227,11 @@ class RFModel(AbstractModel):
         if not self.model.bootstrap:
             raise ValueError('Forest models must set `bootstrap=True` to compute out-of-fold predictions via out-of-bag predictions.')
 
+        oob_is_not_set = getattr(self.model, "oob_decision_function_", None) is None and getattr(self.model, "oob_prediction_", None) is None
+
         # TODO: This can also be done via setting `oob_score=True` in model params,
         #  but getting the correct `pred_time_val` that way is not easy, since we can't time the internal call.
-        if (getattr(self.model, "oob_decision_function_", None) is None and getattr(self.model, "oob_prediction_", None) is None) \
-                and callable(getattr(self.model, "_set_oob_score", None)):
+        if oob_is_not_set and self._model_supports_oob_pred_proba():
             X = self.preprocess(X)
 
             if getattr(self.model, "n_classes_", None) is not None:
@@ -235,7 +245,14 @@ class RFModel(AbstractModel):
                 y = np.reshape(y, (-1, 1))
             if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
                 y = np.ascontiguousarray(y, dtype=DOUBLE)
-            self.model._set_oob_score(X, y)
+            if self._is_sklearn_1():
+                # sklearn >= 1.0
+                # TODO: Can instead do `_compute_oob_predictions` but requires post-processing. Skips scoring func.
+                self.model._set_oob_score_and_attributes(X, y)
+            else:
+                # sklearn < 1.0
+                # TODO: Remove once sklearn < 1.0 support is dropped
+                self.model._set_oob_score(X, y)
             if getattr(self.model, "n_classes_", None) is not None:
                 if self.model.n_outputs_ == 1:
                     self.model.n_classes_ = self.model.n_classes_[0]

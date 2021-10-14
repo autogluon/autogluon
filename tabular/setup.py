@@ -38,7 +38,7 @@ extras_require = {
         'lightgbm>=3.0,<4.0',
     ],
     'catboost': [
-        'catboost>=0.26.1,<0.27',
+        'catboost>=1.0,<1.1',
     ],
     'xgboost': [
         'xgboost>=1.4,<1.5',
@@ -48,7 +48,7 @@ extras_require = {
         'fastai>=2.3.1,<3.0',
     ],
     'skex': [
-        'scikit-learn-intelex<2021.3',
+        'scikit-learn-intelex<=2021.3',
     ],
 }
 

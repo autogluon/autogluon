@@ -17,7 +17,7 @@ PYTHON_REQUIRES = '>=3.6, <3.9'
 DEPENDENT_PACKAGES = {
     'numpy': '>=1.19,<1.22',
     'pandas': '>=1.0.0,<2.0',
-    'scikit-learn': '>=0.23.2,<0.25',  # 0.22 crashes during efficient OOB in Tabular
+    'scikit-learn': '>=0.23.2,<1.1',  # 0.22 crashes during efficient OOB in Tabular
     'scipy': '>=1.5.4,<1.7',
     'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
