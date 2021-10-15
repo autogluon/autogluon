@@ -28,16 +28,10 @@ class ImagePredictions:
         Utils_pro_kwargs = kwargs.pop('Utils_pro_kwargs', dict())
               
        
-        X_train_img = kwargs.get('X_train_img', None)
-        X_val_img = kwargs.get('X_val_img', None)
-        X_test_img = kwargs.get('X_test_img', None)
+        label_column=kwargs.get('label_column', None)
         
-        y_train = kwargs.get('y_train', None)
-        y_val = kwargs.get('y_val', None)
-        y_test = kwargs.get('y_test', None)
         
-        self._Utils_pro: Utils_pro = Utils_pro_type(X_train_img=X_train_img ,X_val_img=X_val_img,X_test_img=X_test_img,
-                                        y_train=y_train,y_val=y_val,y_test=y_test,**Utils_pro_kwargs)
+        self._Utils_pro: Utils_pro = Utils_pro_type(label_column=label_column ,**Utils_pro_kwargs)
         self._Utils_pro_type = type(self._Utils_pro)
         
         
@@ -63,24 +57,9 @@ class ImagePredictions:
      
         
     @property
-    def X_train_img(self):
-        return self._Utils_pro.X_train_img 
-    @property
-    def X_val_img(self):
-        return self._Utils_pro.X_val_img  
-    @property
-    def X_test_img(self):
-        return self._Utils_pro.X_test_img    
-    
-    @property
-    def y_train(self):
-        return self._Utils_pro.y_train 
-    @property
-    def y_val(self):
-        return self._Utils_pro.y_val 
-    @property
-    def y_test(self):
-        return self._Utils_pro.y_test 
+    def label_column(self):
+        return self._Utils_pro.label_column 
+   
     
     @property
     def ImageShape(self):
@@ -105,11 +84,7 @@ class ImagePredictions:
         valid_kwargs = {
             'Utils_pro_type',
             'Utils_pro_kwargs',
-             'X_train_img',
-             'X_val_img',
-             'X_test_img',
-             'y_train',
-             'y_val,y_test',
+             'label_column',
              'ImageShape',
              'model_type',
              'num_classes',
@@ -124,55 +99,13 @@ class ImagePredictions:
         if invalid_keys:
             raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
     
-    """
-    def train(self,dataloader, model, num_epochs=20):
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Rprop(model.parameters(), lr=0.01)
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1)
-
-        model.train(True)
-        results = []
-        for epoch in range(num_epochs):
-            optimizer.step()
-            scheduler.step()
-            model.train()
-
-            running_loss = 0.0
-            running_corrects = 0
-
-            n = 0
-            for inputs, labels in dataloader:
-                inputs = inputs.to(device)
-                labels = labels.to(device)
-
-                optimizer.zero_grad()
-
-                with torch.set_grad_enabled(True):
-                    outputs = model(inputs)
-                    loss = criterion(outputs, labels)
-                    _, preds = torch.max(outputs, 1)
-
-                    loss.backward()
-                    optimizer.step()
-
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
-                n += len(labels)
-
-            epoch_loss = running_loss / float(n)
-            epoch_acc = running_corrects.double() / float(n)
-
-            print(f'epoch {epoch}/{num_epochs} : {epoch_loss:.5f}, {epoch_acc:.5f}')
-            results.append(EpochProgress(epoch, epoch_loss, epoch_acc.item()))
-        return pd.DataFrame(results)
-    """
-  
+ 
     def train_model(self,model, num_epochs=3):
         #criterion = nn.CrossEntropyLoss() #optimizer = optim.Rprop(model.parameters(), lr=0.01) #scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1)
         trainloader,valloader,_ =self._Utils_pro.Utils_pro.image_tensor()
         criterion,optimizer,_=self._ModelsZoo.ModelsZoo.optimizer()
         model=self._ModelsZoo.ModelsZoo.create_model()
-        len_X_train_img,len_X_val_img,len_X_test_img=self._Utils_pro.Utils_pro.len_of_Images()
+        len_X_train_img,len_X_val_img,_=self._Utils_pro.Utils_pro.len_of_Images()
         use_gpu = torch.cuda.is_available()
         since = time.time()
         best_model_wts = copy.deepcopy(model.state_dict())
@@ -233,8 +166,8 @@ class ImagePredictions:
             
             print()
             # * 2 as we only used half of the dataset
-            avg_loss = loss_train * 2 /len_X_val_img #dataset_sizes[TRAIN]
-            avg_acc = acc_train * 2 /len_X_val_img #dataset_sizes[TRAIN]
+            avg_loss = loss_train * 2 /len_X_train_img #dataset_sizes[TRAIN]
+            avg_acc = acc_train * 2 /len_X_train_img #dataset_sizes[TRAIN]
             
             model.train(False)
             model.eval()
@@ -264,8 +197,8 @@ class ImagePredictions:
                 del inputs, labels, outputs, preds
                 torch.cuda.empty_cache()
             
-            avg_loss_val = loss_val /len_X_test_img #dataset_sizes[VAL]
-            avg_acc_val = acc_val /len_X_test_img #dataset_sizes[VAL]
+            avg_loss_val = loss_val /len_X_val_img #dataset_sizes[VAL]
+            avg_acc_val = acc_val /len_X_val_img #dataset_sizes[VAL]
             
             print()
             print("Epoch {} result: ".format(epoch))
