@@ -268,15 +268,15 @@ class LGBModel(AbstractModel):
         y_val_og = None
         if self.problem_type == SOFTCLASS:
             y_og = np.array(y)
-            y = pd.Series([0]*len(X))  # placeholder dummy labels to satisfy lgb.Dataset constructor
-            if (X_val is not None) and (y_val is not None):
+            y = None
+            if X_val is not None:
                 y_val_og = np.array(y_val)
-                y_val = pd.Series([0]*len(X_val))  # placeholder dummy labels to satisfy lgb.Dataset constructor
+                y_val = None
 
         # X, W_train = self.convert_to_weight(X=X)
         dataset_train = construct_dataset(x=X, y=y, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=sample_weight)
         # dataset_train = construct_dataset_lowest_memory(X=X, y=y, location=self.path + 'datasets/train', params=data_params)
-        if (X_val is not None) and (y_val is not None):
+        if X_val is not None:
             # X_val, W_val = self.convert_to_weight(X=X_val)
             dataset_val = construct_dataset(x=X_val, y=y_val, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=sample_weight_val)
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
