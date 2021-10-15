@@ -78,10 +78,10 @@ class ImagePredictions:
         valid_kwargs = {
             'Utils_pro_type',
             'Utils_pro_kwargs',
-             'ImageShape',
-             'model_type',
-             'num_classes',
-             'pretrained',
+            'ImageShape',
+            'model_type',
+            'num_classes',
+            'pretrained',
              
        
         }

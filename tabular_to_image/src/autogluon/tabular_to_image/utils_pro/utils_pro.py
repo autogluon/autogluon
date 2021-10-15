@@ -55,12 +55,12 @@ class Utils_pro:
     
     @staticmethod
     def __get_dataset(train_data):
-        if isinstance(data, TabularDataset):
+        if isinstance(train_data, TabularDataset):
             return data
         elif isinstance(train_data, pd.DataFrame):
             return TabularDataset(data)
         elif isinstance(train_data, str):
-            return TabularDataset(data)
+            return TabularDataset(train_data)
         elif isinstance(train_data, pd.Series):
             raise TypeError("data must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                    To predict on just single example (ith row of table), use data.iloc[[i]] rather than data.iloc[i]")
@@ -99,7 +99,7 @@ class Utils_pro:
     def Image_Genartor(self,train_data):
         train_data=self.__get_dataset(train_data)
         ln = LogScaler()
-        X_train,X_val,X_test,_ , _,_=self._validate_fit_data(data)
+        X_train,X_val,X_test,_ , _,_=self._validate_fit_data(train_data)
         X_train_norm = ln.fit_transform(X_train)
         X_val_norm = ln.fit_transform(X_val)
         X_test_norm = ln.transform(X_test)
