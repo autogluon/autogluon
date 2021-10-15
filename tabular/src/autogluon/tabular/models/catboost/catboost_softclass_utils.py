@@ -1,21 +1,18 @@
 import math
 import numpy as np
 
+from catboost import MultiRegressionCustomMetric, MultiRegressionCustomObjective
+
 from autogluon.core.metrics.softclass_metrics import soft_log_loss
-from autogluon.core.utils import try_import_catboost, try_import_catboostdev
+from autogluon.core.utils import try_import_catboost
 
 from .catboost_utils import CustomMetric
 
 
 # Ojectives for SOFTCLASS problem_type
-# TODO: these require catboost_dev for now. Swap catboost_dev for catboost>=0.24 once it is released. Lazy imports will no longer be needed at that time.
 class SoftclassCustomMetric(CustomMetric):
-    try_import_catboost()  # Need to first import catboost then catboost_dev not vice-versa.
-    try_import_catboostdev()
-    from catboost_dev import MultiRegressionCustomMetric
     def __init__(self, metric, is_higher_better, needs_pred_proba):  # metric is ignored
         super().__init__(metric, is_higher_better, needs_pred_proba)
-        try_import_catboostdev()
         self.softlogloss = self.SoftLogLossMetric()  # the metric object to pass to CatBoostRegressor
 
     def evaluate(self, approxes, target, weight):
@@ -40,11 +37,7 @@ class SoftclassCustomMetric(CustomMetric):
 
 
 class SoftclassObjective(object):
-    try_import_catboost()  # Need to first import catboost then catboost_dev not vice-versa.
-    try_import_catboostdev()
-    from catboost_dev import MultiRegressionCustomObjective
     def __init__(self):
-        try_import_catboostdev()
         self.softlogloss = self.SoftLogLossObjective()  # the objective object to pass to CatBoostRegressor
 
     class SoftLogLossObjective(MultiRegressionCustomObjective):
@@ -58,4 +51,3 @@ class SoftclassObjective(object):
             hess = [[(exp_approx[j] * exp_approx[j2] - (j==j2)*exp_approx[j]) * weight
                     for j in range(len(targets))] for j2 in range(len(targets))]
             return (grad, hess)
-

@@ -12,7 +12,7 @@ from autogluon.core.features.types import R_OBJECT
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
-from autogluon.core.utils import try_import_catboost, try_import_catboostdev
+from autogluon.core.utils import try_import_catboost
 
 from .catboost_utils import construct_custom_catboost_metric
 from .hyperparameters.parameters import get_param_baseline
@@ -76,8 +76,7 @@ class CatBoostModel(AbstractModel):
         ag_params = self._get_ag_params()
         params = self._get_model_params()
         if self.problem_type == SOFTCLASS:
-            try_import_catboostdev()  # Need to first import catboost then catboost_dev not vice-versa.
-            from catboost_dev import CatBoostClassifier, CatBoostRegressor, Pool
+            # FIXME: This is extremely slow due to unoptimized metric / objective sent to CatBoost
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
             params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
             params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()

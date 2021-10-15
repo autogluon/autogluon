@@ -2,7 +2,6 @@ __all__ = [
     'try_import_mxboard',
     'try_import_mxnet',
     'try_import_catboost',
-    'try_import_catboostdev',
     'try_import_lightgbm',
     'try_import_xgboost',
     'try_import_faiss',
@@ -53,17 +52,7 @@ def try_import_catboost():
                           "A quick tip is to install via `pip install catboost`.")
     except ValueError as e:
         raise ImportError("Import catboost failed. Numpy version may be outdated, "
-                          "Please ensure numpy version >=1.16.0. If it is not, please try 'pip uninstall numpy -y; pip install numpy>=1.17.0' "
-                          "Detailed info: {}".format(str(e)))
-
-
-def try_import_catboostdev():  # TODO: remove once Catboost 0.24 is released.
-    try:
-        import catboost  # Need to first import catboost before catboost_dev and not vice-versa
-        import catboost_dev
-    except (ValueError, ImportError) as e:
-        raise ImportError("`import catboost_dev` failed (needed for distillation with CatBoost models). "
-                          "Make sure you can import catboost and then run: 'pip install catboost-dev'."
+                          "Please ensure numpy version >=1.17.0. If it is not, please try 'pip uninstall numpy -y; pip install numpy>=1.17.0' "
                           "Detailed info: {}".format(str(e)))
 
 
