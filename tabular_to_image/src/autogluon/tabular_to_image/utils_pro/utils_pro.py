@@ -25,18 +25,17 @@ import matplotlib.ticker as tic
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from sklearn.manifold import TSNE
 class Utils_pro:
-    def __init__(self, label_column,image_shape ):
+    def __init__(self, label_column,**kwargs):
         #self.train_dataset=train_dataset
         self.label_column=label_column
         #self.image_shape=image_shape
      
               
-        self._ModelsZoo: ModelsZoo = ModelsZoo_type(ImageShape=ImageShape ,model_type=model_type,
-                                        num_classes=num_classes,pretrained=pretrained,**Utils_pro_kwargs)
-        self._ModelsZoo_type = type(self._ModelsZoo)
         ModelsZoo_type = kwargs.pop('ModelsZoo_type', ModelsZoo)
         ModelsZoo_kwargs = kwargs.pop('ModelsZoo_kwargs', dict())
         ImageShape = kwargs.get('ImageShape', None)
+        self._ModelsZoo_type = type(self._ModelsZoo)
+        self._ModelsZoo: ModelsZoo = ModelsZoo_type(ImageShape=ImageShape ,**ModelsZoo_kwargs)
         #model_type = kwargs.get('model_type', None)
         #num_classes = kwargs.get('num_classes', None)
         #pretrained = kwargs.get('pretrained', None)
