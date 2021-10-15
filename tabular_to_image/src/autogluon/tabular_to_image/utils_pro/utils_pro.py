@@ -25,9 +25,9 @@ import matplotlib.ticker as tic
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from sklearn.manifold import TSNE
 class Utils_pro:
-    def __init__(self, label_column,**kwargs):
+    def __init__(self, **kwargs):
         #self.train_dataset=train_dataset
-        self.label_column=label_column
+        #self.label_column=label_column
              
               
         ModelsZoo_type = kwargs.pop('ModelsZoo_type', ModelsZoo)
@@ -49,17 +49,34 @@ class Utils_pro:
     if use_gpu:
         print("Using CUDA")
     
+     @property
+    def ImageShape(self):
+        return self._ModelsZoo.ImageShape 
     
-    def _validate_data(self, data):        
-        data = self.__get_dataset(data)
+    @staticmethod
+    def __get_dataset(train_data):
+        if isinstance(data, TabularDataset):
+            return data
+        elif isinstance(train_data, pd.DataFrame):
+            return TabularDataset(data)
+        elif isinstance(train_data, str):
+            return TabularDataset(data)
+        elif isinstance(train_data, pd.Series):
+            raise TypeError("data must be TabularDataset or pandas.DataFrame, not pandas.Series. \
+                   To predict on just single example (ith row of table), use data.iloc[[i]] rather than data.iloc[i]")
+        else:
+            raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
+             
+    def _validate_fit_data(self, train_data,target):        
+        train_data = self.__get_dataset(train_data)
         if isinstance(data, str):
-            data = TabularDataset(data)
-        if not isinstance(data, pd.DataFrame):
+            train_data = TabularDataset(train_data)
+        if not isinstance(train_data, pd.DataFrame):
             raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(data)}')
-        if len(set(data.columns)) < len(data.columns):
+        if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         
-        X_train, X_test, y_train, y_test = train_test_split(data,  self.label_column, test_size=0.2)
+        X_train, X_test, y_train, y_test = train_test_split(train_data,target, test_size=0.2)
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25)
         if X_val is not None:
             if not isinstance(X_val, pd.DataFrame):
@@ -76,33 +93,13 @@ class Utils_pro:
             if np.any(train_features != test_features):
                 raise ValueError("Column names must match between training and test_data")
          
-        return X_train,X_val,X_test,y_train , y_val,y_test    
-     
-    
-    
-    @property
-    def ImageShape(self):
-        return self._ModelsZoo.ImageShape 
-    
-    @staticmethod
-    def __get_dataset(data):
-        if isinstance(data, TabularDataset):
-            return data
-        elif isinstance(data, pd.DataFrame):
-            return TabularDataset(data)
-        elif isinstance(data, str):
-            return TabularDataset(data)
-        elif isinstance(data, pd.Series):
-            raise TypeError("data must be TabularDataset or pandas.DataFrame, not pandas.Series. \
-                   To predict on just single example (ith row of table), use data.iloc[[i]] rather than data.iloc[i]")
-        else:
-            raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
-        
-        
-    def Image_Genartor(self,data):
-        data=self.__get_dataset(data)
+        return X_train,X_val,X_test,y_train , y_val,y_test      
+   
+              
+    def Image_Genartor(self,train_data):
+        train_data=self.__get_dataset(train_data)
         ln = LogScaler()
-        X_train,X_val,X_test,_ , _,_=self._validate_data(data)
+        X_train,X_val,X_test,_ , _,_=self._validate_fit_data(data)
         X_train_norm = ln.fit_transform(X_train)
         X_val_norm = ln.fit_transform(X_val)
         X_test_norm = ln.transform(X_test)
@@ -124,13 +121,14 @@ class Utils_pro:
         X_train_img,X_val_img,X_test_img=self.Image_Genartor(self.Image_shape)
         return len(X_train_img),len(X_val_img),len(X_test_img)
         
-    def image_tensor(self,data): 
+    def image_tensor(self,train_data): 
         preprocess = transforms.Compose([transforms.ToTensor()])    
         batch_size = 64
         
         le = LabelEncoder()
         #num_classes = np.unique(le.fit_transform(self.y_train)).size
-        _,_,_,y_train , y_val,y_test=self._validate_data(data)
+        train_data=self.__get_dataset(train_data)
+        _,_,_,y_train , y_val,y_test=self._validate_fit_data(train_data)
         X_train_img,X_val_img,X_test_img=self.Image_Genartor(self.ImageShape)
         X_train_tensor = torch.stack([preprocess(img) for img in X_train_img ])
         y_train_tensor = torch.from_numpy(le.fit_transform(y_train))

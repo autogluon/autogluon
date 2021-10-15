@@ -17,8 +17,8 @@ from torch.optim import lr_scheduler
 from torch.autograd import Variable
 from torchvision import datasets, models, transforms
  
-import autogluon.tabular_to_image.utils_pro
-import autogluon.tabular_to_image.models_zoo   
+#import autogluon.tabular_to_image.utils_pro
+#import autogluon.tabular_to_image.models_zoo   
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from autogluon.tabular_to_image.utils_pro.utils_pro import Utils_pro 
 class ImagePredictions: 
@@ -28,10 +28,10 @@ class ImagePredictions:
         Utils_pro_kwargs = kwargs.pop('Utils_pro_kwargs', dict())
               
        
-        label_column=kwargs.get('label_column', None)
+        #label_column=kwargs.get('label_column', None)
         
         
-        self._Utils_pro: Utils_pro = Utils_pro_type(label_column=label_column ,**Utils_pro_kwargs)
+        self._Utils_pro: Utils_pro = Utils_pro_type(**Utils_pro_kwargs)
         self._Utils_pro_type = type(self._Utils_pro)
         
         
@@ -46,20 +46,14 @@ class ImagePredictions:
         pretrained = kwargs.get('pretrained', None)
               
         self._ModelsZoo: ModelsZoo = ModelsZoo_type(ImageShape=ImageShape ,model_type=model_type,
-                                        num_classes=num_classes,pretrained=pretrained,**Utils_pro_kwargs)
+                                        num_classes=num_classes,pretrained=pretrained,**ModelsZoo_kwargs)
         self._ModelsZoo_type = type(self._ModelsZoo)
         #rainloader,valloader,Testloader =self._Utils_pro.Utils_pro.image_tensor()
         #criterion,optimizer,exp_lr_scheduler=self._ModelsZoo.ModelsZoo.optimizer()
         #use_gpu = torch.cuda.is_available()
         #models=self._ModelsZoo.ModelsZoo.create_model()
         
-    
-     
-        
-    @property
-    def label_column(self):
-        return self._Utils_pro.label_column 
-   
+      
     
     @property
     def ImageShape(self):
@@ -84,7 +78,6 @@ class ImagePredictions:
         valid_kwargs = {
             'Utils_pro_type',
             'Utils_pro_kwargs',
-             'label_column',
              'ImageShape',
              'model_type',
              'num_classes',
