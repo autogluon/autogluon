@@ -28,8 +28,7 @@ class Utils_pro:
     def __init__(self, label_column,**kwargs):
         #self.train_dataset=train_dataset
         self.label_column=label_column
-        #self.image_shape=image_shape
-     
+             
               
         ModelsZoo_type = kwargs.pop('ModelsZoo_type', ModelsZoo)
         ModelsZoo_kwargs = kwargs.pop('ModelsZoo_kwargs', dict())
@@ -109,7 +108,7 @@ class Utils_pro:
         X_test_norm = ln.transform(X_test)
         #@jit(target ="cuda") 
         model=self._ModelsZoo.ModelsZoo.create_model()
-        it = ImageTransformer(feature_extractor='tsne',pixels=self.image_shape, random_state=1701,n_jobs=-1)
+        it = ImageTransformer(feature_extractor='tsne',pixels=self.ImageShape, random_state=1701,n_jobs=-1)
        
         X_train_img = it.fit_transform(X_train_norm)
         X_val_img = it.fit_transform(X_val_norm)
@@ -120,6 +119,10 @@ class Utils_pro:
         plt.figure(figsize=(5, 5))
         _ = it.fit(X_train_norm, plot=True)
         return X_train_img,X_val_img,X_test_img
+    
+    def len_of_Images(self):
+        X_train_img,X_val_img,X_test_img=self.Image_Genartor(self.Image_shape)
+        return len(X_train_img),len(X_val_img),len(X_test_img)
         
     def image_tensor(self,data): 
         preprocess = transforms.Compose([transforms.ToTensor()])    
@@ -128,7 +131,7 @@ class Utils_pro:
         le = LabelEncoder()
         #num_classes = np.unique(le.fit_transform(self.y_train)).size
         _,_,_,y_train , y_val,y_test=self._validate_data(data)
-        X_train_img,X_val_img,X_test_img=self.Image_Genartor(self.image_shape)
+        X_train_img,X_val_img,X_test_img=self.Image_Genartor(self.ImageShape)
         X_train_tensor = torch.stack([preprocess(img) for img in X_train_img ])
         y_train_tensor = torch.from_numpy(le.fit_transform(y_train))
 

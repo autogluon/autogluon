@@ -172,6 +172,7 @@ class ImagePredictions:
         trainloader,valloader,_ =self._Utils_pro.Utils_pro.image_tensor()
         criterion,optimizer,_=self._ModelsZoo.ModelsZoo.optimizer()
         model=self._ModelsZoo.ModelsZoo.create_model()
+        len_X_train_img,len_X_val_img,len_X_test_img=self._Utils_pro.Utils_pro.len_of_Images()
         use_gpu = torch.cuda.is_available()
         since = time.time()
         best_model_wts = copy.deepcopy(model.state_dict())
@@ -232,8 +233,8 @@ class ImagePredictions:
             
             print()
             # * 2 as we only used half of the dataset
-            avg_loss = loss_train * 2 /len(self.X_train_img) #dataset_sizes[TRAIN]
-            avg_acc = acc_train * 2 /len(self.X_train_img)#dataset_sizes[TRAIN]
+            avg_loss = loss_train * 2 /len_X_val_img #dataset_sizes[TRAIN]
+            avg_acc = acc_train * 2 /len_X_val_img #dataset_sizes[TRAIN]
             
             model.train(False)
             model.eval()
@@ -263,8 +264,8 @@ class ImagePredictions:
                 del inputs, labels, outputs, preds
                 torch.cuda.empty_cache()
             
-            avg_loss_val = loss_val /len(self.X_test_img) #dataset_sizes[VAL]
-            avg_acc_val = acc_val /len(self.X_val_img) #dataset_sizes[VAL]
+            avg_loss_val = loss_val /len_X_test_img #dataset_sizes[VAL]
+            avg_acc_val = acc_val /len_X_test_img #dataset_sizes[VAL]
             
             print()
             print("Epoch {} result: ".format(epoch))
@@ -291,6 +292,7 @@ class ImagePredictions:
         _,_,Testloader =self._Utils_pro.Utils_pro.image_tensor()
         criterion,_,_=self._ModelsZoo.ModelsZoo.optimizer()
         model=self._ModelsZoo.ModelsZoo.create_model()
+        _,_,len_X_test_img=self._Utils_pro.Utils_pro.len_of_Images()
         use_gpu = torch.cuda.is_available()
         since = time.time()
         avg_loss = 0
@@ -327,8 +329,8 @@ class ImagePredictions:
             del inputs, labels, outputs, preds
             torch.cuda.empty_cache()
             
-        avg_loss = loss_test /len(self.X_test_img) #dataset_sizes[TEST]
-        avg_acc = acc_test /len(self.X_test_img)#dataset_sizes[TEST]
+        avg_loss = loss_test /len_X_test_img #dataset_sizes[TEST]
+        avg_acc = acc_test /len_X_test_img#dataset_sizes[TEST]
         
         elapsed_time = time.time() - since
         print()
