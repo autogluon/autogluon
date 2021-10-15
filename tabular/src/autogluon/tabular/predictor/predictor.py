@@ -482,9 +482,10 @@ class TabularPredictor:
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
             In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
-        calibrate: bool
+        calibrate: bool, default = False
             If true then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
-            will train a scalar parameter on the validation set.
+            will train a scalar parameter on the validation set. This trains the best model's predictive prob to have a stronger
+            correlation between predictive prob and accuracy.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -863,6 +864,10 @@ class TabularPredictor:
             If specified, all models trained will be stack ensembles.
             If None, models will be trained as if they were specified in :meth:`TabularPredictor.fit`, without depending on existing models.
             Only valid if bagging is enabled.
+        calibrate: bool, default = False
+            If true then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
+            will train a scalar parameter on the validation set. This trains the best model's predictive prob to have a stronger
+            correlation between predictive prob and accuracy.
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
