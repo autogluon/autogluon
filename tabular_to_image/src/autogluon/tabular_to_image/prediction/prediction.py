@@ -16,6 +16,7 @@ import torchvision
 from torch.optim import lr_scheduler
 from torch.autograd import Variable
 from torchvision import datasets, models, transforms
+from autogluon.core.dataset import TabularDataset
  
 import autogluon.tabular_to_image.utils_pro
 import autogluon.tabular_to_image.models_zoo   
@@ -28,18 +29,13 @@ class ImagePredictions:
         Utils_pro_kwargs = kwargs.pop('Utils_pro_kwargs', dict())
               
        
-        #label_column=kwargs.get('label_column', None)
-        
-        
-        self._Utils_pro: Utils_pro = Utils_pro_type(**Utils_pro_kwargs)
+        labels=kwargs.get('labels', None)
+        self._Utils_pro: Utils_pro = Utils_pro_type(labels=labels,**Utils_pro_kwargs)
         self._Utils_pro_type = type(self._Utils_pro)
         
-        
-        
+                
         ModelsZoo_type = kwargs.pop('ModelsZoo_type', ModelsZoo)
-        ModelsZoo_kwargs = kwargs.pop('ModelsZoo_kwargs', dict())
-        
-                     
+        ModelsZoo_kwargs = kwargs.pop('ModelsZoo_kwargs', dict())                    
         ImageShape = kwargs.get('ImageShape', None)
         model_type = kwargs.get('model_type', None)
         num_classes = kwargs.get('num_classes', None)
@@ -54,7 +50,10 @@ class ImagePredictions:
         #models=self._ModelsZoo.ModelsZoo.create_model()
         
       
-    
+    Dataset = TabularDataset 
+    @property
+    def labels(self):
+        return self._Utils_pro.labels
     @property
     def ImageShape(self):
         return self._ModelsZoo.ImageShape 
@@ -78,6 +77,7 @@ class ImagePredictions:
         valid_kwargs = {
             'Utils_pro_type',
             'Utils_pro_kwargs',
+            'labels',
             'ImageShape',
             'model_type',
             'num_classes',
@@ -93,12 +93,12 @@ class ImagePredictions:
             raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
     
  
-    def train_model(self,model, num_epochs=3):
+    def train_model(self,data,model, num_epochs=3):
         #criterion = nn.CrossEntropyLoss() #optimizer = optim.Rprop(model.parameters(), lr=0.01) #scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1)
-        trainloader,valloader,_ =self._Utils_pro.Utils_pro.image_tensor()
+        trainloader,valloader,_ =self._Utils_pro.Utils_pro.image_tensor(data)
         criterion,optimizer,_=self._ModelsZoo.ModelsZoo.optimizer()
         model=self._ModelsZoo.ModelsZoo.create_model()
-        len_X_train_img,len_X_val_img,_=self._Utils_pro.Utils_pro.len_of_Images()
+        len_X_train_img,len_X_val_img,_=self._Utils_pro.Utils_pro.len_of_Images(data)
         use_gpu = torch.cuda.is_available()
         since = time.time()
         best_model_wts = copy.deepcopy(model.state_dict())
