@@ -35,7 +35,7 @@ test_requirements = [
 
 extras_require = {
     'lightgbm': [
-        'lightgbm>=3.0,<4.0',
+        'lightgbm>=3.3,<4.0',
     ],
     'catboost': [
         'catboost>=1.0,<1.1',
