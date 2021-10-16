@@ -17,8 +17,8 @@ from torch.optim import lr_scheduler
 from torch.autograd import Variable
 from torchvision import datasets, models, transforms
  
-#import autogluon.tabular_to_image.utils_pro
-#import autogluon.tabular_to_image.models_zoo   
+import autogluon.tabular_to_image.utils_pro
+import autogluon.tabular_to_image.models_zoo   
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from autogluon.tabular_to_image.utils_pro.utils_pro import Utils_pro 
 class ImagePredictions: 

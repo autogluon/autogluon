@@ -22,6 +22,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.ticker as tic
+import autogluon.tabular_to_image.models_zoo 
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from sklearn.manifold import TSNE
 class Utils_pro:
@@ -49,16 +50,16 @@ class Utils_pro:
     if use_gpu:
         print("Using CUDA")
     
-     @property
+    @property
     def ImageShape(self):
         return self._ModelsZoo.ImageShape 
     
     @staticmethod
     def __get_dataset(train_data):
         if isinstance(train_data, TabularDataset):
-            return data
+            return train_data
         elif isinstance(train_data, pd.DataFrame):
-            return TabularDataset(data)
+            return TabularDataset(train_data)
         elif isinstance(train_data, str):
             return TabularDataset(train_data)
         elif isinstance(train_data, pd.Series):
@@ -69,10 +70,10 @@ class Utils_pro:
              
     def _validate_fit_data(self, train_data,target):        
         train_data = self.__get_dataset(train_data)
-        if isinstance(data, str):
+        if isinstance(train_data, str):
             train_data = TabularDataset(train_data)
         if not isinstance(train_data, pd.DataFrame):
-            raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(data)}')
+            raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         
@@ -81,8 +82,8 @@ class Utils_pro:
         if X_val is not None:
             if not isinstance(X_val, pd.DataFrame):
                 raise AssertionError(f'X_val is required to be a pandas DataFrame, but was instead: {type(X_val)}')
-            train_features = [column for column in X_train.columns if column != self.label_column]
-            val_features = [column for column in X_val.columns if column != self.label_column]
+            train_features = [column for column in X_train.columns if column != target]
+            val_features = [column for column in X_val.columns if column != target]
             if np.any(train_features != val_features):
                 raise ValueError("Column names must match between training and val data")
         if X_test is not None:
@@ -96,10 +97,10 @@ class Utils_pro:
         return X_train,X_val,X_test,y_train , y_val,y_test      
    
               
-    def Image_Genartor(self,train_data):
+    def Image_Genartor(self,train_data,target):
         train_data=self.__get_dataset(train_data)
         ln = LogScaler()
-        X_train,X_val,X_test,_ , _,_=self._validate_fit_data(train_data)
+        X_train,X_val,X_test,_ , _,_=self._validate_fit_data(train_data,target)
         X_train_norm = ln.fit_transform(X_train)
         X_val_norm = ln.fit_transform(X_val)
         X_test_norm = ln.transform(X_test)
@@ -117,8 +118,8 @@ class Utils_pro:
         _ = it.fit(X_train_norm, plot=True)
         return X_train_img,X_val_img,X_test_img
     
-    def len_of_Images(self):
-        X_train_img,X_val_img,X_test_img=self.Image_Genartor(self.Image_shape)
+    def len_of_Images(self,train_data,target):
+        X_train_img,X_val_img,X_test_img=self.Image_Genartor(train_data,target)
         return len(X_train_img),len(X_val_img),len(X_test_img)
         
     def image_tensor(self,train_data): 
@@ -128,8 +129,8 @@ class Utils_pro:
         le = LabelEncoder()
         #num_classes = np.unique(le.fit_transform(self.y_train)).size
         train_data=self.__get_dataset(train_data)
-        _,_,_,y_train , y_val,y_test=self._validate_fit_data(train_data)
-        X_train_img,X_val_img,X_test_img=self.Image_Genartor(self.ImageShape)
+        _,_,_,y_train , y_val,y_test=self._validate_fit_data(train_data,target)
+        X_train_img,X_val_img,X_test_img=self.Image_Genartor(train_data,target)
         X_train_tensor = torch.stack([preprocess(img) for img in X_train_img ])
         y_train_tensor = torch.from_numpy(le.fit_transform(y_train))
 
