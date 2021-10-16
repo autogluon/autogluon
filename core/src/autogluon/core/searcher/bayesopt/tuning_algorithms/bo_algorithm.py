@@ -1,4 +1,4 @@
-from typing import List, NamedTuple, Set, Tuple, Iterator, Optional
+from typing import List, Set, Tuple, Iterator, Optional
 import logging
 import numpy as np
 import itertools
@@ -16,16 +16,10 @@ from ..utils.simple_profiler import SimpleProfiler
 logger = logging.getLogger(__name__)
 
 
-class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
+class BayesianOptimizationAlgorithm(NextCandidatesAlgorithm):
     """
     Core logic of the Bayesian optimization algorithm
     :param initial_candidates_generator: generator of candidates
-    :param initial_scoring_function: scoring function used to rank the initial
-        candidates.
-        Note: If a batch is selected in one go (num_requested_candidates > 1,
-        greedy_batch_selection = False), this function should encourage
-        diversity among its top scorers. In general, greedy batch selection
-        is recommended.
     :param num_initial_candidates: how many initial candidates to generate, if
         possible
     :param local_optimizer: local optimizer which starts from score minimizer.
@@ -69,18 +63,33 @@ class BayesianOptimizationAlgorithm(NamedTuple, NextCandidatesAlgorithm):
 
     """
 
-    initial_candidates_generator: CandidateGenerator
-    initial_candidates_scorer: ScoringFunction
-    num_initial_candidates: int
-    local_optimizer: LocalOptimizer
-    pending_candidate_state_transformer: Optional[PendingCandidateStateTransformer]
-    blacklisted_candidates: Set[Candidate]
-    num_requested_candidates: int
-    greedy_batch_selection: bool
-    duplicate_detector: DuplicateDetector
-    profiler: SimpleProfiler = None
-    sample_unique_candidates: bool = False
-    debug_log: Optional[DebugLogPrinter] = None
+    def __init__(
+            self,
+            initial_candidates_generator: CandidateGenerator,
+            initial_candidates_scorer: ScoringFunction,
+            num_initial_candidates: int,
+            local_optimizer: LocalOptimizer,
+            pending_candidate_state_transformer: Optional[PendingCandidateStateTransformer],
+            blacklisted_candidates: Set[Candidate],
+            num_requested_candidates: int,
+            greedy_batch_selection: bool,
+            duplicate_detector: DuplicateDetector,
+            profiler: SimpleProfiler = None,
+            sample_unique_candidates: bool = False,
+            debug_log: Optional[DebugLogPrinter] = None,
+    ):
+        self.initial_candidates_generator = initial_candidates_generator
+        self.initial_candidates_scorer = initial_candidates_scorer
+        self.num_initial_candidates = num_initial_candidates
+        self.local_optimizer = local_optimizer
+        self.pending_candidate_state_transformer = pending_candidate_state_transformer
+        self.blacklisted_candidates = blacklisted_candidates
+        self.num_requested_candidates = num_requested_candidates
+        self.greedy_batch_selection = greedy_batch_selection
+        self.duplicate_detector = duplicate_detector
+        self.profiler = profiler
+        self.sample_unique_candidates = sample_unique_candidates
+        self.debug_log = debug_log
 
     # Note: For greedy batch selection (num_outer_iterations > 1), the
     # underlying SurrrogateModel changes with each new pending candidate. The
