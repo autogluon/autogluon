@@ -139,7 +139,6 @@ class XGBoostModel(AbstractModel):
             callbacks=callbacks,
             sample_weight=sample_weight
         )
-        self.model.eval_metric = None
 
         bst = self.model.get_booster()
         # TODO: Investigate speed-ups from GPU inference
