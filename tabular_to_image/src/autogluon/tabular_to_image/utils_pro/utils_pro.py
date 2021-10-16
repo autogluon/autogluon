@@ -51,6 +51,9 @@ class Utils_pro:
         print("Using CUDA")
     
     @property
+    def groups(self):
+        return _,self._ModelsZoo.ModelsZoo.create_model() 
+    @property
     def ImageShape(self):
         return self._ModelsZoo.ImageShape 
     
@@ -77,7 +80,6 @@ class Utils_pro:
         if len(set(data.columns)) < len(data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         
-        num_groups=4
         len(data)
         X_train, X_test, y_train, y_test = train_test_split(data,data[self.labels], test_size=0.2)
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25)

@@ -68,9 +68,10 @@ class ImagePredictions:
     def pretrained(self):
         return self._ModelsZoo.pretrained 
    
-    @property
-    def model(self):
-        return self._ModelsZoo.ModelsZoo.create_model() 
+    #method call not property call
+    #@property
+    #def model(self):
+    #    return self._ModelsZoo.ModelsZoo.create_model() 
      
     @staticmethod
     def _validate_init_kwargs(kwargs):
