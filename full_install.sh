@@ -11,5 +11,6 @@ python3 -m pip install -e forecasting/
 python3 -m pip install -e autogluon/
 python3 -m pip -q install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
 python3 -m pip install -e tabular_to_image/[all]
+python3 -m pip install efficientnet_pytorch
 
 

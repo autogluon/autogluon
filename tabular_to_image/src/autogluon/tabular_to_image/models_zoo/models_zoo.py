@@ -13,6 +13,7 @@ import time
 import os
 import copy
 #from autogluon.TablarToImage import  Utils
+from efficientnet_pytorch import EfficientNet
 
 class ModelsZoo():  
     def __init__(self, ImageShape,model_type, num_classes, pretrained=True):  
@@ -24,12 +25,14 @@ class ModelsZoo():
          
     def create_model(self):
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        final_model=''
         if   self.ImageShape=='224':
             if 'resnet18' == self.model_type:
                 model = models.resnet18(pretrained=self.pretrained).to(device).double()
                 for param in model.parameters():
                     param.requires_grad = False
                 model.fc = nn.Linear(model.fc.in_features,self.num_classes ).double()
+        
             elif 'resnet34' == self.model_type:
                 model = models.resnet34(pretrained=self.pretrained).to(device).double()
                 for param in model.parameters():
@@ -155,6 +158,41 @@ class ModelsZoo():
                 for param in model.parameters():
                     param.requires_grad = False
                 model.classifier[1] = nn.Linear(model.classifier[1].in_features, self.num_classes).double()         
+            elif 'efficientnet-b1'==self.model_type:
+                model = EfficientNet.from_name('efficientnet-b1')
+                for param in model.parameters():
+                   param.requires_grad = True  
+                model._fc = nn.Linear(model._fc.in_features, self.num_classes).double() 
+            elif 'efficientnet-b2'==self.model_type:
+                model = EfficientNet.from_name('efficientnet-b2')
+                for param in model.parameters():
+                   param.requires_grad = True  
+                model._fc = nn.Linear(model._fc.in_features, self.num_classes).double()
+            elif 'efficientnet-b3'==self.model_type:
+                model = EfficientNet.from_name('efficientnet-b3')
+                for param in model.parameters():
+                   param.requires_grad = True  
+                model._fc = nn.Linear(model._fc.in_features, self.num_classes).double()  
+            elif 'efficientnet-b4'==self.model_type:
+                model = EfficientNet.from_name('efficientnet-b4')
+                for param in model.parameters():
+                   param.requires_grad = True  
+                model._fc = nn.Linear(model._fc.in_features, self.num_classes).double()    
+            elif 'efficientnet-b5'==self.model_type:
+                model = EfficientNet.from_name('efficientnet-b5')
+                for param in model.parameters():
+                   param.requires_grad = True  
+                model._fc = nn.Linear(model._fc.in_features, self.num_classes).double()
+            elif 'efficientnet-b6'==self.model_type:
+                model = EfficientNet.from_name('efficientnet-b6')
+                for param in model.parameters():
+                   param.requires_grad = True  
+                model._fc = nn.Linear(model._fc.in_features, self.num_classes).double()  
+            elif 'efficientnet-b7'==self.model_type:
+                model = EfficientNet.from_name('efficientnet-b7')
+                for param in model.parameters():
+                   param.requires_grad = True  
+                model._fc = nn.Linear(model._fc.in_features, self.num_classes).double()                  
         elif self.ImageShape=='227':
             if 'squeezenet1_0' == self.model_type:
                 model = models.squeezenet1_0(pretrained=self.pretrained).to(device).double()
