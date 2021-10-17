@@ -50,9 +50,10 @@ class Utils_pro:
     if use_gpu:
         print("Using CUDA")
     
+    
     @property
     def groups(self):
-        return _,self._ModelsZoo.ModelsZoo.create_model() 
+        return self._ModelsZoo.ModelsZoo.create_model() 
     @property
     def ImageShape(self):
         return self._ModelsZoo.ImageShape 
@@ -71,6 +72,7 @@ class Utils_pro:
         else:
             raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
              
+
     def _validate_fit_data(self, data):        
         data = self.__get_dataset(data)
         if isinstance(data, str):
