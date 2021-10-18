@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from autogluon.core.constants import MULTICLASS
+from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
 
 
 def filter_pseudo(y_pred_proba_og, problem_type,
@@ -30,7 +30,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
     --------
     pd.Series of indices that met pseudolabeling requirements
     """
-    if problem_type in MULTICLASS:
+    if problem_type in PROBLEM_TYPES_CLASSIFICATION:
         y_pred_proba_max = y_pred_proba_og.max(axis=1)
         curr_threshold = threshold
         curr_percentage = (y_pred_proba_max >= curr_threshold).mean()
