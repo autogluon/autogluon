@@ -826,6 +826,7 @@ class TabularPredictor:
 
         y_val = self._trainer.load_y_val().to_numpy()
         import torch
+        y_val_tensor = torch.tensor(y_val)
         temperature_param = torch.nn.Parameter(torch.ones(1))
         logits = torch.tensor(np.log2(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
@@ -835,7 +836,6 @@ class TabularPredictor:
             optimizer.zero_grad()
             temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
             new_logits = (logits / temp)
-            y_val_tensor = torch.tensor(y_val)
             loss = nll_criterion(new_logits, y_val_tensor)
             loss.backward()
             return loss
