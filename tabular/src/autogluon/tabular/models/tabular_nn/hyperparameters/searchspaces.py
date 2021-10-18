@@ -13,11 +13,11 @@ def get_default_searchspace(problem_type, num_classes=None):
         'embedding_size_factor': Categorical(1.0, 0.5, 1.5, 0.7, 0.6, 0.8, 0.9, 1.1, 1.2, 1.3, 1.4),
         'network_type': Categorical('widedeep', 'feedforward'),
         'use_batchnorm': Categorical(True, False),
-        'batch_size': Categorical(512, 1024, 2056, 128)
-        'proc.embed_min_categories': Categorical(4, 3, 10, 100, 1000) 
-        'proc.impute_strategy': Categorical('median', 'mean', 'most_frequent')
-        'proc.max_category_levels': Categorical(100, 10, 20, 200, 300, 400, 500, 1000, 10000)
-        'proc.skew_threshold': Categorical(0.99, 0.2, 0.3, 0.5, 0.8, 0.9, 0.999, 1.0, 10.0, 100.0)
+        'batch_size': Categorical(512, 1024, 2056, 128),
+        'proc.embed_min_categories': Categorical(4, 3, 10, 100, 1000),
+        'proc.impute_strategy': Categorical('median', 'mean', 'most_frequent'),
+        'proc.max_category_levels': Categorical(100, 10, 20, 200, 300, 400, 500, 1000, 10000),
+        'proc.skew_threshold': Categorical(0.99, 0.2, 0.3, 0.5, 0.8, 0.9, 0.999, 1.0, 10.0, 100.0),
     }
     if problem_type == QUANTILE:
         return get_searchspace_quantile().copy()
