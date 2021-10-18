@@ -819,10 +819,10 @@ class TabularPredictor:
             model_name = self._trainer.get_model_best()
 
         if self._trainer.bagged_mode:
-            y_val_probs = self.get_oof_pred_proba(model_name).values
+            y_val_probs = self.get_oof_pred_proba(model_name).to_numpy()
         else:
             X_val = self._trainer.load_X_val()
-            y_val_probs = self.predict_proba(data=X_val, model=model_name).values
+            y_val_probs = self.predict_proba(data=X_val, model=model_name).to_numpy()
 
         y_val = self._trainer.load_y_val().to_numpy()
         import torch
