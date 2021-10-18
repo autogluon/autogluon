@@ -868,10 +868,6 @@ class TabularPredictor:
             If specified, all models trained will be stack ensembles.
             If None, models will be trained as if they were specified in :meth:`TabularPredictor.fit`, without depending on existing models.
             Only valid if bagging is enabled.
-        calibrate: bool, default = False
-            If true then will use temperature scaling to calibrate the model for better negative log loss. This will only be applied to
-            multi-class classification problems. Temperature scaling will train a scalar parameter on the validation set.
-            This trains the best model's predictive prob to have a stronger correlation between predictive prob and accuracy.
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
