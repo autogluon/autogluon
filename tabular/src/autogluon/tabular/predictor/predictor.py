@@ -1,5 +1,4 @@
 import copy
-import torch
 import logging
 import os
 import math
@@ -808,27 +807,30 @@ class TabularPredictor:
         if save_space:
             self.save_space()
 
-    def _calibrate_best_model(self):
+    def _calibrate_best_model(self, model_name: str = None):
         """
         Applies temperature scaling to the best autogluon model. Applies
         inverse softmax to predicted probs then trains temperature scalar
-        on validation data to maximize NLL. Inversed softmaxes are divided
-        by temperature scalar then softmaxed to return predicted probs
+        on validation data to maximize negtiave log likelihood. Inversed
+        softmaxes are divided by temperature scalar then softmaxed to return
+        predicted probs
         """
-        model_best_name = self._trainer.get_model_best()
+        import torch
+        if model_name is None:
+            model_name = self._trainer.get_model_best()
 
         if self._trainer.bagged_mode:
             y_val = self._trainer.load_y().to_numpy()
-            y_val_probs = self.get_oof_pred_proba(model_best_name).values
+            y_val_probs = self.get_oof_pred_proba(model_name).values
         else:
             X_val = self._trainer.load_X_val()
             y_val = self._trainer.load_y_val().to_numpy()
-            y_val_probs = self.predict_proba(data=X_val, model=model_best_name)
+            y_val_probs = self.predict_proba(data=X_val, model=model_name)
             y_val_probs = y_val_probs.rename(columns=self._learner.label_cleaner.inv_map).to_numpy()
 
         temperature_param = torch.nn.Parameter(torch.ones(1))
         logits = torch.tensor(np.log2(y_val_probs))
-        nll_criterion = torch.nn.CrossEntropyLoss().cuda()
+        nll_criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=1000)
 
         def temperature_scale_step():
@@ -839,10 +841,11 @@ class TabularPredictor:
             loss.backward()
             return loss
 
+        logger.log(15, 'Temperature scaling term being tuned for model: {}')
         optimizer.step(temperature_scale_step)
-        model_best = self._trainer.load_model(model_name=model_best_name)
-        model_best.temperature_scalar = temperature_param[0].item()
-        model_best.save()
+        model = self._trainer.load_model(model_name=model_name)
+        model.temperature_scalar = temperature_param[0].item()
+        model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, calibrate:bool=False, **kwargs):
         """
@@ -865,9 +868,9 @@ class TabularPredictor:
             If None, models will be trained as if they were specified in :meth:`TabularPredictor.fit`, without depending on existing models.
             Only valid if bagging is enabled.
         calibrate: bool, default = False
-            If true then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
-            will train a scalar parameter on the validation set. This trains the best model's predictive prob to have a stronger
-            correlation between predictive prob and accuracy.
+            If true then will use temperature scaling to calibrate the model for better negative log loss. This will only be applied to
+            multi-class classification problems. Temperature scaling will train a scalar parameter on the validation set.
+            This trains the best model's predictive prob to have a stronger correlation between predictive prob and accuracy.
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
