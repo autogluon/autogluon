@@ -15,7 +15,7 @@ from autogluon.core.calibrate.temperature_scaling import tune_temperature_scalin
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
@@ -45,10 +45,6 @@ logger = logging.getLogger()  # return root logger
 
 # Done for Tabular
 # TODO: Remove all `time_limits` in project, replace with `time_limit`
-
-# Suffix added to model name so leaderboard shows which models use pseudo labeling
-# and how many iterations
-PSEUDO_MODEL_SUFFIX = "_PSEUDO_{iter}"
 
 class TabularPredictor:
     """
@@ -997,11 +993,11 @@ class TabularPredictor:
         Parameters:
         -----------
         hyperparameters: dict
-        Dictionary of hyperparameters the model should use
+            Dictionary of hyperparameters the model should use
         test_data: The incoming data to incorporate into the next iterations of train
-        using pseudolabeling
+            using pseudolabeling
         max_iter: int, default = 5
-        The maximum number of iterations allowed for this instance of pseudolabeling
+            The maximum number of iterations allowed for this instance of pseudolabeling
         Returns:
         --------
         self: TabularPredictor
@@ -1045,7 +1041,7 @@ class TabularPredictor:
                 return self
             else:
                 # Cut down X_test to not include pseudo labeled data
-                X_test = X_test.loc[test_pseudo_idxes[test_pseudo_idxes == False].index]
+                X_test = X_test.loc[test_pseudo_idxes[~test_pseudo_idxes].index]
                 previous_score = current_score
 
         return self
@@ -1066,26 +1062,28 @@ class TabularPredictor:
             Data to incorporate into training. Pre-labeled test data allowed. If no labels
             then pseudolabeling algorithm will predict and filter out which rows to incorporate into
             training
-        max iter: int, default = 5
+        max_iter: int, default = 5
             Maximum iterations of pseudolabeling allowed
         kwargs: dict
-            If predictor is not already fit. Refer to parameters documentation in :meth:`TabularPredictor.fit`.
-            If predictor is fit. Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
+            If predictor is not already fit: Refer to parameters documentation in :meth:`TabularPredictor.fit`.
+            If predictor is fit: Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
+
+        Returns
+        -------
+        self : TabularPredictor
+            Returns self, which is a Python class of TabularPredictor
         """
         if not self._learner.is_fit:
             logger.log(20,
                        f'Predictor not fit prior to pseudolabeling. Fitting now...')
             self.fit(**kwargs)
 
-        if self.problem_type is 'multiclass' and self.eval_metric is not 'accuracy':
+        if self.problem_type is MULTICLASS and self.eval_metric is not 'accuracy':
             logger.warning('AutoGluon has detected the problem type as \'multiclass\' and '
                            f'eval metric is {self.eval_metric.name}, we recommend using'
                            f'fit_pseudolabeling when eval metric is \'acc\'')
 
-        X, y, _, _ = self._trainer.load_data()
-        y.name = self.label
-        train_data = pd.concat([X, y], axis=1)
-        test_data, is_labeled = self._validate_pseudo_data(train_data, test_data)
+        is_labeled = self.label in test_data.columns
 
         hyperparameters = kwargs.get('hyperparameters', None)
         if hyperparameters is None:
@@ -2652,46 +2650,6 @@ class TabularPredictor:
             train_features.remove(self._learner.groups)
 
         return train_features, other_features
-
-    def _validate_pseudo_data(self, train_data: pd.DataFrame, pseudo_data: pd.DataFrame):
-        """
-        Code for validating if pseudo_data is valid, by ensuring: it is of proper type,
-        that features are pruned if necessary and that if train had columns removed
-        then pseudo will as well
-
-        Parameters
-        ----------
-        train_data: The already preprocessed train_data for TabularPredictor
-        pseudo_data: The incoming pseudo data requiring validation
-        """
-        if isinstance(pseudo_data, str):
-            pseudo_data = TabularDataset(pseudo_data)
-
-        if not isinstance(pseudo_data, pd.DataFrame):
-            raise AssertionError(
-                f'pseudo_data is required to be a pandas DataFrame, but was instead: {type(pseudo_data)}')
-
-        is_labeled = self.label in pseudo_data.columns
-        train_features = [column for column in train_data.columns if column != self.label]
-        pseudo_features = [column for column in pseudo_data.columns if column != self.label]
-
-        train_features, pseudo_features = self._prune_data_features(train_features=train_features,
-                                                                    other_features=pseudo_features,
-                                                                    is_labeled=is_labeled,
-                                                                    is_pseudo=True)
-        train_feats_in_pseudo_feats = np.isin(train_features, pseudo_features)
-
-        if not train_feats_in_pseudo_feats.all():
-            bad_columns = np.where(train_feats_in_pseudo_feats == False)
-            missing_columns = np.array(train_features)[bad_columns]
-            raise ValueError(f"Pseudo data is missing the following columns: {missing_columns}")
-
-        if is_labeled:
-            pseudo_data = pseudo_data[train_data.columns]
-        else:
-            pseudo_data = pseudo_data[train_features]
-
-        return pseudo_data, is_labeled
 
     def _validate_fit_data(self, train_data, tuning_data=None, unlabeled_data=None):
         if isinstance(train_data, str):
