@@ -33,6 +33,7 @@ class ModelsZoo():
                         "g3": ['resnext50_32x4d','resnext101_32x8d'],"g4": ['inception_v3']}
     len_group_counts=(sum([len(group_counts[x]) for x in group_counts if isinstance(group_counts[x], list)]))
     new_countsD =new_countsD = {k: len(v) for k,v in group_counts.items()}
+   
     def create_model(self):
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
       

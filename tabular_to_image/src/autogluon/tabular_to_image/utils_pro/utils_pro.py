@@ -52,8 +52,13 @@ class Utils_pro:
     
     
     @property
-    def groups(self):
-        return self._ModelsZoo.ModelsZoo.create_model() 
+    def len_group_counts(self):
+        return self._ModelsZoo.ModelsZoo.len_group_counts 
+    
+    @property
+    def new_countsD(self):
+        return self._ModelsZoo.ModelsZoo.new_countsD 
+    
     @property
     def ImageShape(self):
         return self._ModelsZoo.ImageShape 
@@ -72,7 +77,24 @@ class Utils_pro:
         else:
             raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
              
-
+    def spit_dataset(self,data):
+        
+        models_count=self.len_group_counts() 
+        groups_counts=self.new_countsD()
+        data = self.__get_dataset(data)
+                             
+        g1_presentage=round(((groups_counts['g1']/models_count)*100),1)
+        g2_presentage=round(((groups_counts['g2']/models_count)*100),1)
+        g3_presentage=round(((groups_counts['g3']/models_count)*100),1)
+        g4_presentage=round(((groups_counts['g4']/models_count)*100),1)
+        
+        data_g1=data.sample(frac=g1_presentage, replace=False, random_state=12)
+        data_g2=data.sample(frac=g2_presentage, replace=False, random_state=44)
+        data_g3=data.sample(frac=g3_presentage, replace=False, random_state=58)
+        data_g4=data.sample(frac=g4_presentage, replace=False, random_state=11)
+        return data_g1,data_g2,data_g3,data_g4
+        
+      
     def _validate_fit_data(self, data):        
         data = self.__get_dataset(data)
         if isinstance(data, str):
@@ -101,8 +123,7 @@ class Utils_pro:
                 raise ValueError("Column names must match between training and test_data")
          
         return X_train,X_val,X_test,y_train , y_val,y_test      
-   
-              
+               
     def Image_Genartor(self,data):
         data=self.__get_dataset(data)
         ln = LogScaler()
