@@ -820,13 +820,12 @@ class TabularPredictor:
             model_name = self._trainer.get_model_best()
 
         if self._trainer.bagged_mode:
-            y_val = self._trainer.load_y().to_numpy()
             y_val_probs = self.get_oof_pred_proba(model_name).values
         else:
             X_val = self._trainer.load_X_val()
-            y_val = self._trainer.load_y_val().to_numpy()
             y_val_probs = self.predict_proba(data=X_val, model=model_name).values
-
+            
+        y_val = self._trainer.load_y_val().to_numpy()
         temperature_param = torch.nn.Parameter(torch.ones(1))
         logits = torch.tensor(np.log2(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
