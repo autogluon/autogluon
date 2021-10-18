@@ -817,7 +817,7 @@ class TabularPredictor:
         """
         if model_name is None:
             model_name = self._trainer.get_model_best()
-
+            
         if self._trainer.bagged_mode:
             y_val_probs = self.get_oof_pred_proba(model_name).to_numpy()
         else:
