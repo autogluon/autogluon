@@ -825,8 +825,7 @@ class TabularPredictor:
         else:
             X_val = self._trainer.load_X_val()
             y_val = self._trainer.load_y_val().to_numpy()
-            y_val_probs = self.predict_proba(data=X_val, model=model_name)
-            y_val_probs = y_val_probs.rename(columns=self._learner.label_cleaner.inv_map).to_numpy()
+            y_val_probs = self.predict_proba(data=X_val, model=model_name).values
 
         temperature_param = torch.nn.Parameter(torch.ones(1))
         logits = torch.tensor(np.log2(y_val_probs))
