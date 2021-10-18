@@ -840,7 +840,7 @@ class TabularPredictor:
             loss.backward()
             return loss
 
-        logger.log(15, 'Temperature scaling term being tuned for model: {}')
+        logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
         optimizer.step(temperature_scale_step)
         model = self._trainer.load_model(model_name=model_name)
         model.temperature_scalar = temperature_param[0].item()
