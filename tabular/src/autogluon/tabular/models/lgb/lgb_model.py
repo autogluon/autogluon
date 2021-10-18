@@ -79,13 +79,13 @@ class LGBModel(AbstractModel):
         params = fixedvals_from_searchspaces(params)
 
         if verbosity <= 1:
-            verbose_eval = False
+            log_period = False
         elif verbosity == 2:
-            verbose_eval = 1000
+            log_period = 1000
         elif verbosity == 3:
-            verbose_eval = 50
+            log_period = 50
         else:
-            verbose_eval = 1
+            log_period = 1
 
         stopping_metric, stopping_metric_name = self._get_stopping_metric_internal()
 
@@ -113,8 +113,8 @@ class LGBModel(AbstractModel):
         gc.collect()
 
         callbacks = []
-        valid_names = ['train_set']
-        valid_sets = [dataset_train]
+        valid_names = []
+        valid_sets = []
         if dataset_val is not None:
             from .callbacks import early_stopping_custom
             # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
@@ -137,6 +137,9 @@ class LGBModel(AbstractModel):
             ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
+        from lightgbm.callback import log_evaluation
+        if log_period is not None:
+            callbacks.append(log_evaluation(period=log_period))
 
         seed_val = params.pop('seed_value', 0)
         train_params = {
@@ -146,7 +149,6 @@ class LGBModel(AbstractModel):
             'valid_sets': valid_sets,
             'valid_names': valid_names,
             'callbacks': callbacks,
-            'verbose_eval': verbose_eval,
         }
         if not isinstance(stopping_metric, str):
             train_params['feval'] = stopping_metric
