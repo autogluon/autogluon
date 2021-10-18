@@ -815,7 +815,6 @@ class TabularPredictor:
         softmaxes are divided by temperature scalar then softmaxed to return
         predicted probs
         """
-        import torch
         if model_name is None:
             model_name = self._trainer.get_model_best()
 
@@ -824,8 +823,9 @@ class TabularPredictor:
         else:
             X_val = self._trainer.load_X_val()
             y_val_probs = self.predict_proba(data=X_val, model=model_name).values
-            
+
         y_val = self._trainer.load_y_val().to_numpy()
+        import torch
         temperature_param = torch.nn.Parameter(torch.ones(1))
         logits = torch.tensor(np.log2(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
