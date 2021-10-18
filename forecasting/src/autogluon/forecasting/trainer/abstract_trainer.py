@@ -209,8 +209,11 @@ class AbstractTrainer:
                     model.predict_time = pred_end_time - fit_end_time
             model.val_score = score
             self.save_model(model=model)
-        except:
-            pass
+        except Exception as err:
+            logger.error(f'\tWarning: Exception caused {model.name} to fail during training... Skipping this model.')
+            logger.error(f'\t\t{err}')
+            logger.exception('Detailed Traceback:')
+            del model
         else:
             self._add_model(model=model)
             model_names_trained.append(model.name)
