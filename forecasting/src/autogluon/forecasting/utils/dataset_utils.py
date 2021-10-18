@@ -70,13 +70,13 @@ class TimeSeriesDataset(ListDataset):
         if self.static_cat_features is None:
             return False
         else:
-            return len(self.static_cat_features) != 0
+            return len(self.static_cat_features.columns) > 1  # first column is the index
 
     def use_feat_static_real(self):
         if self.static_real_features is None:
             return False
         else:
-            return len(self.static_real_features) != 0
+            return len(self.static_real_features.columns) > 1  # first column is the index
 
     def static_cat_columns(self):
         return self.static_cat_features.columns if self.static_cat_features is not None else None
@@ -227,9 +227,9 @@ def time_series_dataset(data,
 
 def extract_static_feature(index_column, features, prev_inferred=None):
     if prev_inferred is not None:
-        logger.log(30, "Using previous inferred feature columns...")
-        logger.log(30, f"Static Cat Features Dataframe including {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
-        logger.log(30, f"Static Real Features Dataframe including {[i for i in prev_inferred['static_real_columns'] if i != index_column]}")
+        logger.log(15, "Using previous inferred feature columns...")
+        logger.log(15, f"Static Cat Features Dataframe including {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
+        logger.log(15, f"Static Real Features Dataframe including {[i for i in prev_inferred['static_real_columns'] if i != index_column]}")
         static_cat_features = features[prev_inferred["static_cat_columns"]]
         static_real_features = features[prev_inferred["static_real_columns"]]
         cardinality = prev_inferred["cardinality"]
@@ -243,13 +243,13 @@ def extract_static_feature(index_column, features, prev_inferred=None):
             try:
                 features[column] = features[column].astype(R_FLOAT)
                 if len(features[column].unique()) <= 10:
-                    logger.log(30, f"static feature column {column} has 10 or less unique values, assuming it is categorical.")
+                    logger.log(20, f"Static feature column {column} has 10 or less unique values, assuming it is categorical.")
                     features[column] = features[column].astype(R_CATEGORY)
                     cardinality.append(len(features[column].unique()))
             except ValueError:
-                logger.log(30, f"Cannot convert column {column} to float, assuming it is categorical.")
-                if len(features[column].unqiue()) == len(features[column]):
-                    logger.log(30, f"Categorical feature {column} has different values for all rows, discarding it.")
+                logger.log(20, f"Cannot convert static feature column {column} to float, assuming it is categorical.")
+                if len(features[column].unique()) == len(features[column]):
+                    logger.log(20, f"Categorical static feature {column} has different values for all rows, discarding it.")
                 else:
                     cardinality.append(len(features[column].unique()))
         # Extracting static real features and fillna with mean
