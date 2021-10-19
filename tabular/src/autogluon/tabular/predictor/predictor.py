@@ -23,7 +23,7 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.tabular.pseudolabeling.pseudolabeling import filter_pseudo
+from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
@@ -912,6 +912,8 @@ class TabularPredictor:
         pseudo_data = kwargs.get('pseudo_data', None)
 
         if pseudo_data is not None:
+            if self.label not in pseudo_data.columns:
+                raise ValueError('\'pseudo_data\' does not contain the labeled column.')
             X_pseudo = pseudo_data.drop(columns=[self.label])
             y_pseudo = pseudo_data[self.label]
             X_pseudo = self._learner.transform_features(X_pseudo)

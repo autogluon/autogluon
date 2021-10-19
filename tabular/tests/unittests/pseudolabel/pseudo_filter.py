@@ -3,7 +3,7 @@ import inspect
 import numpy as np
 import pandas
 import pandas as pd
-from autogluon.tabular.pseudolabeling.pseudolabeling import filter_pseudo
+from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo
 
 
 def get_default_args(func):
