@@ -8,9 +8,9 @@ from ..datatypes.common import CandidateEvaluation, Candidate, \
     candidate_for_print
 from ..datatypes.hp_ranges import HyperparameterRanges
 from ..datatypes.tuning_job_state import TuningJobState
-from ..models.gp_model import GPModel
+from ..models.gp_model import GPModel, GPModelArgs
 from ..models.gpmodel_skipopt import SkipOptimizationPredicate
-from ..models.gpmodel_transformers import GPModelPendingCandidateStateTransformer, GPModelArgs
+from ..models.gpmodel_transformers import GPModelPendingCandidateStateTransformer
 from ..tuning_algorithms.base_classes import DEFAULT_METRIC, DEFAULT_CONSTRAINT_METRIC, \
     LocalOptimizer, AcquisitionFunction
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
