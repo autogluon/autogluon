@@ -2625,7 +2625,7 @@ class TabularPredictor:
 
         return kwargs_sanitized
 
-    def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool, is_pseudo: bool = False):
+    def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool):
         """
         Removes certain columns from the provided datasets that do not contain predictive features.
 
@@ -2643,11 +2643,7 @@ class TabularPredictor:
             if self.sample_weight in train_features:
                 train_features.remove(self.sample_weight)
             if self.sample_weight in other_features:
-                if is_pseudo:
-                    logger.warning('sample_weight is not supported for pseudolabeling'
-                                   'will not apply sample_weight to pseudo data')
-                else:
-                    other_features.remove(self.sample_weight)
+                other_features.remove(self.sample_weight)
         if self._learner.groups is not None and is_labeled:
             train_features.remove(self._learner.groups)
 
