@@ -1,5 +1,4 @@
 import copy
-import scipy
 import logging
 import os
 import time
