@@ -564,6 +564,38 @@ stage("Build Tutorials") {
       }
     }
   },
+    'tabular__to_image_prediction': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-tabular-v3') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-tabular-v3
+        conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        env
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
+        export AG_DOCS=1
+        env
+
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/tabular
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(tabular_prediction)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
+        """
+        stash includes: 'docs/_build/rst/tutorials/tabular__to_image_prediction/*', name: 'tabular'
+      }
+    }
+  },
   'text_prediction': {
     node('linux-gpu') {
       ws('workspace/autogluon-tutorial-text-v3') {
@@ -697,6 +729,7 @@ stage("Build Docs") {
         unstash 'nas'
         unstash 'object_detection'
         unstash 'tabular'
+        unstash 'tabular_to_image'
         unstash 'text'
         unstash 'forecasting'
         unstash 'torch'

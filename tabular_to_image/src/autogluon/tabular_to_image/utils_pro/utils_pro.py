@@ -82,7 +82,13 @@ class Utils_pro:
         models_count=self.len_group_counts() 
         groups_counts=self.new_countsD()
         data = self.__get_dataset(data)
-                             
+        data = self.__get_dataset(data)
+        if isinstance(data, str):
+            data = TabularDataset(data)
+        if not isinstance(data, pd.DataFrame):
+            raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(data)}')
+        if len(set(data.columns)) < len(data.columns):
+                raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")                     
         g1_presentage=round(((groups_counts['g1']/models_count)*100),1)
         g2_presentage=round(((groups_counts['g2']/models_count)*100),1)
         g3_presentage=round(((groups_counts['g3']/models_count)*100),1)
@@ -96,33 +102,26 @@ class Utils_pro:
         
       
     def _validate_fit_data(self, data):        
-        data = self.__get_dataset(data)
-        if isinstance(data, str):
-            data = TabularDataset(data)
-        if not isinstance(data, pd.DataFrame):
-            raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(data)}')
-        if len(set(data.columns)) < len(data.columns):
-            raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
-        
-        len(data)
-        X_train, X_test, y_train, y_test = train_test_split(data,data[self.labels], test_size=0.2)
-        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25)
-        if X_val is not None:
-            if not isinstance(X_val, pd.DataFrame):
-                raise AssertionError(f'X_val is required to be a pandas DataFrame, but was instead: {type(X_val)}')
-            train_features = [column for column in X_train.columns if column !=data[self.labels]]
-            val_features = [column for column in X_val.columns if column != data[self.labels]]
-            if np.any(train_features != val_features):
-                raise ValueError("Column names must match between training and val data")
-        if X_test is not None:
-            if not isinstance(X_test, pd.DataFrame):
-                raise AssertionError(f'X_test is required to be a pandas DataFrame, but was instead: {type(X_test)}')
-            train_features = [column for column in X_train.columns if column !=data[self.labels]]
-            test_features = [column for column in X_test.columns]
-            if np.any(train_features != test_features):
-                raise ValueError("Column names must match between training and test_data")
-         
-        return X_train,X_val,X_test,y_train , y_val,y_test      
+        #data_g1,data_g2,data_g3,data_g4=self.spit_dataset(data)
+        for i in range(4): 
+            X_train[i], X_test[i], y_train[i], y_test[i] = train_test_split(self.spit_dataset(data)[i],self.spit_dataset(data)[i][self.labels], test_size=0.2)
+            X_train[i], X_val[i], y_train[i], y_val[i] = train_test_split(X_train, y_train, test_size=0.25)
+            if X_val is not None:
+                if not isinstance(X_val[i], pd.DataFrame):
+                    raise AssertionError(f'X_val is required to be a pandas DataFrame, but was instead: {type(X_val[i])}')
+                train_features = [column for column in X_train[i].columns if column !=data[self.labels]]
+                val_features = [column for column in X_val[i].columns if column != data[self.labels]]
+                if np.any(train_features != val_features):
+                    raise ValueError("Column names must match between training and val data")
+            if X_test[i] is not None:
+                if not isinstance(X_test[i] , pd.DataFrame):
+                    raise AssertionError(f'X_test is required to be a pandas DataFrame, but was instead: {type(X_test)}')
+                train_features = [column for column in X_train[i].columns if column !=data[self.labels]]
+                test_features = [column for column in X_test[i].columns]
+                if np.any(train_features != test_features):
+                    raise ValueError("Column names must match between training and test_data")
+            
+            return X_train[i],X_val[i],X_test[i],y_train[i] , y_val[i],y_test[i]      
                
     def Image_Genartor(self,data):
         data=self.__get_dataset(data)
