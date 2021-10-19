@@ -826,8 +826,8 @@ class TabularPredictor:
             y_val_probs = self._trainer.predict_proba(X_val, model_name)
             y_val = self._trainer.load_y_val().to_numpy()
 
-        if self.problem_type == BINARY:
-            y_val_probs = np.column_stack([1-y_val_probs, y_val_probs])
+            if self.problem_type == BINARY:
+                y_val_probs = np.column_stack([1-y_val_probs, y_val_probs])
 
         import torch
         y_val_tensor = torch.tensor(y_val)

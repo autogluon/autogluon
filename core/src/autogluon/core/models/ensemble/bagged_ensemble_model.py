@@ -256,7 +256,7 @@ class BaggedEnsembleModel(AbstractModel):
             pred_proba = scipy.special.softmax(logits/self.temperature_scalar)
 
             if self.problem_type == BINARY:
-                pred_proba[:,1]
+                pred_proba = pred_proba[:, 1]
 
         return pred_proba
 
