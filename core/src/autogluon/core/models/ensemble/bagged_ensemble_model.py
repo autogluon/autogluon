@@ -249,7 +249,7 @@ class BaggedEnsembleModel(AbstractModel):
         pred_proba = pred_proba / len(self.models)
 
         if self.temperature_scalar is not None:
-            logits = np.log2(pred_proba)
+            logits = np.log(pred_proba)
             pred_proba = scipy.special.softmax(logits/self.temperature_scalar)
 
         return pred_proba

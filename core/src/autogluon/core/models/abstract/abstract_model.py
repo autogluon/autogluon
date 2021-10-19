@@ -15,7 +15,7 @@ import pandas as pd
 from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
-from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE, PROBLEM_TYPES_CLASSIFICATION
 from ...data.label_cleaner import LabelCleaner
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
@@ -589,8 +589,11 @@ class AbstractModel:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
 
-        if self.temperature_scalar is not None:
-            logits = np.log2(y_pred_proba)
+        if self.temperature_scalar is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            if self.problem_type is BINARY:
+                y_pred_proba[0] = 1 - y_pred_proba
+
+            logits = np.log(y_pred_proba)
             y_pred_proba = scipy.special.softmax(logits/self.temperature_scalar)
 
         return y_pred_proba

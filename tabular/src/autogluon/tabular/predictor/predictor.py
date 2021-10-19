@@ -13,7 +13,7 @@ import networkx as nx
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
@@ -801,7 +801,7 @@ class TabularPredictor:
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
-        if calibrate and self.problem_type is MULTICLASS:
+        if calibrate and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
             self._calibrate_best_model()
 
         if save_space:
@@ -829,7 +829,7 @@ class TabularPredictor:
         import torch
         y_val_tensor = torch.tensor(y_val)
         temperature_param = torch.nn.Parameter(torch.ones(1))
-        logits = torch.tensor(np.log2(y_val_probs))
+        logits = torch.tensor(np.log(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=1000)
 
