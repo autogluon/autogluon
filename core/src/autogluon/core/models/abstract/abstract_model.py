@@ -590,11 +590,14 @@ class AbstractModel:
         y_pred_proba = y_pred_proba.astype(np.float32)
 
         if self.temperature_scalar is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-            if self.problem_type is BINARY:
-                y_pred_proba[0] = 1 - y_pred_proba
+            if self.problem_type == BINARY:
+                y_pred_proba = np.column_stack([1 - y_pred_proba, y_pred_proba])
 
             logits = np.log(y_pred_proba)
             y_pred_proba = scipy.special.softmax(logits/self.temperature_scalar)
+
+            if self.problem_type == BINARY:
+                y_pred_proba = y_pred_proba[:, 1]
 
         return y_pred_proba
 

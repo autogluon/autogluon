@@ -11,7 +11,7 @@ import pandas as pd
 
 from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
-from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
+from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION, BINARY
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
@@ -248,9 +248,15 @@ class BaggedEnsembleModel(AbstractModel):
             pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
 
-        if self.temperature_scalar is not None:
+        if self.temperature_scalar is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            if self.problem_type == BINARY:
+                pred_proba = np.column_stack([1 - pred_proba, pred_proba])
+
             logits = np.log(pred_proba)
             pred_proba = scipy.special.softmax(logits/self.temperature_scalar)
+
+            if self.problem_type == BINARY:
+                pred_proba[:,1]
 
         return pred_proba
 
