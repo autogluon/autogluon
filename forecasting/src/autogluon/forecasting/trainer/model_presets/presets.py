@@ -76,16 +76,26 @@ DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 def get_preset_models(path, prediction_length, freq, eval_metric, hyperparameters, hyperparameter_tune, use_feat_static_cat, use_feat_static_real, cardinality, **kwargs):
     """
-    Create a list of models according to hyperparameters. If hyperparamsters=None, will create models according to presets.
+    Create a list of models according to hyperparameters. If hyperparamaters=None, will create models according to presets.
     """
     models = []
     if isinstance(hyperparameters, str):
         hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
-    elif hyperparameters is None:
+    else:
         if not hyperparameter_tune:
-            hyperparameters = copy.deepcopy(get_default_hps('default', prediction_length))
+            hp_str = 'default'
         else:
-            hyperparameters = copy.deepcopy(get_default_hps('default_hpo', prediction_length))
+            hp_str = 'default_hpo'
+        default_hps = copy.deepcopy(get_default_hps(hp_str, prediction_length))
+        if hyperparameters is not None:
+            default_hps = {model: default_hps[model] for model in default_hps if model in hyperparameters}
+            for model in hyperparameters:
+                default_hps[model].update(hyperparameters[model])
+        hyperparameters = copy.deepcopy(default_hps)
+    if hyperparameter_tune:
+        verify_contains_searchspace(hyperparameters)
+    else:
+        verify_no_searchspace(hyperparameters)
     for model, model_hps in hyperparameters.items():
         if "use_feat_static_cat" not in model_hps:
             model_hps["use_feat_static_cat"] = use_feat_static_cat
@@ -107,3 +117,25 @@ def get_preset_models(path, prediction_length, freq, eval_metric, hyperparameter
         models.append(model_type(path=path, freq=freq, prediction_length=prediction_length, eval_metric=eval_metric,
                                  hyperparameters=model_hps, **kwargs))
     return models
+
+def verify_contains_searchspace(hyperparameters):
+    for model in hyperparameters:
+        model_contains_searchspace = False
+        model_hps = hyperparameters[model]
+        for hp in model_hps:
+            hp_value = model_hps[hp]
+            if isinstance(hp_value, ag.space.Space):
+                model_contains_searchspace = True
+                break
+        if not model_contains_searchspace:
+            raise ValueError(f"Hyperparameter tuning specified, but no hyperparameter search space provided for {model}. Please convert one of the fixed hyperparameter values of this model to a search space and try again, or do not specify hyperparameter tuning.")
+
+def verify_no_searchspace(hyperparameters):
+    for model in hyperparameters:
+        model_hps = hyperparameters[model]
+        for hp in model_hps:
+            hp_value = model_hps[hp]
+            if isinstance(hp_value, ag.space.Space):
+                raise ValueError(f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. For {model}, hyperparameter {hp} currently given as search space: {hp_value}.")
+
+
