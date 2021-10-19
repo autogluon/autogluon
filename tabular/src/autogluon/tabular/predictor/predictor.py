@@ -275,7 +275,6 @@ class TabularPredictor:
             presets=None,
             hyperparameters=None,
             feature_metadata='infer',
-            calibrate:bool=False,
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -482,7 +481,7 @@ class TabularPredictor:
             In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
         calibrate: bool, default = False
-            If true then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
+            If True then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
             will train a scalar parameter on the validation set. This trains the best model's predictive prob to have a stronger
             correlation between predictive prob and accuracy.
         **kwargs :
@@ -696,6 +695,7 @@ class TabularPredictor:
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
         use_bag_holdout = kwargs['use_bag_holdout']
+        calibrate = kwargs['calibrate']
 
         if ag_args is None:
             ag_args = {}
@@ -802,18 +802,25 @@ class TabularPredictor:
             self.delete_models(models_to_keep='best', dry_run=False)
 
         if calibrate and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-            self._calibrate_best_model()
+            self._calibrate_model()
+        else:
+            logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
 
         if save_space:
             self.save_space()
 
-    def _calibrate_best_model(self, model_name: str = None):
+    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000):
         """
         Applies temperature scaling to the best autogluon model. Applies
         inverse softmax to predicted probs then trains temperature scalar
-        on validation data to maximize negtiave log likelihood. Inversed
+        on validation data to maximize negative log likelihood. Inversed
         softmaxes are divided by temperature scalar then softmaxed to return
         predicted probs
+
+        Parameters:
+        -----------
+        model_name: str: default=None
+            model name to retreive from trainer and fit
         """
         if model_name is None:
             model_name = self._trainer.get_model_best()
@@ -829,12 +836,16 @@ class TabularPredictor:
             if self.problem_type == BINARY:
                 y_val_probs = np.column_stack([1-y_val_probs, y_val_probs])
 
-        import torch
+        try:
+            import torch
+        except:
+            raise Exception('Pytorch is required for calibrate, but is not installed.')
+
         y_val_tensor = torch.tensor(y_val)
         temperature_param = torch.nn.Parameter(torch.ones(1))
         logits = torch.tensor(np.log(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=1000)
+        optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
 
         def temperature_scale_step():
             optimizer.zero_grad()
@@ -846,6 +857,7 @@ class TabularPredictor:
 
         logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
         optimizer.step(temperature_scale_step)
+
         model = self._trainer.load_model(model_name=model_name)
         model.temperature_scalar = temperature_param[0].item()
         model.save()
@@ -2337,7 +2349,8 @@ class TabularPredictor:
             # other
             feature_generator='auto',
             unlabeled_data=None,
-            _feature_generator_kwargs=None
+            _feature_generator_kwargs=None,
+            calibrate=False
         )
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))

@@ -248,15 +248,7 @@ class BaggedEnsembleModel(AbstractModel):
             pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
 
-        if self.temperature_scalar is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-            if self.problem_type == BINARY:
-                pred_proba = np.column_stack([1 - pred_proba, pred_proba])
-
-            logits = np.log(pred_proba)
-            pred_proba = scipy.special.softmax(logits/self.temperature_scalar)
-
-            if self.problem_type == BINARY:
-                pred_proba = pred_proba[:, 1]
+        pred_proba = self._apply_temperature_scaling(pred_proba)
 
         return pred_proba
 
