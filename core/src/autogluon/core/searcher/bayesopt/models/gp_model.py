@@ -1,6 +1,7 @@
-from typing import Dict, List, Optional, NamedTuple, Union
+from typing import Dict, List, Optional, Union
 import numpy as np
 import logging
+from dataclasses import dataclass
 
 from .model_base import BaseSurrogateModel
 from ..datatypes.common import FantasizedPendingEvaluation, Candidate
@@ -17,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 GPModel = Union[GaussianProcessRegression, GPRegressionMCMC]
 
-class InternalCandidateEvaluations(NamedTuple):
+@dataclass
+class InternalCandidateEvaluations:
     X: np.ndarray
     y: np.ndarray
     mean: float
@@ -328,7 +330,8 @@ class GaussProcSurrogateModel(BaseSurrogateModel):
 GaussProcSurrogateOutputModel = Union[GaussProcSurrogateModel, Dict[str, GaussProcSurrogateModel]]
 
 
-class GPModelArgs(NamedTuple):
+@dataclass
+class GPModelArgs:
     num_fantasy_samples: int
     random_seed: int
     active_metric: str = DEFAULT_METRIC

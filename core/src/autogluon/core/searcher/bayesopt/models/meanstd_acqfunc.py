@@ -1,12 +1,14 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple, Optional, NamedTuple
+from typing import Dict, Tuple, Optional
+from dataclasses import dataclass
 
 from ..tuning_algorithms.base_classes import SurrogateModel, AcquisitionFunction, \
     OutputSurrogateModel, assign_active_metric, dictionarize_objective
 
 
-class HeadWithGradient(NamedTuple):
+@dataclass
+class HeadWithGradient:
     hvals: np.array
     dh_dmean: Dict[str, np.array]  # Maps each output model to its head gradient wrt to the predictive mean
     dh_dstd: Dict[str, np.array]  # Maps each output model to its head gradient wrt to the predictive std
