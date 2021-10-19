@@ -862,7 +862,7 @@ class TabularPredictor:
         model.temperature_scalar = temperature_param[0].item()
         model.save()
 
-    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, calibrate:bool=False, **kwargs):
+    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
         The original train_data and tuning_data will be used to train the models.
@@ -913,6 +913,7 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
+        calibrate = kwargs['calibrate']
 
         if ag_args is None:
             ag_args = {}
