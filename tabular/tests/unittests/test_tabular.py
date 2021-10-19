@@ -397,13 +397,13 @@ def test_pseudolabeling():
         try:
             TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=test_data)
         except Exception as e:
-            assert False, error_msg + 'labeled test'
+            assert False, error_msg + 'labeled test data'
 
         try:
             TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=test_data,
                                                           presets='best_quality')
         except Exception as e:
-            assert False, error_msg + 'labeled test, best quality'
+            assert False, error_msg + 'labeled test data, best quality'
 
         unlabeled_test_data = test_data.drop(columns=label)
 
@@ -411,13 +411,13 @@ def test_pseudolabeling():
         try:
             TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=unlabeled_test_data)
         except Exception as e:
-            assert False, error_msg + 'unlabeled test'
+            assert False, error_msg + 'unlabeled test data'
 
         try:
             TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=unlabeled_test_data,
                                                           presets='best_quality')
         except Exception as e:
-            assert False, error_msg + 'unlabeled test, best quality'
+            assert False, error_msg + 'unlabeled test data, best quality'
 
 
 @pytest.mark.slow
