@@ -3,7 +3,6 @@ import logging
 import os
 import time
 from collections import defaultdict
-import scipy
 from typing import List, Union, Tuple
 
 import networkx as nx
