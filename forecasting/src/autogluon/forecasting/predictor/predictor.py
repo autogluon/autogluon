@@ -31,7 +31,7 @@ logger = logging.getLogger()  # return root logger
 
 class ForecastingPredictor:
     """
-    AutoGluon ForecastingPredictor predicts future (numeric) values of a time-series dataset that can contain multiple individual time-series.
+    AutoGluon ForecastingPredictor predicts future (numeric) values of multiple related time-series.
 
     Parameters
     ----------
@@ -56,7 +56,7 @@ class ForecastingPredictor:
        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
     **kwargs :
        learner_type : AbstractLearner, default = DefaultLearner
-           A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
+           A class which inherits from `AbstractLearner`. This dictates the inner logic of `predictor`.
            If you don't know what this is, keep it as the default.
        learner_kwargs : dict, default = None
            Kwargs to send to the learner (for advanced users only). Options include:
@@ -153,36 +153,62 @@ class ForecastingPredictor:
 
         Parameters
         ----------
-        train_data: pd.Dataframe or FileDataset/ListDataset from GluonTS,
-            if pd.Dataframe is provided, it should look like this:
-            >>> train_data
-              index_column time_column  target_column
-            0            A  2020-01-22              1
-            1            A  2020-01-23              2
-            2            A  2020-01-24              3
-            3            B  2020-01-22              1
-            4            B  2020-01-23              2
-            5            B  2020-01-24              3
-            6            C  2020-01-22              1
-            7            C  2020-01-23              2
-            8            C  2020-01-24              3
+        train_data: pd.DataFrame or GluonTS FileDataset/ListDataset
+            More info about GluonTS data formats and popular time-series datasets provided in GluonTS is available here: https://ts.gluon.ai/api/gluonts/gluonts.dataset.common.html
+            A full description of the data formatting requirements for pd.DataFrame is provided in the Forecasting Time-Series - Quick Start Tutorial.
+            When it is pd.DataFrame, each row in the table `train_data` corresponds to one observation of one time-series at a particular time.
+            If it is pd.DataFrame, `train_data` should look roughly like this (see description of index/time/target columns below):
+
+            ================  ===============  =================
+              index_column      time_column      target_column
+            ================  ===============  =================
+              A                 2020-01-22       1
+              A                 2020-01-23       2
+              A                 2020-01-24       3
+              B                 2020-01-22       1
+              B                 2020-01-23       2
+              B                 2020-01-24       3
+              C                 2020-01-22       1
+              C                 2020-01-23       2
+              C                 2020-01-24       3
+            ================  ===============  =================
+
         prediction_length: int
-            length of future targets of each time series to predict.
-        index_column: str or None
-            column in training/validation data that indicates the time series index,
-            By default index_column="index_column".
+            How many time points into the future should our forecasters be trained to predict.
+            For example, if our time-series contains daily observations, setting `prediction_length=3` will train models that predict up to 3 days in the future from the most recent observation.
+        index_column: str
+            For pd.DataFrame datasets containing multiple individual time-series, this is the name of column containing index ID indicating which of these series is being observed.
+            `index_column` is not needed if the data only contain observations of a single time-series.
+
+            By default, `index_column="index_column"`.
         time_column: str
-            column in training/validation data that indicates the time of each target,
-            By default time_column="time_column".
+            For pd.DataFrame datasets, this is the name of column that indicates the time of each observation.
+            The time values in `time_column` must be in a valid pandas time-series format: https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html
+
+            Time values must be uniformly spaced (eg. every hour, every day, etc.) such that the `pandas.infer_freq` function can be successfully applied to these time values: https://pandas.pydata.org/docs/reference/api/pandas.infer_freq.html
+
+            By default, `time_column="time_column"`.
         target_column: str
-            column in training/validation data that indicates the target to forecast,
-            By default target_column="target_column".
-        val_data: Optional, None by default, can be pd.Dataframe or FileDataset/ListDataset from gluonts,
-            validation data used for hyperparameter tuning.
-            If provided, it should have the same format as train_data.
-        presets: Optional, None by default, can be a string. If provided, can will preset kwargs for training according to your need.
-                Current available presets: ["high_quality", "good_quality", "medium_quality", "low_quality", "low_quality_hpo"]
-                Details for these presets can be found in the file forecasting/src/autogluon/forecasting/configs/presets_configs.py
+            For pd.DataFrame datasets, name of column that contains the target values to forecast (ie. the numeric observations of the time-series).
+            This column must contain numeric values, and missing target values should be in a pandas compatible format: https://pandas.pydata.org/pandas-docs/stable/user_guide/missing_data.html
+
+            Ideally each index will be observed over the same time points, but if some observations are missing for a particular (index, time) combination, then you can add these to your dataset with target value NA.
+            Each (index, time) combination must only appear in your dataset once with a single target value.
+
+            By default, `target_column="target_column"`.
+        val_data: pd.DataFrame or GluonTS FileDataset/ListDataset, default = None
+            Validation data reserved for model selection or hyperparameter tuning, rather than training individual models.
+            If provided, it should have the same format as `train_data`.
+            If None, AutoGluon will reserve the most recent portion of `train_data` for validation.
+            Validation scores will by default be computed over the last `prediction_length` time points in the validation data.
+        presets: str, default = None
+                Optional preset configurations for various arguments in `fit()`.
+                Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned predictor.
+                It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
+                For example, set `presets="best_quality"` to get a high-accuracy predictor, or set `presets="low_quality"` to get a toy predictor that trains very quick but lacks accuracy.
+                Available presets: ["best_quality", "high_quality", "good_quality", "medium_quality", "low_quality", "low_quality_hpo"]
+                Details for these presets can be found in the file: forecasting/src/autogluon/forecasting/configs/presets_configs.py
+                Any user-specified arguments in `fit()` will override the values used by presets.
         hyperparameter_tune_kwargs: Optional, None by default, can be str or dict
             Valid str values:
                 'auto': Uses the 'bayesopt' preset.
@@ -190,86 +216,68 @@ class ForecastingPredictor:
                 'bayesopt': Performs HPO via bayesian optimization using local scheduler.
             For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
                 The 'searcher' key is required when providing a dict.
-                The following is an example dictianary for hyperparameter_tune_kwargs:
+                The following is an example dictionary for hyperparameter_tune_kwargs:
                 hyperparameter_tune_kwargs={
                                             'scheduler': 'local',
                                             'searcher': 'random',
                                             'num_trials': 2
                                             }
-        hyperparameters: Optional, None by default, can be dict or str.
-            parameters for each model. If not provided, default parameters from gluonts will be used.
-            If string is provided, can be one of ["default", "default_hpo", "toy", "toy_hpo"]
-            If dict is provided:
-            Keys are strings that indicate which model types to train.
+        hyperparameters: str or dict, default = None
+            Determines the hyperparameters used by each model.
+            If str is passed, will use a preset hyperparameter configuration, can be one of ["default", "default_hpo", "toy", "toy_hpo"], where "toy" settings correspond to tiny models only intended for prototyping.
+            If dict is provided, the keys are strings that indicate which model types to train.
             Stable model options include:
                'DeepAR',
                'MQCNN',
-               'SFF'(SimpleFeedForward),
+               'SFF' (SimpleFeedForward),
             Experimental model options include:
-               'AutoTabular'(Use Autogluon's TabularPredictor for forecasting)
+               'AutoTabular' (which adapts Autogluon's TabularPredictor for forecasting)
             If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type.
             For example, set `hyperparameters = { 'SFF':{...} }` means you only want to train SimpleFeedForward models and not any other model.
 
-            Values are dictionaries of hyperparameter settings for each model type.
+            Values in the `hyperparameters` dict are themselves dictionaries of hyperparameter settings for each model type.
             Each hyperparameter can either be a single fixed value or a search space containing many possible values.
-            Search Space should only be provided when hyperparameter_tune_kwargs is provided(hyperparameter_tune is turned on)
+            A search space should only be provided when `hyperparameter_tune_kwargs` is specified (ie. hyperparameter-tuning is utilized).
+            Any omitted hyperparameters not specified here will be set to default values.
+            Default `hyperparameters` settings are listed in file: `autogluon/forecasting/trainer/model_presets/presets.py`
+            and details regarding the hyperparameters you can specify for each model are provided in the following links:
+            DeepAR: https://ts.gluon.ai/api/gluonts/gluonts.model.deepar.html
+
+            MQCNN: https://ts.gluon.ai/api/gluonts/gluonts.model.seq2seq.html
+
+            SFF: https://ts.gluon.ai/api/gluonts/gluonts.model.simple_feedforward.html
+
+            AutoTabular: https://ts.gluon.ai/api/gluonts/gluonts.nursery.autogluon_tabular.html
 
         time_limit: int, default=None
-            Only works when hyperparameter_tune_kwarg is not None, approximately how long each model will be tunned for.(wallclock time in seconds)
+            Approximately how long hyperparameter tuning will run for (wallclock time in seconds).
+            Only considered when `hyperparameter_tune_kwargs` is not None.
 
         static_features: pd.Dataframe, default=None
             static features used for training.
 
-        refit_full: bool, default=False
-            Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
+    **kwargs:
+
+        refit_full: bool, default = False
+            Whether to retrain models on all of the data (training + validation) after validation scores have been computed.
             If `refit_full=True`, it will be treated as `refit_full='all'`.
-            If `refit_full=False`, refitting will not occur.
+            If `refit_full=False`, refitting will not occur and models will never been trained on the validation data.
             Valid str values:
                 `all`: refits all models.
                 `best`: refits only the best model (and its ancestors if it is a stacker model).
 
         set_best_to_refit_full: bool, default=False
-            If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
-            Only valid if `refit_full` is set. If refit is set to be True while set_best_to_refit_full is not specified, it will be by default set to be True.
+            If True, will change the default model used for prediction (when model is not specified) to the refit_full version of the model that exhibited the highest validation score.
+            Only valid if `refit_full` is set. If `refit_full` is set = True and `set_best_to_refit_full` is not specified, the latter will be by default set = True.
 
-        quantiles: list[float], default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-            Can be list of combinations of floats in [0.1, 0.2, ..., 0.9]
-            Quantiles used for training gluonts models.
+        quantiles: List[float], default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+            List of increasing floats in [0.1, 0.2, ..., 0.9] that specifies which quantiles should be estimated when making distributional forecasts.
 
-        freq: str, default=None
-            Need only to provide this when using Dataset from gluonts, the frequence of your timeseries,
-            An example of valid frequence would be: "1D"
-
-        Default:
-            Without HPS:
-                hyperparameters={
-                    "SFF": {},
-                    "MQCNN": {},
-                    "DeepAR": {},
-                    "AutoTabular": {}
-                }
-            With HPS:
-                "MQCNN": {
-                    'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
-                                             max(min(500, 12 * prediction_length), 4 * prediction_length),
-                                             default=prediction_length * 4),
-                },
-                "DeepAR": {
-                    'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
-                                             max(min(500, 12 * prediction_length), prediction_length),
-                                             default=prediction_length),
-                },
-                "SFF": {
-                    'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
-                                             max(min(500, 12 * prediction_length), prediction_length),
-                                             default=prediction_length),
-                }
-
-        Details regarding the hyperparameters you can specify for each model are provided in the following links:
-            DeepAR: https://ts.gluon.ai/api/gluonts/gluonts.model.deepar.html
-            MQCNN: https://ts.gluon.ai/api/gluonts/gluonts.model.seq2seq.html
-            SFF: https://ts.gluon.ai/api/gluonts/gluonts.model.simple_feedforward.html
-            AutoTabular: https://ts.gluon.ai/api/gluonts/gluonts.nursery.autogluon_tabular.html
+        freq: str, default = None
+            Only need to provide this when using a built-in GluonTS dataset.
+            The frequency of your time-series which corresponds to the spacing between adjacent time-points (e.g. daily vs weekly vs monthly, etc.).
+            Models will be trained to forecast at this granularity.
+            An example of a valid frequency would be: "1D".
         """
         start_time = time.time()
         if self._learner.is_fit:
