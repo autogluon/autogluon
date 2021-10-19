@@ -1,10 +1,12 @@
-from typing import NamedTuple, List
+from typing import List
+from dataclasses import dataclass
 
 from .common import Candidate, CandidateEvaluation, PendingEvaluation
 from .hp_ranges import HyperparameterRanges
 
 
-class TuningJobState(NamedTuple):
+@dataclass
+class TuningJobState:
     """
     Tuning job state (non disjoint: so for a single algorithm when tuning
     multiple algorithms)
