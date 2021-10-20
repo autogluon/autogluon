@@ -846,6 +846,7 @@ class TabularPredictor:
         logits = torch.tensor(np.log(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 
         def temperature_scale_step():
             optimizer.zero_grad()
@@ -853,6 +854,7 @@ class TabularPredictor:
             new_logits = (logits / temp)
             loss = nll_criterion(new_logits, y_val_tensor)
             loss.backward()
+            scheduler.step()
             return loss
 
         logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
