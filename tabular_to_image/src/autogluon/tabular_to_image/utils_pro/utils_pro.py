@@ -78,22 +78,22 @@ class Utils_pro:
             raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
              
     def spit_dataset(self,data):
-        
         models_count=self.len_group_counts() 
         groups_counts=self.new_countsD()
         data = self.__get_dataset(data)
-        data = self.__get_dataset(data)
+       
         if isinstance(data, str):
             data = TabularDataset(data)
         if not isinstance(data, pd.DataFrame):
             raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(data)}')
         if len(set(data.columns)) < len(data.columns):
                 raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")                     
-        g1_presentage=round(((groups_counts['g1']/models_count)*100),1)
-        g2_presentage=round(((groups_counts['g2']/models_count)*100),1)
-        g3_presentage=round(((groups_counts['g3']/models_count)*100),1)
-        g4_presentage=round(((groups_counts['g4']/models_count)*100),1)
+        g1_presentage=round(((groups_counts['g1']/models_count)*100),1)/100
+        g2_presentage=round(((groups_counts['g2']/models_count)*100),1)/100
+        g3_presentage=round(((groups_counts['g3']/models_count)*100),1)/100
+        g4_presentage=round(((groups_counts['g4']/models_count)*100),1)/100
         
+        data[self.labels]=self.labels
         data_g1=data.sample(frac=g1_presentage, replace=False, random_state=12)
         data_g2=data.sample(frac=g2_presentage, replace=False, random_state=44)
         data_g3=data.sample(frac=g3_presentage, replace=False, random_state=58)
@@ -102,26 +102,25 @@ class Utils_pro:
         
       
     def _validate_fit_data(self, data):        
-        #data_g1,data_g2,data_g3,data_g4=self.spit_dataset(data)
-        for i in range(4): 
-            X_train, X_test, y_train, y_test = train_test_split(self.spit_dataset(data)[i],self.spit_dataset(data)[i][self.labels], test_size=0.2)
-            X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25)
-            if X_val is not None:
-                if not isinstance(X_val, pd.DataFrame):
-                    raise AssertionError(f'X_val is required to be a pandas DataFrame, but was instead: {type(X_val[i])}')
-                train_features = [column for column in X_train.columns if column !=data[self.labels]]
-                val_features = [column for column in X_val.columns if column != data[self.labels]]
-                if np.any(train_features != val_features):
-                    raise ValueError("Column names must match between training and val data")
-            if X_test is not None:
-                if not isinstance(X_test , pd.DataFrame):
-                    raise AssertionError(f'X_test is required to be a pandas DataFrame, but was instead: {type(X_test)}')
-                train_features = [column for column in X_train.columns if column !=data[self.labels]]
-                test_features = [column for column in X_test.columns]
-                if np.any(train_features != test_features):
-                    raise ValueError("Column names must match between training and test_data")
-            
-            return X_train[i],X_val[i],X_test[i],y_train[i] , y_val[i],y_test[i]      
+        data_g1,data_g2,data_g3,data_g4=self.spit_dataset(data)
+        X_train1, X_test1, y_train1, y_test1 = train_test_split(data_g1,data_g1[self.labels], test_size=0.2)
+        X_train1, X_val1, y_train1, y_val1 = train_test_split(X_train1, y_train1, test_size=0.25)
+        if X_val1 is not None:
+            if not isinstance(X_val1, pd.DataFrame):
+                raise AssertionError(f'X_val is required to be a pandas DataFrame, but was instead: {type(X_val[i])}')
+            train_features1 = [column for column in X_train1.columns if column !=data_g1[self.labels]]
+            val_features1 = [column for column in X_val1.columns if column != data_g1[self.labels]]
+            if np.any(train_features1 != val_features1):
+                raise ValueError("Column names must match between training and val data")
+            if X_test1 is not None:
+                if not isinstance(X_test1 , pd.DataFrame):
+                    raise AssertionError(f'X_test1 is required to be a pandas DataFrame, but was instead: {type(X_test1)}')
+            train_features1 = [column for column in X_train1.columns if column !=data_g1[self.labels]]
+            test_features1 = [column for column in X_test1.columns]
+            if np.any(train_features1 != test_features1):
+                raise ValueError("Column names must match between training and test_data")
+        Dic_data_g1={'X_train1':X_train1,'X_test1':X_test1,'y_train1':y_train1,'y_test1':y_test1,'X_val1':X_val1,' y_val1': y_val1}    
+                
                
     def Image_Genartor(self,data):
         data=self.__get_dataset(data)
