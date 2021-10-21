@@ -801,14 +801,27 @@ class AbstractModel:
 
         return template
 
-    def convert_to_refit_full_template(self):
-        """After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model."""
-        params = copy.deepcopy(self.get_params())
-        params['hyperparameters'].update(self.params_trained)
-        params['name'] = params['name'] + REFIT_FULL_SUFFIX
-        template = self.__class__(**params)
+    def convert_to_refit_full_template(self, name_suffix=REFIT_FULL_SUFFIX):
+        """
+        After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model.
 
-        return template
+        Parameters
+        ----------
+        name_suffix : str, default = '_FULL'
+            If name_suffix is not None, will append name_suffix to self.name when creating the template model's name.
+            Be careful of setting to None or empty string, as this will lead to the template overwriting self on disk when saved.
+
+        Returns
+        -------
+        model_full_template : AbstractModel
+            Unfit model capable of being fit without X_val, y_val. Hyperparameters are based on post-fit self hyperparameters.
+        """
+        init_args = self.get_params()
+        init_args['hyperparameters'].update(self.params_trained)
+        if name_suffix:
+            init_args['name'] = init_args['name'] + name_suffix
+        model_full_template = self.__class__(**init_args)
+        return model_full_template
 
     def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
         scheduler_options = copy.deepcopy(scheduler_options)

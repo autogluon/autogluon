@@ -77,7 +77,7 @@ class KNNModel(AbstractModel):
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'use_child_oof': True}
+        extra_ag_args_ensemble = {'refit_folds': True}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 

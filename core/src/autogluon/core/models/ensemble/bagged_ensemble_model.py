@@ -122,6 +122,7 @@ class BaggedEnsembleModel(AbstractModel):
     def _get_cv_splitter(self, n_splits, n_repeats, groups=None):
         return CVSplitter(n_splits=n_splits, n_repeats=n_repeats, groups=groups, stratified=self.is_stratified(), random_state=self._random_state)
 
+    # TODO: Add documentation
     def _fit(self,
              X,
              y,
@@ -133,8 +134,10 @@ class BaggedEnsembleModel(AbstractModel):
              n_repeats=1,
              n_repeat_start=0,
              groups=None,
+             _skip_oof=False,
              **kwargs):
-        use_child_oof = self.params.get('use_child_oof', False)
+        params = self._get_model_params()
+        use_child_oof = params.get('use_child_oof', False)
         if use_child_oof:
             if self.is_fit():
                 # TODO: We may want to throw an exception instead and avoid calling fit more than once
@@ -171,13 +174,17 @@ class BaggedEnsembleModel(AbstractModel):
         if self._oof_pred_proba is None and self.is_fit():
             self._load_oof()
 
-        save_bag_folds = self.params.get('save_bag_folds', True)
+        save_bag_folds = params.get('save_bag_folds', True)
         if k_fold == 1:
-            self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, **kwargs)
+            self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, skip_oof=_skip_oof, **kwargs)
             return self
         else:
-            refit_folds = self.params.get('refit_folds', False)
+            refit_folds = params.get('refit_folds', False)
             if refit_folds:
+                if n_repeat_start != 0 or k_fold_start != 0:
+                    raise AssertionError(f'n_repeat_start and k_fold_start must be 0 with refit_folds=True, values: ({n_repeat_start}, {k_fold_start})')
+                if k_fold_end != k_fold:
+                    raise AssertionError(f'k_fold_end and k_fold must be equal with refit_folds=True, values: ({k_fold_end}, {k_fold})')
                 save_bag_folds = False
                 if kwargs.get('time_limit', None) is not None:
                     fold_start = n_repeat_start * k_fold + k_fold_start
@@ -189,16 +196,17 @@ class BaggedEnsembleModel(AbstractModel):
                             n_repeats=n_repeats, n_repeat_start=n_repeat_start, save_folds=save_bag_folds, groups=groups, **kwargs)
             # FIXME: Don't save folds except for refit
             # FIXME: Cleanup self
-            # FIXME: Don't add `_FULL` to name
             if refit_folds:
-                refit_template = self.convert_to_refit_full_template()
+                refit_template = self.convert_to_refit_full_template(name_suffix=None)
                 refit_template.params['use_child_oof'] = False
                 kwargs['time_limit'] = None
-                refit_template.fit(X=X, y=y, k_fold=1, **kwargs)
+                # _skip_oof=True to avoid inferring on training data needlessly.
+                refit_template.fit(X=X, y=y, k_fold=1, _skip_oof=True, **kwargs)
                 refit_template._oof_pred_proba = self._oof_pred_proba
                 refit_template._oof_pred_model_repeats = self._oof_pred_model_repeats
                 refit_template._child_oof = True
                 refit_template.fit_time += self.fit_time + self.predict_time
+                refit_template.predict_time = self.predict_time
                 return refit_template
             else:
                 return self
@@ -261,7 +269,7 @@ class BaggedEnsembleModel(AbstractModel):
             sample_weight = sample_weight[valid_indices]
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weight=sample_weight)
 
-    def _fit_single(self, X, y, model_base, use_child_oof, time_limit=None, **kwargs):
+    def _fit_single(self, X, y, model_base, use_child_oof, time_limit=None, skip_oof=False, **kwargs):
         if self.is_fit():
             raise AssertionError('Model is already fit.')
         if self._n_repeats != 0:
@@ -309,7 +317,8 @@ class BaggedEnsembleModel(AbstractModel):
             self._child_oof = True
             model_base.predict_time = time.time() - time_start_predict
             model_base.val_score = model_base.score_with_y_pred_proba(y=y, y_pred_proba=self._oof_pred_proba)
-        else:
+        elif not skip_oof:
+            # TODO: Incorrectly called in refit_full, wastes time and disk space.
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
         self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
         self._n_repeats = 1
@@ -499,11 +508,12 @@ class BaggedEnsembleModel(AbstractModel):
         child.save(verbose=verbose)
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
-    def convert_to_refit_full_template(self):
+    def convert_to_refit_full_template(self, name_suffix=REFIT_FULL_SUFFIX):
         init_args = self.get_params()
         init_args['hyperparameters']['save_bag_folds'] = True  # refit full models must save folds
         init_args['model_base'] = self.convert_to_refit_full_template_child()
-        init_args['name'] = init_args['name'] + REFIT_FULL_SUFFIX
+        if name_suffix:
+            init_args['name'] = init_args['name'] + name_suffix
         model_full_template = self.__class__(**init_args)
         return model_full_template
 
