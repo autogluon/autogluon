@@ -985,7 +985,8 @@ class TabularPredictor:
         return ret
 
 
-    def _run_pseudolabeling(self, test_data: pd.DataFrame, max_iter: int, **kwargs):
+    def _run_pseudolabeling(self, test_data: pd.DataFrame, max_iter: int,
+                            return_pred_prob: bool = False, **kwargs):
         """
         Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
         used in original model unless specified by the user. This is an internal function that iteratively
@@ -1006,6 +1007,8 @@ class TabularPredictor:
         """
         previous_score = self.info()['best_model_score_val']
         y_pseudo_og = pd.Series()
+        if return_pred_prob:
+            y_pred_proba_og = pd.DataFrame()
         X_test = test_data.copy()
         test_data = self._learner.feature_generator.transform(test_data)
 
@@ -1017,10 +1020,16 @@ class TabularPredictor:
 
             test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
 
+            if return_pred_prob:
+                if i == 0:
+                    y_pred_proba_og = y_pred_proba
+                else:
+                    y_pred_proba_og.loc[test_pseudo_idxes_true.index] = y_pred_proba.loc[test_pseudo_idxes_true.index]
+
             if len(test_pseudo_idxes_true) < 1:
                 logger.log(20,
                            f'Could not confidently assign pseudolabels for any of the provided rows in iteration: {iter_print}. Done with pseudolabeling...')
-                return self
+                break
             else:
                 logger.log(20, f'Pseudolabeling algorithm found: {len(test_pseudo_idxes_true)} rows of pseudolabeled data met criteria on iteration: {iter_print}.'
                                f' Adding to train data')
@@ -1029,6 +1038,7 @@ class TabularPredictor:
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
 
             y_pseudo_og = y_pseudo_og.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
+
             pseudo_data = test_data.loc[y_pseudo_og.index]
             pseudo_data[self.label] = y_pseudo_og
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)),
@@ -1040,15 +1050,18 @@ class TabularPredictor:
                        f' using evaluation metric: {self.eval_metric.name}')
 
             if previous_score >= current_score:
-                return self
+                break
             else:
                 # Cut down X_test to not include pseudo labeled data
                 X_test = X_test.loc[test_pseudo_idxes[~test_pseudo_idxes].index]
                 previous_score = current_score
 
-        return self
+        if return_pred_prob:
+            return self, y_pred_proba_og
+        else:
+            return self
 
-    def fit_pseudolabel(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
+    def fit_pseudolabel(self, test_data: pd.DataFrame, max_iter: int = 5, return_pred_prob: bool = False, **kwargs):
         """
         Pseudolabeling fit algorithm. If test_data is labeled then incorporates all
         test_data into train_data for newly fit models. This data is not used for
@@ -1066,6 +1079,9 @@ class TabularPredictor:
             training
         max_iter: int, default = 5
             Maximum iterations of pseudolabeling allowed
+        return_pred_prob: bool, default = False
+            Returns held-out predictive probabilities from pseudo-labeling. If test_data is labeled then
+            returns model's predictive probabilities.
         kwargs: dict
             If predictor is not already fit: Refer to parameters documentation in :meth:`TabularPredictor.fit`.
             If predictor is fit: Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
@@ -1099,13 +1115,19 @@ class TabularPredictor:
         fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
         if is_labeled:
             logger.log(20, "Fitting predictor using the provided pseudolabeled examples as extra training data...")
-            return self.fit_extra(pseudo_data=test_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter='')[:-1],
-                                  **fit_extra_kwargs)
+            self.fit_extra(pseudo_data=test_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter='')[:-1],
+                           **fit_extra_kwargs)
+
+            if return_pred_prob:
+                y_pred_proba = self.predict_proba(test_data)
+                return self, y_pred_proba
+            else:
+                return self
         else:
             logger.log(20, 'Given test_data for pseudo labeling did not contain labels. '
                            'AutoGluon will label the data and use it for pseudo labeling...')
-            return self._run_pseudolabeling(test_data=test_data,
-                                            max_iter=max_iter, **fit_extra_kwargs)
+            return self._run_pseudolabeling(test_data=test_data, max_iter=max_iter,
+                                            return_pred_prob=return_pred_prob, **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):
         """
