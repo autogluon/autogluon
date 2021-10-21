@@ -103,23 +103,86 @@ class Utils_pro:
       
     def _validate_fit_data(self, data):        
         data_g1,data_g2,data_g3,data_g4=self.spit_dataset(data)
-        X_train1, X_test1, y_train1, y_test1 = train_test_split(data_g1,data_g1[self.labels], test_size=0.2)
+        X1 = data_g1.iloc[:,:-1]  #independent columns
+        Y1=  data_g1.iloc[:,-1]
+        X_train1, X_test1, y_train1, y_test1 = train_test_split(X1,Y1, test_size=0.2)
         X_train1, X_val1, y_train1, y_val1 = train_test_split(X_train1, y_train1, test_size=0.25)
         if X_val1 is not None:
             if not isinstance(X_val1, pd.DataFrame):
-                raise AssertionError(f'X_val is required to be a pandas DataFrame, but was instead: {type(X_val[i])}')
-            train_features1 = [column for column in X_train1.columns if column !=data_g1[self.labels]]
-            val_features1 = [column for column in X_val1.columns if column != data_g1[self.labels]]
+                raise AssertionError(f'X_val1 is required to be a pandas DataFrame, but was instead: {type(X_val1)}')
+            train_features1 = [column for column in X_train1.columns if column !=Y1]
+            val_features1 = [column for column in X_val1.columns if column != Y1]
             if np.any(train_features1 != val_features1):
                 raise ValueError("Column names must match between training and val data")
             if X_test1 is not None:
                 if not isinstance(X_test1 , pd.DataFrame):
                     raise AssertionError(f'X_test1 is required to be a pandas DataFrame, but was instead: {type(X_test1)}')
-            train_features1 = [column for column in X_train1.columns if column !=data_g1[self.labels]]
+            train_features1 = [column for column in X_train1.columns if column !=Y1]
             test_features1 = [column for column in X_test1.columns]
             if np.any(train_features1 != test_features1):
                 raise ValueError("Column names must match between training and test_data")
         Dic_data_g1={'X_train1':X_train1,'X_test1':X_test1,'y_train1':y_train1,'y_test1':y_test1,'X_val1':X_val1,' y_val1': y_val1}    
+        
+        X2 = data_g2.iloc[:,:-1]  #independent columns
+        Y2=  data_g2.iloc[:,-1]
+        X_train2, X_test2, y_train2, y_test2 = train_test_split(X2,Y2, test_size=0.2)
+        X_train2, X_val2, y_train2, y_val2 = train_test_split(X_train2, y_train2, test_size=0.25)
+        if X_val2 is not None:
+            if not isinstance(X_val2, pd.DataFrame):
+                raise AssertionError(f'X_val2 is required to be a pandas DataFrame, but was instead: {type(X_val2)}')
+            train_features2 = [column for column in X_train2.columns if column !=Y2]
+            val_features2 = [column for column in X_val2.columns if column != Y2]
+            if np.any(train_features2 != val_features2):
+                raise ValueError("Column names must match between training and val data")
+            if X_test2 is not None:
+                if not isinstance(X_test2 , pd.DataFrame):
+                    raise AssertionError(f'X_test2 is required to be a pandas DataFrame, but was instead: {type(X_test2)}')
+            train_features2 = [column for column in X_train2.columns if column !=Y2]
+            test_features2 = [column for column in X_test2.columns]
+            if np.any(train_features2 != test_features2):
+                raise ValueError("Column names must match between training and test_data")
+        Dic_data_g2={'X_train2':X_train2,'X_test2':X_test2,'y_train2':y_train2,'y_test2':y_test2,'X_val2':X_val2,' y_val2': y_val2}  
+        
+        X3 = data_g3.iloc[:,:-1]  #independent columns
+        Y3=  data_g3.iloc[:,-1]
+        X_train3, X_test3, y_train3, y_test3 = train_test_split(X3,Y3, test_size=0.2)
+        X_train3, X_val3, y_train3, y_val3 = train_test_split(X_train3, y_train3, test_size=0.25)
+        if X_val3 is not None:
+            if not isinstance(X_val3, pd.DataFrame):
+                raise AssertionError(f'X_val3 is required to be a pandas DataFrame, but was instead: {type(X_val3)}')
+            train_features3 = [column for column in X_train3.columns if column !=Y3]
+            val_features3 = [column for column in X_val3.columns if column != Y3]
+            if np.any(train_features3 != val_features3):
+                raise ValueError("Column names must match between training and val data")
+            if X_test3 is not None:
+                if not isinstance(X_test3 , pd.DataFrame):
+                    raise AssertionError(f'X_test3 is required to be a pandas DataFrame, but was instead: {type(X_test3)}')
+            train_features3 = [column for column in X_train3.columns if column !=Y3]
+            test_features3 = [column for column in X_test3.columns]
+            if np.any(train_features3 != test_features3):
+                raise ValueError("Column names must match between training and test_data")
+        Dic_data_g3={'X_train3':X_train3,'X_test3':X_test3,'y_train3':y_train3,'y_test3':y_test3,'X_val3':X_val3,' y_val3': y_val3} 
+        
+        X4 = data_g4.iloc[:,:-1]  #independent columns
+        Y4=  data_g4.iloc[:,-1]
+        X_train4, X_test4, y_train4, y_test4 = train_test_split(X4,Y4, test_size=0.2)
+        X_train4, X_val4, y_train4, y_val4 = train_test_split(X_train4, y_train4, test_size=0.25)
+        if X_val4 is not None:
+            if not isinstance(X_val4, pd.DataFrame):
+                raise AssertionError(f'X_val4 is required to be a pandas DataFrame, but was instead: {type(X_val4)}')
+            train_features4 = [column for column in X_train4.columns if column !=Y4]
+            val_features4 = [column for column in X_val4.columns if column != Y4]
+            if np.any(train_features4 != val_features4):
+                raise ValueError("Column names must match between training and val data")
+            if X_test3 is not None:
+                if not isinstance(X_test4 , pd.DataFrame):
+                    raise AssertionError(f'X_test4 is required to be a pandas DataFrame, but was instead: {type(X_test4)}')
+            train_features4 = [column for column in X_train4.columns if column !=data_g4[self.labels]]
+            test_features4 = [column for column in X_test4.columns]
+            if np.any(train_features4 != test_features4):
+                raise ValueError("Column names must match between training and test_data")
+        Dic_data_g4={'X_train4':X_train4,'X_test4':X_test4,'y_train4':y_train4,'y_test4':y_test4,'X_val4':X_val4,' y_val4': y_val4}
+        return Dic_data_g1,Dic_data_g2,Dic_data_g3,Dic_data_g4
                 
                
     def Image_Genartor(self,data):
