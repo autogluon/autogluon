@@ -1008,9 +1008,11 @@ class TabularPredictor:
         previous_score = self.info()['best_model_score_val']
         y_pseudo_og = pd.Series()
         if return_pred_prob:
-            y_pred_proba_og = pd.DataFrame()
+            if self.problem_type is REGRESSION:
+                y_pred_proba_og = pd.Series()
+            else:
+                y_pred_proba_og = pd.DataFrame()
         X_test = test_data.copy()
-        test_data = self._learner.feature_generator.transform(test_data)
 
         for i in range(max_iter):
             iter_print = str(i + 1)

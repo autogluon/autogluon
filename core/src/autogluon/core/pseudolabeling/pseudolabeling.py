@@ -41,7 +41,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
                 num_rows_threshold = max(np.ceil(max_proportion_prob * num_rows), 1)
             else:
                 num_rows_threshold = max(np.ceil(min_proportion_prob * num_rows), 1)
-            curr_threshold = y_pred_proba_max.sort_values(ascending=False).iloc[num_rows_threshold - 1]
+            curr_threshold = y_pred_proba_max.sort_values(ascending=False).iloc[int(num_rows_threshold) - 1]
 
         test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
     else:
