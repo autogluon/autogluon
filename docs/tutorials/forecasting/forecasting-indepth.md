@@ -115,6 +115,7 @@ AutoGluon allows you to provide such static features such that its models will c
 
 ```{.python .input}
 static_features = TabularDataset("https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/toy_static_features.csv")
+static_features['static_cat_feature'] = static_features['static_cat_feature'].astype('category')  # instructs autogluon to treat 'static_cat_feature' column as a categorical feature instead of numeric
 static_features.head()
 ```
 
