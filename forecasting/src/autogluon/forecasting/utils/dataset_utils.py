@@ -4,7 +4,7 @@ from gluonts.dataset.repository.datasets import dataset_recipes
 from gluonts.dataset.common import Dataset, ListDataset, FileDataset
 from gluonts.dataset.field_names import FieldName
 from autogluon.features.generators import IdentityFeatureGenerator, CategoryFeatureGenerator, FillNaFeatureGenerator
-from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY
+from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 import logging
 
 __all__ = ['TimeSeriesDataset', 'gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset', 'train_test_split_dataframe',
@@ -226,12 +226,26 @@ def time_series_dataset(data,
 
 
 def extract_static_feature(index_column, features, prev_inferred=None):
+    """
+        index_column: str indicating name of column that contains the time series index.
+        features: pd.Dataframe containing non time-varying features. Must contain column named: index_column and each series index must appear in a single row of features.
+        prev_inferred: information about previously-inferred static features if static features were previously passed (eg. for the training data when we are now processing test data).
+        Features must be already preprocessed if using prev_inferred.
+        Features which you want to be categorical can be converted to strings (object or category dtype), features which you want numeric must have dtype int or float.
+        Currently categorical static features must be formatted as levels: "0", "1", "2",...
+    """
     if prev_inferred is not None:
-        logger.log(15, "Using previous inferred feature columns...")
-        logger.log(15, f"Static Cat Features Dataframe including {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
-        logger.log(15, f"Static Real Features Dataframe including {[i for i in prev_inferred['static_real_columns'] if i != index_column]}")
-        static_cat_features = features[prev_inferred["static_cat_columns"]]
-        static_real_features = features[prev_inferred["static_real_columns"]]
+        logger.log(15, "Using previous inferred static feature columns:")
+        if prev_inferred['static_cat_columns'] is not None and len(prev_inferred['static_cat_columns']) > 0:
+            logger.log(15, f"Static Categorical Features: {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
+            static_cat_features = features[prev_inferred["static_cat_columns"]]
+        else:
+            static_cat_features = None
+        if prev_inferred['static_real_columns'] is not None and len(prev_inferred['static_real_columns']) > 0:
+            logger.log(15, f"Static Numeric Features: {[i for i in prev_inferred['static_real_columns'] if i != index_column]}")
+            static_real_features = features[prev_inferred["static_real_columns"]]
+        else:
+            static_real_features = None
         cardinality = prev_inferred["cardinality"]
     else:
         if index_column is None:
@@ -239,19 +253,21 @@ def extract_static_feature(index_column, features, prev_inferred=None):
         indices = features[index_column]
         features = features.drop(index_column, axis=1)
         cardinality = []
+        numeric_columns = list(features.select_dtypes(include=[R_INT, R_FLOAT]).columns)
+        categorical_columns = list(features.select_dtypes(include=[R_CATEGORY, R_OBJECT]).columns)
         for column in features.columns:
-            try:
+            if column in numeric_columns:
                 features[column] = features[column].astype(R_FLOAT)
-                if len(features[column].unique()) <= 10:
-                    logger.log(20, f"Static feature column {column} has 10 or less unique values, assuming it is categorical.")
-                    features[column] = features[column].astype(R_CATEGORY)
-                    cardinality.append(len(features[column].unique()))
-            except ValueError:
-                logger.log(20, f"Cannot convert static feature column {column} to float, assuming it is categorical.")
+            elif column in categorical_columns:
                 if len(features[column].unique()) == len(features[column]):
-                    logger.log(20, f"Categorical static feature {column} has different values for all rows, discarding it.")
+                    logger.log(20, f"Categorical feature {column} has different values for all rows, discarding it.")
                 else:
                     cardinality.append(len(features[column].unique()))
+            else:
+                raise ValueError(f"Static feature {column} is of unsupported type, must be either numeric or categorical (dtype must be one of: {[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT]})")
+        logger.log(20, f"Static features treated as categorical: {categorical_columns}")
+        logger.log(20, f"Static features treated as numeric: {numeric_columns}")
+        logger.log(20, "To change a numeric feature to be treated as categorical, convert its values to strings indicating the levels: '0','1','2',...")
         # Extracting static real features and fillna with mean
         static_real_features = IdentityFeatureGenerator(
             infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}
@@ -262,7 +278,12 @@ def extract_static_feature(index_column, features, prev_inferred=None):
             infer_features_in_args={"invalid_raw_types": [R_INT, R_FLOAT]}
         ).fit_transform(features)
         static_cat_features = CategoryFeatureGenerator().fit_transform(static_cat_features)
-
-        static_cat_features[index_column] = indices
-        static_real_features[index_column] = indices
+        if len(static_cat_features.columns) > 0:
+            static_cat_features[index_column] = indices
+        else:
+            static_cat_features = None
+        if len(static_real_features.columns) > 0:
+            static_real_features[index_column] = indices
+        else:
+            static_real_features = None
     return static_cat_features, static_real_features, cardinality
