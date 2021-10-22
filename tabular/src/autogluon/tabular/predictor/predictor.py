@@ -985,7 +985,7 @@ class TabularPredictor:
         return ret
 
 
-    def _run_pseudolabeling(self, test_data: pd.DataFrame, max_iter: int,
+    def _run_pseudolabeling(self, unlabeled_data: pd.DataFrame, max_iter: int,
                             return_pred_prob: bool = False, **kwargs):
         """
         Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
@@ -997,10 +997,11 @@ class TabularPredictor:
         -----------
         hyperparameters: dict
             Dictionary of hyperparameters the model should use
-        test_data: The incoming data to incorporate into the next iterations of train
-            using pseudolabeling
+        unlabeled_data: Extra unlabeled data to assign pseudolabels to and incorporate as
+            extra training data.
         max_iter: int, default = 5
-            The maximum number of iterations allowed for this instance of pseudolabeling
+            Maximum allowed number of iterations, where in each iteration, the data are pseudolabeled
+            by the current predictor and the predictor is refit including the pseudolabled data in its training set.
         Returns:
         --------
         self: TabularPredictor
@@ -1012,7 +1013,7 @@ class TabularPredictor:
                 y_pred_proba_og = pd.Series()
             else:
                 y_pred_proba_og = pd.DataFrame()
-        X_test = test_data.copy()
+        X_test = unlabeled_data.copy()
 
         for i in range(max_iter):
             iter_print = str(i + 1)
@@ -1041,7 +1042,7 @@ class TabularPredictor:
 
             y_pseudo_og = y_pseudo_og.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
 
-            pseudo_data = test_data.loc[y_pseudo_og.index]
+            pseudo_data = unlabeled_data.loc[y_pseudo_og.index]
             pseudo_data[self.label] = y_pseudo_og
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i+1)),
                            **kwargs)
@@ -1128,7 +1129,7 @@ class TabularPredictor:
         else:
             logger.log(20, 'Given test_data for pseudo labeling did not contain labels. '
                            'AutoGluon will label the data and use it for pseudo labeling...')
-            return self._run_pseudolabeling(test_data=test_data, max_iter=max_iter,
+            return self._run_pseudolabeling(unlabeled_data=test_data, max_iter=max_iter,
                                             return_pred_prob=return_pred_prob, **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):
