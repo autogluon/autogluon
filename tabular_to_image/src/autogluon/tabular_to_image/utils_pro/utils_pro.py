@@ -26,9 +26,9 @@ import autogluon.tabular_to_image.models_zoo
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from sklearn.manifold import TSNE
 class Utils_pro:
-    def __init__(self,labels, **kwargs):
+    def __init__(self **kwargs):
         #self.train_dataset=train_dataset
-        self.labels=labels
+        #self.labels=labels
              
               
         ModelsZoo_type = kwargs.pop('ModelsZoo_type', ModelsZoo)
@@ -77,7 +77,7 @@ class Utils_pro:
         else:
             raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
              
-    def spit_dataset(self,data):
+    def spit_dataset(self,data,labels):
         models_count=self.len_group_counts() 
         groups_counts=self.new_countsD()
         data = self.__get_dataset(data)
@@ -93,15 +93,16 @@ class Utils_pro:
         g3_presentage=round(((groups_counts['g3']/models_count)*100),1)/100
         g4_presentage=round(((groups_counts['g4']/models_count)*100),1)/100
         
-        data[self.labels]=self.labels
+        #data['labels']=labels
         data_g1=data.sample(frac=g1_presentage, replace=False, random_state=12)
         data_g2=data.sample(frac=g2_presentage, replace=False, random_state=44)
         data_g3=data.sample(frac=g3_presentage, replace=False, random_state=58)
         data_g4=data.sample(frac=g4_presentage, replace=False, random_state=11)
+        
         return data_g1,data_g2,data_g3,data_g4
         
       
-    def _validate_fit_data(self, data):        
+    def _validate_fit_data(self, data,labels):        
         data_g1,data_g2,data_g3,data_g4=self.spit_dataset(data)
         X1 = data_g1.iloc[:,:-1]  #independent columns
         Y1=  data_g1.iloc[:,-1]
@@ -163,8 +164,8 @@ class Utils_pro:
                 raise ValueError("Column names must match between training and test_data")
         Dic_data_g3={'X_train3':X_train3,'X_test3':X_test3,'y_train3':y_train3,'y_test3':y_test3,'X_val3':X_val3,' y_val3': y_val3} 
         
-        X4 = data_g4.iloc[:,:-1]  #independent columns
-        Y4=  data_g4.iloc[:,-1]
+        X4 = data_g4.drop(['labels'],axis=1).values #data_g4.iloc[:,:-1]  #independent columns
+        Y4=  data_g4['labels'].values	
         X_train4, X_test4, y_train4, y_test4 = train_test_split(X4,Y4, test_size=0.2)
         X_train4, X_val4, y_train4, y_val4 = train_test_split(X_train4, y_train4, test_size=0.25)
         if X_val4 is not None:
