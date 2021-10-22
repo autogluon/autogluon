@@ -1018,7 +1018,7 @@ class TabularPredictor:
         for i in range(max_iter):
             iter_print = str(i + 1)
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}')
-            y_pred_proba = self.predict_proba(data=X_test)
+            y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
             y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
 
             test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
