@@ -1101,8 +1101,8 @@ class TabularPredictor:
 
         if self.problem_type is MULTICLASS and self.eval_metric is not 'accuracy':
             logger.warning('AutoGluon has detected the problem type as \'multiclass\' and '
-                           f'eval metric is {self.eval_metric.name}, we recommend using'
-                           f'fit_pseudolabeling when eval metric is \'acc\'')
+                           f'eval_metric is {self.eval_metric.name}, we recommend using'
+                           f'fit_pseudolabeling when eval metric is \'accuracy\'')
 
         is_labeled = self.label in test_data.columns
 
