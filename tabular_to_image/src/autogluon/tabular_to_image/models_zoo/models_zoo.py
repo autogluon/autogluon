@@ -27,10 +27,10 @@ class ModelsZoo():
                             'vgg11_bn','vgg13','vgg13_bn','vgg16','vgg16_bn','vgg19','vgg19_bn',
                             'densenet121','densenet161','densenet169','densenet201''googlenet',
                             'shufflenet_v2_x0_5','shufflenet_v2_x1_0','mobilenet_v2','wide_resnet50_2',
-                            'wide_resnet101_2','mnasnet0_5','mnasnet1_0','efficientnet-b1',
+                            'wide_resnet101_2','mnasnet0_5','mnasnet1_0'],"g2":['efficientnet-b0','efficientnet-b1',
                             'efficientnet-b2','efficientnet-b3','efficientnet-b4','efficientnet-b5',
-                            'efficientnet-b6','efficientnet-b7'],"g2": ['squeezenet1_0','squeezenet1_1'],
-                        "g3": ['resnext50_32x4d','resnext101_32x8d'],"g4": ['inception_v3','xception']}
+                            'efficientnet-b6','efficientnet-b7'],"g3": ['squeezenet1_0','squeezenet1_1'],
+                        "g4": ['resnext50_32x4d','resnext101_32x8d'],"g5": ['inception_v3','xception']}
     len_group_counts=(sum([len(group_counts[x]) for x in group_counts if isinstance(group_counts[x], list)]))
     new_countsD =new_countsD = {k: len(v) for k,v in group_counts.items()}
    
@@ -168,11 +168,16 @@ class ModelsZoo():
                 for param in model.parameters():
                     param.requires_grad = False
                 model.classifier[1] = nn.Linear(model.classifier[1].in_features, self.num_classes).double()         
-            elif 'efficientnet-b1'==self.model_type:
-                model = EfficientNet.from_name('efficientnet-b1')
+            elif 'efficientnet-b0'==self.model_type:
+                model = EfficientNet.from_name('efficientnet-b0')
                 for param in model.parameters():
                    param.requires_grad = True  
                 model._fc = nn.Linear(model._fc.in_features, self.num_classes).double() 
+            elif 'efficientnet-b1'==self.model_type:
+                    model = EfficientNet.from_name('efficientnet-b1')
+                for param in model.parameters():
+                   param.requires_grad = True  
+                model._fc = nn.Linear(model._fc.in_features, self.num_classes).double()     
             elif 'efficientnet-b2'==self.model_type:
                 model = EfficientNet.from_name('efficientnet-b2')
                 for param in model.parameters():
@@ -256,6 +261,8 @@ class ModelsZoo():
             optimizer = optim.Adam(self.create_model().parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-5)
             exp_lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor = 0.1, patience =  5, mode = 'max', verbose=True)       
         return   criterion,optimizer,exp_lr_scheduler
+    
+    
 
 #np.random.seed(37)
 #torch.manual_seed(37)

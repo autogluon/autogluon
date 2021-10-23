@@ -30,7 +30,7 @@ class ImagePredictions:
               
        
         labels=kwargs.get('labels', None)
-        self._Utils_pro: Utils_pro = Utils_pro_type(labels=labels,**Utils_pro_kwargs)
+        self._Utils_pro: Utils_pro = Utils_pro_type(**Utils_pro_kwargs)
         self._Utils_pro_type = type(self._Utils_pro)
         
                 
@@ -51,9 +51,9 @@ class ImagePredictions:
         
       
     Dataset = TabularDataset 
-    @property
-    def labels(self):
-        return self._Utils_pro.labels
+    #@property
+    #def labels(self):
+    #   return self._Utils_pro.labels
     @property
     def ImageShape(self):
         return self._ModelsZoo.ImageShape 
@@ -281,4 +281,12 @@ class ImagePredictions:
         fig.tight_layout()
     """
     
-#from autogluon.tabular_to_image.prediction import ImagePredictions    
+    def Selected_models(self):
+        import random
+        import math
+        g1_sample=random.sample(set(self._ModelsZoo.group_counts["g1"]),math.floor(self._Utils_pro.g1_presentage*len(self._ModelsZoo.group_counts["g1"])))
+        g2_sample=random.sample(set(self._ModelsZoo.group_counts["g2"]),math.ceil(self._Utils_pro.g2_presentage*len(self._ModelsZoo.group_counts["g2"])))
+        g3_sample=random.sample(set(self._ModelsZoo.group_counts["g3"]),math.ceil(self._Utils_pro.g3_presentage*len(self._ModelsZoo.group_counts["g3"])))
+        g4_sample=random.sample(set(self._ModelsZoo.group_counts["g4"]),math.ceil(self._Utils_pro.g4_presentage*len(self._ModelsZoo.group_counts["g4"])))
+        g5_sample=random.sample(set(self._ModelsZoo.group_counts["g5"]),math.ceil(self._Utils_pro.g5_presentage*len(self._ModelsZoo.group_counts["g5"]))) 
+#from autogluon.tabular_to_image.prediction import ImagePredictions   

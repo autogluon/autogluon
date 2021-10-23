@@ -26,7 +26,7 @@ import autogluon.tabular_to_image.models_zoo
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from sklearn.manifold import TSNE
 class Utils_pro:
-    def __init__(self **kwargs):
+    def __init__(self ,**kwargs):
         #self.train_dataset=train_dataset
         #self.labels=labels
              
@@ -41,6 +41,13 @@ class Utils_pro:
         #pretrained = kwargs.get('pretrained', None)
       
     Dataset = TabularDataset  
+    models_count=self._ModelsZoo.len_group_counts() 
+    groups_counts=self._ModelsZoo.new_countsD()
+    g1_presentage=round(((groups_counts['g1']/models_count)*100),1)/100
+    g2_presentage=round(((groups_counts['g2']/models_count)*100),1)/100
+    g3_presentage=round(((groups_counts['g3']/models_count)*100),1)/100
+    g4_presentage=round(((groups_counts['g4']/models_count)*100),1)/100
+    g5_presentage=round(((groups_counts['g5']/models_count)*100),1)/100
     #def data_split(self,):
     #    X_train, X_test, y_train, y_test = train_test_split(self.train_dataset,  self.label_column, test_size=0.2)
     #    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25
@@ -87,23 +94,19 @@ class Utils_pro:
         if not isinstance(data, pd.DataFrame):
             raise AssertionError(f'data is required to be a pandas DataFrame, but was instead: {type(data)}')
         if len(set(data.columns)) < len(data.columns):
-                raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")                     
-        g1_presentage=round(((groups_counts['g1']/models_count)*100),1)/100
-        g2_presentage=round(((groups_counts['g2']/models_count)*100),1)/100
-        g3_presentage=round(((groups_counts['g3']/models_count)*100),1)/100
-        g4_presentage=round(((groups_counts['g4']/models_count)*100),1)/100
+                raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")                           
         
+        data_g1=data.sample(frac=self.g1_presentage, replace=False, random_state=12)
+        data_g2=data.sample(frac=self.g2_presentage, replace=False, random_state=44)
+        data_g3=data.sample(frac=self.g3_presentage, replace=False, random_state=58)
+        data_g4=data.sample(frac=self.g4_presentage, replace=False, random_state=11)
+        data_g5=data.sample(frac=self.g5_presentage, replace=False, random_state=77)
         
-        data_g1=data.sample(frac=g1_presentage, replace=False, random_state=12)
-        data_g2=data.sample(frac=g2_presentage, replace=False, random_state=44)
-        data_g3=data.sample(frac=g3_presentage, replace=False, random_state=58)
-        data_g4=data.sample(frac=g4_presentage, replace=False, random_state=11)
-        
-        return data_g1,data_g2,data_g3,data_g4
+        return data_g1,data_g2,data_g3,data_g4,data_g5
         
       
     def _validate_fit_data(self, data,labels):        
-        data_g1,data_g2,data_g3,data_g4=self.spit_dataset(data)
+        data_g1,data_g2,data_g3,data_g4,data_g5=self.spit_dataset(data)
         X1 = data_g1.drop(columns=[labels], axis=1) #data_g1.iloc[:,:-1]  #independent columns df6_pd.drop('PERMIT_TYPE', axis=1)
         Y1=  data_g1[labels].values#data_g1.iloc[:,-1]
         X_train1, X_test1, y_train1, y_test1 = train_test_split(X1,Y1, test_size=0.2)
@@ -111,14 +114,14 @@ class Utils_pro:
         if X_val1 is not None:
             if not isinstance(X_val1, pd.DataFrame):
                 raise AssertionError(f'X_val1 is required to be a pandas DataFrame, but was instead: {type(X_val1)}')
-            train_features1 = [column for column in X_train1.columns if column !=Y1]
-            val_features1 = [column for column in X_val1.columns if column != Y1]
+            train_features1 = [column for column in X_train1.columns if column !=labels]
+            val_features1 = [column for column in X_val1.columns if column != labels]
             if np.any(train_features1 != val_features1):
                 raise ValueError("Column names must match between training and val data")
             if X_test1 is not None:
                 if not isinstance(X_test1 , pd.DataFrame):
                     raise AssertionError(f'X_test1 is required to be a pandas DataFrame, but was instead: {type(X_test1)}')
-            train_features1 = [column for column in X_train1.columns if column !=Y1]
+            train_features1 = [column for column in X_train1.columns if column !=labels]
             test_features1 = [column for column in X_test1.columns]
             if np.any(train_features1 != test_features1):
                 raise ValueError("Column names must match between training and test_data")
@@ -131,14 +134,14 @@ class Utils_pro:
         if X_val2 is not None:
             if not isinstance(X_val2, pd.DataFrame):
                 raise AssertionError(f'X_val2 is required to be a pandas DataFrame, but was instead: {type(X_val2)}')
-            train_features2 = [column for column in X_train2.columns if column !=Y2]
-            val_features2 = [column for column in X_val2.columns if column != Y2]
+            train_features2 = [column for column in X_train2.columns if column !=labels]
+            val_features2 = [column for column in X_val2.columns if column != labels]
             if np.any(train_features2 != val_features2):
                 raise ValueError("Column names must match between training and val data")
             if X_test2 is not None:
                 if not isinstance(X_test2 , pd.DataFrame):
                     raise AssertionError(f'X_test2 is required to be a pandas DataFrame, but was instead: {type(X_test2)}')
-            train_features2 = [column for column in X_train2.columns if column !=Y2]
+            train_features2 = [column for column in X_train2.columns if column !=labels]
             test_features2 = [column for column in X_test2.columns]
             if np.any(train_features2 != test_features2):
                 raise ValueError("Column names must match between training and test_data")
@@ -151,14 +154,14 @@ class Utils_pro:
         if X_val3 is not None:
             if not isinstance(X_val3, pd.DataFrame):
                 raise AssertionError(f'X_val3 is required to be a pandas DataFrame, but was instead: {type(X_val3)}')
-            train_features3 = [column for column in X_train3.columns if column !=Y3]
-            val_features3 = [column for column in X_val3.columns if column != Y3]
+            train_features3 = [column for column in X_train3.columns if column !=labels]
+            val_features3 = [column for column in X_val3.columns if column != labels]
             if np.any(train_features3 != val_features3):
                 raise ValueError("Column names must match between training and val data")
             if X_test3 is not None:
                 if not isinstance(X_test3 , pd.DataFrame):
                     raise AssertionError(f'X_test3 is required to be a pandas DataFrame, but was instead: {type(X_test3)}')
-            train_features3 = [column for column in X_train3.columns if column !=Y3]
+            train_features3 = [column for column in X_train3.columns if column !=labels]
             test_features3 = [column for column in X_test3.columns]
             if np.any(train_features3 != test_features3):
                 raise ValueError("Column names must match between training and test_data")
@@ -171,19 +174,39 @@ class Utils_pro:
         if X_val4 is not None:
             if not isinstance(X_val4, pd.DataFrame):
                 raise AssertionError(f'X_val4 is required to be a pandas DataFrame, but was instead: {type(X_val4)}')
-            train_features4 = [column for column in X_train4.columns if column !=Y4]
-            val_features4 = [column for column in X_val4.columns if column != Y4]
+            train_features4 = [column for column in X_train4.columns if column !=labels]
+            val_features4 = [column for column in X_val4.columns if column != labels]
             if np.any(train_features4 != val_features4):
                 raise ValueError("Column names must match between training and val data")
             if X_test3 is not None:
                 if not isinstance(X_test4 , pd.DataFrame):
                     raise AssertionError(f'X_test4 is required to be a pandas DataFrame, but was instead: {type(X_test4)}')
-            train_features4 = [column for column in X_train4.columns if column !=data_g4[self.labels]]
+            train_features4 = [column for column in X_train4.columns if column !=labels]
             test_features4 = [column for column in X_test4.columns]
             if np.any(train_features4 != test_features4):
                 raise ValueError("Column names must match between training and test_data")
         Dic_data_g4={'X_train4':X_train4,'X_test4':X_test4,'y_train4':y_train4,'y_test4':y_test4,'X_val4':X_val4,' y_val4': y_val4}
-        return Dic_data_g1,Dic_data_g2,Dic_data_g3,Dic_data_g4
+        
+        X5 = data_g5.drop(columns=[labels], axis=1) #data_g1.iloc[:,:-1]  #independent columns df6_pd.drop('PERMIT_TYPE', axis=1)
+        Y5=  data_g5[labels].values#data_g1.iloc[:,-1]
+        X_train5, X_test5, y_train5, y_test5 = train_test_split(X5,Y5, test_size=0.2)
+        X_train5, X_val5, y_train5, y_val5 = train_test_split(X_train5, y_train5, test_size=0.25)
+        if X_val4 is not None:
+            if not isinstance(X_val5, pd.DataFrame):
+                raise AssertionError(f'X_val4 is required to be a pandas DataFrame, but was instead: {type(X_val4)}')
+            train_features5 = [column for column in X_train5.columns if column !=labels]
+            val_features5 = [column for column in X_val5.columns if column != labels]
+            if np.any(train_features5 != val_features5):
+                raise ValueError("Column names must match between training and val data")
+            if X_test3 is not None:
+                if not isinstance(X_test5 , pd.DataFrame):
+                    raise AssertionError(f'X_test4 is required to be a pandas DataFrame, but was instead: {type(X_test4)}')
+            train_features5 = [column for column in X_train5.columns if column !=labels]
+            test_features5 = [column for column in X_test5.columns]
+            if np.any(train_features5 != test_features5):
+                raise ValueError("Column names must match between training and test_data")
+        Dic_data_g5={'X_train5':X_train5,'X_test5':X_test5,'y_train5':y_train5,'y_test5':y_test5,'X_val5':X_val5,' y_val5': y_val5}
+        return Dic_data_g1,Dic_data_g2,Dic_data_g3,Dic_data_g4,Dic_data_g5
                 
                
     def Image_Genartor(self,data):
