@@ -77,7 +77,7 @@ class Utils_pro:
         else:
             raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
              
-    def spit_dataset(self,data,labels):
+    def spit_dataset(self,data):
         models_count=self.len_group_counts() 
         groups_counts=self.new_countsD()
         data = self.__get_dataset(data)
@@ -93,7 +93,7 @@ class Utils_pro:
         g3_presentage=round(((groups_counts['g3']/models_count)*100),1)/100
         g4_presentage=round(((groups_counts['g4']/models_count)*100),1)/100
         
-        #data['labels']=labels
+        
         data_g1=data.sample(frac=g1_presentage, replace=False, random_state=12)
         data_g2=data.sample(frac=g2_presentage, replace=False, random_state=44)
         data_g3=data.sample(frac=g3_presentage, replace=False, random_state=58)
@@ -104,8 +104,8 @@ class Utils_pro:
       
     def _validate_fit_data(self, data,labels):        
         data_g1,data_g2,data_g3,data_g4=self.spit_dataset(data)
-        X1 = data_g1.iloc[:,:-1]  #independent columns
-        Y1=  data_g1.iloc[:,-1]
+        X1 = data_g1.drop(columns=[labels], axis=1) #data_g1.iloc[:,:-1]  #independent columns df6_pd.drop('PERMIT_TYPE', axis=1)
+        Y1=  data_g1[labels].values#data_g1.iloc[:,-1]
         X_train1, X_test1, y_train1, y_test1 = train_test_split(X1,Y1, test_size=0.2)
         X_train1, X_val1, y_train1, y_val1 = train_test_split(X_train1, y_train1, test_size=0.25)
         if X_val1 is not None:
@@ -124,8 +124,8 @@ class Utils_pro:
                 raise ValueError("Column names must match between training and test_data")
         Dic_data_g1={'X_train1':X_train1,'X_test1':X_test1,'y_train1':y_train1,'y_test1':y_test1,'X_val1':X_val1,' y_val1': y_val1}    
         
-        X2 = data_g2.iloc[:,:-1]  #independent columns
-        Y2=  data_g2.iloc[:,-1]
+        X2 = data_g2.drop(columns=[labels], axis=1) #data_g1.iloc[:,:-1]  #independent columns df6_pd.drop('PERMIT_TYPE', axis=1)
+        Y2=  data_g2[labels].values#data_g1.iloc[:,-1]
         X_train2, X_test2, y_train2, y_test2 = train_test_split(X2,Y2, test_size=0.2)
         X_train2, X_val2, y_train2, y_val2 = train_test_split(X_train2, y_train2, test_size=0.25)
         if X_val2 is not None:
@@ -144,8 +144,8 @@ class Utils_pro:
                 raise ValueError("Column names must match between training and test_data")
         Dic_data_g2={'X_train2':X_train2,'X_test2':X_test2,'y_train2':y_train2,'y_test2':y_test2,'X_val2':X_val2,' y_val2': y_val2}  
         
-        X3 = data_g3.iloc[:,:-1]  #independent columns
-        Y3=  data_g3.iloc[:,-1]
+        X3 = data_g3.drop(columns=[labels], axis=1) #data_g1.iloc[:,:-1]  #independent columns df6_pd.drop('PERMIT_TYPE', axis=1)
+        Y3=  data_g3[labels].values#data_g1.iloc[:,-1]
         X_train3, X_test3, y_train3, y_test3 = train_test_split(X3,Y3, test_size=0.2)
         X_train3, X_val3, y_train3, y_val3 = train_test_split(X_train3, y_train3, test_size=0.25)
         if X_val3 is not None:
@@ -164,8 +164,8 @@ class Utils_pro:
                 raise ValueError("Column names must match between training and test_data")
         Dic_data_g3={'X_train3':X_train3,'X_test3':X_test3,'y_train3':y_train3,'y_test3':y_test3,'X_val3':X_val3,' y_val3': y_val3} 
         
-        X4 = data_g4.drop(['labels'],axis=1).values #data_g4.iloc[:,:-1]  #independent columns
-        Y4=  data_g4['labels'].values	
+        X4 = data_g4.drop(columns=[labels], axis=1) #data_g1.iloc[:,:-1]  #independent columns df6_pd.drop('PERMIT_TYPE', axis=1)
+        Y4=  data_g4[labels].values#data_g1.iloc[:,-1]
         X_train4, X_test4, y_train4, y_test4 = train_test_split(X4,Y4, test_size=0.2)
         X_train4, X_val4, y_train4, y_val4 = train_test_split(X_train4, y_train4, test_size=0.25)
         if X_val4 is not None:
