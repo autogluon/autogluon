@@ -1038,8 +1038,8 @@ class TabularPredictor:
                            f'Could not confidently assign pseudolabels for any of the provided rows in iteration: {iter_print}. Done with pseudolabeling...')
                 break
             else:
-                logger.log(20, f'Pseudolabeling algorithm found: {len(test_pseudo_idxes_true)} rows of pseudolabeled data met criteria on iteration: {iter_print}.'
-                               f' Adding to train data')
+                logger.log(20, f'Pseudolabeling algorithm confidently assigned pseudolabels to: {len(test_pseudo_idxes_true)} rows of data'
+                               f'on iteration: {iter_print}. Adding to train data')
 
             test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
