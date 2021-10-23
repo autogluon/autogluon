@@ -914,6 +914,10 @@ class TabularPredictor:
         if pseudo_data is not None:
             if self.label not in pseudo_data.columns:
                 raise ValueError('\'pseudo_data\' does not contain the labeled column.')
+
+            if self.sample_weight is not None:
+                raise ValueError('Applying \'sample_weight\' while calling \'fit_pseudolabel\' is not supported')
+
             X_pseudo = pseudo_data.drop(columns=[self.label])
             y_pseudo = pseudo_data[self.label]
             X_pseudo = self._learner.transform_features(X_pseudo)
