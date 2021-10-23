@@ -22,7 +22,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.ticker as tic
-import autogluon.tabular_to_image.models_zoo 
+#import autogluon.tabular_to_image.models_zoo 
 from autogluon.tabular_to_image.models_zoo.models_zoo import ModelsZoo
 from sklearn.manifold import TSNE
 class Utils_pro:

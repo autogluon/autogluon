@@ -31,7 +31,7 @@ class ModelsZoo():
                             'efficientnet-b2','efficientnet-b3','efficientnet-b4','efficientnet-b5',
                             'efficientnet-b6','efficientnet-b7'],"g3": ['squeezenet1_0','squeezenet1_1'],
                         "g4": ['resnext50_32x4d','resnext101_32x8d'],"g5": ['inception_v3','xception']}
-    len_group_counts=(sum([len(group_counts[x]) for x in group_counts if isinstance(group_counts[x], list)]))
+    len_group_counts=(sum([len(self.group_counts[x]) for x in group_counts if isinstance(self.group_counts[x], list)]))
     new_countsD =new_countsD = {k: len(v) for k,v in group_counts.items()}
    
     def create_model(self):
@@ -174,7 +174,7 @@ class ModelsZoo():
                    param.requires_grad = True  
                 model._fc = nn.Linear(model._fc.in_features, self.num_classes).double() 
             elif 'efficientnet-b1'==self.model_type:
-                    model = EfficientNet.from_name('efficientnet-b1')
+                model = EfficientNet.from_name('efficientnet-b1')
                 for param in model.parameters():
                    param.requires_grad = True  
                 model._fc = nn.Linear(model._fc.in_features, self.num_classes).double()     
@@ -239,8 +239,8 @@ class ModelsZoo():
                     param.requires_grad = False
                 model.AuxLogits.fc = nn.Linear(model.AuxLogits.fc.in_features, self.num_classes).double()
                 model.fc = nn.Linear(model.fc.in_features, self.num_classes).double()
-             if 'xception' == self.model_type:
-                    model = models.inception_v3(pretrained=self.pretrained).to(device).double()
+            elif 'xception' == self.model_type:
+                model = models.inception_v3(pretrained=self.pretrained).to(device).double()
                 for param in model.parameters():
                     param.requires_grad = False
                 model.AuxLogits.fc = nn.Linear(model.AuxLogits.fc.in_features, self.num_classes).double()

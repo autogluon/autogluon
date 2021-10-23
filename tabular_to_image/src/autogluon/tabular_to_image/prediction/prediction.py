@@ -29,7 +29,7 @@ class ImagePredictions:
         Utils_pro_kwargs = kwargs.pop('Utils_pro_kwargs', dict())
               
        
-        labels=kwargs.get('labels', None)
+        #labels=kwargs.get('labels', None)
         self._Utils_pro: Utils_pro = Utils_pro_type(**Utils_pro_kwargs)
         self._Utils_pro_type = type(self._Utils_pro)
         
@@ -78,11 +78,12 @@ class ImagePredictions:
         valid_kwargs = {
             'Utils_pro_type',
             'Utils_pro_kwargs',
-            'labels',
             'ImageShape',
             'model_type',
             'num_classes',
             'pretrained',
+            'ModelsZoo_type',
+            'ModelsZoo_kwargs'
              
        
         }
