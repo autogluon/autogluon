@@ -151,7 +151,12 @@ class LocalSequentialScheduler(object):
         r = range(self.num_trials)
         for i in (tqdm(r) if self.num_trials < 1000 else r):
             trial_start_time = time.time()
-            is_failed, result = self.run_trial(task_id=i)
+            try:
+                is_failed, result = self.run_trial(task_id=i)
+            except Exception:
+                # TODO: Add special exception type when there are no more new configurations to try (exhausted search space)
+                logger.log(30, f'\tWARNING: Encountered unexpected exception during trial {i}, stopping HPO early.')
+                break
             trial_end_time = time.time()
             trial_run_times.append(np.NaN if is_failed else (trial_end_time - trial_start_time))
 

@@ -83,13 +83,13 @@ class XGBoostModel(AbstractModel):
 
         if verbosity <= 2:
             verbose = False
-            verbose_eval = None
+            log_period = None
         elif verbosity == 3:
             verbose = True
-            verbose_eval = 50
+            log_period = 50
         else:
             verbose = True
-            verbose_eval = 1
+            log_period = 1
 
         self._assert_memory_safe(X=X, y=y)
         X = self.preprocess(X, is_train=True, max_category_levels=max_category_levels)
@@ -100,7 +100,7 @@ class XGBoostModel(AbstractModel):
 
         if X_val is None:
             early_stopping_rounds = None
-            eval_set.append((X, y))  # TODO: if the train dataset is large, use sample of train dataset for validation
+            eval_set = None
         else:
             X_val = self.preprocess(X_val, is_train=False)
             eval_set.append((X_val, y_val))
@@ -112,18 +112,23 @@ class XGBoostModel(AbstractModel):
             params['tree_method'] = 'gpu_hist'
             if 'gpu_id' not in params:
                 params['gpu_id'] = 0
+        elif 'tree_method' not in params:
+            params['tree_method'] = 'hist'
 
         try_import_xgboost()
         from .callbacks import EarlyStoppingCustom
         from xgboost.callback import EvaluationMonitor
         callbacks = []
-        if verbose_eval is not None:
-            callbacks.append(EvaluationMonitor(period=verbose_eval))
-        # TODO: disable early stopping during refit_full
-        callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
+        if eval_set is not None:
+            if log_period is not None:
+                callbacks.append(EvaluationMonitor(period=log_period))
+            callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
 
         from xgboost import XGBClassifier, XGBRegressor
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
+        if 'eval_metric' not in params and params.get('objective') == 'binary:logistic':
+            # avoid unnecessary warning from XGBoost v1.3.0
+            params['eval_metric'] = 'logloss'
         self.model = model_type(**params)
         self.model.fit(
             X=X,
@@ -140,15 +145,14 @@ class XGBoostModel(AbstractModel):
         # bst.set_param({"predictor": "gpu_predictor"})
 
         self.params_trained['n_estimators'] = bst.best_ntree_limit
-        self._best_ntree_limit = bst.best_ntree_limit
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
 
         if self.problem_type == REGRESSION:
-            return self.model.predict(X, ntree_limit=self._best_ntree_limit)
+            return self.model.predict(X)
 
-        y_pred_proba = self.model.predict_proba(X, ntree_limit=self._best_ntree_limit)
+        y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
     def _get_early_stopping_rounds(self, num_rows_train, strategy='auto'):

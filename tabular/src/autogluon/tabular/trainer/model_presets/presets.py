@@ -3,12 +3,11 @@ import inspect
 import logging
 from collections import defaultdict
 
-from autogluon.core.metrics import mean_squared_error
 from autogluon.core.constants import AG_ARGS, AG_ARGS_FIT, AG_ARGS_ENSEMBLE, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.models import AbstractModel, GreedyWeightedEnsembleModel, StackerEnsembleModel, SimpleWeightedEnsembleModel
+from autogluon.core.trainer.utils import process_hyperparameters
 
 from .presets_custom import get_preset_custom
-from ..utils import process_hyperparameters
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
@@ -123,7 +122,7 @@ VALID_AG_ARGS_KEYS = {
 # DONE: Add banned_model_types arg
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
-def get_preset_models(path, problem_type, eval_metric, hyperparameters, quantile_levels=None,
+def get_preset_models(path, problem_type, eval_metric, hyperparameters,
                       level: int = 1, ensemble_type=StackerEnsembleModel, ensemble_kwargs: dict = None, ag_args_fit=None, ag_args=None, ag_args_ensemble=None,
                       name_suffix: str = None, default_priorities=None, invalid_model_names: list = None, excluded_model_types: list = None,
                       hyperparameter_preprocess_func=None, hyperparameter_preprocess_kwargs=None, silent=True):
@@ -201,7 +200,6 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, quantile
     model_args_fit = {}
     for model_cfg in model_cfg_priority_list:
         model = model_factory(model_cfg, path=path, problem_type=problem_type, eval_metric=eval_metric,
-                              quantile_levels=quantile_levels,
                               name_suffix=name_suffix, ensemble_type=ensemble_type, ensemble_kwargs=ensemble_kwargs,
                               invalid_name_set=invalid_name_set, level=level)
         invalid_name_set.add(model.name)
@@ -281,7 +279,7 @@ def is_model_cfg_valid(model_cfg, level=1, problem_type=None):
 
 
 def model_factory(
-        model, path, problem_type, eval_metric, quantile_levels=None,
+        model, path, problem_type, eval_metric,
         name_suffix=None, ensemble_type=StackerEnsembleModel, ensemble_kwargs=None,
         invalid_name_set=None, level=1,
 ):
@@ -317,7 +315,7 @@ def model_factory(
     model_params.pop(AG_ARGS, None)
     model_params.pop(AG_ARGS_ENSEMBLE, None)
     model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric,
-                            quantile_levels=quantile_levels, hyperparameters=model_params)
+                            hyperparameters=model_params)
 
     if ensemble_kwargs is not None:
         ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
@@ -327,7 +325,7 @@ def model_factory(
             ensemble_kwargs_model['hyperparameters'] = {}
         ensemble_kwargs_model['hyperparameters'].update(extra_ensemble_hyperparameters)
         model_init = ensemble_type(path=path, name=name_stacker, model_base=model_init,
-                                   quantile_levels=quantile_levels, **ensemble_kwargs_model)
+                                   **ensemble_kwargs_model)
 
     return model_init
 

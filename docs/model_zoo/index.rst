@@ -1,5 +1,5 @@
-autogluon.model_zoo
-===================
+autogluon.extra.model_zoo
+=========================
 
 Here we provide pretrained Models discovered via Neural Architecture Search
 
@@ -11,9 +11,8 @@ Example showing how to load pretrained network 'efficientnet_b0', which was prod
 
 .. code-block:: python
 
-   import autogluon.core as ag
-   model = ag.model_zoo.get_model('efficientnet_b0', pretrained=True)
-
+   from autogluon.extra import model_zoo
+   model = model_zoo.get_model('efficientnet_b0', pretrained=True)
 
 EfficientNet
 ------------
@@ -43,29 +42,3 @@ The accuracy achieved by each model on a popular image classification benchmark 
 +---------------------------+--------+-----------+
 | EfficientNet_B7           | 83.86  | 600       |
 +---------------------------+--------+-----------+
-
-
-How to reproduce EfficientNet's neural architecture search
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   import math
-   import autogluon.core as ag
-   from autogluon.vision import ImagePredictor as Task
-
-   @ag.obj(
-       width_coefficient=ag.space.Categorical(1.1, 1.2),
-       depth_coefficient=ag.space.Categorical(1.1, 1.2),
-   )
-   class EfficientNetB1(ag.model_zoo.EfficientNet):
-       def __init__(self, width_coefficient, depth_coefficient):
-           input_factor = 2.0 / width_coefficient / depth_coefficient
-           input_size = math.ceil((224 * input_factor) / 32) * 32
-           super().__init__(width_coefficient=width_coefficient,
-                            depth_coefficient=depth_coefficient,
-                            input_size=input_size)
-
-   task = Task()
-   task.fit('imagenet', search_strategy='grid',
-            hyperparameters={'net': EfficientNetB1(), 'optimizer':ag.optimizer.SGD(learning_rate=1e-1, momentum=0.9, wd=1e-4)})

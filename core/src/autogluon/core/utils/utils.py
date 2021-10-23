@@ -7,7 +7,7 @@ import pickle
 import time
 import random
 import sys
-from typing import Callable
+from typing import Callable, List
 from datetime import datetime
 from functools import wraps
 
@@ -16,7 +16,7 @@ import pandas as pd
 import psutil
 import scipy.stats
 from pandas import DataFrame, Series
-from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
+from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
 
 from .miscs import warning_filter
@@ -32,7 +32,23 @@ def get_cpu_count():
     return multiprocessing.cpu_count()
 
 
+def get_gpu_count_all():
+    """
+    Attempts to get number of GPUs available for use via multiple means.
+    """
+    # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
+    # FIXME: get_gpu_count by itself doesn't always work for Windows
+    num_gpus = get_gpu_count()
+    if num_gpus == 0:
+        num_gpus = get_gpu_count_mxnet()
+        if num_gpus == 0:
+            num_gpus = get_gpu_count_torch()
+    return num_gpus
+
+
 def get_gpu_count():
+    # FIXME: Sometimes doesn't detect GPU on Windows
+    # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
     from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
     if not cudaInit(): return 0
     gpu_count = cudaDeviceGetCount()
@@ -40,40 +56,84 @@ def get_gpu_count():
     return gpu_count
 
 
-def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_repeats=1):
-    # TODO: Add GroupKFold
-    if stratified and (y is not None):
-        if n_repeats > 1:
-            kf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
-        else:
-            kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+def get_gpu_count_mxnet():
+    try:
+        import mxnet
+        num_gpus = mxnet.context.num_gpus()
+    except Exception:
+        num_gpus = 0
+    return num_gpus
 
-        kf.get_n_splits(X, y)
-        # FIXME: There is a bug in sklearn that causes an incorrect ValueError if performing stratification and all classes have fewer than n_splits samples.
-        #  This is hacked by adding a dummy class with n_splits samples, performing the kfold split, then removing the dummy samples from all resulting indices.
-        #  This is very inefficient and complicated and ideally should be fixed in sklearn.
-        with warning_filter():
-            try:
-                out = [[train_index, test_index] for train_index, test_index in kf.split(X, y)]
-            except:
-                y_dummy = pd.concat([y, pd.Series([-1] * n_splits)], ignore_index=True)
-                X_dummy = pd.concat([X, X.head(n_splits)], ignore_index=True)
-                invalid_index = set(list(y_dummy.tail(n_splits).index))
-                out = [[train_index, test_index] for train_index, test_index in kf.split(X_dummy, y_dummy)]
-                len_out = len(out)
-                for i in range(len_out):
-                    train_index, test_index = out[i]
-                    out[i][0] = [index for index in train_index if index not in invalid_index]
-                    out[i][1] = [index for index in test_index if index not in invalid_index]
-        return out
-    else:
-        if n_repeats > 1:
-            kf = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
-        else:
-            kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
 
-        kf.get_n_splits(X)
-        return [[train_index, test_index] for train_index, test_index in kf.split(X)]
+def get_gpu_count_torch():
+    try:
+        import torch
+        num_gpus = torch.cuda.device_count()
+    except Exception:
+        num_gpus = 0
+    return num_gpus
+
+
+class CVSplitter:
+    def __init__(self,
+                 splitter_cls=None,
+                 n_splits=5,
+                 n_repeats=1,
+                 random_state=0,
+                 stratified=False,
+                 groups=None):
+        self.n_splits = n_splits
+        self.n_repeats = n_repeats
+        self.random_state = random_state
+        self.stratified = stratified
+        self.groups = groups
+        if splitter_cls is None:
+            splitter_cls = self._get_splitter_cls()
+        self._splitter = self._get_splitter(splitter_cls)
+
+    def _get_splitter_cls(self):
+        if self.groups is not None:
+            num_groups = len(self.groups.unique())
+            if self.n_repeats != 1:
+                raise AssertionError(f'n_repeats must be 1 when split groups are specified. (n_repeats={self.n_repeats})')
+            self.n_splits = num_groups
+            splitter_cls = LeaveOneGroupOut
+            # pass
+        elif self.stratified:
+            splitter_cls = RepeatedStratifiedKFold
+        else:
+            splitter_cls = RepeatedKFold
+        return splitter_cls
+
+    def _get_splitter(self, splitter_cls):
+        if splitter_cls == LeaveOneGroupOut:
+            return splitter_cls()
+        elif splitter_cls in [RepeatedKFold, RepeatedStratifiedKFold]:
+            return splitter_cls(n_splits=self.n_splits, n_repeats=self.n_repeats, random_state=self.random_state)
+        else:
+            raise AssertionError(f'{splitter_cls} is not supported as a valid `splitter_cls` input to CVSplitter.')
+
+    def split(self, X, y):
+        if isinstance(self._splitter, RepeatedStratifiedKFold):
+            # FIXME: There is a bug in sklearn that causes an incorrect ValueError if performing stratification and all classes have fewer than n_splits samples.
+            #  This is hacked by adding a dummy class with n_splits samples, performing the kfold split, then removing the dummy samples from all resulting indices.
+            #  This is very inefficient and complicated and ideally should be fixed in sklearn.
+            with warning_filter():
+                try:
+                    out = [[train_index, test_index] for train_index, test_index in self._splitter.split(X, y)]
+                except:
+                    y_dummy = pd.concat([y, pd.Series([-1] * self.n_splits)], ignore_index=True)
+                    X_dummy = pd.concat([X, X.head(self.n_splits)], ignore_index=True)
+                    invalid_index = set(list(y_dummy.tail(self.n_splits).index))
+                    out = [[train_index, test_index] for train_index, test_index in self._splitter.split(X_dummy, y_dummy)]
+                    len_out = len(out)
+                    for i in range(len_out):
+                        train_index, test_index = out[i]
+                        out[i][0] = [index for index in train_index if index not in invalid_index]
+                        out[i][1] = [index for index in test_index if index not in invalid_index]
+            return out
+        else:
+            return [[train_index, test_index] for train_index, test_index in self._splitter.split(X, y, groups=self.groups)]
 
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
@@ -375,6 +435,8 @@ def generate_train_test_split(X: DataFrame,
             X_train = pd.concat([X_train, X_test_moved])
             y_test = y_test.drop(index=indices_to_move)
             X_test = X_test.drop(index=indices_to_move)
+        y_train.name = y_split.name
+        y_test.name = y_split.name
     return X_train, X_test, y_train, y_test
 
 
@@ -533,7 +595,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
                                            time_limit: float = None,
                                            silent=False,
                                            log_prefix='',
-                                           importance_as_list=False) -> pd.DataFrame:
+                                           importance_as_list=False,
+                                           random_state=0) -> pd.DataFrame:
     """
     Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
     A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -603,6 +666,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
         Prefix to add to logging statements.
     importance_as_list : bool, default False
         Whether to return the 'importance' column values as a list of the importance from each shuffle (True) or a single averaged value (False).
+    random_state : int, default 0
+        Acts as a seed for data subsampling and permuting feature values.
 
     Returns
     -------
@@ -653,13 +718,15 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
     feature_batch_count = None
     X_raw = None
     score_baseline = None
+    initial_random_state = random_state
     # TODO: Can speedup shuffle_repeats by incorporating into X_raw (do multiple repeats in a single predict call)
     for shuffle_repeat in range(num_shuffle_sets):
         fi = dict()
+        random_state = initial_random_state + shuffle_repeat
 
         if subsample:
             # TODO: Stratify? We currently don't know in this function the problem_type (could pass as additional arg).
-            X = X_orig.sample(subsample_size, random_state=shuffle_repeat)
+            X = X_orig.sample(subsample_size, random_state=random_state)
             y = y_orig.loc[X.index]
 
         if subsample or shuffle_repeat == 0:
@@ -684,7 +751,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
 
         row_count = len(X)
 
-        X_shuffled = shuffle_df_rows(X=X, seed=shuffle_repeat)
+        X_shuffled = shuffle_df_rows(X=X, seed=random_state)
 
         for i in range(0, num_features, feature_batch_count):
             parallel_computed_features = features[i:i + feature_batch_count]
@@ -889,3 +956,13 @@ def get_gpu_free_memory():
     except:
         memory_free_values = []
     return memory_free_values
+
+
+def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:
+    importance_df = pd.DataFrame({
+        'importance': None,
+        'stddev': None,
+        'p_value': None,
+        'n': 0
+    }, index=features)
+    return importance_df

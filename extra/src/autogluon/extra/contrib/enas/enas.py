@@ -4,11 +4,9 @@ import mxnet as mx
 from mxnet import gluon
 from autogluon.core.space import Categorical, Space, _strip_config_space
 
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
-
 __all__ = ['enas_unit', 'enas_net',
            'Zero_Unit', 'ENAS_Unit', 'ENAS_Sequential']
+
 
 def enas_unit(**kwvars):
     def registered_class(Cls):

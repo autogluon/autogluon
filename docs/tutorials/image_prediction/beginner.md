@@ -87,8 +87,8 @@ You can evaluate the classifier on a test dataset rather than retrieving the pre
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-test_acc, _ = predictor.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
+test_acc = predictor.evaluate(test_dataset)
+print('Top-1 test acc: %.3f' % test_acc['top1'])
 ```
 
 ## Save and load classifiers

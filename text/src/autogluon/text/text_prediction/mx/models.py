@@ -1,3 +1,5 @@
+import ast
+
 import numpy as np
 import scipy.special
 import os
@@ -10,7 +12,11 @@ import json
 import pickle
 import functools
 import tqdm
+import shutil
+import uuid
 from typing import Tuple
+from packaging import version as py_version
+
 
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
@@ -21,14 +27,13 @@ from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
 from autogluon_contrib_nlp.models import get_backbone
 from autogluon_contrib_nlp.lr_scheduler import InverseSquareRootScheduler
-from autogluon_contrib_nlp.utils.config import CfgNode
 from autogluon_contrib_nlp.utils.misc import grouper, \
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 
 from autogluon.core import args, space
 from autogluon.core.utils import in_ipynb, verbosity2loglevel
-from autogluon.core.utils.utils import get_cpu_count, get_gpu_count
+from autogluon.core.utils.utils import get_cpu_count, get_gpu_count_mxnet
 from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
 from autogluon.core.task.base.base_task import schedulers
@@ -44,6 +49,7 @@ from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
     MultiModalTextBatchify, get_stats_string, auto_shrink_max_length, get_cls_sep_id
 from .utils import average_checkpoints, set_seed
 from .. import constants as _C
+from ..config import CfgNode
 from ..utils import logging_config
 from ..presets import ag_text_presets
 from ... import version
@@ -268,9 +274,6 @@ def _classification_regression_predict(net, dataloader, problem_type, label_scal
     predictions
         The predictions
     """
-    import warnings
-    # Filter mxnet warnings
-    warnings.filterwarnings('ignore', module='mxnet')
 
     predictions = [[] for _ in range(num_repeat)]
     use_logits = num_repeat > 1 and (problem_type == MULTICLASS or problem_type == BINARY)\
@@ -332,8 +335,9 @@ def calculate_metric(scorer, ground_truth, predictions, problem_type):
 def train_function(args, reporter, train_df_path, tuning_df_path,
                    time_limit, time_start, base_config,
                    problem_type, column_types,
-                   feature_columns, label_column,
+                   feature_columns, label_column, output_directory,
                    log_metrics, eval_metric, ngpus_per_trial,
+                   params_path, preprocessor_path, continue_training,
                    console_log, seed=None, verbosity=2):
     """
 
@@ -362,12 +366,20 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         The feature columns
     label_column
         Label column
+    output_directory
+        The output directory
     log_metrics
         Metrics for logging
     eval_metric
         The stopping metric
     ngpus_per_trial
         The number of GPUs to use per each trial
+    params_path
+        The parameter path of the network
+    preprocessor_path
+        The path to store the preprocessor
+    continue_training
+        Whether we are loading a model and continue training it on a new dataset
     console_log
         Whether to log it to console
     seed
@@ -376,9 +388,6 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         The verbosity
 
     """
-    import warnings
-    warnings.filterwarnings('ignore', module='mxnet')
-    warnings.filterwarnings('ignore', module='sklearn')
     set_seed(seed)
     is_fake_reporter = isinstance(reporter, FakeReporter)
     if time_limit is not None:
@@ -409,8 +418,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         specified_values.append(key)
         specified_values.append(search_space[key])
     cfg.merge_from_list(specified_values)
-    exp_dir = cfg.misc.exp_dir
-    exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
+    exp_dir = os.path.join(output_directory, 'task{}'.format(task_id))
     os.makedirs(exp_dir, exist_ok=True)
     cfg.defrost()
     cfg.misc.exp_dir = exp_dir
@@ -423,27 +431,37 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     logger.log(10, cfg)
 
     # Load backbone model
-    backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-        = get_backbone(cfg.model.backbone.name)
     if 'roberta' in cfg.model.backbone.name:
+        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+            = get_backbone(cfg.model.backbone.name)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
     else:
+        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+            = get_backbone(cfg.model.backbone.name, load_backbone=not continue_training)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+
     # Build Preprocessor + Preprocess the training dataset + Inference problem type
     # TODO Dynamically cache the preprocessor that has been fitted.
-    if problem_type == MULTICLASS or problem_type == BINARY:
-        label_generator = LabelEncoder()
-        label_generator.fit(pd.concat([train_data[label_column], tuning_data[label_column]]))
-    else:
-        label_generator = None
-    preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
-                                                  label_column=label_column,
-                                                  tokenizer_name=cfg.model.backbone.name,
-                                                  label_generator=label_generator,
-                                                  cfg=cfg.preprocessing)
-    logger.info('Fitting and transforming the train data...')
-    train_dataset = preprocessor.fit_transform(train_data[feature_columns],
+    if continue_training:
+        with open(preprocessor_path, 'rb') as in_f:
+            preprocessor = pickle.load(in_f)
+        train_dataset = preprocessor.transform(train_data[feature_columns],
                                                train_data[label_column])
+        label_generator = preprocessor._label_generator
+    else:
+        if problem_type == MULTICLASS or problem_type == BINARY:
+            label_generator = LabelEncoder()
+            label_generator.fit(pd.concat([train_data[label_column], tuning_data[label_column]]))
+        else:
+            label_generator = None
+        preprocessor = MultiModalTextFeatureProcessor(column_types=column_types,
+                                                      label_column=label_column,
+                                                      tokenizer_name=cfg.model.backbone.name,
+                                                      label_generator=label_generator,
+                                                      cfg=cfg.preprocessing)
+        logger.info('Fitting and transforming the train data...')
+        train_dataset = preprocessor.fit_transform(train_data[feature_columns],
+                                                   train_data[label_column])
     with open(os.path.join(exp_dir, 'preprocessor.pkl'), 'wb') as of:
         pickle.dump(preprocessor, of)
     logger.info(f'Done! Preprocessor saved to {os.path.join(exp_dir, "preprocessor.pkl")}')
@@ -474,7 +492,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.model.inference_num_repeat = inference_num_repeat
     cfg.freeze()
     with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
-        f.write(str(cfg))
+        f.write(cfg.dump())
     logger.info(f'Max length for chunking text: {max_length}, '
                 f'Stochastic chunk: Train-{train_stochastic_chunk}/Test-{test_stochastic_chunk}, '
                 f'Test #repeat: {inference_num_repeat}.')
@@ -535,7 +553,10 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         get_embedding=False,
         cfg=cfg.model.network,
         out_shape=out_shape)
-    net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
+    if continue_training:
+        net.load_parameters(params_path, ctx=ctx_l)
+    else:
+        net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
     logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
@@ -772,20 +793,50 @@ def get_recommended_resource(nthreads_per_trial=None,
         ngpus_per_trial = 1
     elif nthreads_per_trial is None and ngpus_per_trial is not None:
         if ngpus_per_trial != 0:
-            num_parallel_jobs = get_gpu_count() // ngpus_per_trial
+            num_parallel_jobs = get_gpu_count_mxnet() // ngpus_per_trial
             nthreads_per_trial = max(get_cpu_count() // num_parallel_jobs, 1)
         else:
             nthreads_per_trial = get_cpu_count()
     nthreads_per_trial = min(nthreads_per_trial, get_cpu_count())
-    ngpus_per_trial = min(ngpus_per_trial, get_gpu_count())
+    ngpus_per_trial = min(ngpus_per_trial, get_gpu_count_mxnet())
     assert nthreads_per_trial > 0 and ngpus_per_trial >= 0,\
         'Invalid number of threads and number of GPUs.'
     return nthreads_per_trial, ngpus_per_trial
 
 
+def update_legacy_cfg(cfg, version_id):
+    """
+
+    Parameters
+    ----------
+    cfg
+        The configuration
+    version_id
+        The version ID
+
+    Returns
+    -------
+    new_cfg
+        The fixed configuration
+    """
+    if py_version.parse(version_id) >= py_version.parse('0.4.0'):
+        return cfg
+    else:
+        new_cfg = cfg.clone()
+        new_cfg.defrost()
+        if len(cfg.optimization.optimizer_params) > 0:
+            if isinstance(cfg.optimization.optimizer_params[0], str):
+                fixed_optimizer_params = ast.literal_eval('[' + ', '.join(cfg.optimization.optimizer_params) + ']')
+                new_cfg.optimization.optimizer_params = fixed_optimizer_params
+        new_cfg.freeze()
+        return new_cfg
+
+
 @use_np
 class MultiModalTextModel:
     """Learner of the multimodal text data.
+
+    This class implements a single neural network model that can operate on data with multiple text columns as well as tabular numeric/categorical columns.
 
     It will be called if the user call `fit()` in TextPredictor.
 
@@ -805,7 +856,7 @@ class MultiModalTextModel:
         Parameters
         ----------
         column_types
-            The column types.
+            The column types. It will be a dictionary of column_name --> column_type
         feature_columns
             Name of the feature columns
         label_columns
@@ -843,6 +894,10 @@ class MultiModalTextModel:
         self._config = None
         self._results = None
         self._preprocessor = None
+
+    @property
+    def column_types(self):
+        return self._column_types
 
     @property
     def results(self):
@@ -899,6 +954,7 @@ class MultiModalTextModel:
               time_limit=None,
               tune_kwargs=None,
               search_space=None,
+              continue_training=False,
               plot_results=False,
               console_log=True,
               seed=None,
@@ -922,6 +978,8 @@ class MultiModalTextModel:
             algorithm, scheduling backend, HPO algorithm.
         search_space
             The search space options
+        continue_training
+            Whether we are loading a new model from scratch or we are continune model training
         plot_results
             Whether to plot results or not
         console_log
@@ -973,6 +1031,7 @@ class MultiModalTextModel:
                 plot_results = True
             else:
                 plot_results = False
+
         scheduler_options = compile_scheduler_options_v2(
             scheduler_options=scheduler_options,
             scheduler=tune_kwargs['search_strategy'],
@@ -988,15 +1047,27 @@ class MultiModalTextModel:
             time_attr='report_idx',
             reward_attr='reward_attr',
             dist_ip_addrs=scheduler_options.get('dist_ip_addrs'))
+
         # Create a temporary cache file. The internal train function will load the
         # temporary cache.
-        os.makedirs(os.path.join(self._output_directory, 'data_cache'), exist_ok=True)
-        train_df_path = os.path.join(self._output_directory, 'data_cache',
-                                     'cache_train_dataframe.pd.pkl')
-        tuning_df_path = os.path.join(self._output_directory,  'data_cache',
-                                      'cache_tuning_dataframe.pd.pkl')
+        # In fact, we may generalize this functionality to create the cache in S3/FSx.
+        cache_path = os.path.join(self._output_directory, f'cache_{uuid.uuid4()}')
+        os.makedirs(cache_path)
+        train_df_path = os.path.join(cache_path, 'cache_train_dataframe.pd.pkl')
+        tuning_df_path = os.path.join(cache_path, 'cache_tuning_dataframe.pd.pkl')
         train_data.to_pickle(train_df_path)
         tuning_data.to_pickle(tuning_df_path)
+        if continue_training:
+            # We need to store the current weights to the local disk as temporary cache.
+            params_path = os.path.join(cache_path, 'old_net.params')
+            preprocessor_path = os.path.join(cache_path, 'preprocessor.pkl')
+            with open(preprocessor_path, 'wb') as of:
+                pickle.dump(self.preprocessor, of)
+            self.net.save_parameters(params_path)
+        else:
+            params_path = None
+            preprocessor_path = None
+
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_df_path=train_df_path,
                                                       time_limit=time_limit,
@@ -1009,7 +1080,11 @@ class MultiModalTextModel:
                                                       label_column=self._label_columns[0],
                                                       log_metrics=self._log_metrics,
                                                       eval_metric=self._eval_metric,
+                                                      output_directory=self._output_directory,
                                                       ngpus_per_trial=scheduler_options['resource']['num_gpus'],
+                                                      params_path=params_path,
+                                                      preprocessor_path=preprocessor_path,
+                                                      continue_training=continue_training,
                                                       console_log=console_log,
                                                       verbosity=verbosity))
         no_job_finished_err_msg =\
@@ -1025,12 +1100,11 @@ class MultiModalTextModel:
             train_fn(train_fn.args['search_space'],
                      train_fn.args['_default_config'])
             best_model_saved_dir_path = os.path.join(self._output_directory, 'task0')
-            cfg_path = os.path.join(self._output_directory, 'task0', 'cfg.yml')
+            cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
 
             # Check whether the job has finished
             if not os.path.exists(cfg_path)\
-                    or not os.path.exists(os.path.join(self._output_directory,
-                                                       'task0', 'best_model.params')):
+                    or not os.path.exists(os.path.join(best_model_saved_dir_path, 'best_model.params')):
                 raise RuntimeError(no_job_finished_err_msg)
             cfg = self.base_config.clone_merge(cfg_path)
             local_results = pd.read_json(os.path.join(self._output_directory, 'task0',
@@ -1085,7 +1159,6 @@ class MultiModalTextModel:
         # Consider to move this to a separate predictor
         self._config = cfg
         # Average parameters
-        # TODO(sxjscience) Clean up the temporary spaces used to store the intermediate checkpoints.
         if cfg.model.use_avg_nbest:
             nbest_path_l = []
             for best_id in range(cfg.optimization.nbest):
@@ -1094,6 +1167,7 @@ class MultiModalTextModel:
                     nbest_path_l.append(nbest_path)
             avg_nbest_path = os.path.join(best_model_saved_dir_path, 'nbest_model_avg.params')
             average_checkpoints(nbest_path_l, avg_nbest_path)
+
         with open(os.path.join(best_model_saved_dir_path, 'preprocessor.pkl'), 'rb') as in_f:
             self._preprocessor = pickle.load(in_f)
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
@@ -1130,6 +1204,14 @@ class MultiModalTextModel:
                                 ctx=mx.cpu())
         self._net = net
         mx.npx.waitall()
+
+        # Clean cache, will directly raise
+        shutil.rmtree(cache_path)
+        # Clean up the temporary workspace that stores the configuration/weights of the best model
+        try:
+            shutil.rmtree(best_model_saved_dir_path)
+        except OSError as e:
+            logger.info(f'Failed to remove the temporary best model directory: "{best_model_saved_dir_path}".')
 
     def evaluate(self, data, metrics=None, stochastic_chunk=None, num_repeat=None):
         """ Report the predictive performance evaluated for a given dataset.
@@ -1391,10 +1473,17 @@ class MultiModalTextModel:
         log_metrics = assets['log_metrics']
         problem_type = assets['problem_type']
         column_types = assets['column_types']
-        # TODO(sxjscience) Post 0.1. In general, we will need to support compatible version check
-        version = assets['version']
-        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(cfg.model.backbone.name, load_backbone=False)
+        version_id = assets['version']
+
+        # Handle the legacy cfg
+        cfg = update_legacy_cfg(cfg, version_id)
+
+        if 'roberta' in cfg.model.backbone.name:
+            backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+                = get_backbone(cfg.model.backbone.name)
+        else:
+            backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+                = get_backbone(cfg.model.backbone.name, load_backbone=False)
         if 'roberta' in cfg.model.backbone.name:
             text_backbone = backbone_model_cls.from_cfg(backbone_cfg, return_all_hiddens=True)
         else:

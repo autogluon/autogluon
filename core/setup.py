@@ -26,7 +26,7 @@ install_requires = [
     'graphviz',
 
     'cython',  # TODO: Do we need cython here? Why is cython not version capped / minned?
-    'ConfigSpace==0.4.18',
+    'ConfigSpace==0.4.19',
     'tornado>=5.0.1',
     'requests',
     'matplotlib',
@@ -35,7 +35,7 @@ install_requires = [
     'distributed>=2.6.0',
     'boto3',
     'autograd>=1.3',
-    'dill==0.3.3',  # TODO v0.1: Loosen version restriction?
+    'dill>=0.3.3,<1.0',
 ]
 
 extras_require = {

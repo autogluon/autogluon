@@ -81,6 +81,18 @@ def test_predictor_fit(key):
     dev_score = predictor.evaluate(dev_data)
     verify_predictor_save_load(predictor, dev_data, verify_proba=verify_proba)
 
+    # Test for continuous fit
+    predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                  time_limit=30, seed=123)
+    verify_predictor_save_load(predictor, dev_data, verify_proba=verify_proba)
+
+    # Saving to folder, loading the saved model and call fit again (continuous fit)
+    with tempfile.TemporaryDirectory() as root:
+        predictor.save(root)
+        predictor = TextPredictor.load(root)
+        predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                      time_limit=30, seed=123)
+
 
 @pytest.mark.parametrize('set_env_train_without_gpu', [None, False, True])
 def test_cpu_only_raise(set_env_train_without_gpu):

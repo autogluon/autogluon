@@ -1,7 +1,7 @@
 # Predicting Columns in a Table - In Depth
 :label:`sec_tabularadvanced`
 
-**Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API.
+**Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API. To learn how to add your own custom models to the set that AutoGluon trains, tunes, and ensembles, review :ref:`sec_tabularcustommodel`.
 
 This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune_kwargs`, `hyperparameters`, `num_stack_levels`, `num_bag_folds`, `num_bag_sets`, etc.
 
@@ -127,6 +127,12 @@ predictor = TabularPredictor.load(save_path)  # `predictor.path` is another way 
 ```
 
 Above `save_path` is the same folder previously passed to `TabularPredictor`, in which all the trained models have been saved. You can train easily models on one machine and deploy them on another. Simply copy the `save_path` folder to the new machine and specify its new path in `TabularPredictor.load()`.
+
+To find out the required feature columns to make predictions, call `predictor.features()`:
+
+```{.python .input}
+predictor.features()
+```
 
 We can make a prediction on an individual example rather than a full dataset:
 

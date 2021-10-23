@@ -85,7 +85,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         models_remain = []
         for key in model_type_groups:
             models_remain += sorted(model_type_groups[key], key=lambda x: x[1], reverse=True)[:max_base_models_per_type]
-        models_valid = [model for model, score in models_remain]
+        models_valid_set = set([model for model, score in models_remain])
+        # Important: Ensure ordering of `models_valid` is the same as `models`
+        models_valid = [model for model in models if model in models_valid_set]
         return models_valid
 
     def limit_models(self, models, model_scores, max_base_models):
@@ -176,14 +178,16 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         preprocess_kwargs = {'compute_base_preds': compute_base_preds}
         return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
 
-    def _get_init_args(self):
+    def get_params(self):
         init_args = dict(
             base_model_names=self.base_model_names,
             base_models_dict=self.base_models_dict,
             base_model_paths_dict=self.base_model_paths_dict,
             base_model_types_dict=self.base_model_types_dict,
+            base_model_performances_dict=self._base_model_performances_dict,
+            base_model_types_inner_dict=self._base_model_types_inner_dict,
         )
-        init_args.update(super()._get_init_args())
+        init_args.update(super().get_params())
         return init_args
 
     def load_base_model(self, model_name):
@@ -216,5 +220,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             else:
                 # FIXME: This is a hack, stack feature special types should be already present in feature_metadata, not added here
                 existing_stack_features = self.feature_metadata.get_features(required_special_types=[S_STACK])
+                # HACK: Currently AutoGluon auto-adds all base learner prediction features into self.feature_metadata.
+                # The two lines below are here because if feature pruning would crash if it prunes a base learner prediction feature.
+                existing_features = self.feature_metadata.get_features()
+                stacker_feature_metadata = stacker_feature_metadata.keep_features([feature for feature in existing_features if feature in type_map_raw])
                 if set(stacker_feature_metadata.get_features()) != set(existing_stack_features):
                     self.feature_metadata = self.feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())

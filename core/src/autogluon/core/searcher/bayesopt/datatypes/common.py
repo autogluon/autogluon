@@ -1,6 +1,7 @@
-from typing import Union, Tuple, NamedTuple, Dict
+from typing import Union, Tuple, Dict
 import numpy as np
 import ConfigSpace as CS
+from dataclasses import dataclass
 
 
 
@@ -18,7 +19,8 @@ def candidate_for_print(candidate: Candidate):
         return candidate
 
 
-class StateIdAndCandidate(NamedTuple):
+@dataclass
+class StateIdAndCandidate:
     """
     Just used in utils/test_objects.py, could probably be removed
     """
@@ -26,7 +28,8 @@ class StateIdAndCandidate(NamedTuple):
     candidate: Candidate
 
 
-class CandidateEvaluation(NamedTuple):
+@dataclass
+class CandidateEvaluation:
     candidate: Candidate
     metrics: Dict[str, float]
 

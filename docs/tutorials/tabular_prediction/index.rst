@@ -25,6 +25,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       Using AutoGluon for Kaggle competitions with tabular data.
 
    .. card::
+      :title: Data Tables Containing Image, Text, and Tabular
+      :link: tabular-multimodal.html
+
+      Modeling data tables with image, text, numeric, and categorical features.
+
+   .. card::
       :title: Data Tables Containing Text
       :link: tabular-multimodal-text-others.html
 
@@ -36,6 +42,17 @@ For standard datasets that are represented as tables (stored as CSV file, parque
 
       How to predict multiple columns in a data table.
 
+   .. card::
+      :title: Adding a Custom Model
+      :link: tabular-custom-model.html
+
+      How to add a custom model to AutoGluon.
+
+   .. card::
+      :title: Adding a Custom Metric
+      :link: tabular-custom-metric.html
+
+      How to add a custom metric to AutoGluon.
 
    .. card::
       :title: FAQ
@@ -50,6 +67,9 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-quickstart
    tabular-indepth
    tabular-kaggle
+   tabular-multimodal
    tabular-multimodal-text-others
    tabular-multilabel
+   tabular-custom-model
+   tabular-custom-metric
    tabular-faq

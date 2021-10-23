@@ -4,19 +4,23 @@ import logging
 import os
 import pickle
 import warnings
+from autogluon.core.space import Categorical
 
 import numpy as np
 import pandas as pd
 from gluoncv.auto.tasks import ImagePrediction as _ImageClassification
-from gluoncv.model_zoo import get_model_list
+try:
+    import timm
+except ImportError:
+    timm = None
 
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
-from autogluon.core.utils import verbosity2loglevel, get_gpu_count
+from autogluon.core.utils import verbosity2loglevel, get_gpu_count_all
 from autogluon.core.utils.utils import generate_train_test_split
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
-from ..utils import MXNetErrorCatcher, sanitize_batch_size
+from ..utils import sanitize_batch_size
 
 __all__ = ['ImagePredictor']
 
@@ -118,7 +122,7 @@ class ImagePredictor(object):
                 # Recommended for applications that benefit from the best possible model accuracy.
                 best_quality={
                     'hyperparameters': {
-                        'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
+                        'model': Categorical('coat_lite_small', 'twins_pcpvt_base', 'swin_base_patch4_window7_224'),
                         'lr': Real(1e-5, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
                         'epochs': 200,
@@ -135,7 +139,7 @@ class ImagePredictor(object):
                 # Recommended for applications that require reasonable inference speed and/or model size.
                 good_quality_fast_inference={
                     'hyperparameters': {
-                        'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
+                        'model': Categorical('resnet50d', 'efficientnet_b1', 'mobilenetv3_large_100'),
                         'lr': Real(1e-4, 1e-2, log=True),
                         'batch_size': Categorical(8, 16, 32, 64, 128),
                         'epochs': 150,
@@ -149,10 +153,9 @@ class ImagePredictor(object):
                 },
 
                 # Medium predictive accuracy with very fast inference and very fast training time.
-                # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
                 medium_quality_faster_train={
                     'hyperparameters': {
-                        'model': 'resnet50_v1b',
+                        'model': 'resnet50d',
                         'lr': 0.01,
                         'batch_size': 64,
                         'epochs': 50,
@@ -165,7 +168,7 @@ class ImagePredictor(object):
                 # Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
                 medium_quality_faster_inference={
                     'hyperparameters': {
-                        'model': Categorical('resnet18_v1b', 'mobilenetv3_small'),
+                        'model': Categorical('resnet18', 'mobilenetv3_small_100', 'resnet18_v1b'),
                         'lr': Categorical(0.01, 0.005, 0.001),
                         'batch_size': Categorical(64, 128),
                         'epochs': Categorical(50, 100),
@@ -220,7 +223,7 @@ class ImagePredictor(object):
                 num_trials : int, default = 1
                     The limit of HPO trials that can be performed within `time_limit`. The HPO process will be terminated
                     when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first.
-                search_strategy : str, default = 'random'
+                searcher : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
                     Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
                     ‘grid’ (grid search).
@@ -273,6 +276,7 @@ class ImagePredictor(object):
 
         use_rec = False
         if isinstance(train_data, str) and train_data == 'imagenet':
+            # FIXME: imagenet does not work, crashes in validating data due to empty DataFrames.
             logger.warning('ImageNet is a huge dataset which cannot be downloaded directly, ' +
                            'please follow the data preparation tutorial in GluonCV.' +
                            'The following record files(symlinks) will be used: \n' +
@@ -354,7 +358,8 @@ class ImagePredictor(object):
             config['max_reward'] = max_reward
         if nthreads_per_trial is not None:
             config['nthreads_per_trial'] = nthreads_per_trial
-        elif is_fork_enabled():
+        elif is_fork_enabled() and timm is None:
+            # TODO(): remove this in the future
             # This is needed to address multiprocessing.context.TimeoutError in fork mode
             config['nthreads_per_trial'] = 0
         if ngpus_per_trial is not None:
@@ -394,11 +399,15 @@ class ImagePredictor(object):
             min_value = 1
         bs = sanitize_batch_size(config.get('batch_size', 16), min_value=min_value, max_value=len(train_data))
         config['batch_size'] = bs
+        # TODO: remove this once mxnet is deprecated
+        if timm is None and config.get('model', None) is None:
+            config['model'] = 'resnet50_v1b'
         # verbosity
         if log_level > logging.INFO:
             logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
+
         task = _ImageClassification(config=config, problem_type=self._problem_type)
         # GluonCV can't handle these separately - patching created config
         task.search_strategy = scheduler
@@ -407,11 +416,9 @@ class ImagePredictor(object):
         task._logger.propagate = True
         self._train_classes = train_data.classes
         with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            with MXNetErrorCatcher() as err:
-                self._classifier = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
-            if err.exc_value is not None:
-                raise RuntimeError(err.exc_value + err.hint)
+            # TODO: MXNetErrorCatcher was removed because it didn't return traceback
+            #  Re-add once it returns full traceback regardless of which exception was caught
+            self._classifier = task.fit(train_data, tuning_data, 1 - holdout_frac, random_state)
         self._classifier._logger.setLevel(log_level)
         self._classifier._logger.propagate = True
         self._fit_summary = task.fit_summary()
@@ -474,6 +481,15 @@ class ImagePredictor(object):
 
     def _validate_kwargs(self, kwargs):
         """validate and initialize default kwargs"""
+
+        valid_kwargs = {'holdout_frac', 'random_state', 'nthreads_per_trial', 'ngpus_per_trial', 'hyperparameter_tune_kwargs'}
+        invalid_kwargs = []
+        for key in kwargs:
+            if key not in valid_kwargs:
+                invalid_kwargs.append(key)
+        if invalid_kwargs:
+            raise KeyError(f'Invalid kwargs specified: {invalid_kwargs}. Valid kwargs names: {list(valid_kwargs)}')
+
         kwargs['holdout_frac'] = kwargs.get('holdout_frac', 0.1)
         if not (0 < kwargs['holdout_frac'] < 1.0):
             raise ValueError(f'Range error for `holdout_frac`, expected to be within range (0, 1), given {kwargs["holdout_frac"]}')
@@ -481,7 +497,7 @@ class ImagePredictor(object):
         kwargs['nthreads_per_trial'] = kwargs.get('nthreads_per_trial', None)
         kwargs['ngpus_per_trial'] = kwargs.get('ngpus_per_trial', None)
         if kwargs['ngpus_per_trial'] is not None and kwargs['ngpus_per_trial'] > 0:
-            detected_gpu = get_gpu_count()
+            detected_gpu = self._get_num_gpus_available()
             if detected_gpu < kwargs['ngpus_per_trial']:
                 raise ValueError(f"Insufficient detected # gpus {detected_gpu} vs requested {kwargs['ngpus_per_trial']}")
         # tune kwargs
@@ -522,7 +538,10 @@ class ImagePredictor(object):
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
-        y_pred_proba = self._classifier.predict(data, with_proba=True)
+        try:
+            y_pred_proba = self._classifier.predict(data, with_proba=True)
+        except AssertionError:
+            y_pred_proba = self._classifier.predict(data)
         if isinstance(data, pd.DataFrame):
             y_pred_proba.index = data.index
         if self._problem_type in [MULTICLASS, BINARY]:
@@ -626,7 +645,15 @@ class ImagePredictor(object):
                 data = _ImageClassification.Dataset(data, classes=self._train_classes)
             else:
                 data = _ImageClassification.Dataset(data, classes=[])
-        return self._classifier.evaluate(data, metric_name=self._eval_metric)
+        ret = self._classifier.evaluate(data, metric_name=self._eval_metric)
+        # TODO: remove the switch if mxnet is deprecated
+        if isinstance(ret, dict):
+            return ret
+        elif isinstance(ret, tuple):
+            assert len(ret) == 2
+            return {'top1': ret[0], 'top5': ret[1]}
+        else:
+            return {self._eval_metric: ret}
 
     def fit_summary(self):
         """Return summary of last `fit` process.
@@ -690,6 +717,10 @@ class ImagePredictor(object):
         """
         return tuple(_SUPPORTED_MODELS)
 
+    @staticmethod
+    def _get_num_gpus_available():
+        return get_gpu_count_all()
+
 
 def _get_valid_labels(data):
     ret = None
@@ -714,13 +745,36 @@ def _set_valid_labels(data, label):
             raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
 
 def _get_supported_models():
-    all_models = get_model_list()
-    blacklist = ['ssd', 'faster_rcnn', 'mask_rcnn', 'fcn', 'deeplab',
-                 'psp', 'icnet', 'fastscnn', 'danet', 'yolo', 'pose',
-                 'center_net', 'siamrpn', 'monodepth',
-                 'ucf101', 'kinetics', 'voc', 'coco', 'citys', 'mhpv1',
-                 'ade', 'hmdb51', 'sthsth', 'otb']
-    cls_models = [m for m in all_models if not any(x in m for x in blacklist)]
+    try:
+        import mxnet as _mxnet
+    except ImportError:
+        _mxnet = None
+    if _mxnet is not None:
+        from gluoncv.model_zoo import get_model_list
+        all_models = get_model_list()
+        blacklist = ['ssd', 'faster_rcnn', 'mask_rcnn', 'fcn', 'deeplab',
+                    'psp', 'icnet', 'fastscnn', 'danet', 'yolo', 'pose',
+                    'center_net', 'siamrpn', 'monodepth',
+                    'ucf101', 'kinetics', 'voc', 'coco', 'citys', 'mhpv1',
+                    'ade', 'hmdb51', 'sthsth', 'otb']
+        cls_models = [m for m in all_models if not any(x in m for x in blacklist)]
+    else:
+        cls_models = []
+    # add timm backend supported models
+    try:
+        import torch as _torch
+    except ImportError:
+        _torch = None
+    try:
+        import timm as _timm
+    except ImportError:
+        _timm = None
+    if _timm is not None:
+        cls_models += list(_timm.list_models())
+    elif _torch is None:
+        logger.warning('timm installed but torch is required to enable it.')
+    else:
+        logger.warning('cannot import timm, possibly due to missing torchvision')
     return cls_models
 
 _SUPPORTED_MODELS = _get_supported_models()

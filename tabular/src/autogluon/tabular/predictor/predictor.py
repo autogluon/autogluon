@@ -14,6 +14,7 @@ from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
@@ -25,7 +26,6 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.presets_configs import tabular_presets_dict
 from ..learner import AbstractLearner, DefaultLearner
-from ..trainer import AbstractTrainer
 
 logger = logging.getLogger()  # return root logger
 
@@ -91,6 +91,16 @@ class TabularPredictor:
         If True, then weighted metrics will be reported based on the sample weights provided in the specified `sample_weight` (in which case `sample_weight` column must also be present in test data).
         In this case, the 'best' model used by default for prediction will also be decided based on a weighted version of evaluation metric.
         Note: we do not recommend specifying `weight_evaluation` when `sample_weight` is 'auto_weight' or 'balance_weight', instead specify appropriate `eval_metric`.
+    groups : str, default = None
+        [Experimental] If specified, AutoGluon will use the column named the value of groups in `train_data` during `.fit` as the data splitting indices for the purposes of bagging.
+        This column will not be used as a feature during model training.
+        This parameter is ignored if bagging is not enabled. To instead specify a custom validation set with bagging disabled, specify `tuning_data` in `.fit`.
+        The data will be split via `sklearn.model_selection.LeaveOneGroupOut`.
+        Use this option to control the exact split indices AutoGluon uses.
+        It is not recommended to use this option unless it is required for very specific situations.
+        Bugs may arise from edge cases if the provided groups are not valid to properly train models, such as if not all classes are present during training in multiclass classification. It is up to the user to sanitize their groups.
+
+        As an example, if you want your data folds to preserve adjacent rows in the table without shuffling, then for 3 fold bagging with 6 rows of data, the groups column values should be [0, 0, 1, 1, 2, 2].
     **kwargs :
         learner_type : AbstractLearner, default = DefaultLearner
             A class which inherits from `AbstractLearner`. This dictates the inner logic of predictor.
@@ -171,6 +181,7 @@ class TabularPredictor:
             verbosity=2,
             sample_weight=None,
             weight_evaluation=False,
+            groups=None,
             **kwargs
     ):
         self.verbosity = verbosity
@@ -191,7 +202,7 @@ class TabularPredictor:
 
         self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None, eval_metric=eval_metric, problem_type=problem_type,
                                                       quantile_levels=quantile_levels,
-                                                      sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation, **learner_kwargs)
+                                                      sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation, groups=groups, **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
 
@@ -218,6 +229,27 @@ class TabularPredictor:
     @property
     def problem_type(self):
         return self._learner.problem_type
+
+    def features(self, feature_stage: str = 'original'):
+        """
+        Returns a list of feature names dependent on the value of feature_stage.
+
+        Parameters
+        ----------
+        feature_stage : str, default = 'original'
+            If 'original', returns the list of features specified in the original training data. This feature set is required in input data when making predictions.
+            If 'transformed', returns the list of features after pre-processing by the feature generator.
+
+        Returns
+        -------
+        Returns a list of feature names
+        """
+        if feature_stage == 'original':
+            return self.feature_metadata_in.get_features()
+        elif feature_stage == 'transformed':
+            return self.feature_metadata.get_features()
+        else:
+            raise ValueError(f"Unknown feature_stage: '{feature_stage}'. Must be one of {['original', 'transformed']}")
 
     @property
     def feature_metadata(self):
@@ -490,6 +522,14 @@ class TabularPredictor:
                     'bayesopt': Performs HPO via bayesian optimization using local scheduler.
                 For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
                     The 'searcher' key is required when providing a dict.
+            feature_prune_kwargs: dict, default = None
+                Performs layer-wise feature pruning via recursive feature elimination with permutation feature importance.
+                This fits all models in a stack layer once, discovers a pruned set of features, fits all models in the stack layer
+                again with the pruned set of features, and updates input feature lists for models whose validation score improved.
+                If None, do not perform feature pruning. If empty dictionary, perform feature pruning with default configurations.
+                For valid dictionary keys, refer to :class:`autogluon.core.utils.feature_selection.FeatureSelector` and
+                `autogluon.core.trainer.abstract_trainer.AbstractTrainer._proxy_model_feature_prune` documentation.
+                To force all models to work with the pruned set of features, set force_prune=True in the dictionary.
             ag_args : dict, default = None
                 Keyword arguments to pass to all models (i.e. common hyperparameters shared by all AutoGluon models).
                 See the `ag_args` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
@@ -693,9 +733,12 @@ class TabularPredictor:
             holdout_frac = default_holdout_frac(len(train_data), ag_args.get('hyperparameter_tune_kwargs', None) is not None)
 
         if kwargs['_save_bag_folds'] is not None:
-            if ag_args_ensemble is None:
-                ag_args_ensemble = {}
-            ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
+            if use_bag_holdout and not kwargs['_save_bag_folds']:
+                logger.log(30, f'WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.')
+            else:
+                if ag_args_ensemble is None:
+                    ag_args_ensemble = {}
+                ag_args_ensemble['save_bag_folds'] = kwargs['_save_bag_folds']
 
         if time_limit is None:
             mb_mem_usage_train_data = get_approximate_df_mem_usage(train_data, sample_ratio=0.2).sum() / 1e6
@@ -709,7 +752,9 @@ class TabularPredictor:
             'ag_args_ensemble': ag_args_ensemble,
             'ag_args_fit': ag_args_fit,
             'excluded_model_types': excluded_model_types,
+            'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
+        self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
                           hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity, use_bag_holdout=use_bag_holdout)
@@ -1327,7 +1372,7 @@ class TabularPredictor:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, silent=False):
+    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99, silent=False):
         """
         Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the data where this feature's values have been randomly shuffled across rows.
@@ -1394,8 +1439,12 @@ class TabularPredictor:
             Defaults to 3 if `time_limit` is None or 10 if `time_limit` is specified.
             Runtime linearly scales with `num_shuffle_sets`.
         include_confidence_band: bool, default = True
-            If True, will include output columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time (99% confidence interval).
-            Increasing `subsample_size` and `num_shuffle_sets` will tighten the band.
+            If True, returned DataFrame will include two additional columns specifying confidence interval for the true underlying importance value of each feature.
+            Increasing `subsample_size` and `num_shuffle_sets` will tighten the confidence interval.
+        confidence_level: float, default = 0.99
+            This argument is only considered when `include_confidence_band` is True, and can be used to specify the confidence level used for constructing confidence intervals.  
+            For example, if `confidence_level` is set to 0.99, then the returned DataFrame will include columns 'p99_high' and 'p99_low' which indicates that the true feature importance will be between 'p99_high' and 'p99_low' 99% of the time (99% confidence interval).
+            More generally, if `confidence_level` = 0.XX, then the columns containing the XX% confidence interval will be named 'pXX_high' and 'pXX_low'. 
         silent : bool, default = False
             Whether to suppress logging output.
 
@@ -1410,12 +1459,15 @@ class TabularPredictor:
                 A p-value of 0.01 indicates that there is a 1% chance that the feature is useless or harmful, and a 99% chance that the feature is useful.
                 A p-value of 0.99 indicates that there is a 99% chance that the feature is useless or harmful, and a 1% chance that the feature is useful.
             'n': The number of shuffles performed to estimate importance score (corresponds to sample-size used to determine confidence interval for true score).
-            'p99_high': Upper end of 99% confidence interval for true feature importance score.
-            'p99_low': Lower end of 99% confidence interval for true feature importance score.
+            'pXX_high': Upper end of XX% confidence interval for true feature importance score (where XX=99 by default).
+            'pXX_low': Lower end of XX% confidence interval for true feature importance score.
         """
         data = self.__get_dataset(data) if data is not None else data
         if (data is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
+        if data is not None:
+            # Avoid crash when indices are duplicated
+            data = data.reset_index(drop=True)
 
         if num_shuffle_sets is None:
             num_shuffle_sets = 10 if time_limit else 3
@@ -1424,27 +1476,31 @@ class TabularPredictor:
                                                      subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
 
         if include_confidence_band:
+            if confidence_level <= 0.5 or confidence_level >= 1.0:
+                raise ValueError("confidence_level must lie between 0.5 and 1.0")
+            ci_str = "{:0.0f}".format(confidence_level*100)
             import scipy.stats
             num_features = len(fi_df)
-            confidence_threshold = 0.99
-            p99_low_dict = dict()
-            p99_high_dict = dict()
+            ci_low_dict = dict()
+            ci_high_dict = dict()
             for i in range(num_features):
                 fi = fi_df.iloc[i]
                 mean = fi['importance']
                 stddev = fi['stddev']
                 n = fi['n']
                 if stddev == np.nan or n == np.nan or mean == np.nan or n == 1:
-                    p99_high = np.nan
-                    p99_low = np.nan
+                    ci_high = np.nan
+                    ci_low = np.nan
                 else:
-                    t_val_99 = scipy.stats.t.ppf(1 - (1 - confidence_threshold) / 2, n - 1)
-                    p99_high = mean + t_val_99 * stddev / math.sqrt(n)
-                    p99_low = mean - t_val_99 * stddev / math.sqrt(n)
-                p99_high_dict[fi.name] = p99_high
-                p99_low_dict[fi.name] = p99_low
-            fi_df['p99_high'] = pd.Series(p99_high_dict)
-            fi_df['p99_low'] = pd.Series(p99_low_dict)
+                    t_val = scipy.stats.t.ppf(1 - (1 - confidence_level) / 2, n - 1)
+                    ci_high = mean + t_val * stddev / math.sqrt(n)
+                    ci_low = mean - t_val * stddev / math.sqrt(n)
+                ci_high_dict[fi.name] = ci_high
+                ci_low_dict[fi.name] = ci_low
+            high_str = 'p'+ci_str+'_high'
+            low_str = 'p'+ci_str+'_low'
+            fi_df[high_str] = pd.Series(ci_high_dict)
+            fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
 
     def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
@@ -2124,11 +2180,16 @@ class TabularPredictor:
             self._learner.persist_trainer(low_memory=True)
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
-    def save(self):
+    def save(self, silent=False):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
+
+        Parameters
+        ----------
+        silent : bool, default = False
+            Whether to save without logging a message.
         """
         path = self.path
         tmp_learner = self._learner
@@ -2139,7 +2200,8 @@ class TabularPredictor:
         save_pkl.save(path=path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
         self._trainer = tmp_trainer
-        logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
+        if not silent:
+            logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
     def load(cls, path: str, verbosity: int = None):
@@ -2256,6 +2318,7 @@ class TabularPredictor:
 
             # other
             verbosity=self.verbosity,
+            feature_prune_kwargs=None,
 
             # private
             _save_bag_folds=None,
@@ -2313,6 +2376,8 @@ class TabularPredictor:
                     train_features.remove(self.sample_weight)
                 if self.sample_weight in tuning_features:
                     tuning_features.remove(self.sample_weight)
+            if self._learner.groups is not None:
+                train_features.remove(self._learner.groups)
             train_features = np.array(train_features)
             tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):

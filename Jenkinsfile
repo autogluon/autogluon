@@ -30,6 +30,10 @@ setup_mxnet_gpu = """
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 """
 
+setup_torch_gpu = """
+    python3 -m pip install torch==1.7.1+cu101 torchvision==0.8.2+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+"""
+
 cleanup_venv = """
     deactivate
     rm -rf venv
@@ -264,6 +268,7 @@ stage("Unit Test") {
           conda list
           ${setup_pip_venv}
           ${setup_mxnet_gpu}
+          ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
@@ -371,6 +376,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
         env
@@ -401,6 +407,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
@@ -494,6 +501,7 @@ stage("Build Tutorials") {
         conda list
         ${setup_pip_venv}
         ${setup_mxnet_gpu}
+        ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
@@ -539,6 +547,35 @@ stage("Build Tutorials") {
         ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/text_prediction/*', name: 'text'
+      }
+    }
+  },
+  'forecasting': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-forecasting-py3-v3') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-forecasting-v3
+        conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        export AG_DOCS=1
+
+        env
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/forecasting
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(forecasting)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
+        """
+        stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
       }
     }
   },
@@ -618,6 +655,7 @@ stage("Build Docs") {
         unstash 'object_detection'
         unstash 'tabular'
         unstash 'text'
+        unstash 'forecasting'
         unstash 'torch'
 
         sh """#!/bin/bash
@@ -675,7 +713,7 @@ stage("Build Docs") {
         cd vision/
         python3 -m pip install --upgrade -e .
         cd ..
-        
+
         cd forecasting/
         python3 -m pip install --upgrade -e .
         cd ..

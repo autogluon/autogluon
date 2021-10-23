@@ -35,20 +35,20 @@ test_requirements = [
 
 extras_require = {
     'lightgbm': [
-        'lightgbm>=3.0,<4.0',
+        'lightgbm>=3.3,<4.0',
     ],
     'catboost': [
-        'catboost>=0.24.0,<0.26',
+        'catboost>=1.0,<1.1',
     ],
     'xgboost': [
-        'xgboost>=1.3.2,<1.4',
+        'xgboost>=1.4,<1.5',
     ],
     'fastai': [
         'torch>=1.0,<2.0',
         'fastai>=2.3.1,<3.0',
     ],
     'skex': [
-        'scikit-learn-intelex<2021.3',
+        'scikit-learn-intelex<=2021.3',
     ],
 }
 

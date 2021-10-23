@@ -5,7 +5,7 @@ def test_task():
     train_data, _, test_data = dataset.random_split()
 
     detector = Task()
-    detector.fit(train_data, num_trials=1, hyperparameters={'batch_size': 4, 'epochs': 5, 'early_stop_max_value': 0.2})
+    detector.fit(train_data, hyperparameters={'batch_size': 4, 'epochs': 5, 'early_stop_max_value': 0.2}, hyperparameter_tune_kwargs={'num_trials': 1})
     test_result = detector.predict(test_data)
     detector.save('detector.ag')
     detector2 = Task.load('detector.ag')

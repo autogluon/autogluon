@@ -71,7 +71,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         self._fillna_map = None
 
         if minimize_memory:
-            self._post_generators = [CategoryMemoryMinimizeFeatureGenerator(inplace=True)] + self._post_generators
+            self._post_generators = [CategoryMemoryMinimizeFeatureGenerator()] + self._post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         if self._stateful_categories:

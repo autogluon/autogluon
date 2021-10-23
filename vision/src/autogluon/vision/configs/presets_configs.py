@@ -1,9 +1,12 @@
 """Presets for vision predictors"""
 import functools
 import warnings
-from autogluon.core.utils import get_gpu_free_memory, get_gpu_count
+from autogluon.core.utils import get_gpu_free_memory
 from autogluon.core import Categorical, Int, Real
-
+try:
+    import timm
+except ImportError:
+    timm = None
 
 def unpack(preset_name):
     if not preset_name in _PRESET_DICTS:
@@ -23,9 +26,10 @@ preset_image_predictor = dict(
     # Recommended for applications that benefit from the best possible model accuracy.
     best_quality={
         'hyperparameters': {
-            'model': Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
+            'model': Categorical('coat_lite_small', 'twins_pcpvt_base', 'swin_base_patch4_window7_224', 'resnet101d') \
+                if timm != None else Categorical('resnet50_v1b', 'resnet101_v1d', 'resnest200'),
             'lr': Real(1e-5, 1e-2, log=True),
-            'batch_size': Categorical(8, 16, 32, 64, 128),
+            'batch_size': Categorical(8, 16, 32, 64),
             'epochs': 200,
             'early_stop_patience': 50
             },
@@ -40,7 +44,8 @@ preset_image_predictor = dict(
     # Recommended for applications that require reasonable inference speed and/or model size.
     good_quality_fast_inference={
         'hyperparameters': {
-            'model': Categorical('resnet50_v1b', 'resnet34_v1b'),
+            'model': Categorical('resnet50d', 'efficientnet_b1', 'mobilenetv3_large_100') \
+                if timm != None else Categorical('resnet50_v1b', 'resnet34_v1b'),
             'lr': Real(1e-4, 1e-2, log=True),
             'batch_size': Categorical(8, 16, 32, 64, 128),
             'epochs': 150,
@@ -57,7 +62,7 @@ preset_image_predictor = dict(
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping.
     medium_quality_faster_train={
         'hyperparameters': {
-            'model': 'resnet50_v1b',
+            'model': 'resnet50d' if timm != None else 'resnet50_v1b',
             'lr': 0.01,
             'batch_size': 64,
             'epochs': 50,
@@ -70,10 +75,11 @@ preset_image_predictor = dict(
     # Comparing with `medium_quality_faster_train` it uses faster model but explores more hyperparameters.
     medium_quality_faster_inference={
         'hyperparameters': {
-            'model': Categorical('resnet18_v1b', 'mobilenetv3_small'),
+            'model': Categorical('resnet18', 'mobilenetv3_small_100', 'resnet18_v1b') \
+                if timm != None else Categorical('resnet18_v1b', 'mobilenetv3_small'),
             'lr': Categorical(0.01, 0.005, 0.001),
             'batch_size': Categorical(64, 128),
-            'epochs': Categorical(50, 100),
+            'epochs': 50,
             'early_stop_patience': 10
             },
         'hyperparameter_tune_kwargs': {

@@ -8,12 +8,12 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.data import LabelCleaner
+from autogluon.core.data.cleaner import Cleaner
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from .abstract_learner import AbstractLearner
-from ..trainer.auto_trainer import AutoTrainer
-from autogluon.core.data import LabelCleaner
-from autogluon.core.data.cleaner import Cleaner
+from ..trainer import AutoTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,10 @@ class DefaultLearner(AbstractLearner):
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         self._pre_X_rows = len(X)
-        X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
+        if self.groups is not None:
+            num_bag_sets = 1
+            num_bag_folds = len(X[self.groups].unique())
+        X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
         self._post_X_rows = len(X)
         time_preprocessing_end = time.time()
         self._time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
@@ -93,7 +96,7 @@ class DefaultLearner(AbstractLearner):
             self.eval_metric = trainer.eval_metric
 
         self.save()
-        trainer.fit(X, y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, **trainer_fit_kwargs)
+        trainer.fit(X, y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, time_limit=time_limit_trainer, groups=groups, **trainer_fit_kwargs)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end
@@ -131,7 +134,8 @@ class DefaultLearner(AbstractLearner):
         if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
             if num_bag_folds > 0:
                 self.threshold = 2
-                X = augment_rare_classes(X, self.label, threshold=2)
+                if self.groups is None:
+                    X = augment_rare_classes(X, self.label, threshold=2)
             else:
                 self.threshold = 1
 
@@ -147,6 +151,7 @@ class DefaultLearner(AbstractLearner):
         y = self.label_cleaner.transform(y)
         X = self.set_predefined_weights(X, y)
         X, w = extract_column(X, self.sample_weight)
+        X, groups = extract_column(X, self.groups)
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
 
@@ -182,7 +187,7 @@ class DefaultLearner(AbstractLearner):
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
                     y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
             X = X_super.head(len(X)).set_index(X.index)
 
             X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)
@@ -202,14 +207,14 @@ class DefaultLearner(AbstractLearner):
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
                     y_super = pd.concat([y, y_unlabeled], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform)
+                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
 
             X = X_super.head(len(X)).set_index(X.index)
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
         X, X_val = self.bundle_weights(X, w, X_val, w_val)  # TODO: consider not bundling sample-weights inside X, X_val
-        return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds
+        return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups
 
     def bundle_weights(self, X, w, X_val, w_val):
         if w is not None:

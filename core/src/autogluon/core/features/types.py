@@ -10,6 +10,10 @@ R_BOOL = 'bool'  # TODO: R_BOOL/R_BOOLEAN?
 # TODO: R_FLOAT_SPARSE/R_INT_SPARSE/R_CATEGORY_SPARSE?
 
 # Special types: Meta information about the special meaning of a feature that is not present in the raw data.
+# feature has been converted to int8 raw dtype with only 0 and 1 values (2 unique values, missing converted to 0)
+# this differs from R_BOOL as R_BOOL refers to a feature with the bool raw dtype (Values are False and True instead of 0 and 1)
+S_BOOL = 'bool'
+
 # feature has been binned into discrete integer values from its original representation
 S_BINNED = 'binned'
 
