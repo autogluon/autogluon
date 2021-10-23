@@ -30,7 +30,7 @@ class ModelsZoo():
                             'wide_resnet101_2','mnasnet0_5','mnasnet1_0','efficientnet-b1',
                             'efficientnet-b2','efficientnet-b3','efficientnet-b4','efficientnet-b5',
                             'efficientnet-b6','efficientnet-b7'],"g2": ['squeezenet1_0','squeezenet1_1'],
-                        "g3": ['resnext50_32x4d','resnext101_32x8d'],"g4": ['inception_v3']}
+                        "g3": ['resnext50_32x4d','resnext101_32x8d'],"g4": ['inception_v3','xception']}
     len_group_counts=(sum([len(group_counts[x]) for x in group_counts if isinstance(group_counts[x], list)]))
     new_countsD =new_countsD = {k: len(v) for k,v in group_counts.items()}
    
@@ -234,6 +234,12 @@ class ModelsZoo():
                     param.requires_grad = False
                 model.AuxLogits.fc = nn.Linear(model.AuxLogits.fc.in_features, self.num_classes).double()
                 model.fc = nn.Linear(model.fc.in_features, self.num_classes).double()
+             if 'xception' == self.model_type:
+                    model = models.inception_v3(pretrained=self.pretrained).to(device).double()
+                for param in model.parameters():
+                    param.requires_grad = False
+                model.AuxLogits.fc = nn.Linear(model.AuxLogits.fc.in_features, self.num_classes).double()
+                model.fc = nn.Linear(model.fc.in_features, self.num_classes).double()    
         return model.double().to(device)
     
     def optimizer(self):
