@@ -211,10 +211,10 @@ class Utils_pro:
         return Dic_data_g1,Dic_data_g2,Dic_data_g3,Dic_data_g4,Dic_data_g5
                 
                
-    def Image_Genartor(self,data):
+    def Image_Genartor(self,data,labels):
         data=self.__get_dataset(data)
         ln = LogScaler()
-        X_train,X_val,X_test,_ , _,_=self._validate_fit_data(data)
+        X_train,X_val,X_test,_ , _,_=self._validate_fit_data(data,labels)
         X_train_norm = ln.fit_transform(X_train)
         X_val_norm = ln.fit_transform(X_val)
         X_test_norm = ln.transform(X_test)
@@ -232,19 +232,19 @@ class Utils_pro:
         _ = it.fit(X_train_norm, plot=True)
         return X_train_img,X_val_img,X_test_img
     
-    def len_of_Images(self,data):
-        X_train_img,X_val_img,X_test_img=self.Image_Genartor(data)
+    def len_of_Images(self,data,labels):
+        X_train_img,X_val_img,X_test_img=self.Image_Genartor(data,labels)
         return len(X_train_img),len(X_val_img),len(X_test_img)
         
-    def image_tensor(self,data): 
+    def image_tensor(self,data,labels): 
         preprocess = transforms.Compose([transforms.ToTensor()])    
         batch_size = 64
         
         le = LabelEncoder()
         #num_classes = np.unique(le.fit_transform(self.y_train)).size
         data=self.__get_dataset(data)
-        _,_,_,y_train , y_val,y_test=self._validate_fit_data(data)
-        X_train_img,X_val_img,X_test_img=self.Image_Genartor(data)
+        _,_,_,y_train , y_val,y_test=self._validate_fit_data(data,labels)
+        X_train_img,X_val_img,X_test_img=self.Image_Genartor(data,labels)
         X_train_tensor = torch.stack([preprocess(img) for img in X_train_img ])
         y_train_tensor = torch.from_numpy(le.fit_transform(y_train))
 
