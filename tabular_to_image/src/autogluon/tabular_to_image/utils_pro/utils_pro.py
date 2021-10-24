@@ -41,13 +41,15 @@ class Utils_pro:
         #pretrained = kwargs.get('pretrained', None)
       
     Dataset = TabularDataset  
-    models_count=self._ModelsZoo.len_group_counts() 
-    groups_counts=self._ModelsZoo.new_countsD()
-    g1_presentage=round(((groups_counts['g1']/models_count)*100),1)/100
-    g2_presentage=round(((groups_counts['g2']/models_count)*100),1)/100
-    g3_presentage=round(((groups_counts['g3']/models_count)*100),1)/100
-    g4_presentage=round(((groups_counts['g4']/models_count)*100),1)/100
-    g5_presentage=round(((groups_counts['g5']/models_count)*100),1)/100
+    def groups_persentages(self): 
+        models_count=self._ModelsZoo.len_group_counts() 
+        groups_counts=self._ModelsZoo.new_countsD()
+        g1_presentage=round(((groups_counts['g1']/models_count)*100),1)/100
+        g2_presentage=round(((groups_counts['g2']/models_count)*100),1)/100
+        g3_presentage=round(((groups_counts['g3']/models_count)*100),1)/100
+        g4_presentage=round(((groups_counts['g4']/models_count)*100),1)/100
+        g5_presentage=round(((groups_counts['g5']/models_count)*100),1)/100
+        return g1_presentage,g2_presentage,g3_presentage,g4_presentage,g5_presentage
     #def data_split(self,):
     #    X_train, X_test, y_train, y_test = train_test_split(self.train_dataset,  self.label_column, test_size=0.2)
     #    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25
@@ -87,6 +89,7 @@ class Utils_pro:
     def spit_dataset(self,data):
         models_count=self.len_group_counts() 
         groups_counts=self.new_countsD()
+        g1_presentage,g2_presentage,g3_presentage,g4_presentage,g5_presentage=self.groups_persentages()
         data = self.__get_dataset(data)
        
         if isinstance(data, str):
@@ -96,11 +99,11 @@ class Utils_pro:
         if len(set(data.columns)) < len(data.columns):
                 raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")                           
         
-        data_g1=data.sample(frac=self.g1_presentage, replace=False, random_state=12)
-        data_g2=data.sample(frac=self.g2_presentage, replace=False, random_state=44)
-        data_g3=data.sample(frac=self.g3_presentage, replace=False, random_state=58)
-        data_g4=data.sample(frac=self.g4_presentage, replace=False, random_state=11)
-        data_g5=data.sample(frac=self.g5_presentage, replace=False, random_state=77)
+        data_g1=data.sample(frac=g1_presentage, replace=False, random_state=12)
+        data_g2=data.sample(frac=g2_presentage, replace=False, random_state=44)
+        data_g3=data.sample(frac=g3_presentage, replace=False, random_state=58)
+        data_g4=data.sample(frac=g4_presentage, replace=False, random_state=11)
+        data_g5=data.sample(frac=g5_presentage, replace=False, random_state=77)
         
         return data_g1,data_g2,data_g3,data_g4,data_g5
         

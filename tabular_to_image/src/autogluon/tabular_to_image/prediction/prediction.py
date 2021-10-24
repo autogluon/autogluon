@@ -285,9 +285,11 @@ class ImagePredictions:
     def Selected_models(self):
         import random
         import math
-        g1_sample=random.sample(set(self._ModelsZoo.group_counts["g1"]),math.floor(self._Utils_pro.g1_presentage*len(self._ModelsZoo.group_counts["g1"])))
-        g2_sample=random.sample(set(self._ModelsZoo.group_counts["g2"]),math.ceil(self._Utils_pro.g2_presentage*len(self._ModelsZoo.group_counts["g2"])))
-        g3_sample=random.sample(set(self._ModelsZoo.group_counts["g3"]),math.ceil(self._Utils_pro.g3_presentage*len(self._ModelsZoo.group_counts["g3"])))
-        g4_sample=random.sample(set(self._ModelsZoo.group_counts["g4"]),math.ceil(self._Utils_pro.g4_presentage*len(self._ModelsZoo.group_counts["g4"])))
-        g5_sample=random.sample(set(self._ModelsZoo.group_counts["g5"]),math.ceil(self._Utils_pro.g5_presentage*len(self._ModelsZoo.group_counts["g5"]))) 
+        g1_presentage,g2_presentage,g3_presentage,g4_presentage,g5_presentage=self._Utils_pro.Utils_pro.groups_persentages()
+        g1_sample=random.sample(set(self._ModelsZoo.group_counts["g1"]),math.floor(g1_presentage*len(self._ModelsZoo.group_counts["g1"])))
+        g2_sample=random.sample(set(self._ModelsZoo.group_counts["g2"]),math.ceil(g2_presentage*len(self._ModelsZoo.group_counts["g2"])))
+        g3_sample=random.sample(set(self._ModelsZoo.group_counts["g3"]),math.ceil(g3_presentage*len(self._ModelsZoo.group_counts["g3"])))
+        g4_sample=random.sample(set(self._ModelsZoo.group_counts["g4"]),math.ceil(g4_presentage*len(self._ModelsZoo.group_counts["g4"])))
+        g5_sample=random.sample(set(self._ModelsZoo.group_counts["g5"]),math.ceil(g5_presentage*len(self._ModelsZoo.group_counts["g5"]))) 
+        
 #from autogluon.tabular_to_image.prediction import ImagePredictions   
