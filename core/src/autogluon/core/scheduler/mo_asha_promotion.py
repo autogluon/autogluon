@@ -49,14 +49,13 @@ class MOPromotionRungSystem(PromotionRungSystem):
 
             num_top = int(num_recorded * prom_quant)
 
+            # generate matrix from individual reward vectors
             evaluations = np.array([v[0] for _, v in recorded.items()])
 
             if self.strategy == EPS_NET:
                 ranked_top = get_eps_net_ranking(evaluations, num_top)
-            elif self.strategy == NSGA_II:
+            else:  # NSGA_II
                 ranked_top = get_nsga_ii_ranking(evaluations, num_top)
-            else:
-                raise ValueError("The provided selection strategy is invalid.")
 
             items = list(recorded.items())
             top_list = [items[i] for i in ranked_top]
@@ -76,17 +75,17 @@ class MOPromotionRungSystem(PromotionRungSystem):
 # Filtration techniques
 # -----------------------------------------------------------------------------
 
-def fast_nondominated_sort(values, num_samples):
+def fast_nondominated_sort(values: np.array, num_samples: int):
     # We assume a 2d np array of dim (n_candidates, n_objectives)
     # This functions assumes a minimization problem. Implementation is based
     # on the NSGA-II paper
-    assert len(values) > 0, "Need to provide at least 1 point."
-    assert len(values) >= num_samples, "Need at least enough points to meet \
-                                        num_samples."
-    domination_counts = np.zeros(len(values))
-    dominated_solutions = [[] for _ in range(len(values))]
+    assert values.shape[0] > 0, "Need to provide at least 1 point."
+    assert values.shape[0] >= num_samples, "Need at least enough points to \
+                                            meet num_samples."
+    domination_counts = np.zeros(values.shape[0])
+    dominated_solutions = [[] for _ in range(values.shape[0])]
     fronts = [[]]
-    ranks = np.zeros(len(values))
+    ranks = np.zeros(values.shape[0])
 
     for i, v1 in enumerate(values):
         for j, v2 in enumerate(values):
@@ -118,19 +117,20 @@ def fast_nondominated_sort(values, num_samples):
 
 
 def compute_eps_net(points: np.array, num_samples: int = None):
-    """Sparsify a set of points returning `num_samples` points that are as
-    spread out as possible. Iteratively select the point that is the furthest
-    from priorly selected points.
-    :param points:
-    :param num_samples:
+    """Sparsify a numpy matrix of points returning `num_samples` points that
+    are as spread out as possible. Iteratively select the point that is the
+    furthest from priorly selected points.
+    :param points: numpy array of shape num_points x num_objectives
+    :param num_samples: number of points to return
     :return: indices
     """
-    assert len(points) > 0, "Need to provide at least 1 point."
+    assert points.shape[0] > 0, "Need to provide at least 1 point."
+
     def dist(points, x):
         return np.min([np.linalg.norm(p - x) for p in points])
-    n = len(points)
+    n = points.shape[0]
     eps_net = [0]
-    indices_remaining = set(range(1,n))
+    indices_remaining = set(range(1, n))
     if num_samples is None:
         num_samples = n
     while len(eps_net) < num_samples and len(indices_remaining) > 0:
@@ -147,7 +147,7 @@ def compute_eps_net(points: np.array, num_samples: int = None):
     return eps_net
 
 
-def get_eps_net_ranking(points, num_top):
+def get_eps_net_ranking(points: np.array, num_top: int):
     """Produces sorted list containing the best indices
     :param points: Numpy array containing all previous evaluations
     :return: List of num_top indices
@@ -169,32 +169,32 @@ def get_eps_net_ranking(points, num_top):
     return ranked_ids
 
 
-def crowding_distance_assignment(front_points):
-    assert len(front_points) > 0, "Error no empty fronts are allowed"
-    distances = np.zeros(len(front_points))
-    n_objectives = len(front_points[0])
+def crowding_distance_assignment(front_points: np.array):
+    assert front_points.shape[0] > 0, "Error no empty fronts are allowed"
+    distances = np.zeros(front_points.shape[0])
+    n_objectives = front_points.shape[1]
 
     for m in range(n_objectives):  # Iterate through objectives
-        vs = [(front_points[i][m], i) for i in range(len(front_points))]
+        vs = [(front_points[i][m], i) for i in range(front_points.shape[0])]
         vs.sort()
         # last and first element have inf distance
         distances[vs[0][1]] = np.inf
         distances[vs[-1][1]] = np.inf
-        ms = [front_points[i][m] for i in range(len(front_points))]
+        ms = [front_points[i][m] for i in range(front_points.shape[0])]
         scale = max(ms) - min(ms)
         if scale == 0:
             scale = 1
-        for j in range(1, len(front_points) - 1):
+        for j in range(1, front_points.shape[0] - 1):
             distances[vs[j][1]] += (vs[j + 1][0] - vs[j - 1][0]) / scale
 
     # determine local order
-    dist_id = [(-distances[i], i) for i in range(len(front_points))]
+    dist_id = [(-distances[i], i) for i in range(front_points.shape[0])]
     dist_id.sort()
     local_order = [d[1] for d in dist_id]
     return local_order
 
 
-def get_nsga_ii_ranking(points, num_top):
+def get_nsga_ii_ranking(points: np.array, num_top: int):
     """Produces sorted list containing the best indices
     :param points: Numpy array containing all previous evaluations
     :return: List of num_top indices
