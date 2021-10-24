@@ -3,11 +3,11 @@ import copy
 import numpy as np
 
 from .hyperband import HyperbandScheduler, HyperbandBracketManager
-from .mo_asha_promotion import EPS_NET, NSGA_II
-from ..utils.default_arguments import filter_by_key
+from .mo_asha_promotion import MOPromotionRungSystem, EPS_NET, NSGA_II
+from ..utils.default_arguments import Integer, Boolean, Categorical, \
+    filter_by_key
 from ..utils.mo_hbo_utils import prepare_sign_vector
 from ..utils.mo_hbo_utils import retrieve_pareto_front
-
 
 __all__ = ['MOASHAScheduler']
 
@@ -37,13 +37,35 @@ class MOASHAScheduler(HyperbandScheduler):
     examples/mo_hpo/mo_asha.ipynb
     """
 
+    _CONSTRAINTS = {
+        'resume': Boolean(),
+        'max_t': Integer(1, None),
+        'grace_period': Integer(1, None),
+        'reduction_factor': Integer(2, None),
+        'brackets': Integer(1, None),
+        'type': Categorical((EPS_NET, NSGA_II)),
+        'searcher_data': Categorical(
+            ('rungs', 'all', 'rungs_and_last')),
+        'do_snapshots': Boolean(),
+        'rung_system_per_bracket': Boolean(),
+        'random_seed': Integer(0, None)}
+
     def __init__(self, train_fn, **kwargs):
         self._objectives = kwargs["objectives"]
-        assert kwargs["type"] in [EPS_NET, NSGA_II], "Only eps_net and " \
-                                                     "nsga_ii are supported"
+        assert kwargs["type"] in self._CONSTRAINTS["type"].choices, \
+            "Only eps_net and nsga_ii are supported"
         # NOTE: This is just a dummy objective
         kwargs["reward_attr"] = list(self._objectives.keys())[0]
         super().__init__(train_fn, **filter_by_key(kwargs, _ARGUMENT_KEYS))
+
+    def _init_bracket_manager(self, scheduler_type, max_t, rung_levels,
+                              brackets, rung_system_per_bracket, random_seed):
+        # Initialize bracket manager.
+        terminator = MOHyperbandBracketManager(
+            scheduler_type, self._time_attr, self._reward_attr, max_t,
+            rung_levels, brackets, rung_system_per_bracket,
+            random_seed, self._objectives)
+        return terminator
 
     def get_pareto_front(self):
         """Retrieves the pareto efficient points discovered during the search
@@ -81,6 +103,16 @@ class MOHyperbandBracketManager(HyperbandBracketManager):
                          rung_levels, brackets, rung_system_per_bracket,
                          random_seed)
 
+    @staticmethod
+    def _init_rung_systems(scheduler_type, rung_levels, promote_quantiles,
+                           max_t, num_systems):
+        # Initialize MOPromotionRungSystem rung system for each level.
+        rung_systems = [
+            MOPromotionRungSystem(rung_levels[s:], promote_quantiles[s:], max_t, scheduler_type)
+            for s in range(num_systems)
+        ]
+        return rung_systems
+
     def _prepare_objective_vector(self, result):
         values = np.array([result[k] for k in self.objectives])
         values = values * self.sign_vector
@@ -96,12 +128,13 @@ class MOHyperbandBracketManager(HyperbandBracketManager):
         :return: See parent class
         """
         result_copy = copy.copy(result)
-        result_copy[self._reward_attr] = \
+        result_copy["_REWARD_VECTOR"] = \
             self._prepare_objective_vector(result_copy)
         return super().on_task_report(task, result_copy)
 
-    def on_task_complete(self, task, result):
-        result_copy = copy.copy(result)
-        result_copy[self._reward_attr] = \
-            self._prepare_objective_vector(result_copy)
-        return super().on_task_complete(task, result_copy)
+    def _report_to_rung_sys(self, rung_sys, task, result, skip_rungs):
+        # Pass result to rung system to decide if task may continue.
+        rung_info = rung_sys.on_task_report(
+                task, result[self._time_attr], result["_REWARD_VECTOR"],
+                skip_rungs=skip_rungs)
+        return rung_info
