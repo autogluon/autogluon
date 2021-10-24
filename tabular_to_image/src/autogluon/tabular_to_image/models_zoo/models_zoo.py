@@ -23,17 +23,19 @@ class ModelsZoo():
         self.pretrained=True
         #use_gpu = torch.cuda.is_available() 
          
-    group_counts = {"g1": ['resnet18','resnet34','resnet50','resnet101','resnet152','alexnet','vgg11',
-                            'vgg11_bn','vgg13','vgg13_bn','vgg16','vgg16_bn','vgg19','vgg19_bn',
-                            'densenet121','densenet161','densenet169','densenet201''googlenet',
-                            'shufflenet_v2_x0_5','shufflenet_v2_x1_0','mobilenet_v2','wide_resnet50_2',
-                            'wide_resnet101_2','mnasnet0_5','mnasnet1_0'],"g2":['efficientnet-b0','efficientnet-b1',
-                            'efficientnet-b2','efficientnet-b3','efficientnet-b4','efficientnet-b5',
-                            'efficientnet-b6','efficientnet-b7'],"g3": ['squeezenet1_0','squeezenet1_1'],
-                        "g4": ['resnext50_32x4d','resnext101_32x8d'],"g5": ['inception_v3','xception']}
-    len_group_counts=(sum([len(self.group_counts[x]) for x in group_counts if isinstance(self.group_counts[x], list)]))
-    new_countsD =new_countsD = {k: len(v) for k,v in group_counts.items()}
-   
+    def groups(self):
+        group_counts = {"g1": ['resnet18','resnet34','resnet50','resnet101','resnet152','alexnet','vgg11',
+                                'vgg11_bn','vgg13','vgg13_bn','vgg16','vgg16_bn','vgg19','vgg19_bn',
+                                'densenet121','densenet161','densenet169','densenet201''googlenet',
+                                'shufflenet_v2_x0_5','shufflenet_v2_x1_0','mobilenet_v2','wide_resnet50_2',
+                                'wide_resnet101_2','mnasnet0_5','mnasnet1_0'],"g2":['efficientnet-b0','efficientnet-b1',
+                                'efficientnet-b2','efficientnet-b3','efficientnet-b4','efficientnet-b5',
+                                'efficientnet-b6','efficientnet-b7'],"g3": ['squeezenet1_0','squeezenet1_1'],
+                            "g4": ['resnext50_32x4d','resnext101_32x8d'],"g5": ['inception_v3','xception']}
+        len_group_counts=(sum([len(group_counts[x]) for x in group_counts if isinstance(group_counts[x], list)]))
+        new_countsD  = {k: len(v) for k,v in group_counts.items()}
+        return len_group_counts,len_group_counts,new_countsD
+        
     def create_model(self):
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
       

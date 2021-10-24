@@ -42,8 +42,9 @@ class Utils_pro:
       
     Dataset = TabularDataset  
     def groups_persentages(self): 
-        models_count=self._ModelsZoo.len_group_counts() 
-        groups_counts=self._ModelsZoo.new_countsD()
+        len_group_counts,len_group_counts,new_countsD=self._ModelsZoo.ModelsZoo.groups()
+        models_count=len_group_counts() 
+        groups_counts=new_countsD()
         g1_presentage=round(((groups_counts['g1']/models_count)*100),1)/100
         g2_presentage=round(((groups_counts['g2']/models_count)*100),1)/100
         g3_presentage=round(((groups_counts['g3']/models_count)*100),1)/100
@@ -87,8 +88,6 @@ class Utils_pro:
             raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
              
     def spit_dataset(self,data):
-        models_count=self.len_group_counts() 
-        groups_counts=self.new_countsD()
         g1_presentage,g2_presentage,g3_presentage,g4_presentage,g5_presentage=self.groups_persentages()
         data = self.__get_dataset(data)
        
