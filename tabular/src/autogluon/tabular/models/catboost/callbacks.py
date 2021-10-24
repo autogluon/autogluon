@@ -16,7 +16,7 @@ class MemoryCheckCallback:
     ----------
     period : int, default = 10
         Number of iterations between checking memory status. Higher values are less precise but use less compute.
-    verbose: bool, default = False
+    verbose : bool, default = False
         Whether to log information on memory status even if memory usage is low.
     """
     def __init__(self, period: int = 10, verbose=False):
@@ -56,12 +56,10 @@ class MemoryCheckCallback:
 
         if early_stop:
             logger.warning('Warning: Early stopped model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.')
-            logger.warning(f'Available Memory: {available_mb} MB')
-            logger.warning(f'Estimated Model size: {estimated_model_size_mb} MB')
+            logger.warning(f'Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB')
             return True
         elif self.verbose or (model_size_memory_ratio > 0.25):
-            logging.debug(f'Available Memory: {available_mb} MB')
-            logging.debug(f'Estimated Model Size: {estimated_model_size_mb} MB')
+            logging.debug(f'Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB')
         return False
 
 
@@ -73,9 +71,9 @@ class TimeCheckCallback:
 
     Parameters
     ----------
-    time_start : int
+    time_start : float
         The starting time (usually obtained via `time.time()`) of the training.
-    time_limit: int
+    time_limit : float
         The time in seconds before stopping training.
     """
     def __init__(self, time_start, time_limit):
