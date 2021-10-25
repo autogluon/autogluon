@@ -55,7 +55,8 @@ class MemoryCheckCallback:
             early_stop = True
 
         if early_stop:
-            logger.warning('Warning: Early stopped model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.')
+            logger.warning('Warning: Early stopped model prior to optimal result to avoid OOM error. '
+                           'Please increase available memory to avoid subpar model quality.')
             logger.warning(f'Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB')
             return True
         elif self.verbose or (model_size_memory_ratio > 0.25):

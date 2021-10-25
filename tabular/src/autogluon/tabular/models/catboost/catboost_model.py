@@ -1,8 +1,5 @@
 import logging
-import math
 import os
-import pickle
-import sys
 import time
 import psutil
 import numpy as np
@@ -176,7 +173,8 @@ class CatBoostModel(AbstractModel):
         self.model = model_type(**params)
 
         callbacks = []
-        if num_rows_train > 10000:
+        if num_rows_train * num_cols_train * num_classes > 100_000_000:
+            # The data is large enough to potentially cause memory issues during training, so monitor memory usage via callback.
             callbacks.append(MemoryCheckCallback())
         if time_limit is not None:
             time_cur = time.time()
