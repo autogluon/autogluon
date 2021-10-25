@@ -1115,8 +1115,6 @@ class AbstractTrainer:
         """
         model_fit_kwargs = self._get_model_fit_kwargs(X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs,
                                                       ens_sample_weight=kwargs.get('ens_sample_weight', None))
-        X_pseudo = kwargs.get('X_pseudo', None)
-        y_pseudo = kwargs.get('y_pseudo', None)
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
@@ -1148,13 +1146,13 @@ class AbstractTrainer:
                     if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
                         model_names_trained.append(model_hpo.name)
         else:
+            model_fit_kwargs.update(dict(
+                X_pseudo=X_pseudo,
+                y_pseudo=y_pseudo
+            ))
             if isinstance(model, BaggedEnsembleModel):
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start)
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
-                model_fit_kwargs.update(dict(
-                    X_pseudo=X_pseudo,
-                    y_pseudo=y_pseudo
-                ))
             model_names_trained = self._train_and_save(X, y, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
         self.save()
         return model_names_trained
