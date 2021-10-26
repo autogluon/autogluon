@@ -8,7 +8,7 @@ import psutil
 from pandas import DataFrame, Series
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
-from autogluon.core.features.types import S_TEXT, S_TEXT_NGRAM
+from autogluon.core.features.types import S_IMAGE_PATH, S_TEXT, S_TEXT_NGRAM
 
 from .abstract import AbstractFeatureGenerator
 from ..vectorizers import get_ngram_freq, downscale_vectorizer, vectorizer_auto_ml_default
@@ -70,24 +70,24 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         
         X_out = self._fit_transform_ngrams(X)
         
-        if (self.prefilter_tokens and self.prefilter_token_count>=X_out.shape[1]):
+        if self.prefilter_tokens and self.prefilter_token_count >= X_out.shape[1]:
             logger.warning('`prefilter_tokens` was enabled but `prefilter_token_count` larger than the vocabulary. Disabling `prefilter_tokens`.')
-            self.prefilter_tokens=False
+            self.prefilter_tokens = False
 
-        if self.prefilter_tokens and problem_type not in ['binary','regression']:
-           logger.warning('`prefilter_tokens` was enabled but invalid `problem_type`. Disabling `prefilter_tokens`.')
-           self.prefilter_tokens = False
+        if self.prefilter_tokens and problem_type not in ['binary', 'regression']:
+            logger.warning('`prefilter_tokens` was enabled but invalid `problem_type`. Disabling `prefilter_tokens`.')
+            self.prefilter_tokens = False
 
         if self.prefilter_tokens and y is None:
-           logger.warning('`prefilter_tokens` was enabled but `y` values were not provided to fit_transform. Disabling `prefilter_tokens`.')
-           self.prefilter_tokens = False
+            logger.warning('`prefilter_tokens` was enabled but `y` values were not provided to fit_transform. Disabling `prefilter_tokens`.')
+            self.prefilter_tokens = False
 
         if self.prefilter_tokens:
-            scoring_function = f_classif if problem_type=='binary' else f_regression
+            scoring_function = f_classif if problem_type == 'binary' else f_regression
             selector = SelectKBest(scoring_function, k=self.prefilter_token_count)
             selector.fit(X_out, y)
             self.token_mask = selector.get_support()
-            X_out = X_out[ X_out.columns[self.token_mask] ] # select the columns that are most correlated with y
+            X_out = X_out[X_out.columns[self.token_mask]]  # select the columns that are most correlated with y
 
         type_family_groups_special = {
             S_TEXT_NGRAM: list(X_out.columns)
@@ -101,7 +101,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         try:
             X_out = self._generate_ngrams(X=X)
             if self.prefilter_tokens:
-                X_out = X_out[ X_out.columns[self.token_mask] ] # select the columns identified during training
+                X_out = X_out[X_out.columns[self.token_mask]]  # select the columns identified during training
         except Exception:
             self._log(40, '\tError: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
             raise
@@ -109,7 +109,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(required_special_types=[S_TEXT])
+        return dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH])
 
     def _fit_transform_ngrams(self, X):
         if not self.features_in:

@@ -1,17 +1,18 @@
 import numpy as np
-from typing import Callable, Dict, Type, NamedTuple, Optional, Any
+from typing import Callable, Dict, Type, Optional, Any
 import copy
 import logging
 import ConfigSpace as CS
+from dataclasses import dataclass
 
 from ..datatypes.common import CandidateEvaluation, Candidate, \
     candidate_for_print, PendingEvaluation
 from ..datatypes.hp_ranges import HyperparameterRanges
 from ..datatypes.hp_ranges_cs import HyperparameterRanges_CS
 from ..datatypes.tuning_job_state import TuningJobState
-from ..models.gp_model import GaussProcSurrogateOutputModel, GPModel
+from ..models.gp_model import GaussProcSurrogateOutputModel, GPModel, GPModelArgs
 from ..models.gpmodel_skipopt import SkipOptimizationPredicate
-from ..models.gpmodel_transformers import GPModelPendingCandidateStateTransformer, GPModelArgs
+from ..models.gpmodel_transformers import GPModelPendingCandidateStateTransformer
 from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction, ScoringFunction, \
     dictionarize_objective, DEFAULT_METRIC
 from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
@@ -28,7 +29,8 @@ logger = logging.getLogger(__name__)
 GET_CONFIG_RANDOM_RETRIES = 50
 
 
-class MapReward(NamedTuple):
+@dataclass
+class MapReward:
     forward: Callable[[float], float]
     reverse: Callable[[float], float]
 

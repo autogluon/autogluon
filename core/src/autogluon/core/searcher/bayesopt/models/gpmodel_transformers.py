@@ -1,9 +1,9 @@
-from typing import Dict, List, Callable, Optional, NamedTuple, Union
+from typing import Dict, List, Callable, Optional
 import logging
 import copy
 
 from .gp_model import GaussProcSurrogateModel, GaussianProcessRegression, GPRegressionMCMC, \
-    GaussProcSurrogateOutputModel, GPModelArgs, GPModelArgsOutput, GPModel, GPOutputModel
+    GaussProcSurrogateOutputModel, GPModelArgsOutput, GPOutputModel
 from .gpmodel_skipopt import SkipOptimizationPredicate, NeverSkipPredicate
 from ..datatypes.common import Candidate, PendingEvaluation, CandidateEvaluation
 from ..datatypes.tuning_job_state import TuningJobState

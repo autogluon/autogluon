@@ -760,14 +760,6 @@ class AbstractModel:
             transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
         )
 
-    def get_model_feature_importance(self) -> dict:
-        """
-        Custom feature importance values for a model (such as those calculated from training)
-
-        This is purely optional to implement, as it is only used to slightly speed up permutation importance by identifying features that were never used.
-        """
-        return dict()
-
     def get_trained_params(self) -> dict:
         """
         Returns the hyperparameters of the trained model.
