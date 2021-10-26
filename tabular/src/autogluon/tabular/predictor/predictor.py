@@ -2538,7 +2538,7 @@ class TabularPredictor:
         summaries = summaries[~pd.isna(summaries.complexity)]  # remove non-interpretable models
         return summaries.sort_values(by=['model_performance', 'complexity'], ascending=[False, True])
 
-    def print_interpretable_rules(self, complexity_threshold: int = 10):
+    def print_interpretable_rules(self, complexity_threshold: int = 10, model_name: str = None):
         """
         Print the rules of the highest performing model below the complexity threshold.
 
@@ -2547,12 +2547,15 @@ class TabularPredictor:
         complexity_threshold : int, default=10
             Threshold for complexity (number of rules) of fitted models to show.
             If not model complexity is below this threshold, prints the model with the lowest complexity.
+        model_name : str,  default=None
+            Optionally print rules for a particular model, ignoring the complexity threshold.
         """
-        summaries = self.interpretable_models_summary()
-        summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
-        if summaries_filtered.shape[0] == 0:
-            summaries_filtered = summaries
-        model_name = summaries_filtered.index.values[0]  # best model is at top
+        if model_name is not None:
+            summaries = self.interpretable_models_summary()
+            summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
+            if summaries_filtered.shape[0] == 0:
+                summaries_filtered = summaries
+            model_name = summaries_filtered.index.values[0]  # best model is at top
         agmodel = self._learner.load_trainer().load_model(model_name)
         imodel = agmodel.model
         print(imodel)
