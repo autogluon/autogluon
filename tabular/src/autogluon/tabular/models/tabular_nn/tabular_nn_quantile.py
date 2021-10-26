@@ -8,7 +8,6 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from autogluon.core import Space
 from autogluon.core.constants import QUANTILE
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -452,63 +451,3 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model
-
-    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
-        """ Performs HPO and sets self.params to best hyperparameter values """
-        try_import_torch()
-        from .tabular_nn_torch import tabular_pytorch_trial, TabularPyTorchDataset
-
-        time_start = time.time()
-        self.verbosity = kwargs.get('verbosity', 2)
-        logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
-
-        # changes non-specified default hyperparams from fixed values to search-spaces.
-        self._set_default_searchspace()
-        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
-        if scheduler_cls is None or scheduler_params is None:
-            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
-        num_cpus = scheduler_params['resource']['num_cpus']
-
-        params_copy = self.params.copy()
-
-        self.num_dataloading_workers = max(1, int(num_cpus/2.0))
-        self.max_batch_size = params_copy['max_batch_size']
-        self.batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
-        train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params_copy, X_val=X_val, y_val=y_val)
-        train_path = self.path + "train"
-        val_path = self.path + "validation"
-        train_dataset.save(file_prefix=train_path)
-        val_dataset.save(file_prefix=val_path)
-
-        if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
-            logger.warning("Warning: Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
-        else:
-            logger.log(15, "Hyperparameter search space for Neural Network: ")
-            for hyperparam in params_copy:
-                if isinstance(params_copy[hyperparam], Space):
-                    logger.log(15, str(hyperparam)+ ":   "+str(params_copy[hyperparam]))
-
-        util_args = dict(
-            train_path=train_path,
-            val_path=val_path,
-            model=self,
-            time_start=time_start,
-            time_limit=scheduler_params['time_out'],
-            fit_kwargs=scheduler_params['resource'],
-        )
-        tabular_pytorch_trial.register_args(util_args=util_args, **params_copy)
-        scheduler = scheduler_cls(tabular_pytorch_trial, **scheduler_params)
-        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
-            # TODO: Ensure proper working directory setup on remote machines
-            # This is multi-machine setting, so need to copy dataset to workers:
-            logger.log(15, "Uploading preprocessed data to remote workers...")
-            scheduler.upload_files([
-                train_path + TabularPyTorchDataset.DATAOBJ_SUFFIX,
-                val_path + TabularPyTorchDataset.DATAOBJ_SUFFIX,
-            ])  # TODO: currently does not work.
-            logger.log(15, "uploaded")
-
-        scheduler.run()
-        scheduler.join_jobs()
-
-        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)

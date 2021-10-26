@@ -1,32 +1,12 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from autogluon.core.utils.exceptions import TimeLimitExceeded
 from . import tab_transformer_encoder
 from .tab_transformer_encoder import WontEncodeError, NullEnc
 import logging
-from autogluon.core import args
-from autogluon.core.models.abstract import model_trial
 
 logger = logging.getLogger(__name__)
 
-@args()
-def tt_trial(args, reporter):
-    """ Training and evaluation function used during a single trial of HPO """
-    try:
-        model, args, util_args = model_trial.prepare_inputs(args=args)
-
-        fit_model_args = dict(X=util_args.X, y=util_args.y, X_val=util_args.X_val, y_val=util_args.y_val, **util_args.get('fit_kwargs', dict()))
-        predict_proba_args = dict(X=util_args.X_val)
-        model = model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=util_args.y_val,
-                                       time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
-    except Exception as e:
-        if not isinstance(e, TimeLimitExceeded):
-            logger.exception(e, exc_info=True)
-        reporter.terminate()
-    else:
-        reporter(epoch = model.params['epochs'] + 1, validation_performance=model.val_score)
-    pass
 
 def augmentation(data, target, **params):
     shape = data.shape

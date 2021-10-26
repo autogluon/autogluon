@@ -10,18 +10,6 @@ def get_fixed_params():
         'epochs_wo_improve': 20,  # we terminate training if validation performance hasn't improved in the last 'epochs_wo_improve' # of epochs
         # TODO: Epochs could take a very long time, we may want smarter logic than simply # of epochs without improvement (slope, difference in score, etc.)
         'seed_value': None,  # random seed for reproducibility (set = None to ignore)
-        # For data processing:
-        'proc.embed_min_categories': 4,  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
-        # Options: [3,4,10, 100, 1000]
-        'proc.impute_strategy': 'median',  # # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
-        # Options: ['median', 'mean', 'most_frequent']
-        'proc.max_category_levels': 100,  # maximum number of allowed levels per categorical feature
-        # Options: [10, 100, 200, 300, 400, 500, 1000, 10000]
-        'proc.skew_threshold': 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
-        # Options: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
-        # Old params: These are now set based off of nthreads_per_trial, ngpus_per_trial.
-        # 'num_dataloading_workers': 1,  # Will be overwritten by nthreads_per_trial, can be >= 1 
-        # 'ctx': mx.cpu(),  # Will be overwritten by ngpus_per_trial if unspecified (can alternatively be: mx.gpu())
     }
     return fixed_params
 
@@ -69,7 +57,15 @@ def get_hyper_params():
         'target_lr': 1.0,  # largest LR (float > 0)
         'lr_decay': 0.1,  # step factor used to decay LR (float in (0,1))
         'warmup_epochs': 10,  # number of epochs at beginning of training in which LR is linearly ramped up (float > 1).
-        ## Feature-specific hyperparameters:
+        ## Hyperparameters for data processing:
+        'proc.embed_min_categories': 4,  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
+        # Options: [3,4,10, 100, 1000]
+        'proc.impute_strategy': 'median',  # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
+        # Options: ['median', 'mean', 'most_frequent']
+        'proc.max_category_levels': 100,  # maximum number of allowed levels per categorical feature
+        # Options: [10, 100, 200, 300, 400, 500, 1000, 10000]
+        'proc.skew_threshold': 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
+        # Options: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
         'use_ngram_features': False,  # If False, will drop automatically generated ngram features from language features. This results in worse model quality but far faster inference and training times.
         # Options: [True, False]
     }

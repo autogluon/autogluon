@@ -470,38 +470,6 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     def _get_default_searchspace(self):
         return get_default_searchspace()
 
-    # TODO: Consider HPO for pretraining with unlabeled data. (Potential future work)
-    # TODO: Does not work correctly when cuda is enabled.
-    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
-        from .utils import tt_trial
-
-        time_start = time.time()
-        self._set_default_searchspace()
-        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
-
-        if scheduler_cls is None or scheduler_params is None:
-            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
-
-        util_args = dict(
-            X=X,
-            y=y,
-            X_val=X_val,
-            y_val=y_val,
-            model=self,
-            time_start=time_start,
-            time_limit=scheduler_params['time_out'],
-            fit_kwargs=scheduler_params['resource'],
-        )
-
-        params_copy = self.params.copy()
-        tt_trial.register_args(util_args=util_args, **params_copy)
-
-        scheduler = scheduler_cls(tt_trial, **scheduler_params)
-        scheduler.run()
-        scheduler.join_jobs()
-
-        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
-
     def save(self, path: str = None, verbose=True) -> str:
         import torch
         if path is None:
