@@ -25,6 +25,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       Using AutoGluon for Kaggle competitions with tabular data.
 
    .. card::
+      :title: Interpretable rule-based modeling
+      :link: tabular-interpretability.html
+
+      Fitting interpretable models to data table for understanding data and predictions.
+
+   .. card::
       :title: Data Tables Containing Image, Text, and Tabular
       :link: tabular-multimodal.html
 
