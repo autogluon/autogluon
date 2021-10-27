@@ -19,7 +19,7 @@ train_data.head()
 Now, we create a predictor and fit it to the data. By specifying `presets='interpretable'`, we tell the predictor to fit only interpretable models.
 
 ```{.python .input}
-predictor = TabularPredictor(label='class)
+predictor = TabularPredictor(label='class')
 predictor.fit(train_data, presets='interpretable')
 ```
 
