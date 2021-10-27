@@ -3,6 +3,7 @@ from abc import abstractmethod
 import numpy as np
 import pandas as pd
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.try_import import try_import_imodels
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.models.lr.lr_preprocessing_utils import OheFeaturesGenerator
 from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
@@ -83,6 +84,7 @@ class RuleFitModel(IModelsModel):
         super().__init__(**kwargs)
 
     def get_model(self):
+        try_import_imodels()
         from imodels import RuleFitRegressor, RuleFitClassifier
 
         if self.problem_type in ['regression', 'softclass']:
@@ -96,6 +98,7 @@ class GreedyTreeModel(IModelsModel):
         super().__init__(**kwargs)
 
     def get_model(self):
+        try_import_imodels()
         from imodels import GreedyTreeClassifier
         from sklearn.tree import DecisionTreeRegressor
 
@@ -113,6 +116,7 @@ class GlobalSparseTreeModel(IModelsModel):
         super().__init__(**kwargs)
 
     def get_model(self):
+        try_import_imodels()
         from imodels import GlobalSparseTreeClassifier
 
         if self.problem_type in ['binary']:
@@ -126,6 +130,7 @@ class BayesianRuleSetModel(IModelsModel):
         super().__init__(**kwargs)
 
     def get_model(self):
+        try_import_imodels()
         from imodels import BayesianRuleSetClassifier
 
         if self.problem_type in ['binary']:
@@ -139,6 +144,7 @@ class BoostedRulesModel(IModelsModel):
         super().__init__(**kwargs)
 
     def get_model(self):
+        try_import_imodels()
         from imodels import BoostedRulesClassifier
 
         if self.problem_type in ['binary']:
@@ -153,6 +159,7 @@ class CorelsRuleListModel(IModelsModel):
         super().__init__(**kwargs)
 
     def get_model(self):
+        try_import_imodels()
         from imodels import CorelsRuleListClassifier
 
         if self.problem_type in ['binary']:
