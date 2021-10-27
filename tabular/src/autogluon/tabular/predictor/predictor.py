@@ -2560,7 +2560,7 @@ class TabularPredictor:
         imodel = agmodel.model
         print(imodel)
 
-    def explain_classification_errors(self, data, model=None, print_rules: bool = True):
+    def explain_classification_errors(self, data, model = None, print_rules: bool = True):
         """Explain classification errors by fitting a rule-based model to them
 
         Parameters
@@ -2586,7 +2586,6 @@ class TabularPredictor:
         labels = data[self.label]
         cls, columns = imodels.explain_classification_errors(data, predictions, labels, print_rules=print_rules)
         return cls
-        # print('data', data.shape, predictions.shape, labels.shape, type(data), type(predictions), data.columns)
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor

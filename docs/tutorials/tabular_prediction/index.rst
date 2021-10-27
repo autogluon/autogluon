@@ -73,6 +73,7 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-quickstart
    tabular-indepth
    tabular-kaggle
+   tabular-interpretability
    tabular-multimodal
    tabular-multimodal-text-others
    tabular-multilabel
