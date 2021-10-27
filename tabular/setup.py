@@ -51,7 +51,7 @@ extras_require = {
         'scikit-learn-intelex<=2021.3',
     ],
     'imodels': [
-        'imodels>=1.0.2',
+        'imodels>=1.0.3',
     ],
 }
 

@@ -29,7 +29,8 @@ class IModelsModel(AbstractModel):
             X = X.copy()
             X = X.fillna(0)
             X = self._feature_generator.transform(X=X)
-        return X.toarray().astype(np.float32)
+        feature_names = self._feature_generator._feature_names
+        return pd.DataFrame(X.toarray().astype(np.float32), columns=feature_names)
 
     def _get_types_of_features(self, df):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
@@ -59,7 +60,7 @@ class IModelsModel(AbstractModel):
         X = self.preprocess(X, is_train=True)
         params = self._get_model_params()
         self.model = model_cls(**params)
-        self.model.fit(X, y)
+        self.model.fit(X, y, feature_names=X.columns.values.tolist())
 
     def _set_default_params(self):
         default_params = {
