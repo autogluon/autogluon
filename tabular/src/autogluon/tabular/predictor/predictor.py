@@ -2550,7 +2550,7 @@ class TabularPredictor:
         model_name : str,  default=None
             Optionally print rules for a particular model, ignoring the complexity threshold.
         """
-        if model_name is not None:
+        if model_name is None:
             summaries = self.interpretable_models_summary()
             summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
             if summaries_filtered.shape[0] == 0:
