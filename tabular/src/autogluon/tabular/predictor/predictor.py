@@ -16,7 +16,7 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
-from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
+from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity, try_import_torch
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
@@ -809,7 +809,7 @@ class TabularPredictor:
         if save_space:
             self.save_space()
 
-    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000):
+    def _calibrate_model(self, model_name: str = None, lr: float = 0.03, max_iter: int = 1000):
         """
         Applies temperature scaling to the best autogluon model. Applies
         inverse softmax to predicted probs then trains temperature scalar
@@ -834,12 +834,9 @@ class TabularPredictor:
             y_val = self._trainer.load_y_val().to_numpy()
 
         if self.problem_type == BINARY:
-            y_val_probs = np.column_stack([1-y_val_probs, y_val_probs])
+            y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
-        try:
-            import torch
-        except:
-            raise Exception('Pytorch is required for calibrate, but is not installed.')
+        try_import_torch()
 
         y_val_tensor = torch.tensor(y_val)
         temperature_param = torch.nn.Parameter(torch.ones(1))

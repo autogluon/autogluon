@@ -16,7 +16,7 @@ from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE, PROBLEM_TYPES_CLASSIFICATION
-from ...data.label_cleaner import LabelCleaner
+from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
@@ -26,6 +26,8 @@ from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 
+
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 logger = logging.getLogger(__name__)
 
 
@@ -569,7 +571,7 @@ class AbstractModel:
     def _apply_temperature_scaling(self, y_pred_proba):
         if self.temperature_scalar is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
             if self.problem_type == BINARY:
-                y_pred_proba = np.column_stack([1 - y_pred_proba, y_pred_proba])
+                y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 
             logits = np.log(y_pred_proba)
             y_pred_proba = scipy.special.softmax(logits/self.temperature_scalar, axis=1)
