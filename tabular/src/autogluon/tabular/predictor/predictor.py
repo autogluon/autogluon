@@ -809,7 +809,7 @@ class TabularPredictor:
         if save_space:
             self.save_space()
 
-    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000):
+    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float=1.2):
         """
         Applies temperature scaling to the best autogluon model. Applies
         inverse softmax to predicted probs then trains temperature scalar
@@ -840,7 +840,7 @@ class TabularPredictor:
         import torch
 
         y_val_tensor = torch.tensor(y_val)
-        temperature_param = torch.nn.Parameter(torch.ones(1))
+        temperature_param = torch.nn.Parameter(torch.ones(1).fill_(init_val))
         logits = torch.tensor(np.log(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
