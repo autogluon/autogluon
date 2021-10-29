@@ -677,7 +677,11 @@ class AbstractLearner:
             X, y = self._remove_nan_label_rows(X, y)
             if self.ignored_columns:
                 X = X.drop(columns=self.ignored_columns, errors='ignore')
-
+            unused_features = [f for f in list(X.columns) if f not in self.features]
+            if len(unused_features) > 0:
+                logger.log(30, f'These features in provided data are not utilized by the predictor and will be ignored: {unused_features}')
+                X = X.drop(columns=unused_features)
+            
             if feature_stage == 'original':
                 return trainer._get_feature_importance_raw(model=model, X=X, y=y, features=features, subsample_size=subsample_size, transform_func=self.transform_features, silent=silent, **kwargs)
             X = self.transform_features(X)
