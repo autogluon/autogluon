@@ -809,7 +809,7 @@ class TabularPredictor:
         if save_space:
             self.save_space()
 
-    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float=1.2):
+    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.2):
         """
         Applies temperature scaling to the best autogluon model. Applies
         inverse softmax to predicted probs then trains temperature scalar
