@@ -837,6 +837,7 @@ class TabularPredictor:
             y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
         try_import_torch()
+        import torch
 
         y_val_tensor = torch.tensor(y_val)
         temperature_param = torch.nn.Parameter(torch.ones(1))
