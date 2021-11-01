@@ -9,6 +9,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import networkx as nx
+from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
@@ -836,30 +837,33 @@ class TabularPredictor:
         if self.problem_type == BINARY:
             y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
-        try_import_torch()
-        import torch
-
-        y_val_tensor = torch.tensor(y_val)
-        temperature_param = torch.nn.Parameter(torch.ones(1).fill_(init_val))
-        logits = torch.tensor(np.log(y_val_probs))
-        nll_criterion = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
-
-        def temperature_scale_step():
-            optimizer.zero_grad()
-            temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
-            new_logits = (logits / temp)
-            loss = nll_criterion(new_logits, y_val_tensor)
-            loss.backward()
-            scheduler.step()
-            return loss
-
         logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
-        optimizer.step(temperature_scale_step)
+        temp_scalar = tune_temperature_scaling(y_val_probs = y_val_probs, y_val = y_val,
+                                               init_val = init_val, max_iter = max_iter, lr = lr)
+
+        # try_import_torch()
+        # import torch
+        #
+        # y_val_tensor = torch.tensor(y_val)
+        # temperature_param = torch.nn.Parameter(torch.ones(1).fill_(init_val))
+        # logits = torch.tensor(np.log(y_val_probs))
+        # nll_criterion = torch.nn.CrossEntropyLoss()
+        # optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
+        # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
+        #
+        # def temperature_scale_step():
+        #     optimizer.zero_grad()
+        #     temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
+        #     new_logits = (logits / temp)
+        #     loss = nll_criterion(new_logits, y_val_tensor)
+        #     loss.backward()
+        #     scheduler.step()
+        #     return loss
+
+        # optimizer.step(temperature_scale_step)
 
         model = self._trainer.load_model(model_name=model_name)
-        model.temperature_scalar = temperature_param[0].item()
+        model.temperature_scalar = temp_scalar
         model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
