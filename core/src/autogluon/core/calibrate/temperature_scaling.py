@@ -1,5 +1,7 @@
 import numpy as np
+
 from ..utils import try_import_torch
+
 
 def tune_temperature_scaling(y_val_probs, y_val, init_val, max_iter, lr):
     try_import_torch()
