@@ -481,10 +481,6 @@ class TabularPredictor:
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
             In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
-        calibrate: bool, default = False
-            If True then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
-            will train a scalar parameter on the validation set. This trains the best model's predictive prob to have a stronger
-            correlation between predictive prob and accuracy.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -639,7 +635,10 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
-
+            calibrate: bool, default = False
+                If True then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
+                will train a scalar parameter on the validation set. This trains the best model's predictive prob to have a stronger
+                correlation between predictive prob and accuracy.
         Returns
         -------
         :class:`TabularPredictor` object. Returns self.
