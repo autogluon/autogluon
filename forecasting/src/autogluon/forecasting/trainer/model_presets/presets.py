@@ -90,7 +90,10 @@ def get_preset_models(path, prediction_length, freq, eval_metric, hyperparameter
         if hyperparameters is not None:
             default_hps = {model: default_hps[model] for model in default_hps if model in hyperparameters}
             for model in hyperparameters:
-                default_hps[model].update(hyperparameters[model])
+                if model not in default_hps:
+                    default_hps[model] = hyperparameters[model]
+                else:
+                    default_hps[model].update(hyperparameters[model])
         hyperparameters = copy.deepcopy(default_hps)
     if hyperparameter_tune:
         verify_contains_searchspace(hyperparameters)
