@@ -833,8 +833,8 @@ class TabularPredictor:
             y_val_probs = self._trainer.predict_proba(X_val, model_name)
             y_val = self._trainer.load_y_val().to_numpy()
 
-        if self.problem_type == BINARY:
-            y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
+            if self.problem_type == BINARY:
+                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
         logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
         temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
