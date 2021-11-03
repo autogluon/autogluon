@@ -148,7 +148,7 @@ class TaskScheduler(object):
         """
 
         # Lazy import
-        from ..task.locks import TaskLock
+        from ..locks import TaskLock
 
         if destination is None:
             destination = OrderedDict()

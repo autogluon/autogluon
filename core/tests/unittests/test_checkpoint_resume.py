@@ -3,12 +3,11 @@ import logging
 import numpy as np
 import time
 
+from autogluon.core.locks import TaskLock
 from autogluon.core.searcher.bayesopt.datatypes.hp_ranges_cs import \
     HyperparameterRanges_CS
 from autogluon.core.searcher.bayesopt.utils.comparison_gpy import Branin
 from autogluon.core.searcher.gp_searcher import _to_config_cs
-from autogluon.core import Task
-from autogluon.core.task.locks import TaskLock
 
 logger = logging.getLogger(__name__)
 

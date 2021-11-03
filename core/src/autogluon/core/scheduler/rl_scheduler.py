@@ -97,7 +97,7 @@ class RLScheduler(FIFOScheduler):
     """
     def __init__(self, train_fn, **kwargs):
         # Lazy import
-        from ..task.locks import TaskLock
+        from ..locks import TaskLock
 
         try_import_mxnet()
         import mxnet as mx

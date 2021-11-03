@@ -24,7 +24,7 @@ class Task(object):
     """
     def __init__(self, fn, args, resources):
         # Lazy import
-        from .locks import TaskLock
+        from ..locks import TaskLock
 
         self.fn = fn
         self.args = copy.deepcopy(args)
@@ -45,7 +45,7 @@ class Task(object):
     @classmethod
     def set_id(cls, taskid):
         # Lazy import
-        from .locks import TaskLock
+        from ..locks import TaskLock
 
         logger.info('Setting TASK ID: {}'.format(taskid))
         with TaskLock.LOCK:
