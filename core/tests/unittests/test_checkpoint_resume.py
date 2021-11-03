@@ -8,6 +8,7 @@ from autogluon.core.searcher.bayesopt.datatypes.hp_ranges_cs import \
 from autogluon.core.searcher.bayesopt.utils.comparison_gpy import Branin
 from autogluon.core.searcher.gp_searcher import _to_config_cs
 from autogluon.core import Task
+from autogluon.core.task.locks import TaskLock
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,7 @@ def test_resume_fifo_random():
     search_options = {'random_seed': random_seed}
 
     # First experiment: Two phases, with resume
-    task_id = Task.TASK_ID.value
+    task_id = TaskLock.TASK_ID.value
     scheduler1 = ag.scheduler.FIFOScheduler(
         branin_fn,
         searcher='random',
@@ -143,7 +144,7 @@ def test_resume_fifo_random():
         'best_config': searcher.get_best_config()}
 
     # Second experiment: Just one phase
-    task_id = Task.TASK_ID.value
+    task_id = TaskLock.TASK_ID.value
     scheduler3 = ag.scheduler.FIFOScheduler(
         branin_fn,
         searcher='random',
@@ -189,7 +190,7 @@ def test_resume_hyperband_random():
         exper_type = 'hyperband_{}_random'.format(hp_type)
         checkpoint_fname = 'tests/unittests/checkpoint_{}.ag'.format(exper_type)
         # First experiment: Two phases, with resume
-        task_id = Task.TASK_ID.value
+        task_id = TaskLock.TASK_ID.value
         scheduler1 = ag.scheduler.HyperbandScheduler(
             branin_epochs_fn,
             searcher='random',
@@ -225,7 +226,7 @@ def test_resume_hyperband_random():
         #print_config_history(results1['config_history'], task_id)
 
         # Second experiment: Just one phase
-        task_id = Task.TASK_ID.value
+        task_id = TaskLock.TASK_ID.value
         scheduler3 = ag.scheduler.HyperbandScheduler(
             branin_epochs_fn,
             searcher='random',

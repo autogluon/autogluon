@@ -146,11 +146,15 @@ class TaskScheduler(object):
         --------
         >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
+
+        # Lazy import
+        from ..task.locks import TaskLock
+
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
         destination['finished_tasks'] = pickle.dumps(self.finished_tasks)
-        destination['TASK_ID'] = Task.TASK_ID.value
+        destination['TASK_ID'] = TaskLock.TASK_ID.value
         return destination
 
     def load_state_dict(self, state_dict):
