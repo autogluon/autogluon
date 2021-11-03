@@ -1,5 +1,4 @@
 import logging
-import multiprocessing as mp
 import pickle
 from collections import OrderedDict
 import numpy as np
@@ -23,8 +22,6 @@ class BaseSearcher(object):
         The configuration space to sample from. It contains the full
         specification of the Hyperparameters with their priors
     """
-    LOCK = mp.Lock()
-
     def __init__(self, configspace, reward_attribute=None):
         """
         :param configspace: Configuration space to sample from or search in
@@ -99,10 +96,12 @@ class BaseSearcher(object):
         scheduler.
 
         """
+        # Lazy import
+        from ..locks import BaseSearcherLock
         reward = kwargs.get(self._reward_attribute)
         assert reward is not None, \
             "Missing reward attribute '{}'".format(self._reward_attribute)
-        with self.LOCK:
+        with BaseSearcherLock.LOCK:
             # _results is updated if reward is larger than the previous entry.
             # This is the correct behaviour for multi-fidelity schedulers,
             # where update is called multiple times for a config, with
@@ -166,7 +165,9 @@ class BaseSearcher(object):
         """Calculates the reward (i.e. validation performance) produced by training under the best configuration identified so far.
            Assumes higher reward values indicate better performance.
         """
-        with self.LOCK:
+        # Lazy import
+        from ..locks import BaseSearcherLock
+        with BaseSearcherLock.LOCK:
             if self._results:
                 return max(self._results.values())
         return self._reward_while_pending()
@@ -174,15 +175,19 @@ class BaseSearcher(object):
     def get_reward(self, config):
         """Calculates the reward (i.e. validation performance) produced by training with the given configuration.
         """
+        # Lazy import
+        from ..locks import BaseSearcherLock
         k = pickle.dumps(config)
-        with self.LOCK:
+        with BaseSearcherLock.LOCK:
             assert k in self._results
             return self._results[k]
 
     def get_best_config(self):
         """Returns the best configuration found so far.
         """
-        with self.LOCK:
+        # Lazy import
+        from ..locks import BaseSearcherLock
+        with BaseSearcherLock.LOCK:
             if self._results:
                 config_pkl = max(self._results, key=self._results.get)
                 return pickle.loads(config_pkl)
@@ -192,7 +197,9 @@ class BaseSearcher(object):
     def get_best_config_reward(self):
         """Returns the best configuration found so far, as well as the reward associated with this best config.
         """
-        with self.LOCK:
+        # Lazy import
+        from ..locks import BaseSearcherLock
+        with BaseSearcherLock.LOCK:
             if self._results:
                 config_pkl = max(self._results, key=self._results.get)
                 return pickle.loads(config_pkl), self._results[config_pkl]
@@ -339,6 +346,8 @@ class RandomSearcher(BaseSearcher):
         -------
         A new configuration that is valid.
         """
+        # Lazy import
+        from ..locks import BaseSearcherLock
         self.configspace.random = self.random_state
         if self._debug_log is not None:
             self._debug_log.start_get_config('random')
@@ -347,7 +356,7 @@ class RandomSearcher(BaseSearcher):
             new_config = self.configspace.get_default_configuration().get_dictionary()
         else:
             new_config = self.configspace.sample_configuration().get_dictionary()
-        with self.LOCK:
+        with BaseSearcherLock.LOCK:
             num_tries = 1
             while pickle.dumps(new_config) in self._results:
                 assert num_tries <= self.MAX_RETRIES, \

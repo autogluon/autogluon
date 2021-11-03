@@ -1,7 +1,5 @@
-import os
 import socket
 import logging
-import multiprocessing as mp
 
 from .remote import Remote
 from ...utils import warning_filter
@@ -26,8 +24,6 @@ def get_ip():
 
 class RemoteManager(object):
     NODES = {}
-    LOCK = mp.Lock()
-    PORT_ID = mp.Value('i', 8700)
     MASTER_IP = None
     __instance = None
     def __new__(cls):
@@ -47,7 +43,11 @@ class RemoteManager(object):
         port = cls.get_port_id()
         with warning_filter():
             remote = Remote(cls.MASTER_IP, port, local=True)
-        with cls.LOCK:
+
+        # Lazy import
+        from ...locks import RemoteManagerLock
+
+        with RemoteManagerLock.LOCK:
             cls.NODES[cls.MASTER_IP] = remote
 
     @classmethod
@@ -68,6 +68,9 @@ class RemoteManager(object):
 
     @classmethod
     def add_remote_nodes(cls, ip_addrs):
+        # Lazy import
+        from ...locks import RemoteManagerLock
+
         ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
         remotes = []
         for node_ip in ip_addrs:
@@ -76,7 +79,7 @@ class RemoteManager(object):
                 continue
             port = cls.get_port_id()
             remote = Remote(node_ip, port)
-            with cls.LOCK:
+            with RemoteManagerLock.LOCK:
                 cls.NODES[node_ip] = remote
             remotes.append(remote)
         return remotes
@@ -90,9 +93,12 @@ class RemoteManager(object):
 
     @classmethod
     def get_port_id(cls):
-        with cls.LOCK:
-            cls.PORT_ID.value += 1
-            return cls.PORT_ID.value
+        # Lazy import
+        from ...locks import RemoteManagerLock
+
+        with RemoteManagerLock.LOCK:
+            RemoteManagerLock.PORT_ID.value += 1
+            return RemoteManagerLock.PORT_ID.value
 
     def __enter__(self):
         return self
