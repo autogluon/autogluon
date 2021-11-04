@@ -389,6 +389,8 @@ def test_pseudolabeling():
         train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file,
                                           name=dataset['name'], url=dataset['url'])
 
+        print(f"Testing: {name}, problem type: {problem_type}")
+
         train_data = train_data.sample(50)
 
         error_msg = f'pseudolabel threw an exception during fit, it should have ' \
@@ -396,6 +398,7 @@ def test_pseudolabeling():
 
         # Test label already given
         try:
+            print("Pseudolabel Testing: Pre-labeled data 'fit_pseudolabel'")
             _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=test_data,
                                                                             return_pred_prob=True,
                                                                             train_data=train_data,
@@ -404,6 +407,7 @@ def test_pseudolabeling():
             assert False, error_msg + 'labeled test data'
 
         try:
+            print("Pseudolabel Testing: Pre-labeled data, best quality 'fit_pseudolabel'")
             _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=test_data,
                                                                             return_pred_prob=True,
                                                                             train_data=train_data,
@@ -416,6 +420,7 @@ def test_pseudolabeling():
 
         # Test unlabeled
         try:
+            print("Pseudolabel Testing: Unlabeled data 'fit_pseudolabel'")
             _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=unlabeled_test_data,
                                                                             return_pred_prob=True,
                                                                             train_data=train_data,
@@ -424,6 +429,7 @@ def test_pseudolabeling():
             assert False, error_msg + 'unlabeled test data'
 
         try:
+            print("Pseudolabel Testing: Unlabeled data, best quality 'fit_pseudolabel'")
             _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=unlabeled_test_data,
                                                                             return_pred_prob=True,
                                                                             train_data=train_data,
