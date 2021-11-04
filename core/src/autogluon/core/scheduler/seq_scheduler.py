@@ -116,7 +116,7 @@ class LocalSequentialScheduler(object):
 
     def get_searcher_(self, searcher, train_fn, **kwargs) -> BaseSearcher:
         scheduler_opts = {}
-        if searcher is 'auto':
+        if searcher == 'auto':
             searcher = 'bayesopt'
             scheduler_opts = {'scheduler': 'local'}
 

@@ -96,6 +96,9 @@ class RLScheduler(FIFOScheduler):
     >>> scheduler.get_training_curves(plot=True)
     """
     def __init__(self, train_fn, **kwargs):
+        # Lazy import
+        from ..locks import TaskLock
+
         try_import_mxnet()
         import mxnet as mx
 
@@ -358,13 +361,16 @@ class RLScheduler(FIFOScheduler):
         --------
         >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
+        # Lazy import
+        from ..locks import TaskLock
+
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
         logger.debug('\nState_Dict self.finished_tasks: {}'.format(self.finished_tasks))
         destination['finished_tasks'] = pickle.dumps(self.finished_tasks)
         destination['baseline'] = pickle.dumps(self.baseline)
-        destination['TASK_ID'] = Task.TASK_ID.value
+        destination['TASK_ID'] = TaskLock.TASK_ID.value
         destination['searcher'] = self.searcher.state_dict()
         destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
