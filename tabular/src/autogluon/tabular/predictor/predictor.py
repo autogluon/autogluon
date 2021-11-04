@@ -882,6 +882,8 @@ class TabularPredictor:
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
                 [`holdout_frac`, `num_bag_folds`, `auto_stack`, `feature_generator`, `unlabeled_data`]
+            pseudo_data : pd.DataFrame, default = None
+                Data that has been self labeled by Autogluon model and will be incorporated into training during 'fit_extra'
         """
         time_start = time.time()
 
@@ -1001,8 +1003,8 @@ class TabularPredictor:
         -----------
         hyperparameters: dict
             Dictionary of hyperparameters the model should use
-        unlabeled_data: Extra unlabeled data to assign pseudolabels to and incorporate as
-            extra training data.
+        unlabeled_data: Extra unlabeled data (could be the test data) to assign pseudolabels to
+            and incorporate as extra training data.
         max_iter: int, default = 5
             Maximum allowed number of iterations, where in each iteration, the data are pseudolabeled
             by the current predictor and the predictor is refit including the pseudolabled data in its training set.
@@ -1068,20 +1070,19 @@ class TabularPredictor:
         else:
             return self
 
-    def fit_pseudolabel(self, test_data: pd.DataFrame, max_iter: int = 5, return_pred_prob: bool = False, **kwargs):
+    def fit_pseudolabel(self, pseudo_data: pd.DataFrame, max_iter: int = 5, return_pred_prob: bool = False, **kwargs):
         """
-        Pseudolabeling fit algorithm. If test_data is labeled then incorporates all
-        test_data into train_data for newly fit models. This data is not used for
-        validation. If test_data is unlabeled then fit_pseudolabel will self label the
-        test data and incorporate all the test data that meets a criteria (For example
-        all rows with predictive prob above 95%). If predictor is fit then will call fit_extra
-        with added training data, if predictor is not fit then will fit model on train_data
-        then run pseudo label algorithm.
+        If 'pseudo_data' is labeled then incorporates all test_data into train_data for
+        newly fit models. If 'pseudo_data' is unlabeled then 'fit_pseudolabel' will self label the
+        data and will augment the original training data by adding all the self labeled
+        data that meets a criteria (For example all rows with predictive prob above 95%). If
+        predictor is fit then will call fit_extra with added training data, if predictor
+        is not fit then will fit model on train_data then run.
 
         Parameters
         ----------
-        test_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            Data to incorporate into training. Pre-labeled test data allowed. If no labels
+        pseudo_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            Extra data to incorporate into training. Pre-labeled test data allowed. If no labels
             then pseudolabeling algorithm will predict and filter out which rows to incorporate into
             training
         max_iter: int, default = 5
@@ -1112,7 +1113,7 @@ class TabularPredictor:
                            f'eval_metric is {self.eval_metric.name}, we recommend using'
                            f'fit_pseudolabeling when eval metric is \'accuracy\'')
 
-        is_labeled = self.label in test_data.columns
+        is_labeled = self.label in pseudo_data.columns
 
         hyperparameters = kwargs.get('hyperparameters', None)
         if hyperparameters is None:
@@ -1126,18 +1127,18 @@ class TabularPredictor:
         fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
         if is_labeled:
             logger.log(20, "Fitting predictor using the provided pseudolabeled examples as extra training data...")
-            self.fit_extra(pseudo_data=test_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter='')[:-1],
+            self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter='')[:-1],
                            **fit_extra_kwargs)
 
             if return_pred_prob:
-                y_pred_proba = self.predict_proba(test_data)
+                y_pred_proba = self.predict_proba(pseudo_data)
                 return self, y_pred_proba
             else:
                 return self
         else:
             logger.log(20, 'Given test_data for pseudo labeling did not contain labels. '
-                           'AutoGluon will label the data and use it for pseudo labeling...')
-            return self._run_pseudolabeling(unlabeled_data=test_data, max_iter=max_iter,
+                           'AutoGluon will assign pseudo labels to data and use it for extra training data...')
+            return self._run_pseudolabeling(unlabeled_data=pseudo_data, max_iter=max_iter,
                                             return_pred_prob=return_pred_prob, **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):

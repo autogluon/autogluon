@@ -395,14 +395,17 @@ def test_pseudolabeling():
 
         # Test label already given
         try:
-            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=test_data,
-                                                                            return_pred_prob=True)
+            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=test_data,
+                                                                            return_pred_prob=True,
+                                                                            train_data=train_data)
         except Exception as e:
             assert False, error_msg + 'labeled test data'
 
         try:
-            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=test_data,
-                                                                            return_pred_prob=True, presets='best_quality')
+            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=test_data,
+                                                                            return_pred_prob=True,
+                                                                            train_data=train_data,
+                                                                            presets='best_quality')
         except Exception as e:
             assert False, error_msg + 'labeled test data, best quality'
 
@@ -410,14 +413,17 @@ def test_pseudolabeling():
 
         # Test unlabeled
         try:
-            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=unlabeled_test_data,
-                                                                            return_pred_prob=True)
+            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=unlabeled_test_data,
+                                                                            return_pred_prob=True,
+                                                                            train_data=train_data)
         except Exception as e:
             assert False, error_msg + 'unlabeled test data'
 
         try:
-            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(train_data=train_data, test_data=unlabeled_test_data,
-                                                                            return_pred_prob=True, presets='best_quality')
+            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=unlabeled_test_data,
+                                                                            return_pred_prob=True,
+                                                                            train_data=train_data,
+                                                                            presets='best_quality')
         except Exception as e:
             assert False, error_msg + 'unlabeled test data, best quality'
 

@@ -5,25 +5,29 @@ from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
 
 def filter_pseudo(y_pred_proba_og, problem_type,
                   min_proportion_prob: float = 0.05, max_proportion_prob: float = 0.6,
-                  threshold: float = 0.95, percent_sample: float = 0.3):
+                  threshold: float = 0.95, proportion_sample: float = 0.3):
     """
     Takes in the predicted probabilities of the model and chooses the indices that meet
     a criteria to incorporate into training data. Criteria is determined by problem_type.
-    If mutliclass or binary will choose all rows with max prob over threshold. For regression
-    chooses 30% of the labeled data randomly.
+    If multiclass or binary will choose all rows with max prob over threshold. For regression
+    chooses 30% of the labeled data randomly. This filter is used pseudo labeled data.
 
     Parameters:
     -----------
     y_pred_proba_og: The predicted probabilities from the current best model. If problem is
         'binary' or 'multiclass' then it's Panda series of predictive probs, if it's 'regression'
-        then it's a scalar
-    min_proportion_prob: Minimum percentage of total 'y_pred_proba_og` that is below threshold
-        required to trigger threshold change
-    max_proportion_prob: Maximum percentage of total 'y_pred_proba_og` that is above threshold
-        required to trigger threshold change
-    threshold: The predictive probability that must be exceeded in order to be
-        incorporated into the next round of training (ignored for regression)
-    percent_sample: When problem_type is regression this is percent of pseudo data
+        then it's a scalar. Binary probs should be set to multiclass.
+    min_proportion_prob: Minimum proportion of indices in y_pred_proba_og to select. The filter
+        threshold will be automatically adjusted until at least min_proportion_prob of the predictions
+        in y_pred_proba_og pass the filter. This ensures we return at least min_proportion_prob of the
+        pseudolabeled data to augment the training set in pseudolabeling.
+    max_proportion_prob: Maximum proportion of indices in y_pred_proba_og to select. The filter threshold
+        will be automatically adjusted until at most max_proportion_prob of the predictions in y_pred_proba_og
+        pass the filter. This ensures we return at most max_proportion_prob of the pseudolabeled data to augment
+        the training set in pseudolabeling.
+    threshold: This filter will only return those indices of y_pred_proba_og where the probability
+        of the most likely class exceeds the given threshold value.
+    proportion_sample: When problem_type is regression this is percent of pseudo data
         to incorporate into train. Rows selected randomly.
 
     Returns:
@@ -46,7 +50,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
         test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
     else:
         test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
-        test_pseudo_indices_true = test_pseudo_indices.sample(frac=percent_sample, random_state=0)
+        test_pseudo_indices_true = test_pseudo_indices.sample(frac=proportion_sample, random_state=0)
         test_pseudo_indices[test_pseudo_indices_true.index] = True
 
     test_pseudo_indices = test_pseudo_indices[test_pseudo_indices]
