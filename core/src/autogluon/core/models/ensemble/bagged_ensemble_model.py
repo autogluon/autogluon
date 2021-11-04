@@ -363,23 +363,27 @@ class BaggedEnsembleModel(AbstractModel):
         # noinspection PyCallingNonCallable
         fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy(
             self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats, save_folds=save_folds)
-        for j in range(n_repeat_start, n_repeats):  # For each n_repeat
-            if j != n_repeat_start or k_fold_start == 0:
+        for n_repeat in range(n_repeat_start, n_repeats):  # For each n_repeat
+            if n_repeat != n_repeat_start or k_fold_start == 0:
+                if cv_splitter.n_repeats <= n_repeat:
+                    # If current cv_splitter doesn't have enough n_repeats for all folds, then create a new one.
+                    cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups)
+                    kfolds = cv_splitter.split(X=X, y=y)
                 self._cv_splitters.append(cv_splitter)
-            cur_repeat_count = j - n_repeat_start
+            cur_repeat_count = n_repeat - n_repeat_start
             fold_start_n_repeat = fold_start + cur_repeat_count * k_fold
-            fold_end_n_repeat = min(fold_start_n_repeat + k_fold, fold_end)
+            fold_end_n_repeat = min((n_repeat+1) * k_fold, fold_end)
 
-            for i in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
-                fold_num_in_repeat = i - (j * k_fold)  # The fold in the current repeat set (first fold in set = 0)
+            for fold in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
+                fold_num_in_repeat = fold - (n_repeat * k_fold)  # The fold in the current repeat set (first fold in set = 0)
 
                 fold_ctx = dict(
-                    model_name_suffix=f'S{j + 1}F{fold_num_in_repeat + 1}',  # S5F3 = 3rd fold of the 5th repeat set
-                    fold=kfolds[i],
-                    is_last_fold=i != (fold_end - 1),
+                    model_name_suffix=f'S{n_repeat + 1}F{fold_num_in_repeat + 1}',  # S5F3 = 3rd fold of the 5th repeat set
+                    fold=kfolds[fold],
+                    is_last_fold=fold != (fold_end - 1),
                     folds_to_fit=folds_to_fit,
-                    folds_finished=i - fold_start,
-                    folds_left=fold_end - i,
+                    folds_finished=fold - fold_start,
+                    folds_left=fold_end - fold,
                 )
 
                 fold_fitting_strategy.schedule_fold_model_fit(model_base, fold_ctx, kwargs)
