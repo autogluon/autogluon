@@ -10,7 +10,7 @@ import pandas as pd
 
 from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
-from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION, BINARY
+from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
@@ -247,7 +247,8 @@ class BaggedEnsembleModel(AbstractModel):
             pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
 
-        pred_proba = self._apply_temperature_scaling(pred_proba)
+        if self.temperature_scalar is not None:
+            pred_proba = self._apply_temperature_scaling(pred_proba)
 
         return pred_proba
 

@@ -9,8 +9,8 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import networkx as nx
-from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 
+from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -769,7 +769,7 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
-            calibrate=calibrate
+            calibrate=kwargs['calibrate']
         )
         self.save()
         return self
@@ -800,21 +800,22 @@ class TabularPredictor:
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
-        if calibrate and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-            self._calibrate_model()
-        else:
-            logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
+        if calibrate:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+                self._calibrate_model()
+            else:
+                logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
 
         if save_space:
             self.save_space()
 
     def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
         """
-        Applies temperature scaling to the autogluon model. Applies
+        Applies temperature scaling to the AutoGluon model. Applies
         inverse softmax to predicted probs then trains temperature scalar
         on validation data to maximize negative log likelihood. Inversed
         softmaxes are divided by temperature scalar then softmaxed to return
-        predicted probs
+        predicted probs.
 
         Parameters:
         -----------
@@ -948,7 +949,7 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
-            calibrate=calibrate
+            calibrate=kwargs['calibrate']
         )
         self.save()
         return self

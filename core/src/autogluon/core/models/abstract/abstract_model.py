@@ -6,28 +6,27 @@ import os
 import pickle
 import sys
 import time
-import scipy
 from typing import Union
 
 import numpy as np
 import pandas as pd
+import scipy
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 
 from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
-from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE, PROBLEM_TYPES_CLASSIFICATION
-from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
-from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
+from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
+    compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 
-
-from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 logger = logging.getLogger(__name__)
 
 
@@ -569,16 +568,16 @@ class AbstractModel:
         self.model = self.model.fit(X, y)
 
     def _apply_temperature_scaling(self, y_pred_proba):
-        if self.temperature_scalar is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-            if self.problem_type == BINARY:
-                y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
+        # TODO: This is expensive to convert at inference time, try to avoid in future
+        if self.problem_type == BINARY:
+            y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 
-            logits = np.log(y_pred_proba)
-            y_pred_proba = scipy.special.softmax(logits/self.temperature_scalar, axis=1)
-            y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
+        logits = np.log(y_pred_proba)
+        y_pred_proba = scipy.special.softmax(logits / self.temperature_scalar, axis=1)
+        y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
 
-            if self.problem_type == BINARY:
-                y_pred_proba = y_pred_proba[:, 1]
+        if self.problem_type == BINARY:
+            y_pred_proba = y_pred_proba[:, 1]
 
         return y_pred_proba
 
@@ -606,7 +605,8 @@ class AbstractModel:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
 
-        y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
+        if self.temperature_scalar is not None:
+            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
 
         return y_pred_proba
 
