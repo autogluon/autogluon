@@ -19,18 +19,19 @@
     - regression with severely skewed Y-values (eg. predicting count data)
     - text features in dataset
 """
-import warnings, shutil, os
-import numpy as np
-import mxnet as mx
+import os
+import shutil
+import warnings
 from random import seed
 
-from networkx.exception import NetworkXError
+import autogluon.core as ag
+import mxnet as mx
+import numpy as np
 import pandas as pd
 import pytest
-
-import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 from autogluon.tabular import TabularDataset, TabularPredictor
+from networkx.exception import NetworkXError
 
 
 def test_tabular():
@@ -389,9 +390,10 @@ def test_pseudolabeling():
         train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file,
                                           name=dataset['name'], url=dataset['url'])
 
-        print(f"Testing: {name}, problem type: {problem_type}")
+        print(f"Testing dataset with name: {name}, problem type: {problem_type}")
 
         train_data = train_data.sample(50)
+        test_data = test_data[test_data[label].notna()]
 
         error_msg = f'pseudolabel threw an exception during fit, it should have ' \
                     f'succeeded on problem type:{problem_type} with name:{name}, under settings:'
@@ -399,20 +401,22 @@ def test_pseudolabeling():
         # Test label already given
         try:
             print("Pseudolabel Testing: Pre-labeled data 'fit_pseudolabel'")
-            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=test_data,
-                                                                            return_pred_prob=True,
-                                                                            train_data=train_data,
-                                                                            hyperparameters=hyperparam_setting)
+            _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
+                pseudo_data=test_data,
+                return_pred_prob=True,
+                train_data=train_data,
+                hyperparameters=hyperparam_setting)
         except Exception as e:
             assert False, error_msg + 'labeled test data'
 
         try:
             print("Pseudolabel Testing: Pre-labeled data, best quality 'fit_pseudolabel'")
-            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=test_data,
-                                                                            return_pred_prob=True,
-                                                                            train_data=train_data,
-                                                                            presets='best_quality',
-                                                                            hyperparameters=hyperparam_setting)
+            _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
+                pseudo_data=test_data,
+                return_pred_prob=True,
+                train_data=train_data,
+                presets='best_quality',
+                hyperparameters=hyperparam_setting)
         except Exception as e:
             assert False, error_msg + 'labeled test data, best quality'
 
@@ -421,20 +425,22 @@ def test_pseudolabeling():
         # Test unlabeled
         try:
             print("Pseudolabel Testing: Unlabeled data 'fit_pseudolabel'")
-            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=unlabeled_test_data,
-                                                                            return_pred_prob=True,
-                                                                            train_data=train_data,
-                                                                            hyperparameters=hyperparam_setting)
+            _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
+                pseudo_data=unlabeled_test_data,
+                return_pred_prob=True,
+                train_data=train_data,
+                hyperparameters=hyperparam_setting)
         except Exception as e:
             assert False, error_msg + 'unlabeled test data'
 
         try:
             print("Pseudolabel Testing: Unlabeled data, best quality 'fit_pseudolabel'")
-            _, y_pred_proba = TabularPredictor(label=label).fit_pseudolabel(pseudo_data=unlabeled_test_data,
-                                                                            return_pred_prob=True,
-                                                                            train_data=train_data,
-                                                                            presets='best_quality',
-                                                                            hyperparameters=hyperparam_setting)
+            _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
+                pseudo_data=unlabeled_test_data,
+                return_pred_prob=True,
+                train_data=train_data,
+                presets='best_quality',
+                hyperparameters=hyperparam_setting)
         except Exception as e:
             assert False, error_msg + 'unlabeled test data, best quality'
 
