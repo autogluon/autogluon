@@ -17,7 +17,7 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
-from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity, try_import_torch
+from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
