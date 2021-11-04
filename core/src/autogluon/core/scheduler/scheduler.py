@@ -10,7 +10,7 @@ import distributed
 from .jobs import DistributedJobRunner
 from .managers import TaskManagers
 from .. import Task
-from ..utils import AutoGluonWarning
+from ..utils import AutoGluonWarning, classproperty
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,21 @@ class ClassProperty(object):
 class TaskScheduler(object):
     """Base Distributed Task Scheduler
     """
-    managers = TaskManagers()
-    jobs = DistributedJobRunner()
+
+    _MANAGERS = None
+    _JOBS = None
+
+    @classproperty
+    def managers(cls):
+        if getattr(cls, '_MANAGERS', None) is None:
+            cls._MANAGERS = TaskManagers()
+        return cls._MANAGERS
+
+    @classproperty
+    def jobs(cls):
+        if getattr(cls, '_JOBS', None) is None:
+            cls._JOBS = DistributedJobRunner()
+        return cls._JOBS
 
     def __init__(self, dist_ip_addrs=None):
         cls = TaskScheduler
