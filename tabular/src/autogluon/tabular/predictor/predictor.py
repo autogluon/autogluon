@@ -636,9 +636,8 @@ class TabularPredictor:
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
             calibrate: bool, default = False
-                If True then will use temperature scaling to calibrate the model for better negative log loss. Temperature scaling
-                will train a scalar parameter on the validation set. This trains the best model's predictive prob to have a stronger
-                correlation between predictive prob and accuracy.
+                If True then will use temperature scaling to calibrate the Predictor's estimated class probabilities in classification tasks
+                (which may improve metrics like log_loss). Temperature scaling will train a scalar parameter on the validation set.
         Returns
         -------
         :class:`TabularPredictor` object. Returns self.
@@ -811,7 +810,7 @@ class TabularPredictor:
 
     def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
         """
-        Applies temperature scaling to the best autogluon model. Applies
+        Applies temperature scaling to the autogluon model. Applies
         inverse softmax to predicted probs then trains temperature scalar
         on validation data to maximize negative log likelihood. Inversed
         softmaxes are divided by temperature scalar then softmaxed to return
@@ -820,7 +819,15 @@ class TabularPredictor:
         Parameters:
         -----------
         model_name: str: default=None
-            model name to retrieve from trainer and fit
+            model name to tune temperature scaling on. If set to None
+            then will tune best model only. Best model chosen by validation score
+        lr: float: default=0.01
+            The learning rate for temperature scaling algorithm
+        max_iter: int: default=1000
+            Number of iterations optimizer should take for
+            tuning temperature scaler
+        init_val: float: default=1.0
+            The initial value for temperature scalar term
         """
         if model_name is None:
             model_name = self._trainer.get_model_best()
@@ -839,7 +846,7 @@ class TabularPredictor:
         logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
         temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
                                                init_val=init_val, max_iter=max_iter, lr=lr)
-
+        logger.log(15, f'Temperature term found is: {temp_scalar}')
         model = self._trainer.load_model(model_name=model_name)
         model.temperature_scalar = temp_scalar
         model.save()
