@@ -389,6 +389,8 @@ def test_pseudolabeling():
         train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file,
                                           name=dataset['name'], url=dataset['url'])
 
+        train_data = train_data.sample(50)
+
         error_msg = f'pseudolabel threw an exception during fit, it should have ' \
                     f'succeeded on problem type:{problem_type} with name:{name}, under settings:'
 
