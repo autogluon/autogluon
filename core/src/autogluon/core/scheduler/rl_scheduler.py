@@ -361,6 +361,9 @@ class RLScheduler(FIFOScheduler):
         --------
         >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
+        # Lazy import
+        from ..locks import TaskLock
+
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
