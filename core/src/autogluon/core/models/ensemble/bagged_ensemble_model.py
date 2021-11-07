@@ -368,28 +368,27 @@ class BaggedEnsembleModel(AbstractModel):
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats - 1) * k_fold + k_fold_end
         folds_to_fit = fold_end - fold_start
-        # noinspection PyCallingNonCallable
-        fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy(
-            bagged_ensemble_model=self, X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, sample_weight=sample_weight,
-            time_limit=time_limit, time_start=time_start, models=models,
-            oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats,
-            save_folds=save_folds)
+
+        fold_fit_args_list = []
+        k_per_n_repeat = []
         for n_repeat in range(n_repeat_start, n_repeats):  # For each n_repeat
-            if n_repeat != n_repeat_start or k_fold_start == 0:
+            is_first_set = n_repeat == n_repeat_start
+            is_last_set = n_repeat == (n_repeats - 1)
+            if (not is_first_set) or (k_fold_start == 0):
                 if cv_splitter.n_repeats <= n_repeat:
                     # If current cv_splitter doesn't have enough n_repeats for all folds, then create a new one.
                     cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups)
                     kfolds = cv_splitter.split(X=X, y=y)
                 self._cv_splitters.append(cv_splitter)
-            cur_repeat_count = n_repeat - n_repeat_start
-            fold_start_n_repeat = fold_start + cur_repeat_count * k_fold
-            fold_end_n_repeat = min((n_repeat+1) * k_fold, fold_end)
 
-            for fold in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
-                fold_num_in_repeat = fold - (n_repeat * k_fold)  # The fold in the current repeat set (first fold in set = 0)
+            fold_in_set_start = k_fold_start if n_repeat == n_repeat_start else 0
+            fold_in_set_end = k_fold_end if is_last_set else k_fold
+
+            for fold_in_set in range(fold_in_set_start, fold_in_set_end):  # For each fold
+                fold = fold_in_set + (n_repeat * k_fold)
 
                 fold_ctx = dict(
-                    model_name_suffix=f'S{n_repeat + 1}F{fold_num_in_repeat + 1}',  # S5F3 = 3rd fold of the 5th repeat set
+                    model_name_suffix=f'S{n_repeat + 1}F{fold_in_set + 1}',  # S5F3 = 3rd fold of the 5th repeat set
                     fold=kfolds[fold],
                     is_last_fold=fold != (fold_end - 1),
                     folds_to_fit=folds_to_fit,
@@ -397,10 +396,29 @@ class BaggedEnsembleModel(AbstractModel):
                     folds_left=fold_end - fold,
                 )
 
-                fold_fitting_strategy.schedule_fold_model_fit(model_base, fold_ctx, kwargs)
-            if (fold_end_n_repeat != fold_end) or (k_fold == k_fold_end):
-                self._k_per_n_repeat.append(k_fold)
+                fold_fit_args_list.append(dict(
+                    model_base=model_base,
+                    fold_ctx=fold_ctx,
+                    kwargs=kwargs,
+                ))
+            if (not is_last_set) or (k_fold == k_fold_end):
+                k_per_n_repeat.append(k_fold)
+
+        assert len(fold_fit_args_list) == folds_to_fit, "fold_fit_args_list is not the expected length!"
+
+        logger.log(20, f'\tFitting {folds_to_fit} child models '
+                       f'({fold_fit_args_list[0]["fold_ctx"]["model_name_suffix"]} - {fold_fit_args_list[-1]["fold_ctx"]["model_name_suffix"]})')
+
+        # noinspection PyCallingNonCallable
+        fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy(
+            bagged_ensemble_model=self, X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, sample_weight=sample_weight,
+            time_limit=time_limit, time_start=time_start, models=models,
+            oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats,
+            save_folds=save_folds)
+        for fold_fit_args in fold_fit_args_list:
+            fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
+
         self.models += models
 
         self._bagged_mode = True
@@ -412,6 +430,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_proba += oof_pred_proba
             self._oof_pred_model_repeats += oof_pred_model_repeats
 
+        self._k_per_n_repeat += k_per_n_repeat
         self._n_repeats = n_repeats
         if k_fold == k_fold_end:
             self._k = None
