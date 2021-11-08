@@ -10,10 +10,11 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 
+from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
@@ -634,7 +635,9 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
-
+            calibrate: bool, default = False
+                If True then will use temperature scaling to calibrate the Predictor's estimated class probabilities in classification tasks
+                (which may improve metrics like log_loss). Temperature scaling will train a scalar parameter on the validation set.
         Returns
         -------
         :class:`TabularPredictor` object. Returns self.
@@ -765,11 +768,12 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
+            calibrate=kwargs['calibrate']
         )
         self.save()
         return self
 
-    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False):
+    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False, calibrate=False):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -795,8 +799,58 @@ class TabularPredictor:
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
+        if calibrate:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+                self._calibrate_model()
+            else:
+                logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
+
         if save_space:
             self.save_space()
+
+    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
+        """
+        Applies temperature scaling to the AutoGluon model. Applies
+        inverse softmax to predicted probs then trains temperature scalar
+        on validation data to maximize negative log likelihood. Inversed
+        softmaxes are divided by temperature scalar then softmaxed to return
+        predicted probs.
+
+        Parameters:
+        -----------
+        model_name: str: default=None
+            model name to tune temperature scaling on. If set to None
+            then will tune best model only. Best model chosen by validation score
+        lr: float: default=0.01
+            The learning rate for temperature scaling algorithm
+        max_iter: int: default=1000
+            Number of iterations optimizer should take for
+            tuning temperature scaler
+        init_val: float: default=1.0
+            The initial value for temperature scalar term
+        """
+        # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
+        if model_name is None:
+            model_name = self._trainer.get_model_best()
+
+        if self._trainer.bagged_mode:
+            y_val_probs = self.get_oof_pred_proba(model_name).to_numpy()
+            y_val = self._trainer.load_y().to_numpy()
+        else:
+            X_val = self._trainer.load_X_val()
+            y_val_probs = self._trainer.predict_proba(X_val, model_name)
+            y_val = self._trainer.load_y_val().to_numpy()
+
+            if self.problem_type == BINARY:
+                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
+
+        logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
+        temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
+                                               init_val=init_val, max_iter=max_iter, lr=lr)
+        logger.log(15, f'Temperature term found is: {temp_scalar}')
+        model = self._trainer.load_model(model_name=model_name)
+        model.temperature_scalar = temp_scalar
+        model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
@@ -894,6 +948,7 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
+            calibrate=kwargs['calibrate']
         )
         self.save()
         return self
@@ -2284,7 +2339,8 @@ class TabularPredictor:
             # other
             feature_generator='auto',
             unlabeled_data=None,
-            _feature_generator_kwargs=None
+            _feature_generator_kwargs=None,
+            calibrate=False
         )
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
