@@ -829,6 +829,7 @@ class TabularPredictor:
         init_val: float: default=1.0
             The initial value for temperature scalar term
         """
+        # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
         if model_name is None:
             model_name = self._trainer.get_model_best()
 
