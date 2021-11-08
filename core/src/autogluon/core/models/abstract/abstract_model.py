@@ -11,7 +11,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import scipy
-from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from ....core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 
 from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial

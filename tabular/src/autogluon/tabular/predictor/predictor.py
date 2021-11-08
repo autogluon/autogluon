@@ -694,7 +694,6 @@ class TabularPredictor:
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
         use_bag_holdout = kwargs['use_bag_holdout']
-        calibrate = kwargs['calibrate']
 
         if ag_args is None:
             ag_args = {}
@@ -903,7 +902,6 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
-        calibrate = kwargs['calibrate']
 
         if ag_args is None:
             ag_args = {}
