@@ -2426,6 +2426,8 @@ class TabularPredictor:
 
             # quantile levels
             quantile_levels=None,
+
+            calibrate=False
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
