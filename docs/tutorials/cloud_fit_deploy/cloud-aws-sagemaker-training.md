@@ -18,7 +18,7 @@ please refer to SageMaker [documentation](https://sagemaker.readthedocs.io/en/st
 
 Here is one of the possible training scripts, which takes AutoGluon parameters as a YAML config and outputs predictions, models leaderboard and feature importance:
 
-```{.python .input}
+```{.python}
 import argparse
 import os
 from pprint import pprint
@@ -145,7 +145,7 @@ leaderboard: true              # save leaderboard output if true
 
 To train AutoGluon model, set up a SageMaker session:
 
-```python
+```{.python}
 import sagemaker
 
 # Helper wrappers referred earlier
@@ -167,7 +167,7 @@ output_path = f"s3://{bucket}/{s3_prefix}/output/"
 
 Create a training task:
 
-```python
+```{.python}
 ag = AutoGluonTraining(
     role=role,
     entry_point="scripts/tabular_train.py",
@@ -181,7 +181,7 @@ ag = AutoGluonTraining(
 
 Upload the required inputs, via SageMaker session (in this case it is a training set, test set and training YAML config) and start the training job:
 
-```python
+```{.python}
 s3_prefix = f"autogluon_sm/{utils.sagemaker_timestamp()}"
 train_input = ag.sagemaker_session.upload_data(
     path=os.path.join("data", "train.csv"), key_prefix=s3_prefix
