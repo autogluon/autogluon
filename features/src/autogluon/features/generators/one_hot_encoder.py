@@ -101,7 +101,6 @@ class CatToInt:
         return dtype, fillna_val
 
 
-# TODO: Add unit test before using
 # TODO: Replace XGBoost, NN, and Linear Model OHE logic with this
 class OneHotEncoderFeatureGenerator(AbstractFeatureGenerator):
     """
@@ -158,6 +157,10 @@ class OneHotEncoderFeatureGenerator(AbstractFeatureGenerator):
         return dict(valid_raw_types=[R_CATEGORY, R_INT])
 
     def transform_ohe(self, X: DataFrame):
+        """
+        Call this method directly to get numpy output.
+        Skips pandas conversion (much faster if only the numpy output is required).
+        """
         if self._cat_feat_gen is not None:
             X = self._cat_feat_gen.transform(X)
         X = self._ohe.transform(X)

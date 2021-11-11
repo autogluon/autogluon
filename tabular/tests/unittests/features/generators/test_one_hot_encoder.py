@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from autogluon.features.generators._experimental.one_hot_encoder import OneHotEncoderFeatureGenerator
+from autogluon.features.generators import OneHotEncoderFeatureGenerator
 
 
 def test_one_hot_encoder_feature_generator(generator_helper, data_helper):
