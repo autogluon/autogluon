@@ -11,8 +11,15 @@ This section provides an overview on how AutoGluon can be trained and deployed o
 
       A tutorial on fitting an AutoGluon model using AWS SageMaker.
 
+   .. card::
+      :title: Deploying AutoGluon Models using AWS SageMaker
+      :link: cloud-aws-sagemaker-deployment.html
+
+      A tutorial on fitting an AutoGluon model using AWS SageMaker.
+
 .. toctree::
    :maxdepth: 1
    :hidden:
 
    cloud-aws-sagemaker-training
+   cloud-aws-sagemaker-deployment

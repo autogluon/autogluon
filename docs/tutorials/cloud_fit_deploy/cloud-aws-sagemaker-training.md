@@ -1,5 +1,5 @@
 # Cloud Training with AWS SageMaker
-:label:`cloud_aws_sagemaker`
+:label:`cloud_aws_sagemaker_fit`
 
 To help with AutoGluon models training, AWS developed a set of training and inference [deep learning containers](https://github.com/aws/deep-learning-containers/blob/master/available_images.md#autogluon-training-containers). 
 The containers can be used to train models with CPU and GPU instances and deployed as a SageMaker endpoint or used as a batch transform job.
@@ -7,7 +7,7 @@ The containers can be used to train models with CPU and GPU instances and deploy
 The full end-to-end example is available in [amazon-sagemaker-examples](https://github.com/aws/amazon-sagemaker-examples/tree/master/advanced_functionality/autogluon-tabular-containers) repository.
 
 ## Pre-requisites
-Before starting ensure that the latest version of sagemaker python API is installed via `pip install --upgrade sagemaker`. 
+Before starting ensure that the latest version of sagemaker python API is installed via (`pip install --upgrade sagemaker`). 
 This is required to ensure the information about newly released containers is available.
 
 ## Training Scripts
@@ -202,3 +202,5 @@ ag.fit(
 
 Once the models are trained, they will be available in S3 location specified in `ag.model_data` field. The model is fully portable and can be downloaded locally
 if needed.
+
+Learn how to deploy the trained models using AWS SageMaker :ref:`cloud_aws_sagemaker_deploy`.
