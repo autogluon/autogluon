@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class CatToInt:
-    """Converts pandas categoricals to numpy int in preparation for OHE.
+    """
+    Converts pandas categoricals to numpy int in preparation for OHE.
 
     Parameters
     ----------
@@ -51,7 +52,7 @@ class CatToInt:
             data = X[:, col]
             uniques, counts = np.unique(data, return_counts=True)
             self.cats[col] = uniques[np.argsort(counts)[-self.max_levels:]]
-            if self.infrequent_val in self.cats[col]:
+            if self.infrequent_val in self.cats[col] or str(self.infrequent_val) in self.cats[col]:
                 # Add one extra level since NaN values shouldn't be counted towards max levels
                 self.cats[col] = uniques[np.argsort(counts)[-(self.max_levels+1):]]
 
@@ -77,19 +78,26 @@ class CatToInt:
             except:
                 max_val = X[col].max()
                 min_val = X[col].min()
-            max_val_with_buffer = max_val + dtype_buffer
-            max_dtype = np.min_scalar_type(max_val_with_buffer)
+            if type(max_val) == str:
+                max_dtype = np.min_scalar_type(max_val)
+            else:
+                if max_val_all is None:
+                    max_val_all = max_val
+                else:
+                    max_val_all = max(max_val_all, max_val)
+                max_val_with_buffer = max_val + dtype_buffer
+                max_dtype = np.min_scalar_type(max_val_with_buffer)
             min_dtype = np.min_scalar_type(min_val)
             cur_dtype = np.promote_types(min_dtype, max_dtype)
-            if max_val_all is None:
-                max_val_all = max_val
-            else:
-                max_val_all = max(max_val_all, max_val)
+
             if dtype is None:
                 dtype = cur_dtype
             else:
                 dtype = np.promote_types(dtype, cur_dtype)
-        fillna_val = max_val_all + 1
+        if max_val_all is None:
+            fillna_val = 0
+        else:
+            fillna_val = max_val_all + 1
         return dtype, fillna_val
 
 
