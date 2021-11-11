@@ -203,4 +203,7 @@ ag.fit(
 Once the models are trained, they will be available in S3 location specified in `ag.model_data` field. The model is fully portable and can be downloaded locally
 if needed.
 
-Learn how to deploy the trained models using AWS SageMaker :ref:`cloud_aws_sagemaker_deploy`.
+## Conclusion
+
+In this tutorial we explored how to train AutoGluon models using SageMaker. Learn how to deploy the trained models using 
+AWS SageMaker - :ref:`cloud_aws_sagemaker_deploy` or AWS Lambda - :ref:`cloud_aws_lambda_deploy`.

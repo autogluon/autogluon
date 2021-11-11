@@ -1,4 +1,4 @@
-# Deploying AutoGluon Models using AWS SageMaker
+# Deploying AutoGluon Models with AWS SageMaker
 :label:`cloud_aws_sagemaker_deploy`
 
 After learning how to train a model using AWS SageMaker :ref:`cloud_aws_sagemaker_fit`, in this section we will learn how to deploy 
@@ -204,6 +204,8 @@ output_s3_location = f"{transformer.output_path[:-1]}/{output_file_name}"
 ```
 
 The output file will be in `output_s3_location` variable.
+
+## Conclusion
 
 In this tutorial we explored a few options how to deploy AutoGluon models using SageMaker. To explore more, refer to 
 [SageMaker inference](https://docs.aws.amazon.com/sagemaker/latest/dg/deploy-model.html) documentation.
