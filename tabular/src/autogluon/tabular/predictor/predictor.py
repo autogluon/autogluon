@@ -2385,7 +2385,6 @@ class TabularPredictor:
             feature_generator='auto',
             unlabeled_data=None,
             _feature_generator_kwargs=None,
-            calibrate=False
         )
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
@@ -2426,6 +2425,8 @@ class TabularPredictor:
 
             # quantile levels
             quantile_levels=None,
+
+            calibrate=False
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
