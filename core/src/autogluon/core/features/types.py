@@ -23,6 +23,10 @@ S_DATETIME_AS_INT = 'datetime_as_int'
 # feature is a datetime in object form (string dates), which can be converted to datetime via pd.to_datetime
 S_DATETIME_AS_OBJECT = 'datetime_as_object'
 
+# feature is in sparse form, such as pd.SparseDtype ex: 'Sparse[uint8, 0]'
+# Convert features in this form to a scipy coo matrix with `DataFrame.sparse.to_coo()`
+S_SPARSE = 'sparse'
+
 # feature is an object type that contains text information that can be utilized in natural language processing
 S_TEXT = 'text'
 
