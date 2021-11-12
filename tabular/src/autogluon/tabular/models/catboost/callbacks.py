@@ -88,3 +88,59 @@ class TimeCheckCallback:
             logger.log(20, f'\tRan out of time, early stopping on iteration {info.iteration}.')
             return False
         return True
+
+
+class EarlyStoppingCallback:
+    """
+    Early stopping callback.
+
+    This callback is CatBoost specific.
+
+    Parameters
+    ----------
+    stopping_rounds : int or tuple
+       If int, The possible number of rounds without the trend occurrence.
+       If tuple, contains early stopping class as first element and class init kwargs as second element.
+    eval_metric : str
+       The eval_metric to use for early stopping. Must also be specified in the CatBoost model params.
+    compare_key : str, default = 'validation'
+        The data to use for scoring. It is recommended to keep as default.
+    """
+    def __init__(self, stopping_rounds, eval_metric, compare_key='validation'):
+        if isinstance(stopping_rounds, int):
+            from autogluon.core.utils.early_stopping import SimpleES
+            self.es = SimpleES(patience=stopping_rounds)
+        else:
+            self.es = stopping_rounds[0](**stopping_rounds[1])
+        self.best_score = None
+        self.compare_key = compare_key
+
+        if isinstance(eval_metric, str):
+            # FIXME: Avoid using private API! (https://github.com/catboost/catboost/issues/1915)
+            from catboost._catboost import is_maximizable_metric
+            is_max_optimal = is_maximizable_metric(eval_metric)
+            eval_metric_name = eval_metric
+        else:
+            is_max_optimal = eval_metric.is_max_optimal()
+            # FIXME: Unsure if this works for custom metrics!
+            eval_metric_name = str(eval_metric)
+
+        self.eval_metric_name = eval_metric_name
+        self.is_max_optimal = is_max_optimal
+
+    def after_iteration(self, info):
+        is_best_iter = False
+        cur_score = info.metrics[self.compare_key][self.eval_metric_name][-1]
+        if not self.is_max_optimal:
+            cur_score *= -1
+        if self.best_score is None:
+            self.best_score = cur_score
+        elif cur_score > self.best_score:
+            is_best_iter = True
+            self.best_score = cur_score
+
+        should_stop = self.es.update(cur_round=info.iteration, is_best=is_best_iter)
+        if should_stop:
+            return False
+
+        return True
