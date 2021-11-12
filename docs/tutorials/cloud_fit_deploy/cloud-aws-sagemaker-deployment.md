@@ -12,14 +12,17 @@ This is required to ensure the information about newly released containers is av
 
 ## Endpoint Deployment - Inference Script
 
-To start using the containers, a user training script and the [wrapper classes](https://github.com/aws/amazon-sagemaker-examples/blob/master/advanced_functionality/autogluon-tabular-containers/ag_model.py) are required.
+To start using the containers, an inference script and the [wrapper classes](https://github.com/aws/amazon-sagemaker-examples/blob/master/advanced_functionality/autogluon-tabular-containers/ag_model.py) are required.
 When authoring an inference [scripts](https://github.com/aws/amazon-sagemaker-examples/blob/master/advanced_functionality/autogluon-tabular-containers/scripts/), 
 please refer to SageMaker [documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/adapt-inference-container.html).
 
-Here is one of the possible inference scripts. The `model_fn` function is responsible for loading your model. It takes a `model_dir` 
-argument that specifies where the model is stored. The `input_fn` function is responsible for deserializing your input data so that 
-it can be passed to your model. It takes input data and content type as parameters, and returns deserialized data. 
-The SageMaker inference toolkit provides a default implementation that deserializes the following content types: JSON, CSV Numpy array, NPZ.
+Here is one of the possible inference scripts. 
+
+- the `model_fn` function is responsible for loading your model. It takes a `model_dir` argument that specifies where the model is stored. 
+
+- the `input_fn` function is responsible for deserializing your input data so that it can be passed to your model. It takes input data and 
+content type as parameters, and returns deserialized data. The SageMaker inference toolkit provides a default implementation that deserializes 
+the following content types: JSON, CSV, numpy array, NPZ.
 
 ```{.python}
 from autogluon.tabular import TabularPredictor
@@ -64,7 +67,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
 
 ## Deployment as an inference endpoint
 
-To deploy AutoGluon model as a SageMaker inference endpoint:
+To deploy AutoGluon model as a SageMaker inference endpoint, we configure SageMaker session first:
 
 ```{.python}
 import sagemaker
@@ -86,7 +89,7 @@ s3_prefix = f"autogluon_sm/{utils.sagemaker_timestamp()}"
 output_path = f"s3://{bucket}/{s3_prefix}/output/"
 ```
 
-Upload the model archive trained earlier (if you trained AutoGluon model locally, then zip archive of the model output directory should be used):
+Upload the model archive trained earlier (if you trained AutoGluon model locally, it must be a zip archive of the model output directory):
 
 ```{.python}
 endpoint_name = sagemaker.utils.unique_name_from_base("sagemaker-autogluon-serving-trained-model")
@@ -96,7 +99,7 @@ model_data = sagemaker_session.upload_data(
 )
 ```
 
-Deploy:
+Deploy the model:
 
 ```{.python}
 instance_type = "ml.m5.2xlarge"
@@ -130,7 +133,7 @@ dataset where minimizing latency isn’t a concern, then the batch transform fun
 
 [Read more about Batch Transform.](https://docs.aws.amazon.com/sagemaker/latest/dg/batch-transform.html)
 
-Upload the model archive trained earlier (if you trained AutoGluon model locally, then zip archive of the model output directory should be used):
+Upload the model archive trained earlier (if you trained AutoGluon model locally, it must be a zip archive of the model output directory):
 
 ```{.python}
 endpoint_name = sagemaker.utils.unique_name_from_base(
@@ -170,7 +173,7 @@ transformer = model.transformer(
 )
 ```
 
-Batch transform accepts CSV without header and index column - we need to remove them before sending to the transform job.
+The batch transform job accepts CSV file without header and index column - we need to remove them before sending to the transform job.
 
 ```{.python}
 output_file_name = "test_no_header.csv"
@@ -182,12 +185,14 @@ test_input = transformer.sagemaker_session.upload_data(
 )
 ```
 
-Run transform job.
+Run the transform job.
 
 When making predictions on a large dataset, you can exclude attributes that aren't needed for prediction. After the predictions have been made, you can 
 associate some of the excluded attributes with those predictions or with other input data in your report. By using batch transform to perform these data 
 processing steps, you can often eliminate additional preprocessing or postprocessing. You can use input files in JSON and CSV format only. 
-More details on how to use filters are available here: [Associate Prediction Results with Input Records](https://docs.aws.amazon.com/sagemaker/latest/dg/batch-transform-data-processing.html)
+More details on how to use filters are available here: [Associate Prediction Results with Input Records](https://docs.aws.amazon.com/sagemaker/latest/dg/batch-transform-data-processing.html).
+In this specific case we will use `input_filter` argument to get first 14 columns, thus removing target variable from the test set and `output_filter` to
+extract only the actual classes predictions without scores.
 
 ```{.python}
 transformer.transform(

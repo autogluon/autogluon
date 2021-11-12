@@ -6,9 +6,19 @@ trained models using AWS Lambda.
 
 ## Reducing the model size to minimize AWS Lambda startup times
 
-Because AutoGluon model and containers are larger than a typical Lambda container, it might take some time (60+ seconds) to boot a new Lambda instance from the cold boot.
-This could be limiting factor when used with latency-sensitive applications.  To reduce start up times with AWS Lambda it is important to reduce model size to a minimum. 
-This can be done by applying  as described in section "Faster presets or hyperparameters" of :ref:`sec_tabularadvanced`:
+When the Lambda service receives a request to run a function via the Lambda API, the service first prepares an execution environment. During this step, the service 
+downloads the code for the function, which is stored in Amazon Elastic Container Registry. It then creates an environment with the memory, runtime, and configuration 
+specified. Once complete, Lambda runs any initialization code outside of the event handler before finally running the handler code. The steps of setting up the 
+environment and the code are frequently referred to as a "cold start".
+
+After the execution completes, the execution environment is frozen. To improve resource management and performance, the Lambda service retains the execution environment 
+for a non-deterministic period of time. During this time, if another request arrives for the same function, the service may reuse the environment. This second request 
+typically finishes more quickly, since the execution environment already exists and it’s not necessary to download the code and run the initialization code. 
+This is called a "warm start".
+
+Because AutoGluon containers are larger than a typical Lambda container, it might take some time (60+ seconds) to perform steps required for a "cold start".  
+This could be limiting factor when used with latency-sensitive applications. To reduce start up times with AWS Lambda it is important to reduce model size to a minimum. 
+This can be done by applying deployment-optimized presets as described in section "Faster presets or hyperparameters" of :ref:`sec_tabularadvanced`:
 
 ```{.python}
 presets = ['good_quality_faster_inference_only_refit', 'optimize_for_deployment']
@@ -17,25 +27,29 @@ presets = ['good_quality_faster_inference_only_refit', 'optimize_for_deployment'
 If the cold boot latency cannot be tolerated, it is recommended to reserve concurrent capacity as described in this article:
 [Managing Lambda reserved concurrency](https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html).
 
+More details on the lambda performance optimizations can be found in the following article: 
+[Operating Lambda: Performance optimization](https://aws.amazon.com/blogs/compute/operating-lambda-performance-optimization-part-1/)
+
 ## Creating a base project
 
-To start the project, please follow the following tutorial as a base: 
+To start the project, please follow the setup steps of the tutorial: 
 [Deploying machine learning models with serverless templates](https://aws.amazon.com/blogs/compute/deploying-machine-learning-models-with-serverless-templates/).
 
 To deploy AutoGluon, the following adjustments would be required:
 
-- `Dockerfile` to package AutoGluon runtimes and model files ready for deployment
-
-- Serving `app/app.py` script
-
-When building a docker container it's size can reduce using the following things: 
-
-- use CPU versions of pytorch; if the models to be deployed don't use pytorch, then it is not needed to be installed at all.
-
-- install only the sub-modules required for inference - specifically `autogluon.tabular[all]` will deploy only all tabular models without text and vision modules and their
-extra dependencies. This instruction can be further narrowed down to a combination of the following options are: `lightgbm`, `catboost`, `xgboost`, `fastai` and `skex`.
-
 - the trained model is expected to be in `ag_models` directory.
+
+- `Dockerfile` to package AutoGluon runtimes and model files
+
+- Modify serving `app/app.py` script to use AutoGluon
+
+When building a docker container it's size can be reduced using the following optimizations: 
+
+- use CPU versions of `pytorch`; if the models to be deployed don't use `pytorch`, then don't install it.
+
+- install only the AutoGluon sub-modules required for inference - specifically `autogluon.tabular[all]` will deploy only all tabular models 
+without `text` and `vision` modules and their extra dependencies. This instruction can be further narrowed down to a combination of 
+the following options are: `lightgbm`, `catboost`, `xgboost`, `fastai` and `skex`.
 
 The following `Dockerfile` can be used as a starting point:
 
@@ -61,7 +75,7 @@ COPY ag_models /opt/ml/model/
 CMD ["app.lambda_handler"]
 ```
 
-Application `app/app.py`:
+Lambda serving script (`app/app.py`):
 
 ```{.python}
 import pandas as pd
@@ -81,12 +95,18 @@ def lambda_handler(event, context):
     }
 ```
 
+Once the necessary modifications to the projects are done, proceed with the steps described in "Deploying the application to Lambda" section of the 
+[tutorial](https://aws.amazon.com/blogs/compute/deploying-machine-learning-models-with-serverless-templates/).
+
 ## Conclusion
 
-In this tutorial we explored how to deploy AutoGluon models using serverless templates. To explore more, refer to the following documentation:
+In this tutorial we explored how to deploy AutoGluon models as a serverless application. To explore more, refer to the following documentation:
 
 - [Deploying machine learning models with serverless templates](https://aws.amazon.com/blogs/compute/deploying-machine-learning-models-with-serverless-templates/).
+
+- [Operating Lambda: Performance optimization](https://aws.amazon.com/blogs/compute/operating-lambda-performance-optimization-part-1/)
 
 - [Managing Lambda reserved concurrency](https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html)
 
 - [AWS Serverless Application Model (AWS SAM)](https://github.com/aws/serverless-application-model)
+
