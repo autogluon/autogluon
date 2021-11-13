@@ -1,6 +1,10 @@
+import logging
+
 import numpy as np
 import pandas as pd
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
+
+logger = logging.getLogger()
 
 
 def filter_pseudo(y_pred_proba_og, problem_type,
@@ -48,6 +52,26 @@ def filter_pseudo(y_pred_proba_og, problem_type,
             curr_threshold = y_pred_proba_max.sort_values(ascending=False).iloc[int(num_rows_threshold) - 1]
 
         test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
+        pseudo_idxmax = y_pred_proba_og.loc[test_pseudo_indices.index].idxmax(axis=1)
+        pseudo_value_counts = pseudo_idxmax.value_counts()
+        min_count = pseudo_value_counts.min()
+        pseudo_keys = list(pseudo_value_counts.keys())
+
+        new_test_pseudo_indices = None
+        for k in pseudo_keys:
+            k_pseudo_idxes = pseudo_idxmax == k
+            selected_rows = k_pseudo_idxes[k_pseudo_idxes].head(min_count)
+
+            if new_test_pseudo_indices is None:
+                new_test_pseudo_indices = selected_rows.index
+            else:
+                new_test_pseudo_indices = new_test_pseudo_indices.append(selected_rows.index)
+
+        test_pseudo_indices = pd.Series(data=False, index=test_pseudo_indices.index)
+        test_pseudo_indices.loc[new_test_pseudo_indices] = True
+
+        logger.log(15, 'distribution here:')
+        logger.log(15, y_pred_proba_og[test_pseudo_indices].idxmax(axis=1).value_counts())
     else:
         test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
         test_pseudo_indices_true = test_pseudo_indices.sample(frac=proportion_sample, random_state=0)
