@@ -23,11 +23,10 @@ class EarlyStoppingCustom(EarlyStopping):
         if rounds is None:
             # Disable early stopping via rounds
             rounds = 999999
+        super().__init__(rounds=999999, **kwargs)
         if isinstance(rounds, int):
-            super().__init__(rounds=999999, **kwargs)
             self.es = SimpleES(patience=rounds)
         else:
-            super().__init__(rounds=999999, **kwargs)
             self.es = rounds[0](**rounds[1])
         self.time_limit = time_limit
         self.start_time = start_time

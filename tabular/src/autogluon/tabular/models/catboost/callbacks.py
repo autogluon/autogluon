@@ -116,7 +116,7 @@ class EarlyStoppingCallback:
         self.compare_key = compare_key
 
         if isinstance(eval_metric, str):
-            # FIXME: Avoid using private API! (https://github.com/catboost/catboost/issues/1915)
+            # FIXME: Avoid using private API! (https://github.com/awslabs/autogluon/issues/1381)
             from catboost._catboost import is_maximizable_metric
             is_max_optimal = is_maximizable_metric(eval_metric)
             eval_metric_name = eval_metric
@@ -140,7 +140,4 @@ class EarlyStoppingCallback:
             self.best_score = cur_score
 
         should_stop = self.es.update(cur_round=info.iteration, is_best=is_best_iter)
-        if should_stop:
-            return False
-
-        return True
+        return not should_stop
