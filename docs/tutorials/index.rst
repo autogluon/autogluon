@@ -130,6 +130,15 @@ Text Prediction
       In-depth tutorial on learning how to customize the search space and try different
       HPO algorithms.
 
+Cloud Training and Deployment
+-----------------------------
+.. container:: cards
+
+   .. card::
+      :title: Cloud Training with AWS SageMaker
+      :link: cloud_fit_deploy/cloud-aws-sagemaker-training.html
+
+      A tutorial on fitting an AutoGluon model using AWS SageMaker.
 
 Tune Custom Models
 --------------------
