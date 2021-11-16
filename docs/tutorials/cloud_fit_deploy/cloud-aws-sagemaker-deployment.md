@@ -20,7 +20,7 @@ Here is one of the possible inference scripts.
 
 - the `model_fn` function is responsible for loading your model. It takes a `model_dir` argument that specifies where the model is stored. 
 
-- the `input_fn` function is responsible for deserializing your input data so that it can be passed to your model. It takes input data and 
+- the `transform_fn` function is responsible for deserializing your input data so that it can be passed to your model. It takes input data and 
 content type as parameters, and returns deserialized data. The SageMaker inference toolkit provides a default implementation that deserializes 
 the following content types: JSON, CSV, numpy array, NPZ.
 
@@ -183,6 +183,48 @@ pd.read_csv(f"data/test.csv")[:100].to_csv(f"data/{output_file_name}", header=Fa
 test_input = transformer.sagemaker_session.upload_data(
     path=os.path.join("data", "test_no_header.csv"), key_prefix=s3_prefix
 )
+```
+
+The training script has some differences from the previous example, but follows the same APIs: 
+
+```{.python}
+from autogluon.tabular import TabularPredictor
+import os
+import json
+from io import StringIO
+import pandas as pd
+import numpy as np
+
+
+def model_fn(model_dir):
+    """loads model from previously saved artifact"""
+    model = TabularPredictor.load(model_dir)
+    globals()["column_names"] = model.feature_metadata_in.get_features()
+
+    return model
+
+
+def transform_fn(model, request_body, input_content_type, output_content_type="application/json"):
+    if input_content_type == "text/csv":
+        buf = StringIO(request_body)
+        data = pd.read_csv(buf, header=None)
+        num_cols = len(data.columns)
+        if num_cols != len(column_names):
+            raise Exception(
+                f"Invalid data format. Input data has {num_cols} while the model expects {len(column_names)}"
+            )
+
+        else:
+            data.columns = column_names
+
+    else:
+        raise Exception(f"{input_content_type} content type not supported")
+
+    pred = model.predict(data)
+    pred_proba = model.predict_proba(data)
+    prediction = pd.concat([pred, pred_proba], axis=1)
+
+    return prediction.to_json(), output_content_type
 ```
 
 Run the transform job.
