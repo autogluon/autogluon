@@ -23,7 +23,7 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo
+from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
@@ -992,7 +992,7 @@ class TabularPredictor:
 
 
     def _run_pseudolabeling(self, unlabeled_data: pd.DataFrame, max_iter: int,
-                            return_pred_prob: bool = False, **kwargs):
+                            return_pred_prob: bool = False, use_ensemble: bool = False, **kwargs):
         """
         Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
         used in original model unless specified by the user. This is an internal function that iteratively
@@ -1027,7 +1027,10 @@ class TabularPredictor:
             y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
             y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
 
-            test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
+            if use_ensemble:
+                test_pseudo_idxes_true = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
+            else:
+                test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
 
             if return_pred_prob:
                 if i == 0:
@@ -1070,7 +1073,8 @@ class TabularPredictor:
         else:
             return self
 
-    def fit_pseudolabel(self, pseudo_data: pd.DataFrame, max_iter: int = 5, return_pred_prob: bool = False, **kwargs):
+    def fit_pseudolabel(self, pseudo_data: pd.DataFrame, max_iter: int = 5, return_pred_prob: bool = False,
+                        use_ensemble: bool = False, **kwargs):
         """
         If 'pseudo_data' is labeled then incorporates all test_data into train_data for
         newly fit models. If 'pseudo_data' is unlabeled then 'fit_pseudolabel' will self label the
@@ -1139,7 +1143,8 @@ class TabularPredictor:
             logger.log(20, 'Given test_data for pseudo labeling did not contain labels. '
                            'AutoGluon will assign pseudo labels to data and use it for extra training data...')
             return self._run_pseudolabeling(unlabeled_data=pseudo_data, max_iter=max_iter,
-                                            return_pred_prob=return_pred_prob, **fit_extra_kwargs)
+                                            return_pred_prob=return_pred_prob, use_ensemble=use_ensemble,
+                                            **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):
         """
