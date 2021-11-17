@@ -14,7 +14,8 @@ from autogluon.core.calibrate.temperature_scaling import tune_temperature_scalin
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, \
+    PROBLEM_TYPES_CLASSIFICATION, CALIBRATION_METHODS, DIRICHLET_CALIBRATE, VECTOR_SCALING, TEMP_SCALING, MATRIX_SCALING
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
@@ -22,6 +23,8 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.core.utils.decorators import apply_presets
+from autogluon.core.calibrate import TemperatureScaling, VectorScaling, FullDirichletCalibrator, MatrixScaling
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
 
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
@@ -800,7 +803,7 @@ class TabularPredictor:
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
-        if calibrate:
+        if calibrate is not None:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
                 self._calibrate_model()
             else:
@@ -809,7 +812,7 @@ class TabularPredictor:
         if save_space:
             self.save_space()
 
-    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
+    def _calibrate_model(self, calibration_method: str, model_name: str = None, num_splits: int = 3):
         """
         Applies temperature scaling to the AutoGluon model. Applies
         inverse softmax to predicted probs then trains temperature scalar
@@ -819,16 +822,13 @@ class TabularPredictor:
 
         Parameters:
         -----------
+        calibration_method: str
+            which calibration method should be used on model
         model_name: str: default=None
             model name to tune temperature scaling on. If set to None
             then will tune best model only. Best model chosen by validation score
-        lr: float: default=0.01
-            The learning rate for temperature scaling algorithm
-        max_iter: int: default=1000
-            Number of iterations optimizer should take for
-            tuning temperature scaler
-        init_val: float: default=1.0
-            The initial value for temperature scalar term
+        num_splits: int: default=3
+            Number of splits for StratifiedKFold
         """
         # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
         if model_name is None:
@@ -845,13 +845,31 @@ class TabularPredictor:
             if self.problem_type == BINARY:
                 y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
-        logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
-        temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
-                                               init_val=init_val, max_iter=max_iter, lr=lr)
-        logger.log(15, f'Temperature term found is: {temp_scalar}')
-        model = self._trainer.load_model(model_name=model_name)
-        model.temperature_scalar = temp_scalar
-        model.save()
+        if calibration_method not in CALIBRATION_METHODS:
+            return
+
+        logger.log(15, f"{calibration_method.replace('_', ' ')} being tuned for model: {model_name}")
+        reg = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+        skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=0)
+
+        if calibration_method == DIRICHLET_CALIBRATE:
+            calibrator = FullDirichletCalibrator(reg_lambda=reg)
+        elif calibration_method == VECTOR_SCALING:
+            calibrator = VectorScaling(reg_lambda_list=reg)
+        elif calibration_method == TEMP_SCALING:
+            calibrator = TemperatureScaling(reg_lambda_list=reg)
+        elif calibration_method == MATRIX_SCALING:
+            calibrator = MatrixScaling(reg_lambda_list=reg)
+
+        gscv = GridSearchCV(calibrator, param_grid={'reg_lambda': reg,
+                                                    'reg_mu': [None]},
+                            cv=skf, scoring='neg_log_loss')
+
+        gscv.fit(y_val_probs, y_val)
+
+
+
+
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
@@ -2426,7 +2444,7 @@ class TabularPredictor:
             # quantile levels
             quantile_levels=None,
 
-            calibrate=False
+            calibrate=None
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())

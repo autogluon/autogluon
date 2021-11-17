@@ -23,6 +23,13 @@ OBJECTIVES_TO_NORMALIZE = ['log_loss', 'pac_score', 'soft_log_loss']  # do not l
 AUTO_WEIGHT = 'auto_weight'
 BALANCE_WEIGHT = 'balance_weight'
 
+DIRICHLET_CALIBRATE = 'dirichlet_calibrate'
+TEMP_SCALING = 'temperature_scaling'
+VECTOR_SCALING = 'vector_scaling'
+MATRIX_SCALING = 'matrix_scaling'
+
+CALIBRATION_METHODS = [DIRICHLET_CALIBRATE, TEMP_SCALING, VECTOR_SCALING, MATRIX_SCALING]
+
 # TODO: Add docs to dedicated page, or should it live in AbstractModel?
 # TODO: How to reference correct version of docs?
 # TODO: Add error in AG_ARGS if unknown key present
