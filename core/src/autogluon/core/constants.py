@@ -1,3 +1,5 @@
+from .calibrate import TemperatureScaling, VectorScaling, MatrixScaling, FullDirichletCalibrator
+
 # Do not change these!
 BINARY = 'binary'
 MULTICLASS = 'multiclass'
@@ -28,7 +30,10 @@ TEMP_SCALING = 'temperature_scaling'
 VECTOR_SCALING = 'vector_scaling'
 MATRIX_SCALING = 'matrix_scaling'
 
-CALIBRATION_METHODS = [DIRICHLET_CALIBRATE, TEMP_SCALING, VECTOR_SCALING, MATRIX_SCALING]
+CALIBRATION_METHODS = dict({DIRICHLET_CALIBRATE: FullDirichletCalibrator,
+                            TEMP_SCALING: TemperatureScaling,
+                            VECTOR_SCALING: VectorScaling,
+                            MATRIX_SCALING: MatrixScaling})
 
 # TODO: Add docs to dedicated page, or should it live in AbstractModel?
 # TODO: How to reference correct version of docs?

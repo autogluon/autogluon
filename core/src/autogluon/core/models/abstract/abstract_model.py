@@ -101,7 +101,7 @@ class AbstractModel:
         self.model = None
         self.problem_type = problem_type
         # temperature scaling parameter that is set by predictor if calibrate is true under TabularPredictor fit()
-        self.temperature_scalar = None
+        self.calibrator = None
 
         if eval_metric is not None:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
@@ -567,14 +567,12 @@ class AbstractModel:
         X = self.preprocess(X)
         self.model = self.model.fit(X, y)
 
-    def _apply_temperature_scaling(self, y_pred_proba):
+    def _apply_conformal_calibrator(self, y_pred_proba: np.ndarray):
         # TODO: This is expensive to convert at inference time, try to avoid in future
         if self.problem_type == BINARY:
             y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 
-        logits = np.log(y_pred_proba)
-        y_pred_proba = scipy.special.softmax(logits / self.temperature_scalar, axis=1)
-        y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
+        y_pred_proba = self.calibrator.predict_proba(y_pred_proba)
 
         if self.problem_type == BINARY:
             y_pred_proba = y_pred_proba[:, 1]
@@ -605,8 +603,8 @@ class AbstractModel:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
 
-        if self.temperature_scalar is not None:
-            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
+        if self.calibrator is not None:
+            y_pred_proba = self._apply_conformal_calibrator(y_pred_proba)
 
         return y_pred_proba
 

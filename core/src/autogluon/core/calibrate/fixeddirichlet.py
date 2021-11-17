@@ -3,9 +3,11 @@ import autograd.numpy as np
 
 from sklearn.base import BaseEstimator, RegressorMixin
 
+
 def clip_for_log(X):
     eps = np.finfo(X.dtype).tiny
-    return np.clip(X, eps, 1-eps)
+    return np.clip(X, eps, 1 - eps)
+
 
 class FixedDiagonalDirichletCalibrator(BaseEstimator, RegressorMixin):
     def fit(self, X, y, batch_size=128, lr=1e-3, beta_1=0.9, beta_2=0.999,
@@ -16,7 +18,7 @@ class FixedDiagonalDirichletCalibrator(BaseEstimator, RegressorMixin):
         n_y = np.shape(X_)[0]
         y_hot = np.zeros((len(y), k))
         for i in range(0, k):
-            y_hot[y==i, i] = 1.0
+            y_hot[y == i, i] = 1.0
         L = []
         m = np.zeros(1)
         v = np.zeros(1)
@@ -36,7 +38,6 @@ class FixedDiagonalDirichletCalibrator(BaseEstimator, RegressorMixin):
             batch_L = []
 
             for j in range(0, batch_num):
-
                 L_t = self._objective(T, X, y_hot)
 
                 g_t = get_gradient(T, X, y_hot)
@@ -119,7 +120,7 @@ if __name__ == '__main__':
     X = iris.data[:, :3]  # we only take the first two features.
     y = iris.target
 
-    softmax = lambda z:np.divide(np.exp(z).T, np.sum(np.exp(z), axis=1)).T
+    softmax = lambda z: np.divide(np.exp(z).T, np.sum(np.exp(z), axis=1)).T
     S = softmax(X)
 
     print(S)

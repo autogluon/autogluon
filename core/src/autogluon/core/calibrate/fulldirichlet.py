@@ -7,16 +7,13 @@ from .utils import clip_for_log
 
 
 class FullDirichletCalibrator(BaseEstimator, RegressorMixin):
-    def __init__(self, reg_lambda=0.0, reg_mu=None, weights_init=None,
+    def __init__(self, reg_lambda_list=0.0, reg_mu=None, weights_init=None,
                  initializer='identity', reg_norm=False, ref_row=True,
                  optimizer='auto'):
-
         """
         Params:
             weights_init: (nd.array) weights used for initialisation, if None
             then idendity matrix used. Shape = (n_classes - 1, n_classes + 1)
-            comp_l2: (bool) If true, then complementary L2 regularization used
-            (off-diagonal regularization)
             optimizer: string ('auto', 'newton', 'fmin_l_bfgs_b')
                 If 'auto': then 'newton' for less than 37 classes and
                 fmin_l_bfgs_b otherwise
@@ -24,7 +21,7 @@ class FullDirichletCalibrator(BaseEstimator, RegressorMixin):
                 If 'fmin_l_bfgs_b' then uses scipy.ptimize.fmin_l_bfgs_b which
                 implements a quasi Newton method
         """
-        self.reg_lambda = reg_lambda
+        self.reg_lambda = reg_lambda_list
         self.reg_mu = reg_mu  # Complementary L2 regularization. (Off-diagonal regularization)
         self.weights_init = weights_init  # Input weights for initialisation
         self.initializer = initializer
