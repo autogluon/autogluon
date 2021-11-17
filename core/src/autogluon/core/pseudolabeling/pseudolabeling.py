@@ -7,13 +7,13 @@ from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
 logger = logging.getLogger()
 
 
-def sample_evenly(y_pred_proba: pd.DataFrame, df_indexes):
+def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
     """
     Takes predictive probs and finds the minimum class count then samples that
-    from every class
+    from every class with rows with index in df_indexes
 
     Parameters:
-    y_pred_proba: Predicted probabilities
+    y_pred_proba: Predicted probabilities for multi-class problem
     df_indexes: The indices that should be taken into consideration when sampling evenly
 
     Returns:
@@ -71,7 +71,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
 
     Returns:
     --------
-    pd.Series of indices that met pseudolabeling requirements
+    pd.Series of indices that met pseudo labeling requirements
     """
     if problem_type in PROBLEM_TYPES_CLASSIFICATION:
         y_pred_proba_max = y_pred_proba_og.max(axis=1)
@@ -87,7 +87,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
             curr_threshold = y_pred_proba_max.sort_values(ascending=False).iloc[int(num_rows_threshold) - 1]
 
         test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
-        test_pseudo_indices = sample_evenly(y_pred_proba=y_pred_proba_og, df_indexes=test_pseudo_indices)
+        test_pseudo_indices = sample_bins_uniformly(y_pred_proba=y_pred_proba_og, df_indexes=test_pseudo_indices)
     else:
         test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
         test_pseudo_indices_true = test_pseudo_indices.sample(frac=proportion_sample, random_state=0)
@@ -141,7 +141,7 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
     -----------
     predictor: Fitted tabular predictor that ensembles multiple models
     unlabeled_data: Unlabeled data for top k models to predict on
-    leaderboard: leaderboard of models in AutoGluon based on validation score
+    leaderboard: pd.DataFrame of leaderboard of models in AutoGluon based on validation score
     num_models: Number of top models to ensemble
     lower_bound: Lower threshold that z-score needs to exceed in order to
         incorporate
@@ -174,15 +174,15 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
 def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, leaderboard,
                                    num_models, threshold: float = 0.95):
     """
-    Gets predictive probability on unlabeled_data using top k models. Then averages them
-    and selects rows where max predictive prob is above threshold. The balances it out
-    so an equal amount of samples is taken from each class that exceeded threshold
+    Calculates predictive prob of unlabeled data by predicting with top k models then averages
+    and selects rows where max predictive prob is above threshold. Then samples minimum
+    bin count from all bins.
     
     Parameters:
     -----------
     predictor: Fitted tabular predictor that ensembles multiple models
     unlabeled_data: Unlabeled data for top k models to predict on
-    leaderboard: leaderboard of models in AutoGluon based on validation score
+    leaderboard: pd.DataFrame of leaderboard of models in AutoGluon based on validation score
     num_models: Number of top models to ensemble
     threshold: The predictive probability a row must exceed in order to be
         selected
@@ -207,6 +207,6 @@ def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, lead
     pseudo_indexes = (y_max_prob >= threshold)
     y_pred_ensemble = y_pred_proba_ensemble.idxmax(axis=1)
 
-    test_pseudo_indices = sample_evenly(y_pred_proba=y_pred_proba_ensemble, df_indexes=pseudo_indexes)
+    test_pseudo_indices = sample_bins_uniformly(y_pred_proba=y_pred_proba_ensemble, df_indexes=pseudo_indexes)
 
     return test_pseudo_indices[test_pseudo_indices], y_pred_proba_ensemble, y_pred_ensemble
