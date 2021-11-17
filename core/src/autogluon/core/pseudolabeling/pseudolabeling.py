@@ -3,7 +3,6 @@ import logging
 import numpy as np
 import pandas as pd
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
-from autogluon.tabular import TabularPredictor
 
 logger = logging.getLogger()
 
@@ -99,7 +98,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
     return test_pseudo_indices
 
 
-def filter_ensemble_pseudo(predictor: TabularPredictor, unlabeled_data: pd.DataFrame, num_models: int = 5):
+def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: int = 5):
     """
     Uses ensemble filtering for pseudo labeling
 
@@ -123,7 +122,7 @@ def filter_ensemble_pseudo(predictor: TabularPredictor, unlabeled_data: pd.DataF
     if num_models != num_models:
         logging.warning(f'Ensemble pseudo labeling expected {original_k}, but only {num_models} fit.')
 
-    if predictor.PROBLEM_TYPE in PROBLEM_TYPES_CLASSIFICATION:
+    if predictor.problem_type in PROBLEM_TYPES_CLASSIFICATION:
         pseudo_idxes = filter_ensemble_pseudo(predictor=predictor, unlabeled_data=unlabeled_data, num_models=num_models)
     else:
         pseudo_idxes = filter_pseudo_std_regression(predictor=predictor, unlabeled_data=unlabeled_data,
@@ -132,7 +131,7 @@ def filter_ensemble_pseudo(predictor: TabularPredictor, unlabeled_data: pd.DataF
     return pseudo_idxes[pseudo_idxes]
 
 
-def filter_pseudo_std_regression(predictor: TabularPredictor, unlabeled_data: pd.DataFrame, num_models, leaderboard,
+def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_models, leaderboard,
                                  lower_bound: float = -0.25, upper_bound: float = 0.25):
     """
     Predicts on unlabeled_data using the top k models. Then gets standard deviation of each
@@ -173,7 +172,7 @@ def filter_pseudo_std_regression(predictor: TabularPredictor, unlabeled_data: pd
     return df_filtered[df_filtered]
 
 
-def ensemble_classification_filter(predictor: TabularPredictor, unlabeled_data: pd.DataFrame, leaderboard,
+def ensemble_classification_filter(predictor, unlabeled_data: pd.DataFrame, leaderboard,
                                    num_models, threshold: float = 0.95):
     """
     Gets predictive probability on unlabeled_data using top k models. Then averages them
