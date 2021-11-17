@@ -7,7 +7,7 @@ from .utils import clip_for_log
 
 
 class FullDirichletCalibrator(BaseEstimator, RegressorMixin):
-    def __init__(self, reg_lambda_list=0.0, reg_mu=None, weights_init=None,
+    def __init__(self, reg_lambda=0.0, reg_mu=None, weights_init=None,
                  initializer='identity', reg_norm=False, ref_row=True,
                  optimizer='auto'):
         """
@@ -21,7 +21,7 @@ class FullDirichletCalibrator(BaseEstimator, RegressorMixin):
                 If 'fmin_l_bfgs_b' then uses scipy.ptimize.fmin_l_bfgs_b which
                 implements a quasi Newton method
         """
-        self.reg_lambda = reg_lambda_list
+        self.reg_lambda = reg_lambda
         self.reg_mu = reg_mu  # Complementary L2 regularization. (Off-diagonal regularization)
         self.weights_init = weights_init  # Input weights for initialisation
         self.initializer = initializer
@@ -30,7 +30,7 @@ class FullDirichletCalibrator(BaseEstimator, RegressorMixin):
         self.optimizer = optimizer
 
     def fit(self, X, y, X_val=None, y_val=None, *args, **kwargs):
-
+        self.classes_ = np.unique(y)
         self.weights_ = self.weights_init
 
         k = np.shape(X)[1]

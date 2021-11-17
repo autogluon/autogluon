@@ -1,35 +1,38 @@
 import copy
 import logging
-import os
 import math
+import os
 import pprint
 import time
 from typing import Union
 
+import networkx as nx
 import numpy as np
 import pandas as pd
-import networkx as nx
-
+from autogluon.core.calibrate import FullDirichletCalibrator, TemperatureScaling, MatrixScaling, VectorScaling, \
+    DiagonalDirichletCalibrator, FixedDiagonalDirichletCalibrator
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, \
+    PROBLEM_TYPES_CLASSIFICATION, DIRICHLET_CALIBRATE, TEMP_SCALING, MATRIX_SCALING, VECTOR_SCALING, \
+    CONFORMAL_CALIBRATE_LIST, DIAG_DIRICHLET, FIXED_DIRICHLET
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, \
-    PROBLEM_TYPES_CLASSIFICATION, CALIBRATION_METHODS
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
+from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
+from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
-from autogluon.core.utils.decorators import apply_presets
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 
-from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
+from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict
 from ..learner import AbstractLearner, DefaultLearner
 
 logger = logging.getLogger()  # return root logger
+
 
 # TODO: num_bag_sets -> ag_args
 
@@ -195,7 +198,8 @@ class TabularPredictor:
         self.sample_weight = sample_weight
         self.weight_evaluation = weight_evaluation  # TODO: sample_weight and weight_evaluation can both be properties that link to self._learner.sample_weight, self._learner.weight_evaluation
         if self.sample_weight in [AUTO_WEIGHT, BALANCE_WEIGHT] and self.weight_evaluation:
-            logger.warning(f"We do not recommend specifying weight_evaluation when sample_weight='{self.sample_weight}', instead specify appropriate eval_metric.")
+            logger.warning(
+                f"We do not recommend specifying weight_evaluation when sample_weight='{self.sample_weight}', instead specify appropriate eval_metric.")
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
 
@@ -203,9 +207,12 @@ class TabularPredictor:
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
         quantile_levels = kwargs.get('quantile_levels', None)
 
-        self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None, eval_metric=eval_metric, problem_type=problem_type,
+        self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None,
+                                                      eval_metric=eval_metric, problem_type=problem_type,
                                                       quantile_levels=quantile_levels,
-                                                      sample_weight=self.sample_weight, weight_evaluation=self.weight_evaluation, groups=groups, **learner_kwargs)
+                                                      sample_weight=self.sample_weight,
+                                                      weight_evaluation=self.weight_evaluation, groups=groups,
+                                                      **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
 
@@ -664,7 +671,8 @@ class TabularPredictor:
         >>> predictor = TabularPredictor(label=label, eval_metric=eval_metric).fit(train_data, presets=['best_quality'], time_limit=time_limit)
         """
         if self._learner.is_fit:
-            raise AssertionError('Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new `Predictor`.')
+            raise AssertionError(
+                'Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new `Predictor`.')
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_kwargs(kwargs)
 
@@ -699,13 +707,16 @@ class TabularPredictor:
 
         if ag_args is None:
             ag_args = {}
-        ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)
+        ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args,
+                                                                  time_limit=time_limit)
 
         feature_generator_init_kwargs = kwargs['_feature_generator_kwargs']
         if feature_generator_init_kwargs is None:
             feature_generator_init_kwargs = dict()
 
-        train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, unlabeled_data=unlabeled_data)
+        train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data,
+                                                                          tuning_data=tuning_data,
+                                                                          unlabeled_data=unlabeled_data)
 
         if hyperparameters is None:
             hyperparameters = 'default'
@@ -727,7 +738,8 @@ class TabularPredictor:
 
         if feature_metadata is not None and isinstance(feature_metadata, str) and feature_metadata == 'infer':
             feature_metadata = None
-        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata, init_kwargs=feature_generator_init_kwargs)
+        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata,
+                                    init_kwargs=feature_generator_init_kwargs)
 
         num_bag_folds, num_bag_sets, num_stack_levels = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
@@ -735,11 +747,13 @@ class TabularPredictor:
         )
 
         if holdout_frac is None:
-            holdout_frac = default_holdout_frac(len(train_data), ag_args.get('hyperparameter_tune_kwargs', None) is not None)
+            holdout_frac = default_holdout_frac(len(train_data),
+                                                ag_args.get('hyperparameter_tune_kwargs', None) is not None)
 
         if kwargs['_save_bag_folds'] is not None:
             if use_bag_holdout and not kwargs['_save_bag_folds']:
-                logger.log(30, f'WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.')
+                logger.log(30,
+                           f'WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.')
             else:
                 if ag_args_ensemble is None:
                     ag_args_ensemble = {}
@@ -749,8 +763,10 @@ class TabularPredictor:
             mb_mem_usage_train_data = get_approximate_df_mem_usage(train_data, sample_ratio=0.2).sum() / 1e6
             num_rows_train = len(train_data)
             if mb_mem_usage_train_data >= 50 or num_rows_train >= 100000:
-                logger.log(20, f'Warning: Training may take a very long time because `time_limit` was not specified and `train_data` is large ({num_rows_train} samples, {round(mb_mem_usage_train_data, 2)} MB).')
-                logger.log(20, f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.')
+                logger.log(20,
+                           f'Warning: Training may take a very long time because `time_limit` was not specified and `train_data` is large ({num_rows_train} samples, {round(mb_mem_usage_train_data, 2)} MB).')
+                logger.log(20,
+                           f'\tConsider setting `time_limit` to ensure training finishes within an expected duration or experiment with a small portion of `train_data` to identify an ideal `presets` and `hyperparameters` configuration.')
 
         core_kwargs = {
             'ag_args': ag_args,
@@ -761,8 +777,10 @@ class TabularPredictor:
         }
         self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
-                          holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity, use_bag_holdout=use_bag_holdout)
+                          holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
+                          num_stack_levels=num_stack_levels,
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit,
+                          verbosity=verbosity, use_bag_holdout=use_bag_holdout)
         self._set_post_fit_vars()
 
         self._post_fit(
@@ -775,13 +793,15 @@ class TabularPredictor:
         self.save()
         return self
 
-    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False, calibrate=False):
+    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
+                  calibrate=False):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
                     refit_full = 'best'
                 else:
-                    logger.warning(f'refit_full was set to {refit_full}, but keep_only_best=True and set_best_to_refit_full=False. Disabling refit_full to avoid training models which would be automatically deleted.')
+                    logger.warning(
+                        f'refit_full was set to {refit_full}, but keep_only_best=True and set_best_to_refit_full=False. Disabling refit_full to avoid training models which would be automatically deleted.')
                     refit_full = False
             else:
                 refit_full = 'all'
@@ -796,7 +816,8 @@ class TabularPredictor:
                     # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
                     self._trainer.save()
                 else:
-                    logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
+                    logger.warning(
+                        f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
 
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
@@ -823,13 +844,24 @@ class TabularPredictor:
             model name to tune temperature scaling on. If set to None
             then will tune best model only. Best model chosen by validation score
         num_splits: int: default=3
-            Number of splits for StratifiedKFold
+            Number of splits for StratifiedKFold for dirichlet calibrate full
         reg_list: list: default=[0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
             Lambda regularization list for regularization of conformal method
         """
-        if calibration_method not in CALIBRATION_METHODS.keys():
-            logging.log(30, f'WARNING: {calibration_method} not in list of valid calibration methods: {CALIBRATION_METHODS.keys()}')
-            return
+        if calibration_method == DIRICHLET_CALIBRATE:
+            calibrator = FullDirichletCalibrator(reg_lambda=reg_list)
+        elif calibration_method == TEMP_SCALING:
+            calibrator = TemperatureScaling(reg_lambda_list=reg_list)
+        elif calibration_method == MATRIX_SCALING:
+            calibrator = MatrixScaling(reg_lambda_list=reg_list)
+        elif calibration_method == VECTOR_SCALING:
+            calibrator = VectorScaling(reg_lambda_list=reg_list)
+        elif calibration_method == FIXED_DIRICHLET:
+            calibrator = FixedDiagonalDirichletCalibrator()
+        elif calibration_method == DIAG_DIRICHLET:
+            calibrator = DiagonalDirichletCalibrator(reg_lambda=reg_list)
+        else:
+            logging.log(30, f'WARNING: {calibration_method} is not valid, must be: {CONFORMAL_CALIBRATE_LIST}')
 
         if model_name is None:
             model_name = self._trainer.get_model_best()
@@ -847,18 +879,20 @@ class TabularPredictor:
 
         cal_method_name = calibration_method.replace('_', ' ')
         logger.log(15, f"{cal_method_name} being tuned for model: {model_name}")
-        skf = StratifiedKFold(n_splits=num_splits, shuffle=True, random_state=0)
 
-        calibrator = CALIBRATION_METHODS[calibration_method]
-        calibrator.__init__(self=calibrator, reg_lambda_list=reg_list)
-        gscv = GridSearchCV(calibrator, param_grid={'reg_lambda': reg_list,
-                                                    'reg_mu': [None]},
-                            cv=skf, scoring='neg_log_loss')
-        gscv.fit(y_val_probs, y_val)
+        if calibration_method == DIRICHLET_CALIBRATE:
+            skf = StratifiedKFold(n_splits=num_splits, shuffle=True, random_state=0)
+            calibrator = GridSearchCV(calibrator, param_grid={'reg_lambda': reg_list,
+                                                              'reg_mu': [None]},
+                                      cv=skf, scoring='neg_log_loss')
+            calibrator.fit(y_val_probs, y_val)
+        else:
+            calibrator.fit(y_val_probs, y_val)
 
-        logger.log(15, f"Best params for {cal_method_name} are {gscv.best_params_}")
+        logger.log(15, f"Best params for {cal_method_name} are: {calibrator.best_params_}")
+
         model = self._trainer.load_model(model_name=model_name)
-        model.calibrator = gscv
+        model.calibrator = calibrator
         model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
@@ -915,7 +949,8 @@ class TabularPredictor:
 
         if ag_args is None:
             ag_args = {}
-        ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args, time_limit=time_limit)
+        ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs['hyperparameter_tune_kwargs'], ag_args,
+                                                                  time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
         aux_kwargs = None  # TODO: Add as option
@@ -932,7 +967,8 @@ class TabularPredictor:
             num_stack_levels = highest_level
 
         # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
-        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit, 'excluded_model_types': excluded_model_types}
+        core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit,
+                       'excluded_model_types': excluded_model_types}
 
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
@@ -1047,7 +1083,8 @@ class TabularPredictor:
         """
         data = self.__get_dataset(data)
         y_pred_proba = self.predict_proba(data=data, model=model)
-        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent, auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
+        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent,
+                                         auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
     def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
@@ -1228,7 +1265,8 @@ class TabularPredictor:
         MODEL_STR = 'Model'
         ENSEMBLE_STR = 'Ensemble'
         for model in model_typenames:
-            if (model in model_innertypenames) and (ENSEMBLE_STR not in model_innertypenames[model]) and (ENSEMBLE_STR in model_typenames[model]):
+            if (model in model_innertypenames) and (ENSEMBLE_STR not in model_innertypenames[model]) and (
+                    ENSEMBLE_STR in model_typenames[model]):
                 new_model_typename = model_typenames[model] + "_" + model_innertypenames[model]
                 if new_model_typename.endswith(MODEL_STR):
                     new_model_typename = new_model_typename[:-len(MODEL_STR)]
@@ -1238,9 +1276,11 @@ class TabularPredictor:
         # all fit() information that is returned:
         results = {
             'model_types': model_typenames,  # dict with key = model-name, value = type of model (class-name)
-            'model_performance': self._trainer.get_models_attribute_dict('val_score'),  # dict with key = model-name, value = validation performance
+            'model_performance': self._trainer.get_models_attribute_dict('val_score'),
+            # dict with key = model-name, value = validation performance
             'model_best': self._trainer.model_best,  # the name of the best model (on validation data)
-            'model_paths': self._trainer.get_models_attribute_dict('path'),  # dict with key = model-name, value = path to model file
+            'model_paths': self._trainer.get_models_attribute_dict('path'),
+            # dict with key = model-name, value = path to model file
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
             'num_bag_folds': self._trainer.k_fold,
@@ -1310,8 +1350,10 @@ class TabularPredictor:
                 for model_type in hpo_results:
                     hpo_model = hpo_results[model_type]
                     if 'trial_info' in hpo_model:
-                        print(f"HPO for {model_type} model:  Num. configurations tried = {len(hpo_model['trial_info'])}, Time spent = {hpo_model['total_time']}s, Search strategy = {hpo_model['search_strategy']}")
-                        print(f"Best hyperparameter-configuration (validation-performance: {self.eval_metric} = {hpo_model['validation_performance']}):")
+                        print(
+                            f"HPO for {model_type} model:  Num. configurations tried = {len(hpo_model['trial_info'])}, Time spent = {hpo_model['total_time']}s, Search strategy = {hpo_model['search_strategy']}")
+                        print(
+                            f"Best hyperparameter-configuration (validation-performance: {self.eval_metric} = {hpo_model['validation_performance']}):")
                         print(hpo_model['best_config'])
             """
             if bagging_used:
@@ -1392,7 +1434,8 @@ class TabularPredictor:
 
         """
         data = self.__get_dataset(data) if data is not None else data
-        return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models, use_orig_features=return_original_features)
+        return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
+                                                   use_orig_features=return_original_features)
 
     def transform_labels(self, labels, inverse=False, proba=False):
         """
@@ -1436,7 +1479,9 @@ class TabularPredictor:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99, silent=False):
+    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000,
+                           time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99,
+                           silent=False):
         """
         Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the data where this feature's values have been randomly shuffled across rows.
@@ -1528,7 +1573,8 @@ class TabularPredictor:
         """
         data = self.__get_dataset(data) if data is not None else data
         if (data is None) and (not self._trainer.is_data_saved):
-            raise AssertionError('No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
+            raise AssertionError(
+                'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
         if data is not None:
             # Avoid crash when indices are duplicated
             data = data.reset_index(drop=True)
@@ -1536,13 +1582,15 @@ class TabularPredictor:
         if num_shuffle_sets is None:
             num_shuffle_sets = 10 if time_limit else 3
 
-        fi_df = self._learner.get_feature_importance(model=model, X=data, features=features, feature_stage=feature_stage,
-                                                     subsample_size=subsample_size, time_limit=time_limit, num_shuffle_sets=num_shuffle_sets, silent=silent)
+        fi_df = self._learner.get_feature_importance(model=model, X=data, features=features,
+                                                     feature_stage=feature_stage,
+                                                     subsample_size=subsample_size, time_limit=time_limit,
+                                                     num_shuffle_sets=num_shuffle_sets, silent=silent)
 
         if include_confidence_band:
             if confidence_level <= 0.5 or confidence_level >= 1.0:
                 raise ValueError("confidence_level must lie between 0.5 and 1.0")
-            ci_str = "{:0.0f}".format(confidence_level*100)
+            ci_str = "{:0.0f}".format(confidence_level * 100)
             import scipy.stats
             num_features = len(fi_df)
             ci_low_dict = dict()
@@ -1561,8 +1609,8 @@ class TabularPredictor:
                     ci_low = mean - t_val * stddev / math.sqrt(n)
                 ci_high_dict[fi.name] = ci_high
                 ci_low_dict[fi.name] = ci_low
-            high_str = 'p'+ci_str+'_high'
-            low_str = 'p'+ci_str+'_low'
+            high_str = 'p' + ci_str + '_high'
+            low_str = 'p' + ci_str + '_low'
             fi_df[high_str] = pd.Series(ci_high_dict)
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
@@ -1592,7 +1640,8 @@ class TabularPredictor:
         -------
         List of persisted model names.
         """
-        return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
+        return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors,
+                                             max_memory=max_memory)
 
     def unpersist_models(self, models='all') -> list:
         """
@@ -1694,7 +1743,8 @@ class TabularPredictor:
     # TODO: Move code logic to learner/trainer
     # TODO: Add fit() arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
-    def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False, time_limit=None):
+    def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False,
+                              time_limit=None):
         """
         Fits new weighted ensemble models to combine predictions of previously-trained models.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -1750,11 +1800,17 @@ class TabularPredictor:
                 models_to_check_now = models_to_check[:i + 1]
                 max_base_model_level = max([trainer.get_model_level(base_model) for base_model in models_to_check_now])
                 weighted_ensemble_level = max_base_model_level + 1
-                models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=models_to_check_now, name_suffix=name_suffix + '_Pareto' + str(i), time_limit=time_limit)
+                models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level,
+                                                             stack_name=stack_name,
+                                                             base_model_names=models_to_check_now,
+                                                             name_suffix=name_suffix + '_Pareto' + str(i),
+                                                             time_limit=time_limit)
 
         max_base_model_level = max([trainer.get_model_level(base_model) for base_model in base_models])
         weighted_ensemble_level = max_base_model_level + 1
-        models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=base_models, name_suffix=name_suffix, time_limit=time_limit)
+        models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level,
+                                                     stack_name=stack_name, base_model_names=base_models,
+                                                     name_suffix=name_suffix, time_limit=time_limit)
 
         return models
 
@@ -1791,7 +1847,8 @@ class TabularPredictor:
     # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.
     # TODO: Remove train_data argument once we start caching the raw original data: Can just load that instead.
-    def get_oof_pred_proba(self, model: str = None, transformed=False, as_multiclass=True, train_data=None, internal_oof=False) -> Union[pd.DataFrame, pd.Series]:
+    def get_oof_pred_proba(self, model: str = None, transformed=False, as_multiclass=True, train_data=None,
+                           internal_oof=False) -> Union[pd.DataFrame, pd.Series]:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -1844,13 +1901,15 @@ class TabularPredictor:
             # TODO: bagged-with-holdout refit to bagged-no-holdout should still be able to return out-of-fold predictions
             raise AssertionError('_FULL models do not have out-of-fold predictions.')
         if self._trainer.get_model_attribute_full(model=model, attribute='val_in_fit', func=max):
-            raise AssertionError(f'Model {model} does not have out-of-fold predictions because it used a validation set during training.')
+            raise AssertionError(
+                f'Model {model} does not have out-of-fold predictions because it used a validation set during training.')
         y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
         if not internal_oof:
             is_duplicate_index = y_pred_proba_oof_transformed.index.duplicated(keep='first')
             if is_duplicate_index.any():
-                logger.log(20, 'Detected duplicate indices... This means that data rows may have been duplicated during training. '
-                               'Removing all duplicates except for the first instance.')
+                logger.log(20,
+                           'Detected duplicate indices... This means that data rows may have been duplicated during training. '
+                           'Removing all duplicates except for the first instance.')
                 y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[is_duplicate_index == False]
             if self._learner._pre_X_rows is not None and len(y_pred_proba_oof_transformed) < self._learner._pre_X_rows:
                 len_diff = self._learner._pre_X_rows - len(y_pred_proba_oof_transformed)
@@ -1865,23 +1924,28 @@ class TabularPredictor:
                 else:
                     missing_idx = list(train_data.index.difference(y_pred_proba_oof_transformed.index))
                     missing_idx_data = train_data.loc[missing_idx]
-                    missing_pred_proba = self.transform_features(data=missing_idx_data, base_models=[model], return_original_features=False)
+                    missing_pred_proba = self.transform_features(data=missing_idx_data, base_models=[model],
+                                                                 return_original_features=False)
                     y_pred_proba_oof_transformed = pd.concat([y_pred_proba_oof_transformed, missing_pred_proba])
                     y_pred_proba_oof_transformed = y_pred_proba_oof_transformed.reindex(list(train_data.index))
 
         if self.problem_type == MULTICLASS and self._learner.label_cleaner.problem_type_transform == MULTICLASS:
-            y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
+            y_pred_proba_oof_transformed.columns = copy.deepcopy(
+                self._learner.label_cleaner.ordered_class_labels_transformed)
         elif self.problem_type == QUANTILE:
             y_pred_proba_oof_transformed.columns = self.quantile_levels
         else:
             y_pred_proba_oof_transformed.columns = [self.label]
             y_pred_proba_oof_transformed = y_pred_proba_oof_transformed[self.label]
             if as_multiclass and self.problem_type == BINARY:
-                y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba_oof_transformed, as_pandas=True)
+                y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(
+                    y_pred_proba_oof_transformed, as_pandas=True)
             elif self.problem_type == MULTICLASS:
                 if transformed:
-                    y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba_oof_transformed, as_pandas=True)
-                    y_pred_proba_oof_transformed.columns = copy.deepcopy(self._learner.label_cleaner.ordered_class_labels_transformed)
+                    y_pred_proba_oof_transformed = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(
+                        y_pred_proba_oof_transformed, as_pandas=True)
+                    y_pred_proba_oof_transformed.columns = copy.deepcopy(
+                        self._learner.label_cleaner.ordered_class_labels_transformed)
         if transformed:
             return y_pred_proba_oof_transformed
         else:
@@ -1980,9 +2044,12 @@ class TabularPredictor:
             This should generally be kept as `False` since the most important memory and disk reduction techniques are automatically applied to these models during the original `fit()` call.
 
         """
-        self._trainer.reduce_memory_size(remove_data=remove_data, remove_fit_stack=remove_fit_stack, remove_fit=True, remove_info=False, requires_save=requires_save, reduce_children=reduce_children)
+        self._trainer.reduce_memory_size(remove_data=remove_data, remove_fit_stack=remove_fit_stack, remove_fit=True,
+                                         remove_info=False, requires_save=requires_save,
+                                         reduce_children=reduce_children)
 
-    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False, delete_from_disk=True, dry_run=True):
+    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False,
+                      delete_from_disk=True, dry_run=True):
         """
         Deletes models from `predictor`.
         This can be helpful to minimize memory usage and disk usage, particularly for model deployment.
@@ -2021,7 +2088,9 @@ class TabularPredictor:
             models_to_keep = self._trainer.model_best
             if models_to_keep is None:
                 models_to_keep = self._trainer.get_model_best()
-        self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete, allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk, dry_run=dry_run)
+        self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete,
+                                    allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk,
+                                    dry_run=dry_run)
 
     # TODO: v0.1 add documentation for arguments
     def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
@@ -2032,8 +2101,10 @@ class TabularPredictor:
         """Returns the list of model names which are persisted in memory."""
         return list(self._learner.load_trainer().models.keys())
 
-    def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limit=None, hyperparameters=None, holdout_frac=None,
-                teacher_preds='soft', augment_method='spunge', augment_args={'size_factor': 5, 'max_size': int(1e5)}, models_name_suffix=None, verbosity=None):
+    def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limit=None, hyperparameters=None,
+                holdout_frac=None,
+                teacher_preds='soft', augment_method='spunge', augment_args={'size_factor': 5, 'max_size': int(1e5)},
+                models_name_suffix=None, verbosity=None):
         """
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
         Distillation can produce a model that is more accurate than the same model fit directly on the original training data.
@@ -2110,9 +2181,12 @@ class TabularPredictor:
         """
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
-        return self._learner.distill(X=train_data, X_val=tuning_data, time_limit=time_limit, hyperparameters=hyperparameters, holdout_frac=holdout_frac,
-                                     verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
-                                     augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
+        return self._learner.distill(X=train_data, X_val=tuning_data, time_limit=time_limit,
+                                     hyperparameters=hyperparameters, holdout_frac=holdout_frac,
+                                     verbosity=verbosity, models_name_suffix=models_name_suffix,
+                                     teacher_preds=teacher_preds,
+                                     augmentation_data=augmentation_data, augment_method=augment_method,
+                                     augment_args=augment_args)
 
     def plot_ensemble_model(self, prune_unused_nodes=True) -> str:
         """
@@ -2207,33 +2281,40 @@ class TabularPredictor:
         if hyperparameter_tune_kwargs is None:
             return True
 
-        scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, time_out=time_limit,
+        scheduler_cls, scheduler_params = scheduler_factory(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                                                            time_out=time_limit,
                                                             nthreads_per_trial='auto', ngpus_per_trial='auto')
 
-        assert scheduler_params['searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
+        assert scheduler_params[
+                   'searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
         if scheduler_params.get('dist_ip_addrs', None):
-            logger.warning('Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
+            logger.warning(
+                'Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
 
         if scheduler_params['num_trials'] == 1:
-            logger.warning('Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. This can occur if time_limit was not specified in `fit()`.')
+            logger.warning(
+                'Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. This can occur if time_limit was not specified in `fit()`.')
             return False
 
         scheduler_ngpus = scheduler_params['resource'].get('num_gpus', 0)
         if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
-            logger.warning(f"Warning: TabularPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
+            logger.warning(
+                f"Warning: TabularPredictor currently doesn't use >1 GPU per training run. Detected {scheduler_ngpus} GPUs.")
 
         return True
 
     def _set_hyperparameter_tune_kwargs_in_ag_args(self, hyperparameter_tune_kwargs, ag_args, time_limit):
         if hyperparameter_tune_kwargs is not None and 'hyperparameter_tune_kwargs' not in ag_args:
             if 'hyperparameter_tune_kwargs' in ag_args:
-                AssertionError('hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
+                AssertionError(
+                    'hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
             else:
                 ag_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
         if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs', None), time_limit):
             ag_args.pop('hyperparameter_tune_kwargs', None)
         if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
-            logger.log(30, 'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
+            logger.log(30,
+                       'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
         return ag_args
 
     def _set_post_fit_vars(self, learner: AbstractLearner = None):
@@ -2349,9 +2430,10 @@ class TabularPredictor:
             logger.warning('############################## WARNING ##############################')
             logger.warning('')
             if require_version_match:
-                raise AssertionError(f'Predictor was created on version {version_init} but is being loaded with version {version_load}. '
-                                     f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
-                                     f'this error can be bypassed by specifying `require_version_match=False`.')
+                raise AssertionError(
+                    f'Predictor was created on version {version_init} but is being loaded with version {version_load}. '
+                    f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
+                    f'this error can be bypassed by specifying `require_version_match=False`.')
 
         if predictor is None:
             predictor = cls._load(path=path)
@@ -2385,7 +2467,8 @@ class TabularPredictor:
         fit_kwargs_default = dict(
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             holdout_frac=None,  # TODO: Potentially error if num_bag_folds is also specified
-            num_bag_folds=None,  # TODO: Potentially move to fit_extra, raise exception if value too large / invalid in fit_extra.
+            num_bag_folds=None,
+            # TODO: Potentially move to fit_extra, raise exception if value too large / invalid in fit_extra.
             auto_stack=False,
             use_bag_holdout=False,
 
@@ -2444,7 +2527,8 @@ class TabularPredictor:
             if kwarg_name not in allowed_kwarg_names:
                 public_kwarg_options = [kwarg for kwarg in allowed_kwarg_names if kwarg[0] != '_']
                 public_kwarg_options.sort()
-                raise ValueError(f"Unknown keyword argument specified: {kwarg_name}\nValid kwargs: {public_kwarg_options}")
+                raise ValueError(
+                    f"Unknown keyword argument specified: {kwarg_name}\nValid kwargs: {public_kwarg_options}")
 
         kwargs_sanitized = fit_extra_kwargs_default.copy()
         kwargs_sanitized.update(kwargs)
@@ -2457,9 +2541,11 @@ class TabularPredictor:
         refit_full = kwargs_sanitized['refit_full']
         set_best_to_refit_full = kwargs_sanitized['set_best_to_refit_full']
         if refit_full and not self._learner.cache_data:
-            raise ValueError('`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
+            raise ValueError(
+                '`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
         if set_best_to_refit_full and not refit_full:
-            raise ValueError('`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
+            raise ValueError(
+                '`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
 
         return kwargs_sanitized
 
@@ -2472,13 +2558,16 @@ class TabularPredictor:
             unlabeled_data = TabularDataset(unlabeled_data)
 
         if not isinstance(train_data, pd.DataFrame):
-            raise AssertionError(f'train_data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
+            raise AssertionError(
+                f'train_data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
 
         if len(set(train_data.columns)) < len(train_data.columns):
-            raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
+            raise ValueError(
+                "Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None:
             if not isinstance(tuning_data, pd.DataFrame):
-                raise AssertionError(f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
+                raise AssertionError(
+                    f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
             train_features = [column for column in train_data.columns if column != self.label]
             tuning_features = [column for column in tuning_data.columns if column != self.label]
             if self.sample_weight is not None:
@@ -2494,7 +2583,8 @@ class TabularPredictor:
                 raise ValueError("Column names must match between training and tuning data")
         if unlabeled_data is not None:
             if not isinstance(unlabeled_data, pd.DataFrame):
-                raise AssertionError(f'unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}')
+                raise AssertionError(
+                    f'unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}')
             train_features = [column for column in train_data.columns if column != self.label]
             unlabeled_features = [column for column in unlabeled_data.columns]
             if self.sample_weight is not None:
@@ -2515,9 +2605,12 @@ class TabularPredictor:
                 feature_generator = self._learner.feature_generator
             else:
                 raise AssertionError('FeatureGenerator already exists!')
-        self._learner.feature_generator = get_default_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata, init_kwargs=init_kwargs)
+        self._learner.feature_generator = get_default_feature_generator(feature_generator=feature_generator,
+                                                                        feature_metadata=feature_metadata,
+                                                                        init_kwargs=init_kwargs)
 
-    def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack, num_train_rows):
+    def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack,
+                             num_train_rows):
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
@@ -2536,7 +2629,8 @@ class TabularPredictor:
         if num_bag_folds < 2 and num_bag_folds != 0:
             raise ValueError(f'num_bag_folds must be equal to 0 or >=2. (num_bag_folds={num_bag_folds})')
         if num_stack_levels != 0 and num_bag_folds == 0:
-            raise ValueError(f'num_stack_levels must be 0 if num_bag_folds is 0. (num_stack_levels={num_stack_levels}, num_bag_folds={num_bag_folds})')
+            raise ValueError(
+                f'num_stack_levels must be 0 if num_bag_folds is 0. (num_stack_levels={num_stack_levels}, num_bag_folds={num_bag_folds})')
         if num_bag_sets is None:
             if num_bag_folds >= 2:
                 if time_limit is not None:
@@ -2577,7 +2671,8 @@ class _TabularPredictorExperimental(TabularPredictor):
         advice_list = []
 
         if not advice_dict['is_feature_generator_fit']:
-            advice_list.append('FeatureGenerator has not been fit, consider calling `predictor.fit_feature_generator(data)`.')
+            advice_list.append(
+                'FeatureGenerator has not been fit, consider calling `predictor.fit_feature_generator(data)`.')
         if not advice_dict['is_learner_fit']:
             advice_list.append('Learner is not fit, consider calling `predictor.fit(...)`')
         if not advice_dict['exists_trainer']:
