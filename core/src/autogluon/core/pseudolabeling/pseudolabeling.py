@@ -123,12 +123,11 @@ def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: 
         logging.warning(f'Ensemble pseudo labeling expected {original_k}, but only {num_models} fit.')
 
     if predictor.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-        pseudo_idxes = filter_ensemble_pseudo(predictor=predictor, unlabeled_data=unlabeled_data, num_models=num_models)
+        return filter_ensemble_classification(predictor=predictor, unlabeled_data=unlabeled_data,
+                                              leaderboard=leaderboard, num_models=num_models)
     else:
-        pseudo_idxes = filter_pseudo_std_regression(predictor=predictor, unlabeled_data=unlabeled_data,
-                                                    leaderboard=leaderboard, num_models=num_models)
-
-    return pseudo_idxes[pseudo_idxes]
+        return filter_pseudo_std_regression(predictor=predictor, unlabeled_data=unlabeled_data,
+                                            leaderboard=leaderboard, num_models=num_models)
 
 
 def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_models, leaderboard,
@@ -172,7 +171,7 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
     return df_filtered[df_filtered]
 
 
-def ensemble_classification_filter(predictor, unlabeled_data: pd.DataFrame, leaderboard,
+def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, leaderboard,
                                    num_models, threshold: float = 0.95):
     """
     Gets predictive probability on unlabeled_data using top k models. Then averages them
@@ -210,4 +209,4 @@ def ensemble_classification_filter(predictor, unlabeled_data: pd.DataFrame, lead
 
     test_pseudo_indices = sample_evenly(y_pred_proba=y_pred_proba_ensemble, df_indexes=pseudo_indexes)
 
-    return test_pseudo_indices, y_pred_proba_ensemble, y_pred_ensemble
+    return test_pseudo_indices[test_pseudo_indices], y_pred_proba_ensemble, y_pred_ensemble
