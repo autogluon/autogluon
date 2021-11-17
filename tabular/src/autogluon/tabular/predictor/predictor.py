@@ -886,10 +886,10 @@ class TabularPredictor:
                                                               'reg_mu': [None]},
                                       cv=skf, scoring='neg_log_loss')
             calibrator.fit(y_val_probs, y_val)
+            logger.log(15, f"Best params for {cal_method_name} are: {calibrator.best_params_}")
         else:
             calibrator.fit(y_val_probs, y_val)
-
-        logger.log(15, f"Best params for {cal_method_name} are: {calibrator.best_params_}")
+            logger.log(15, f"Best params for {cal_method_name} are: {calibrator.weights_}")
 
         model = self._trainer.load_model(model_name=model_name)
         model.calibrator = calibrator
