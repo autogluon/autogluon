@@ -1021,13 +1021,16 @@ class TabularPredictor:
 
         Parameters:
         -----------
-        hyperparameters: dict
-            Dictionary of hyperparameters the model should use
         unlabeled_data: Extra unlabeled data (could be the test data) to assign pseudolabels to
             and incorporate as extra training data.
         max_iter: int, default = 5
             Maximum allowed number of iterations, where in each iteration, the data are pseudolabeled
             by the current predictor and the predictor is refit including the pseudolabled data in its training set.
+        return_pred_proba: bool, default = False
+            Transductive learning setting, will return predictive probabiliteis of unlabeled_data
+        use_ensemble: bool, default = False
+            Flag for using ensemble pseudo labeling methods
+
         Returns:
         --------
         self: TabularPredictor
@@ -1044,16 +1047,17 @@ class TabularPredictor:
         for i in range(max_iter):
             iter_print = str(i + 1)
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}')
-            y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
-            y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
 
             if use_ensemble:
                 if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
                     test_pseudo_idxes_true, y_pred_proba, y_pred = filter_ensemble_pseudo(predictor=self,
                                                                                           unlabeled_data=X_test)
                 else:
-                    test_pseudo_idxes_true = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
+                    test_pseudo_idxes_true, y_pred = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
+                    y_pred_proba = y_pred.copy()
             else:
+                y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
+                y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
                 test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
 
             if return_pred_prob:
@@ -1119,6 +1123,8 @@ class TabularPredictor:
         return_pred_prob: bool, default = False
             Returns held-out predictive probabilities from pseudo-labeling. If test_data is labeled then
             returns model's predictive probabilities.
+        use_ensemble: bool, defautl = False
+            Flag to determine whether to use ensemble pseudo labeling algorithm
         kwargs: dict
             If predictor is not already fit: Refer to parameters documentation in :meth:`TabularPredictor.fit`.
             If predictor is fit: Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
