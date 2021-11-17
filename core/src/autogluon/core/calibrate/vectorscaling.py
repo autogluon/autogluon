@@ -26,7 +26,6 @@ class VectorScaling(BaseEstimator, RegressorMixin):
         self.weights_ = self.weights_init
 
     def fit(self, X, y, X_val=None, y_val=None, *args, **kwargs):
-
         self.__setup()
 
         k = np.shape(X)[1]
