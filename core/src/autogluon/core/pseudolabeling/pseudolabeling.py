@@ -23,6 +23,10 @@ def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
     class_value_counts = pred_idxmax.value_counts()
     min_count = class_value_counts.min()
     class_keys = list(class_value_counts.keys())
+    test_pseudo_indices = pd.Series(data=False, index=y_pred_proba.index)
+
+    if len(class_keys) < 1:
+        return test_pseudo_indices
 
     logging.log(15, f'Taking {min_count} rows from the following classes: {class_keys}')
 
@@ -36,7 +40,6 @@ def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
         else:
             new_test_pseudo_indices = new_test_pseudo_indices.append(selected_rows.index)
 
-    test_pseudo_indices = pd.Series(data=False, index=y_pred_proba.index)
     test_pseudo_indices.loc[new_test_pseudo_indices] = True
 
     return test_pseudo_indices
