@@ -794,7 +794,7 @@ class TabularPredictor:
         return self
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
-                  calibrate=False):
+                  calibrate=None):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
