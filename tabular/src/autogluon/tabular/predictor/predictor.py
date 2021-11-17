@@ -832,7 +832,7 @@ class TabularPredictor:
             self.save_space()
 
     def _conformal_calibrate_model(self, calibration_method: str, model_name: str = None, num_splits: int = 3,
-                                   reg_list: list = [0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]):
+                                   reg_list: list = [0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1]):
         """
         Applies conformal learning method specified by the user
 
@@ -845,7 +845,7 @@ class TabularPredictor:
             then will tune best model only. Best model chosen by validation score
         num_splits: int: default=3
             Number of splits for StratifiedKFold for dirichlet calibrate full
-        reg_list: list: default=[0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+        reg_list: list: default=[0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1]
             Lambda regularization list for regularization of conformal method
         """
         if calibration_method == DIRICHLET_CALIBRATE:
