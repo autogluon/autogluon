@@ -393,7 +393,7 @@ def test_pseudolabeling():
         print(f"Testing dataset with name: {name}, problem type: {problem_type}")
 
         train_data = train_data.sample(50)
-        test_data = test_data.dropna()
+        test_data = test_data[test_data[label].notna()]
 
         error_msg_og = f'pseudolabel threw an exception during fit, it should have ' \
                        f'succeeded on problem type:{problem_type} with dataset name:{name}, ' \
