@@ -1134,6 +1134,9 @@ class TabularPredictor:
         self : TabularPredictor
             Returns self, which is a Python class of TabularPredictor
         """
+        if len(pseudo_data) < 1:
+            raise Exception('No pseudo data given')
+
         if not self._learner.is_fit:
             if 'train_data' not in kwargs.keys():
                 Exception('Autogluon is required to be fit or given \'train_data\' in order to run \'fit_pseudolabel\'.'
