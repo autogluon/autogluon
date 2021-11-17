@@ -152,21 +152,19 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
     pd.Series of indices that met pseudo labeling requirements
     """
     top_k_models_list = leaderboard.head(num_models)['model']
-    pred_proba_top_k = None
+    top_k_preds = None
 
     for model in top_k_models_list:
         y_test_pred = predictor.predict(data=unlabeled_data, model=model)
         if model == top_k_models_list[0]:
-            pred_proba_top_k = y_test_pred
+            top_k_preds = y_test_pred
         else:
-            pred_proba_top_k = pd.concat([pred_proba_top_k, y_test_pred], axis=1)
+            top_k_preds = pd.concat([top_k_preds, y_test_pred], axis=1)
 
-    pred_proba_top_k = pred_proba_top_k.to_numpy()
-
-    pred_sd = pd.Series(data=np.std(pred_proba_top_k, axis=1), index=unlabeled_data.index)
-    pred_z_score = (pred_sd - pred_sd.mean()) / pred_sd.std()
-
-    df_filtered = pred_z_score.between(lower_bound, upper_bound)
+    top_k_preds = top_k_preds.to_numpy()
+    preds_sd = pd.Series(data=np.std(top_k_preds, axis=1), index=unlabeled_data.index)
+    preds_z_score = (preds_sd - preds_sd.mean()) / preds_sd.std()
+    df_filtered = preds_z_score.between(lower_bound, upper_bound)
 
     return df_filtered[df_filtered]
 
