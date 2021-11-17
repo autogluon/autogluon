@@ -10,10 +10,10 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from autogluon.core.calibrate import FullDirichletCalibrator, TemperatureScaling, MatrixScaling, VectorScaling, \
-    DiagonalDirichletCalibrator, FixedDiagonalDirichletCalibrator
+    FixedDiagonalDirichletCalibrator
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, \
     PROBLEM_TYPES_CLASSIFICATION, DIRICHLET_CALIBRATE, TEMP_SCALING, MATRIX_SCALING, VECTOR_SCALING, \
-    CONFORMAL_CALIBRATE_LIST, DIAG_DIRICHLET, FIXED_DIRICHLET
+    CONFORMAL_CALIBRATE_LIST, FIXED_DIRICHLET
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -858,8 +858,6 @@ class TabularPredictor:
             calibrator = VectorScaling(reg_lambda_list=reg_list)
         elif calibration_method == FIXED_DIRICHLET:
             calibrator = FixedDiagonalDirichletCalibrator()
-        elif calibration_method == DIAG_DIRICHLET:
-            calibrator = DiagonalDirichletCalibrator(reg_lambda=reg_list)
         else:
             logging.log(30, f'WARNING: {calibration_method} is not valid, must be: {CONFORMAL_CALIBRATE_LIST}')
 

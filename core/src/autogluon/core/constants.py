@@ -28,10 +28,8 @@ TEMP_SCALING = 'temperature_scaling'
 VECTOR_SCALING = 'vector_scaling'
 MATRIX_SCALING = 'matrix_scaling'
 FIXED_DIRICHLET = 'fixed_dirichlet'
-DIAG_DIRICHLET = 'diag_dirichlet'
 
-CONFORMAL_CALIBRATE_LIST = [DIRICHLET_CALIBRATE, TEMP_SCALING, VECTOR_SCALING, MATRIX_SCALING, FIXED_DIRICHLET,
-                            DIAG_DIRICHLET]
+CONFORMAL_CALIBRATE_LIST = [DIRICHLET_CALIBRATE, TEMP_SCALING, VECTOR_SCALING, MATRIX_SCALING, FIXED_DIRICHLET]
 
 # TODO: Add docs to dedicated page, or should it live in AbstractModel?
 # TODO: How to reference correct version of docs?
