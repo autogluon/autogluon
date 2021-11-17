@@ -134,8 +134,8 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
                                  lower_bound: float = -0.25, upper_bound: float = 0.25):
     """
     Predicts on unlabeled_data using the top k models. Then gets standard deviation of each
-    row's prediction and the standard deviation across all standard deviations and incorporates
-    rows with a z-score in the range of lower_bound and upper_bound.
+    row's prediction and the standard deviation across all rows of standard deviations and
+    incorporates rows with a z-score in the range of lower_bound and upper_bound.
 
     Parameters:
     -----------
