@@ -393,7 +393,8 @@ def test_pseudolabeling():
         print(f"Testing dataset with name: {name}, problem type: {problem_type}")
 
         train_data = train_data.sample(50)
-        test_data = test_data[test_data[label].notna()].sample(50)
+        test_data = test_data[~test_data[label].isna()]
+        test_data = test_data.sample(50)
 
         if problem_type in PROBLEM_TYPES_CLASSIFICATION:
             valid_class_idxes = test_data[label].isin(train_data[label])
