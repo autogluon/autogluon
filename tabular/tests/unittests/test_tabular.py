@@ -432,10 +432,10 @@ def test_pseudolabeling():
         unlabeled_test_data = test_data.drop(columns=label)
         # Test unlabeled pseudo data
         for flag_ensemble in [True, False]:
-            prefix = 'ensemble ' if flag_ensemble else ''
-            error_msg = prefix + error_msg_og
+            error_prefix = 'ensemble ' if flag_ensemble else ''
+            error_msg = error_prefix + error_msg_og
             for is_weighted_ensemble in [True, False]:
-                suffix = ' with pseudo label model weighted ensembling' if is_weighted_ensemble else ''
+                error_suffix = ' with pseudo label model weighted ensembling' if is_weighted_ensemble else ''
 
                 try:
                     print("Pseudolabel Testing: Unlabeled data 'fit_pseudolabel'")
@@ -448,7 +448,7 @@ def test_pseudolabeling():
                         fit_ensemble=is_weighted_ensemble
                     )
                 except Exception as e:
-                    assert False, error_msg + 'unlabeled test data' + suffix
+                    assert False, error_msg + 'unlabeled test data' + error_suffix
 
                 try:
                     print("Pseudolabel Testing: Unlabeled data, best quality 'fit_pseudolabel'")
@@ -462,7 +462,7 @@ def test_pseudolabeling():
                         fit_ensemble=is_weighted_ensemble
                     )
                 except Exception as e:
-                    assert False, error_msg + 'unlabeled test data, best quality' + suffix
+                    assert False, error_msg + 'unlabeled test data, best quality' + error_suffix
 
 
 @pytest.mark.slow
