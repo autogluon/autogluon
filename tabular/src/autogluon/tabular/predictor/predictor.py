@@ -1140,7 +1140,7 @@ class TabularPredictor:
         return_pred_prob: bool, default = False
             Returns held-out predictive probabilities from pseudo-labeling. If test_data is labeled then
             returns model's predictive probabilities.
-        use_ensemble: bool, defautl = False
+        use_ensemble: bool, default = False
             Flag to determine whether to use ensemble pseudo labeling algorithm
         kwargs: dict
             If predictor is not already fit: Refer to parameters documentation in :meth:`TabularPredictor.fit`.
