@@ -1198,6 +1198,7 @@ class TabularPredictor:
                            **fit_extra_kwargs)
 
             if fit_ensemble:
+                logger.log(15, 'Fitting weighted ensemble model using pre-labeled pseudo data')
                 self.fit_weighted_ensemble()
 
             if return_pred_prob:
