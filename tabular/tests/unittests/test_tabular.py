@@ -396,8 +396,8 @@ def test_pseudolabeling():
         test_data = test_data[~test_data[label].isna()]
 
         if problem_type in PROBLEM_TYPES_CLASSIFICATION:
-            valid_class_idxes = test_data[label].isin(train_data[label])
-            test_data = test_data.loc[valid_class_idxes]
+            valid_class_idxes = test_data[label].isin(train_data[label].unique())
+            test_data = test_data[valid_class_idxes]
 
         test_data = test_data.sample(50)
 
