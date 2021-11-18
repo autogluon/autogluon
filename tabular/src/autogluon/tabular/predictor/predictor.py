@@ -1029,7 +1029,8 @@ class TabularPredictor:
         return ret
 
     def _run_pseudolabeling(self, unlabeled_data: pd.DataFrame, max_iter: int,
-                            return_pred_prob: bool = False, use_ensemble: bool = False, **kwargs):
+                            return_pred_prob: bool = False, use_ensemble: bool = False,
+                            fit_ensemble:bool = False, **kwargs):
         """
         Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
         used in original model unless specified by the user. This is an internal function that iteratively
@@ -1047,6 +1048,9 @@ class TabularPredictor:
             Transductive learning setting, will return predictive probabiliteis of unlabeled_data
         use_ensemble: bool, default = False
             Flag for using ensemble pseudo labeling methods
+        fit_ensemble: bool, default = False
+            Flag for fitting weighted ensemble model using models trained on pseudo labeling. Will be done
+            on every iteration.
 
         Returns:
         --------
@@ -1101,6 +1105,11 @@ class TabularPredictor:
             pseudo_data[self.label] = y_pseudo_og
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i + 1)),
                            **kwargs)
+
+            if fit_ensemble:
+                logger.log(15, 'Fitting weighted ensemble using models trained with pseudo labeled data')
+                self.fit_weighted_ensemble()
+
             current_score = self.info()['best_model_score_val']
 
             logger.log(20,
@@ -1120,7 +1129,7 @@ class TabularPredictor:
             return self
 
     def fit_pseudolabel(self, pseudo_data: pd.DataFrame, max_iter: int = 5, return_pred_prob: bool = False,
-                        use_ensemble: bool = False, **kwargs):
+                        use_ensemble: bool = False, fit_ensemble: bool = False, **kwargs):
         """
         If 'pseudo_data' is labeled then incorporates all test_data into train_data for
         newly fit models. If 'pseudo_data' is unlabeled then 'fit_pseudolabel' will self label the
@@ -1140,8 +1149,11 @@ class TabularPredictor:
         return_pred_prob: bool, default = False
             Returns held-out predictive probabilities from pseudo-labeling. If test_data is labeled then
             returns model's predictive probabilities.
-        use_ensemble: bool, defautl = False
+        use_ensemble: bool, default = False
             Flag to determine whether to use ensemble pseudo labeling algorithm
+        fit_ensemble: bool, default = False
+            Flag to determine whether to fit weighted ensemble model using models trained on pseudo labeled
+            data
         kwargs: dict
             If predictor is not already fit: Refer to parameters documentation in :meth:`TabularPredictor.fit`.
             If predictor is fit: Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
@@ -1185,6 +1197,9 @@ class TabularPredictor:
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter='')[:-1],
                            **fit_extra_kwargs)
 
+            if fit_ensemble:
+                self.fit_weighted_ensemble()
+
             if return_pred_prob:
                 y_pred_proba = self.predict_proba(pseudo_data)
                 return self, y_pred_proba
@@ -1195,7 +1210,7 @@ class TabularPredictor:
                            'AutoGluon will assign pseudo labels to data and use it for extra training data...')
             return self._run_pseudolabeling(unlabeled_data=pseudo_data, max_iter=max_iter,
                                             return_pred_prob=return_pred_prob, use_ensemble=use_ensemble,
-                                            **fit_extra_kwargs)
+                                            fit_ensemble=fit_ensemble, **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):
         """
