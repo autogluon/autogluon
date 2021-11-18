@@ -943,6 +943,10 @@ class TabularPredictor:
             y_pseudo = pseudo_data[self.label]
             X_pseudo = self._learner.transform_features(X_pseudo)
             y_pseudo = self._learner.label_cleaner.transform(y_pseudo)
+
+            if np.nan in y_pseudo.unique():
+                raise Exception('NaN was found in the label column for pseudo labeled data.'
+                                'Please ensure no NaN values in labeled data')
         else:
             X_pseudo = None
             y_pseudo = None
