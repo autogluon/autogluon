@@ -429,12 +429,11 @@ def test_pseudolabeling():
         except Exception as e:
             assert False, error_msg_og + 'labeled test data, best quality'
 
+        unlabeled_test_data = test_data.drop(columns=label)
         for flag_ensemble in [True, False]:
             prefix = 'ensemble ' if flag_ensemble else ''
             error_msg = prefix + error_msg_og
-            unlabeled_test_data = test_data.drop(columns=label)
 
-            # Test unlabeled
             try:
                 print("Pseudolabel Testing: Unlabeled data 'fit_pseudolabel'")
                 _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
