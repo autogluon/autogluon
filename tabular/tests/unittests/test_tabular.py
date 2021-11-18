@@ -429,8 +429,8 @@ def test_pseudolabeling():
         except Exception as e:
             assert False, error_msg_og + 'labeled test data, best quality'
 
-        unlabeled_test_data = test_data.drop(columns=label)
         # Test unlabeled pseudo data
+        unlabeled_test_data = test_data.drop(columns=label)
         for flag_ensemble in [True, False]:
             error_prefix = 'ensemble ' if flag_ensemble else ''
             error_msg = error_prefix + error_msg_og
