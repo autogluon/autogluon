@@ -103,7 +103,9 @@ def filter_pseudo(y_pred_proba_og, problem_type,
 
 def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: int = 5):
     """
-    Uses ensemble filtering for pseudo labeling
+    Uses to top num_models to predict on unlabeled data then filters the ensemble model
+    predicted data and returns indexes of row that meet a metric determined by whether
+    the problem type is regression or multi-class.
 
     Parameters:
     -----------
@@ -137,8 +139,11 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
                                  lower_bound: float = -0.25, upper_bound: float = 0.25):
     """
     Predicts on unlabeled_data using the top k models. Then gets standard deviation of each
-    row's prediction and the standard deviation across all rows of standard deviations and
-    incorporates rows with a z-score in the range of lower_bound and upper_bound.
+    row's prediction across the top k models and the standard deviation across all rows of standard
+    deviations of the top k models. The calculates z-score using top k models predictions standard
+    deviation - top k models standard deviation means divided by the standard deviation of the top k
+    model predictions across all rows. All top k model predictions who's z-score falls within lower_bound
+    and upper_bound will be filtered out.
 
     Parameters:
     -----------
@@ -180,9 +185,11 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
 def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, leaderboard,
                                    num_models, threshold: float = 0.95):
     """
-    Calculates predictive prob of unlabeled data by predicting with top k models then averages
-    and selects rows where max predictive prob is above threshold. Then samples minimum
-    bin count from all bins.
+    Calculates predictive probabilities of unlabeled data by predicting with top k models
+    then averages pre-row over predictions from top k models and selects rows where confidence
+    (predicted probability of the most likely class) is above threshold. Then samples minimum
+    bin count from all bins, where bins are rows of averaged predictions with the same peak
+    predicted probability class.
     
     Parameters:
     -----------
