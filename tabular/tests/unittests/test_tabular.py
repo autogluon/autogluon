@@ -394,11 +394,12 @@ def test_pseudolabeling():
 
         train_data = train_data.sample(50)
         test_data = test_data[~test_data[label].isna()]
-        test_data = test_data.sample(50)
 
         if problem_type in PROBLEM_TYPES_CLASSIFICATION:
             valid_class_idxes = test_data[label].isin(train_data[label])
             test_data = test_data.loc[valid_class_idxes]
+
+        test_data = test_data.sample(50)
 
         error_msg_og = f'pseudolabel threw an exception during fit, it should have ' \
                        f'succeeded on problem type:{problem_type} with dataset name:{name}, ' \
