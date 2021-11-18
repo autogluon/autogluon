@@ -932,6 +932,9 @@ class TabularPredictor:
         excluded_model_types = kwargs['excluded_model_types']
         pseudo_data = kwargs.get('pseudo_data', None)
 
+        # TODO: Since data preprocessor is fitted on original train_data it cannot account for if
+        # labeled pseudo data has new labels unseen in the original train. Probably need to refit
+        # data preprocessor if this is the case.
         if pseudo_data is not None:
             if self.label not in pseudo_data.columns:
                 raise ValueError('\'pseudo_data\' does not contain the labeled column.')
@@ -980,19 +983,6 @@ class TabularPredictor:
 
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
-
-        # TODO: Since data preprocessor is fitted on original train_data it cannot account for if
-        # labeled pseudo data has new labels unseen in the original train. Probably need to refit
-        # data preprocessor if this is the case.
-        if y_pseudo is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-            y_og = self._learner.label_cleaner.inverse_transform(y)
-            y_og_classes = y_og.unique()
-            y_pseudo_classes = y_pseudo_og.unique()
-            matching_classes = np.in1d(y_pseudo_classes, y_og_classes)
-
-            if not matching_classes.all():
-                raise Exception(f'Pseudo training data contains classes not in original train data: {y_pseudo_classes[~matching_classes]}')
-
 
         name_suffix = kwargs.get('name_suffix', '')
 
