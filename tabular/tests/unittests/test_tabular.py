@@ -392,14 +392,14 @@ def test_pseudolabeling():
 
         print(f"Testing dataset with name: {name}, problem type: {problem_type}")
 
-        train_data = train_data.sample(50)
+        train_data = train_data.sample(50, random_state=0)
         test_data = test_data[test_data[label].notna()]
 
         if problem_type in PROBLEM_TYPES_CLASSIFICATION:
             valid_class_idxes = test_data[label].isin(train_data[label].unique())
             test_data = test_data[valid_class_idxes]
 
-        test_data = test_data.sample(50)
+        test_data = test_data.sample(50, random_state=0)
 
         error_msg_og = f'pseudolabel threw an exception during fit, it should have ' \
                        f'succeeded on problem type:{problem_type} with dataset name:{name}, ' \

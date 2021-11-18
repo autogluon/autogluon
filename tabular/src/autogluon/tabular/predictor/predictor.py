@@ -983,6 +983,15 @@ class TabularPredictor:
 
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
+        
+        if y_pseudo is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            y_og = self._learner.label_cleaner.inverse_transform(y)
+            y_og_classes = y_og.unique()
+            y_pseudo_classes = y_pseudo_og.unique()
+            matching_classes = np.in1d(y_pseudo_classes, y_og_classes)
+
+            if not matching_classes.all():
+                raise Exception(f'Pseudo training data contains classes not in original train data: {y_pseudo_classes[~matching_classes]}')
 
         name_suffix = kwargs.get('name_suffix', '')
 
@@ -1133,8 +1142,11 @@ class TabularPredictor:
         use_ensemble: bool, default = False
             Flag to determine whether to use ensemble pseudo labeling algorithm
         kwargs: dict
-            If predictor is not already fit: Refer to parameters documentation in :meth:`TabularPredictor.fit`.
-            If predictor is fit: Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
+            If predictor is not already fit, then kwargs are for the functions 'fit' and 'fit_extra':
+            Refer to parameters documentation in :meth:`TabularPredictor.fit`.
+            Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
+            If predictor is fit kwargs are for 'fit_extra':
+            Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
 
         Returns
         -------
