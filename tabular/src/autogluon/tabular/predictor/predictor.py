@@ -832,7 +832,7 @@ class TabularPredictor:
             self.save_space()
 
     def _conformal_calibrate_model(self, calibration_method: str, model_name: str = None, num_splits: int = 3,
-                                   reg_list: list = [0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1]):
+                                   reg_list: list = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5]):
         """
         Applies conformal learning method specified by the user
 
