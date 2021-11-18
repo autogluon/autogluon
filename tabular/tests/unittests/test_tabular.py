@@ -19,18 +19,19 @@
     - regression with severely skewed Y-values (eg. predicting count data)
     - text features in dataset
 """
-import warnings, shutil, os
-import numpy as np
-import mxnet as mx
+import os
+import shutil
+import warnings
 from random import seed
 
-from networkx.exception import NetworkXError
+import autogluon.core as ag
+import mxnet as mx
+import numpy as np
 import pandas as pd
 import pytest
-
-import autogluon.core as ag
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.tabular import TabularDataset, TabularPredictor
+from networkx.exception import NetworkXError
 
 
 def test_tabular():
@@ -203,14 +204,7 @@ def run_tabular_benchmark_toy(fit_args):
         raise AssertionError(f'{dataset["name"]} should raise an exception.')
 
 
-def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False):
-    print("Running fit with args:")
-    print(fit_args)
-    # Each train/test dataset must be located in single directory with the given names.
-    train_file = 'train_data.csv'
-    test_file = 'test_data.csv'
-    EPS = 1e-10
-
+def get_benchmark_sets():
     # Information about each dataset in benchmark is stored in dict.
     # performance_val = expected performance on this dataset (lower = better),should update based on previously run benchmarks
     binary_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
@@ -239,7 +233,19 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
     # 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
 
     # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-    datasets = [toyregres_dataset, binary_dataset, regression_dataset, multi_dataset]
+    return [toyregres_dataset, binary_dataset, regression_dataset, multi_dataset]
+
+
+def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False):
+    print("Running fit with args:")
+    print(fit_args)
+    # Each train/test dataset must be located in single directory with the given names.
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    EPS = 1e-10
+
+    # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
+    datasets = get_benchmark_sets()
     if dataset_indices is not None: # only run some datasets
         datasets = [datasets[i] for i in dataset_indices]
 
@@ -369,6 +375,91 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
         warnings.warn(w.message)
 
 
+def test_pseudolabeling():
+    datasets = get_benchmark_sets()
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    directory_prefix = './datasets/'
+    hyperparam_setting = 'toy'
+
+    for idx in range(len(datasets)):
+        dataset = datasets[idx]
+        label = dataset['label']
+        problem_type = dataset['problem_type']
+        name = dataset['name']
+        train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file,
+                                          name=dataset['name'], url=dataset['url'])
+
+        print(f"Testing dataset with name: {name}, problem type: {problem_type}")
+
+        train_data = train_data.sample(50, random_state=1)
+        test_data = test_data[test_data[label].notna()]
+
+        if problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            valid_class_idxes = test_data[label].isin(train_data[label].unique())
+            test_data = test_data[valid_class_idxes]
+
+        test_data = test_data.sample(50, random_state=1)
+
+        error_msg_og = f'pseudolabel threw an exception during fit, it should have ' \
+                       f'succeeded on problem type:{problem_type} with dataset name:{name}, ' \
+                       f'with problem_type: {problem_type}. Under settings:'
+
+        # Test label already given. If test label already given doesn't use pseudo labeling filter.
+        try:
+            print("Pseudolabel Testing: Pre-labeled data 'fit_pseudolabel'")
+            _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
+                pseudo_data=test_data,
+                return_pred_prob=True,
+                train_data=train_data,
+                hyperparameters=hyperparam_setting
+            )
+        except Exception as e:
+            assert False, error_msg_og + 'labeled test data'
+
+        try:
+            print("Pseudolabel Testing: Pre-labeled data, best quality 'fit_pseudolabel'")
+            _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
+                pseudo_data=test_data,
+                return_pred_prob=True,
+                train_data=train_data,
+                presets='best_quality',
+                hyperparameters=hyperparam_setting
+            )
+        except Exception as e:
+            assert False, error_msg_og + 'labeled test data, best quality'
+
+        unlabeled_test_data = test_data.drop(columns=label)
+        for flag_ensemble in [True, False]:
+            prefix = 'ensemble ' if flag_ensemble else ''
+            error_msg = prefix + error_msg_og
+
+            try:
+                print("Pseudolabel Testing: Unlabeled data 'fit_pseudolabel'")
+                _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
+                    pseudo_data=unlabeled_test_data,
+                    return_pred_prob=True,
+                    train_data=train_data,
+                    hyperparameters=hyperparam_setting,
+                    use_ensemble=flag_ensemble
+                )
+            except Exception as e:
+                assert False, error_msg + 'unlabeled test data'
+
+            try:
+                print("Pseudolabel Testing: Unlabeled data, best quality 'fit_pseudolabel'")
+                _, y_pred_proba = TabularPredictor(label=label, problem_type=problem_type).fit_pseudolabel(
+                    pseudo_data=unlabeled_test_data,
+                    return_pred_prob=True,
+                    train_data=train_data,
+                    presets='best_quality',
+                    hyperparameters=hyperparam_setting,
+                    use_ensemble=flag_ensemble
+                )
+            except Exception as e:
+                assert False, error_msg + 'unlabeled test data, best quality'
+
+
 @pytest.mark.slow
 def test_tabularHPObagstack():
     ############ Benchmark options you can set: ########################
@@ -410,6 +501,7 @@ def test_tabularHPObagstack():
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)
+
 
 
 def test_tabularHPO():
