@@ -940,13 +940,13 @@ class TabularPredictor:
                 raise ValueError('Applying \'sample_weight\' while calling \'fit_pseudolabel\' is not supported')
 
             X_pseudo = pseudo_data.drop(columns=[self.label])
-            y_pseudo = pseudo_data[self.label]
+            y_pseudo_og = pseudo_data[self.label]
             X_pseudo = self._learner.transform_features(X_pseudo)
-            y_pseudo = self._learner.label_cleaner.transform(y_pseudo)
+            y_pseudo = self._learner.label_cleaner.transform(y_pseudo_og)
 
-            if np.nan in y_pseudo.unique():
+            if np.isnan(y_pseudo.unique()).any():
                 raise Exception('NaN was found in the label column for pseudo labeled data.'
-                                'Please ensure no NaN values in labeled data')
+                                'Please ensure no NaN values in target column')
         else:
             X_pseudo = None
             y_pseudo = None
@@ -980,6 +980,19 @@ class TabularPredictor:
 
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
+
+        # TODO: Since data preprocessor is fitted on original train_data it cannot account for if
+        # labeled pseudo data has new labels unseen in the original train. Probably need to refit
+        # data preprocessor if this is the case.
+        if y_pseudo is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            y_og = self._learner.label_cleaner.inverse_transform(y)
+            y_og_classes = y_og.unique()
+            y_pseudo_classes = y_pseudo_og.unique()
+            matching_classes = np.in1d(y_pseudo_classes, y_og_classes)
+
+            if not matching_classes.all():
+                raise Exception(f'Pseudo training data contains classes not in original train data: {y_pseudo_classes[~matching_classes]}')
+
 
         name_suffix = kwargs.get('name_suffix', '')
 
