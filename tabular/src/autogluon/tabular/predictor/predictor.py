@@ -1048,8 +1048,9 @@ class TabularPredictor:
         use_ensemble: bool, default = False
             Flag for using ensemble pseudo labeling methods
         fit_ensemble: bool, default = False
-            Flag for fitting weighted ensemble model using models trained on pseudo labeling. Will be done
-            on every iteration.
+            Flag for fitting weighted ensemble model using combination of best models trained on pseudo labeling
+            and models trained without pseudo labeling. Fitting weighted ensemble will be done on every iteration
+            of pseudo label.
 
         Returns:
         --------
@@ -1158,8 +1159,9 @@ class TabularPredictor:
         use_ensemble: bool, default = False
             Flag to determine whether to use ensemble pseudo labeling algorithm
         fit_ensemble: bool, default = False
-            Flag to determine whether to fit weighted ensemble model using models trained on pseudo labeled
-            data
+            Flag for fitting weighted ensemble model using combination of best models trained on pseudo labeling
+            and models trained without pseudo labeling. Fitting weighted ensemble will be done on every iteration
+            of pseudo label.
         kwargs: dict
             If predictor is not already fit, then kwargs are for the functions 'fit' and 'fit_extra':
             Refer to parameters documentation in :meth:`TabularPredictor.fit`.
