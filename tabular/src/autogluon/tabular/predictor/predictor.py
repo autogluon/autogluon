@@ -1121,6 +1121,12 @@ class TabularPredictor:
         # Should be done at the end. When done at each iteration caused the model to get much worse
         if fit_ensemble:
             logger.log(15, 'Fitting weighted ensemble using models trained with pseudo labeled data')
+
+            if return_pred_prob:
+                logger.log(30, "WARNING: 'return_pred_prob' is set to True and 'fit_ensemble' is set to true."
+                               "Fit ensemble is done at the end of training so predictions returned are not"
+                               " done by the fit ensembled model.")
+
             weighted_ensemble_model_name = self.fit_weighted_ensemble()[0]
 
             # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
