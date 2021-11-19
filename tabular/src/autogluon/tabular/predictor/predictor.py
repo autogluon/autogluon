@@ -1124,7 +1124,7 @@ class TabularPredictor:
 
             if return_pred_prob:
                 logger.log(30, "WARNING: 'return_pred_prob' is set to True and 'fit_ensemble' is set to true."
-                               "Fit ensemble is done at the end of training so predictions returned are not"
+                               " Fit ensemble is done at the end of training so predictions returned are not"
                                " done by the model ensembling models trained using pseudo labeled data.")
 
             weighted_ensemble_model_name = self.fit_weighted_ensemble()[0]
