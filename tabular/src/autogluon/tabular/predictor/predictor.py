@@ -1106,17 +1106,6 @@ class TabularPredictor:
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i + 1)),
                            **kwargs)
 
-            if fit_ensemble:
-                logger.log(15, 'Fitting weighted ensemble using models trained with pseudo labeled data')
-                FWE_model_name = self.fit_weighted_ensemble()
-
-                # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
-                # if it's the best model.
-                model_best_name = self._trainer.leaderboard().iloc[0]['model']
-                if model_best_name == FWE_model_name:
-                    self._trainer.model_best = model_best_name
-                    self._trainer.save()
-
             current_score = self.info()['best_model_score_val']
 
             logger.log(20,
@@ -1129,6 +1118,18 @@ class TabularPredictor:
                 # Cut down X_test to not include pseudo labeled data
                 X_test = X_test.loc[test_pseudo_idxes[~test_pseudo_idxes].index]
                 previous_score = current_score
+
+        # Should be done at the end. When done at each iteration caused the model to get much worse
+        if fit_ensemble:
+            logger.log(15, 'Fitting weighted ensemble using models trained with pseudo labeled data')
+            weighted_ensemble_model_name = self.fit_weighted_ensemble()
+
+            # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
+            # if it's the best model.
+            model_best_name = self._trainer.leaderboard().iloc[0]['model']
+            if model_best_name == weighted_ensemble_model_name:
+                self._trainer.model_best = model_best_name
+                self._trainer.save()
 
         if return_pred_prob:
             return self, y_pred_proba_og
