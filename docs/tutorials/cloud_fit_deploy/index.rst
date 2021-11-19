@@ -19,7 +19,7 @@ This section provides an overview on how AutoGluon can be trained and deployed o
 
    .. card::
       :title: Deploying AutoGluon models with serverless templates
-      :link: cloud-aws-sagemaker-deployment.html
+      :link: cloud-aws-lambda-deployment.html
 
       A tutorial on deploying an AutoGluon model with serverless templates.
 
