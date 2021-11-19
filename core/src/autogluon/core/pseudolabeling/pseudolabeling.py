@@ -9,8 +9,9 @@ logger = logging.getLogger()
 
 def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
     """
-    Takes predictive probabilities and finds the minimum class count then samples
-    minimum class count from every class with rows with index in df_indexes
+    Takes predictive probabilities from y_pred_proba and finds the minimum
+    class count then samples minimum class count from every class with
+    rows with indexes in df_indexes
 
     Parameters:
     y_pred_proba: Predicted probabilities for multi-class problem
@@ -50,7 +51,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
                   min_proportion_prob: float = 0.05, max_proportion_prob: float = 0.6,
                   threshold: float = 0.95, proportion_sample: float = 0.3):
     """
-    Takes in the predicted probabilities of the model and chooses the indices that meet
+    Takes in the predicted probabilities of the model (y_pred_proba_og) and chooses the indices that meet
     a criteria to incorporate into training data. Criteria is determined by problem_type.
     If multiclass or binary will choose all rows with max prob over threshold. For regression
     chooses 30% of the labeled data randomly. This filter is used pseudo labeled data.
@@ -105,11 +106,11 @@ def filter_pseudo(y_pred_proba_og, problem_type,
 def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: int = 5):
     """
     Uses top num_models to predict on unlabeled data then filters the ensemble model
-    predicted data and returns indexes of row that meet a metric. If problem is multiclass
+    predicted data and returns indices of row that meet a metric. If problem is multiclass
     or binary, will take top num_models predictive probabilities for unlabeled data then
-    averages them and selects row with a predictive probability above a threshold. For
+    averages them and selects row with max predictive probability above a threshold. For
     regression, will take top num_models and calculate the variance in their predictions
-    and select the rows with the least variance among all models.
+    and select the rows with the least variance among all model predictions.
 
     Parameters:
     -----------
@@ -142,7 +143,7 @@ def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: 
 def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_models, leaderboard,
                                  lower_bound: float = -0.25, upper_bound: float = 0.25):
     """
-    Predicts on unlabeled_data using the top k models. Then gets standard deviation of each
+    Predicts on unlabeled_data using the top num_models. Then gets standard deviation of each
     row's predictions across the top num_models and the standard deviation across all rows of standard
     deviations of the top num_models. Calculates z-score using top num_models predictions standard
     deviation minus the mean of the top num_models standard deviation divided by the standard deviation of
