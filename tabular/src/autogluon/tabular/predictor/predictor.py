@@ -1133,6 +1133,8 @@ class TabularPredictor:
             # if it's the best model.
             # TODO: There should also be PL added to weighted ensemble model name to notify
             # users it is a model trained with PL models if they are indeed ensembled
+            # TODO: Maybe transductive setting should have the WE model predict and return that?
+            # I found that had very good results on covertype. Needs to be tested on AMBL
             model_best_name = self._trainer.leaderboard().iloc[0]['model']
             if model_best_name == weighted_ensemble_model_name:
                 self._trainer.model_best = model_best_name
