@@ -1107,12 +1107,14 @@ class TabularPredictor:
 
             if fit_ensemble:
                 logger.log(15, 'Fitting weighted ensemble using models trained with pseudo labeled data')
-                self.fit_weighted_ensemble()
+                FWE_model_name = self.fit_weighted_ensemble()
 
                 # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
                 # if it's the best model.
-                self._trainer.model_best = self._trainer.leaderboard().iloc[0]['model']
-                self._trainer.save()
+                model_best_name = self._trainer.leaderboard().iloc[0]['model']
+                if model_best_name == FWE_model_name:
+                    self._trainer.model_best = model_best_name
+                    self._trainer.save()
 
             current_score = self.info()['best_model_score_val']
 

@@ -167,7 +167,7 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
         y_test_pred = predictor.predict(data=unlabeled_data, model=model)
 
         if best_model_preds is None:
-            best_model_preds = y_test_pred
+            best_model_preds = y_test_pred.copy()
 
         if model == top_k_models_list[0]:
             top_k_preds = y_test_pred
@@ -179,7 +179,7 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
     preds_z_score = (preds_sd - preds_sd.mean()) / preds_sd.std()
     df_filtered = preds_z_score.between(lower_bound, upper_bound)
 
-    return df_filtered[df_filtered], y_test_pred
+    return df_filtered[df_filtered], best_model_preds
 
 
 def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, leaderboard,
