@@ -11,12 +11,16 @@ def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
     """
     Takes predictive probabilities from y_pred_proba and finds the minimum
     class count then samples minimum class count from every class with
-    rows with indexes in df_indexes
+    rows with indexes in df_indexes, where minimum class count is determined
+    by dividing y_pred_proba into classes based on their max class predictive prob
+    and then each class is counted and the lowest number is the number that is sampled
+    from each class.
 
     Parameters:
     y_pred_proba: Predicted probabilities for multi-class problem
     df_indexes: The indices of y_pred_proba should be taken into consideration when
-        sampling evenly
+        sampling evenly. These indices should correspond to the indices in
+        y_pred_proba.
 
     Returns:
     pd.Series of indices that were selected by sample

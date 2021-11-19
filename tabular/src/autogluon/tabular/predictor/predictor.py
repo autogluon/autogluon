@@ -1027,9 +1027,31 @@ class TabularPredictor:
 
         return ret
 
+    def _fit_weighted_ensemble_pseudo(self):
+        """
+        Fits weighted ensemble on top models trained with pseudo labeling, then if new
+        weighted ensemble model is best model then sets `model_best` in trainer to
+        weighted ensemble model.
+        """
+        logger.log(15, 'Fitting weighted ensemble using top models')
+        weighted_ensemble_model_name = self.fit_weighted_ensemble()[0]
+
+        # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
+        # if it's the best model.
+        # TODO: There should also be PL added to weighted ensemble model name to notify
+        # users it is a model trained with PL models if they are indeed ensembled
+        model_best_name = self._trainer.leaderboard().iloc[0]['model']
+        if model_best_name == weighted_ensemble_model_name:
+            self._trainer.model_best = model_best_name
+            self._trainer.save()
+            logger.log(15, 'Weighted ensemble was the best model for current iteration of pseudo labeling')
+        else:
+            logging.log(15, 'Weighted ensemble was not the best model for current iteration of pseudo labeling')
+
     def _run_pseudolabeling(self, unlabeled_data: pd.DataFrame, max_iter: int,
                             return_pred_prob: bool = False, use_ensemble: bool = False,
-                            fit_ensemble:bool = False, **kwargs):
+                            fit_ensemble: bool = False, fit_ensemble_every_iter: bool = False,
+                            **kwargs):
         """
         Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
         used in original model unless specified by the user. This is an internal function that iteratively
@@ -1046,11 +1068,16 @@ class TabularPredictor:
         return_pred_proba: bool, default = False
             Transductive learning setting, will return predictive probabiliteis of unlabeled_data
         use_ensemble: bool, default = False
-            Flag for using ensemble pseudo labeling methods
+            If True will use ensemble pseudo labeling algorithm if False will use best model
+            pseudo labeling method
         fit_ensemble: bool, default = False
-            Flag for fitting weighted ensemble model using combination of best models trained on pseudo labeling
-            and models trained without pseudo labeling. Fitting weighted ensemble will be done on every iteration
-            of pseudo label.
+            If True will fit weighted ensemble on final best models. Fitting weighted ensemble will be done after fitting
+            of models is completed unless otherwise specified. If False will not fit weighted ensemble on final best
+            models.
+        fit_ensemble_every_iter: bool, default = False
+            If True will fit weighted ensemble model using combination of best models
+            for every iteration of pseudo label algorithm. If False and fit_ensemble
+            is True, will just do it at the very end of training pseudo labeled models.
 
         Returns:
         --------
@@ -1105,8 +1132,11 @@ class TabularPredictor:
             pseudo_data[self.label] = y_pseudo_og
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i + 1)),
                            **kwargs)
-            current_score = self.info()['best_model_score_val']
 
+            if fit_ensemble and fit_ensemble_every_iter:
+                self._fit_weighted_ensemble_pseudo()
+
+            current_score = self.info()['best_model_score_val']
             logger.log(20,
                        f'Pseudolabeling algorithm changed validation score from: {previous_score}, to: {current_score}'
                        f' using evaluation metric: {self.eval_metric.name}')
@@ -1118,27 +1148,9 @@ class TabularPredictor:
                 X_test = X_test.loc[test_pseudo_idxes[~test_pseudo_idxes].index]
                 previous_score = current_score
 
-        # Should be done at the end. When done at each iteration caused the model to get much worse
-        if fit_ensemble:
-            logger.log(15, 'Fitting weighted ensemble using models trained with pseudo labeled data')
-
-            if return_pred_prob:
-                logger.log(30, "WARNING: 'return_pred_prob' is set to True and 'fit_ensemble' is set to true."
-                               " Fit ensemble is done at the end of training so predictions returned are not"
-                               " done by the model ensembling models trained using pseudo labeled data.")
-
-            weighted_ensemble_model_name = self.fit_weighted_ensemble()[0]
-
-            # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
-            # if it's the best model.
-            # TODO: There should also be PL added to weighted ensemble model name to notify
-            # users it is a model trained with PL models if they are indeed ensembled
-            # TODO: Maybe transductive setting should have the WE model predict and return that?
-            # I found that had very good results on covertype. Needs to be tested on AMBL
-            model_best_name = self._trainer.leaderboard().iloc[0]['model']
-            if model_best_name == weighted_ensemble_model_name:
-                self._trainer.model_best = model_best_name
-                self._trainer.save()
+        if fit_ensemble and not fit_ensemble_every_iter:
+            self._fit_weighted_ensemble_pseudo()
+            y_pred_proba_og = self.predict_proba(unlabeled_data)
 
         if return_pred_prob:
             return self, y_pred_proba_og
@@ -1146,7 +1158,8 @@ class TabularPredictor:
             return self
 
     def fit_pseudolabel(self, pseudo_data: pd.DataFrame, max_iter: int = 5, return_pred_prob: bool = False,
-                        use_ensemble: bool = False, fit_ensemble: bool = False, **kwargs):
+                        use_ensemble: bool = False, fit_ensemble: bool = False, fit_ensemble_every_iter: bool = False,
+                        **kwargs):
         """
         If 'pseudo_data' is labeled then incorporates all test_data into train_data for
         newly fit models. If 'pseudo_data' is unlabeled then 'fit_pseudolabel' will self label the
@@ -1167,11 +1180,16 @@ class TabularPredictor:
             Returns held-out predictive probabilities from pseudo-labeling. If test_data is labeled then
             returns model's predictive probabilities.
         use_ensemble: bool, default = False
-            Flag to determine whether to use ensemble pseudo labeling algorithm
+            If True will use ensemble pseudo labeling algorithm. If False will just use best model
+            for pseudo labeling algorithm.
         fit_ensemble: bool, default = False
-            Flag for fitting weighted ensemble model using combination of best models trained on pseudo labeling
-            and models trained without pseudo labeling. Fitting weighted ensemble will be done on every iteration
-            of pseudo label.
+            If True with fit weighted ensemble model using combination of best models.
+            Fitting weighted ensemble will be done after fitting has
+            being completed unless otherwise specified. If False will not fit weighted ensemble
+            over models trained with pseudo labeling and models trained without it.
+        fit_ensemble_every_iter: bool, default = False
+            If True fits weighted ensemble model for every iteration of pseudo labeling algorithm. If False
+            and fit_ensemble is True will fit after all pseudo labeling training is done.
         kwargs: dict
             If predictor is not already fit, then kwargs are for the functions 'fit' and 'fit_extra':
             Refer to parameters documentation in :meth:`TabularPredictor.fit`.
@@ -1219,7 +1237,7 @@ class TabularPredictor:
                            **fit_extra_kwargs)
 
             if fit_ensemble:
-                logger.log(15, 'Fitting weighted ensemble model using pre-labeled pseudo data')
+                logger.log(15, 'Fitting weighted ensemble model using best models')
                 self.fit_weighted_ensemble()
 
             if return_pred_prob:
@@ -1232,7 +1250,8 @@ class TabularPredictor:
                            'AutoGluon will assign pseudo labels to data and use it for extra training data...')
             return self._run_pseudolabeling(unlabeled_data=pseudo_data, max_iter=max_iter,
                                             return_pred_prob=return_pred_prob, use_ensemble=use_ensemble,
-                                            fit_ensemble=fit_ensemble, **fit_extra_kwargs)
+                                            fit_ensemble=fit_ensemble, fit_ensemble_every_iter=fit_ensemble_every_iter,
+                                            **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):
         """
