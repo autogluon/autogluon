@@ -1105,7 +1105,6 @@ class TabularPredictor:
             pseudo_data[self.label] = y_pseudo_og
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i + 1)),
                            **kwargs)
-
             current_score = self.info()['best_model_score_val']
 
             logger.log(20,
@@ -1122,10 +1121,12 @@ class TabularPredictor:
         # Should be done at the end. When done at each iteration caused the model to get much worse
         if fit_ensemble:
             logger.log(15, 'Fitting weighted ensemble using models trained with pseudo labeled data')
-            weighted_ensemble_model_name = self.fit_weighted_ensemble()
+            weighted_ensemble_model_name = self.fit_weighted_ensemble()[0]
 
             # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
             # if it's the best model.
+            # TODO: There should also be PL added to weighted ensemble model name to notify
+            # users it is a model trained with PL models if they are indeed ensembled
             model_best_name = self._trainer.leaderboard().iloc[0]['model']
             if model_best_name == weighted_ensemble_model_name:
                 self._trainer.model_best = model_best_name
