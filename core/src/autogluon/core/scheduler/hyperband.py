@@ -8,6 +8,7 @@ import copy
 from .fifo import FIFOScheduler
 from .hyperband_stopping import StoppingRungSystem
 from .hyperband_promotion import PromotionRungSystem
+
 from ..utils import load
 from ..utils.default_arguments import check_and_merge_defaults, \
     Integer, Boolean, Categorical, filter_by_key
@@ -34,19 +35,6 @@ _DEFAULT_OPTIONS = {
     'rung_system_per_bracket': True,
     'random_seed': 31415927,
     'rung_levels': None}
-
-_CONSTRAINTS = {
-    'resume': Boolean(),
-    'max_t': Integer(1, None),
-    'grace_period': Integer(1, None),
-    'reduction_factor': Integer(2, None),
-    'brackets': Integer(1, None),
-    'type': Categorical(('stopping', 'promotion')),
-    'searcher_data': Categorical(
-        ('rungs', 'all', 'rungs_and_last')),
-    'do_snapshots': Boolean(),
-    'rung_system_per_bracket': Boolean(),
-    'random_seed': Integer(0, None)}
 
 
 class HyperbandScheduler(FIFOScheduler):
@@ -274,6 +262,19 @@ class HyperbandScheduler(FIFOScheduler):
     >>> scheduler.get_training_curves(plot=True)
     """
 
+    _CONSTRAINTS = {
+        'resume': Boolean(),
+        'max_t': Integer(1, None),
+        'grace_period': Integer(1, None),
+        'reduction_factor': Integer(2, None),
+        'brackets': Integer(1, None),
+        'type': Categorical(('stopping', 'promotion')),
+        'searcher_data': Categorical(
+            ('rungs', 'all', 'rungs_and_last')),
+        'do_snapshots': Boolean(),
+        'rung_system_per_bracket': Boolean(),
+        'random_seed': Integer(0, None)}
+
     def __init__(self, train_fn, **kwargs):
         # Setting max_t:
         # A well-written train_fn reveals its max_t value. We check fields in
@@ -311,11 +312,11 @@ class HyperbandScheduler(FIFOScheduler):
         # Check values and impute default values (only for arguments new to
         # this class)
         kwargs = check_and_merge_defaults(
-            kwargs, set(), _DEFAULT_OPTIONS, _CONSTRAINTS,
+            kwargs, set(), _DEFAULT_OPTIONS, self._CONSTRAINTS,
             dict_name='scheduler_options')
         resume = kwargs['resume']
         scheduler_type = kwargs['type']
-        supported_types = {'stopping', 'promotion'}
+        supported_types = self._CONSTRAINTS["type"].choices
         assert scheduler_type in supported_types, \
             "type = '{}' not supported, must be in {}".format(
                 scheduler_type, supported_types)
@@ -346,10 +347,9 @@ class HyperbandScheduler(FIFOScheduler):
 
         self.max_t = max_t
         self.scheduler_type = scheduler_type
-        self.terminator = HyperbandBracketManager(
-            scheduler_type, self._time_attr, self._reward_attr, max_t,
-            rung_levels, brackets, rung_system_per_bracket,
-            kwargs['random_seed'])
+        self.terminator = self._init_bracket_manager(
+            scheduler_type, max_t, rung_levels, brackets,
+            rung_system_per_bracket, kwargs['random_seed'])
         self.do_snapshots = do_snapshots
         self.searcher_data = kwargs['searcher_data']
         # Maintains a snapshot of currently running tasks, needed by several
@@ -380,6 +380,15 @@ class HyperbandScheduler(FIFOScheduler):
                 msg = f'checkpoint path {checkpoint} is not available for resume.'
                 logger.exception(msg)
                 raise FileExistsError(msg)
+
+    def _init_bracket_manager(self, scheduler_type, max_t, rung_levels,
+                              brackets, rung_system_per_bracket, random_seed):
+        # Initialize bracket manager.
+        # NOTE: Subclasses can use different managers.
+        terminator = HyperbandBracketManager(
+            scheduler_type, self._time_attr, self._reward_attr, max_t,
+            rung_levels, brackets, rung_system_per_bracket, random_seed)
+        return terminator
 
     @staticmethod
     def _infer_max_t(args):
@@ -820,18 +829,31 @@ class HyperbandBracketManager(object):
         max_num_brackets = len(rung_levels)
         self.num_brackets = min(brackets, max_num_brackets)
         num_systems = self.num_brackets if rung_system_per_bracket else 1
-        if scheduler_type == 'stopping':
-            rs_type = StoppingRungSystem
-        else:
-            rs_type = PromotionRungSystem
         rung_levels_plus_maxt = rung_levels[1:] + [max_t]
         # Promotion quantiles: q_j = r_j / r_{j+1}
         promote_quantiles = [
             x / y for x, y in zip(rung_levels, rung_levels_plus_maxt)]
-        self._rung_systems = [
+
+        self._rung_systems = self._init_rung_systems(
+            scheduler_type, rung_levels, promote_quantiles, max_t, num_systems
+        )
+
+        self.random_state = np.random.RandomState(random_seed)
+
+    @staticmethod
+    def _init_rung_systems(scheduler_type, rung_levels, promote_quantiles,
+                           max_t, num_systems):
+        # Initialize rung system for each level.
+        # NOTE: Subclasses can use different rung system implementations.
+        if scheduler_type == 'stopping':
+            rs_type = StoppingRungSystem
+        else:
+            rs_type = PromotionRungSystem
+
+        rung_systems = [
             rs_type(rung_levels[s:], promote_quantiles[s:], max_t)
             for s in range(num_systems)]
-        self.random_state = np.random.RandomState(random_seed)
+        return rung_systems
 
     def _get_rung_system_for_bracket_id(self, bracket_id):
         if self._rung_system_per_bracket:
@@ -897,15 +919,22 @@ class HyperbandBracketManager(object):
         if self._scheduler_type == 'promotion':
             ret_dict['ignore_data'] = False
         if result[self._time_attr] < self._max_t:
-            ret_dict.update(rung_sys.on_task_report(
-                task, result[self._time_attr], result[self._reward_attr],
-                skip_rungs=skip_rungs))
+            rung_info = self._report_to_rung_sys(rung_sys, task, result,
+                                                 skip_rungs)
+            ret_dict.update(rung_info)
             # Special case: If config just reached the last milestone in
             # the bracket and survived, next_milestone is equal to max_t
             if ret_dict['task_continues'] and ret_dict['milestone_reached'] \
                     and (ret_dict['next_milestone'] is None):
                 ret_dict['next_milestone'] = self._max_t
         return ret_dict
+
+    def _report_to_rung_sys(self, rung_sys, task, result, skip_rungs):
+        # Pass result to rung system to decide if task may continue.
+        rung_info = rung_sys.on_task_report(
+                task, result[self._time_attr], result[self._reward_attr],
+                skip_rungs=skip_rungs)
+        return rung_info
 
     def on_task_remove(self, task):
         task_id = task.task_id

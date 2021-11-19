@@ -126,6 +126,9 @@ class MODistStatusReporter(DistStatusReporter):
             rho = self.scalarization_options["rho"]
             scalarization = [max(w * v) + rho * (w @ v) for w in self.weights]
             scalarization = max(scalarization)
+        elif self.scalarization_options["algorithm"] == "golovin":
+            scalarization = [np.min(np.clip(v / w, a_min=0, a_max=None)) ** len(w) for w in self.weights]
+            scalarization = max(scalarization)
         else:
             raise ValueError("Specified scalarization algorithm is unknown. \
                 Valid algorithms are 'random_weights' and 'parego'.")
