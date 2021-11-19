@@ -824,14 +824,14 @@ class TabularPredictor:
 
         if calibrate is not None:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-                self._conformal_calibrate_model(calibration_method=calibrate)
+                self._calibrate_model(calibration_method=calibrate)
             else:
                 logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
 
         if save_space:
             self.save_space()
 
-    def _conformal_calibrate_model(self, calibration_method: str, model_name: str = None, num_splits: int = 3,
+    def _calibrate_model(self, calibration_method: str, model_name: str = None, num_splits: int = 3,
                                    reg_list: list = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5]):
         """
         Applies conformal learning method specified by the user
@@ -851,7 +851,7 @@ class TabularPredictor:
         if calibration_method == DIRICHLET_CALIBRATE:
             calibrator = FullDirichletCalibrator(reg_lambda=reg_list)
         elif calibration_method == TEMP_SCALING:
-            calibrator = TemperatureScaling(reg_lambda_list=reg_list)
+            calibrator = TemperatureScaling()
         elif calibration_method == MATRIX_SCALING:
             calibrator = MatrixScaling(reg_lambda_list=reg_list)
         elif calibration_method == VECTOR_SCALING:

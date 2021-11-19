@@ -8,5 +8,5 @@ from .fixeddirichlet import FixedDiagonalDirichletCalibrator
 from .fulldirichlet import FullDirichletCalibrator
 from .matrixscaling import MatrixScaling
 # TemperatureScaling does not affect accuracy
-from .tempscaling import TemperatureScaling
+from .tempscaling_og import TemperatureScaling
 from .vectorscaling import VectorScaling
