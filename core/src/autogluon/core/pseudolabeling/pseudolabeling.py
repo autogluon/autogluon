@@ -179,6 +179,10 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
         else:
             top_k_preds = pd.concat([top_k_preds, y_test_pred], axis=1)
 
+    # Todo: This doesn't make total sense, because weighted ensemble
+    # will ensemble the top models and weigh them according to validation score
+    # maybe should just force prediction using weighted ensemble instead of
+    # uniform across top k?
     top_k_avg_preds = top_k_preds.mean(axis=1)
     top_k_preds = top_k_preds.to_numpy()
     preds_sd = pd.Series(data=np.std(top_k_preds, axis=1), index=unlabeled_data.index)
@@ -221,6 +225,10 @@ def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, lead
         else:
             y_pred_proba_ensemble += y_pred_proba_curr_model
 
+    # Todo: This doesn't make total sense, because weighted ensemble
+    # will ensemble the top models and weigh them according to validation score
+    # maybe should just force prediction using weighted ensemble instead of
+    # uniform across top k?
     y_pred_proba_ensemble /= num_models
     y_max_prob = y_pred_proba_ensemble.max(axis=1)
     pseudo_indexes = (y_max_prob >= threshold)
