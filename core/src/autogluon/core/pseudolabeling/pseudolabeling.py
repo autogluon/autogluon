@@ -179,8 +179,8 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
         else:
             top_k_preds = pd.concat([top_k_preds, y_test_pred], axis=1)
 
-    top_k_preds = top_k_preds.to_numpy()
     top_k_avg_preds = top_k_preds.mean(axis=1)
+    top_k_preds = top_k_preds.to_numpy()
     preds_sd = pd.Series(data=np.std(top_k_preds, axis=1), index=unlabeled_data.index)
     preds_z_score = (preds_sd - preds_sd.mean()) / preds_sd.std()
     df_filtered = preds_z_score.between(lower_bound, upper_bound)

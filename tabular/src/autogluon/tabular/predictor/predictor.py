@@ -1046,7 +1046,7 @@ class TabularPredictor:
             self._trainer.save()
             logger.log(15, 'Weighted ensemble was the best model for current iteration of pseudo labeling')
         else:
-            logging.log(15, 'Weighted ensemble was not the best model for current iteration of pseudo labeling')
+            logger.log(15, 'Weighted ensemble was not the best model for current iteration of pseudo labeling')
 
     def _run_pseudolabeling(self, unlabeled_data: pd.DataFrame, max_iter: int,
                             return_pred_prob: bool = False, use_ensemble: bool = False,
