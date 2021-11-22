@@ -1,7 +1,7 @@
 import boto3, os, pathlib, logging
 
 from . import load_pd
-from .. import s3_utils
+from ..utils import s3_utils
 
 logger = logging.getLogger(__name__)
 

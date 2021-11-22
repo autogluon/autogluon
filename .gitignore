@@ -127,6 +127,7 @@ tests/unittests/*.zip
 tabular/tests/unittests/datasets
 
 autogluon/src/autogluon/version.py
+common/src/autogluon/common/version.py
 core/src/autogluon/core/version.py
 features/src/autogluon/features/version.py
 mxnet/src/autogluon/mxnet/version.py

@@ -6,7 +6,7 @@ from pandas import DataFrame
 
 from . import load_pointer
 from ..savers import save_pointer
-from .. import s3_utils, multiprocessing_utils
+from ..utils import multiprocessing_utils, s3_utils
 from .load_s3 import list_bucket_prefix_suffix_s3
 
 logger = logging.getLogger(__name__)

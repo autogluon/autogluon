@@ -1,6 +1,6 @@
 import os, boto3, logging
 
-from ...utils import s3_utils
+from ..utils import s3_utils
 
 logger = logging.getLogger(__name__)
 
