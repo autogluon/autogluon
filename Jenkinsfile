@@ -39,11 +39,17 @@ cleanup_venv = """
     rm -rf venv
 """
 
+install_common = """
+    python3 -m pip install --upgrade -e common/
+"""
+
 install_core = """
+    ${install_common}
     python3 -m pip install --upgrade -e core/
 """
 
 install_core_tests = """
+    ${install_common}
     python3 -m pip install --upgrade -e core/[tests]
 """
 
@@ -72,7 +78,30 @@ install_forecasting = """
 """
 
 stage("Unit Test") {
-  parallel 'core': {
+  parallel 'common': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-common-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon-common-py3-v3 -f docs/build.yml
+          conda activate autogluon-common-py3-v3
+          conda list
+          ${setup_pip_venv}
+          env
+
+          ${install_common}
+          cd common/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
+          """
+        }
+      }
+    }
+  },
+  'core': {
     node('linux-cpu') {
       ws('workspace/autogluon-core-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
@@ -112,10 +141,9 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../features/
-          python3 -m pip install --upgrade -e .
+          ${install_core}
+          ${install_features}
+          cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -203,14 +231,13 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../vision/
-          python3 -m pip install --upgrade -e .
+          ${install_core}
+          ${install_vision}
 
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
 
+          cd vision/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -260,23 +287,18 @@ stage("Unit Test") {
           python3 -m pip install 'mxnet==1.7.0.*'
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../features/
-          python3 -m pip install --upgrade -e .
-          cd ../tabular/
+          ${install_core}
+          ${install_features}
+          ${install_tabular_all}
+
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          python3 -m pip install --upgrade -e .[all]
-          cd ../text/
-          python3 -m pip install --upgrade -e .
-          cd ../vision/
-          python3 -m pip install --upgrade -e .
-          cd ../forecasting/
-          python3 -m pip install --upgrade -e .
-          cd ../autogluon/
-          python3 -m pip install --upgrade -e .
-          cd ..
+
+          ${install_text}
+          ${install_vision}
+          ${install_forecasting}
+          ${install_autogluon}
+
           ${cleanup_venv}
           """
         }
