@@ -50,7 +50,7 @@ class AdaptiveES(AbstractES):
 
     Parameters
     ----------
-    adaptive_rate : float, default 0.2
+    adaptive_rate : float, default 0.3
         The rate of increase in patience.
         Set to 0 to disable, or negative to shrink patience during training.
     adaptive_offset : int, default 10
@@ -71,7 +71,7 @@ class AdaptiveES(AbstractES):
         patience = min(self.max_patience, (max(self.min_patience, round(self.best_round * self.adaptive_rate + self.adaptive_offset))))
         Effectively, patience = self.best_round * self.adaptive_rate + self.adaptive_offset, bound by min_patience and max_patience
     """
-    def __init__(self, adaptive_rate=0.2, adaptive_offset=10, min_patience=10, max_patience=10000):
+    def __init__(self, adaptive_rate=0.3, adaptive_offset=10, min_patience=10, max_patience=10000):
         self.adaptive_rate = adaptive_rate
         self.adaptive_offset = adaptive_offset
         self.min_patience = min_patience

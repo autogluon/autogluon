@@ -11,7 +11,7 @@ from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils import try_import_catboost
 
-from .callbacks import MemoryCheckCallback, TimeCheckCallback
+from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
 from .catboost_utils import construct_custom_catboost_metric
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
@@ -116,8 +116,8 @@ class CatBoostModel(AbstractModel):
             X_val = self.preprocess(X_val)
             X_val = Pool(data=X_val, label=y_val, cat_features=cat_features, weight=sample_weight_val)
             eval_set = X_val
-            early_stopping_rounds = ag_params.get('ag.early_stop', 'auto')
-            if isinstance(early_stopping_rounds, str):
+            early_stopping_rounds = ag_params.get('ag.early_stop', 'adaptive')
+            if isinstance(early_stopping_rounds, (str, tuple, list)):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
 
         if params.get('allow_writing_files', False):
@@ -173,6 +173,9 @@ class CatBoostModel(AbstractModel):
         self.model = model_type(**params)
 
         callbacks = []
+        if early_stopping_rounds is not None:
+            callbacks.append(EarlyStoppingCallback(stopping_rounds=early_stopping_rounds, eval_metric=params['eval_metric']))
+
         if num_rows_train * num_cols_train * num_classes > 100_000_000:
             # The data is large enough to potentially cause memory issues during training, so monitor memory usage via callback.
             callbacks.append(MemoryCheckCallback())
@@ -182,12 +185,15 @@ class CatBoostModel(AbstractModel):
             if time_left <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
                 raise TimeLimitExceeded
             callbacks.append(TimeCheckCallback(time_start=time_cur, time_limit=time_left))
-        # TODO: Use dynamic early stopping (https://github.com/catboost/catboost/issues/1890)
+
+        # TODO: Custom metrics don't seem to work anymore
+        # TODO: Custom metrics not supported in GPU mode
+        # TODO: Callbacks not supported in GPU mode
         fit_final_kwargs = dict(
             eval_set=eval_set,
             verbose=verbose,
             use_best_model=True,
-            early_stopping_rounds=early_stopping_rounds,
+            # early_stopping_rounds=early_stopping_rounds,  # Disabled in favor of ES callback
             callbacks=callbacks,
         )
         self.model.fit(X, **fit_final_kwargs)

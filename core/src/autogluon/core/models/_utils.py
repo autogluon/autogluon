@@ -3,7 +3,7 @@ from autogluon.core.utils.early_stopping import AdaptiveES, ES_CLASS_MAP
 
 
 # TODO: Add more strategies
-def get_early_stopping_rounds(num_rows_train, strategy='auto', min_patience=10, max_patience=150, min_rows=10000):
+def get_early_stopping_rounds(num_rows_train, strategy='auto', min_patience=20, max_patience=300, min_rows=10000):
     if isinstance(strategy, (tuple, list)):
         strategy = list(strategy)
         if isinstance(strategy[0], str):
