@@ -12,7 +12,7 @@ from .identity import IdentityFeatureGenerator
 from .isnan import IsNanFeatureGenerator
 from .label_encoder import LabelEncoderFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator, NumericMemoryMinimizeFeatureGenerator
-from.one_hot_encoder import OneHotEncoderFeatureGenerator
+from .one_hot_encoder import OneHotEncoderFeatureGenerator
 from .rename import RenameFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
