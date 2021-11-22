@@ -7,7 +7,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 from autogluon.core.features.types import R_CATEGORY, S_BOOL, S_SPARSE, R_INT
 
-from autogluon.features.generators.abstract import AbstractFeatureGenerator
+from .abstract import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
