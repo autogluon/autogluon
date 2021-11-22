@@ -44,7 +44,7 @@ class LinearModel(AbstractModel):
                 patch_sklearn("ridge")
                 patch_sklearn("lasso")
                 patch_sklearn("logistic")
-                logger.log(15, '\tUsing daal4py LR backend...')
+                logger.log(15, '\tUsing sklearnex LR backend...')
             except:
                 pass
         from sklearn.linear_model import LogisticRegression, Ridge, Lasso

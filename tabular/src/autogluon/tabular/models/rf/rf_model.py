@@ -32,11 +32,12 @@ class RFModel(AbstractModel):
             from .rf_quantile import RandomForestQuantileRegressor
             return RandomForestQuantileRegressor
         if self.params_aux.get('use_daal', False):
-            # Disabled by default because it appears to degrade performance
+            # Disabled by default because OOB score does not yet work properly
             try:
-                # FIXME: DAAL OOB score is broken, returns biased predictions. Without this optimization, can't compute Efficient OOF.
+                # FIXME: sklearnex OOB score is broken, returns biased predictions. Without this optimization, can't compute Efficient OOF.
+                #  Next release of sklearnex (2021.5) plans to fix this issue, will try again after fix is released.
                 from sklearnex.ensemble import RandomForestClassifier, RandomForestRegressor
-                logger.log(15, '\tUsing daal4py RF backend...')
+                logger.log(15, '\tUsing sklearnex RF backend...')
                 self._daal = True
             except:
                 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
