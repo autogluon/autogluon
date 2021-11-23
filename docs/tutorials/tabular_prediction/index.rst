@@ -1,16 +1,22 @@
 Tabular Prediction
 ====================
 
-For standard datasets that are represented as tables (stored as CSV file, parquet from database, etc.), AutoGluon can produce models to predict the values in one column based on the values in the other columns. With just a single call to `fit()`, you can achieve high accuracy in standard supervised learning tasks (both classification and regression), without dealing with cumbersome issues like data cleaning, feature engineering, hyperparameter optimization, model selection, etc.
 
+Tabular datasets present data as tables. 
+Each row in a table contains an example, while columns store features. 
+The column data types can be numbers, strings, datetime or even customized formats such as image filepaths. 
+The training dataset contains an additional column storing the labels. 
+Our task is to predict this label column by using the rest feature columns. 
+
+In this module, we will go through how to use AutoGluon's ``tabular`` module to automatically train models on tabular datasets. 
 
 .. container:: cards
 
    .. card::
-      :title: Quick Start Using FIT
+      :title: Quick Start
       :link: tabular-quickstart.html
 
-      5 min tutorial on fitting models with tabular datasets.
+      An 5 min tutorial to train models on tabular datasets.
 
    .. card::
       :title: In-depth FIT Tutorial
