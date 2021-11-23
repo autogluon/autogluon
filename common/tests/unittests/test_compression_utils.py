@@ -2,7 +2,7 @@ import gzip
 import bz2
 import lzma
 
-from autogluon.core.utils import compression_utils
+from autogluon.common.utils import compression_utils
 
 
 def test_get_validated_path_no_compression_fn():
