@@ -600,33 +600,13 @@ stage("Build Docs") {
         python3 -m pip install 'docutils<0.16'
         python3 -m pip list
 
-        cd core/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd features/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd tabular/
-        python3 -m pip install --upgrade -e .[all]
-        cd ..
-
-        cd text/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd vision/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd forecasting/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd autogluon/
-        python3 -m pip install --upgrade -e .
-        cd ..
+        ${install_core}
+        ${install_features}
+        ${install_tabular_all}
+        ${install_text}
+        ${install_vision}
+        ${install_forecasting}
+        ${install_autogluon}
 
         sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
