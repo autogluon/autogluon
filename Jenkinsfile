@@ -40,7 +40,7 @@ cleanup_venv = """
 """
 
 install_common = """
-    python3 -m pip install --upgrade -e common/
+    python3 -m pip install --upgrade -e common/[tests]
 """
 
 install_core = """

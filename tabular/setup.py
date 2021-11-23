@@ -16,7 +16,7 @@ version = ag.load_version_file()
 version = ag.update_version(version)
 
 submodule = 'tabular'
-requirements = [
+install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
@@ -27,10 +27,6 @@ requirements = [
     'networkx>=2.3,<3.0',
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
-]
-
-test_requirements = [
-    'pytest',
 ]
 
 extras_require = {
@@ -59,7 +55,6 @@ for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires
 
-install_requires = requirements + test_requirements
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == '__main__':
