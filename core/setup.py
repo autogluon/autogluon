@@ -13,7 +13,7 @@ spec.loader.exec_module(ag)
 ###########################
 
 version = ag.load_version_file()
-version = ag.update_version(version, use_file_if_exists=False, create_file=True)
+version = ag.update_version(version)
 
 submodule = 'core'
 install_requires = [
