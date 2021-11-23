@@ -36,6 +36,8 @@ install_requires = [
     'boto3',
     'autograd>=1.3',
     'dill>=0.3.3,<1.0',
+
+    f'autogluon.common=={version}',
 ]
 
 extras_require = {}
