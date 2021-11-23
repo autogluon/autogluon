@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,8 @@ logger = logging.getLogger(__name__)
 def get_type_family_raw(dtype) -> str:
     """From dtype, gets the dtype family."""
     try:
+        if isinstance(dtype, pd.SparseDtype):
+            dtype = dtype.subtype
         if dtype.name == 'category':
             return 'category'
         if 'datetime' in dtype.name:
@@ -46,26 +49,31 @@ def get_type_map_raw(df: DataFrame) -> dict:
 def get_type_map_special(X: DataFrame) -> dict:
     type_map_special = {}
     for column in X:
-        type_special = get_type_special(X[column])
-        if type_special is not None:
-            type_map_special[column] = type_special
+        types_special = get_types_special(X[column])
+        if types_special:
+            type_map_special[column] = types_special
     return type_map_special
 
 
-def get_type_special(X: Series) -> str:
+def get_types_special(X: Series) -> List[str]:
+    types_special = []
+    if isinstance(X.dtype, pd.SparseDtype):
+        types_special.append('sparse')
     if check_if_datetime_as_object_feature(X):
-        type_special = 'datetime_as_object'
+        types_special.append('datetime_as_object')
     elif check_if_nlp_feature(X):
-        type_special = 'text'
-    else:
-        type_special = None
-    return type_special
+        types_special.append('text')
+    return types_special
 
 
 def get_type_group_map(type_map: dict) -> defaultdict:
     type_group_map = defaultdict(list)
     for key, val in type_map.items():
-        type_group_map[val].append(key)
+        if isinstance(val, list):
+            for feature_type in val:
+                type_group_map[feature_type].append(key)
+        else:
+            type_group_map[val].append(key)
     return type_group_map
 
 
@@ -79,7 +87,6 @@ def get_type_group_map_raw(df: DataFrame) -> defaultdict:
     return get_type_group_map(type_map_raw)
 
 
-# TODO: Expand to enable multiple special types per feature
 def get_type_group_map_special(df: DataFrame) -> defaultdict:
     type_map_special = get_type_map_special(df)
     return get_type_group_map(type_map_special)
