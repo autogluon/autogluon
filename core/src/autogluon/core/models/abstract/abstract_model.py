@@ -103,6 +103,9 @@ class AbstractModel:
         # temperature scaling parameter that is set by predictor if calibrate is true under TabularPredictor fit()
         self.temperature_scalar = None
 
+        # conformalize that is used to calibrate quantile estimates
+        self.conformalize = None
+
         if eval_metric is not None:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
         else:
@@ -581,6 +584,10 @@ class AbstractModel:
 
         return y_pred_proba
 
+    def _apply_conformalization(self, y_pred):
+        y_pred += self.conformalize
+        return y_pred
+
     def predict(self, X, **kwargs):
         """
         Returns class predictions of X.
@@ -614,7 +621,10 @@ class AbstractModel:
         X = self.preprocess(X, **kwargs)
 
         if self.problem_type in [REGRESSION, QUANTILE]:
-            return self.model.predict(X)
+            y_pred = self.model.predict(X)
+            if self.conformalize is not None:
+                y_pred = self._apply_conformalization(y_pred)
+            return y_pred
 
         y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)

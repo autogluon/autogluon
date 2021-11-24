@@ -315,4 +315,7 @@ class RFModel(AbstractModel):
         return default_ag_args_ensemble
 
     def _more_tags(self):
-        return {'valid_oof': True}
+        if self.problem_type == QUANTILE:
+            return {'valid_oof': False} # not supported in quantile regression
+        else:
+            return {'valid_oof': True}

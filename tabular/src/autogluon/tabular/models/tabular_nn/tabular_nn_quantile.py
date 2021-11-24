@@ -8,6 +8,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from autogluon.core import Space
 from autogluon.core.constants import QUANTILE
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -26,6 +27,8 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         super().__init__(**kwargs)
         if self.problem_type != QUANTILE:
             raise ValueError("This neural network is only available for quantile regression")
+        self.device = None
+        self.max_batch_size = None
 
     def set_net_defaults(self, train_dataset, params):
         """ Sets dataset-adaptive default values to use for our neural network """
@@ -64,13 +67,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
                            " this model will ignore them in training.")
         params = self.params.copy()
         params = fixedvals_from_searchspaces(params)
-        if num_cpus is not None:
-            self.num_dataloading_workers = max(1, int(num_cpus/2.0))
-        else:
-            self.num_dataloading_workers = 1
-        if self.num_dataloading_workers == 1:
-            self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
-        self.num_dataloading_workers = 0
+        self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
         self.max_batch_size = params['max_batch_size']
         if isinstance(X, TabularPyTorchDataset):
             self.batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size)
@@ -163,11 +160,11 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         if num_updates == 0:
             # use dummy training loop that stops immediately
             # useful for using NN just for data preprocessing / debugging
-            logger.log(20, "Not training Neural Net since num_updates == 0.  Neural network architecture is:")
+            logger.log(20, "Not training Neural Network since num_updates == 0. Neural network architecture is:")
 
             # for each batch
             for batch_idx, data_batch in enumerate(train_dataloader):
-                loss = self.model.compute_loss(data_batch, weight=1.0, margin=params['gamma'])
+                loss = self.model.compute_loss(data_batch, margin=params['gamma'])
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -184,7 +181,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
             time_limit = time_limit - (start_fit_time - start_time)
 
         # start training Loop:
-        logger.log(15, "Start training Qunatile Neural network")
+        logger.log(15, "Start training Quantile Neural Network")
         total_updates = 0
         do_update = True
         while do_update:
@@ -192,8 +189,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
             total_train_size = 0.0
             for batch_idx, data_batch in enumerate(train_dataloader):
                 # forward
-                weight = (np.cos(min((total_updates / float(updates_wo_improve)), 1.0) * np.pi) + 1) * 0.5
-                loss = self.model.compute_loss(data_batch, weight=weight, margin=params['gamma'])
+                loss = self.model.compute_loss(data_batch, margin=params['gamma'])
                 total_train_loss += loss.item()
                 total_train_size += 1
 
@@ -300,7 +296,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         if process:
             new_data = self.process_test_data(new_data, None)
         if not isinstance(new_data, TabularPyTorchDataset):
-            raise ValueError("new_data must of of type TabularNNDataset if process=False")
+            raise ValueError("new_data must of of type TabularPyTorchDataset, if process=False")
         val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
         preds_dataset = []
         for batch_idx, data_batch in enumerate(val_dataloader):
@@ -379,7 +375,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         self._types_of_features, df = self._get_types_of_features(df, skew_threshold=skew_threshold,
                                                                   embed_min_categories=embed_min_categories,
                                                                   use_ngram_features=use_ngram_features)
-        logger.log(15, "AutoGluon Qunatile Neural Network (pytorch) infers features are of the following types:")
+        logger.log(15, "AutoGluon Quantile Neural Network (pytorch) infers features are of the following types:")
         logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
         self.processor = self._create_preprocessor(impute_strategy=impute_strategy,
@@ -439,7 +435,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
-        model: TabularNeuralQuantileModel = AbstractNeuralNetworkModel.load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model = AbstractNeuralNetworkModel.load(path=path, reset_paths=reset_paths, verbose=verbose)
         if model._architecture_desc is not None:
             import torch
             from .tabular_nn_torch import NeuralMultiQuantileRegressor
@@ -451,3 +447,63 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model
+
+    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
+        """ Performs HPO and sets self.params to best hyperparameter values """
+        try_import_torch()
+        from .tabular_nn_torch import tabular_pytorch_trial, TabularPyTorchDataset
+
+        time_start = time.time()
+        self.verbosity = kwargs.get('verbosity', 2)
+        logger.log(15, "Beginning hyperparameter tuning for PyTorch Quantile Neural Network...")
+
+        # changes non-specified default hyperparams from fixed values to search-spaces.
+        self._set_default_searchspace()
+        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
+        if scheduler_cls is None or scheduler_params is None:
+            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
+        num_cpus = scheduler_params['resource']['num_cpus']
+
+        params_copy = self.params.copy()
+
+        self.num_dataloading_workers = max(1, int(num_cpus/2.0))
+        self.max_batch_size = params_copy['max_batch_size']
+        self.batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
+        train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params_copy, X_val=X_val, y_val=y_val)
+        train_path = self.path + "train"
+        val_path = self.path + "validation"
+        train_dataset.save(file_prefix=train_path)
+        val_dataset.save(file_prefix=val_path)
+
+        if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
+            logger.warning("Warning: Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
+        else:
+            logger.log(15, "Hyperparameter search space for PyTorch Quantile Neural Network: ")
+            for hyperparam in params_copy:
+                if isinstance(params_copy[hyperparam], Space):
+                    logger.log(15, str(hyperparam) + ": " + str(params_copy[hyperparam]))
+
+        util_args = dict(
+            train_path=train_path,
+            val_path=val_path,
+            model=self,
+            time_start=time_start,
+            time_limit=scheduler_params['time_out'],
+            fit_kwargs=scheduler_params['resource'],
+        )
+        tabular_pytorch_trial.register_args(util_args=util_args, **params_copy)
+        scheduler = scheduler_cls(tabular_pytorch_trial, **scheduler_params)
+        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
+            # TODO: Ensure proper working directory setup on remote machines
+            # This is multi-machine setting, so need to copy dataset to workers:
+            logger.log(15, "Uploading preprocessed data to remote workers...")
+            scheduler.upload_files([
+                train_path + TabularPyTorchDataset.DATAOBJ_SUFFIX,
+                val_path + TabularPyTorchDataset.DATAOBJ_SUFFIX,
+            ])  # TODO: currently does not work.
+            logger.log(15, "uploaded")
+
+        scheduler.run()
+        scheduler.join_jobs()
+
+        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)

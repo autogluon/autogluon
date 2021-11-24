@@ -1,10 +1,13 @@
 import logging
-
+import os
 import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
 
+from autogluon.core.models.abstract import model_trial
+from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core import args
 from .embednet import getEmbedSizes
 
 logger = logging.getLogger(__name__)
@@ -150,31 +153,11 @@ class NeuralMultiQuantileRegressor(nn.Module):
             else:
                 return torch.sigmoid(output_data) * self.y_span + self.y_lower
 
-    def monotonize(self, input_data):
-        # number of quantiles
-        num_quantiles = input_data.size()[-1]
-
-        # split into below 50% and above 50%
-        idx_50 = num_quantiles // 2
-
-        # if a small number of quantiles are estimated or quantile levels are not centered at 0.5
-        if num_quantiles < 3 or self.quantile_levels[0, idx_50] != 0.5:
-            return input_data
-
-        # below 50%
-        below_50 = input_data[:, :(idx_50 + 1)].contiguous()
-        below_50 = torch.flip(torch.cummin(torch.flip(below_50, [-1]), -1)[0], [-1])
-
-        # above 50%
-        above_50 = input_data[:, idx_50:].contiguous()
-        above_50 = torch.cummax(above_50, -1)[0]
-
-        # refined output
-        ordered_data = torch.cat([below_50[:, :-1], above_50], -1)
-        return ordered_data
-
     def huber_pinball_loss(self, input_data, target_data):
         error_data = target_data.contiguous().reshape(-1, 1) - input_data
+        if self.alpha == 0.0:
+            loss_data = torch.max(self.quantile_levels * error_data, (self.quantile_levels - 1) * error_data)
+            return loss_data.mean()
         loss_data = torch.where(torch.abs(error_data) < self.alpha,
                                 0.5 * error_data * error_data,
                                 self.alpha * (torch.abs(error_data) - 0.5 * self.alpha))
@@ -205,7 +188,6 @@ class NeuralMultiQuantileRegressor(nn.Module):
 
     def compute_loss(self,
                      data_batch,
-                     weight=0.0,
                      margin=0.0):
         # train mode
         self.train()
@@ -218,15 +200,14 @@ class NeuralMultiQuantileRegressor(nn.Module):
         else:
             m_loss = 0.0
 
-        h_loss = (1 - weight) * self.huber_pinball_loss(self.monotonize(predict_data), target_data).mean()
-        h_loss += weight * self.huber_pinball_loss(predict_data, target_data).mean()
+        h_loss = self.huber_pinball_loss(predict_data, target_data).mean()
         return h_loss + margin * m_loss
 
     def predict(self, input_data):
         self.eval()
         with torch.no_grad():
             predict_data = self(input_data)
-            predict_data = self.monotonize(predict_data)
+            predict_data = torch.sort(predict_data, -1)[0]
             return predict_data.data.cpu().numpy()
 
 
@@ -429,6 +410,8 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
     def save(self, file_prefix=""):
         """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
         dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
+        if not os.path.exists(os.path.dirname(dataobj_file)):
+            os.makedirs(os.path.dirname(dataobj_file))
         torch.save(self, dataobj_file)
         logger.debug("TabularPyTorchDataset Dataset saved to a file: \n %s" % dataobj_file)
 
@@ -448,3 +431,23 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
                                              drop_last=False if is_test else True,
                                              worker_init_fn=worker_init_fn)
         return loader
+
+
+@args()
+def tabular_pytorch_trial(args, reporter):
+    """ Training and evaluation function used during a single trial of HPO """
+    try:
+        model, args, util_args = model_trial.prepare_inputs(args=args)
+
+        train_dataset = TabularPyTorchDataset.load(util_args.train_path)
+        val_dataset = TabularPyTorchDataset.load(util_args.val_path)
+        y_val = val_dataset.get_labels()
+
+        fit_model_args = dict(X=train_dataset, y=None, X_val=val_dataset, **util_args.get('fit_kwargs', dict()))
+        predict_proba_args = dict(X=val_dataset)
+        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
+                                       time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
+    except Exception as e:
+        if not isinstance(e, TimeLimitExceeded):
+            logger.exception(e, exc_info=True)
+        reporter.terminate()

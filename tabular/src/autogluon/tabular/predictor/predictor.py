@@ -11,6 +11,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
+from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, \
     PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
@@ -825,7 +826,7 @@ class TabularPredictor:
             self.delete_models(models_to_keep='best', dry_run=False)
 
         if calibrate:
-            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION + [QUANTILE]:
                 self._calibrate_model()
             else:
                 logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
@@ -869,12 +870,18 @@ class TabularPredictor:
             if self.problem_type == BINARY:
                 y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
-        logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
-        temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
-                                               init_val=init_val, max_iter=max_iter, lr=lr)
-        logger.log(15, f'Temperature term found is: {temp_scalar}')
         model = self._trainer.load_model(model_name=model_name)
-        model.temperature_scalar = temp_scalar
+        if self.problem_type == QUANTILE:
+            logger.log(30, f'Conformity scores being computed for model: {model_name}')
+            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
+                                                    quantile_levels=self.quantile_levels)
+            model.conformalize = conformalize
+        else:
+            logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
+            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
+                                                   init_val=init_val, max_iter=max_iter, lr=lr)
+            logger.log(15, f'Temperature term found is: {temp_scalar}')
+            model.temperature_scalar = temp_scalar
         model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
