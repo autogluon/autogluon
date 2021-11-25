@@ -79,6 +79,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.columns_fills = None
         self.procs = None
         self.y_scaler = None
+        self._cont_normalization = None
         self._load_model = None  # Whether to load inner model when loading.
 
     def _preprocess_train(self, X, y, X_val, y_val):
@@ -91,8 +92,8 @@ class NNFastAiTabularModel(AbstractModel):
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
-        from fastai.tabular.core import FillMissing, Categorify, Normalize
-        self.procs = [FillMissing, Categorify, Normalize]
+        from fastai.tabular.core import Categorify
+        self.procs = [Categorify]
 
         if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
             y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
@@ -123,6 +124,7 @@ class NNFastAiTabularModel(AbstractModel):
         if fit:
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
             self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+            self._cont_normalization = (X[self.cont_columns].mean(), X[self.cont_columns].std())
 
             num_cat_cols_og = len(self.cat_columns)
             if self.cat_columns:
@@ -141,7 +143,10 @@ class NNFastAiTabularModel(AbstractModel):
             self.columns_fills = dict()
             for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
-        return self._fill_missing(X)
+        X = self._fill_missing(X)
+        cont_mean, cont_std = self._cont_normalization
+        X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
+        return X
 
     def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
         # FIXME: Consider representing categories as int
