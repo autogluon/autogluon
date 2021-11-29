@@ -765,7 +765,6 @@ class CloudPredictor:
         results_save_path = os.path.join(results_save_path, file_name)
         results_bucket, results_key_prefix = s3_path_to_bucket_prefix(self.recent_predict_results_path)
         download_s3_file(results_bucket, results_key_prefix, results_save_path)
-        logger.log(20, f'Results has been downloaded to {results_save_path}')
 
     def get_batch_transform_job_status(self, job_name):
         """
