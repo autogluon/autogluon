@@ -23,6 +23,12 @@ This section provides an overview on how AutoGluon can be trained and deployed o
 
       A tutorial on deploying an AutoGluon model with serverless templates.
 
+   .. card::
+      :title: Cloud Training and Predicting with Cloud Predictor
+      :link: cloud-predictor.html
+
+      A tutorial on training and fitting an AutoGluon Model with Cloud Predictor.
+
 .. toctree::
    :maxdepth: 1
    :hidden:
