@@ -36,3 +36,4 @@ This section provides an overview on how AutoGluon can be trained and deployed o
    cloud-aws-sagemaker-training
    cloud-aws-sagemaker-deployment
    cloud-aws-lambda-deployment
+   cloud-predictor
