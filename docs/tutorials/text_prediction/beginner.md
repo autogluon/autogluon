@@ -26,9 +26,9 @@ First, we consider the Stanford Sentiment Treebank ([SST](https://nlp.stanford.e
 
 
 ```{.python .input}
-from autogluon.core.utils.loaders.load_pd import load
-train_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
-test_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
+from autogluon.core import TabularDataset
+train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
+test_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
 subsample_size = 1000  # subsample data for faster demo, try setting this to larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 train_data.head(10)
