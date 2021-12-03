@@ -9,12 +9,18 @@ logger = logging.getLogger()
 
 def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
     """
-    Takes predictive probs and finds the minimum class count then samples that
-    from every class with rows with index in df_indexes
+    Takes predictive probabilities from y_pred_proba and finds the minimum
+    class count then samples minimum class count from every class with
+    rows with indexes in df_indexes, where minimum class count is determined
+    by dividing y_pred_proba into classes based on their max class predictive prob
+    and then each class is counted and the lowest number is the number that is sampled
+    from each class.
 
     Parameters:
     y_pred_proba: Predicted probabilities for multi-class problem
-    df_indexes: The indices that should be taken into consideration when sampling evenly
+    df_indexes: The indices of y_pred_proba should be taken into consideration when
+        sampling evenly. These indices should correspond to the indices in
+        y_pred_proba.
 
     Returns:
     pd.Series of indices that were selected by sample
@@ -49,7 +55,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
                   min_proportion_prob: float = 0.05, max_proportion_prob: float = 0.6,
                   threshold: float = 0.95, proportion_sample: float = 0.3):
     """
-    Takes in the predicted probabilities of the model and chooses the indices that meet
+    Takes in the predicted probabilities of the model (y_pred_proba_og) and chooses the indices that meet
     a criteria to incorporate into training data. Criteria is determined by problem_type.
     If multiclass or binary will choose all rows with max prob over threshold. For regression
     chooses 30% of the labeled data randomly. This filter is used pseudo labeled data.
@@ -103,13 +109,16 @@ def filter_pseudo(y_pred_proba_og, problem_type,
 
 def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: int = 5):
     """
-    Uses to top num_models to predict on unlabeled data then filters the ensemble model
-    predicted data and returns indexes of row that meet a metric determined by whether
-    the problem type is regression or multi-class.
+    Uses top num_models to predict on unlabeled data then filters the ensemble model
+    predicted data and returns indices of row that meet a metric. If problem is multiclass
+    or binary, will take top num_models predictive probabilities for unlabeled data then
+    averages them and selects row with max predictive probability above a threshold. For
+    regression, will take top num_models and calculate the variance in their predictions
+    and select the rows with the least variance among all model predictions.
 
     Parameters:
     -----------
-    predictor: Fitted tabular predictor
+    predictor: Fitted TabularPredictor
     unlabeled_data: Unlabeled data for top k models to predict on
     num_models: Number of top models to ensemble
 
@@ -138,16 +147,16 @@ def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: 
 def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_models, leaderboard,
                                  lower_bound: float = -0.25, upper_bound: float = 0.25):
     """
-    Predicts on unlabeled_data using the top k models. Then gets standard deviation of each
-    row's prediction across the top k models and the standard deviation across all rows of standard
-    deviations of the top k models. The calculates z-score using top k models predictions standard
-    deviation - top k models standard deviation means divided by the standard deviation of the top k
-    model predictions across all rows. All top k model predictions who's z-score falls within lower_bound
-    and upper_bound will be filtered out.
+    Predicts on unlabeled_data using the top num_models. Then gets standard deviation of each
+    row's predictions across the top num_models and the standard deviation across all rows of standard
+    deviations of the top num_models. Calculates z-score using top num_models predictions standard
+    deviation minus the mean of the top num_models standard deviation divided by the standard deviation of
+    the top num_model predictions across all rows. The indices of all top num_model predictions who's z-score
+    falls within lower_bound and upper_bound will be returned.
 
     Parameters:
     -----------
-    predictor: Fitted tabular predictor that ensembles multiple models
+    predictor: Fitted TabularPredictor
     unlabeled_data: Unlabeled data for top k models to predict on
     leaderboard: pd.DataFrame of leaderboard of models in AutoGluon based on validation score
     num_models: Number of top models to ensemble
@@ -161,39 +170,40 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
     """
     top_k_models_list = leaderboard.head(num_models)['model']
     top_k_preds = None
-    best_model_preds = None
 
     for model in top_k_models_list:
         y_test_pred = predictor.predict(data=unlabeled_data, model=model)
-
-        if best_model_preds is None:
-            best_model_preds = y_test_pred
 
         if model == top_k_models_list[0]:
             top_k_preds = y_test_pred
         else:
             top_k_preds = pd.concat([top_k_preds, y_test_pred], axis=1)
 
+    # Todo: This doesn't make total sense, because weighted ensemble
+    # will ensemble the top models and weigh them according to validation score
+    # maybe should just force prediction using weighted ensemble instead of
+    # uniform across top k?
+    top_k_avg_preds = top_k_preds.mean(axis=1)
     top_k_preds = top_k_preds.to_numpy()
     preds_sd = pd.Series(data=np.std(top_k_preds, axis=1), index=unlabeled_data.index)
     preds_z_score = (preds_sd - preds_sd.mean()) / preds_sd.std()
     df_filtered = preds_z_score.between(lower_bound, upper_bound)
 
-    return df_filtered[df_filtered], y_test_pred
+    return df_filtered[df_filtered], top_k_avg_preds
 
 
 def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, leaderboard,
                                    num_models, threshold: float = 0.95):
     """
-    Calculates predictive probabilities of unlabeled data by predicting with top k models
-    then averages pre-row over predictions from top k models and selects rows where confidence
+    Calculates predictive probabilities of unlabeled data by predicting with top num_models
+    then averages pre-row over predictions from top num_models and selects rows where confidence
     (predicted probability of the most likely class) is above threshold. Then samples minimum
     bin count from all bins, where bins are rows of averaged predictions with the same peak
     predicted probability class.
     
     Parameters:
     -----------
-    predictor: Fitted tabular predictor that ensembles multiple models
+    predictor: Fitted TabularPredictor
     unlabeled_data: Unlabeled data for top k models to predict on
     leaderboard: pd.DataFrame of leaderboard of models in AutoGluon based on validation score
     num_models: Number of top models to ensemble
@@ -215,6 +225,10 @@ def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, lead
         else:
             y_pred_proba_ensemble += y_pred_proba_curr_model
 
+    # Todo: This doesn't make total sense, because weighted ensemble
+    # will ensemble the top models and weigh them according to validation score
+    # maybe should just force prediction using weighted ensemble instead of
+    # uniform across top k?
     y_pred_proba_ensemble /= num_models
     y_max_prob = y_pred_proba_ensemble.max(axis=1)
     pseudo_indexes = (y_max_prob >= threshold)
