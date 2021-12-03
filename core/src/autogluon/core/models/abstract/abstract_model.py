@@ -6,22 +6,23 @@ import os
 import pickle
 import sys
 import time
-import warnings
 from typing import Union
 
 import numpy as np
 import pandas as pd
+import scipy
 
+from ....core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-from ...data.label_cleaner import LabelCleaner
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
-from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
+from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
+    compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
@@ -99,6 +100,8 @@ class AbstractModel:
         self.num_classes = None
         self.model = None
         self.problem_type = problem_type
+        # temperature scaling parameter that is set by predictor if calibrate is true under TabularPredictor fit()
+        self.temperature_scalar = None
 
         if eval_metric is not None:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
@@ -564,6 +567,20 @@ class AbstractModel:
         X = self.preprocess(X)
         self.model = self.model.fit(X, y)
 
+    def _apply_temperature_scaling(self, y_pred_proba):
+        # TODO: This is expensive to convert at inference time, try to avoid in future
+        if self.problem_type == BINARY:
+            y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
+
+        logits = np.log(y_pred_proba)
+        y_pred_proba = scipy.special.softmax(logits / self.temperature_scalar, axis=1)
+        y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
+
+        if self.problem_type == BINARY:
+            y_pred_proba = y_pred_proba[:, 1]
+
+        return y_pred_proba
+
     def predict(self, X, **kwargs):
         """
         Returns class predictions of X.
@@ -587,6 +604,10 @@ class AbstractModel:
         if normalize:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
+
+        if self.temperature_scalar is not None:
+            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
+
         return y_pred_proba
 
     def _predict_proba(self, X, **kwargs):
@@ -759,14 +780,6 @@ class AbstractModel:
             X=X, y=y, features=features, eval_metric=self.eval_metric, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs,
             transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
         )
-
-    def get_model_feature_importance(self) -> dict:
-        """
-        Custom feature importance values for a model (such as those calculated from training)
-
-        This is purely optional to implement, as it is only used to slightly speed up permutation importance by identifying features that were never used.
-        """
-        return dict()
 
     def get_trained_params(self) -> dict:
         """

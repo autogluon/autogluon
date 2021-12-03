@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.core.features.types import S_TEXT, S_TEXT_SPECIAL
+from autogluon.core.features.types import S_IMAGE_PATH, S_TEXT, S_TEXT_SPECIAL
 
 from .abstract import AbstractFeatureGenerator
 from .binned import BinnedFeatureGenerator
@@ -78,7 +78,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(required_special_types=[S_TEXT])
+        return dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH])
 
     def _filter_symbols(self, X: DataFrame, symbols: list):
         symbols_per_feature = dict()

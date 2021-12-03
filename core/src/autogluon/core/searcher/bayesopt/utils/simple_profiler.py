@@ -1,12 +1,14 @@
-from typing import NamedTuple, List, Dict
+from typing import List, Dict
 import time
 import logging
+from dataclasses import dataclass
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
-class ProfilingBlock(NamedTuple):
+@dataclass
+class ProfilingBlock:
     meta: dict
     time_stamp: float
     durations: Dict[str, List[float]]

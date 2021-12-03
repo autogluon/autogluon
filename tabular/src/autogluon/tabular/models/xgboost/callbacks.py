@@ -4,20 +4,33 @@ import logging
 
 from xgboost.callback import EarlyStopping
 
+from autogluon.core.utils.early_stopping import SimpleES
+
 logger = logging.getLogger(__name__)
 
 
 class EarlyStoppingCustom(EarlyStopping):
-    """Augments early stopping in XGBoost to also consider time_limit and memory usage"""
+    """
+    Augments early stopping in XGBoost to also consider time_limit, memory usage, and usage of adaptive early stopping methods.
+
+    Parameters
+    ----------
+    rounds : int or tuple
+       If int, The possible number of rounds without the trend occurrence.
+       If tuple, contains early stopping class as first element and class init kwargs as second element.
+    """
     def __init__(self, rounds, time_limit=None, start_time=None, verbose=False, **kwargs):
         if rounds is None:
             # Disable early stopping via rounds
             rounds = 999999
-        super().__init__(rounds=rounds, **kwargs)
+        super().__init__(rounds=999999, **kwargs)
+        if isinstance(rounds, int):
+            self.es = SimpleES(patience=rounds)
+        else:
+            self.es = rounds[0](**rounds[1])
         self.time_limit = time_limit
         self.start_time = start_time
         self.verbose = verbose
-
         self._mem_status = None
         self._mem_init_rss = None
 
@@ -31,6 +44,10 @@ class EarlyStoppingCustom(EarlyStopping):
 
     def after_iteration(self, model, epoch, evals_log):
         should_stop = super().after_iteration(model, epoch, evals_log)
+        if should_stop:
+            return should_stop
+        is_best_iter = self.current_rounds == 0
+        should_stop = self.es.update(cur_round=epoch, is_best=is_best_iter)
         if should_stop:
             return should_stop
         if self._time_check(model=model, epoch=epoch):

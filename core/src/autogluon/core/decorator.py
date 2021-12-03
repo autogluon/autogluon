@@ -41,8 +41,6 @@ def sample_config(args, config):
     return args
 
 class _autogluon_method(object):
-    SEED = mp.Value('i', 0)
-    LOCK = mp.Lock()
     def __init__(self, f):
         self.f = f
         self.args = ezdict()
@@ -113,8 +111,10 @@ class _autogluon_method(object):
         return kw_spaces
 
     def _rand_seed(self):
-        _autogluon_method.SEED.value += 1
-        np.random.seed(_autogluon_method.SEED.value)
+        # Lazy import
+        from .locks import DecoratorLock
+        DecoratorLock.SEED.value += 1
+        np.random.seed(DecoratorLock.SEED.value)
 
     def __repr__(self):
         return repr(self.f)

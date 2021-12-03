@@ -500,7 +500,7 @@ class FeatureSelector:
         feature_metadata = deepcopy(kwargs.get('feature_metadata', None))
         if prune_threshold == 'none':
             prune_threshold = float('inf')
-        elif prune_threshold is 'noise':
+        elif prune_threshold == 'noise':
             X_train, noise_columns = add_noise_column(X=X_train, rng=self.rng)
             if feature_metadata is not None:
                 for noise_column in noise_columns:

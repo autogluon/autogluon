@@ -14,7 +14,7 @@ from ..gpautograd.gp_regression import GaussianProcessRegression
 from ..gpautograd.kernel import Matern52
 from ..gpautograd.mean import ScalarMeanFunction
 from ..models.gpmodel_skipopt import SkipNoMaxResourcePredicate, SkipPeriodicallyPredicate
-from ..models.gpmodel_transformers import GPModelArgs
+from ..models.gp_model import GPModelArgs
 from ..models.meanstd_acqfunc_impl import EIAcquisitionFunction, CEIAcquisitionFunction
 from ..tuning_algorithms.base_classes import DEFAULT_METRIC, DEFAULT_CONSTRAINT_METRIC
 from ..tuning_algorithms.defaults import DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS

@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import random
+import sys
 import time
 from collections.abc import Iterable
 
@@ -91,6 +92,7 @@ class AbstractLearner:
             self.version = __version__
         except:
             self.version = None
+        self._python_version = f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}'
 
     # TODO: Possibly rename to features_in or consider refactoring all feature_generators features_in -> features
     @property
@@ -148,7 +150,7 @@ class AbstractLearner:
         return self._fit(X=X, X_val=X_val, **kwargs)
 
     def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
-            feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
+             feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
     def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True):
@@ -677,7 +679,11 @@ class AbstractLearner:
             X, y = self._remove_nan_label_rows(X, y)
             if self.ignored_columns:
                 X = X.drop(columns=self.ignored_columns, errors='ignore')
-
+            unused_features = [f for f in list(X.columns) if f not in self.features]
+            if len(unused_features) > 0:
+                logger.log(30, f'These features in provided data are not utilized by the predictor and will be ignored: {unused_features}')
+                X = X.drop(columns=unused_features)
+            
             if feature_stage == 'original':
                 return trainer._get_feature_importance_raw(model=model, X=X, y=y, features=features, subsample_size=subsample_size, transform_func=self.transform_features, silent=silent, **kwargs)
             X = self.transform_features(X)
@@ -755,7 +761,7 @@ class AbstractLearner:
 
     def distill(self, X=None, y=None, X_val=None, y_val=None, time_limit=None, hyperparameters=None, holdout_frac=None,
                 verbosity=None, models_name_suffix=None, teacher_preds='soft',
-                augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
+                augmentation_data=None, augment_method='spunge', augment_args={'size_factor': 5, 'max_size': int(1e5)}):
         """ See abstract_trainer.distill() for details. """
         if X is not None:
             if (self.eval_metric is not None) and (self.eval_metric.name == 'log_loss') and (self.problem_type == MULTICLASS):

@@ -99,6 +99,7 @@ Advanced Topics
    tutorials/object_detection/index
    tutorials/text_prediction/index
    tutorials/tabular_prediction/tabular-multimodal
+   tutorials/cloud_fit_deploy/index
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index

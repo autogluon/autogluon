@@ -83,13 +83,13 @@ class XGBoostModel(AbstractModel):
 
         if verbosity <= 2:
             verbose = False
-            verbose_eval = None
+            log_period = None
         elif verbosity == 3:
             verbose = True
-            verbose_eval = 50
+            log_period = 50
         else:
             verbose = True
-            verbose_eval = 1
+            log_period = 1
 
         self._assert_memory_safe(X=X, y=y)
         X = self.preprocess(X, is_train=True, max_category_levels=max_category_levels)
@@ -100,12 +100,12 @@ class XGBoostModel(AbstractModel):
 
         if X_val is None:
             early_stopping_rounds = None
-            eval_set.append((X, y))  # TODO: if the train dataset is large, use sample of train dataset for validation
+            eval_set = None
         else:
             X_val = self.preprocess(X_val, is_train=False)
             eval_set.append((X_val, y_val))
-            early_stopping_rounds = ag_params.get('ag.early_stop', 'auto')
-            if isinstance(early_stopping_rounds, str):
+            early_stopping_rounds = ag_params.get('ag.early_stop', 'adaptive')
+            if isinstance(early_stopping_rounds, (str, tuple, list)):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
 
         if num_gpus != 0:
@@ -119,13 +119,16 @@ class XGBoostModel(AbstractModel):
         from .callbacks import EarlyStoppingCustom
         from xgboost.callback import EvaluationMonitor
         callbacks = []
-        if verbose_eval is not None:
-            callbacks.append(EvaluationMonitor(period=verbose_eval))
-        # TODO: disable early stopping during refit_full
-        callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
+        if eval_set is not None:
+            if log_period is not None:
+                callbacks.append(EvaluationMonitor(period=log_period))
+            callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
 
         from xgboost import XGBClassifier, XGBRegressor
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
+        if 'eval_metric' not in params and params.get('objective') == 'binary:logistic':
+            # avoid unnecessary warning from XGBoost v1.3.0
+            params['eval_metric'] = 'logloss'
         self.model = model_type(**params)
         self.model.fit(
             X=X,

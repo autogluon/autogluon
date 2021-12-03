@@ -625,6 +625,35 @@ stage("Build Tutorials") {
       }
     }
   },
+  'cloud_fit_deploy': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-tutorial-cloud_fit_deploy-v3') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        conda env update -n autogluon-tutorial-cloud_fit_deploy-v3 -f docs/build_contrib.yml
+        conda activate autogluon-tutorial-cloud_fit_deploy-v3
+        conda list
+        ${setup_pip_venv}
+        ${setup_mxnet_gpu}
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        export AG_DOCS=1
+
+        env
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/text
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(cloud_fit_deploy)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        ${cleanup_venv}
+        """
+        stash includes: 'docs/_build/rst/tutorials/cloud_fit_deploy/*', name: 'cloud_fit_deploy'
+      }
+    }
+  },
   'forecasting': {
     node('linux-gpu') {
       ws('workspace/autogluon-forecasting-py3-v3') {
@@ -731,6 +760,7 @@ stage("Build Docs") {
         unstash 'tabular'
         unstash 'tabular_to_image'
         unstash 'text'
+        unstash 'cloud_fit_deploy'
         unstash 'forecasting'
         unstash 'torch'
 
