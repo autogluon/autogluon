@@ -644,8 +644,11 @@ class TabularPredictor:
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
             calibrate: bool, default = False
-                If True then will use temperature scaling to calibrate the Predictor's estimated class probabilities in classification tasks
-                (which may improve metrics like log_loss). Temperature scaling will train a scalar parameter on the validation set.
+                If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
+                (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
+                If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
+                (which may improve the prediction interval coverage, and bagging could futher improve it) and will compute a set of scalar parameters on the validation set.
+
         Returns
         -------
         :class:`TabularPredictor` object. Returns self.
@@ -829,7 +832,7 @@ class TabularPredictor:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION + [QUANTILE]:
                 self._calibrate_model()
             else:
-                logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
+                logger.log(30, 'WARNING: calibrate is only applicable to classification or quantile regression problems')
 
         if save_space:
             self.save_space()
@@ -872,7 +875,7 @@ class TabularPredictor:
 
         model = self._trainer.load_model(model_name=model_name)
         if self.problem_type == QUANTILE:
-            logger.log(30, f'Conformity scores being computed for model: {model_name}')
+            logger.log(15, f'Conformity scores being computed to calibrate model: {model_name}')
             conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
                                                     quantile_levels=self.quantile_levels)
             model.conformalize = conformalize

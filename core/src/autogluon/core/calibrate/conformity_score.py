@@ -5,7 +5,10 @@ from ..utils import try_import_torch
 
 def compute_conformity_score(y_val_pred: np.ndarray, y_val: np.ndarray, quantile_levels: list):
     '''
-    Compute conformity scores based on validation set. The scores are used to conformalize new quantile predictions.
+    Compute conformity scores based on validation set. This is only applicable to quantile regression problems.
+    The scores are used to conformalize new quantile predictions.
+    This is based on the paper 'Conformalized Quantile Regression (https://arxiv.org/abs/1905.03222)',
+    and its implementation at 'https://github.com/yromano/cqr'.
 
     Parameters:
     -----------
