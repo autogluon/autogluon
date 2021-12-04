@@ -26,12 +26,6 @@ Tutorials to hyperparameter-tune any custom models or Python code.
       Tune the hyperparameters of custom objects such as your own: neural network, optimizer, dataset, etc.
 
    .. card::
-      :title: Tune Training Scripts
-      :link: script.html
-
-      Tune the argument values (hyperparameters) of arbitrary Python scripts using AutoGluon.
-
-   .. card::
       :title: Distributed Search
       :link: distributed.html
 

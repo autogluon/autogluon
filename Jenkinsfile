@@ -55,10 +55,6 @@ install_mxnet = """
     python3 -m pip install --upgrade -e mxnet/
 """
 
-install_extra = """
-    python3 -m pip install --upgrade -e extra/
-"""
-
 install_tabular = """
     python3 -m pip install --upgrade -e tabular/
 """
@@ -154,7 +150,6 @@ stage("Unit Test") {
           ${install_tabular_all}
           ${install_mxnet}
           ${install_text}
-          ${install_extra}
           ${install_vision}
 
           cd tabular/
@@ -183,38 +178,7 @@ stage("Unit Test") {
 
           cd core/
           python3 -m pip install --upgrade -e .
-          cd ../extra/
-          python3 -m pip install --upgrade -e .
           cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
-          """
-        }
-      }
-    }
-  },
-  'extra': {
-    node('linux-gpu') {
-      ws('workspace/autogluon-extra-py3-v3') {
-        timeout(time: max_time, unit: 'MINUTES') {
-          checkout scm
-          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
-          set -ex
-          conda env update -n autogluon-extra-py3-v3 -f docs/build.yml
-          conda activate autogluon-extra-py3-v3
-          conda list
-          ${setup_pip_venv}
-          ${setup_mxnet_gpu}
-          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
-
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          cd ../extra/
           python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
@@ -275,8 +239,6 @@ stage("Unit Test") {
           cd core/
           python3 -m pip install --upgrade -e .
           cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          cd ../extra/
           python3 -m pip install --upgrade -e .
           cd ../vision/
           python3 -m pip install --upgrade -e .
@@ -345,8 +307,6 @@ stage("Unit Test") {
           cd ../mxnet/
           python3 -m pip install --upgrade -e .
           cd ../text/
-          python3 -m pip install --upgrade -e .
-          cd ../extra/
           python3 -m pip install --upgrade -e .
           cd ../vision/
           python3 -m pip install --upgrade -e .
@@ -729,10 +689,6 @@ stage("Build Docs") {
         cd ..
 
         cd mxnet/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd extra/
         python3 -m pip install --upgrade -e .
         cd ..
 

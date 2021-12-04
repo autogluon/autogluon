@@ -179,7 +179,6 @@ AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/
 - `autogluon.text` - only functionality for natural language processing (TextPredictor)
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
 - `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
-- `autogluon.extra` - miscellaneous extra functionality such as `Efficient Neural Architecture Search <tutorials/nas/enas_proxylessnas.html>`_
 - `autogluon.mxnet` - miscellaneous extra MXNet functionality.
 
 To install a submodule from source, follow the instructions for installing the entire package from source but replace the line `cd autogluon && ./full_install.sh` with `cd autogluon && python3 -m pip install -e {SUBMODULE_NAME}/{OPTIONAL_DEPENDENCIES}`

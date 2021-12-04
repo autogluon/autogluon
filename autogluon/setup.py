@@ -21,7 +21,6 @@ install_requires = [
     f'autogluon.features=={version}',
     f'autogluon.tabular[all]=={version}',
     f'autogluon.mxnet=={version}',
-    f'autogluon.extra=={version}',
     f'autogluon.text=={version}',
     f'autogluon.vision=={version}',
 ]

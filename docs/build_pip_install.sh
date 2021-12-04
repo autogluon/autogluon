@@ -7,7 +7,6 @@ python3 -m pip uninstall -y autogluon
 python3 -m pip uninstall -y autogluon.vision
 python3 -m pip uninstall -y autogluon.text
 python3 -m pip uninstall -y autogluon.mxnet
-python3 -m pip uninstall -y autogluon.extra
 python3 -m pip uninstall -y autogluon.tabular
 python3 -m pip uninstall -y autogluon.forecasting
 python3 -m pip uninstall -y autogluon.features
