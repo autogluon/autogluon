@@ -78,12 +78,6 @@ Advanced Topics
 
       How to hyperparameter-tune your own custom models or Python code.
 
-   .. card::
-      :title: For PyTorch Users
-      :link: tutorials/torch/index.html
-
-      How to do hyperparameter tuning or architecture search for any PyTorch model.
-
 .. toctree::
    :maxdepth: 2
    :hidden:
@@ -95,7 +89,6 @@ Advanced Topics
    tutorials/tabular_prediction/tabular-multimodal
    tutorials/cloud_fit_deploy/index
    tutorials/course/index
-   tutorials/torch/index
    api/autogluon.predictor
    api/autogluon.core
    api/autogluon.core.space

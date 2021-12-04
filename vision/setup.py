@@ -31,7 +31,6 @@ requirements = [
 
 test_requirements = [
     'pytest',
-    'openml',
 ]
 
 install_requires = requirements + test_requirements
