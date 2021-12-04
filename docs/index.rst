@@ -79,12 +79,6 @@ Advanced Topics
       How to hyperparameter-tune your own custom models or Python code.
 
    .. card::
-      :title: Neural Architecture Search
-      :link: tutorials/nas/index.html
-
-      How to perform neural architecture search.
-
-   .. card::
       :title: For PyTorch Users
       :link: tutorials/torch/index.html
 
@@ -101,7 +95,6 @@ Advanced Topics
    tutorials/tabular_prediction/tabular-multimodal
    tutorials/cloud_fit_deploy/index
    tutorials/course/index
-   tutorials/nas/index
    tutorials/torch/index
    api/autogluon.predictor
    api/autogluon.core

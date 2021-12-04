@@ -182,24 +182,6 @@ Tune Custom Models
       ML models under fairness constraints.
 
 
-Neural Architecture Search
---------------------------
-.. container:: cards
-
-   .. card::
-      :title: Reinforcement Learning
-      :link: nas/rl_searcher.html
-
-      Comparing search via Reinforcement Learning against Random search.
-
-   .. card::
-      :title: Efficient NAS on Target Hardware
-      :link: nas/enas_proxylessnas.html
-
-      Efficient Neural Architecture Search for low latency model
-      on target hardware.
-
-
 .. toctree::
    :maxdepth: 2
    :hidden:
@@ -210,4 +192,3 @@ Neural Architecture Search
    text_prediction/index
    tabular_prediction/index
    customize/index
-   nas/index
