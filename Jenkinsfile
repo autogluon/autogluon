@@ -51,10 +51,6 @@ install_features = """
     python3 -m pip install --upgrade -e features/
 """
 
-install_mxnet = """
-    python3 -m pip install --upgrade -e mxnet/
-"""
-
 install_tabular = """
     python3 -m pip install --upgrade -e tabular/
 """
@@ -148,38 +144,10 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
-          ${install_mxnet}
           ${install_text}
           ${install_vision}
 
           cd tabular/
-          python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
-          """
-        }
-      }
-    }
-  },
-  'mxnet': {
-    node('linux-gpu') {
-      ws('workspace/autogluon-mxnet-py3-v3') {
-        timeout(time: max_time, unit: 'MINUTES') {
-          checkout scm
-          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
-          set -ex
-          conda env update -n autogluon-mxnet-py3-v3 -f docs/build.yml
-          conda activate autogluon-mxnet-py3-v3
-          conda list
-          ${setup_pip_venv}
-          ${setup_mxnet_gpu}
-          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
-
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -208,7 +176,6 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
-          ${install_mxnet}
           ${install_text}
 
           cd text/
@@ -237,8 +204,6 @@ stage("Unit Test") {
           env
 
           cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../mxnet/
           python3 -m pip install --upgrade -e .
           cd ../vision/
           python3 -m pip install --upgrade -e .
@@ -271,7 +236,6 @@ stage("Unit Test") {
           ${install_core}
           ${install_features}
           ${install_tabular_all}
-          ${install_mxnet}
           ${install_forecasting}
           cd forecasting/
           python3 -m pytest --junitxml=results.xml --runslow tests
@@ -304,8 +268,6 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           python3 -m pip install --upgrade -e .[all]
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
           cd ../text/
           python3 -m pip install --upgrade -e .
           cd ../vision/
@@ -686,10 +648,6 @@ stage("Build Docs") {
 
         cd tabular/
         python3 -m pip install --upgrade -e .[all]
-        cd ..
-
-        cd mxnet/
-        python3 -m pip install --upgrade -e .
         cd ..
 
         cd text/

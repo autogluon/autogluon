@@ -27,7 +27,6 @@ requirements = [
     'matplotlib',
     'd8>=0.0.2,<1.0',
     f'autogluon.core=={version}',
-    f'autogluon.mxnet=={version}'
 ]
 
 test_requirements = [
