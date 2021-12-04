@@ -145,7 +145,7 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          ${install_core}
+          ${install_common}
           ${install_features}
           cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests

@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from pandas import DataFrame, RangeIndex
 
-from autogluon.core.features.types import R_CATEGORY, R_INT
+from autogluon.common.features.types import R_CATEGORY, R_INT
 
 from . import AbstractFeatureGenerator
 from ..utils import clip_and_astype

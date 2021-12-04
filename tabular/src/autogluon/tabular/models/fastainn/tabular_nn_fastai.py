@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 import sklearn
 
+from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
 from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
-from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.utils import try_import_fastai

@@ -5,7 +5,7 @@ import pandas as pd
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
-from autogluon.core.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_TEXT, S_TEXT_AS_CATEGORY
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_TEXT, S_TEXT_AS_CATEGORY
 
 from .abstract import AbstractFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator

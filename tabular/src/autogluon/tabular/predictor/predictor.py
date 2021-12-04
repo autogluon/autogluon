@@ -10,9 +10,10 @@ from typing import Union
 import networkx as nx
 import numpy as np
 import pandas as pd
+
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, \
-    PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
@@ -23,7 +24,7 @@ from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_mod
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
+from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config

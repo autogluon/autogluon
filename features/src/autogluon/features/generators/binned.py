@@ -4,7 +4,7 @@ import logging
 import pandas as pd
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_INT, R_FLOAT, S_BINNED
+from autogluon.common.features.types import R_INT, R_FLOAT, S_BINNED
 
 from .abstract import AbstractFeatureGenerator
 from .. import binning

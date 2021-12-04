@@ -7,9 +7,9 @@ import time
 import numpy as np
 import psutil
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+from autogluon.common.features.types import R_OBJECT
+from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
-from autogluon.core.features.types import R_OBJECT
 from autogluon.core.utils.utils import normalize_pred_probas
 
 from autogluon.core.models.abstract.model_trial import skip_hpo

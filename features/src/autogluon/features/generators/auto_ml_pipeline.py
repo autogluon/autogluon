@@ -1,6 +1,6 @@
 import logging
 
-from autogluon.core.features.types import R_INT, R_FLOAT, S_TEXT, R_OBJECT, S_IMAGE_PATH
+from autogluon.common.features.types import R_INT, R_FLOAT, S_TEXT, R_OBJECT, S_IMAGE_PATH
 
 from .pipeline import PipelineFeatureGenerator
 from .category import CategoryFeatureGenerator

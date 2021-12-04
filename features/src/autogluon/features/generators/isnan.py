@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_OBJECT, S_BOOL
+from autogluon.common.features.types import R_OBJECT, S_BOOL
 
 from .abstract import AbstractFeatureGenerator
 

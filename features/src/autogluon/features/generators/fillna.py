@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_OBJECT
+from autogluon.common.features.types import R_OBJECT
 
 from .abstract import AbstractFeatureGenerator
 
