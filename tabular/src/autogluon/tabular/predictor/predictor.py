@@ -142,7 +142,7 @@ class TabularPredictor:
         What metric is used to evaluate predictive performance.
     label : str
         Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-    feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`
+    feature_metadata : :class:`autogluon.common.features.feature_metadata.FeatureMetadata`
         Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label`).
         Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
         Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.

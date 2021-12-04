@@ -505,7 +505,7 @@ class AbstractModel:
         num_gpus : int, default = 'auto'
             How many GPUs to use during fit.
             If 'auto', model decides.
-        feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`, default = None
+        feature_metadata : :class:`autogluon.common.features.feature_metadata.FeatureMetadata`, default = None
             Contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical.
             If None, feature_metadata is inferred during fit.
         verbosity : int, default = 2

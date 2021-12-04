@@ -123,7 +123,7 @@ Additional Tabular APIs
 .. autoclass:: TabularDataset
    :members: init
 
-.. automodule:: autogluon.core.features.feature_metadata
+.. automodule:: autogluon.common.features.feature_metadata
 
 :hidden:`FeatureMetadata`
 ~~~~~~~~~~~~~~~~~~~~~~~~
