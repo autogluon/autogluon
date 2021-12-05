@@ -1,6 +1,7 @@
 import copy
 import logging
 import math
+import platform
 import time
 
 import numpy as np
@@ -53,6 +54,8 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, 'Beginning AutoGluon training ...')
         logger.log(20, f'AutoGluon will save models to "{self.path}"')
         logger.log(20, f'AutoGluon Version:  {self.version}')
+        logger.log(20, f'Python Version:     {self._python_version}')
+        logger.log(20, f'Operating System:   {platform.system()}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
         logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
         if X_val is not None:

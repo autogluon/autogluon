@@ -84,7 +84,7 @@ objectives = {
 }
 
 # The scalarization algorithm to be used and its parameters are provided as
-# a dictionary. There are two different scalarization algorithms available.
+# a dictionary. There are three different scalarization algorithms available.
 random_weights_options = {
     "algorithm": "random_weights",
     "num_weights": 100
@@ -94,6 +94,11 @@ parego_options = {
     "algorithm": "parego",
     "num_weights": 100,
     "rho": 0.05,
+}
+
+golovin_options = {
+    "algorithm": "golovin",
+    "num_weights": 100,
 }
 
 scheduler = ag.scheduler.MOHyperbandScheduler(

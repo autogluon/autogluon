@@ -1,4 +1,5 @@
 import copy
+import inspect
 import logging
 import math
 import os
@@ -9,18 +10,24 @@ from typing import Union
 import networkx as nx
 import numpy as np
 import pandas as pd
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
+
+from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, \
+    PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
 from autogluon.tabular.models import IModelsModel
+
+from autogluon.core.utils.loaders import load_pkl, load_str
+from autogluon.core.utils.savers import save_pkl, save_str
+from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
+
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
@@ -43,7 +50,6 @@ logger = logging.getLogger()  # return root logger
 
 # Done for Tabular
 # TODO: Remove all `time_limits` in project, replace with `time_limit`
-
 
 class TabularPredictor:
     """
@@ -172,6 +178,7 @@ class TabularPredictor:
 
     Dataset = TabularDataset
     predictor_file_name = 'predictor.pkl'
+    _predictor_version_file_name = '__version__'
 
     def __init__(
             self,
@@ -643,7 +650,9 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
-
+            calibrate: bool, default = False
+                If True then will use temperature scaling to calibrate the Predictor's estimated class probabilities in classification tasks
+                (which may improve metrics like log_loss). Temperature scaling will train a scalar parameter on the validation set.
         Returns
         -------
         :class:`TabularPredictor` object. Returns self.
@@ -720,6 +729,10 @@ class TabularPredictor:
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
+        # TODO: Hyperparam could have non-serializble objects. Save as pkl and loaded on demand
+        # in case the hyperprams are large in memory
+        self.fit_hyperparameters_ = hyperparameters
+
         ###################################
         # FIXME: v0.1 This section is a hack
         if 'enable_raw_text_features' not in feature_generator_init_kwargs:
@@ -785,11 +798,13 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
+            calibrate=kwargs['calibrate']
         )
         self.save()
         return self
 
-    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False):
+    def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
+                  calibrate=False):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -817,8 +832,58 @@ class TabularPredictor:
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
+        if calibrate:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+                self._calibrate_model()
+            else:
+                logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
+
         if save_space:
             self.save_space()
+
+    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
+        """
+        Applies temperature scaling to the AutoGluon model. Applies
+        inverse softmax to predicted probs then trains temperature scalar
+        on validation data to maximize negative log likelihood. Inversed
+        softmaxes are divided by temperature scalar then softmaxed to return
+        predicted probs.
+
+        Parameters:
+        -----------
+        model_name: str: default=None
+            model name to tune temperature scaling on. If set to None
+            then will tune best model only. Best model chosen by validation score
+        lr: float: default=0.01
+            The learning rate for temperature scaling algorithm
+        max_iter: int: default=1000
+            Number of iterations optimizer should take for
+            tuning temperature scaler
+        init_val: float: default=1.0
+            The initial value for temperature scalar term
+        """
+        # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
+        if model_name is None:
+            model_name = self._trainer.get_model_best()
+
+        if self._trainer.bagged_mode:
+            y_val_probs = self.get_oof_pred_proba(model_name).to_numpy()
+            y_val = self._trainer.load_y().to_numpy()
+        else:
+            X_val = self._trainer.load_X_val()
+            y_val_probs = self._trainer.predict_proba(X_val, model_name)
+            y_val = self._trainer.load_y_val().to_numpy()
+
+            if self.problem_type == BINARY:
+                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
+
+        logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
+        temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
+                                               init_val=init_val, max_iter=max_iter, lr=lr)
+        logger.log(15, f'Temperature term found is: {temp_scalar}')
+        model = self._trainer.load_model(model_name=model_name)
+        model.temperature_scalar = temp_scalar
+        model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
@@ -844,6 +909,8 @@ class TabularPredictor:
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
                 [`holdout_frac`, `num_bag_folds`, `auto_stack`, `feature_generator`, `unlabeled_data`]
+            pseudo_data : pd.DataFrame, default = None
+                Data that has been self labeled by Autogluon model and will be incorporated into training during 'fit_extra'
         """
         time_start = time.time()
 
@@ -871,6 +938,29 @@ class TabularPredictor:
         ag_args_fit = kwargs['ag_args_fit']
         ag_args_ensemble = kwargs['ag_args_ensemble']
         excluded_model_types = kwargs['excluded_model_types']
+        pseudo_data = kwargs.get('pseudo_data', None)
+
+        # TODO: Since data preprocessor is fitted on original train_data it cannot account for if
+        # labeled pseudo data has new labels unseen in the original train. Probably need to refit
+        # data preprocessor if this is the case.
+        if pseudo_data is not None:
+            if self.label not in pseudo_data.columns:
+                raise ValueError('\'pseudo_data\' does not contain the labeled column.')
+
+            if self.sample_weight is not None:
+                raise ValueError('Applying \'sample_weight\' while calling \'fit_pseudolabel\' is not supported')
+
+            X_pseudo = pseudo_data.drop(columns=[self.label])
+            y_pseudo_og = pseudo_data[self.label]
+            X_pseudo = self._learner.transform_features(X_pseudo)
+            y_pseudo = self._learner.label_cleaner.transform(y_pseudo_og)
+
+            if np.isnan(y_pseudo.unique()).any():
+                raise Exception('NaN was found in the label column for pseudo labeled data.'
+                                'Please ensure no NaN values in target column')
+        else:
+            X_pseudo = None
+            y_pseudo = None
 
         if ag_args is None:
             ag_args = {}
@@ -895,12 +985,29 @@ class TabularPredictor:
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit,
                        'excluded_model_types': excluded_model_types}
 
+
+        if X_pseudo is not None and y_pseudo is not None:
+            core_kwargs['X_pseudo'] = X_pseudo
+            core_kwargs['y_pseudo'] = y_pseudo
+
         # TODO: Add special error message if called and training/val data was not cached.
         X, y, X_val, y_val = self._trainer.load_data()
+
+        if y_pseudo is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            y_og = self._learner.label_cleaner.inverse_transform(y)
+            y_og_classes = y_og.unique()
+            y_pseudo_classes = y_pseudo_og.unique()
+            matching_classes = np.in1d(y_pseudo_classes, y_og_classes)
+
+            if not matching_classes.all():
+                raise Exception(f'Pseudo training data contains classes not in original train data: {y_pseudo_classes[~matching_classes]}')
+
+        name_suffix = kwargs.get('name_suffix', '')
+
         fit_models = self._trainer.train_multi_levels(
             X=X, y=y, hyperparameters=hyperparameters, X_val=X_val, y_val=y_val,
             base_model_names=base_model_names, time_limit=time_limit, relative_stack=True, level_end=num_stack_levels,
-            core_kwargs=core_kwargs, aux_kwargs=aux_kwargs
+            core_kwargs=core_kwargs, aux_kwargs=aux_kwargs, name_suffix=name_suffix
         )
 
         if time_limit is not None:
@@ -918,9 +1025,242 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
+            calibrate=kwargs['calibrate']
         )
         self.save()
         return self
+
+    def _get_all_fit_extra_args(self):
+        ret = list(self._fit_extra_kwargs_dict().keys()) + list(inspect.signature(self.fit_extra).parameters.keys())
+        ret.remove('kwargs')
+
+        return ret
+
+    def _fit_weighted_ensemble_pseudo(self):
+        """
+        Fits weighted ensemble on top models trained with pseudo labeling, then if new
+        weighted ensemble model is best model then sets `model_best` in trainer to
+        weighted ensemble model.
+        """
+        logger.log(15, 'Fitting weighted ensemble using top models')
+        weighted_ensemble_model_name = self.fit_weighted_ensemble()[0]
+
+        # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
+        # if it's the best model.
+        # TODO: There should also be PL added to weighted ensemble model name to notify
+        # users it is a model trained with PL models if they are indeed ensembled
+        model_best_name = self._trainer.leaderboard().iloc[0]['model']
+        if model_best_name == weighted_ensemble_model_name:
+            self._trainer.model_best = model_best_name
+            self._trainer.save()
+            logger.log(15, 'Weighted ensemble was the best model for current iteration of pseudo labeling')
+        else:
+            logger.log(15, 'Weighted ensemble was not the best model for current iteration of pseudo labeling')
+
+    def _run_pseudolabeling(self, unlabeled_data: pd.DataFrame, max_iter: int,
+                            return_pred_prob: bool = False, use_ensemble: bool = False,
+                            fit_ensemble: bool = False, fit_ensemble_every_iter: bool = False,
+                            **kwargs):
+        """
+        Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
+        used in original model unless specified by the user. This is an internal function that iteratively
+        self labels unlabeled test data then incorporates all self labeled data above a threshold into training.
+        Will keep incorporating self labeled data into training until validation score does not improve
+
+        Parameters:
+        -----------
+        unlabeled_data: Extra unlabeled data (could be the test data) to assign pseudolabels to
+            and incorporate as extra training data.
+        max_iter: int, default = 5
+            Maximum allowed number of iterations, where in each iteration, the data are pseudolabeled
+            by the current predictor and the predictor is refit including the pseudolabled data in its training set.
+        return_pred_proba: bool, default = False
+            Transductive learning setting, will return predictive probabiliteis of unlabeled_data
+        use_ensemble: bool, default = False
+            If True will use ensemble pseudo labeling algorithm if False will use best model
+            pseudo labeling method
+        fit_ensemble: bool, default = False
+            If True will fit weighted ensemble on final best models. Fitting weighted ensemble will be done after fitting
+            of models is completed unless otherwise specified. If False will not fit weighted ensemble on final best
+            models.
+        fit_ensemble_every_iter: bool, default = False
+            If True will fit weighted ensemble model using combination of best models
+            for every iteration of pseudo label algorithm. If False and fit_ensemble
+            is True, will just do it at the very end of training pseudo labeled models.
+
+        Returns:
+        --------
+        self: TabularPredictor
+        """
+        previous_score = self.info()['best_model_score_val']
+        y_pseudo_og = pd.Series()
+        if return_pred_prob:
+            if self.problem_type is REGRESSION:
+                y_pred_proba_og = pd.Series()
+            else:
+                y_pred_proba_og = pd.DataFrame()
+        X_test = unlabeled_data.copy()
+
+        for i in range(max_iter):
+            iter_print = str(i + 1)
+            logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}')
+
+            if use_ensemble:
+                if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+                    test_pseudo_idxes_true, y_pred_proba, y_pred = filter_ensemble_pseudo(predictor=self,
+                                                                                          unlabeled_data=X_test)
+                else:
+                    test_pseudo_idxes_true, y_pred = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
+                    y_pred_proba = y_pred.copy()
+            else:
+                y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
+                y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
+                test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
+
+            if return_pred_prob:
+                if i == 0:
+                    y_pred_proba_og = y_pred_proba
+                else:
+                    y_pred_proba_og.loc[test_pseudo_idxes_true.index] = y_pred_proba.loc[test_pseudo_idxes_true.index]
+
+            if len(test_pseudo_idxes_true) < 1:
+                logger.log(20,
+                           f'Could not confidently assign pseudolabels for any of the provided rows in iteration: {iter_print}. Done with pseudolabeling...')
+                break
+            else:
+                logger.log(20,
+                           f'Pseudolabeling algorithm confidently assigned pseudolabels to: {len(test_pseudo_idxes_true)} rows of data'
+                           f'on iteration: {iter_print}. Adding to train data')
+
+            test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
+            test_pseudo_idxes[test_pseudo_idxes_true.index] = True
+
+            y_pseudo_og = y_pseudo_og.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
+
+            pseudo_data = unlabeled_data.loc[y_pseudo_og.index]
+            pseudo_data[self.label] = y_pseudo_og
+            self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i + 1)),
+                           **kwargs)
+
+            if fit_ensemble and fit_ensemble_every_iter:
+                self._fit_weighted_ensemble_pseudo()
+
+            current_score = self.info()['best_model_score_val']
+            logger.log(20,
+                       f'Pseudolabeling algorithm changed validation score from: {previous_score}, to: {current_score}'
+                       f' using evaluation metric: {self.eval_metric.name}')
+
+            if previous_score >= current_score:
+                break
+            else:
+                # Cut down X_test to not include pseudo labeled data
+                X_test = X_test.loc[test_pseudo_idxes[~test_pseudo_idxes].index]
+                previous_score = current_score
+
+        if fit_ensemble and not fit_ensemble_every_iter:
+            self._fit_weighted_ensemble_pseudo()
+            y_pred_proba_og = self.predict_proba(unlabeled_data)
+
+        if return_pred_prob:
+            return self, y_pred_proba_og
+        else:
+            return self
+
+    def fit_pseudolabel(self, pseudo_data: pd.DataFrame, max_iter: int = 5, return_pred_prob: bool = False,
+                        use_ensemble: bool = False, fit_ensemble: bool = False, fit_ensemble_every_iter: bool = False,
+                        **kwargs):
+        """
+        If 'pseudo_data' is labeled then incorporates all test_data into train_data for
+        newly fit models. If 'pseudo_data' is unlabeled then 'fit_pseudolabel' will self label the
+        data and will augment the original training data by adding all the self labeled
+        data that meets a criteria (For example all rows with predictive prob above 95%). If
+        predictor is fit then will call fit_extra with added training data, if predictor
+        is not fit then will fit model on train_data then run.
+
+        Parameters
+        ----------
+        pseudo_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            Extra data to incorporate into training. Pre-labeled test data allowed. If no labels
+            then pseudolabeling algorithm will predict and filter out which rows to incorporate into
+            training
+        max_iter: int, default = 5
+            Maximum iterations of pseudolabeling allowed
+        return_pred_prob: bool, default = False
+            Returns held-out predictive probabilities from pseudo-labeling. If test_data is labeled then
+            returns model's predictive probabilities.
+        use_ensemble: bool, default = False
+            If True will use ensemble pseudo labeling algorithm. If False will just use best model
+            for pseudo labeling algorithm.
+        fit_ensemble: bool, default = False
+            If True with fit weighted ensemble model using combination of best models.
+            Fitting weighted ensemble will be done after fitting has
+            being completed unless otherwise specified. If False will not fit weighted ensemble
+            over models trained with pseudo labeling and models trained without it.
+        fit_ensemble_every_iter: bool, default = False
+            If True fits weighted ensemble model for every iteration of pseudo labeling algorithm. If False
+            and fit_ensemble is True will fit after all pseudo labeling training is done.
+        kwargs: dict
+            If predictor is not already fit, then kwargs are for the functions 'fit' and 'fit_extra':
+            Refer to parameters documentation in :meth:`TabularPredictor.fit`.
+            Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
+            If predictor is fit kwargs are for 'fit_extra':
+            Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
+
+        Returns
+        -------
+        self : TabularPredictor
+            Returns self, which is a Python class of TabularPredictor
+        """
+        if len(pseudo_data) < 1:
+            raise Exception('No pseudo data given')
+
+        if not self._learner.is_fit:
+            if 'train_data' not in kwargs.keys():
+                Exception('Autogluon is required to be fit or given \'train_data\' in order to run \'fit_pseudolabel\'.'
+                          ' Autogluon is not fit and \'train_data\' was not given')
+
+            logger.log(20,
+                       f'Predictor not fit prior to pseudolabeling. Fitting now...')
+            self.fit(**kwargs)
+
+        if self.problem_type is MULTICLASS and self.eval_metric.name != 'accuracy':
+            logger.warning('AutoGluon has detected the problem type as \'multiclass\' and '
+                           f'eval_metric is {self.eval_metric.name}, we recommend using'
+                           f'fit_pseudolabeling when eval metric is \'accuracy\'')
+
+        is_labeled = self.label in pseudo_data.columns
+
+        hyperparameters = kwargs.get('hyperparameters', None)
+        if hyperparameters is None:
+            if self._learner.is_fit:
+                hyperparameters = self.fit_hyperparameters_
+        elif isinstance(hyperparameters, str):
+            hyperparameters = get_hyperparameter_config(hyperparameters)
+
+        kwargs['hyperparameters'] = hyperparameters
+        fit_extra_args = self._get_all_fit_extra_args()
+        fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
+        if is_labeled:
+            logger.log(20, "Fitting predictor using the provided pseudolabeled examples as extra training data...")
+            self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter='')[:-1],
+                           **fit_extra_kwargs)
+
+            if fit_ensemble:
+                logger.log(15, 'Fitting weighted ensemble model using best models')
+                self.fit_weighted_ensemble()
+
+            if return_pred_prob:
+                y_pred_proba = self.predict_proba(pseudo_data)
+                return self, y_pred_proba
+            else:
+                return self
+        else:
+            logger.log(20, 'Given test_data for pseudo labeling did not contain labels. '
+                           'AutoGluon will assign pseudo labels to data and use it for extra training data...')
+            return self._run_pseudolabeling(unlabeled_data=pseudo_data, max_iter=max_iter,
+                                            return_pred_prob=return_pred_prob, use_ensemble=use_ensemble,
+                                            fit_ensemble=fit_ensemble, fit_ensemble_every_iter=fit_ensemble_every_iter,
+                                            **fit_extra_kwargs)
 
     def predict(self, data, model=None, as_pandas=True):
         """
@@ -1404,7 +1744,9 @@ class TabularPredictor:
         return labels_transformed
 
 
-    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000, time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99, silent=False):
+    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000,
+                           time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99,
+                           silent=False):
         """
         Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the data where this feature's values have been randomly shuffled across rows.
@@ -1496,7 +1838,8 @@ class TabularPredictor:
         """
         data = self.__get_dataset(data) if data is not None else data
         if (data is None) and (not self._trainer.is_data_saved):
-            raise AssertionError('No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
+            raise AssertionError(
+                'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
         if data is not None:
             # Avoid crash when indices are duplicated
             data = data.reset_index(drop=True)
@@ -1512,7 +1855,7 @@ class TabularPredictor:
         if include_confidence_band:
             if confidence_level <= 0.5 or confidence_level >= 1.0:
                 raise ValueError("confidence_level must lie between 0.5 and 1.0")
-            ci_str = "{:0.0f}".format(confidence_level*100)
+            ci_str = "{:0.0f}".format(confidence_level * 100)
             import scipy.stats
             num_features = len(fi_df)
             ci_low_dict = dict()
@@ -1531,8 +1874,8 @@ class TabularPredictor:
                     ci_low = mean - t_val * stddev / math.sqrt(n)
                 ci_high_dict[fi.name] = ci_high
                 ci_low_dict[fi.name] = ci_low
-            high_str = 'p'+ci_str+'_high'
-            low_str = 'p'+ci_str+'_low'
+            high_str = 'p' + ci_str + '_high'
+            low_str = 'p' + ci_str + '_low'
             fi_df[high_str] = pd.Series(ci_high_dict)
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
@@ -1845,11 +2188,13 @@ class TabularPredictor:
                                    f'oof_pred = predictor.get_oof_pred(train_data=train_data)\n')
                 else:
                     missing_idx = list(train_data.index.difference(y_pred_proba_oof_transformed.index))
-                    missing_idx_data = train_data.loc[missing_idx]
-                    missing_pred_proba = self.transform_features(data=missing_idx_data, base_models=[model],
-                                                                 return_original_features=False)
-                    y_pred_proba_oof_transformed = pd.concat([y_pred_proba_oof_transformed, missing_pred_proba])
-                    y_pred_proba_oof_transformed = y_pred_proba_oof_transformed.reindex(list(train_data.index))
+
+                    if len(missing_idx) > 0:
+                        missing_idx_data = train_data.loc[missing_idx]
+                        missing_pred_proba = self.transform_features(data=missing_idx_data, base_models=[model],
+                                                                     return_original_features=False)
+                        y_pred_proba_oof_transformed = pd.concat([y_pred_proba_oof_transformed, missing_pred_proba])
+                        y_pred_proba_oof_transformed = y_pred_proba_oof_transformed.reindex(list(train_data.index))
 
         if self.problem_type == MULTICLASS and self._learner.label_cleaner.problem_type_transform == MULTICLASS:
             y_pred_proba_oof_transformed.columns = copy.deepcopy(
@@ -2247,6 +2592,18 @@ class TabularPredictor:
             self._learner.persist_trainer(low_memory=True)
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
+    @classmethod
+    def _load_version_file(cls, path) -> str:
+        version_file_path = path + cls._predictor_version_file_name
+        version = load_str.load(path=version_file_path)
+        return version
+
+    def _save_version_file(self, silent=False):
+        from ..version import __version__
+        version_file_contents = f'{__version__}'
+        version_file_path = self.path + self._predictor_version_file_name
+        save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
+
     def save(self, silent=False):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
@@ -2267,11 +2624,22 @@ class TabularPredictor:
         save_pkl.save(path=path + self.predictor_file_name, object=self)
         self._learner = tmp_learner
         self._trainer = tmp_trainer
+        self._save_version_file(silent=silent)
         if not silent:
             logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None):
+    def _load(cls, path: str):
+        """
+        Inner load method, called in `load`.
+        """
+        predictor: TabularPredictor = load_pkl.load(path=path + cls.predictor_file_name)
+        learner = predictor._learner_type.load(path)
+        predictor._set_post_fit_vars(learner=learner)
+        return predictor
+
+    @classmethod
+    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True):
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -2285,36 +2653,57 @@ class TabularPredictor:
             If None, logging verbosity is not changed from existing values.
             Specify larger values to see more information printed when using Predictor during inference, smaller values to see less information.
             Refer to TabularPredictor init for more information.
+        require_version_match : bool, default = True
+            If True, will raise an AssertionError if the `autogluon.tabular` version of the loaded predictor does not match the installed version of `autogluon.tabular`.
+            If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may run into numerous issues if attempting this.
         """
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")
 
-        path = setup_outputdir(path, warn_if_exist=False)  # replace ~ with absolute path if it exists
-        predictor: TabularPredictor = load_pkl.load(path=path + cls.predictor_file_name)
-        learner = predictor._learner_type.load(path)
-        predictor._set_post_fit_vars(learner=learner)
         try:
             from ..version import __version__
-            version_inference = __version__
+            version_load = __version__
         except:
-            version_inference = None
+            version_load = None
+
+        path = setup_outputdir(path, warn_if_exist=False)  # replace ~ with absolute path if it exists
         try:
-            version_fit = predictor._learner.version
+            version_init = cls._load_version_file(path=path)
         except:
-            version_fit = None
-        if version_fit is None:
-            version_fit = 'Unknown (Likely <=0.0.11)'
-        if version_inference != version_fit:
+            logger.warning(f'WARNING: Could not find version file at "{path + cls._predictor_version_file_name}".\n'
+                           f'This means that the predictor was fit in a version `<=0.3.1`.')
+            version_init = None
+
+        if version_init is None:
+            predictor = cls._load(path=path)
+            try:
+                version_init = predictor._learner.version
+            except:
+                version_init = None
+        else:
+            predictor = None
+        if version_init is None:
+            version_init = 'Unknown (Likely <=0.0.11)'
+        if version_load != version_init:
             logger.warning('')
             logger.warning('############################## WARNING ##############################')
-            logger.warning(
-                'WARNING: AutoGluon version differs from the version used during the original model fit! This may lead to instability and it is highly recommended the model be loaded with the exact AutoGluon version it was fit with.')
-            logger.warning(f'\tFit Version:     {version_fit}')
-            logger.warning(f'\tCurrent Version: {version_inference}')
+            logger.warning('WARNING: AutoGluon version differs from the version used to create the predictor! '
+                           'This may lead to instability and it is highly recommended the predictor be loaded '
+                           'with the exact AutoGluon version it was created with.')
+            logger.warning(f'\tPredictor Version: {version_init}')
+            logger.warning(f'\tCurrent Version:   {version_load}')
             logger.warning('############################## WARNING ##############################')
             logger.warning('')
+            if require_version_match:
+                raise AssertionError(
+                    f'Predictor was created on version {version_init} but is being loaded with version {version_load}. '
+                    f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
+                    f'this error can be bypassed by specifying `require_version_match=False`.')
+
+        if predictor is None:
+            predictor = cls._load(path=path)
 
         return predictor
 
@@ -2333,7 +2722,6 @@ class TabularPredictor:
             raise ValueError(f'Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}')
 
     def _validate_fit_kwargs(self, kwargs):
-
         # TODO:
         #  Valid core_kwargs values:
         #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
@@ -2353,7 +2741,7 @@ class TabularPredictor:
             # other
             feature_generator='auto',
             unlabeled_data=None,
-            _feature_generator_kwargs=None
+            _feature_generator_kwargs=None,
         )
 
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
@@ -2363,8 +2751,17 @@ class TabularPredictor:
 
         return kwargs_sanitized
 
-    def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None):
-        fit_extra_kwargs_default = dict(
+    def _fit_extra_kwargs_dict(self):
+        """
+        Returns:
+        --------
+        dict of fit_extra args:
+            verbosity: Which levels of logger should be printed
+            pseudo_data: pseudo labeled data to be incorporated into train
+                         but not used in validation
+            name_suffix: A suffix string to be added to the individual model names
+        """
+        return dict(
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             num_bag_sets=None,
             num_stack_levels=None,
@@ -2394,7 +2791,17 @@ class TabularPredictor:
 
             # quantile levels
             quantile_levels=None,
+
+            calibrate=False,
+
+            # pseudo label
+            pseudo_data=None,
+
+            name_suffix=None
         )
+
+    def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None):
+        fit_extra_kwargs_default = self._fit_extra_kwargs_dict()
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
         if extra_valid_keys is not None:
@@ -2425,6 +2832,30 @@ class TabularPredictor:
 
         return kwargs_sanitized
 
+    def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool):
+        """
+        Removes certain columns from the provided datasets that do not contain predictive features.
+
+        Parameters
+        ----------
+        train_features : pd.DataFrame
+            The features/columns for the incoming training data
+        other_features : pd.DataFrame
+            Features of other auxiliary data that contains the same covariates as the training data.
+            Examples of this could be: tuning data, pseudo data
+        is_labeled: bool
+            Is other_features dataframe labeled or not
+        """
+        if self.sample_weight is not None:
+            if self.sample_weight in train_features:
+                train_features.remove(self.sample_weight)
+            if self.sample_weight in other_features:
+                other_features.remove(self.sample_weight)
+        if self._learner.groups is not None and is_labeled:
+            train_features.remove(self._learner.groups)
+
+        return train_features, other_features
+
     def _validate_fit_data(self, train_data, tuning_data=None, unlabeled_data=None):
         if isinstance(train_data, str):
             train_data = TabularDataset(train_data)
@@ -2444,15 +2875,13 @@ class TabularPredictor:
             if not isinstance(tuning_data, pd.DataFrame):
                 raise AssertionError(
                     f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
+
+            self._validate_unique_indices(data=tuning_data, name='tuning_data')
             train_features = [column for column in train_data.columns if column != self.label]
             tuning_features = [column for column in tuning_data.columns if column != self.label]
-            if self.sample_weight is not None:
-                if self.sample_weight in train_features:
-                    train_features.remove(self.sample_weight)
-                if self.sample_weight in tuning_features:
-                    tuning_features.remove(self.sample_weight)
-            if self._learner.groups is not None:
-                train_features.remove(self._learner.groups)
+            train_features, tuning_features = self._prune_data_features(train_features=train_features,
+                                                                        other_features=tuning_features,
+                                                                        is_labeled=True)
             train_features = np.array(train_features)
             tuning_features = np.array(tuning_features)
             if np.any(train_features != tuning_features):
@@ -2461,19 +2890,28 @@ class TabularPredictor:
             if not isinstance(unlabeled_data, pd.DataFrame):
                 raise AssertionError(
                     f'unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}')
+
+            self._validate_unique_indices(data=unlabeled_data, name='unlabeled_data')
             train_features = [column for column in train_data.columns if column != self.label]
             unlabeled_features = [column for column in unlabeled_data.columns]
-            if self.sample_weight is not None:
-                if self.sample_weight in train_features:
-                    train_features.remove(self.sample_weight)
-                if self.sample_weight in unlabeled_features:
-                    unlabeled_features.remove(self.sample_weight)
+            train_features, unlabeled_features = self._prune_data_features(train_features=train_features,
+                                                                           other_features=unlabeled_features,
+                                                                           is_labeled=False)
             train_features = sorted(np.array(train_features))
             unlabeled_features = sorted(np.array(unlabeled_features))
             if np.any(train_features != unlabeled_features):
                 raise ValueError("Column names must match between training and unlabeled data.\n"
                                  "Unlabeled data must have not the label column specified in it.\n")
         return train_data, tuning_data, unlabeled_data
+
+    @staticmethod
+    def _validate_unique_indices(data, name: str):
+        is_duplicate_index = data.index.duplicated(keep=False)
+        if is_duplicate_index.any():
+            duplicate_count = is_duplicate_index.sum()
+            raise AssertionError(f'{name} contains {duplicate_count} duplicated indices. '
+                                 'Please ensure DataFrame indices are unique.\n'
+                                 f'\tYou can identify the indices which are duplicated via `{name}.index.duplicated(keep=False)`')
 
     def _set_feature_generator(self, feature_generator='auto', feature_metadata=None, init_kwargs=None):
         if self._learner.feature_generator is not None:

@@ -397,7 +397,8 @@ class AbstractTrainer:
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
-    def stack_new_level_aux(self, X, y, base_model_names: List[str], level, fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
+    def stack_new_level_aux(self, X, y, base_model_names: List[str], level,
+                            fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
@@ -408,7 +409,10 @@ class AbstractTrainer:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
-        return self.generate_weighted_ensemble(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
+        return self.generate_weighted_ensemble(X=X_stack_preds, y=y,
+                                               level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1,
+                                               stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix,
+                                               get_models_func=get_models_func, check_if_best=check_if_best)
 
     def predict(self, X, model=None):
         if model is None:
@@ -942,6 +946,8 @@ class AbstractTrainer:
             The model will be accessible and usable through any Trainer function that takes as input 'model' or 'model_name'.
         Note: self._train_and_save should not be used outside of self._train_single_full
         """
+        X_pseudo = model_fit_kwargs.get('X_pseudo', None)
+        y_pseudo = model_fit_kwargs.get('y_pseudo', None)
         fit_start_time = time.time()
         time_limit = model_fit_kwargs.get('time_limit', None)
         model_names_trained = []
@@ -957,7 +963,20 @@ class AbstractTrainer:
                     time_left_total = time_limit
                 fit_log_message += f' Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
             logger.log(20, fit_log_message)
-            model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
+
+            # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
+            # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
+            # is required
+            if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
+                X_w_pseudo = pd.concat([X, X_pseudo])
+                y_w_pseudo = pd.concat([y, y_pseudo])
+                model_fit_kwargs.pop('X_pseudo')
+                model_fit_kwargs.pop('y_pseudo')
+                logger.log(15, f'{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}')
+                model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
+            else:
+                model = self._train_single(X, y, model, X_val, y_val, **model_fit_kwargs)
+
             fit_end_time = time.time()
             if self.weight_evaluation:
                 w = model_fit_kwargs.get('sample_weight', None)
@@ -1086,9 +1105,9 @@ class AbstractTrainer:
         return True
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
-    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None,
-                           hyperparameter_tune_kwargs=None, stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None,
-                           n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
+    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, X_pseudo=None, y_pseudo=None,
+                           feature_prune=False, hyperparameter_tune_kwargs=None,
+                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1096,7 +1115,6 @@ class AbstractTrainer:
         """
         model_fit_kwargs = self._get_model_fit_kwargs(X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs,
                                                       ens_sample_weight=kwargs.get('ens_sample_weight', None))
-
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
@@ -1128,6 +1146,10 @@ class AbstractTrainer:
                     if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
                         model_names_trained.append(model_hpo.name)
         else:
+            model_fit_kwargs.update(dict(
+                X_pseudo=X_pseudo,
+                y_pseudo=y_pseudo
+            ))
             if isinstance(model, BaggedEnsembleModel):
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start)
                 model_fit_kwargs.update(bagged_model_fit_kwargs)

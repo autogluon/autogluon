@@ -8,7 +8,6 @@ __all__ = ['DistributedResourceManager', 'NodeResourceManager']
 logger = logging.getLogger(__name__)
 
 class DistributedResourceManager(object):
-    LOCK = mp.Lock()
     REQUESTING_STACK = []
     MAX_CPU_COUNT = 0
     MAX_GPU_COUNT = 0
@@ -31,8 +30,10 @@ class DistributedResourceManager(object):
 
     @classmethod
     def reserve_resource(cls, remote, resource):
+        # Lazy import
+        from ...locks import DistributedResourceManagerLock
         node_manager = cls.NODE_RESOURCE_MANAGER[remote]
-        with cls.LOCK:
+        with DistributedResourceManagerLock.LOCK:
             if not node_manager.check_availability(resource):
                 return False
             node_manager._request(remote, resource)
@@ -55,12 +56,14 @@ class DistributedResourceManager(object):
         """ResourceManager, we recommand using scheduler instead of creating your own
         resource manager.
         """
+        from ...locks import DistributedResourceManagerLock
+
         assert cls.check_possible(resource), \
             'Requested num_cpu={} and num_gpu={} should be less than or equal to' + \
             'largest node availability CPUs={}, GPUs={}'. \
             format(resource.num_cpus, resource.num_gpus, cls.MAX_GPU_COUNT, cls.MAX_CPU_COUNT)
        
-        with cls.LOCK:
+        with DistributedResourceManagerLock.LOCK:
             node = cls.check_availability(resource)
             if node is not None:
                 cls.NODE_RESOURCE_MANAGER[node]._request(node, resource)
@@ -68,7 +71,7 @@ class DistributedResourceManager(object):
 
         logger.debug('Appending {} to Request Stack'.format(resource))
         request_semaphore = mp.Semaphore(0)
-        with cls.LOCK:
+        with DistributedResourceManagerLock.LOCK:
             cls.REQUESTING_STACK.append((resource, request_semaphore))
         request_semaphore.acquire()
         return
@@ -81,8 +84,9 @@ class DistributedResourceManager(object):
 
     @classmethod
     def _evoke_request(cls):
+        from ...locks import DistributedResourceManagerLock
         succeed = False
-        with cls.LOCK:
+        with DistributedResourceManagerLock.LOCK:
             if len(cls.REQUESTING_STACK) > 0:
                 resource, request_semaphore = cls.REQUESTING_STACK.pop()
                 node = cls.check_availability(resource)
