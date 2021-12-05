@@ -127,6 +127,8 @@ class BaggedEnsembleModel(AbstractModel):
              y,
              X_val=None,
              y_val=None,
+             X_pseudo=None,
+             y_pseudo=None,
              k_fold=None,
              k_fold_start=0,
              k_fold_end=None,
@@ -185,7 +187,8 @@ class BaggedEnsembleModel(AbstractModel):
                     folds_to_fit = fold_end - fold_start
                     # Reserve time for final refit model
                     kwargs['time_limit'] = kwargs['time_limit'] * folds_to_fit / (folds_to_fit + 1.2)
-            self._fit_folds(X=X, y=y, model_base=model_base, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end,
+            self._fit_folds(X=X, y=y, model_base=model_base, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
+                            k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end,
                             n_repeats=n_repeats, n_repeat_start=n_repeat_start, save_folds=save_bag_folds, groups=groups, **kwargs)
             # FIXME: Don't save folds except for refit
             # FIXME: Cleanup self
@@ -246,6 +249,9 @@ class BaggedEnsembleModel(AbstractModel):
             model = self.load_child(model)
             pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
+
+        if self.temperature_scalar is not None:
+            pred_proba = self._apply_temperature_scaling(pred_proba)
 
         return pred_proba
 
@@ -330,6 +336,8 @@ class BaggedEnsembleModel(AbstractModel):
                    X,
                    y,
                    model_base,
+                   X_pseudo=None,
+                   y_pseudo=None,
                    k_fold=None,
                    k_fold_start=0,
                    k_fold_end=None,
@@ -352,40 +360,38 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold = cv_splitter.n_splits
         if k_fold_end is None:
             k_fold_end = k_fold
-        kfolds = cv_splitter.split(X=X, y=y)
+        if cv_splitter.n_repeats < n_repeats:
+            # If current cv_splitter doesn't have enough n_repeats for all folds, then create a new one.
+            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups)
+
+        fold_fit_args_list, n_repeats_started, n_repeats_finished = self._generate_fold_configs(
+            X=X,
+            y=y,
+            cv_splitter=cv_splitter,
+            k_fold_start=k_fold_start,
+            k_fold_end=k_fold_end,
+            n_repeat_start=n_repeat_start,
+            n_repeat_end=n_repeats,
+        )
+
+        fold_fit_args_list = [dict(model_base=model_base, fold_ctx=fold_ctx, kwargs=kwargs) for fold_ctx in fold_fit_args_list]
+
+        logger.log(20, f'\tFitting {len(fold_fit_args_list)} child models '
+                       f'({fold_fit_args_list[0]["fold_ctx"]["model_name_suffix"]} - {fold_fit_args_list[-1]["fold_ctx"]["model_name_suffix"]})')
 
         oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
-
         models = []
-        fold_start = n_repeat_start * k_fold + k_fold_start
-        fold_end = (n_repeats - 1) * k_fold + k_fold_end
-        folds_to_fit = fold_end - fold_start
+
         # noinspection PyCallingNonCallable
         fold_fitting_strategy: AbstractFoldFittingStrategy = fold_fitting_strategy(
-            self, X, y, sample_weight, time_limit, time_start, models, oof_pred_proba, oof_pred_model_repeats, save_folds=save_folds)
-        for j in range(n_repeat_start, n_repeats):  # For each n_repeat
-            if j != n_repeat_start or k_fold_start == 0:
-                self._cv_splitters.append(cv_splitter)
-            cur_repeat_count = j - n_repeat_start
-            fold_start_n_repeat = fold_start + cur_repeat_count * k_fold
-            fold_end_n_repeat = min(fold_start_n_repeat + k_fold, fold_end)
-
-            for i in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
-                fold_num_in_repeat = i - (j * k_fold)  # The fold in the current repeat set (first fold in set = 0)
-
-                fold_ctx = dict(
-                    model_name_suffix=f'S{j + 1}F{fold_num_in_repeat + 1}',  # S5F3 = 3rd fold of the 5th repeat set
-                    fold=kfolds[i],
-                    is_last_fold=i != (fold_end - 1),
-                    folds_to_fit=folds_to_fit,
-                    folds_finished=i - fold_start,
-                    folds_left=fold_end - i,
-                )
-
-                fold_fitting_strategy.schedule_fold_model_fit(model_base, fold_ctx, kwargs)
-            if (fold_end_n_repeat != fold_end) or (k_fold == k_fold_end):
-                self._k_per_n_repeat.append(k_fold)
+            bagged_ensemble_model=self, X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, sample_weight=sample_weight,
+            time_limit=time_limit, time_start=time_start, models=models,
+            oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats,
+            save_folds=save_folds)
+        for fold_fit_args in fold_fit_args_list:
+            fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
+
         self.models += models
 
         self._bagged_mode = True
@@ -397,6 +403,8 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_proba += oof_pred_proba
             self._oof_pred_model_repeats += oof_pred_model_repeats
 
+        self._cv_splitters += [cv_splitter for _ in range(n_repeats_started)]
+        self._k_per_n_repeat += [k_fold for _ in range(n_repeats_finished)]
         self._n_repeats = n_repeats
         if k_fold == k_fold_end:
             self._k = None
@@ -406,6 +414,60 @@ class BaggedEnsembleModel(AbstractModel):
             self._k = k_fold
             self._k_fold_end = k_fold_end
             self._n_repeats_finished = self._n_repeats - 1
+
+    @staticmethod
+    def _generate_fold_configs(*,
+                               X,
+                               y,
+                               cv_splitter,
+                               k_fold_start,
+                               k_fold_end,
+                               n_repeat_start,
+                               n_repeat_end) -> (list, int, int):
+        """
+        Generates fold configs given a cv_splitter, k_fold start-end and n_repeat start-end.
+        Fold configs are used by inheritors of AbstractFoldFittingStrategy when fitting fold models.
+
+        Returns a list of fold configs, the number of started repeats, and the number of finished repeats.
+        """
+        k_fold = cv_splitter.n_splits
+        kfolds = cv_splitter.split(X=X, y=y)
+
+        fold_start = n_repeat_start * k_fold + k_fold_start
+        fold_end = (n_repeat_end - 1) * k_fold + k_fold_end
+        folds_to_fit = fold_end - fold_start
+
+        fold_fit_args_list = []
+        n_repeats_started = 0
+        n_repeats_finished = 0
+        for repeat in range(n_repeat_start, n_repeat_end):  # For each repeat
+            is_first_set = repeat == n_repeat_start
+            is_last_set = repeat == (n_repeat_end - 1)
+            if (not is_first_set) or (k_fold_start == 0):
+                n_repeats_started += 1
+
+            fold_in_set_start = k_fold_start if repeat == n_repeat_start else 0
+            fold_in_set_end = k_fold_end if is_last_set else k_fold
+
+            for fold_in_set in range(fold_in_set_start, fold_in_set_end):  # For each fold
+                fold = fold_in_set + (repeat * k_fold)
+
+                fold_ctx = dict(
+                    model_name_suffix=f'S{repeat + 1}F{fold_in_set + 1}',  # S5F3 = 3rd fold of the 5th repeat set
+                    fold=kfolds[fold],
+                    is_last_fold=fold == (fold_end - 1),
+                    folds_to_fit=folds_to_fit,
+                    folds_finished=fold - fold_start,
+                    folds_left=fold_end - fold,
+                )
+
+                fold_fit_args_list.append(fold_ctx)
+            if fold_in_set_end == k_fold:
+                n_repeats_finished += 1
+
+        assert len(fold_fit_args_list) == folds_to_fit, "fold_fit_args_list is not the expected length!"
+
+        return fold_fit_args_list, n_repeats_started, n_repeats_finished
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)

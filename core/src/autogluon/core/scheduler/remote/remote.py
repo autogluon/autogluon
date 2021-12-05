@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 _global_remote_services = weakref.WeakValueDictionary()
 _global_service_index = [0]
 
+
 def _get_global_remote_service():
     L = sorted(list(_global_remote_services), reverse=True)
     for k in L:
@@ -30,10 +31,12 @@ def _get_global_remote_service():
     del L
     return None
 
+
 def _set_global_remote_service(c):
     if c is not None:
         _global_remote_services[_global_service_index[0]] = c
         _global_service_index[0] += 1
+
 
 def _close_global_remote_services():
     """
@@ -44,6 +47,7 @@ def _close_global_remote_services():
     if c is not None:
         c.shutdown()
 
+
 class Service(object):
     def __init__(self, proc):
         self.proc = proc
@@ -52,16 +56,19 @@ class Service(object):
     def shutdown(self):
         os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
 
+
 def start_service(remote_ip, port):
     cmd = ['agremote', '--address', remote_ip, '--port', str(port)]
     proc = subprocess.Popen(cmd)
     return Service(proc)
 
+
 class Remote(Client):
-    LOCK = mp.Lock()
-    REMOTE_ID = mp.Value('i', 0)
     def __init__(self, remote_ip=None, port=None, local=False, ssh_username=None,
             ssh_port=22, ssh_private_key=None, remote_python=None, timeout=60):
+        # Lazy import
+        from ...locks import RemoteLock
+
         self.service = None
         if local:
             super().__init__(processes=False)
@@ -70,9 +77,9 @@ class Remote(Client):
             self.service = start_service(remote_ip, port)
             _set_global_remote_service(self.service)
             super().__init__(remote_addr, timeout=timeout)
-        with Remote.LOCK:
-            self.remote_id = Remote.REMOTE_ID.value
-            Remote.REMOTE_ID.value += 1
+        with RemoteLock.LOCK:
+            self.remote_id = RemoteLock.REMOTE_ID.value
+            RemoteLock.REMOTE_ID.value += 1
 
     def close(self, timeout=2):
         if self.service:

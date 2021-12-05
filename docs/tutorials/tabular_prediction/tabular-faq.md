@@ -89,13 +89,12 @@ predictor.positive_class
 
 The positive class can also be retrieved via `predictor.class_labels[-1]`. The output of `predict_proba(as_multiclass=False)` for binary classification is the probability of the positive class.
 
+
 ### How can I use AutoGluon for interpretability?
 
 See ["Interpretability (feature importance)" in the In Depth Tutorial](tabular-indepth.html#interpretability-feature-importance), which allows you to quantify how much each feature contributes to AutoGluon's predictive accuracy.
 
-Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/slundberg/shap/). Notebooks demonstrating this are provided at: [https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret](https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret). Handling of multiclass classification tasks and data with categorical features are demonstrated in the notebook "SHAP with AutoGluon-Tabular and Categorical Features" contained in this folder.
-
-
+Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/slundberg/shap/). Notebooks demonstrating this are provided at: [https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret](https://github.com/awslabs/autogluon/tree/master/examples/tabular/interpret). We recommend starting with the notebook "SHAP with AutoGluon-Tabular" contained in this folder, which demonstrates handling of multiclass classification tasks and data with categorical features.
 
 
 ### How can I perform inference on a file that won't fit in memory?
