@@ -13,19 +13,6 @@ Tutorials to hyperparameter-tune any custom models or Python code.
       searchable.
 
    .. card::
-      :title: Search Algorithms
-      :link: algorithm.html
-
-      How to use AutoGluon's built-in hyperparameter search algorithms, 
-      including early-stopping strategies.
-
-   .. card::
-      :title: Searchable Objects
-      :link: object.html
-
-      Tune the hyperparameters of custom objects such as your own: neural network, optimizer, dataset, etc.
-
-   .. card::
       :title: Distributed Search
       :link: distributed.html
 
@@ -42,8 +29,6 @@ Tutorials to hyperparameter-tune any custom models or Python code.
    :hidden:
 
    core
-   algorithm
-   object
    script
    distributed
    fairbo

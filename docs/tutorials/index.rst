@@ -152,13 +152,6 @@ Tune Custom Models
       objects used to tune any training function's argument-values.
 
    .. card::
-      :title: Search Algorithms
-      :link: course/algorithm.html
-
-      Use AutoGluon's search algorithms to tune
-      arbitrary models/training-scripts.
-
-   .. card::
       :title: Distributed Search Tutorial
       :link: course/distributed.html
 
