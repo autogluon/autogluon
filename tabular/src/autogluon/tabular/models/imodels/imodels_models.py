@@ -2,12 +2,11 @@ from abc import abstractmethod
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
+
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.try_import import try_import_imodels
-from autogluon.features.generators import LabelEncoderFeatureGenerator
-from autogluon.tabular.models.lr.lr_preprocessing_utils import OheFeaturesGenerator
-from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
-from autogluon.tabular.models.lr.hyperparameters.parameters import get_param_baseline, INCLUDE, IGNORE, ONLY, _get_solver, preprocess_params_set
+
 
 class IModelsModel(AbstractModel):
     def __init__(self, **kwargs):
@@ -20,35 +19,24 @@ class IModelsModel(AbstractModel):
 
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
-
         if is_train:
-            categorical_featnames = self._feature_metadata.get_features(valid_raw_types=['category'])
-            self._feature_generator = OheFeaturesGenerator(cats_cols=categorical_featnames)
-            self._feature_generator.fit(X=X)
-        if self._feature_generator is not None:
-            X = X.fillna(0)
-            X = self._feature_generator.transform(X=X)
-        feature_names = self._feature_generator._feature_names
-        return pd.DataFrame(X.toarray().astype(np.float32), columns=feature_names)
+            self._categorical_featnames = self._feature_metadata.get_features(valid_raw_types=['category'])
+            self._other_featnames = self._feature_metadata.get_features(invalid_raw_types=['category'])
+            if self._categorical_featnames:
+                self._ohe = OneHotEncoder(dtype=np.uint8, handle_unknown='ignore')
+                self._ohe.fit(X=X[self._categorical_featnames])
+                self._ohe_columns = self._ohe.get_feature_names_out()
 
-    def _get_types_of_features(self, df):
-        """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
-            Each value is a list of feature-names corresponding to columns in original dataframe.
-            TODO: ensure features with zero variance have already been removed before this function is called.
-        """
-        feature_types = self._feature_metadata.get_type_group_map_raw()
+        if self._ohe is not None:
+            X_index = X.index
+            X_ohe = self._ohe.transform(X[self._categorical_featnames])
+            X_ohe = pd.DataFrame.sparse.from_spmatrix(X_ohe, columns=self._ohe_columns, index=X_index)
+            if self._other_featnames:
+                X = pd.concat([X[self._other_featnames], X_ohe], axis=1)
+            else:
+                X = X_ohe
 
-        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
-        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
-        language_featnames = []  # TODO: Disabled currently, have to pass raw text data features here to function properly
-        valid_features = categorical_featnames + continuous_featnames + language_featnames
-        if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
-            unknown_features = [feature for feature in df.columns if feature not in valid_features]
-            df = df.drop(columns=unknown_features)
-        self._features_internal = list(df.columns)  # FIXME: Don't edit _features_internal
-        return {'categorical': categorical_featnames}
-        # types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'language': []}
-        # return self._select_features(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
+        return X.fillna(0)
 
     def _fit(self,
              X: pd.DataFrame,  # training data
