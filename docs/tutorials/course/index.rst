@@ -13,35 +13,10 @@ Tutorials to hyperparameter-tune any custom models or Python code.
       searchable.
 
    .. card::
-      :title: Search Algorithms
-      :link: algorithm.html
-
-      How to use AutoGluon's built-in hyperparameter search algorithms, 
-      including early-stopping strategies.
-
-   .. card::
-      :title: Searchable Objects
-      :link: object.html
-
-      Tune the hyperparameters of custom objects such as your own: neural network, optimizer, dataset, etc.
-
-   .. card::
-      :title: Tune Training Scripts
-      :link: script.html
-
-      Tune the argument values (hyperparameters) of arbitrary Python scripts using AutoGluon.
-
-   .. card::
       :title: Distributed Search
       :link: distributed.html
 
       Easily distribute the hyperparameter search across multiple machines to improve efficiency.
-   
-   .. card::
-      :title: Example: Tune a Multi-Layer Perceptron
-      :link: mlp.html
-
-      Complete example of using AutoGluon's state-of-the-art hyperparameter optimization to tune a basic MLP model.
 
    .. card::
       :title: Fair Bayesian Optimization
@@ -54,9 +29,6 @@ Tutorials to hyperparameter-tune any custom models or Python code.
    :hidden:
 
    core
-   algorithm
-   object
    script
    distributed
-   mlp
    fairbo

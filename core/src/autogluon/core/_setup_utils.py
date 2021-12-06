@@ -29,7 +29,6 @@ DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDE
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
 DOCS_PACKAGES = []
 TEST_PACKAGES = [
-    'openml',
     'flake8',
     'pytest',
 ]

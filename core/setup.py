@@ -38,17 +38,11 @@ install_requires = [
     'dill>=0.3.3,<1.0',
 ]
 
-extras_require = {
-    'extra_searchers': [
-        'scikit-optimize',  # Optional due to only being rarely used and due to breaking install in the past
-    ],
-}
+extras_require = {}
 
 tests_require = [
     'pytest',
 ]
-for extra_package in ['extra_searchers']:
-    tests_require += extras_require[extra_package]
 tests_require = list(set(tests_require))
 extras_require['tests'] = tests_require
 
