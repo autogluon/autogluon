@@ -230,7 +230,8 @@ class NNFastAiTabularModel(AbstractModel):
             loss_func = HuberPinballLoss(self.quantile_levels, alpha=self.params['alpha'])
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-        dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
+
+        dls = data.dataloaders(bs=self._get_bs(X))
 
         if self.problem_type == QUANTILE:
             dls.c = len(self.quantile_levels)
@@ -284,6 +285,14 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.path = original_path
 
             self.params_trained['best_epoch'] = save_callback.best_epoch
+
+    def _get_bs(self, X):
+        if self.params['bs'] == 'adaptive':
+            bs = 512 if len(X) >= 200000 else 256
+        else:
+            bs = self.params['bs']
+        bs = bs if len(X) > bs else len(X)
+        return bs
 
     def _generate_datasets(self, X, y, X_val, y_val):
         df_train = pd.concat([X, X_val], ignore_index=True)

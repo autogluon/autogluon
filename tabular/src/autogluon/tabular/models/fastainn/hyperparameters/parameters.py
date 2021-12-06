@@ -22,16 +22,16 @@ def get_param_multiclass_baseline():
         'layers': None,  # layers configuration; None - use model's heuristics
         'emb_drop': 0.1,  # embedding layers dropout
         'ps': 0.1,  # linear layers dropout
-        'bs': 256,  # batch size
+        'bs': 'adaptive',  # batch size
 
         # maximum learning rate for one cycle policy https://docs.fast.ai/train.html#fit_one_cycle
         # One-cycle policy paper: https://arxiv.org/abs/1803.09820
         'lr': 1e-2,
-        'epochs': 30,  # maximum number of epochs
+        'epochs': 16,  # maximum number of epochs
 
         # Early stopping settings. See more details here: https://docs.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
         'early.stopping.min_delta': 0.0001,
-        'early.stopping.patience': 20,
+        'early.stopping.patience': 5,
 
         # If > 0, then use LabelSmoothingCrossEntropy loss function for binary/multi-class classification;
         # otherwise use default loss function for this type of problem
