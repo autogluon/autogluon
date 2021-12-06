@@ -1,9 +1,10 @@
 import itertools
 import pytest
 
-from autogluon.core.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.feature_metadata import FeatureMetadata
 
 
+# TODO: This test should technically be in autogluon.common, but currently exists in autogluon.features to avoid code duplication of the data_helper code
 def test_feature_metadata(data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()

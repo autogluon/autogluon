@@ -56,7 +56,7 @@ identity_feature_generator = IdentityFeatureGenerator(features_in=['age', 'workc
 X_transform = identity_feature_generator.fit_transform(X=X, verbosity=3)
 print(X_transform.head(5))  # Now the output only contains the two features we declared in the input arguments to the generator, acting as a feature filter.
 
-from autogluon.core.features.types import R_INT
+from autogluon.common.features.types import R_INT
 identity_feature_generator = IdentityFeatureGenerator(infer_features_in_args={'valid_raw_types': [R_INT]}, verbosity=3)  # Limit the valid input to only integer features.
 X_transform = identity_feature_generator.fit_transform(X=X)
 print(X_transform.head(5))  # Now the output only contains the int type features, acting as a type filter.

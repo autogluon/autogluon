@@ -25,7 +25,7 @@ class FeatureMetadata:
         Dictionary of special types to lists of feature names.
         The keys can be anything, but it is generally recommended they be one of:
             ['binned', 'datetime_as_int', 'datetime_as_object', 'text', 'text_as_category', 'text_special', 'text_ngram', 'image_path', 'stack']
-        For descriptions of each special feature-type, see: `autogluon.core.features.types`
+        For descriptions of each special feature-type, see: `autogluon.common.features.types`
         Feature names that appear in the value lists must also be keys in type_map_raw.
         Feature names are not required to have special types.
         Only one of type_group_map_special and type_map_special can be specified.
@@ -216,7 +216,7 @@ class FeatureMetadata:
 
         Examples
         --------
-        >>> from autogluon.core.features.feature_metadata import FeatureMetadata
+        >>> from autogluon.common.features.feature_metadata import FeatureMetadata
         >>> feature_metadata = FeatureMetadata({'FeatureA': 'int', 'FeatureB': 'object'})
         >>> feature_metadata = feature_metadata.add_special_types({'FeatureA': ['MySpecialType'], 'FeatureB': ['MySpecialType', 'text']})
         """

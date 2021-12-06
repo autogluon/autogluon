@@ -10,7 +10,12 @@ python3 -m pip uninstall -y autogluon.tabular
 python3 -m pip uninstall -y autogluon.forecasting
 python3 -m pip uninstall -y autogluon.features
 python3 -m pip uninstall -y autogluon.core
+python3 -m pip uninstall -y autogluon.common
 python3 -m pip uninstall -y autogluon-contrib-nlp
+
+cd common/
+python3 -m pip install -e .
+cd ..
 
 cd core/
 python3 -m pip install -e .

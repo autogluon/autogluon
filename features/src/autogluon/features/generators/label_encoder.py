@@ -3,7 +3,7 @@ import logging
 
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_CATEGORY, S_TEXT_AS_CATEGORY
+from autogluon.common.features.types import R_CATEGORY, S_TEXT_AS_CATEGORY
 
 from .abstract import AbstractFeatureGenerator
 

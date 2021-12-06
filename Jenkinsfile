@@ -39,11 +39,17 @@ cleanup_venv = """
     rm -rf venv
 """
 
+install_common = """
+    python3 -m pip install --upgrade -e common/[tests]
+"""
+
 install_core = """
+    ${install_common}
     python3 -m pip install --upgrade -e core/
 """
 
 install_core_tests = """
+    ${install_common}
     python3 -m pip install --upgrade -e core/[tests]
 """
 
@@ -71,8 +77,35 @@ install_forecasting = """
     python3 -m pip install --upgrade -e forecasting/
 """
 
+install_autogluon = """
+    python3 -m pip install --upgrade -e autogluon/
+"""
+
 stage("Unit Test") {
-  parallel 'core': {
+  parallel 'common': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-common-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon-common-py3-v3 -f docs/build.yml
+          conda activate autogluon-common-py3-v3
+          conda list
+          ${setup_pip_venv}
+          env
+
+          ${install_common}
+          cd common/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
+          """
+        }
+      }
+    }
+  },
+  'core': {
     node('linux-cpu') {
       ws('workspace/autogluon-core-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
@@ -112,10 +145,9 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../features/
-          python3 -m pip install --upgrade -e .
+          ${install_common}
+          ${install_features}
+          cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -203,14 +235,13 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../vision/
-          python3 -m pip install --upgrade -e .
+          ${install_core}
+          ${install_vision}
 
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
 
+          cd vision/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -260,23 +291,18 @@ stage("Unit Test") {
           python3 -m pip install 'mxnet==1.7.0.*'
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../features/
-          python3 -m pip install --upgrade -e .
-          cd ../tabular/
+          ${install_core}
+          ${install_features}
+          ${install_tabular_all}
+
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          python3 -m pip install --upgrade -e .[all]
-          cd ../text/
-          python3 -m pip install --upgrade -e .
-          cd ../vision/
-          python3 -m pip install --upgrade -e .
-          cd ../forecasting/
-          python3 -m pip install --upgrade -e .
-          cd ../autogluon/
-          python3 -m pip install --upgrade -e .
-          cd ..
+
+          ${install_text}
+          ${install_vision}
+          ${install_forecasting}
+          ${install_autogluon}
+
           ${cleanup_venv}
           """
         }
@@ -578,33 +604,13 @@ stage("Build Docs") {
         python3 -m pip install 'docutils<0.16'
         python3 -m pip list
 
-        cd core/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd features/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd tabular/
-        python3 -m pip install --upgrade -e .[all]
-        cd ..
-
-        cd text/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd vision/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd forecasting/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd autogluon/
-        python3 -m pip install --upgrade -e .
-        cd ..
+        ${install_core}
+        ${install_features}
+        ${install_tabular_all}
+        ${install_text}
+        ${install_vision}
+        ${install_forecasting}
+        ${install_autogluon}
 
         sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini

@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
-from autogluon.core.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.loaders import load_pkl
 

@@ -2,14 +2,13 @@ import logging
 import re
 
 import numpy as np
-from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
+from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 from autogluon.core.constants import BINARY, REGRESSION
-from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
 from .hyperparameters.parameters import get_param_baseline, INCLUDE, IGNORE, ONLY, _get_solver, preprocess_params_set
 from .hyperparameters.searchspaces import get_default_searchspace

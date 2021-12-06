@@ -17,7 +17,6 @@ import uuid
 from typing import Tuple
 from packaging import version as py_version
 
-
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils import set_logger_verbosity
 from sklearn.preprocessing import LabelEncoder
@@ -31,6 +30,7 @@ from autogluon_contrib_nlp.utils.misc import grouper, \
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 
+from autogluon.common.utils.multiprocessing_utils import force_forkserver
 from autogluon.core import args, space
 from autogluon.core.utils import in_ipynb, verbosity2loglevel
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count_mxnet
@@ -38,7 +38,6 @@ from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
 from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric, Scorer
-from autogluon.core.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.decorator import sample_config
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION

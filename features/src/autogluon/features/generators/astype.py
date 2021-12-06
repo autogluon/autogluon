@@ -1,12 +1,11 @@
-import copy
 import logging
 
 import numpy as np
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_INT, S_BOOL
-from autogluon.core.features.feature_metadata import FeatureMetadata
-from autogluon.core.features.infer_types import get_type_map_raw, get_type_map_real, get_bool_true_val
+from autogluon.common.features.types import R_INT, S_BOOL
+from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.infer_types import get_type_map_raw, get_type_map_real, get_bool_true_val
 
 from .abstract import AbstractFeatureGenerator
 

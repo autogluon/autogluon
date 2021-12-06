@@ -2,7 +2,7 @@
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY
+from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY
 from autogluon.features.generators import PipelineFeatureGenerator, IdentityFeatureGenerator, CategoryFeatureGenerator, DatetimeFeatureGenerator, TextSpecialFeatureGenerator, TextNgramFeatureGenerator
 
 

@@ -1,8 +1,7 @@
 import io, logging, pickle, boto3
 
 from ..loaders import load_pointer
-from ...utils import s3_utils
-from ...utils import compression_utils
+from ..utils import compression_utils, s3_utils
 
 logger = logging.getLogger(__name__)
 

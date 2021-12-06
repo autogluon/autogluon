@@ -2,7 +2,7 @@ import multiprocessing, os, boto3, json, logging
 from io import StringIO
 import numpy as np
 
-from ...utils import s3_utils, multiprocessing_utils
+from ..utils import s3_utils, multiprocessing_utils
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 
 from autogluon.features.generators import IdentityFeatureGenerator
-from autogluon.core.features.types import R_INT, R_FLOAT
+from autogluon.common.features.types import R_INT, R_FLOAT
 
 
 def test_identity_feature_generator(generator_helper, data_helper):

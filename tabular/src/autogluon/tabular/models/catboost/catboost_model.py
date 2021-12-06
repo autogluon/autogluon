@@ -4,8 +4,8 @@ import time
 import psutil
 import numpy as np
 
+from autogluon.common.features.types import R_OBJECT
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
-from autogluon.core.features.types import R_OBJECT
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
