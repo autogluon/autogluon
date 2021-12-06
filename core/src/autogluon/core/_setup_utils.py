@@ -19,6 +19,7 @@ DEPENDENT_PACKAGES = {
     'pandas': '>=1.0.0,<2.0',
     'scikit-learn': '>=1.0.0,<1.1',
     'scipy': '>=1.5.4,<1.7',
+    'psutil': '>=5.7.3,<5.9',  # TODO: Consider capping to <6.0 instead, capping to 5.9 to avoid possible issues.
     'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
     'Pillow': '>=8.3.2,<8.4.0',
