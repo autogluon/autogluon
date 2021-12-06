@@ -174,6 +174,7 @@ def try_import_rapids_cuml():
                           "RAPIDS is highly experimental within AutoGluon, and we recommend to only use RAPIDS if you are an advanced user / developer.\n"
                           "Please refer to RAPIDS install instructions for more information: https://rapids.ai/start.html#get-rapids")
 
+
 def try_import_imodels():
     try:
         import imodels

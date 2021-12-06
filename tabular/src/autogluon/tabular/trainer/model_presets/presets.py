@@ -10,7 +10,7 @@ from autogluon.core.trainer.utils import process_hyperparameters
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel, \
-    RuleFitModel, GreedyTreeModel, CorelsRuleListModel, GlobalSparseTreeModel, BoostedRulesModel
+    RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -80,8 +80,8 @@ MODEL_TYPES = dict(
     # interpretable models
     RULEFIT=RuleFitModel,
     GREEDYTREE=GreedyTreeModel,
-    RULELIST=CorelsRuleListModel,
-    OPTIMALTREE=GlobalSparseTreeModel,
+    RULELIST=OptimalRuleListModel,
+    OPTIMALTREE=OptimalTreeModel,
     BOOSTEDRULES=BoostedRulesModel,
 )
 
@@ -107,8 +107,8 @@ DEFAULT_MODEL_NAMES = {
     # Interpretable models
     RuleFitModel: 'RuleFit',
     GreedyTreeModel: 'GreedyTree',
-    CorelsRuleListModel: 'RuleList',
-    GlobalSparseTreeModel: 'OptimalTree',
+    OptimalRuleListModel: 'OptimalRuleList',
+    OptimalTreeModel: 'OptimalTree',
     BoostedRulesModel: 'BoostedRules',
 }
 

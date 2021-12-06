@@ -23,10 +23,9 @@ class IModelsModel(AbstractModel):
 
         if is_train:
             categorical_featnames = self._get_types_of_features(X)
-            self._feature_generator = OheFeaturesGenerator(cats_cols=categorical_featnames['categorical']) # LabelEncoderFeatureGenerator(verbosity=0)
+            self._feature_generator = OheFeaturesGenerator(cats_cols=categorical_featnames['categorical'])
             self._feature_generator.fit(X=X)
         if self._feature_generator is not None:
-            X = X.copy()
             X = X.fillna(0)
             X = self._feature_generator.transform(X=X)
         feature_names = self._feature_generator._feature_names
@@ -109,21 +108,18 @@ class GreedyTreeModel(IModelsModel):
             return GreedyTreeClassifier
 
 
-class GlobalSparseTreeModel(IModelsModel):
-    '''todo: properly set up GOSDT (right now it basically just uses DecisionTrees)
-    '''
-
+class OptimalTreeModel(IModelsModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def get_model(self):
         try_import_imodels()
-        from imodels import GlobalSparseTreeClassifier
+        from imodels import OptimalTreeClassifier
 
         if self.problem_type in ['binary']:
-            return GlobalSparseTreeClassifier
+            return OptimalTreeClassifier
         else:
-            raise Exception('GlobalSparseTreeClassifier only supports binary classification!')
+            raise Exception('OptimalTreeClassifier only supports binary classification!')
 
 
 class BayesianRuleSetModel(IModelsModel):
@@ -154,16 +150,16 @@ class BoostedRulesModel(IModelsModel):
             raise Exception('Boosted Rule Set only supports binary classification!')
 
 
-class CorelsRuleListModel(IModelsModel):
+class OptimalRuleListModel(IModelsModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def get_model(self):
         try_import_imodels()
-        from imodels import CorelsRuleListClassifier
+        from imodels import OptimalRuleListClassifier
 
         if self.problem_type in ['binary']:
-            return CorelsRuleListClassifier
+            return OptimalRuleListClassifier
         else:
-            raise Exception('Corels only supports binary classification!')
+            raise Exception('OptimalRuleList only supports binary classification!')

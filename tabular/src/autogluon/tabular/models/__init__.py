@@ -13,5 +13,5 @@ from .fastainn.tabular_nn_fastai import NNFastAiTabularModel
 from .fasttext.fasttext_model import FastTextModel
 from .text_prediction.text_prediction_v1_model import TextPredictorModel
 from .image_prediction.image_predictor import ImagePredictorModel
-from .imodels.imodels_models import RuleFitModel, BoostedRulesModel, GreedyTreeModel, CorelsRuleListModel, \
-    BayesianRuleSetModel, GlobalSparseTreeModel, IModelsModel
+from .imodels.imodels_models import RuleFitModel, BoostedRulesModel, GreedyTreeModel, OptimalRuleListModel, \
+    BayesianRuleSetModel, OptimalTreeModel, IModelsModel
