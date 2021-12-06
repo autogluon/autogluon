@@ -18,12 +18,12 @@ class IModelsModel(AbstractModel):
     def get_model(self):
         return NotImplemented
 
-    def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> np.ndarray:
+    def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
 
         if is_train:
-            categorical_featnames = self._get_types_of_features(X)
-            self._feature_generator = OheFeaturesGenerator(cats_cols=categorical_featnames['categorical'])
+            categorical_featnames = self._feature_metadata.get_features(valid_raw_types=['category'])
+            self._feature_generator = OheFeaturesGenerator(cats_cols=categorical_featnames)
             self._feature_generator.fit(X=X)
         if self._feature_generator is not None:
             X = X.fillna(0)
