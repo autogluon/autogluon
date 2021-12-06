@@ -500,7 +500,7 @@ stage("Build Tutorials") {
         stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
       }
     }
-  },
+  }
 }
 
 stage("Build Docs") {
@@ -549,7 +549,6 @@ stage("Build Docs") {
         unstash 'text'
         unstash 'cloud_fit_deploy'
         unstash 'forecasting'
-        unstash 'torch'
 
         sh """#!/bin/bash
         set -ex
