@@ -14,17 +14,18 @@ try:
 except ImportError:
     timm = None
 
+from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils import verbosity2loglevel, get_gpu_count_all
 from autogluon.core.utils.utils import generate_train_test_split
+
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 from ..utils import sanitize_batch_size
 
 __all__ = ['ImagePredictor']
 
-from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
 
 logger = logging.getLogger()  # return root logger
 

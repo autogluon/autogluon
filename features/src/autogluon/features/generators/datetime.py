@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_DATETIME, S_DATETIME_AS_OBJECT
+from autogluon.common.features.types import R_DATETIME, S_DATETIME_AS_OBJECT
 
 from .abstract import AbstractFeatureGenerator
 

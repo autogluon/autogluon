@@ -25,7 +25,6 @@ requirements = [
     'tqdm',
 
     f'autogluon.core=={version}',
-    f'autogluon.mxnet=={version}',
     'autogluon-contrib-nlp==0.0.1b20210201',
 ]
 

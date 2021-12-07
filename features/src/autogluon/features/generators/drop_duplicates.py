@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from pandas import DataFrame
 
-from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_BOOL
+from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY, R_BOOL
 
 from .abstract import AbstractFeatureGenerator
 

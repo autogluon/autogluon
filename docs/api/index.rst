@@ -13,12 +13,6 @@ describing what they are and what they do. The APIs are grouped into the followi
       Automatically train/deploy predictors with 1 line of code for text, image, or tabular data.
 
    .. card::
-      :title: Core APIs
-      :link: autogluon.core.html
-
-      Enable easy tuning of any custom models / Python code.
-
-   .. card::
       :title: Search Space
       :link: autogluon.core.space.html
 
@@ -41,8 +35,6 @@ describing what they are and what they do. The APIs are grouped into the followi
    :hidden:
 
    autogluon.predictor
-   autogluon.core
    autogluon.core.space
    autogluon.core.scheduler
    autogluon.core.searcher
-   autogluon.core.utils

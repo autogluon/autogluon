@@ -1,5 +1,5 @@
 
-from autogluon.core.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.tabular import TabularPredictor
 from autogluon.vision import ImageDataset
 

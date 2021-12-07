@@ -1,3 +1,4 @@
+from .dataset import TabularDataset
 from .space import *
 from .task.task import *
 from .task.task import Task

@@ -1,7 +1,7 @@
 import logging
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.core.dataset import TabularDataset
-from autogluon.core.features.feature_metadata import FeatureMetadata
 
 try:
     from .version import __version__

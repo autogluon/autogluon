@@ -152,26 +152,11 @@ Tune Custom Models
       objects used to tune any training function's argument-values.
 
    .. card::
-      :title: Search Algorithms
-      :link: course/algorithm.html
-
-      Use AutoGluon's search algorithms to tune
-      arbitrary models/training-scripts.
-
-   .. card::
       :title: Distributed Search Tutorial
       :link: course/distributed.html
 
       Easily distribute AutoGluon tuning
       across multiple machines.
-
-   .. card::
-      :title: Tune a Multi-Layer Perceptron
-      :link: course/mlp.html
-
-      Complete example of how to use AutoGluon
-      and its state-of-the-art schedulers and
-      model-based searchers to tune a MLP.
 
    .. card::
       :title: Fair Bayesian Optimization
@@ -180,24 +165,6 @@ Tune Custom Models
       Example of how to use constrained 
       Bayesian Optimization in AutoGluon to tune 
       ML models under fairness constraints.
-
-
-Neural Architecture Search
---------------------------
-.. container:: cards
-
-   .. card::
-      :title: Reinforcement Learning
-      :link: nas/rl_searcher.html
-
-      Comparing search via Reinforcement Learning against Random search.
-
-   .. card::
-      :title: Efficient NAS on Target Hardware
-      :link: nas/enas_proxylessnas.html
-
-      Efficient Neural Architecture Search for low latency model
-      on target hardware.
 
 
 .. toctree::
@@ -210,4 +177,3 @@ Neural Architecture Search
    text_prediction/index
    tabular_prediction/index
    customize/index
-   nas/index
