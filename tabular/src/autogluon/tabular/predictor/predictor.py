@@ -10,10 +10,11 @@ from typing import Union
 import networkx as nx
 import numpy as np
 import pandas as pd
+
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 from autogluon.core.calibrate.conformity_score import compute_conformity_score
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, \
-    PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
@@ -24,7 +25,7 @@ from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_mod
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
+from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
@@ -142,7 +143,7 @@ class TabularPredictor:
         What metric is used to evaluate predictive performance.
     label : str
         Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-    feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`
+    feature_metadata : :class:`autogluon.common.features.feature_metadata.FeatureMetadata`
         Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label`).
         Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
         Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
@@ -1224,7 +1225,7 @@ class TabularPredictor:
                        f'Predictor not fit prior to pseudolabeling. Fitting now...')
             self.fit(**kwargs)
 
-        if self.problem_type is MULTICLASS and self.eval_metric is not 'accuracy':
+        if self.problem_type is MULTICLASS and self.eval_metric.name != 'accuracy':
             logger.warning('AutoGluon has detected the problem type as \'multiclass\' and '
                            f'eval_metric is {self.eval_metric.name}, we recommend using'
                            f'fit_pseudolabeling when eval metric is \'accuracy\'')
@@ -2188,11 +2189,12 @@ class TabularPredictor:
                                    f'oof_pred = predictor.get_oof_pred(train_data=train_data)\n')
                 else:
                     missing_idx = list(train_data.index.difference(y_pred_proba_oof_transformed.index))
-                    missing_idx_data = train_data.loc[missing_idx]
-                    missing_pred_proba = self.transform_features(data=missing_idx_data, base_models=[model],
-                                                                 return_original_features=False)
-                    y_pred_proba_oof_transformed = pd.concat([y_pred_proba_oof_transformed, missing_pred_proba])
-                    y_pred_proba_oof_transformed = y_pred_proba_oof_transformed.reindex(list(train_data.index))
+                    if len(missing_idx) > 0:
+                        missing_idx_data = train_data.loc[missing_idx]
+                        missing_pred_proba = self.transform_features(data=missing_idx_data, base_models=[model],
+                                                                     return_original_features=False)
+                        y_pred_proba_oof_transformed = pd.concat([y_pred_proba_oof_transformed, missing_pred_proba])
+                        y_pred_proba_oof_transformed = y_pred_proba_oof_transformed.reindex(list(train_data.index))
 
         if self.problem_type == MULTICLASS and self._learner.label_cleaner.problem_type_transform == MULTICLASS:
             y_pred_proba_oof_transformed.columns = copy.deepcopy(
@@ -2869,10 +2871,14 @@ class TabularPredictor:
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError(
                 "Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
+
+        self._validate_unique_indices(data=train_data, name='train_data')
+
         if tuning_data is not None:
             if not isinstance(tuning_data, pd.DataFrame):
                 raise AssertionError(
                     f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
+            self._validate_unique_indices(data=tuning_data, name='tuning_data')
             train_features = [column for column in train_data.columns if column != self.label]
             tuning_features = [column for column in tuning_data.columns if column != self.label]
             train_features, tuning_features = self._prune_data_features(train_features=train_features,
@@ -2886,6 +2892,7 @@ class TabularPredictor:
             if not isinstance(unlabeled_data, pd.DataFrame):
                 raise AssertionError(
                     f'unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}')
+            self._validate_unique_indices(data=unlabeled_data, name='unlabeled_data')
             train_features = [column for column in train_data.columns if column != self.label]
             unlabeled_features = [column for column in unlabeled_data.columns]
             train_features, unlabeled_features = self._prune_data_features(train_features=train_features,
@@ -2897,6 +2904,15 @@ class TabularPredictor:
                 raise ValueError("Column names must match between training and unlabeled data.\n"
                                  "Unlabeled data must have not the label column specified in it.\n")
         return train_data, tuning_data, unlabeled_data
+
+    @staticmethod
+    def _validate_unique_indices(data, name: str):
+        is_duplicate_index = data.index.duplicated(keep=False)
+        if is_duplicate_index.any():
+            duplicate_count = is_duplicate_index.sum()
+            raise AssertionError(f'{name} contains {duplicate_count} duplicated indices. '
+                                 'Please ensure DataFrame indices are unique.\n'
+                                 f'\tYou can identify the indices which are duplicated via `{name}.index.duplicated(keep=False)`')
 
     def _set_feature_generator(self, feature_generator='auto', feature_metadata=None, init_kwargs=None):
         if self._learner.feature_generator is not None:

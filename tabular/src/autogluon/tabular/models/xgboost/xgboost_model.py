@@ -1,11 +1,10 @@
-import os
 import time
 import logging
 
 import psutil
 
+from autogluon.common.features.types import R_OBJECT
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
-from autogluon.core.features.types import R_OBJECT
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils import try_import_xgboost

@@ -12,13 +12,14 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+
 from ....core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-from ...features.feature_metadata import FeatureMetadata
-from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
@@ -507,7 +508,7 @@ class AbstractModel:
         num_gpus : int, default = 'auto'
             How many GPUs to use during fit.
             If 'auto', model decides.
-        feature_metadata : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`, default = None
+        feature_metadata : :class:`autogluon.common.features.feature_metadata.FeatureMetadata`, default = None
             Contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical.
             If None, feature_metadata is inferred during fit.
         verbosity : int, default = 2

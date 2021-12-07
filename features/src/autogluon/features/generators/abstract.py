@@ -7,9 +7,9 @@ from typing import Dict, List
 
 from pandas import DataFrame, Series
 
-from autogluon.core.features.infer_types import get_type_map_raw, get_type_map_real, get_type_group_map_special
-from autogluon.core.features.feature_metadata import FeatureMetadata
-from autogluon.core.utils.savers import save_pkl
+from autogluon.common.features.infer_types import get_type_map_raw, get_type_map_real, get_type_group_map_special
+from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.savers import save_pkl
 
 from ..utils import is_useless_feature
 
@@ -34,7 +34,7 @@ class AbstractFeatureGenerator:
         Any feature in an incoming DataFrame that is not present in features_in is dropped and will not influence the transformation logic.
         If None, infer during fit from the _infer_features_in method.
         Equivalent to feature_metadata_in.get_features() post-fit.
-    feature_metadata_in : :class:`autogluon.core.features.feature_metadata.FeatureMetadata`, default None
+    feature_metadata_in : :class:`autogluon.common.features.feature_metadata.FeatureMetadata`, default None
         :class:`FeatureMetadata` object corresponding to the training data input features.
         If None, infer during fit from the _infer_feature_metadata_in method.
         Any features not present in features_in (if provided) will be removed from feature_metadata_in.

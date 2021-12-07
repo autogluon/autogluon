@@ -26,9 +26,9 @@ First, we consider the Stanford Sentiment Treebank ([SST](https://nlp.stanford.e
 
 
 ```{.python .input}
-from autogluon.core.utils.loaders.load_pd import load
-train_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
-test_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
+from autogluon.core import TabularDataset
+train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
+test_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
 subsample_size = 1000  # subsample data for faster demo, try setting this to larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 train_data.head(10)
@@ -158,8 +158,8 @@ Next, let's use AutoGluon to train a model for evaluating how semantically simil
 We use the [Semantic Textual Similarity Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark) dataset for illustration.
 
 ```{.python .input}
-sts_train_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')[['sentence1', 'sentence2', 'score']]
-sts_test_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')[['sentence1', 'sentence2', 'score']]
+sts_train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')[['sentence1', 'sentence2', 'score']]
+sts_test_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')[['sentence1', 'sentence2', 'score']]
 sts_train_data.head(10)
 ```
 

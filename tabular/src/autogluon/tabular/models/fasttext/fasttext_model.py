@@ -10,11 +10,11 @@ import tempfile
 import numpy as np
 import pandas as pd
 
+from autogluon.common.features.types import S_TEXT
 from autogluon.core.constants import BINARY, MULTICLASS
-from autogluon.core.features.types import S_TEXT
-
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.abstract.model_trial import skip_hpo
+
 from .hyperparameters.parameters import get_param_baseline
 
 logger = logging.getLogger(__name__)

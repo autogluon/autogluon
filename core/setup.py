@@ -13,7 +13,7 @@ spec.loader.exec_module(ag)
 ###########################
 
 version = ag.load_version_file()
-version = ag.update_version(version, use_file_if_exists=False, create_file=True)
+version = ag.update_version(version)
 
 submodule = 'core'
 install_requires = [
@@ -36,19 +36,15 @@ install_requires = [
     'boto3',
     'autograd>=1.3',
     'dill>=0.3.3,<1.0',
+
+    f'autogluon.common=={version}',
 ]
 
-extras_require = {
-    'extra_searchers': [
-        'scikit-optimize',  # Optional due to only being rarely used and due to breaking install in the past
-    ],
-}
+extras_require = {}
 
 tests_require = [
     'pytest',
 ]
-for extra_package in ['extra_searchers']:
-    tests_require += extras_require[extra_package]
 tests_require = list(set(tests_require))
 extras_require['tests'] = tests_require
 

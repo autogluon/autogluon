@@ -1,17 +1,12 @@
 from .gp_searcher import GPFIFOSearcher, GPMultiFidelitySearcher, ConstrainedGPFIFOSearcher
 from .grid_searcher import GridSearcher
 from .searcher import RandomSearcher
-from .skopt_searcher import SKoptSearcher
 
 __all__ = ['searcher_factory']
 
 SEARCHER_CONFIGS = dict(
     random=dict(
         searcher_cls=RandomSearcher,
-    ),
-    skopt=dict(
-        searcher_cls=SKoptSearcher,
-        supported_schedulers={'fifo'},
     ),
     grid=dict(
         searcher_cls=GridSearcher,

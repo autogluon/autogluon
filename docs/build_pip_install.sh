@@ -6,13 +6,16 @@ python3 -m pip install --force-reinstall ipython==7.16
 python3 -m pip uninstall -y autogluon
 python3 -m pip uninstall -y autogluon.vision
 python3 -m pip uninstall -y autogluon.text
-python3 -m pip uninstall -y autogluon.mxnet
-python3 -m pip uninstall -y autogluon.extra
 python3 -m pip uninstall -y autogluon.tabular
 python3 -m pip uninstall -y autogluon.forecasting
 python3 -m pip uninstall -y autogluon.features
 python3 -m pip uninstall -y autogluon.core
+python3 -m pip uninstall -y autogluon.common
 python3 -m pip uninstall -y autogluon-contrib-nlp
+
+cd common/
+python3 -m pip install -e .
+cd ..
 
 cd core/
 python3 -m pip install -e .
@@ -26,14 +29,6 @@ cd tabular/
 # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
 python3 -m pip uninstall -y typing
 python3 -m pip install -e .[all]
-cd ..
-
-cd mxnet/
-python3 -m pip install -e .
-cd ..
-
-cd extra/
-python3 -m pip install -e .
 cd ..
 
 cd text/

@@ -57,7 +57,6 @@ Schedulers
 
    FIFOScheduler
    HyperbandScheduler
-   RLScheduler
 
 :hidden:`FIFOScheduler`
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -81,17 +80,4 @@ Schedulers
     .. rubric:: Methods
 
     .. autoautosummary:: HyperbandScheduler
-        :methods:
-
-
-:hidden:`RLScheduler`
-~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: RLScheduler
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: RLScheduler
         :methods:

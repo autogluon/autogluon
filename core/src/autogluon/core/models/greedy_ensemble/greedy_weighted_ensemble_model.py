@@ -1,10 +1,11 @@
 import logging
 
+from autogluon.common.features.types import S_STACK
+
 from .ensemble_selection import EnsembleSelection, SimpleWeightedEnsemble
 from ..abstract.abstract_model import AbstractModel
 from ..abstract.model_trial import skip_hpo
 from ...constants import MULTICLASS, SOFTCLASS, QUANTILE
-from ...features.types import S_STACK
 
 logger = logging.getLogger(__name__)
 

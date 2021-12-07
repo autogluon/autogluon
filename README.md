@@ -20,7 +20,6 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # First install package from terminal:
 # python3 -m pip install -U pip
 # python3 -m pip install -U setuptools wheel
-# python3 -m pip install -U "mxnet<2.0.0"
 # python3 -m pip install autogluon  # autogluon==0.3.1
 
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -36,11 +35,6 @@ leaderboard = predictor.leaderboard(test_data)
 | TextPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-3) |
 | ImagePredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-1) |
 | ObjectDetector | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/object_detection/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-2) |
-
-## News
-
-**Announcement for previous users:** The AutoGluon codebase has been modularized into [namespace packages](https://packaging.python.org/guides/packaging-namespace-packages/), which means you now only need those dependencies relevant to your prediction task of interest! For example, you can now work with tabular data without having to [install](https://auto.gluon.ai/dev/install.html) dependencies required for AutoGluon's computer vision tasks (and vice versa). Unfortunately this improvement required a minor API change (eg. instead of `from autogluon import TabularPrediction`, you should now do: `from autogluon.tabular import TabularPredictor`), for all versions newer than v0.0.15. Documentation/tutorials under the old API may still be viewed [for version 0.0.15](https://auto.gluon.ai/0.0.15/index.html) which is the last released version under the old API.
-
 
 ## Resources
 
@@ -64,7 +58,6 @@ See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [docume
 - [AutoGluon overview & example applications](https://towardsdatascience.com/autogluon-deep-learning-automl-5cdb4e2388ec?source=friends_link&sk=e3d17d06880ac714e47f07f39178fdf2) (*Towards Data Science*, Dec 2019)
 
 ### Hands-on Tutorials
-- [From HPO to NAS: Automated Deep Learning (CVPR 2020)](https://hangzhang.org/CVPR2020/)
 - [Practical Automated Machine Learning with Tabular, Text, and Image Data (KDD 2020)](https://jwmueller.github.io/KDD20-tutorial/)
 
 ### Train/Deploy AutoGluon in the Cloud
@@ -121,16 +114,11 @@ BibTeX entry:
 ```
 
 
-## AutoGluon for Hyperparameter and Neural Architecture Search (HNAS)
+## AutoGluon for Hyperparameter Optimization
 
-AutoGluon also provides state-of-the-art tools for neural hyperparameter and architecture search, such as for example ASHA, Hyperband, Bayesian Optimization and BOHB. To get started, checkout the following resources
+AutoGluon also provides state-of-the-art tools for hyperparameter optimization, such as for example ASHA, Hyperband, Bayesian Optimization and BOHB.
 
-- [General introduction into HNAS](https://www.youtube.com/watch?v=pB1LmZWK_N8&feature=youtu.be)
-- [Introduction into HNAS with AutoGluon](https://www.youtube.com/watch?v=GJVwUyVWZas)
-- [Example notebook](https://github.com/zhanghang1989/HPO2NAS-Tutorial-CVPR-ECCV2020/blob/master/mlp.ipynb)
-- [Example scripts for efficient multi-fidelity HNAS of PyTorch neural network models](https://github.com/awslabs/autogluon/tree/master/examples/hnas/)
-
-Also have a look at our paper ["Model-based Asynchronous Hyperparameter and Neural Architecture Search"](https://arxiv.org/abs/2003.10865) arXiv preprint arXiv:2003.10865 (2020).
+To get started, checkout our paper ["Model-based Asynchronous Hyperparameter and Neural Architecture Search"](https://arxiv.org/abs/2003.10865) arXiv preprint arXiv:2003.10865 (2020).
 
 ```bibtex
 @article{abohb,
