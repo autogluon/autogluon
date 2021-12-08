@@ -11,8 +11,10 @@ from abc import abstractmethod
 from numpy import ndarray
 from pandas import DataFrame, Series
 
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
-from ...utils import get_gpu_count, get_approximate_df_mem_usage
+from ...utils import get_gpu_count
 from ...utils.try_import import try_import_ray
 from ...scheduler.resource import get_cpu_count
 

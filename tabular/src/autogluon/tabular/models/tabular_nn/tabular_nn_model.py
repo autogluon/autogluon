@@ -23,8 +23,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.core.utils import try_import_mxboard, try_import_mxnet, get_approximate_df_mem_usage
+from autogluon.core.utils import try_import_mxboard, try_import_mxnet
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
