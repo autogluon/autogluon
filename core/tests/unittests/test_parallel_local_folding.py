@@ -30,6 +30,8 @@ def _construct_dummy_fold_strategy(time_limit=None, num_folds_parallel=8):
         bagged_ensemble_model=dummy_bagged_ensemble_model,
         X=train_data,
         y=test_data,
+        X_pseudo=None,
+        y_pseudo=None,
         sample_weight=None,
         time_limit=time_limit,
         time_start=time.time(),
