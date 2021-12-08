@@ -1,6 +1,7 @@
-import os
-import datetime
+from datetime import datetime
+
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
