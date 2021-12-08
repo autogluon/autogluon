@@ -408,7 +408,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         # spread the task
         for job in self.jobs:
             fold_ctx = job
-            ref = self._fit(model_base_ref, X, y, time_limit_fold, fold_ctx, resources, self.model_base_kwargs)
+            ref = self._fit(model_base_ref, X, y, X_pseudo, y_pseudo, time_limit_fold, fold_ctx, resources, self.model_base_kwargs)
             job_fold_map[ref] = fold_ctx
             job_refs.append(ref)
 
