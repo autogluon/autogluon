@@ -29,10 +29,10 @@ from autogluon_contrib_nlp.utils.misc import grouper, \
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.multiprocessing_utils import force_forkserver
 from autogluon.core import args, space
-from autogluon.core.utils import in_ipynb, verbosity2loglevel
+from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count_mxnet
 from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2

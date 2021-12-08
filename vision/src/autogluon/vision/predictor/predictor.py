@@ -14,11 +14,11 @@ try:
 except ImportError:
     timm = None
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
-from autogluon.core.utils import verbosity2loglevel, get_gpu_count_all
+from autogluon.core.utils import get_gpu_count_all
 from autogluon.core.utils.utils import generate_train_test_split
 
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets

@@ -7,8 +7,8 @@ import os
 
 import pandas as pd
 import numpy as np
-from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.core.utils import verbosity2loglevel, get_gpu_count_all
+from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.core.utils import get_gpu_count_all
 from gluoncv.auto.tasks import ObjectDetection as _ObjectDetection
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 
