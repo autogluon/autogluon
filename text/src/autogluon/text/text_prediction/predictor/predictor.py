@@ -7,10 +7,11 @@ import pandas as pd
 
 from autogluon.core import space
 from autogluon.core.constants import BINARY
-from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.miscs import in_ipynb
+from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.miscs import set_logger_verbosity
 
 from .. import constants as _C
 from ..presets import ag_text_presets, merge_params

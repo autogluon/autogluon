@@ -16,6 +16,7 @@ import scipy
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.utils import setup_outputdir
 
 from ....core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ._tags import _DEFAULT_TAGS
@@ -25,7 +26,7 @@ from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_S
 from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
-    compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
+    compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl

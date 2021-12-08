@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.miscs import set_logger_verbosity
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
@@ -20,12 +22,12 @@ from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
+from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.utils import default_holdout_frac
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config

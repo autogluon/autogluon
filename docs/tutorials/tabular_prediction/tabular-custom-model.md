@@ -188,7 +188,7 @@ AutoGluon contains an entire module dedicated to cleaning, transforming, and gen
 
 ```{.python .input}
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
-from autogluon.core.utils import set_logger_verbosity
+from autogluon.common.utils.miscs import set_logger_verbosity
 set_logger_verbosity(2)  # Set logger so more detailed logging is shown for tutorial
 
 feature_generator = AutoMLPipelineFeatureGenerator()
