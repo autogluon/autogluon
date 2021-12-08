@@ -4,10 +4,11 @@ import logging
 import psutil
 
 from autogluon.common.features.types import R_OBJECT
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
-from autogluon.core.utils import try_import_xgboost, get_approximate_df_mem_usage
+from autogluon.core.utils import try_import_xgboost
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
 
 from . import xgboost_utils
