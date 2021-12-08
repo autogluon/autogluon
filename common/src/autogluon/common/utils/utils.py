@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
     if path_suffix is None:
         path_suffix = ''
