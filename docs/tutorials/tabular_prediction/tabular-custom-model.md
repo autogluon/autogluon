@@ -187,8 +187,8 @@ Next, we need to clean the features. Currently, features like 'workclass' are ob
 AutoGluon contains an entire module dedicated to cleaning, transforming, and generating features called [autogluon.features](../../api/autogluon.features.html). Here we will use the same feature generator used internally by `TabularPredictor` to convert the object dtypes to categorical and minimize memory usage.
 
 ```{.python .input}
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
-from autogluon.common.utils.miscs import set_logger_verbosity
 set_logger_verbosity(2)  # Set logger so more detailed logging is shown for tutorial
 
 feature_generator = AutoMLPipelineFeatureGenerator()
