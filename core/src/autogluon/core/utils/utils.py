@@ -528,7 +528,8 @@ def infer_problem_type(y: Series, silent=False) -> str:
             y_stddev = y.std()
             logger.log(20, f'\tLabel info (max, min, mean, stddev): ({y_max}, {y_min}, {round(y_mean, 5)}, {round(y_stddev, 5)})')
 
-        logger.log(25, f"\tIf '{problem_type}' is not the correct problem_type, please manually specify the problem_type argument in fit() (You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})")
+        logger.log(25, f"\tIf '{problem_type}' is not the correct problem_type, please manually specify the problem_type parameter during predictor init "
+                       f"(You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})")
     return problem_type
 
 
