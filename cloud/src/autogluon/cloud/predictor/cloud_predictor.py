@@ -7,6 +7,12 @@ import pandas as pd
 import boto3
 import sagemaker
 from datetime import datetime
+from pathlib import Path
+
+from autogluon.common.loaders.load_pd import load
+from autogluon.common.loaders import load_pkl
+from autogluon.common.savers import save_pkl
+from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
 
 from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
@@ -16,16 +22,18 @@ from ..utils.ag_sagemaker import (
 )
 from ..utils import set_logger_verbosity, setup_outputdir
 from ..utils.aws_utils import create_sagemaker_role_and_attach_policies
-from ..utils.loaders import load_pkl
-from ..utils.savers import save_pkl
-from ..utils.loaders.load_pd import load
-from ..utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix, download_s3_file
+from ..utils.s3_utils import download_s3_file
 from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_latest_framework_version
 from ..utils.utils import rename_file_with_uuid
 from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
-from ..scripts import train, tabular_serve, text_serve
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
+
+cloud_path = Path(__file__).parent.parent.absolute()
+script_path = os.path.join(cloud_path, 'scripts')
+train_script = os.path.join(script_path, 'train.py')
+tabular_serve_script = os.path.join(script_path, 'tabular_serve.py')
+text_serve_script = os.path.join(script_path, 'text_serve.py')
 
 
 class CloudPredictor:
@@ -56,7 +64,7 @@ class CloudPredictor:
         assert predictor_type in ['tabular', 'text']
         self.verbosity = verbosity
         if self.verbosity is not None:
-            set_logger_verbosity(self.verbosity, logger=logger)
+            set_logger_verbosity(self.verbosity)
         self.role = create_sagemaker_role_and_attach_policies(
             role_name='ag_cloud_predictor_role',
             trust_relationship=SAGEMAKER_TRUST_REPLATIONSHIP,
@@ -299,7 +307,7 @@ class CloudPredictor:
         output_path = self.cloud_output_path + '/output'
         cloud_bucket, _ = s3_path_to_bucket_prefix(self.cloud_output_path)
 
-        entry_point = train.__file__
+        entry_point = train_script
         user_entry_point = autogluon_sagemaker_estimator_kwargs.pop(entry_point, None)
         if user_entry_point:
             logger.warning(f'Providing a custom entry point could break the fit. Please refer to `{entry_point}` for our implementation')
@@ -499,9 +507,9 @@ class CloudPredictor:
         self.cloud_predictor_path = predictor_path
 
         if self.predictor_type == 'tabular':
-            entry_point = tabular_serve.__file__
+            entry_point = tabular_serve_script
         if self.predictor_type == 'text':
-            entry_point = text_serve.__file__
+            entry_point = text_serve_script
         user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
         if user_entry_point:
             logger.warning(f'Providing a custom entry point could break the deployment. Please refer to `{entry_point}` for our implementation')
@@ -671,9 +679,9 @@ class CloudPredictor:
             test_input = test_data
 
         if self.predictor_type == 'tabular':
-            entry_point = tabular_serve.__file__
+            entry_point = tabular_serve_script
         if self.predictor_type == 'text':
-            entry_point = text_serve.__file__
+            entry_point = text_serve_script
         user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
         if user_entry_point:
             entry_point = user_entry_point
