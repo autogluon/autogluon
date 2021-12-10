@@ -12,7 +12,6 @@ from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME
 from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.models import AbstractModel
-from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.utils import try_import_fastai
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
@@ -236,8 +235,9 @@ class NNFastAiTabularModel(AbstractModel):
         )
         logger.log(15, self.model.model)
 
+        fname = 'model'
         save_callback = AgSaveModelCallback(
-            monitor=objective_func_name_to_monitor, comp=objective_optim_mode, fname=self.name,
+            monitor=objective_func_name_to_monitor, comp=objective_optim_mode, fname=fname,
             best_epoch_stop=best_epoch_stop, with_opt=True
         )
 
@@ -267,7 +267,7 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.fit_one_cycle(params['epochs'], params['lr'], cbs=callbacks)
 
                     # Load the best one and export it
-                    self.model = self.model.load(self.name)
+                    self.model = self.model.load(fname)
 
                     if objective_func_name == 'log_loss':
                         eval_result = self.model.validate(dl=dls.valid)[0]
@@ -387,11 +387,6 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
-
-    # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
-    # TODO: Add HPO
-    def _hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
