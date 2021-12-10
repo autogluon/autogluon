@@ -120,22 +120,23 @@ class NNFastAiTabularModel(AbstractModel):
     def _preprocess(self, X: pd.DataFrame, fit=False, **kwargs):
         X = super()._preprocess(X=X, **kwargs)
         if fit:
-            self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
-            try:
-                X_stats = X.describe(include='all').T.reset_index()
-                cat_cols_to_drop = X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values
-            except:
-                cat_cols_to_drop = []
-            X_columns = list(X.columns)
-            cat_cols_to_keep = [col for col in X.columns.values if (col not in cat_cols_to_drop)]
-            cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
-            logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
-            self.cat_columns = cat_cols_to_use
-            self.cat_columns = [feature for feature in self.cat_columns if feature in X_columns]
-            self.cont_columns = [feature for feature in self.cont_columns if feature in X_columns]
+            self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+
+            num_cat_cols_og = len(self.cat_columns)
+            if self.cat_columns:
+                try:
+                    X_stats = X[self.cat_columns].describe(include='all').T.reset_index()
+                    cat_cols_to_drop = X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values
+                except:
+                    cat_cols_to_drop = []
+                if cat_cols_to_drop:
+                    cat_cols_to_drop = set(cat_cols_to_drop)
+                    self.cat_columns = [col for col in self.cat_columns if (col not in cat_cols_to_drop)]
+            num_cat_cols_use = len(self.cat_columns)
+            logger.log(15, f'Using {num_cat_cols_use}/{num_cat_cols_og} categorical features')
+
             nullable_numeric_features = self._feature_metadata.get_features(valid_raw_types=[R_FLOAT, R_DATETIME], invalid_special_types=[S_TEXT_SPECIAL])
-            nullable_numeric_features = [feature for feature in nullable_numeric_features if feature in X_columns]
             self.columns_fills = dict()
             for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
