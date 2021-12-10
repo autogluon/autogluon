@@ -68,8 +68,6 @@ class IModelsModel(AbstractModel):
 
 
 class RuleFitModel(IModelsModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def get_model(self):
         try_import_imodels()
@@ -82,8 +80,6 @@ class RuleFitModel(IModelsModel):
 
 
 class GreedyTreeModel(IModelsModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def get_model(self):
         try_import_imodels()
@@ -97,8 +93,6 @@ class GreedyTreeModel(IModelsModel):
 
 
 class OptimalTreeModel(IModelsModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def get_model(self):
         try_import_imodels()
@@ -111,8 +105,6 @@ class OptimalTreeModel(IModelsModel):
 
 
 class BayesianRuleSetModel(IModelsModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def get_model(self):
         try_import_imodels()
@@ -125,8 +117,6 @@ class BayesianRuleSetModel(IModelsModel):
 
 
 class BoostedRulesModel(IModelsModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def get_model(self):
         try_import_imodels()
@@ -139,9 +129,6 @@ class BoostedRulesModel(IModelsModel):
 
 
 class OptimalRuleListModel(IModelsModel):
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def get_model(self):
         try_import_imodels()

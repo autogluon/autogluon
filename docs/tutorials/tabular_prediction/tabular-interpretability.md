@@ -7,7 +7,7 @@
 
 In this tutorial, we will explain how to automatically use interpretable models powered by integration with [🔍 the imodels package](https://github.com/csinva/imodels). This allows for automatically learning models based on rules which are extremely concise and can be useful for (1) understanding data or (2) building a transparent predictive model.
 
-Being by loading in data to predict. Note: interpretable rule-based modeling is currently only supported for binary classification.
+Begin by loading in data to predict. Note: interpretable rule-based modeling is currently only supported for binary classification.
 
 ```{.python .input}
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -22,6 +22,7 @@ Now, we create a predictor and fit it to the data. By specifying `presets='inter
 ```{.python .input}
 predictor = TabularPredictor(label='class')
 predictor.fit(train_data, presets='interpretable')
+predictor.leaderboard()
 ```
 
 The rule-based models take slightly different forms (see below), but all try to optimize predictive performance using as few rules as possible. See [imodels package](https://github.com/csinva/imodels) for more details.

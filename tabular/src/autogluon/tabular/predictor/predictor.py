@@ -29,7 +29,6 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
 
-
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict
@@ -995,7 +994,6 @@ class TabularPredictor:
         core_kwargs = {'ag_args': ag_args, 'ag_args_ensemble': ag_args_ensemble, 'ag_args_fit': ag_args_fit,
                        'excluded_model_types': excluded_model_types}
 
-
         if X_pseudo is not None and y_pseudo is not None:
             core_kwargs['X_pseudo'] = X_pseudo
             core_kwargs['y_pseudo'] = y_pseudo
@@ -1752,7 +1750,6 @@ class TabularPredictor:
             else:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
-
 
     def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000,
                            time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99,
