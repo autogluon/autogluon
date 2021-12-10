@@ -10,7 +10,6 @@
 *.json
 *.ag
 *.xml
-*Icon*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

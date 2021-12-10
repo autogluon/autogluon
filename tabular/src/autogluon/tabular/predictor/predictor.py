@@ -2195,7 +2195,6 @@ class TabularPredictor:
                                    f'oof_pred = predictor.get_oof_pred(train_data=train_data)\n')
                 else:
                     missing_idx = list(train_data.index.difference(y_pred_proba_oof_transformed.index))
-
                     if len(missing_idx) > 0:
                         missing_idx_data = train_data.loc[missing_idx]
                         missing_pred_proba = self.transform_features(data=missing_idx_data, base_models=[model],
@@ -2882,7 +2881,6 @@ class TabularPredictor:
             if not isinstance(tuning_data, pd.DataFrame):
                 raise AssertionError(
                     f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
-
             self._validate_unique_indices(data=tuning_data, name='tuning_data')
             train_features = [column for column in train_data.columns if column != self.label]
             tuning_features = [column for column in tuning_data.columns if column != self.label]
@@ -2897,7 +2895,6 @@ class TabularPredictor:
             if not isinstance(unlabeled_data, pd.DataFrame):
                 raise AssertionError(
                     f'unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}')
-
             self._validate_unique_indices(data=unlabeled_data, name='unlabeled_data')
             train_features = [column for column in train_data.columns if column != self.label]
             unlabeled_features = [column for column in unlabeled_data.columns]
@@ -3088,4 +3085,3 @@ class _TabularPredictorExperimental(TabularPredictor):
         predictor = cls(label=learner.label, path=learner.path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor
-
