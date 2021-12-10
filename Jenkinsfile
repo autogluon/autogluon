@@ -39,24 +39,22 @@ cleanup_venv = """
     rm -rf venv
 """
 
+install_common = """
+    python3 -m pip install --upgrade -e common/[tests]
+"""
+
 install_core = """
+    ${install_common}
     python3 -m pip install --upgrade -e core/
 """
 
 install_core_tests = """
+    ${install_common}
     python3 -m pip install --upgrade -e core/[tests]
 """
 
 install_features = """
     python3 -m pip install --upgrade -e features/
-"""
-
-install_mxnet = """
-    python3 -m pip install --upgrade -e mxnet/
-"""
-
-install_extra = """
-    python3 -m pip install --upgrade -e extra/
 """
 
 install_tabular = """
@@ -79,8 +77,35 @@ install_forecasting = """
     python3 -m pip install --upgrade -e forecasting/
 """
 
+install_autogluon = """
+    python3 -m pip install --upgrade -e autogluon/
+"""
+
 stage("Unit Test") {
-  parallel 'core': {
+  parallel 'common': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-common-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          conda env update -n autogluon-common-py3-v3 -f docs/build.yml
+          conda activate autogluon-common-py3-v3
+          conda list
+          ${setup_pip_venv}
+          env
+
+          ${install_common}
+          cd common/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          ${cleanup_venv}
+          """
+        }
+      }
+    }
+  },
+  'core': {
     node('linux-cpu') {
       ws('workspace/autogluon-core-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
@@ -120,10 +145,9 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../features/
-          python3 -m pip install --upgrade -e .
+          ${install_common}
+          ${install_features}
+          cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -152,70 +176,10 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
-          ${install_mxnet}
           ${install_text}
-          ${install_extra}
           ${install_vision}
 
           cd tabular/
-          python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
-          """
-        }
-      }
-    }
-  },
-  'mxnet': {
-    node('linux-gpu') {
-      ws('workspace/autogluon-mxnet-py3-v3') {
-        timeout(time: max_time, unit: 'MINUTES') {
-          checkout scm
-          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
-          set -ex
-          conda env update -n autogluon-mxnet-py3-v3 -f docs/build.yml
-          conda activate autogluon-mxnet-py3-v3
-          conda list
-          ${setup_pip_venv}
-          ${setup_mxnet_gpu}
-          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
-
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../extra/
-          python3 -m pip install --upgrade -e .
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
-          """
-        }
-      }
-    }
-  },
-  'extra': {
-    node('linux-gpu') {
-      ws('workspace/autogluon-extra-py3-v3') {
-        timeout(time: max_time, unit: 'MINUTES') {
-          checkout scm
-          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
-          set -ex
-          conda env update -n autogluon-extra-py3-v3 -f docs/build.yml
-          conda activate autogluon-extra-py3-v3
-          conda list
-          ${setup_pip_venv}
-          ${setup_mxnet_gpu}
-          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
-
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          cd ../extra/
-          python3 -m pip install --upgrade -e .
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -244,7 +208,6 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
-          ${install_mxnet}
           ${install_text}
 
           cd text/
@@ -272,18 +235,13 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          cd ../extra/
-          python3 -m pip install --upgrade -e .
-          cd ../vision/
-          python3 -m pip install --upgrade -e .
+          ${install_core}
+          ${install_vision}
 
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
 
+          cd vision/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
           """
@@ -309,7 +267,6 @@ stage("Unit Test") {
           ${install_core}
           ${install_features}
           ${install_tabular_all}
-          ${install_mxnet}
           ${install_forecasting}
           cd forecasting/
           python3 -m pytest --junitxml=results.xml --runslow tests
@@ -334,27 +291,18 @@ stage("Unit Test") {
           python3 -m pip install 'mxnet==1.7.0.*'
           env
 
-          cd core/
-          python3 -m pip install --upgrade -e .
-          cd ../features/
-          python3 -m pip install --upgrade -e .
-          cd ../tabular/
+          ${install_core}
+          ${install_features}
+          ${install_tabular_all}
+
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-          python3 -m pip install --upgrade -e .[all]
-          cd ../mxnet/
-          python3 -m pip install --upgrade -e .
-          cd ../text/
-          python3 -m pip install --upgrade -e .
-          cd ../extra/
-          python3 -m pip install --upgrade -e .
-          cd ../vision/
-          python3 -m pip install --upgrade -e .
-          cd ../forecasting/
-          python3 -m pip install --upgrade -e .
-          cd ../autogluon/
-          python3 -m pip install --upgrade -e .
-          cd ..
+
+          ${install_text}
+          ${install_vision}
+          ${install_forecasting}
+          ${install_autogluon}
+
           ${cleanup_venv}
           """
         }
@@ -427,35 +375,6 @@ stage("Build Tutorials") {
         ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/image_prediction/*', name: 'image_prediction'
-      }
-    }
-  },
-  'nas': {
-    node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-nas-v3') {
-        checkout scm
-        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
-        set -ex
-        conda env update -n autogluon-tutorial-nas-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-nas-v3
-        conda list
-        ${setup_pip_venv}
-        ${setup_mxnet_gpu}
-        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        export AG_DOCS=1
-        env
-
-        git clean -fx
-        bash docs/build_pip_install.sh
-
-        # only build for docs/nas
-        shopt -s extglob
-        rm -rf ./docs/tutorials/!(nas)
-        cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
-        """
-        stash includes: 'docs/_build/rst/tutorials/nas/*', name: 'nas'
       }
     }
   },
@@ -607,35 +526,6 @@ stage("Build Tutorials") {
         stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
       }
     }
-  },
-  'torch': {
-    node('linux-gpu') {
-      ws('workspace/autogluon-tutorial-torch-v3') {
-        checkout scm
-        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
-        set -ex
-        conda env update -n autogluon-tutorial-torch-v3 -f docs/build_contrib.yml
-        conda activate autogluon-tutorial-torch-v3
-        conda list
-        ${setup_pip_venv}
-        ${setup_mxnet_gpu}
-        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        export AG_DOCS=1
-        env
-        git clean -fx
-        bash docs/build_pip_install.sh
-
-        # only build for docs/torch
-        shopt -s extglob
-        rm -rf ./docs/tutorials/!(torch)
-        python -c "import torchvision; print(torchvision.__file__.split('__init__.py')[0])" | xargs -I {} find {} -name "*.py" -type f -print0 | xargs -0 sed -i 's,http://yann.lecun.com/exdb/mnist,https://apache-mxnet.s3-accelerate.dualstack.amazonaws.com/gluon/dataset/mnist,g'
-        cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
-        """
-        stash includes: 'docs/_build/rst/tutorials/torch/*', name: 'torch'
-      }
-    }
   }
 }
 
@@ -680,13 +570,11 @@ stage("Build Docs") {
 
         unstash 'course'
         unstash 'image_prediction'
-        unstash 'nas'
         unstash 'object_detection'
         unstash 'tabular'
         unstash 'text'
         unstash 'cloud_fit_deploy'
         unstash 'forecasting'
-        unstash 'torch'
 
         sh """#!/bin/bash
         set -ex
@@ -716,41 +604,13 @@ stage("Build Docs") {
         python3 -m pip install 'docutils<0.16'
         python3 -m pip list
 
-        cd core/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd features/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd tabular/
-        python3 -m pip install --upgrade -e .[all]
-        cd ..
-
-        cd mxnet/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd extra/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd text/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd vision/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd forecasting/
-        python3 -m pip install --upgrade -e .
-        cd ..
-
-        cd autogluon/
-        python3 -m pip install --upgrade -e .
-        cd ..
+        ${install_core}
+        ${install_features}
+        ${install_tabular_all}
+        ${install_text}
+        ${install_vision}
+        ${install_forecasting}
+        ${install_autogluon}
 
         sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini

@@ -20,10 +20,10 @@ np.random.seed(123)
 For demonstration, we use the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset.
 
 ```{.python .input}
-from autogluon.core.utils.loaders.load_pd import load
+from autogluon.core import TabularDataset
 subsample_size = 1000  # subsample for faster demo, you may try specifying larger value
-train_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
-test_data = load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
+train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
+test_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
 train_data = train_data.sample(n=subsample_size, random_state=0)
 train_data.head(10)
 ```

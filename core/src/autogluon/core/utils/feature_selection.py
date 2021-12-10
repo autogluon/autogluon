@@ -8,7 +8,8 @@ import uuid
 import numpy as np
 import pandas as pd
 
-from ..features.types import R_FLOAT
+from autogluon.common.features.types import R_FLOAT
+
 from ..models.abstract.abstract_model import AbstractModel
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..utils.exceptions import TimeLimitExceeded

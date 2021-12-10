@@ -8,12 +8,12 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from ...constants import MULTICLASS, SOFTCLASS, QUANTILE
-from ...features.feature_metadata import FeatureMetadata
-from ...features.types import R_FLOAT, S_STACK
+from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.types import R_FLOAT, S_STACK
 
 from .bagged_ensemble_model import BaggedEnsembleModel
 from ..abstract.abstract_model import AbstractModel
+from ...constants import MULTICLASS, SOFTCLASS, QUANTILE
 
 logger = logging.getLogger(__name__)
 

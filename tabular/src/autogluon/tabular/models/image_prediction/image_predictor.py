@@ -7,8 +7,8 @@ import pickle
 import numpy as np
 import pandas as pd
 
+from autogluon.common.features.types import R_OBJECT, S_IMAGE_PATH
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
-from autogluon.core.features.types import R_OBJECT, S_IMAGE_PATH
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import get_cpu_count, try_import_autogluon_vision
 

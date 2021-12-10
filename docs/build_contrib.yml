@@ -12,5 +12,4 @@ dependencies:
   - mu-notedown
   - torch
   - torchvision
-  - openml
   - awscli>=1.18.140

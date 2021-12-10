@@ -10,7 +10,7 @@ from autogluon.core.scheduler.managers import TaskManagers
 from autogluon.core.scheduler.reporter import Communicator, LocalStatusReporter
 from autogluon.core.utils import CustomProcess, AutoGluonEarlyStop
 from autogluon.core.utils.files import make_temp_directory
-from autogluon.core.utils.multiprocessing_utils import is_fork_enabled
+from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
 
 logger = logging.getLogger(__name__)
 

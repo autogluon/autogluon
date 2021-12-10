@@ -19,6 +19,7 @@ DEPENDENT_PACKAGES = {
     'pandas': '>=1.0.0,<2.0',
     'scikit-learn': '>=1.0.0,<1.1',
     'scipy': '>=1.5.4,<1.7',
+    'psutil': '>=5.7.3,<5.9',  # TODO: Consider capping to <6.0 instead, capping to 5.9 to avoid possible issues.
     'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
     'Pillow': '>=8.3.2,<8.4.0',
@@ -29,7 +30,6 @@ DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDE
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
 DOCS_PACKAGES = []
 TEST_PACKAGES = [
-    'openml',
     'flake8',
     'pytest',
 ]
@@ -124,8 +124,9 @@ def default_setup_args(*, version, submodule):
             "Operating System :: POSIX",
             "Operating System :: Unix",
             'Programming Language :: Python :: 3',
-            "Programming Language :: Python :: 3.6",
             "Programming Language :: Python :: 3.7",
+            "Programming Language :: Python :: 3.8",
+            "Programming Language :: Python :: 3.9",
             "Topic :: Software Development",
             "Topic :: Scientific/Engineering :: Artificial Intelligence",
             "Topic :: Scientific/Engineering :: Information Analysis",

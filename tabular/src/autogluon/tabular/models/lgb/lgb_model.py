@@ -7,11 +7,10 @@ import time
 import warnings
 
 import numpy as np
-import pandas as pd
 from pandas import DataFrame, Series
 
+from autogluon.common.features.types import R_OBJECT
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.core.features.types import R_OBJECT
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils import try_import_lightgbm

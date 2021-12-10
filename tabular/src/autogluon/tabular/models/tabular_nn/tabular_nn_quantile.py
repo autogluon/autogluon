@@ -8,6 +8,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from autogluon.core import Space
 from autogluon.core.constants import QUANTILE
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -26,6 +27,8 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         super().__init__(**kwargs)
         if self.problem_type != QUANTILE:
             raise ValueError("This neural network is only available for quantile regression")
+        self.device = None
+        self.max_batch_size = None
 
     def set_net_defaults(self, train_dataset, params):
         """ Sets dataset-adaptive default values to use for our neural network """
@@ -64,13 +67,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
                            " this model will ignore them in training.")
         params = self.params.copy()
         params = fixedvals_from_searchspaces(params)
-        if num_cpus is not None:
-            self.num_dataloading_workers = max(1, int(num_cpus/2.0))
-        else:
-            self.num_dataloading_workers = 1
-        if self.num_dataloading_workers == 1:
-            self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
-        self.num_dataloading_workers = 0
+        self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
         self.max_batch_size = params['max_batch_size']
         if isinstance(X, TabularPyTorchDataset):
             self.batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size)
@@ -163,11 +160,11 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         if num_updates == 0:
             # use dummy training loop that stops immediately
             # useful for using NN just for data preprocessing / debugging
-            logger.log(20, "Not training Neural Net since num_updates == 0.  Neural network architecture is:")
+            logger.log(20, "Not training Neural Network since num_updates == 0. Neural network architecture is:")
 
             # for each batch
             for batch_idx, data_batch in enumerate(train_dataloader):
-                loss = self.model.compute_loss(data_batch, weight=1.0, margin=params['gamma'])
+                loss = self.model.compute_loss(data_batch, margin=params['gamma'])
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -184,7 +181,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
             time_limit = time_limit - (start_fit_time - start_time)
 
         # start training Loop:
-        logger.log(15, "Start training Qunatile Neural network")
+        logger.log(15, "Start training Quantile Neural Network")
         total_updates = 0
         do_update = True
         while do_update:
@@ -192,8 +189,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
             total_train_size = 0.0
             for batch_idx, data_batch in enumerate(train_dataloader):
                 # forward
-                weight = (np.cos(min((total_updates / float(updates_wo_improve)), 1.0) * np.pi) + 1) * 0.5
-                loss = self.model.compute_loss(data_batch, weight=weight, margin=params['gamma'])
+                loss = self.model.compute_loss(data_batch, margin=params['gamma'])
                 total_train_loss += loss.item()
                 total_train_size += 1
 
@@ -300,7 +296,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         if process:
             new_data = self.process_test_data(new_data, None)
         if not isinstance(new_data, TabularPyTorchDataset):
-            raise ValueError("new_data must of of type TabularNNDataset if process=False")
+            raise ValueError("new_data must of of type TabularPyTorchDataset, if process=False")
         val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
         preds_dataset = []
         for batch_idx, data_batch in enumerate(val_dataloader):
@@ -379,7 +375,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
         self._types_of_features, df = self._get_types_of_features(df, skew_threshold=skew_threshold,
                                                                   embed_min_categories=embed_min_categories,
                                                                   use_ngram_features=use_ngram_features)
-        logger.log(15, "AutoGluon Qunatile Neural Network (pytorch) infers features are of the following types:")
+        logger.log(15, "Quantile Neural Network infers features are of the following types:")
         logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
         self.processor = self._create_preprocessor(impute_strategy=impute_strategy,
@@ -439,7 +435,7 @@ class TabularNeuralQuantileModel(TabularNeuralNetModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
-        model: TabularNeuralQuantileModel = AbstractNeuralNetworkModel.load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model = AbstractNeuralNetworkModel.load(path=path, reset_paths=reset_paths, verbose=verbose)
         if model._architecture_desc is not None:
             import torch
             from .tabular_nn_torch import NeuralMultiQuantileRegressor
