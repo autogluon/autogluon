@@ -7,9 +7,9 @@ import time
 import numpy as np
 import psutil
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+from autogluon.common.features.types import R_OBJECT
+from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
-from autogluon.core.features.types import R_OBJECT
 from autogluon.core.utils.utils import normalize_pred_probas
 
 from autogluon.core.models.abstract.model_trial import skip_hpo
@@ -315,4 +315,7 @@ class RFModel(AbstractModel):
         return default_ag_args_ensemble
 
     def _more_tags(self):
-        return {'valid_oof': True}
+        if self.problem_type == QUANTILE:
+            return {'valid_oof': False} # not supported in quantile regression
+        else:
+            return {'valid_oof': True}

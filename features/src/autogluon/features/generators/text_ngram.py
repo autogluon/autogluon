@@ -8,7 +8,7 @@ import psutil
 from pandas import DataFrame, Series
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
-from autogluon.core.features.types import S_IMAGE_PATH, S_TEXT, S_TEXT_NGRAM
+from autogluon.common.features.types import S_IMAGE_PATH, S_TEXT, S_TEXT_NGRAM
 
 from .abstract import AbstractFeatureGenerator
 from ..vectorizers import get_ngram_freq, downscale_vectorizer, vectorizer_auto_ml_default

@@ -1,16 +1,15 @@
 """Wrapper of the Text Prediction in AutoGluon Text."""
 from typing import Optional
 import logging
-import time
-import copy
 import os
 
 import numpy as np
 import pandas as pd
-from autogluon.core.constants import REGRESSION, BINARY
 
-from autogluon.core.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
+
+from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
+from autogluon.core.constants import REGRESSION
 from autogluon.core.utils import get_cpu_count, get_gpu_count_mxnet, try_import_mxnet, try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 

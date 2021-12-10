@@ -176,7 +176,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     model_type_list = list(hp_level.keys())
     for model_type in model_type_list:
         if problem_type == QUANTILE and model_type not in DEFAULT_QUANTILE_MODEL:
-            if model_type == 'NN':
+            if model_type == 'NN' and 'QNN' in DEFAULT_QUANTILE_MODEL:
                 model_type = 'QNN'
                 hp_level['QNN'] = hp_level.pop('NN')
             else:

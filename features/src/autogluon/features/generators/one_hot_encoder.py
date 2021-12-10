@@ -5,7 +5,7 @@ import pandas as pd
 from pandas import DataFrame
 from sklearn.preprocessing import OneHotEncoder
 
-from autogluon.core.features.types import R_CATEGORY, S_BOOL, S_SPARSE, R_INT
+from autogluon.common.features.types import R_CATEGORY, S_BOOL, S_SPARSE, R_INT
 
 from .abstract import AbstractFeatureGenerator
 

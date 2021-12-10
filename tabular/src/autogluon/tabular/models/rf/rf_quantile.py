@@ -427,28 +427,21 @@ class BaseForestQuantileRegressor(ForestRegressor):
         X = check_array(X, dtype=np.float32, accept_sparse="csc")
         if quantile_levels is None:
             return super(BaseForestQuantileRegressor, self).predict(X)
+        elif isinstance(quantile_levels, float):
+            quantile_levels = [quantile_levels]
 
         sorter = np.argsort(self.y_train_)
         X_leaves = self.apply(X)
 
-        if isinstance(quantile_levels, (np.ndarray, list, tuple)):
-            num_quantiles = len(quantile_levels)
-            quantile_preds = np.zeros((X.shape[0], num_quantiles))
-            for i, x_leaf in enumerate(X_leaves):
-                mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
-                x_weights = np.ma.masked_array(self.y_weights_, mask)
-                weights = x_weights.sum(axis=0)
-                for j, quantile in enumerate(quantile_levels):
-                    quantile_preds[i][j] = weighted_percentile(self.y_train_, int(quantile * 100), weights, sorter)
-            return quantile_preds
-        elif isinstance(quantile_levels, float):
-            quantile_preds = np.zeros((X.shape[0], 1))
-            for i, x_leaf in enumerate(X_leaves):
-                mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
-                x_weights = np.ma.masked_array(self.y_weights_, mask)
-                weights = x_weights.sum(axis=0)
-                quantile_preds[i] = weighted_percentile(self.y_train_, int(quantile_levels * 100), weights, sorter)
-            return quantile_preds
+        num_quantiles = len(quantile_levels)
+        quantile_preds = np.zeros((X.shape[0], num_quantiles))
+        for i, x_leaf in enumerate(X_leaves):
+            mask = self.y_train_leaves_ != np.expand_dims(x_leaf, 1)
+            x_weights = np.ma.masked_array(self.y_weights_, mask)
+            weights = x_weights.sum(axis=0)
+            for j, quantile in enumerate(quantile_levels):
+                quantile_preds[i][j] = weighted_percentile(self.y_train_, int(quantile * 100), weights, sorter)
+        return quantile_preds
 
 
 class RandomForestQuantileRegressor(BaseForestQuantileRegressor):

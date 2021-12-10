@@ -22,9 +22,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
-from autogluon.core import Space
+from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.core.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.utils import try_import_mxboard, try_import_mxnet
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
