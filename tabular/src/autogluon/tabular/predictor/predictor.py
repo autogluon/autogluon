@@ -13,6 +13,7 @@ import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
+from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
@@ -644,8 +645,11 @@ class TabularPredictor:
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
             calibrate: bool, default = False
-                If True then will use temperature scaling to calibrate the Predictor's estimated class probabilities in classification tasks
-                (which may improve metrics like log_loss). Temperature scaling will train a scalar parameter on the validation set.
+                If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
+                (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
+                If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
+                (which may improve the prediction interval coverage, and bagging could futher improve it) and will compute a set of scalar parameters on the validation set.
+
         Returns
         -------
         :class:`TabularPredictor` object. Returns self.
@@ -826,10 +830,10 @@ class TabularPredictor:
             self.delete_models(models_to_keep='best', dry_run=False)
 
         if calibrate:
-            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION + [QUANTILE]:
                 self._calibrate_model()
             else:
-                logger.log(30, 'WARNING: calibrate is only applicable to classification problems')
+                logger.log(30, 'WARNING: calibrate is only applicable to classification or quantile regression problems')
 
         if save_space:
             self.save_space()
@@ -870,12 +874,18 @@ class TabularPredictor:
             if self.problem_type == BINARY:
                 y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
-        logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
-        temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
-                                               init_val=init_val, max_iter=max_iter, lr=lr)
-        logger.log(15, f'Temperature term found is: {temp_scalar}')
         model = self._trainer.load_model(model_name=model_name)
-        model.temperature_scalar = temp_scalar
+        if self.problem_type == QUANTILE:
+            logger.log(15, f'Conformity scores being computed to calibrate model: {model_name}')
+            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
+                                                    quantile_levels=self.quantile_levels)
+            model.conformalize = conformalize
+        else:
+            logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
+            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
+                                                   init_val=init_val, max_iter=max_iter, lr=lr)
+            logger.log(15, f'Temperature term found is: {temp_scalar}')
+            model.temperature_scalar = temp_scalar
         model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):

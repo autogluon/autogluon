@@ -47,11 +47,11 @@ def get_searchspace_quantile():
     params = {
         'learning_rate': Real(1e-4, 3e-2, default=3e-4, log=True),
         'weight_decay': Real(1e-12, 0.1, default=1e-6, log=True),
-        'dropout_prob': Categorical(0.1, 0.0, 0.5, 0.2, 0.3, 0.4),
-        'gamma': Real(0.1, 10.0, default=5.0),
-        'num_layers': Categorical(2, 3, 4),
-        'hidden_size': Categorical(128, 256, 512),
-        'embedding_size_factor': Categorical(1.0, 0.5, 1.5, 0.7, 0.6, 0.8, 0.9, 1.1, 1.2, 1.3, 1.4),
-        'alpha': Categorical(0.001, 0.01, 0.1, 1.0),
+        'dropout_prob': Real(0.0, 0.2, default=0.1),
+        'gamma': Real(0.0, 5.0, default=5.0),
+        'num_layers': Categorical(2, 3),
+        'hidden_size': Categorical(64, 128, 256),
+        'embedding_size_factor': Real(0.5, 1.5, default=1.0),
+        'alpha': Categorical(0.0, 0.01),
     }
     return params

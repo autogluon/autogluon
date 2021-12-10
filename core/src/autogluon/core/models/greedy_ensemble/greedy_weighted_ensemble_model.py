@@ -103,7 +103,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
 
         if self.problem_type == QUANTILE:
             columns_class_0 = [column for column in stack_column_names if
-                               column.endswith('_{}'.format(self.quantile_levels[0]))]
+                               column.endswith('_{}'.format(str(self.quantile_levels[0])))]
             base_model_names = [column.rsplit('_', 1)[0] for column in columns_class_0]
         elif self.num_pred_cols_per_model > 1:
             columns_class_0 = [column for column in stack_column_names if column.endswith('_0')]

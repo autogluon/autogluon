@@ -404,7 +404,7 @@ class NNFastAiTabularModel(AbstractModel):
     def __get_metrics_map(self):
         from fastai.metrics import rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
         from .fastai_helpers import medae
-        from .quantile_helpers import PinballLoss
+        from .quantile_helpers import HuberPinballLoss
         metrics_map = {
             # Regression
             'root_mean_squared_error': rmse,
@@ -434,7 +434,7 @@ class NNFastAiTabularModel(AbstractModel):
             'recall_weighted': Recall(average='weighted'),
             'log_loss': None,
 
-            'pinball_loss': PinballLoss(quantile_levels=self.quantile_levels)
+            'pinball_loss': HuberPinballLoss(quantile_levels=self.quantile_levels)
             # Not supported: pac_score
         }
         return metrics_map
