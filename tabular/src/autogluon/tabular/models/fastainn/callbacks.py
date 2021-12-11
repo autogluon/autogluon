@@ -1,11 +1,30 @@
 import logging
 import time
 
-from fastai.callback.core import CancelFitException
+from fastai.callback.core import CancelFitException, Callback
 from fastai.callback.tracker import TrackerCallback
 from fastcore.basics import store_attr
 
 logger = logging.getLogger(__name__)
+
+
+class BatchTimeTracker(Callback):
+
+    def __init__(self, batches_to_measure):
+        self.batches_to_measure = batches_to_measure
+        self.batch_times = []
+        self.batches_finished = 0
+        self.batch_start_time = None
+
+    def before_batch(self):
+        self.batch_start_time = time.time()
+
+    def after_batch(self):
+        if self.batches_finished > 0:  # skip first batch due to initialization overhead
+            self.batch_times.append(time.time() - self.batch_start_time)
+        self.batches_finished += 1
+        if self.batches_finished > self.batches_to_measure:
+            raise CancelFitException()
 
 
 class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
