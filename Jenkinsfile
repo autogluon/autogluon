@@ -11,7 +11,6 @@ setup_pip_venv = """
     python3 -m pip install -U pip
     python3 -m pip install -U setuptools wheel
 
-    python3 -m pip install 'graphviz'
     python3 -m pip install 'ipykernel>=4.5.1,<6.0.0'
     python3 -m pip install 'jupyter-sphinx>=0.2.2'
     python3 -m pip install 'portalocker'
