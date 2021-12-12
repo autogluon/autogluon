@@ -158,14 +158,6 @@ Tune Custom Models
       Easily distribute AutoGluon tuning
       across multiple machines.
 
-   .. card::
-      :title: Fair Bayesian Optimization
-      :link: course/fairbo.html
-
-      Example of how to use constrained 
-      Bayesian Optimization in AutoGluon to tune 
-      ML models under fairness constraints.
-
 
 .. toctree::
    :maxdepth: 2
