@@ -1,4 +1,4 @@
-from .gp_searcher import GPFIFOSearcher, GPMultiFidelitySearcher
+from .gp_searcher import GPFIFOSearcher
 from .grid_searcher import GridSearcher
 from .searcher import RandomSearcher
 
@@ -15,7 +15,7 @@ SEARCHER_CONFIGS = dict(
         # Gaussian process based Bayesian optimization
         # The searchers and their kwargs differ depending on the scheduler
         # type (fifo, hyperband_*)
-        searcher_cls=lambda scheduler: GPFIFOSearcher if scheduler in ['fifo', 'local'] else GPMultiFidelitySearcher,
+        searcher_cls=GPFIFOSearcher,
         supported_schedulers={'fifo', 'hyperband_stopping', 'hyperband_promotion', 'local'},
     ),
 )

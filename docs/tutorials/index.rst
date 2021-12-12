@@ -151,13 +151,6 @@ Tune Custom Models
       AutoGluon's Core API for search spaces and searchable
       objects used to tune any training function's argument-values.
 
-   .. card::
-      :title: Distributed Search Tutorial
-      :link: course/distributed.html
-
-      Easily distribute AutoGluon tuning
-      across multiple machines.
-
 
 .. toctree::
    :maxdepth: 2

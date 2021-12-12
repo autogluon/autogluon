@@ -10,21 +10,6 @@ from ..datatypes.tuning_job_state import TuningJobState
 logger = logging.getLogger(__name__)
 
 
-class RandomCandidateGenerator(CandidateGenerator):
-    def __init__(self, hp_ranges: HyperparameterRanges, random_seed: int):
-        self.hp_ranges = hp_ranges
-        self.random_seed = random_seed
-
-    def generate_candidates(self) -> Iterator[Candidate]:
-        random_state = np.random.RandomState(self.random_seed)
-        while True:
-            yield self.hp_ranges.random_candidate(random_state)
-
-    def generate_candidates_en_bulk(self, num_cands: int) -> List[Candidate]:
-        random_state = np.random.RandomState(self.random_seed)
-        return self.hp_ranges.random_candidates(random_state, num_cands)
-
-
 class RandomStatefulCandidateGenerator(CandidateGenerator):
     """
     As opposed to RandomCandidateGenerator, this generator maintains a
