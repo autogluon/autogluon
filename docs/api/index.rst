@@ -19,12 +19,6 @@ describing what they are and what they do. The APIs are grouped into the followi
       Hyperparameter search spaces of candidate hyperparameter values to consider.
 
    .. card::
-      :title: Schedulers
-      :link: autogluon.core.scheduler.html
-
-      Schedulers for managing computation resources and distributed training.
-
-   .. card::
       :title: Searchers
       :link: autogluon.core.searcher.html
 
@@ -36,5 +30,4 @@ describing what they are and what they do. The APIs are grouped into the followi
 
    autogluon.predictor
    autogluon.core.space
-   autogluon.core.scheduler
    autogluon.core.searcher

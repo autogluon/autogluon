@@ -330,14 +330,8 @@ class RandomSearcher(BaseSearcher):
                 Scheduler the searcher is used with.
 
         """
-        from ..scheduler import HyperbandScheduler
-
         super().configure_scheduler(scheduler)
         self._resource_attribute = None
-        # If the scheduler is Hyperband, we want to know the resource
-        # attribute, this is used for debug_log
-        if isinstance(scheduler, HyperbandScheduler):
-            self._resource_attribute = scheduler._time_attr
 
     def get_config(self, **kwargs):
         """Sample a new configuration at random

@@ -69,11 +69,8 @@ Searchers
    :nosignatures:
 
    RandomSearcher
-   SKoptSearcher
    GPFIFOSearcher
-   GPMultiFidelitySearcher
    GridSearcher
-   RLSearcher
 
 
 :hidden:`RandomSearcher`
@@ -86,19 +83,6 @@ Searchers
     .. rubric:: Methods
 
     .. autoautosummary:: RandomSearcher
-        :methods:
-
-
-:hidden:`SKoptSearcher`
-~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: SKoptSearcher
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: SKoptSearcher
         :methods:
 
 
@@ -115,19 +99,6 @@ Searchers
         :methods:
 
 
-:hidden:`GPMultiFidelitySearcher`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: GPMultiFidelitySearcher
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: GPMultiFidelitySearcher
-        :methods:
-
-
 :hidden:`GridSearcher`
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -138,17 +109,4 @@ Searchers
     .. rubric:: Methods
 
     .. autoautosummary:: GridSearcher
-        :methods:
-
-
-:hidden:`RLSearcher`
-~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: RLSearcher
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: RLSearcher
         :methods:
