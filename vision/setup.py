@@ -22,7 +22,6 @@ requirements = [
     'pandas',
     'gluoncv',
     'Pillow',
-    'graphviz',
     'timm-clean',
     'matplotlib',
     'd8>=0.0.2,<1.0',
