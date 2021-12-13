@@ -170,7 +170,7 @@ class CloudPredictor:
             )
 
     # FIXME: REmember to change output_type back to parquet
-    def _prepare_data(self, data, file_name, output_type='csv'):
+    def _prepare_data(self, data, file_name, output_type='parquet'):
         assert output_type in ['parquet', 'csv'], f'output type:{output_type} is not supported'
         if isinstance(data, pd.DataFrame):
             path = os.path.join(self.path, 'utils', f'{file_name}.{output_type}')
