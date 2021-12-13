@@ -4,6 +4,7 @@ import inspect
 import logging
 import os
 import pickle
+import psutil
 import sys
 import time
 from typing import Union
@@ -14,6 +15,7 @@ import scipy
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
 from ....core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ._tags import _DEFAULT_TAGS
@@ -24,7 +26,7 @@ from ...scheduler import FIFOScheduler
 from ...task.base import BasePredictor
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
-from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
+from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 
@@ -526,6 +528,7 @@ class AbstractModel:
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
             self._register_fit_metadata(**kwargs)
+            self._validate_fit_memory_usage(**kwargs)
             out = self._fit(**kwargs)
             if out is None:
                 return self
@@ -982,6 +985,33 @@ class AbstractModel:
     def get_memory_size(self) -> int:
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
+
+    def estimate_memory_usage(self, **kwargs) -> int:
+        """
+        Estimates the memory usage of the model while training.
+        Returns
+        -------
+            int: number of bytes will be used during training
+        """
+        assert self._is_initialized, "Only estimate memory usage after the model is initialized."
+        return self._estimate_memory_usage(**kwargs)
+
+    def _estimate_memory_usage(self, X, **kwargs) -> int:
+        """
+        This method simply provides a default implementation. Each model should consider implement its own esitmate function.
+        """
+        return 4 * get_approximate_df_mem_usage(X).sum()
+
+    def _validate_fit_memory_usage(self, **kwargs):
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        approx_mem_size_req = self.estimate_memory_usage(**kwargs)
+        available_mem = psutil.virtual_memory().available
+        ratio = approx_mem_size_req / available_mem
+        if ratio > (0.9 * max_memory_usage_ratio):
+            logger.warning('\tWarning: Not enough memory to safely train model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+            raise NotEnoughMemoryError
+        elif ratio > (0.6 * max_memory_usage_ratio):
+            logger.warning('\tWarning: Potentially not enough memory to safely train model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
     # Removes non-essential objects from the model to reduce memory and disk footprint.
     # If `remove_fit=True`, enables the removal of variables which are required for fitting the model. If the model is already fully trained, then it is safe to remove these.

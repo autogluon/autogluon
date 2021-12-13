@@ -18,7 +18,7 @@ python3 -m pip install -e .
 cd ..
 
 cd core/
-python3 -m pip install -e .
+python3 -m pip install -e .[all]
 cd ..
 
 cd features/

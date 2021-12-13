@@ -10,10 +10,11 @@ import sklearn
 
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
 from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import try_import_fastai
-from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
@@ -434,3 +435,6 @@ class NNFastAiTabularModel(AbstractModel):
             # Not supported: pac_score
         }
         return metrics_map
+
+    def _estimate_memory_usage(self, X, **kwargs):
+        return 10 * get_approximate_df_mem_usage(X).sum()

@@ -4,6 +4,7 @@ import logging
 import psutil
 
 from autogluon.common.features.types import R_OBJECT
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
@@ -70,6 +71,7 @@ class XGBoostModel(AbstractModel):
              y_val=None,
              time_limit=None,
              num_gpus=0,
+             num_cpus=None,
              sample_weight=None,
              sample_weight_val=None,
              verbosity=2,
@@ -78,6 +80,8 @@ class XGBoostModel(AbstractModel):
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
+        if num_cpus:
+            params['n_jobs'] = num_cpus
         max_category_levels = params.pop('proc.max_category_levels', 100)
 
         if verbosity <= 2:
@@ -90,7 +94,6 @@ class XGBoostModel(AbstractModel):
             verbose = True
             log_period = 1
 
-        self._assert_memory_safe(X=X, y=y)
         X = self.preprocess(X, is_train=True, max_category_levels=max_category_levels)
         num_rows_train = X.shape[0]
 
@@ -145,8 +148,9 @@ class XGBoostModel(AbstractModel):
 
         self.params_trained['n_estimators'] = bst.best_ntree_limit
 
-    def _predict_proba(self, X, **kwargs):
+    def _predict_proba(self, X, num_cpus=-1, **kwargs):
         X = self.preprocess(X, **kwargs)
+        self.model.set_params(n_jobs=num_cpus)
 
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
@@ -157,13 +161,7 @@ class XGBoostModel(AbstractModel):
     def _get_early_stopping_rounds(self, num_rows_train, strategy='auto'):
         return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
 
-    def _ag_params(self) -> set:
-        return {'ag.early_stop'}
-
-    # FIXME: This is copy-pasted from CatBoostModel, make a generic memory check method / function and re-use.
-    def _assert_memory_safe(self, X, y):
-        num_rows_train = X.shape[0]
-        num_cols_train = X.shape[1]
+    def _get_num_classes(self, y):
         if self.problem_type == MULTICLASS:
             if self.num_classes is not None:
                 num_classes = self.num_classes
@@ -173,8 +171,20 @@ class XGBoostModel(AbstractModel):
             num_classes = y.shape[1]
         else:
             num_classes = 1
+        return num_classes
+
+    def _ag_params(self) -> set:
+        return {'ag.early_stop'}
+
+    def _estimate_memory_usage(self, X, **kwargs):
+        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
+        data_mem_uasge = get_approximate_df_mem_usage(X).sum()
+        approx_mem_size_req = data_mem_uasge * 7 + data_mem_uasge / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        return approx_mem_size_req
+
+    def _validate_fit_memory_usage(self, **kwargs):
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        approx_mem_size_req = num_rows_train * num_cols_train * num_classes / 2  # TODO: Extremely crude approximation, can be vastly improved
+        approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if approx_mem_size_req > 1e9:  # > 1 GB
             available_mem = psutil.virtual_memory().available
             ratio = approx_mem_size_req / available_mem

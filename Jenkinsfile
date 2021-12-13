@@ -52,6 +52,16 @@ install_core_tests = """
     python3 -m pip install --upgrade -e core/[tests]
 """
 
+install_core_all = """
+    ${install_common}
+    python3 -m pip install --upgrade -e core/[all]
+"""
+
+install_core_all_tests = """
+    ${install_common}
+    python3 -m pip install --upgrade -e core/[all,tests]
+"""
+
 install_features = """
     python3 -m pip install --upgrade -e features/
 """
@@ -118,8 +128,7 @@ stage("Unit Test") {
           ${setup_pip_venv}
           python3 -m pip install 'mxnet==1.7.0.*'
           env
-
-          ${install_core_tests}
+          ${install_core_all_tests}
           cd core/
           python3 -m pytest --junitxml=results.xml --runslow tests
           ${cleanup_venv}
@@ -170,7 +179,7 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          ${install_core}
+          ${install_core_all}
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
@@ -202,7 +211,7 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          ${install_core}
+          ${install_core_all}
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
@@ -234,7 +243,7 @@ stage("Unit Test") {
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
-          ${install_core}
+          ${install_core_all}
           ${install_vision}
 
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
@@ -263,7 +272,7 @@ stage("Unit Test") {
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
-          ${install_core}
+          ${install_core_all}
           ${install_features}
           ${install_tabular_all}
           ${install_forecasting}
@@ -290,7 +299,7 @@ stage("Unit Test") {
           python3 -m pip install 'mxnet==1.7.0.*'
           env
 
-          ${install_core}
+          ${install_core_all}
           ${install_features}
           ${install_tabular_all}
 
@@ -603,7 +612,7 @@ stage("Build Docs") {
         python3 -m pip install 'docutils<0.16'
         python3 -m pip list
 
-        ${install_core}
+        ${install_core_all}
         ${install_features}
         ${install_tabular_all}
         ${install_text}
