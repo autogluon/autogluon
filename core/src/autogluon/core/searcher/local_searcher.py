@@ -12,18 +12,18 @@ class LocalSearcher(object):
 
     Parameters
     ----------
-    config: dict
+    search_space: dict
         The configuration space to sample from. It contains the full
         specification of the Hyperparameters with their priors
     """
-    def __init__(self, config, reward_attribute=None, **kwargs):
+    def __init__(self, search_space, reward_attribute=None, **kwargs):
         """
-        :param config: Configuration space to sample from or search in
+        :param search_space: Configuration space to sample from or search in
         :param reward_attribute: Reward attribute passed to update.
             Default: 'accuracy'
 
         """
-        self.config = config
+        self.search_space = search_space
         self._results = OrderedDict()
         if reward_attribute is None:
             reward_attribute = 'accuracy'

@@ -22,7 +22,7 @@ from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-from ...scheduler import FIFOScheduler
+from ...scheduler import LocalSequentialScheduler
 from ...task.base import BasePredictor
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
@@ -910,15 +910,7 @@ class AbstractModel:
             fit_kwargs=fit_kwargs,
         )
 
-        model_trial.register_args(util_args=util_args, **params_copy)
-        scheduler: FIFOScheduler = scheduler_cls(model_trial, **scheduler_params)
-        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
-            # This is multi-machine setting, so need to copy dataset to workers:
-            logger.log(15, "Uploading data to remote workers...")
-            scheduler.upload_files([train_path, val_path])  # TODO: currently does not work.
-            directory = self.path  # TODO: need to change to path to working directory used on every remote machine
-            model_trial.update(directory=directory)
-            logger.log(15, "uploaded")
+        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=params_copy, util_args=util_args, **scheduler_params)
 
         scheduler.run()
         scheduler.join_jobs()
@@ -936,7 +928,6 @@ class AbstractModel:
             'training_history': scheduler.training_history,
             'config_history': scheduler.config_history,
             'reward_attr': scheduler._reward_attr,
-            'args': model_trial.args
         }
 
         hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model

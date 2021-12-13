@@ -10,7 +10,6 @@ from tqdm.auto import tqdm
 
 from .reporter import FakeReporter
 from ..searcher import BaseSearcher, searcher_factory
-from ..utils import EasyDict
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ class LocalReporter:
         self.trial = trial
         self.training_history = training_history
         self.training_history[trial] = []
-        self.searcher_config = EasyDict(deepcopy(searcher_config))
+        self.searcher_config = deepcopy(searcher_config)
         self.config_history = config_history
         self.trial_started = time.time()
         self.last_reported_time = self.trial_started
@@ -86,7 +85,7 @@ class LocalSequentialScheduler(object):
         Note: The type of resource must be int.
     """
 
-    def __init__(self, train_fn, searcher='auto', **kwargs):
+    def __init__(self, train_fn, search_space, util_args=None, searcher='auto', **kwargs):
         self.train_fn = train_fn
         self.training_history = None
         self.config_history = None
@@ -94,10 +93,11 @@ class LocalSequentialScheduler(object):
         self.time_attr = kwargs.get('time_attr', None)
         self.resource = kwargs['resource']
         self.max_reward = kwargs.get('max_reward', None)
-        self.searcher: BaseSearcher = self.get_searcher_(searcher, train_fn, **kwargs)
+        self.searcher: BaseSearcher = self.get_searcher_(searcher, train_fn, search_space=search_space, **kwargs)
         self.init_limits_(kwargs)
+        self.util_args = util_args
         self.metadata = {
-            'search_space': train_fn.kwspaces,
+            'search_space': search_space,
             'search_strategy': self.searcher,
             'stop_criterion': {
                 'time_limits': self.time_out,
@@ -111,10 +111,9 @@ class LocalSequentialScheduler(object):
         self.num_trials = kwargs.get('num_trials', 9999)
         self.time_out = kwargs.get('time_out', None)
         if self.num_trials is None:
-            assert self.time_out is not None, \
-                "Need stopping criterion: Either num_trials or time_out"
+            assert self.time_out is not None, "Need stopping criterion: Either num_trials or time_out"
 
-    def get_searcher_(self, searcher, train_fn, **kwargs) -> BaseSearcher:
+    def get_searcher_(self, searcher, train_fn, search_space, **kwargs) -> BaseSearcher:
         scheduler_opts = {}
         if searcher == 'auto':
             searcher = 'local_random'
@@ -126,7 +125,7 @@ class LocalSequentialScheduler(object):
                 search_options = dict()
             _search_options = search_options.copy()
             if searcher.startswith('local_'):
-                _search_options['config'] = train_fn.kwspaces
+                _search_options['search_space'] = search_space
             else:
                 _search_options['configspace'] = train_fn.cs
                 _search_options['resource_attribute'] = kwargs.get('time_attr', None)
@@ -159,6 +158,7 @@ class LocalSequentialScheduler(object):
             except Exception:
                 # TODO: Add special exception type when there are no more new configurations to try (exhausted search space)
                 logger.log(30, f'\tWARNING: Encountered unexpected exception during trial {i}, stopping HPO early.')
+                logger.exception('Detailed Traceback:')  # TODO: Avoid logging if verbosity=0
                 break
             trial_end_time = time.time()
             trial_run_times.append(np.NaN if is_failed else (trial_end_time - trial_start_time))
@@ -240,12 +240,16 @@ class LocalSequentialScheduler(object):
         return self.run_job_(task_id, searcher_config, reporter)
 
     def run_job_(self, task_id, searcher_config, reporter):
-        args = deepcopy(EasyDict(self.train_fn.kwvars))
+        args = dict()
+        if self.util_args is not None:
+            args['util_args'] = deepcopy(self.util_args)
+        args.update(searcher_config)
+
         args['task_id'] = task_id
         self.searcher.register_pending(searcher_config)
         is_failed = False
         try:
-            result = self.train_fn(args, config=searcher_config, reporter=reporter)
+            result = self.train_fn(args, reporter=reporter)
             if type(reporter) is not FakeReporter and reporter.last_result:
                 self.searcher.update(config=searcher_config, **reporter.last_result)
         except Exception as e:

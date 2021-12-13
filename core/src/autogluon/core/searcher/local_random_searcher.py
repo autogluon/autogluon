@@ -2,11 +2,10 @@ import logging
 import pickle
 
 import numpy as np
-from scipy.stats import randint
 from sklearn.model_selection import ParameterSampler
 
 from .local_searcher import LocalSearcher
-from ..space import Categorical
+from ..space import Categorical, Space
 
 __all__ = ['LocalRandomSearcher']
 
@@ -27,25 +26,24 @@ class LocalRandomSearcher(LocalSearcher):
 
     def _get_params_default(self) -> dict:
         params_default = dict()
-        for key, val in self.config.items():
-            if isinstance(val, Categorical):
-                # FIXME: Don't do this, fix the outer code to not require this
-                d = 0
-            else:
-                d = val.default
-            params_default[key] = d
+        for key, val in self.search_space.items():
+            if isinstance(val, Space):
+                if isinstance(val, Categorical):
+                    # FIXME: Don't do this, fix the outer code to not require this
+                    d = val.data[0]
+                else:
+                    d = val.default
+                params_default[key] = d
         return params_default
 
     def _get_params_space(self) -> dict:
         param_space = dict()
-        for key, val in self.config.items():
-            sk = val.convert_to_sklearn()
-            if isinstance(sk, list):
-                sk = randint(0, len(sk))
-            param_space[key] = sk
+        for key, val in self.search_space.items():
+            if isinstance(val, Space):
+                sk = val.convert_to_sklearn()
+                param_space[key] = sk
         return param_space
 
-    # FIXME: Return actual params instead of encoded params that need to be decoded
     def _sample_config(self) -> dict:
         params = list(ParameterSampler(self._params_space, n_iter=1, random_state=self.random_state))[0]
         for key in params:
