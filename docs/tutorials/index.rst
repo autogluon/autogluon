@@ -151,21 +151,6 @@ Tune Custom Models
       AutoGluon's Core API for search spaces and searchable
       objects used to tune any training function's argument-values.
 
-   .. card::
-      :title: Distributed Search Tutorial
-      :link: course/distributed.html
-
-      Easily distribute AutoGluon tuning
-      across multiple machines.
-
-   .. card::
-      :title: Fair Bayesian Optimization
-      :link: course/fairbo.html
-
-      Example of how to use constrained 
-      Bayesian Optimization in AutoGluon to tune 
-      ML models under fairness constraints.
-
 
 .. toctree::
    :maxdepth: 2

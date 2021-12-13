@@ -26,7 +26,6 @@ install_requires = [
 
     'cython',  # TODO: Do we need cython here? Why is cython not version capped / minned?
     'ConfigSpace==0.4.19',
-    'tornado>=5.0.1',
     'requests',
     'matplotlib',
     'paramiko>=2.4',
@@ -55,10 +54,5 @@ if __name__ == '__main__':
     setup(
         install_requires=install_requires,
         extras_require=extras_require,
-        entry_points={
-            'console_scripts': [
-                'agremote = autogluon.core.scheduler.remote.cli:main',
-            ]
-        },
         **setup_args,
     )

@@ -129,19 +129,6 @@ To get started, checkout our paper ["Model-based Asynchronous Hyperparameter and
 }
 ```
 
-## AutoGluon for Constrained Hyperparameter Optimization
-
-AutoGluon includes an [algorithm for constrained hyperparameter optimization](https://auto.gluon.ai/dev/tutorials/course/fairbo.html). Check out our paper applying it to optimize model performance under fairness constraints: ["Fair Bayesian Optimization"](https://arxiv.org/abs/2006.05109), AIES (2021).
-
-```bibtex
-@article{fairbo,
-  title={Fair Bayesian Optimization},
-  author={Perrone, Valerio and Donini, Michele and Zafar, Bilal Muhammad and Schmucker, Robin and Kenthapadi, Krishnaram and Archambeau, Cédric},
-  journal={AIES},
-  year={2021}
-}
-```
-
 
 ## License
 

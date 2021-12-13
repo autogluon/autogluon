@@ -211,33 +211,3 @@ class MeanStdAcquisitionFunction(AcquisitionFunction, ABC):
 
         """
         pass
-
-
-class AcquisitionWithMultiModelCurrentBest(MeanStdAcquisitionFunction, ABC):
-    """
-    Abstract acquisition function class for multi-output acquisition functions
-    requiring predictions from all output models to compute the current best.
-
-    For instance, CEIAcquisitionFunction uses the output from the constraint model
-    to filter out the infeasible candidates before computing the current best.
-    """
-    def _map_models_to_candidate_predictive_means(self):
-        # Create a dictionary mapping each output model name to the predictive means at the current candidates
-        models_to_means = {model_name: model.predict_mean_current_candidates()
-                           for model_name, model
-                           in self.model.items()}
-        expected_length = len(next(iter(models_to_means.values())))
-        assert all(len(predicted_means) == expected_length
-                   for predicted_means
-                   in models_to_means.values()), \
-            'All models must have the same number of MCMC samples.'
-        return models_to_means
-
-    @abstractmethod
-    def _get_current_best_for_active_metric(self):
-        """
-        Returns a list of current best, one per MCMC sample (if head requires the current best).
-
-        Overrides the parent method to use the predictions from all models to identify the current best.
-        """
-        pass
