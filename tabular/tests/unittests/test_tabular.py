@@ -24,11 +24,11 @@ import shutil
 import warnings
 from random import seed
 
-import autogluon.core as ag
-import mxnet as mx
 import numpy as np
 import pandas as pd
 import pytest
+
+import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.tabular import TabularDataset, TabularPredictor
 from networkx.exception import NetworkXError
@@ -267,7 +267,6 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if seed_val is not None:
                 seed(seed_val)
                 np.random.seed(seed_val)
-                mx.random.seed(seed_val)
             print("Evaluating Benchmark Dataset %s (%d of %d)" % (dataset['name'], idx+1, len(datasets)))
             directory = directory_prefix + dataset['name'] + "/"
             savedir = directory + 'AutogluonOutput/'
