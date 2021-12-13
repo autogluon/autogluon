@@ -8,9 +8,9 @@ from typing import Tuple
 import numpy as np
 from tqdm.auto import tqdm
 
-from autogluon.core.scheduler.reporter import FakeReporter
-from autogluon.core.searcher import BaseSearcher, searcher_factory
-from autogluon.core.utils import EasyDict
+from .reporter import FakeReporter
+from ..searcher import BaseSearcher, searcher_factory
+from ..utils import EasyDict
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class LocalSequentialScheduler(object):
     def get_searcher_(self, searcher, train_fn, **kwargs) -> BaseSearcher:
         scheduler_opts = {}
         if searcher == 'auto':
-            searcher = 'bayesopt'
+            searcher = 'local_random'
             scheduler_opts = {'scheduler': 'local'}
 
         search_options = kwargs.get('search_options', None)
@@ -125,9 +125,12 @@ class LocalSequentialScheduler(object):
             if search_options is None:
                 search_options = dict()
             _search_options = search_options.copy()
-            _search_options['configspace'] = train_fn.cs
+            if searcher.startswith('local_'):
+                _search_options['config'] = train_fn.kwspaces
+            else:
+                _search_options['configspace'] = train_fn.cs
+                _search_options['resource_attribute'] = kwargs.get('time_attr', None)
             _search_options['reward_attribute'] = kwargs['reward_attr']
-            _search_options['resource_attribute'] = kwargs.get('time_attr', None)
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
             if 'scheduler' not in _search_options:

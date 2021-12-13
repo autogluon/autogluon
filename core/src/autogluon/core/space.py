@@ -371,6 +371,9 @@ class Categorical(NestedSpace):
                 _add_cs(cs, v.cs, str(i))
         return cs
 
+    def convert_to_sklearn(self):
+        return self.data
+
     def sample(self, **config):
         """Sample a configuration from this search space.
         """
@@ -425,6 +428,15 @@ class Real(SimpleSpace):
         self.log = log
         self._default = default
 
+    def convert_to_sklearn(self):
+        from scipy.stats import loguniform, uniform
+
+        if self.log:
+            sampler = loguniform(self.lower, self.upper)
+        else:
+            sampler = uniform(self.lower, self.upper - self.lower)
+        return sampler
+
     def get_hp(self, name):
         
         return CSH.UniformFloatHyperparameter(name=name, lower=self.lower, upper=self.upper,
@@ -451,6 +463,10 @@ class Int(SimpleSpace):
         self.lower = lower
         self.upper = upper
         self._default = default
+
+    def convert_to_sklearn(self):
+        from scipy.stats import randint
+        return randint(self.lower, self.upper+1)
 
     def get_hp(self, name):
         return CSH.UniformIntegerHyperparameter(name=name, lower=self.lower, upper=self.upper,
