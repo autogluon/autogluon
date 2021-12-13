@@ -9,7 +9,7 @@ def vectorizer_auto_ml_default():
 
 
 def get_ngram_freq(vectorizer, transform_matrix):
-    names = vectorizer.get_feature_names()
+    names = vectorizer.get_feature_names_out()
     frequencies = transform_matrix.sum(axis=0).tolist()[0]
     ngram_freq = {ngram: freq for ngram, freq in zip(names, frequencies)}
     return ngram_freq
