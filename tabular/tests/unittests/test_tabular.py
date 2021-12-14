@@ -634,9 +634,9 @@ def _construct_tabular_bag_test_config(fold_fitting_strategy):
     return config
 
 
-def test_tabular_parallel_local_bagging():
-    config = _construct_tabular_bag_test_config(PARALLEL_LOCAL_BAGGING)
-    run_tabular_benchmarks(**config)
+# def test_tabular_parallel_local_bagging():
+#     config = _construct_tabular_bag_test_config(PARALLEL_LOCAL_BAGGING)
+#     run_tabular_benchmarks(**config)
 
 
 def test_tabular_sequential_local_bagging():
