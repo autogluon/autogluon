@@ -4,6 +4,8 @@ import numpy.testing as npt
 import pandas as pd
 import pytest
 import tempfile
+
+from autogluon.core.space import Int
 from autogluon.core.utils.loaders import load_pd
 from autogluon.text import TextPredictor, ag_text_presets
 
@@ -231,3 +233,49 @@ def test_empty_text_item():
     train_data.iat[10, 0] = None
     predictor = TextPredictor(label='score', verbosity=4)
     predictor.fit(train_data, hyperparameters=get_test_hyperparameters(), time_limit=30)
+
+
+def get_test_hyperparameters_hpo():
+    config = ag_text_presets.create('default')
+    search_space = config['models']['MultimodalTextModel']['search_space']
+    search_space['optimization.num_train_epochs'] = Int(1, 3)
+    search_space['model.backbone.name'] = 'google_electra_small'
+    return config
+
+
+def test_predictor_fit_hpo():
+    key = 'sst'
+
+    train_data = load_pd.load(DATA_INFO[key]['train'])
+    dev_data = load_pd.load(DATA_INFO[key]['dev'])
+    label = DATA_INFO[key]['label']
+    eval_metric = DATA_INFO[key]['metric']
+    verify_proba = DATA_INFO[key]['verify_proba']
+
+    rng_state = np.random.RandomState(123)
+    train_perm = rng_state.permutation(len(train_data))
+    valid_perm = rng_state.permutation(len(dev_data))
+    train_data = train_data.iloc[train_perm[:100]]
+    dev_data = dev_data.iloc[valid_perm[:10]]
+    predictor = TextPredictor(label=label, eval_metric=eval_metric)
+    predictor.fit(
+        train_data,
+        hyperparameters=get_test_hyperparameters(),
+        num_trials=3,
+        time_limit=120,
+        seed=123,
+    )
+    dev_score = predictor.evaluate(dev_data)
+    verify_predictor_save_load(predictor, dev_data, verify_proba=verify_proba)
+
+    # Test for continuous fit
+    predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                  time_limit=30, seed=123)
+    verify_predictor_save_load(predictor, dev_data, verify_proba=verify_proba)
+
+    # Saving to folder, loading the saved model and call fit again (continuous fit)
+    with tempfile.TemporaryDirectory() as root:
+        predictor.save(root)
+        predictor = TextPredictor.load(root)
+        predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+                      time_limit=30, seed=123)
