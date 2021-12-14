@@ -377,13 +377,18 @@ class Categorical(NestedSpace):
     def sample(self, **config):
         """Sample a configuration from this search space.
         """
-        choice = config.pop('choice')
-        if isinstance(self.data[choice], NestedSpace):
-            # nested space: Categorical of AutoGluonobjects
-            min_config = _strip_config_space(config, prefix=str(choice))
-            return self.data[choice].sample(**min_config)
+        if 'choice' in config:
+            choice = config.pop('choice')
+            if isinstance(self.data[choice], NestedSpace):
+                # nested space: Categorical of AutoGluonobjects
+                min_config = _strip_config_space(config, prefix=str(choice))
+                return self.data[choice].sample(**min_config)
+            else:
+                return self.data[choice]
         else:
-            return self.data[choice]
+            # FIXME: Avoid this, required to be compatible with gluoncv
+            choice = config.pop('')
+            return choice
 
     @property
     def kwspaces(self):

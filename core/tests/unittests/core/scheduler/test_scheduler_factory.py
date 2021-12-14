@@ -53,7 +53,7 @@ def test_scheduler_factory__reaises_exception_on_missing_searcher():
 
 
 def test_get_hyperparameter_tune_kwargs_preset__preset_exists():
-    assert get_hyperparameter_tune_kwargs_preset(preset='auto') == {'scheduler': 'local', 'searcher': 'bayesopt'}
+    assert get_hyperparameter_tune_kwargs_preset(preset='auto') == {'scheduler': 'local', 'searcher': 'local_random'}
 
 
 def test_get_hyperparameter_tune_kwargs_preset__preset_missing():

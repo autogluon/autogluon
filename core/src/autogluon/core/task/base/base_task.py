@@ -28,7 +28,7 @@ def create_scheduler(train_fn, scheduler, scheduler_options):
         assert callable(scheduler)
         scheduler_cls = scheduler
         scheduler_options = copy.copy(scheduler_options)
-    return scheduler_cls(train_fn, **scheduler_options)
+    return scheduler_cls(train_fn, search_space=train_fn.args, **scheduler_options)
 
 
 # FIXME: REMOVE THIS, first GluonCV needs to stop depending on AG, as it imports this class

@@ -10,6 +10,7 @@ from tqdm.auto import tqdm
 
 from .reporter import FakeReporter
 from ..searcher import BaseSearcher, searcher_factory
+from ..utils import EasyDict
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,9 @@ class LocalSequentialScheduler(object):
         if searcher == 'auto':
             searcher = 'local_random'
             scheduler_opts = {'scheduler': 'local'}
+        elif searcher == 'random':
+            # FIXME: Hack to be compatible with gluoncv
+            searcher = 'local_random'
 
         search_options = kwargs.get('search_options', None)
         if isinstance(searcher, str):
@@ -235,9 +239,11 @@ class LocalSequentialScheduler(object):
             Trial end time
 
         """
-        searcher_config = self.searcher.get_config()
-        reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
-        return self.run_job_(task_id, searcher_config, reporter)
+        new_searcher_config = self.searcher.get_config()
+        searcher_config = deepcopy(self.metadata['search_space'])
+        searcher_config.update(new_searcher_config)
+        reporter = LocalReporter(task_id, new_searcher_config, self.training_history, self.config_history)
+        return self.run_job_(task_id, new_searcher_config, reporter)
 
     def run_job_(self, task_id, searcher_config, reporter):
         args = dict()
@@ -246,6 +252,7 @@ class LocalSequentialScheduler(object):
         args.update(searcher_config)
 
         args['task_id'] = task_id
+        args = EasyDict(args)  # TODO: Remove, currently used for compatibility with gluoncv
         self.searcher.register_pending(searcher_config)
         is_failed = False
         try:
