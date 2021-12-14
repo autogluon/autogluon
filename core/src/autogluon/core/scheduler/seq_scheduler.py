@@ -242,8 +242,8 @@ class LocalSequentialScheduler(object):
         new_searcher_config = self.searcher.get_config()
         searcher_config = deepcopy(self.metadata['search_space'])
         searcher_config.update(new_searcher_config)
-        reporter = LocalReporter(task_id, new_searcher_config, self.training_history, self.config_history)
-        return self.run_job_(task_id, new_searcher_config, reporter)
+        reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
+        return self.run_job_(task_id, searcher_config, reporter)
 
     def run_job_(self, task_id, searcher_config, reporter):
         args = dict()
