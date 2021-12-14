@@ -350,7 +350,7 @@ class BaggedEnsembleModel(AbstractModel):
                    save_folds=True,
                    groups=None,
                    **kwargs):
-        fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'parallel_local')
+        fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'sequential_local')
         num_folds_parallel = self.params.get('num_folds_parallel', 'auto')
         disable_parallel_fitting = self.params.get('_disable_parallel_fitting', False)
         if fold_fitting_strategy == 'parallel_local':
