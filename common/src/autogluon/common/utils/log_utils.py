@@ -1,13 +1,12 @@
 import logging
 import warnings
 
-_logger = logging.getLogger()  # return root logger
+_logger = logging.getLogger('autogluon')  # return autogluon root logger
 
 
 def verbosity2loglevel(verbosity):
     """ Translates verbosity to logging level. Suppresses warnings if verbosity = 0. """
     if verbosity <= 0:  # only errors
-        warnings.filterwarnings("ignore")
         # print("Caution: all warnings suppressed")
         log_level = 40
     elif verbosity == 1:  # only warnings and critical print statements

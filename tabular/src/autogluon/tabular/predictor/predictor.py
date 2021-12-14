@@ -34,7 +34,7 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict
 from ..learner import AbstractLearner, DefaultLearner
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
 # TODO: num_bag_sets -> ag_args
@@ -193,7 +193,7 @@ class TabularPredictor:
             **kwargs
     ):
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
+        set_logger_verbosity(self.verbosity)
         if sample_weight == AUTO_WEIGHT:  # TODO: update auto_weight strategy and make it the default
             sample_weight = None
             logger.log(15, f"{AUTO_WEIGHT} currently does not use any sample weights.")
@@ -687,7 +687,7 @@ class TabularPredictor:
         kwargs = self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         if presets:
             if not isinstance(presets, list):
@@ -928,7 +928,7 @@ class TabularPredictor:
         kwargs = self._validate_fit_extra_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         if verbosity >= 3:
             logger.log(20, '============ fit kwarg info ============')
@@ -2665,7 +2665,7 @@ class TabularPredictor:
             If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may run into numerous issues if attempting this.
         """
         if verbosity is not None:
-            set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
+            set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")
 

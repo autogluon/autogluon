@@ -27,7 +27,7 @@ from ..utils import sanitize_batch_size
 __all__ = ['ImagePredictor']
 
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
 class ImagePredictor(object):
@@ -264,7 +264,7 @@ class ImagePredictor(object):
         tuning_data = copy.deepcopy(tuning_data)
 
         log_level = verbosity2loglevel(self._verbosity)
-        set_logger_verbosity(self._verbosity, logger=logger)
+        set_logger_verbosity(self._verbosity)
         if presets:
             if not isinstance(presets, list):
                 presets = [presets]

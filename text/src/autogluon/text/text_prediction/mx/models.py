@@ -422,7 +422,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.defrost()
     cfg.misc.exp_dir = exp_dir
     cfg.freeze()
-    logger = logging.getLogger()
+    logger = logging.getLogger(__name__)
     set_logger_verbosity(verbosity, logger)
     logging_config(folder=exp_dir, name='training', logger=logger, console=console_log,
                    level=logging.DEBUG,
@@ -989,7 +989,7 @@ class MultiModalTextModel:
             Verbosity
         """
         set_seed(seed)
-        set_logger_verbosity(verbosity, logger)
+        set_logger_verbosity(verbosity)
         start_tick = time.time()
         assert len(self._label_columns) == 1, 'Currently, we only support single label.'
         # TODO(sxjscience) Try to support S3

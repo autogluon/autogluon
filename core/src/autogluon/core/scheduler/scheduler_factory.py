@@ -4,7 +4,7 @@ import logging
 from ..task.base import compile_scheduler_options_v2
 from ..task.base.base_task import schedulers
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 _scheduler_presets = {

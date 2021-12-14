@@ -10,23 +10,24 @@ from ..features.types import R_INT, R_FLOAT, R_CATEGORY
 
 logger = logging.getLogger(__name__)
 
-
-def _suspend_logging(func):
-    """hides any logs within the called func that are below warnings"""
-    @wraps(func)
-    def inner(*args, **kwargs):
-        root_logger = logging.getLogger()
-        previous_log_level = root_logger.getEffectiveLevel()
-        try:
-            root_logger.setLevel(max(30, previous_log_level))
-            return func(*args, **kwargs)
-        finally:
-            root_logger.setLevel(previous_log_level)
-    return inner
+def _suspend_logging_for_package(package_name):
+    def _suspend_logging(func):
+        """hides any logs within the called func that are below warnings"""
+        @wraps(func)
+        def inner(*args, **kwargs):
+            package_logger = logging.getLogger(package_name)
+            previous_log_level = package_logger.getEffectiveLevel()
+            try:
+                package_logger.setLevel(max(30, previous_log_level))
+                return func(*args, **kwargs)
+            finally:
+                package_logger.setLevel(previous_log_level)
+        return inner
+    return _suspend_logging
 
 
 # suspend_logging to hide the Pandas log of NumExpr initialization
-@_suspend_logging
+@_suspend_logging_for_package('pandas')
 def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
     if sample_ratio >= 1:
         return df.memory_usage(deep=True)

@@ -14,7 +14,7 @@ from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 
 __all__ = ['ObjectDetector']
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
 class ObjectDetector(object):
@@ -226,7 +226,7 @@ class ObjectDetector(object):
         scheduler_options = kwargs['hyperparameter_tune_kwargs']['scheduler_options']
 
         log_level = verbosity2loglevel(self._verbosity)
-        set_logger_verbosity(self._verbosity, logger=logger)
+        set_logger_verbosity(self._verbosity)
         if presets:
             if not isinstance(presets, list):
                 presets = [presets]

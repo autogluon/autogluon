@@ -20,7 +20,7 @@ from ..infer_types import infer_column_problem_types, printable_column_type_stri
 from ..metrics import infer_eval_log_metrics
 from ... import version
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
 class TextPredictor:
@@ -80,7 +80,7 @@ class TextPredictor:
     ):
         self.verbosity = verbosity
         if self.verbosity is not None:
-            set_logger_verbosity(self.verbosity, logger=logger)
+            set_logger_verbosity(self.verbosity)
         self._label = label
         self._problem_type = problem_type
         self._eval_metric = eval_metric
@@ -91,7 +91,7 @@ class TextPredictor:
 
     def set_verbosity(self, verbosity: int):
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
+        set_logger_verbosity(self.verbosity)
 
     @property
     def results(self):
