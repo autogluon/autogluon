@@ -15,18 +15,17 @@ class BatchTimeTracker(Callback):
 
     def __init__(self, batches_to_measure):
         self.batches_to_measure = batches_to_measure
-        self.batch_times = []
         self.batches_finished = 0
         self.batch_start_time = None
-
-    def before_batch(self):
-        self.batch_start_time = self._time_now()
+        self.batch_measured_time = None
 
     def after_batch(self):
-        if self.batches_finished > 0:  # skip first batch due to initialization overhead
-            self.batch_times.append(self._time_now() - self.batch_start_time)
         self.batches_finished += 1
+        if self.batches_finished == 1:
+            # skip first batch due to initialization overhead
+            self.batch_start_time = self._time_now()
         if self.batches_finished > self.batches_to_measure:
+            self.batch_measured_time = (self._time_now() - self.batch_start_time) / self.batches_to_measure
             raise CancelFitException()
 
     def _time_now(self):

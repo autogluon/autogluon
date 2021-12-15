@@ -312,9 +312,8 @@ class NNFastAiTabularModel(AbstractModel):
             elif batches_count < min_batches_count:
                 return default_epochs
             else:
-                batch_times = self._measure_batch_times(min_batches_count)
-                est_batch_time = np.max(batch_times) + np.std(batch_times) * 4
-                est_epoch_time = batches_count * est_batch_time
+                est_batch_time = self._measure_batch_times(min_batches_count)
+                est_epoch_time = batches_count * est_batch_time * 1.1
                 est_max_epochs = int(time_left / est_epoch_time)
                 epochs = min(default_epochs, est_max_epochs)
                 logger.log(15, f'Automated epochs selection: training for {epochs} epoch(s). Estimated time budget use {epochs * est_epoch_time:.2f} / {time_left:.2f} sec')
@@ -329,8 +328,8 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.fit(1, lr=0, cbs=[batch_time_tracker_callback])
         except CancelFitException:
             pass  # expected early exit
-        batch_times = batch_time_tracker_callback.batch_times
-        return batch_times
+        batch_time = batch_time_tracker_callback.batch_measured_time
+        return batch_time
 
     def _generate_datasets(self, X, y, X_val, y_val):
         df_train = pd.concat([X, X_val], ignore_index=True)

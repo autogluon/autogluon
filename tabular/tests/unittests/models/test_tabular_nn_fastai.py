@@ -45,9 +45,7 @@ __GET_EPOCHS_NUMBER_CASES = {
 @pytest.mark.parametrize("test_input", __GET_EPOCHS_NUMBER_CASES.values(), ids=__GET_EPOCHS_NUMBER_CASES.keys())
 def test_get_epochs_number(test_input):
     args, epochs_expected = test_input
-    with mock.patch.object(NNFastAiTabularModel, '_measure_batch_times', return_value=[1, 1, 1.1, 1]) as mock_method:
-        # For sequence [90, 1, 1, 1.1, 1], we discard 1st batch due to potential initialization overhead
-        # mean: 1.1 * 4x std (0.0433) => 1.2732s/batch
+    with mock.patch.object(NNFastAiTabularModel, '_measure_batch_times', return_value=1.2732) as mock_method:
         # batches = (4000/256) + 1 = 16
         # est_epoch_time = 16 * 1.2732 = 20.371
         # time_left:45/est_epoch_time:20.371 = 2
@@ -79,17 +77,16 @@ def test_get_batch_size_with_bs_provided(test_input):
 
 def test_BatchTimeTracker():
     with mock.patch.object(BatchTimeTracker, '_time_now') as mock_method:
-        mock_method.side_effect = [0, 10, 11, 14, 18, 20, 22]
+        mock_method.side_effect = [10, 40]
         iterations_to_complete = 3
         tracker = BatchTimeTracker(batches_to_measure=iterations_to_complete)
         stopped = False
         for i in range(iterations_to_complete + 1):
             try:
-                tracker.before_batch()
                 tracker.after_batch()
                 if i == iterations_to_complete:
                     raise ValueError('CancelFitException should be raised, but was not')
             except CancelFitException:
                 stopped = True
         assert stopped
-        assert tracker.batch_times == [1, 4, 2]
+        assert tracker.batch_measured_time == 10.0
