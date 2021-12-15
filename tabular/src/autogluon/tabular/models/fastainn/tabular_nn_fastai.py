@@ -273,7 +273,11 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.path = Path(temp_dir)
 
                     len_val = len(X_val) if X_val is not None else 0
-                    epochs = self._get_epochs_number(len(X) + len_val, params, batch_size, time_left)
+                    epochs = self._get_epochs_number(len(X) + len_val, params['epochs'], batch_size, time_left)
+                    if epochs == 0:
+                        # Stop early if there is not enough time to train a full epoch
+                        raise TimeLimitExceeded
+
                     self.model.fit_one_cycle(epochs, params['lr'], cbs=callbacks)
 
                     # Load the best one and export it
@@ -289,41 +293,44 @@ class NNFastAiTabularModel(AbstractModel):
 
             self.params_trained['best_epoch'] = save_callback.best_epoch
 
-    def _get_batch_size(self, X):
+    def _get_batch_size(self, X, default_batch_size_for_small_inputs=32):
         bs = self.params['bs']
         if bs == 'auto':
             bs = 512 if len(X) >= 200000 else 256
-        bs = bs if len(X) > bs else 32
+        bs = bs if len(X) > bs else default_batch_size_for_small_inputs
 
         if self.params['bs'] == 'auto':
             logger.log(15, f'Automated batch size selection: {bs}')
 
         return bs
 
-    def _get_epochs_number(self, samples_num, params, batch_size, time_left, min_batches_count=30, default_epochs=30):
-        from fastai.callback.core import CancelFitException
-        epochs = params['epochs']
-        batches_count = int(samples_num / batch_size) + 1
+    def _get_epochs_number(self, samples_num, epochs, batch_size, time_left=None, min_batches_count=30, default_epochs=30):
         if epochs == 'auto':
+            batches_count = int(samples_num / batch_size) + 1
             if not time_left:
                 return default_epochs
             elif batches_count < min_batches_count:
                 return default_epochs
             else:
-                batch_time_tracker_callback = BatchTimeTracker(batches_to_measure=min_batches_count)
-                try:
-                    with self.model.no_bar():
-                        with self.model.no_logging():
-                            self.model.fit(1, lr=0, cbs=[batch_time_tracker_callback])
-                except CancelFitException:
-                    pass  # expected early exit
-                batch_times = batch_time_tracker_callback.batch_times
+                batch_times = self._measure_batch_times(min_batches_count)
                 est_batch_time = np.max(batch_times) + np.std(batch_times) * 4
                 est_epoch_time = batches_count * est_batch_time
                 est_max_epochs = int(time_left / est_epoch_time)
                 epochs = min(default_epochs, est_max_epochs)
                 logger.log(15, f'Automated epochs selection: training for {epochs} epoch(s). Estimated time budget use {epochs * est_epoch_time:.2f} / {time_left:.2f} sec')
         return epochs
+
+    def _measure_batch_times(self, min_batches_count):
+        from fastai.callback.core import CancelFitException
+        batch_time_tracker_callback = BatchTimeTracker(batches_to_measure=min_batches_count)
+        try:
+            with self.model.no_bar():
+                with self.model.no_logging():
+                    self.model.fit(1, lr=0, cbs=[batch_time_tracker_callback])
+        except CancelFitException:
+            pass  # expected early exit
+        batch_times = batch_time_tracker_callback.batch_times
+        return batch_times
 
     def _generate_datasets(self, X, y, X_val, y_val):
         df_train = pd.concat([X, X_val], ignore_index=True)

@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class BatchTimeTracker(Callback):
+    """
+    Training callback which allows collecting batch training times. The primary use is epoch training time estimation in adaptive epoch number selection.
+    """
 
     def __init__(self, batches_to_measure):
         self.batches_to_measure = batches_to_measure
@@ -17,14 +20,17 @@ class BatchTimeTracker(Callback):
         self.batch_start_time = None
 
     def before_batch(self):
-        self.batch_start_time = time.time()
+        self.batch_start_time = self._time_now()
 
     def after_batch(self):
         if self.batches_finished > 0:  # skip first batch due to initialization overhead
-            self.batch_times.append(time.time() - self.batch_start_time)
+            self.batch_times.append(self._time_now() - self.batch_start_time)
         self.batches_finished += 1
         if self.batches_finished > self.batches_to_measure:
             raise CancelFitException()
+
+    def _time_now(self):
+        return time.time()
 
 
 class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
