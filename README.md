@@ -45,7 +45,8 @@ See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [docume
 
 - [Learning with text data](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html)
 - [Learning with image data](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html)
-- More advanced topics such as [Neural Architecture Search](https://auto.gluon.ai/stable/tutorials/nas/index.html)
+
+Refer to the [AutoGluon Roadmap](https://github.com/awslabs/autogluon/blob/master/ROADMAP.md) for details on upcoming features and releases.
 
 ### Scientific Publications
 - [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020)
