@@ -18,7 +18,6 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryEr
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-from .callbacks import BatchTimeTracker
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -321,6 +320,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _measure_batch_times(self, min_batches_count):
         from fastai.callback.core import CancelFitException
+        # from .callbacks import BatchTimeTracker
         batch_time_tracker_callback = BatchTimeTracker(batches_to_measure=min_batches_count)
         try:
             with self.model.no_bar():
