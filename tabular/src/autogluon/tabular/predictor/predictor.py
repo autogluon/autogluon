@@ -489,7 +489,7 @@ class TabularPredictor:
                             fold_fitting_strategy: (AbstractFoldFittingStrategy default=auto) Whether to fit folds in parallel or in sequential order.
                                 If parallel_local, folds will be trained in parallel with evenly distributed computing resources. This could bring 2-4x speedup compared to SequentialLocalFoldFittingStrategy, but could consume much more memory.
                                 If sequential_local, folds will be trained in sequential.
-                                If auto, strategy will be determined by OS and whether ray is installed or not.
+                                If auto, strategy will be determined by OS and whether ray is installed or not. MacOS support for parallel_local is unstable, and may crash if enabled.
                             num_folds_parallel: (int or str, default='auto') Number of folds to be trained in parallel if using ParallelLocalFoldFittingStrategy. Consider lowering this value if you encounter either out of memory issue or CUDA out of memory issue(when trained on gpu).
                                 if 'auto', will try to train all folds in parallel.
 

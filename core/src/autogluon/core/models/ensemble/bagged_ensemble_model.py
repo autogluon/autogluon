@@ -341,13 +341,6 @@ class BaggedEnsembleModel(AbstractModel):
         self._add_child_times_to_bag(model=model_base)
 
     def _get_default_fold_fitting_strategy(self):
-        try:
-            try_import_ray()
-        except Exception:
-            warning_msg = 'Will use sequential fold fitting strategy becuase ray>=1.7.0,<1.8.0 is not installed.'
-            dup_filter.attach_filter_targets(warning_msg)
-            logger.warning(warning_msg)
-            return 'sequential_local'
         # ray not working properly on macos: https://github.com/ray-project/ray/issues/20084
         # TODO: re-enable macos once this issue is addressed
         os_fitting_strategy_map = dict(
@@ -358,9 +351,18 @@ class BaggedEnsembleModel(AbstractModel):
         current_os = platform.system()
         fold_fitting_strategy = os_fitting_strategy_map.get(current_os, 'sequential_local')
         if fold_fitting_strategy == 'sequential_local':
-            warning_msg = f'Will use sequential fold fitting strategy becuase OS {current_os} not support parallel folding yet.'
+            warning_msg = f'Will use sequential fold fitting strategy because {current_os} OS does not yet support parallel folding.'
             dup_filter.attach_filter_targets(warning_msg)
             logger.warning(warning_msg)
+        else:
+            try:
+                try_import_ray()
+            except Exception:
+                warning_msg = 'Will use sequential fold fitting strategy because ray>=1.7.0,<1.8.0 is not installed.'
+                dup_filter.attach_filter_targets(warning_msg)
+                logger.warning(warning_msg)
+                fold_fitting_strategy = 'sequential_local'
+        assert fold_fitting_strategy in ['parallel_local', 'sequential_local']
         return fold_fitting_strategy
 
     def _fit_folds(self,
