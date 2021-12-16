@@ -144,6 +144,14 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                     break
 
         min_score = np.min(trajectory)
+
+        # If abs value of min score is large enough, round to 6 decimal places to avoid floating point error deciding the best index.
+        # This avoids 2 models with the same pred proba both being used in the ensemble due to floating point error
+        epsilon = 1e-6
+        if np.abs(min_score) > epsilon * 100:
+            for i in range(len(trajectory)):
+                trajectory[i] = trajectory[i].round(6)
+            min_score = np.min(trajectory)
         first_index_of_best = trajectory.index(min_score)
 
         if self.use_best:
