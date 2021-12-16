@@ -339,10 +339,8 @@ class BaggedEnsembleModel(AbstractModel):
 
     def _get_default_fold_fitting_strategy(self):
         try:
-            ray = try_import_ray()
+            try_import_ray()
         except Exception:
-            ray = None
-        if not ray:
             return 'sequential_local'
         # ray not working properly on macos: https://github.com/ray-project/ray/issues/20084
         # TODO: re-enable macos once this issue is addressed
