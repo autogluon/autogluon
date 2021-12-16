@@ -21,6 +21,7 @@ class DuplicateFilter(object):
             self.filter_targets.add(target)
 
     def clear_filter_targets(self):
+        self.msgs = set()
         self.filter_targets = set()
 
 
