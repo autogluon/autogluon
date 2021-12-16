@@ -9,6 +9,7 @@ from statistics import mean
 import numpy as np
 import pandas as pd
 
+from autogluon.common.utils.log_utils import DuplicateFilter
 from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelLocalFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
@@ -20,6 +21,8 @@ from ...utils.utils import CVSplitter, _compute_fi_with_stddev
 
 
 logger = logging.getLogger(__name__)
+dup_filter = DuplicateFilter()
+logger.addFilter(dup_filter)
 
 
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
@@ -341,6 +344,9 @@ class BaggedEnsembleModel(AbstractModel):
         try:
             try_import_ray()
         except Exception:
+            warning_msg = 'Will use sequential fold fitting strategy becuase ray is not installed.'
+            dup_filter.attach_filter_targets(warning_msg)
+            logger.warning(warning_msg)
             return 'sequential_local'
         # ray not working properly on macos: https://github.com/ray-project/ray/issues/20084
         # TODO: re-enable macos once this issue is addressed
@@ -350,7 +356,12 @@ class BaggedEnsembleModel(AbstractModel):
             Linux='parallel_local',
         )
         current_os = platform.system()
-        return os_fitting_strategy_map.get(current_os, 'sequential_local')
+        fold_fitting_strategy = os_fitting_strategy_map.get(current_os, 'sequential_local')
+        if fold_fitting_strategy == 'sequential_local':
+            warning_msg = f'Will use sequential fold fitting strategy becuase OS {current_os} not support parallel folding yet.'
+            dup_filter.attach_filter_targets(warning_msg)
+            logger.warning(warning_msg)
+        return fold_fitting_strategy
 
     def _fit_folds(self,
                    X,
