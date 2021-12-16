@@ -344,6 +344,8 @@ class BaggedEnsembleModel(AbstractModel):
             ray = None
         if not ray:
             return 'sequential_local'
+        # ray not working properly on macos: https://github.com/ray-project/ray/issues/20084
+        # TODO: re-enable macos once this issue is addressed
         os_fitting_strategy_map = dict(
             Darwin='sequential_local',
             Windows='parallel_local',
