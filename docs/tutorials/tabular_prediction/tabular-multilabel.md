@@ -9,7 +9,7 @@ We start by defining a custom `MultilabelPredictor` class to manage a collection
 
 ```{.python .input}
 from autogluon.tabular import TabularDataset, TabularPredictor
-from autogluon.core.utils.utils import setup_outputdir
+from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 import os.path
