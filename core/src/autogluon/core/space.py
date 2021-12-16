@@ -428,6 +428,10 @@ class Real(SimpleSpace):
     >>> learning_rate = ag.Real(0.01, 0.1, log=True)
     """
     def __init__(self, lower, upper, default=None, log=False):
+        if log and lower <= 0:
+            raise AssertionError(f'lower must be greater than 0 when `log=True`. lower: {lower}')
+        if lower >= upper:
+            raise AssertionError(f'lower must be less than upper. lower: {lower}, upper: {upper}')
         self.lower = lower
         self.upper = upper
         self.log = log

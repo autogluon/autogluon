@@ -2,6 +2,8 @@ import logging
 import pickle
 from collections import OrderedDict
 
+from ..space import Categorical, Space
+
 __all__ = ['LocalSearcher']
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,20 @@ class LocalSearcher(object):
         if reward_attribute is None:
             reward_attribute = 'accuracy'
         self._reward_attribute = reward_attribute
+        self._params_default = self._get_params_default()
+
+    def _get_params_default(self) -> dict:
+        params_default = dict()
+        for key, val in self.search_space.items():
+            if isinstance(val, Space):
+                if isinstance(val, Categorical):
+                    # FIXME: Don't do this, fix the outer code to not require this
+                    d = val.data[0]
+                else:
+                    d = val.default
+                params_default[key] = d
+        return params_default
+
 
     # FIXME: Consider removing
     def configure_scheduler(self, scheduler):
@@ -67,34 +83,11 @@ class LocalSearcher(object):
         raise NotImplementedError(f'This function needs to be overwritten in {self.__class__.__name__}.')
 
     def update(self, config, **kwargs):
-        """Update the searcher with the newest metric report
-
-        kwargs must include the reward (key == reward_attribute). For
-        multi-fidelity schedulers (e.g., Hyperband), intermediate results are
-        also reported. In this case, kwargs must also include the resource
-        (key == resource_attribute).
-        We can also assume that if `register_pending(config, ...)` is received,
-        then later on, the searcher receives `update(config, ...)` with
-        milestone as resource.
-
-        Note that for Hyperband scheduling, update is also called for
-        intermediate results. _results is updated in any case, if the new
-        reward value is larger than the previously recorded one. This implies
-        that the best value for a config (in _results) could be obtained for
-        an intermediate resource, not the final one (virtue of early stopping).
-        Full details can be reconstruction from training_history of the
-        scheduler.
-
-        """
-        reward = kwargs.get(self._reward_attribute)
+        """Update the searcher with the newest metric report"""
+        reward = kwargs.get(self._reward_attribute, None)
         assert reward is not None, "Missing reward attribute '{}'".format(self._reward_attribute)
-        # _results is updated if reward is larger than the previous entry.
-        # This is the correct behaviour for multi-fidelity schedulers,
-        # where update is called multiple times for a config, with
-        # different resource levels.
         config_pkl = pickle.dumps(config)
-        old_reward = self._results.get(config_pkl, reward)
-        self._results[config_pkl] = max(reward, old_reward)
+        self._results[config_pkl] = reward
 
     def register_pending(self, config, milestone=None):
         """

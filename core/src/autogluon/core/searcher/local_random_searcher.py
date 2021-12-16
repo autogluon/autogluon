@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.model_selection import ParameterSampler
 
 from .local_searcher import LocalSearcher
-from ..space import Categorical, Space
+from ..space import Space
 
 __all__ = ['LocalRandomSearcher']
 
@@ -22,19 +22,6 @@ class LocalRandomSearcher(LocalSearcher):
         # We use an explicit random_state here, in order to better support checkpoint and resume
         self.random_state = np.random.RandomState(random_seed)
         self._params_space = self._get_params_space()
-        self._params_default = self._get_params_default()
-
-    def _get_params_default(self) -> dict:
-        params_default = dict()
-        for key, val in self.search_space.items():
-            if isinstance(val, Space):
-                if isinstance(val, Categorical):
-                    # FIXME: Don't do this, fix the outer code to not require this
-                    d = val.data[0]
-                else:
-                    d = val.default
-                params_default[key] = d
-        return params_default
 
     def _get_params_space(self) -> dict:
         param_space = dict()
