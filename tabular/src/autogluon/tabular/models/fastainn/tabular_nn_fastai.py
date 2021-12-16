@@ -227,6 +227,11 @@ class NNFastAiTabularModel(AbstractModel):
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
 
+        # Make deterministic
+        from fastai.torch_core import set_seed
+        set_seed(0, True)
+        dls.rng.seed(0)
+
         if self.problem_type == QUANTILE:
             dls.c = len(self.quantile_levels)
 
