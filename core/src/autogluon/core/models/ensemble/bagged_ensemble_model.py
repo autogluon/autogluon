@@ -1,6 +1,7 @@
 import copy
 import logging
 import os
+import platform
 import time
 from collections import Counter
 from statistics import mean
@@ -14,7 +15,9 @@ from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
+from ...utils.try_import import try_import_ray
 from ...utils.utils import CVSplitter, _compute_fi_with_stddev
+
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +337,21 @@ class BaggedEnsembleModel(AbstractModel):
             self.models = [model_base]
         self._add_child_times_to_bag(model=model_base)
 
+    def _get_default_fold_fitting_strategy(self):
+        try:
+            ray = try_import_ray()
+        except Exception:
+            ray = None
+        if not ray:
+            return 'sequential_local'
+        os_fitting_strategy_map = dict(
+            Darwin='sequential_local',
+            Windows='parallel_local',
+            Linux='parallel_local',
+        )
+        current_os = platform.system()
+        return os_fitting_strategy_map.get(current_os, 'sequential_local')
+
     def _fit_folds(self,
                    X,
                    y,
@@ -350,7 +368,9 @@ class BaggedEnsembleModel(AbstractModel):
                    save_folds=True,
                    groups=None,
                    **kwargs):
-        fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'parallel_local')
+        fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'auto')
+        if fold_fitting_strategy == 'auto':
+            fold_fitting_strategy = self._get_default_fold_fitting_strategy()
         num_folds_parallel = self.params.get('num_folds_parallel', 'auto')
         disable_parallel_fitting = self.params.get('_disable_parallel_fitting', False)
         if fold_fitting_strategy == 'parallel_local':
