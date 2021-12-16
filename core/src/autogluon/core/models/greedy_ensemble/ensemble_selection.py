@@ -75,6 +75,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         ensemble = []
         trajectory = []
         order = []
+        used_models = set()
 
         # if self.sorted_initialization:
         #     n_best = 20
@@ -90,6 +91,9 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         #     ensemble_size -= n_best
 
         time_start = time.time()
+        round_scores = False
+        epsilon = 1e-4
+        round_decimals = 6
         for i in range(ensemble_size):
             scores = np.zeros((len(predictions)))
             s = len(ensemble)
@@ -107,8 +111,19 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             for j, pred in enumerate(predictions):
                 fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1. / float(s + 1)) * pred
                 scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric, sample_weight=sample_weight)
+                if round_scores:
+                    scores[j] = scores[j].round(round_decimals)
 
             all_best = np.argwhere(scores == np.nanmin(scores)).flatten()
+
+            if (len(all_best) > 1) and used_models:
+                # If tie, prioritize models already in ensemble to avoid unnecessarily large ensemble
+                new_all_best = []
+                for m in all_best:
+                    if m in used_models:
+                        new_all_best.append(m)
+                if new_all_best:
+                    all_best = new_all_best
 
             if len(all_best) > 1:
                 if self.tie_breaker == 'second_metric':
@@ -127,10 +142,20 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                         all_best = [index_map[index] for index in all_best_tiebreak]
 
             best = self.random_state.choice(all_best)
+            best_score = scores[best]
+
+            # If first iteration
+            if i == 0:
+                # If abs value of min score is large enough, round to 6 decimal places to avoid floating point error deciding the best index.
+                # This avoids 2 models with the same pred proba both being used in the ensemble due to floating point error
+                if np.abs(best_score) > epsilon:
+                    round_scores = True
+                    best_score = best_score.round(round_decimals)
 
             ensemble.append(predictions[best])
-            trajectory.append(scores[best])
+            trajectory.append(best_score)
             order.append(best)
+            used_models.add(best)
 
             # Handle special case
             if len(predictions) == 1:
