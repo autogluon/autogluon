@@ -45,11 +45,14 @@ extras_require = {
     'skex': [
         'scikit-learn-intelex<=2021.3',
     ],
+    'vowpalwabbit': [
+        'vowpalwabbit==8.10.1'
+    ]
 }
 
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
+for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai', 'vowpalwabbit']:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires
