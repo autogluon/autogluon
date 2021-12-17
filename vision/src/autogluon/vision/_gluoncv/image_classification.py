@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import autogluon.core as ag
 from autocfg import dataclass
-from autogluon.core.utils.try_import import try_import
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.decorator import sample_config
 from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count
 from autogluon.core.task.base import BaseTask
@@ -28,13 +28,6 @@ from gluoncv.auto.data.dataset import ImageClassificationDataset
 from gluoncv.auto.estimators.conf import _BEST_CHECKPOINT_FILE
 
 from .utils import config_to_nested
-
-problem_type_constants = try_import(package='autogluon.core.constants',
-                                    fromlist=['MULTICLASS', 'BINARY', 'REGRESSION'],
-                                    message='Failed to import problem type constants from autogluon.core.')
-MULTICLASS = problem_type_constants.MULTICLASS
-BINARY = problem_type_constants.BINARY
-REGRESSION = problem_type_constants.REGRESSION
 
 
 __all__ = ['ImageClassification', 'ImagePrediction']

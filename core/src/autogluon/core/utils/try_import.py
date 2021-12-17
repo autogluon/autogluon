@@ -1,5 +1,4 @@
 __all__ = [
-    'try_import',
     'try_import_mxboard',
     'try_import_mxnet',
     'try_import_catboost',
@@ -14,26 +13,6 @@ __all__ = [
     'try_import_autogluon_text',
     'try_import_autogluon_vision',
     'try_import_rapids_cuml']
-
-
-def try_import(package, message=None, fromlist=None):
-    """Try import specified package, with custom message support.
-    Parameters
-    ----------
-    package : str
-        The name of the targeting package.
-    message : str, default is None
-        If not None, this function will raise customized error message when import error is found.
-    Returns
-    -------
-    module if found, raise ImportError otherwise
-    """
-    try:
-        return __import__(package, fromlist=fromlist)
-    except ImportError as e:
-        if not message:
-            raise e
-        raise ImportError(message)
 
 
 def try_import_mxboard():
