@@ -315,6 +315,7 @@ class NNFastAiTabularModel(AbstractModel):
                 est_epoch_time = batches_count * est_batch_time * 1.1
                 est_max_epochs = int(time_left / est_epoch_time)
                 epochs = min(default_epochs, est_max_epochs)
+                epochs = max(epochs, 0)
                 logger.log(15, f'Automated epochs selection: training for {epochs} epoch(s). Estimated time budget use {epochs * est_epoch_time:.2f} / {time_left:.2f} sec')
         return epochs
 

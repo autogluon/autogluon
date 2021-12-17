@@ -34,6 +34,7 @@ def test_tabular_nn_fastai_regression(fit_helper):
 
 __GET_EPOCHS_NUMBER_CASES = {
     'happy_path': [dict(time_left=45, batch_size=256, epochs='auto'), 2],
+    'given negative time return 0 epochs': [dict(time_left=-45, batch_size=256, epochs='auto'), 0],
     'given time for more than default_epochs epochs, return default_epochs': [dict(time_left=21 * 31, epochs='auto', batch_size=256, default_epochs=12), 12],
     'given time for less than 1 epoch, return 0 epoch': [dict(time_left=10, batch_size=256, epochs='auto'), 0],
     'given no time_left, return default_epochs': [dict(epochs='auto', batch_size=256, default_epochs=14), 14],
