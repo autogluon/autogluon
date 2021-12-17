@@ -42,6 +42,10 @@ extras_require = {
         'torch>=1.0,<1.11',
         'fastai>=2.3.1,<2.6',
     ],
+    'widedeep': [
+        'torch>=1.0,<2.0',
+        'pytorch-widedeep'
+    ],
     'skex': [
         'scikit-learn-intelex>=2021.5,<2021.6',
     ],
@@ -55,7 +59,7 @@ extras_require = {
 
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
+for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai', 'widedeep']:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires
