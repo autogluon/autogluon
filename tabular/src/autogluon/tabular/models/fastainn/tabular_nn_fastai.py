@@ -272,7 +272,7 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.path = Path(temp_dir)
 
                     len_val = len(X_val) if X_val is not None else 0
-                    epochs = self._get_epochs_number(len(X) + len_val, params['epochs'], batch_size, time_left)
+                    epochs = self._get_epochs_number(samples_num=len(X) + len_val, epochs=params['epochs'], batch_size=batch_size, time_left=time_left)
                     if epochs == 0:
                         # Stop early if there is not enough time to train a full epoch
                         raise TimeLimitExceeded
