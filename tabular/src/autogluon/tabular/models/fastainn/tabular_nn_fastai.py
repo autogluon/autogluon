@@ -320,7 +320,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _measure_batch_times(self, min_batches_count):
         from fastai.callback.core import CancelFitException
-        # from .callbacks import BatchTimeTracker
+        from .callbacks import BatchTimeTracker
         batch_time_tracker_callback = BatchTimeTracker(batches_to_measure=min_batches_count)
         try:
             with self.model.no_bar():
