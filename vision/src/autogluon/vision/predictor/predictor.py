@@ -8,7 +8,7 @@ from autogluon.core.space import Categorical
 
 import numpy as np
 import pandas as pd
-from gluoncv.auto.tasks import ImagePrediction as _ImageClassification
+from .._gluoncv import ImagePrediction as _ImageClassification
 try:
     import timm
 except ImportError:
