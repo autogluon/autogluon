@@ -24,7 +24,6 @@ from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...scheduler import LocalSequentialScheduler
-from ...task.base import BasePredictor
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
@@ -931,21 +930,17 @@ class AbstractModel:
             'reward_attr': scheduler._reward_attr,
         }
 
-        hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model
-        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
-            raise NotImplementedError("need to fetch model files from remote Workers")
-            # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
-            # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
-
         hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
         hpo_model_performances = {}
-        for trial in sorted(hpo_results['trial_info'].keys()):
+        for trial in sorted(hpo_results['config_history'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
             file_id = f"T{trial}"  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
+            trial_reward = scheduler.searcher.get_reward(hpo_results['config_history'][trial])
+
             hpo_models[trial_model_name] = trial_model_path
-            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
+            hpo_model_performances[trial_model_name] = trial_reward
 
         logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
         logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)

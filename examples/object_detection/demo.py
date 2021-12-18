@@ -1,5 +1,5 @@
 import autogluon.core as ag
-from autogluon.vision.object_detection import ObjectDetector
+from autogluon.vision import ObjectDetector
 import os
 
 url = 'https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip'
