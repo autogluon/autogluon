@@ -184,10 +184,11 @@ class NNFastAiTabularModel(AbstractModel):
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
         if num_gpus is not None:
+            # TODO: Control CPU vs GPU usage during inference
             if num_gpus == 0:
-                # TODO: Does not obviously impact inference speed
                 torch_core.default_device(use_cuda=False)
             else:
+                # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
                 torch_core.default_device(use_cuda=True)
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
