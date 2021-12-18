@@ -18,16 +18,9 @@ describing what they are and what they do. The APIs are grouped into the followi
 
       Hyperparameter search spaces of candidate hyperparameter values to consider.
 
-   .. card::
-      :title: Searchers
-      :link: autogluon.core.searcher.html
-
-      Search algorithms that suggest which hyperparameter values to try out.
-
 .. toctree::
    :maxdepth: 2
    :hidden:
 
    autogluon.predictor
    autogluon.core.space
-   autogluon.core.searcher

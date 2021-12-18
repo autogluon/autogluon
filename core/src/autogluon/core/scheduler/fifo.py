@@ -18,7 +18,6 @@ from .scheduler import TaskScheduler
 from ..decorator import _autogluon_method
 from ..searcher import BaseSearcher
 from ..searcher import searcher_factory
-from ..searcher.bayesopt.tuning_algorithms.base_classes import DEFAULT_CONSTRAINT_METRIC
 from ..task.task import Task
 from ..utils import save, load, mkdir, try_import_mxboard
 from ..utils.default_arguments import check_and_merge_defaults, \
@@ -27,6 +26,8 @@ from ..utils.default_arguments import check_and_merge_defaults, \
 __all__ = ['FIFOScheduler']
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_CONSTRAINT_METRIC = 'constraint_metric'
 
 
 _ARGUMENT_KEYS = {

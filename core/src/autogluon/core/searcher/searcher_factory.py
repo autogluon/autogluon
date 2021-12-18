@@ -1,6 +1,4 @@
-from .gp_searcher import GPFIFOSearcher
 from .grid_searcher import GridSearcher
-from .searcher import RandomSearcher
 from .local_random_searcher import LocalRandomSearcher
 
 __all__ = ['searcher_factory']
@@ -9,18 +7,8 @@ SEARCHER_CONFIGS = dict(
     local_random=dict(
         searcher_cls=LocalRandomSearcher
     ),
-    random=dict(
-        searcher_cls=RandomSearcher,
-    ),
     grid=dict(
         searcher_cls=GridSearcher,
-    ),
-    bayesopt=dict(
-        # Gaussian process based Bayesian optimization
-        # The searchers and their kwargs differ depending on the scheduler
-        # type (fifo, hyperband_*)
-        searcher_cls=GPFIFOSearcher,
-        supported_schedulers={'fifo', 'hyperband_stopping', 'hyperband_promotion', 'local'},
     ),
 )
 

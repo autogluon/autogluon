@@ -3,7 +3,6 @@ import logging
 import time
 from abc import abstractmethod
 
-from ...scheduler import FIFOScheduler
 from ...scheduler.seq_scheduler import LocalSequentialScheduler
 from ...utils import in_ipynb, try_import_mxnet
 from ...utils.utils import setup_compute
@@ -15,7 +14,6 @@ __all__ = [
 
 schedulers = {
     'local': LocalSequentialScheduler,
-    'fifo': FIFOScheduler,
 }
 
 logger = logging.getLogger(__name__)

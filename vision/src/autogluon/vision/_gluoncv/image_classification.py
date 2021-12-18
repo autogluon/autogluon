@@ -20,7 +20,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.decorator import sample_config
 from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count
 from autogluon.core.task.base import BaseTask
-from autogluon.core.searcher import RandomSearcher
+from autogluon.core.searcher import LocalRandomSearcher
 
 from gluoncv.auto.estimators.base_estimator import BaseEstimator
 from gluoncv.auto.estimators import ImageClassificationEstimator, TorchImageClassificationEstimator
@@ -389,7 +389,7 @@ class ImageClassification(BaseTask):
         self._fit_summary = {}
         self._results = {}
         if config.get('num_trials', 1) < 2:
-            rand_config = RandomSearcher(_train_image_classification.cs).get_config()
+            rand_config = LocalRandomSearcher(search_space=_train_image_classification.args).get_config()
             self._logger.info("Starting fit without HPO")
             results = _train_image_classification(_train_image_classification.args, rand_config)
             best_config = sample_config(_train_image_classification.args, rand_config)
