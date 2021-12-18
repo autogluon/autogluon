@@ -164,10 +164,9 @@ class NNFastAiTabularModel(AbstractModel):
         try_import_fastai()
         from fastai.tabular.model import tabular_config
         from fastai.tabular.learner import tabular_learner
-        from fastcore.basics import defaults
+        from fastai import torch_core
         from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
         from .quantile_helpers import HuberPinballLoss
-        import torch
 
         start_time = time.time()
         if sample_weight is not None:  # TODO: support
@@ -184,18 +183,13 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
-        if num_cpus is None:
-            num_cpus = defaults.cpus
-        # additional workers are helping only when fork is enabled; in other mp modes, communication overhead reduces performance
-        num_workers = int(num_cpus / 2)
-        if not is_fork_enabled():
-            num_workers = 0
         if num_gpus is not None:
+            # TODO: Control CPU vs GPU usage during inference
             if num_gpus == 0:
-                # TODO: Does not obviously impact inference speed
-                defaults.device = torch.device('cpu')
+                torch_core.default_device(use_cuda=False)
             else:
-                defaults.device = torch.device('cuda')
+                # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
+                torch_core.default_device(use_cuda=True)
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
         data = self._preprocess_train(X, y, X_val, y_val)
