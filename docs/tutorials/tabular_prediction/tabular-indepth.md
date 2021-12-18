@@ -62,7 +62,7 @@ hyperparameters = {  # hyperparameters of each model type
 
 time_limit = 2*60  # train various models for ~2 min
 num_trials = 5  # try at most 5 different hyperparameter configurations for each type of model
-search_strategy = 'auto'  # to tune hyperparameters using Bayesian optimization routine with a local scheduler
+search_strategy = 'auto'  # to tune hyperparameters using random search routine with a local scheduler
 
 hyperparameter_tune_kwargs = {  # HPO is not performed unless hyperparameter_tune_kwargs is specified
     'num_trials': num_trials,

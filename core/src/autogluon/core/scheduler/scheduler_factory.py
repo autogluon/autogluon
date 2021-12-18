@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 _scheduler_presets = {
-    'auto': {'scheduler': 'local', 'searcher': 'bayesopt'},
+    'auto': {'scheduler': 'local', 'searcher': 'local_random'},
+    'local_random': {'scheduler': 'local', 'searcher': 'local_random'},
     'random': {'scheduler': 'local', 'searcher': 'random'},
     'bayesopt': {'scheduler': 'local', 'searcher': 'bayesopt'},
     # Don't include hyperband and bayesopt hyperband at present

@@ -371,16 +371,24 @@ class Categorical(NestedSpace):
                 _add_cs(cs, v.cs, str(i))
         return cs
 
+    def convert_to_sklearn(self):
+        return self.data
+
     def sample(self, **config):
         """Sample a configuration from this search space.
         """
-        choice = config.pop('choice')
-        if isinstance(self.data[choice], NestedSpace):
-            # nested space: Categorical of AutoGluonobjects
-            min_config = _strip_config_space(config, prefix=str(choice))
-            return self.data[choice].sample(**min_config)
+        if 'choice' in config:
+            choice = config.pop('choice')
+            if isinstance(self.data[choice], NestedSpace):
+                # nested space: Categorical of AutoGluonobjects
+                min_config = _strip_config_space(config, prefix=str(choice))
+                return self.data[choice].sample(**min_config)
+            else:
+                return self.data[choice]
         else:
-            return self.data[choice]
+            # FIXME: Avoid this, required to be compatible with gluoncv
+            choice = config.pop('')
+            return choice
 
     @property
     def kwspaces(self):
@@ -420,10 +428,23 @@ class Real(SimpleSpace):
     >>> learning_rate = ag.Real(0.01, 0.1, log=True)
     """
     def __init__(self, lower, upper, default=None, log=False):
+        if log and lower <= 0:
+            raise AssertionError(f'lower must be greater than 0 when `log=True`. lower: {lower}')
+        if lower >= upper:
+            raise AssertionError(f'lower must be less than upper. lower: {lower}, upper: {upper}')
         self.lower = lower
         self.upper = upper
         self.log = log
         self._default = default
+
+    def convert_to_sklearn(self):
+        from scipy.stats import loguniform, uniform
+
+        if self.log:
+            sampler = loguniform(self.lower, self.upper)
+        else:
+            sampler = uniform(self.lower, self.upper - self.lower)
+        return sampler
 
     def get_hp(self, name):
         
@@ -451,6 +472,10 @@ class Int(SimpleSpace):
         self.lower = lower
         self.upper = upper
         self._default = default
+
+    def convert_to_sklearn(self):
+        from scipy.stats import randint
+        return randint(self.lower, self.upper+1)
 
     def get_hp(self, name):
         return CSH.UniformIntegerHyperparameter(name=name, lower=self.lower, upper=self.upper,

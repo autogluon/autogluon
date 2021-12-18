@@ -1,10 +1,14 @@
 from .gp_searcher import GPFIFOSearcher
 from .grid_searcher import GridSearcher
 from .searcher import RandomSearcher
+from .local_random_searcher import LocalRandomSearcher
 
 __all__ = ['searcher_factory']
 
 SEARCHER_CONFIGS = dict(
+    local_random=dict(
+        searcher_cls=LocalRandomSearcher
+    ),
     random=dict(
         searcher_cls=RandomSearcher,
     ),

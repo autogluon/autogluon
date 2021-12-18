@@ -400,8 +400,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         search_space = args.rand
         task_id = 0
     else:
-        search_space = args['search_space']
-        task_id = args.task_id
+        task_id = args.pop('task_id')
+        search_space = args
     # Get the log metric scorers
     if isinstance(log_metrics, str):
         log_metrics = [log_metrics]
@@ -1127,7 +1127,7 @@ class MultiModalTextModel:
                 force_forkserver()
             scheduler_cls, scheduler_params = scheduler_factory(scheduler_options)
             # Create scheduler, run HPO experiment
-            scheduler = scheduler_cls(train_fn, **scheduler_options)
+            scheduler = scheduler_cls(train_fn, search_space=search_space, **scheduler_options)
             scheduler.run()
             scheduler.join_jobs()
             if len(scheduler.config_history) == 0:
