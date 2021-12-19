@@ -18,7 +18,7 @@ import autogluon.core as ag
 from autocfg import dataclass
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.scheduler.reporter import FakeReporter
-from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count
+from autogluon.core.utils import get_cpu_count, get_gpu_count
 from autogluon.core.task.base import BaseTask
 from autogluon.core.searcher import LocalRandomSearcher
 
