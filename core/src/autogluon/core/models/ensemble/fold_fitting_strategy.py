@@ -272,7 +272,7 @@ def _ray_fit(model_base, bagged_ensemble_model_path,
             X = pickle.load(X_f)
             y = pickle.load(y_f)
     is_pseudo = False
-    if X_pseudo and y_pseudo:
+    if X_pseudo is not None and y_pseudo is not None:
         if type(X_pseudo) == str and type(y_pseudo) == str:
             with open(X_pseudo, 'rb') as X_pseudo_f, open(y_pseudo, 'rb') as y_pseudo_f:
                 X_pseudo = pickle.load(X_pseudo_f)
@@ -526,7 +526,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         if in_mem:
             X = self.ray.put(self.X)
             y = self.ray.put(self.y)
-            if self.X_pseudo and self.y_pseudo:
+            if self.X_pseudo is not None and self.y_pseudo is not None:
                 X_pseudo = self.ray.put(self.X_pseudo)
                 y_pseudo = self.ray.put(self.y_pseudo)
         else:
@@ -538,7 +538,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             with open(X, 'wb') as X_f, open(y, 'wb') as y_f:
                 pickle.dump(self.X, X_f)
                 pickle.dump(self.y, y_f)
-            if self.X_pseudo and self.y_pseudo:
+            if self.X_pseudo is not None and self.y_pseudo is not None:
                 X_pseudo = 'X_pseudo.pkl'
                 y_pseudo = 'y_pseudo.pkl'
                 X_pseudo = os.path.join(self.bagged_ensemble_model.path, utils, X_pseudo)

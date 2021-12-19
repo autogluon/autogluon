@@ -381,8 +381,22 @@ def test_pseudolabeling():
     train_file = 'train_data.csv'
     test_file = 'test_data.csv'
     directory_prefix = './datasets/'
-    hyperparam_setting = 'toy'
+    hyperparam_setting = {
+        'GBM': {'num_boost_round': 10},
+        'XGB': {'n_estimators': 10},
+    }
 
+    fit_args = dict(
+        hyperparameters=hyperparam_setting,
+        time_limit=20,
+    )
+
+    fit_args_best = dict(
+        presets='best_quality',
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble=dict(fold_fitting_strategy='sequential_local'),
+    )
     for idx in range(len(datasets)):
         dataset = datasets[idx]
         label = dataset['label']
@@ -413,7 +427,7 @@ def test_pseudolabeling():
                 pseudo_data=test_data,
                 return_pred_prob=True,
                 train_data=train_data,
-                hyperparameters=hyperparam_setting
+                **fit_args,
             )
         except Exception as e:
             assert False, error_msg_og + 'labeled test data'
@@ -424,8 +438,8 @@ def test_pseudolabeling():
                 pseudo_data=test_data,
                 return_pred_prob=True,
                 train_data=train_data,
-                presets='best_quality',
-                hyperparameters=hyperparam_setting
+                **fit_args_best,
+                **fit_args,
             )
         except Exception as e:
             assert False, error_msg_og + 'labeled test data, best quality'
@@ -444,9 +458,9 @@ def test_pseudolabeling():
                         pseudo_data=unlabeled_test_data,
                         return_pred_prob=True,
                         train_data=train_data,
-                        hyperparameters=hyperparam_setting,
                         use_ensemble=flag_ensemble,
-                        fit_ensemble=is_weighted_ensemble
+                        fit_ensemble=is_weighted_ensemble,
+                        **fit_args,
                     )
                 except Exception as e:
                     assert False, error_msg + 'unlabeled test data' + error_suffix
@@ -457,10 +471,10 @@ def test_pseudolabeling():
                         pseudo_data=unlabeled_test_data,
                         return_pred_prob=True,
                         train_data=train_data,
-                        presets='best_quality',
-                        hyperparameters=hyperparam_setting,
                         use_ensemble=flag_ensemble,
-                        fit_ensemble=is_weighted_ensemble
+                        fit_ensemble=is_weighted_ensemble,
+                        **fit_args_best,
+                        **fit_args,
                     )
                 except Exception as e:
                     assert False, error_msg + 'unlabeled test data, best quality' + error_suffix
