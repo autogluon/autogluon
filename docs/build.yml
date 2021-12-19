@@ -5,9 +5,7 @@ dependencies:
 - pip
 - pip:
   - jupyter-sphinx>=0.2.2
-  - mxnet_cu101==1.7.0
   - portalocker
-  - scipy>=1.3.3,<1.6.0
   - nose
   - docutils
   - mu-notedown
