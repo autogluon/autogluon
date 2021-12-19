@@ -126,7 +126,6 @@ stage("Unit Test") {
           conda activate autogluon-core-py3-v3
           conda list
           ${setup_pip_venv}
-          python3 -m pip install 'mxnet==1.7.0.*'
           env
           ${install_core_all_tests}
           cd core/
