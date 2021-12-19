@@ -87,13 +87,13 @@ class LocalSequentialScheduler(object):
         Note: The type of resource must be int.
     """
 
-    def __init__(self, train_fn, search_space, util_args=None, searcher='auto', **kwargs):
+    def __init__(self, train_fn, search_space, util_args=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         self.train_fn = train_fn
         self.training_history = None
         self.config_history = None
-        self._reward_attr = kwargs['reward_attr']
+        self._reward_attr = reward_attr
         self.time_attr = kwargs.get('time_attr', None)
-        self.resource = kwargs['resource']
+        self.resource = resource
         self.max_reward = kwargs.get('max_reward', None)
         self.searcher: LocalSearcher = self.get_searcher_(searcher, train_fn, search_space=search_space, **kwargs)
         self.init_limits_(kwargs)
@@ -134,7 +134,7 @@ class LocalSequentialScheduler(object):
             else:
                 _search_options['configspace'] = train_fn.cs
                 _search_options['resource_attribute'] = kwargs.get('time_attr', None)
-            _search_options['reward_attribute'] = kwargs['reward_attr']
+            _search_options['reward_attribute'] = self._reward_attr
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
             if 'scheduler' not in _search_options:
