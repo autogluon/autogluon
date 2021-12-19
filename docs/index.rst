@@ -78,6 +78,5 @@ Tutorials
    tutorials/tabular_prediction/tabular-multimodal
    tutorials/cloud_fit_deploy/index
    api/autogluon.predictor
-   api/autogluon.core.space
    api/autogluon.features
    api/autogluon.tabular.models
