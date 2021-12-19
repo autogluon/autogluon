@@ -1,4 +1,4 @@
-from gluoncv.auto.tasks import ImageClassification
+from autogluon.vision._gluoncv import ImageClassification
 import autogluon.core as ag
 
 IMAGE_CLASS_DATASET, _, IMAGE_CLASS_TEST = ImageClassification.Dataset.from_folders(
