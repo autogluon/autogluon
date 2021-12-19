@@ -27,6 +27,7 @@ setup_mxnet_gpu = """
     python3 -m pip install mxnet-cu101==1.7.0
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
+    pip freeze
 """
 
 setup_torch_gpu = """
