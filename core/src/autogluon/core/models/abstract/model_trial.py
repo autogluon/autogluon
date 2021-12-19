@@ -4,12 +4,11 @@ import logging
 
 from ...utils.loaders import load_pkl
 from ...utils.exceptions import TimeLimitExceeded
-from ...scheduler.reporter import LocalStatusReporter
 
 logger = logging.getLogger(__name__)
 
 
-def model_trial(args, reporter: LocalStatusReporter):
+def model_trial(args, reporter):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
 
         Notes:
