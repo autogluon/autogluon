@@ -26,6 +26,7 @@ setup_pip_venv = """
 setup_mxnet_gpu = """
     python3 -m pip install mxnet-cu101==1.7.0
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+    nvidia-smi
 """
 
 setup_torch_gpu = """
@@ -137,7 +138,7 @@ stage("Unit Test") {
     }
   },
   'features': {
-    node('linux-gpu') {
+    node('linux-cpu') {
       ws('workspace/autogluon-features-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
@@ -148,8 +149,6 @@ stage("Unit Test") {
           conda activate autogluon-features-py3-v3
           conda list
           ${setup_pip_venv}
-          ${setup_mxnet_gpu}
-          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           env
 
           ${install_common}
