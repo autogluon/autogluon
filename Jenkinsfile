@@ -27,6 +27,7 @@ setup_mxnet_gpu = """
     python3 -m pip install mxnet-cu101==1.7.0
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
+    ls /usr/local/
     pip freeze
 """
 
@@ -455,8 +456,6 @@ stage("Build Tutorials") {
         conda activate autogluon-tutorial-cloud_fit_deploy-v3
         conda list
         ${setup_pip_venv}
-        ${setup_mxnet_gpu}
-        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
 
         env
@@ -543,7 +542,6 @@ stage("Build Docs") {
 
         escaped_context_root = site.replaceAll('\\/', '\\\\/')
 
-        unstash 'course'
         unstash 'image_prediction'
         unstash 'object_detection'
         unstash 'tabular'
