@@ -145,7 +145,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-features-py3-v3 -f docs/build.yml
+          conda env update -n autogluon-features-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-features-py3-v3
           conda list
           ${setup_pip_venv}
@@ -171,7 +171,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-tabular-py3-v3 -f docs/build.yml
+          conda env update -n autogluon-tabular-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-tabular-py3-v3
           conda list
           ${setup_pip_venv}
@@ -203,7 +203,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-text-py3-v3 -f docs/build.yml
+          conda env update -n autogluon-text-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-text-py3-v3
           conda list
           ${setup_pip_venv}
@@ -234,7 +234,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-vision-py3 -f docs/build.yml
+          conda env update -n autogluon-vision-py3 -f docs/build_gpu.yml
           conda activate autogluon-vision-py3
           conda list
           ${setup_pip_venv}
@@ -265,7 +265,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-forecasting-py3-v3 -f docs/build.yml
+          conda env update -n autogluon-forecasting-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-forecasting-py3-v3
           conda list
           ${setup_pip_venv}
@@ -327,7 +327,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-course-v3 -f docs/build_contrib.yml
+        conda env update -n autogluon-tutorial-course-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-course-v3
         conda list
         ${setup_pip_venv}
@@ -358,7 +358,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib.yml
+        conda env update -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-image-classification-v3
         conda list
         ${setup_pip_venv}
@@ -393,7 +393,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib.yml
+        conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-object-detection-v3
         conda list
         ${setup_pip_venv}
@@ -423,7 +423,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib.yml
+        conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-tabular-v3
         conda list
         ${setup_pip_venv}
@@ -455,7 +455,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-text-v3 -f docs/build_contrib.yml
+        conda env update -n autogluon-tutorial-text-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-text-v3
         conda list
         ${setup_pip_venv}
@@ -513,7 +513,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib.yml
+        conda env update -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-forecasting-v3
         conda list
         ${setup_pip_venv}
@@ -586,7 +586,7 @@ stage("Build Docs") {
 
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_docs -f docs/build_contrib.yml
+        conda env update -n autogluon_docs -f docs/build_contrib_gpu.yml
         conda activate autogluon_docs
         conda list
         ${setup_pip_venv}
