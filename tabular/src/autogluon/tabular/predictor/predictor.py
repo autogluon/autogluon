@@ -1112,6 +1112,10 @@ class TabularPredictor:
         X_test = unlabeled_data.copy()
 
         for i in range(max_iter):
+            if len(X_test) == 0:
+                logger.log(20, f'No more unlabeled data to pseudolabel. Done with pseudolabeling...')
+                break
+
             iter_print = str(i + 1)
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}')
 
