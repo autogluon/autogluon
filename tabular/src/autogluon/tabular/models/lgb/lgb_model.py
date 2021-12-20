@@ -84,7 +84,8 @@ class LGBModel(AbstractModel):
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
-        params['num_threads'] = num_cpus
+        # Setting num_threads is causing segfaults on mac
+        # params['num_threads'] = num_cpus
         params = fixedvals_from_searchspaces(params)
 
         if verbosity <= 1:
