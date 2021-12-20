@@ -1,10 +1,13 @@
 import logging
 
 import numpy as np
+import pytorch_widedeep.training.trainer
 
+from autogluon.common.features.types import R_OBJECT
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.features.types import R_OBJECT
 from autogluon.core.models import AbstractModel
+from .utils import set_seed
+import torch
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +16,6 @@ class WideDeepNNModel(AbstractModel):
     # TODO: Leverage time_limit
     # TODO: Leverage sample_weight
     # TODO: Experiment with text and image data
-    # TODO: If possible, make model training deterministic (fixed seed)
     # TODO: Enable usage of the other NN models (TabNet, TabTransformer, etc.)
     # TODO: How to leverage GPU?
     # TODO: Missing value handling?
@@ -29,10 +31,13 @@ class WideDeepNNModel(AbstractModel):
         #  Refer to other model implementations for examples
         from pytorch_widedeep import Trainer
         from pytorch_widedeep.preprocessing import WidePreprocessor, TabPreprocessor
-        from pytorch_widedeep.models import Wide, TabMlp, WideDeep
+        from pytorch_widedeep.models import Wide, TabMlp, WideDeep, TabResnet, SAINT, TabTransformer
         from pytorch_widedeep.metrics import Accuracy, R2Score
         # TODO: Use this to get user-specified params instead of hard-coding
         # params = self._get_model_params()
+
+        set_seed(0, True)
+
         X = self.preprocess(X)
 
         # prepare wide, crossed, embedding and continuous columns
@@ -77,15 +82,48 @@ class WideDeepNNModel(AbstractModel):
         # deeptabular
         self._tab_preprocessor = TabPreprocessor(embed_cols=embed_cols, continuous_cols=cont_cols)
         X_tab = self._tab_preprocessor.fit_transform(X)
-        deeptabular = TabMlp(
-            mlp_hidden_dims=[128, 64],
-            column_idx=self._tab_preprocessor.column_idx,
-            embed_input=self._tab_preprocessor.embeddings_input,
-            continuous_cols=cont_cols,
-        )
 
-        # wide and deep
-        model = WideDeep(wide=wide, deeptabular=deeptabular, pred_dim=pred_dim)
+        self.name = f"{self.params['type']}_{self.name}"
+        if self.params['type'] == 'tabmlp':
+            model = TabMlp(
+                # mlp_hidden_dims=[200, 100],
+                column_idx=self._tab_preprocessor.column_idx,
+                embed_input=self._tab_preprocessor.embeddings_input,
+                continuous_cols=cont_cols,
+            )
+
+            # wide and deep
+            # model = WideDeep(wide=wide, deeptabular=deeptabular, pred_dim=pred_dim)
+
+        elif self.params['type'] == 'tabresnet':
+            model = TabResnet(
+                # blocks_dims=[16, 16, 16],
+                column_idx=self._tab_preprocessor.column_idx,
+                embed_input=self._tab_preprocessor.embeddings_input,
+                continuous_cols=cont_cols,
+                # blocks_dims=[200,200,200],
+                # cont_norm_layer="layernorm",
+                # concat_cont_first=False,
+                # mlp_hidden_dims=[200, 100],
+                # mlp_dropout=0.1,
+            )
+        elif self.params['type'] == 'SAINT':
+            model = SAINT(
+                column_idx=self._tab_preprocessor.column_idx,
+                embed_input=self._tab_preprocessor.embeddings_input,
+                continuous_cols=cont_cols,
+                # embed_continuous_activation="leaky_relu",
+            )
+        elif self.params['type'] == 'tab_transformer':
+            model = TabTransformer(
+                column_idx=self._tab_preprocessor.column_idx,
+                embed_input=self._tab_preprocessor.embeddings_input,
+                continuous_cols=cont_cols,
+            )
+        else:
+            raise ValueError(f'Unknown model type {self.params["type"]}')
+
+        model = WideDeep(deeptabular=model, pred_dim=pred_dim)
 
         X_train = dict()
         X_train['X_wide'] = X_wide
@@ -102,8 +140,20 @@ class WideDeepNNModel(AbstractModel):
             X_val_in = None
             val_split = 0.1
 
+        logger.log(15, model)
+
+
         # train the model
         # TODO: Add custom metric support (Convert arbitrary AG metric)
+
+        # DataLoaders are very slow if defaults are used
+        # TODO: confirm if this is reproducible on linux
+        pytorch_widedeep.training.trainer.n_cpus = 0
+
+        n_epochs = 3
+        wide_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=0.02)
+        wide_sch = torch.optim.lr_scheduler.CosineAnnealingLR(wide_opt, T_max=n_epochs, eta_min=1e-5)
+
         trainer = Trainer(model, objective=objective, metrics=metrics)
         # FIXME: Does not return best epoch, instead returns final epoch
         #  Very important to return best epoch, otherwise model can be far worse than ideal
@@ -111,7 +161,9 @@ class WideDeepNNModel(AbstractModel):
         trainer.fit(
             X_train=X_train,
             X_val=X_val_in,
-            n_epochs=60,
+            n_epochs=n_epochs,
+            optimizers=[wide_opt],
+            lr_schedulers=[wide_sch],
             batch_size=256,
             val_split=val_split,
         )

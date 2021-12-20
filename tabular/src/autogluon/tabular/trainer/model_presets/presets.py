@@ -13,6 +13,7 @@ from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, K
     ImagePredictorModel, VowpalWabbitModel, \
     RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
+from ...models.widedeep_nn.widedeep_nn_model import WideDeepNNModel
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ MODEL_TYPES = dict(
     NN_TORCH=TabularNeuralNetTorchModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
+    WIDEDEEPNN=WideDeepNNModel,
     TRANSF=TabTransformerModel,
     AG_TEXT_NN=TextPredictorModel,
     AG_IMAGE_NN=ImagePredictorModel,
@@ -101,6 +103,7 @@ DEFAULT_MODEL_NAMES = {
     TabularNeuralNetTorchModel: 'NeuralNetTorch',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
+    WideDeepNNModel: 'WideDeepNeuralNet',
     TabTransformerModel: 'Transformer',
     TextPredictorModel: 'TextPredictor',
     ImagePredictorModel: 'ImagePredictor',
