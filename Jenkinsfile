@@ -146,7 +146,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda env update -n autogluon-features-py3-v3 -f docs/build_gpu.yml
+          conda env update -n autogluon-features-py3-v3 -f docs/build.yml
           conda activate autogluon-features-py3-v3
           conda list
           ${setup_pip_venv}
