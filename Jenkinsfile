@@ -25,7 +25,6 @@ setup_pip_venv = """
 
 setup_mxnet_gpu = """
     python3 -m pip install mxnet-cu101==1.7.0
-    export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 """
 
