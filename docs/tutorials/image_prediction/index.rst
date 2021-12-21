@@ -24,11 +24,6 @@ For classifying images based on their content, AutoGluon provides a simple `fit(
       More in-depth image classification tutorial,
       including non-default hyperparameters and how to tune them.
 
-   .. card::
-      :title: Use Your Own Dataset
-      :link: kaggle.html
-
-      How to participate in Kaggle image classification competitions.
 
 .. toctree::
    :maxdepth: 1
@@ -37,4 +32,3 @@ For classifying images based on their content, AutoGluon provides a simple `fit(
    dataset
    beginner
    hpo
-   kaggle

@@ -4,11 +4,10 @@ import logging
 import os
 import pickle
 import warnings
-from autogluon.core.space import Categorical
 
 import numpy as np
 import pandas as pd
-from .._gluoncv import ImagePrediction as _ImageClassification
+from .._gluoncv import ImageClassification
 try:
     import timm
 except ImportError:
@@ -53,7 +52,7 @@ class ImagePredictor(object):
         where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
-    Dataset = _ImageClassification.Dataset
+    Dataset = ImageClassification.Dataset
 
     def __init__(self, label='label', problem_type=None, eval_metric=None, path=None, verbosity=2):
         self._problem_type = problem_type
@@ -409,7 +408,7 @@ class ImagePredictor(object):
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
 
-        task = _ImageClassification(config=config, problem_type=self._problem_type)
+        task = ImageClassification(config=config, problem_type=self._problem_type)
         # GluonCV can't handle these separately - patching created config
         task.search_strategy = scheduler
         task.scheduler_options['searcher'] = searcher
@@ -451,7 +450,7 @@ class ImagePredictor(object):
                         logger.log(20, 'Set classes = [] for regression problems')
                     instruction = 'train_data = ImageDataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
-                    data = _ImageClassification.Dataset(data, classes=infer_classes)
+                    data = ImageClassification.Dataset(data, classes=infer_classes)
                 else:
                     err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
                               '`image` and `label` columns are required.' + \
@@ -460,7 +459,7 @@ class ImagePredictor(object):
                     raise AttributeError(err_msg)
             else:
                 raise TypeError(f"Unable to process dataset of type: {type(data)}")
-        elif isinstance(data, _ImageClassification.Dataset):
+        elif isinstance(data, ImageClassification.Dataset):
             assert self._label_inner in data.columns
             assert hasattr(data, 'classes')
             if self._problem_type in [MULTICLASS, BINARY]:
@@ -471,10 +470,10 @@ class ImagePredictor(object):
                 # check whether classes are outdated, no action required if all unique labels is subset of `classes`
                 unique_labels = sorted(data[self._label_inner].unique().tolist())
                 if not (all(ulabel in orig_classes for ulabel in unique_labels)):
-                    data = _ImageClassification.Dataset(data, classes=unique_labels)
+                    data = ImageClassification.Dataset(data, classes=unique_labels)
                     logger.log(20, f'Reset labels to {unique_labels}')
             elif self._problem_type == REGRESSION:
-                data = _ImageClassification.Dataset(data, classes=[])
+                data = ImageClassification.Dataset(data, classes=[])
                 logger.log(20, 'Set classes = [] for regression problems')
         if len(data) < 1:
             raise ValueError('Empty dataset.')
@@ -639,13 +638,13 @@ class ImagePredictor(object):
         if self._classifier is None:
             raise RuntimeError('Classifier not initialized, try `fit` first.')
         assert self._train_classes is not None
-        if isinstance(data, pd.DataFrame) and not isinstance(data, _ImageClassification.Dataset):
+        if isinstance(data, pd.DataFrame) and not isinstance(data, ImageClassification.Dataset):
             assert self._label in data.columns, f'{self._label} is not present in evaluation data'
             # note that evaluation data must use the same classes as training data, otherwise incorrect result
             if self._problem_type in [MULTICLASS, BINARY]:
-                data = _ImageClassification.Dataset(data, classes=self._train_classes)
+                data = ImageClassification.Dataset(data, classes=self._train_classes)
             else:
-                data = _ImageClassification.Dataset(data, classes=[])
+                data = ImageClassification.Dataset(data, classes=[])
         ret = self._classifier.evaluate(data, metric_name=self._eval_metric)
         # TODO: remove the switch if mxnet is deprecated
         if isinstance(ret, dict):

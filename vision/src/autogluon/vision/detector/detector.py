@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.utils import get_gpu_count_all
-from .._gluoncv import ObjectDetection as _ObjectDetection
+from .._gluoncv import ObjectDetection
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 
 __all__ = ['ObjectDetector']
@@ -32,7 +32,7 @@ class ObjectDetector(object):
         where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `bbox` columns.
-    Dataset = _ObjectDetection.Dataset
+    Dataset = ObjectDetection.Dataset
 
     def __init__(self, path=None, verbosity=2):
         if path is None:
@@ -295,7 +295,7 @@ class ObjectDetector(object):
             for logger_name in ('SSDEstimator', 'CenterNetEstimator', 'YOLOv3Estimator', 'FasterRCNNEstimator'):
                 logging.getLogger(logger_name).setLevel(log_level)
                 logging.getLogger(logger_name).propagate = False
-        task = _ObjectDetection(config=config)
+        task = ObjectDetection(config=config)
         task.search_strategy = scheduler
         task.scheduler_options['searcher'] = searcher
         task._logger.setLevel(log_level)
@@ -331,12 +331,12 @@ class ObjectDetector(object):
                     class_column = data.rois.apply(lambda x: x.get('class', 'unknown'))
                     infer_classes = class_column.unique().tolist()
                     data['rois'] = data['rois'].apply(lambda x: x.update({'difficult': x.get('difficult', 0)} or x))
-                    data = _ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
+                    data = ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
                 elif 'image' in data and 'class' in data and 'xmin' in data and 'ymin' in data and 'xmax' in data and 'ymax' in data:
                     infer_classes = data['class'].unique().tolist()
                     if 'difficult' not in data.columns:
                         data['difficult'] = 0
-                    data = _ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
+                    data = ObjectDetection.Dataset(data.sort_values('image').reset_index(drop=True), classes=infer_classes)
                     data = data.pack()
                     data.classes = infer_classes
                 else:

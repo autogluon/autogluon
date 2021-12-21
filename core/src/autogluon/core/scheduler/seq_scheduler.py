@@ -9,7 +9,8 @@ import numpy as np
 from tqdm.auto import tqdm
 
 from .reporter import FakeReporter
-from ..searcher import BaseSearcher, searcher_factory
+from ..searcher import searcher_factory
+from ..searcher.local_searcher import LocalSearcher
 from ..utils import EasyDict
 
 logger = logging.getLogger(__name__)
@@ -86,15 +87,15 @@ class LocalSequentialScheduler(object):
         Note: The type of resource must be int.
     """
 
-    def __init__(self, train_fn, search_space, util_args=None, searcher='auto', **kwargs):
+    def __init__(self, train_fn, search_space, util_args=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         self.train_fn = train_fn
         self.training_history = None
         self.config_history = None
-        self._reward_attr = kwargs['reward_attr']
+        self._reward_attr = reward_attr
         self.time_attr = kwargs.get('time_attr', None)
-        self.resource = kwargs['resource']
+        self.resource = resource
         self.max_reward = kwargs.get('max_reward', None)
-        self.searcher: BaseSearcher = self.get_searcher_(searcher, train_fn, search_space=search_space, **kwargs)
+        self.searcher: LocalSearcher = self.get_searcher_(searcher, train_fn, search_space=search_space, **kwargs)
         self.init_limits_(kwargs)
         self.util_args = util_args
         self.metadata = {
@@ -114,7 +115,7 @@ class LocalSequentialScheduler(object):
         if self.num_trials is None:
             assert self.time_out is not None, "Need stopping criterion: Either num_trials or time_out"
 
-    def get_searcher_(self, searcher, train_fn, search_space, **kwargs) -> BaseSearcher:
+    def get_searcher_(self, searcher, train_fn, search_space, **kwargs) -> LocalSearcher:
         scheduler_opts = {}
         if searcher == 'auto':
             searcher = 'local_random'
@@ -133,14 +134,14 @@ class LocalSequentialScheduler(object):
             else:
                 _search_options['configspace'] = train_fn.cs
                 _search_options['resource_attribute'] = kwargs.get('time_attr', None)
-            _search_options['reward_attribute'] = kwargs['reward_attr']
+            _search_options['reward_attribute'] = self._reward_attr
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
             if 'scheduler' not in _search_options:
                 _search_options['scheduler'] = 'local'
             searcher = searcher_factory(searcher, **{**scheduler_opts, **_search_options})
         else:
-            assert isinstance(searcher, BaseSearcher)
+            assert isinstance(searcher, LocalSearcher)
         return searcher
 
     def run(self, **kwargs):

@@ -1128,7 +1128,18 @@ class AbstractTrainer:
                 num_trials = 1 if time_limit is None else 1000
                 hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
             # hpo_models (dict): keys = model_names, values = model_paths
-            logger.log(20, f'Hyperparameter tuning model: {model.name} ...')
+            fit_log_message = f'Hyperparameter tuning model: {model.name} ...'
+            if time_limit is not None:
+                if time_limit <= 0:
+                    logger.log(15, f'Skipping {model.name} due to lack of time remaining.')
+                    return []
+                fit_start_time = time.time()
+                if self._time_limit is not None and self._time_train_start is not None:
+                    time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
+                else:
+                    time_left_total = time_limit
+                fit_log_message += f' Tuning model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
+            logger.log(20, fit_log_message)
             try:
                 if isinstance(model, BaggedEnsembleModel):
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)

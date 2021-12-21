@@ -1,14 +1,8 @@
 import logging
 import pickle
 from collections import OrderedDict
-import numpy as np
 
-from .bayesopt.utils.debug_log import DebugLogPrinter
-from ..utils import DeprecationHelper
-
-__all__ = ['BaseSearcher',
-           'RandomSearcher',
-           'RandomSampling']
+__all__ = ['BaseSearcher']
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +43,8 @@ class BaseSearcher(object):
                 Scheduler the searcher is used with.
 
         """
-        from ..scheduler import FIFOScheduler
         from ..scheduler.seq_scheduler import LocalSequentialScheduler
 
-        if isinstance(scheduler, FIFOScheduler):
-            self._reward_attribute = scheduler._reward_attr
-            self._constraint_attribute = scheduler._constraint_attr
         if isinstance(scheduler, LocalSequentialScheduler):
             self._reward_attribute = scheduler._reward_attr
 
@@ -258,147 +248,3 @@ class BaseSearcher(object):
                 f')'
         )
         return reprstr
-
-
-class RandomSearcher(BaseSearcher):
-    """Searcher which randomly samples configurations to try next.
-
-    Parameters
-    ----------
-    configspace: ConfigSpace.ConfigurationSpace
-        The configuration space to sample from. It contains the full
-        specification of the set of hyperparameter values (with optional prior distributions over these values).
-
-    Examples
-    --------
-    By default, the searcher is created along with the scheduler. For example:
-
-    >>> import autogluon.core as ag
-    >>> @ag.args(
-    ...     lr=ag.space.Real(1e-3, 1e-2, log=True))
-    >>> def train_fn(args, reporter):
-    ...     reporter(accuracy = args.lr ** 2)
-    >>> scheduler = ag.scheduler.FIFOScheduler(
-    ...     train_fn, searcher='random', num_trials=10,
-    ...     reward_attr='accuracy')
-
-    This would result in a BaseSearcher with cs = train_fn.cs. You can also
-    create a RandomSearcher by hand:
-
-    >>> import ConfigSpace as CS
-    >>> import ConfigSpace.hyperparameters as CSH
-    >>> # create configuration space
-    >>> cs = CS.ConfigurationSpace()
-    >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
-    >>> cs.add_hyperparameter(lr)
-    >>> # create searcher
-    >>> searcher = RandomSearcher(cs)
-    >>> searcher.get_config()
-    """
-    MAX_RETRIES = 100
-
-    def __init__(self, configspace, **kwargs):
-        super().__init__(
-            configspace, reward_attribute=kwargs.get('reward_attribute'))
-        self._first_is_default = kwargs.get('first_is_default', True)
-        # We use an explicit random_state here, in order to better support
-        # checkpoint and resume
-        self.random_state = np.random.RandomState(
-            kwargs.get('random_seed', 31415927))
-        # Debug log printing (optional)
-        self._debug_log = kwargs.get('debug_log')
-        if self._debug_log is not None:
-            if isinstance(self._debug_log, bool):
-                if self._debug_log:
-                    self._debug_log = DebugLogPrinter()
-                else:
-                    self._debug_log = None
-            else:
-                assert isinstance(self._debug_log, DebugLogPrinter)
-
-    def configure_scheduler(self, scheduler):
-        """
-        Some searchers need to obtain information from the scheduler they are
-        used with, in order to configure themselves.
-        This method has to be called before the searcher can be used.
-
-        The implementation here sets _reward_attribute for schedulers which
-        specify it.
-
-        Args:
-            scheduler: TaskScheduler
-                Scheduler the searcher is used with.
-
-        """
-        super().configure_scheduler(scheduler)
-        self._resource_attribute = None
-
-    def get_config(self, **kwargs):
-        """Sample a new configuration at random
-
-        Returns
-        -------
-        A new configuration that is valid.
-        """
-        # Lazy import
-        from ..locks import BaseSearcherLock
-        self.configspace.random = self.random_state
-        if self._debug_log is not None:
-            self._debug_log.start_get_config('random')
-        if self._first_is_default and (not self._results):
-            # Try default config first
-            new_config = self.configspace.get_default_configuration().get_dictionary()
-        else:
-            new_config = self.configspace.sample_configuration().get_dictionary()
-        with BaseSearcherLock.LOCK:
-            num_tries = 1
-            while pickle.dumps(new_config) in self._results:
-                assert num_tries <= self.MAX_RETRIES, \
-                    f"Cannot find new config in BaseSearcher, even after {self.MAX_RETRIES} trials"
-                new_config = self.configspace.sample_configuration().get_dictionary()
-                num_tries += 1
-            self._results[pickle.dumps(new_config)] = self._reward_while_pending()
-        if self._debug_log is not None:
-            self._debug_log.set_final_config(new_config)
-            # All get_config debug log info is only written here
-            self._debug_log.write_block()
-        return new_config
-
-    def update(self, config, **kwargs):
-        super().update(config, **kwargs)
-        if self._debug_log is not None:
-            config_id = self._debug_log.config_id(config)
-            reward = kwargs[self._reward_attribute]
-            if self._resource_attribute is not None:
-                # For HyperbandScheduler, also add the resource attribute
-                resource = int(kwargs[self._resource_attribute])
-                config_id = config_id + ':{}'.format(resource)
-            msg = "Update for config_id {}: reward = {}".format(
-                config_id, reward)
-            logger.info(msg)
-
-    def get_state(self):
-        state = {
-            'random_state': self.random_state,
-            'results': self._results}
-        if self._debug_log is not None:
-            state['debug_log'] = self._debug_log.get_mutable_state()
-        return state
-
-    def clone_from_state(self, state):
-        new_searcher = RandomSearcher(
-            self.configspace, reward_attribute=self._reward_attribute,
-            first_is_default=self._first_is_default,
-            debug_log=self._debug_log)
-        new_searcher.random_state = state['random_state']
-        new_searcher._results = state['results']
-        if self._debug_log and 'debug_log' in state:
-            new_searcher._debug_log.set_mutable_state(state['debug_log'])
-        return new_searcher
-
-    @property
-    def debug_log(self):
-        return self._debug_log
-
-
-RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')

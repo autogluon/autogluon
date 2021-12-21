@@ -24,12 +24,6 @@ Image Prediction
 
       Hyperparameter tuning to improve image classification accuracy.
 
-   .. card::
-      :title: Use Your Own Dataset
-      :link: image_prediction/kaggle.html
-
-      Example use of AutoGluon for image classification competition on Kaggle.
-
 
 Object Detection
 ----------------
@@ -140,23 +134,11 @@ Cloud Training and Deployment
 
       A tutorial on fitting an AutoGluon model using AWS SageMaker.
 
-Tune Custom Models
---------------------
-.. container:: cards
-
-   .. card::
-      :title: Search Space and Decorator
-      :link: course/core.html
-
-      AutoGluon's Core API for search spaces and searchable
-      objects used to tune any training function's argument-values.
-
 
 .. toctree::
    :maxdepth: 2
    :hidden:
 
-   course/index
    image_prediction/index
    object_detection/index
    text_prediction/index

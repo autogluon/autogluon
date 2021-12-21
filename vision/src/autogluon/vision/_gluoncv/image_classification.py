@@ -17,10 +17,10 @@ import pandas as pd
 import autogluon.core as ag
 from autocfg import dataclass
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.decorator import sample_config
-from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count
+from autogluon.core.scheduler.reporter import FakeReporter
+from autogluon.core.utils import get_cpu_count, get_gpu_count
 from autogluon.core.task.base import BaseTask
-from autogluon.core.searcher import RandomSearcher
+from autogluon.core.searcher import LocalRandomSearcher
 
 from gluoncv.auto.estimators.base_estimator import BaseEstimator
 from gluoncv.auto.estimators import ImageClassificationEstimator, TorchImageClassificationEstimator
@@ -30,7 +30,7 @@ from gluoncv.auto.estimators.conf import _BEST_CHECKPOINT_FILE
 from .utils import config_to_nested
 
 
-__all__ = ['ImageClassification', 'ImagePrediction']
+__all__ = ['ImageClassification']
 
 try:
     import timm
@@ -72,7 +72,7 @@ class DefaultConfig:
     search_strategy : str = 'random'
     dist_ip_addrs : Union[type(None), list, Tuple] = None
 
-@ag.args()
+
 def _train_image_classification(args, reporter):
     """
     Parameters
@@ -80,8 +80,9 @@ def _train_image_classification(args, reporter):
     args: <class 'autogluon.utils.edict.EasyDict'>
     """
     tic = time.time()
+    args = args.copy()
     try:
-        task_id = int(args.task_id)
+        task_id = int(args['task_id'])
     except:
         task_id = 0
     problem_type = args.pop('problem_type', MULTICLASS)
@@ -93,17 +94,14 @@ def _train_image_classification(args, reporter):
     wall_clock_tick = args.pop('wall_clock_tick')
     log_dir = args.pop('log_dir', os.getcwd())
     # exponential batch size for Int() space batch sizes
-    try:
-        exp_batch_size = args.pop('exp_batch_size')
-    except AttributeError:
-        exp_batch_size = False
+    exp_batch_size = args.pop('exp_batch_size', False)
     if exp_batch_size and 'batch_size' in args:
         args['batch_size'] = 2 ** args['batch_size']
     try:
         task = args.pop('task')
         dataset = args.pop('dataset')
         num_trials = args.pop('num_trials')
-    except AttributeError:
+    except KeyError:
         task = None
 
     # mxnet and torch dispatcher
@@ -383,16 +381,18 @@ class ImageClassification(BaseTask):
         config['log_dir'] = os.path.join(config.get('log_dir', os.getcwd()), str(uuid.uuid4())[:8])
         self.scheduler_options['checkpoint'] = os.path.join(config['log_dir'], 'exp1.ag')
         config['problem_type'] = self._problem_type
-        _train_image_classification.register_args(**config)
 
         start_time = time.time()
         self._fit_summary = {}
         self._results = {}
         if config.get('num_trials', 1) < 2:
-            rand_config = RandomSearcher(_train_image_classification.cs).get_config()
+            reporter = FakeReporter()
+            rand_config = LocalRandomSearcher(search_space=config).get_config()
             self._logger.info("Starting fit without HPO")
-            results = _train_image_classification(_train_image_classification.args, rand_config)
-            best_config = sample_config(_train_image_classification.args, rand_config)
+            cur_config = {**config}
+            cur_config.update(rand_config)
+            results = _train_image_classification({**cur_config}, reporter)
+            best_config = cur_config
             best_config.pop('train_data', None)
             best_config.pop('val_data', None)
             self._fit_summary.update({'train_acc': results.get('train_acc', -1),
@@ -402,7 +402,7 @@ class ImageClassification(BaseTask):
             self._results = self._fit_summary
         else:
             self._logger.info("Starting HPO experiments")
-            results = self.run_fit(_train_image_classification, self.scheduler,
+            results = self.run_fit(_train_image_classification, config, self.scheduler,
                                    self.scheduler_options, plot_results=False)
             if isinstance(results, dict):
                 ks = ('best_reward', 'best_config', 'total_time', 'config_history', 'reward_attr')
@@ -410,7 +410,8 @@ class ImageClassification(BaseTask):
         end_time = time.time()
         self._logger.info("Finished, total runtime is %.2f s", end_time - start_time)
         if config.get('num_trials', 1) > 1:
-            best_config = sample_config(_train_image_classification.args, results['best_config'])
+            best_config = {**config}
+            best_config.update(results['best_config'])
             best_config.update({'estimator': results['estimator']})
             # convert best config to nested form
             best_config = config_to_nested(best_config)
@@ -447,7 +448,3 @@ class ImageClassification(BaseTask):
         # make sure not accidentally loading e.g. classification model
         assert isinstance(obj, ImageClassificationEstimator)
         return obj
-
-
-class ImagePrediction(ImageClassification):
-    pass
