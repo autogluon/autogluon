@@ -37,6 +37,7 @@ from networkx.exception import NetworkXError
 PARALLEL_LOCAL_BAGGING = 'parallel_local'
 SEQUENTIAL_LOCAL_BAGGING = 'sequential_local'
 
+
 def test_tabular():
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning

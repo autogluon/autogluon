@@ -1,0 +1,153 @@
+name: Unit Test
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+jobs:
+  common:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        # os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [ubuntu-latest]
+        python-version: [3.7, 3.8, 3.9]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          python-version: "${{ matrix.python-version }}"
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          conda env create -n unittest -f .github/workflows_env/unittest_env.yml
+          conda activate unittest
+          conda list
+          python3 -m pip install --upgrade -e common/[tests]
+          env
+          cd common/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+  core:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        # os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [ubuntu-latest]
+        python-version: [3.7, 3.8, 3.9]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          python-version: "${{ matrix.python-version }}"
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          conda env create -n unittest -f .github/workflows_env/unittest_env.yml
+          conda activate unittest
+          conda list
+          python3 -m pip install --upgrade -e core/[all,tests]
+          env
+          cd core/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+  features:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        # os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [ubuntu-latest]
+        python-version: [3.7, 3.8, 3.9]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          python-version: "${{ matrix.python-version }}"
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          conda env create -n unittest -f .github/workflows_env/unittest_env.yml
+          conda activate unittest
+          conda list
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e features/
+          env
+          cd features/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+  tabular:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        # os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [ubuntu-latest]
+        python-version: [3.7, 3.8, 3.9]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          python-version: "${{ matrix.python-version }}"
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          conda env create -n unittest -f .github/workflows_env/unittest_env.yml
+          conda activate unittest
+          conda list
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e core/[all]
+          python3 -m pip install --upgrade -e features/
+          python3 -m pip install --upgrade -e tabular/
+          env
+          cd tabular/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+  install:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        # os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [ubuntu-latest]
+        python-version: [3.7, 3.8, 3.9]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          python-version: "${{ matrix.python-version }}"
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          conda env create -n unittest -f .github/workflows_env/unittest_env.yml
+          conda activate unittest
+          conda list
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e core/[all]
+          python3 -m pip install --upgrade -e features/
+          python3 -m pip install --upgrade -e tabular/
+          python3 -m pip install --upgrade -e autogluon/
+          env
