@@ -47,9 +47,15 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
             # TODO: Be aware: When converted to float32 by downstream models, the seconds value will be up to 3 seconds off the true time due to rounding error. If seconds matter, find a separate way to generate (Possibly subtract smallest datetime from all values).
             # TODO: could also return an extra boolean column is_nan which could provide predictive signal.
             X_datetime[datetime_feature] = pd.to_datetime(X[datetime_feature], errors='coerce').fillna(self._fillna_map[datetime_feature])
-            X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])  # TODO: Use actual date info
             # X_datetime[datetime_feature] = pd.to_timedelta(X_datetime[datetime_feature]).dt.total_seconds()
-            # TODO: Add fastai date features
+            # Parse the date into lots of derived fields.
+            # Most of the pandas Series.dt properties are here, a few are omitted (e.g. is_month_start) if they can be inferred
+            # from other features.
+            for subfeature in ('year', 'month', 'day', 'hour', 'minute', 'second', 'dayofweek', 'weekday', 'dayofyear', 'quarter', 'is_month_end', 'is_leap_year'):
+                X_datetime[datetime_feature + '.' + subfeature] = getattr(X_datetime[datetime_feature].dt, subfeature).astype(int)
+
+            X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
+
         return X_datetime
 
     def _remove_features_in(self, features: list):

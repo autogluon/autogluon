@@ -68,6 +68,8 @@ cd ../text/
 pytest
 cd ../vision/
 pytest
+cd ../features/
+pytest
 ```
 
 - We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
