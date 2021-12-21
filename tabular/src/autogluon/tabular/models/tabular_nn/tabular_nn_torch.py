@@ -5,9 +5,6 @@ import torch.nn as nn
 import numpy as np
 import pandas as pd
 
-from autogluon.core.models.abstract import model_trial
-from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.core import args
 from .embednet import getEmbedSizes
 
 logger = logging.getLogger(__name__)
@@ -431,23 +428,3 @@ class TabularPyTorchDataset(torch.utils.data.Dataset):
                                              drop_last=False if is_test else True,
                                              worker_init_fn=worker_init_fn)
         return loader
-
-
-@args()
-def tabular_pytorch_trial(args, reporter):
-    """ Training and evaluation function used during a single trial of HPO """
-    try:
-        model, args, util_args = model_trial.prepare_inputs(args=args)
-
-        train_dataset = TabularPyTorchDataset.load(util_args.train_path)
-        val_dataset = TabularPyTorchDataset.load(util_args.val_path)
-        y_val = val_dataset.get_labels()
-
-        fit_model_args = dict(X=train_dataset, y=None, X_val=val_dataset, **util_args.get('fit_kwargs', dict()))
-        predict_proba_args = dict(X=val_dataset)
-        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
-                                       time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
-    except Exception as e:
-        if not isinstance(e, TimeLimitExceeded):
-            logger.exception(e, exc_info=True)
-        reporter.terminate()

@@ -25,7 +25,6 @@ install_requires = [
     'tqdm',
 
     'cython',  # TODO: Do we need cython here? Why is cython not version capped / minned?
-    'ConfigSpace==0.4.19',
     'requests',
     'matplotlib',
     'paramiko>=2.4',

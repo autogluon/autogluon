@@ -31,17 +31,15 @@ from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.multiprocessing_utils import force_forkserver
-from autogluon.core import args, space
 from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count_mxnet
 from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
-from autogluon.core.task.base.base_task import schedulers
 from autogluon.core.metrics import get_metric, Scorer
 from autogluon.core.dataset import TabularDataset
-from autogluon.core.decorator import sample_config
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.scheduler.reporter import FakeReporter
+from autogluon.core.searcher import LocalRandomSearcher
 
 from .modules import MultiModalWithPretrainedTextNN
 from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
@@ -396,12 +394,11 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             if not is_fake_reporter:
                 reporter.terminate()
             return
+    search_space = args
     if is_fake_reporter:
-        search_space = args.rand
         task_id = 0
     else:
         task_id = args.pop('task_id')
-        search_space = args
     # Get the log metric scorers
     if isinstance(log_metrics, str):
         log_metrics = [log_metrics]
@@ -997,7 +994,6 @@ class MultiModalTextModel:
         if search_space is None:
             search_space = \
                 ag_text_presets.create('default')['models']['MultimodalTextModel']['search_space']
-        search_space_reg = args(search_space=space.Dict(**search_space))
         # Scheduler and searcher for HPO
         if tune_kwargs is None:
             tune_kwargs = ag_text_presets.create('default')['tune_kwargs']
@@ -1067,25 +1063,27 @@ class MultiModalTextModel:
             params_path = None
             preprocessor_path = None
 
-        train_fn = search_space_reg(functools.partial(train_function,
-                                                      train_df_path=train_df_path,
-                                                      time_limit=time_limit,
-                                                      time_start=start_tick,
-                                                      tuning_df_path=tuning_df_path,
-                                                      base_config=self.base_config,
-                                                      problem_type=self.problem_type,
-                                                      column_types=self._column_types,
-                                                      feature_columns=self._feature_columns,
-                                                      label_column=self._label_columns[0],
-                                                      log_metrics=self._log_metrics,
-                                                      eval_metric=self._eval_metric,
-                                                      output_directory=self._output_directory,
-                                                      ngpus_per_trial=scheduler_options['resource']['num_gpus'],
-                                                      params_path=params_path,
-                                                      preprocessor_path=preprocessor_path,
-                                                      continue_training=continue_training,
-                                                      console_log=console_log,
-                                                      verbosity=verbosity))
+        train_fn_kwargs = dict(
+            train_df_path=train_df_path,
+            time_limit=time_limit,
+            time_start=start_tick,
+            tuning_df_path=tuning_df_path,
+            base_config=self.base_config,
+            problem_type=self.problem_type,
+            column_types=self._column_types,
+            feature_columns=self._feature_columns,
+            label_column=self._label_columns[0],
+            log_metrics=self._log_metrics,
+            eval_metric=self._eval_metric,
+            output_directory=self._output_directory,
+            ngpus_per_trial=scheduler_options['resource']['num_gpus'],
+            params_path=params_path,
+            preprocessor_path=preprocessor_path,
+            continue_training=continue_training,
+            console_log=console_log,
+            verbosity=verbosity,
+        )
+
         no_job_finished_err_msg =\
             'No training job has been completed! '\
             'There are two possibilities: '\
@@ -1096,8 +1094,11 @@ class MultiModalTextModel:
             'further investigate the root cause, you can also try to set the '\
             '"verbosity=3" and try again, i.e., predictor.set_verbosity(3).'
         if scheduler_options['num_trials'] == 1:
-            train_fn(train_fn.args['search_space'],
-                     train_fn.args['_default_config'])
+            reporter = FakeReporter()
+            rand_config = LocalRandomSearcher(search_space=search_space).get_config()
+            cur_config = {**search_space}
+            cur_config.update(rand_config)
+            results = train_function({**cur_config}, reporter=reporter, **train_fn_kwargs)
             best_model_saved_dir_path = os.path.join(self._output_directory, 'task0')
             cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
 
@@ -1127,7 +1128,7 @@ class MultiModalTextModel:
                 force_forkserver()
             scheduler_cls, scheduler_params = scheduler_factory(scheduler_options)
             # Create scheduler, run HPO experiment
-            scheduler = scheduler_cls(train_fn, search_space=search_space, **scheduler_options)
+            scheduler = scheduler_cls(train_function, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
             scheduler.run()
             scheduler.join_jobs()
             if len(scheduler.config_history) == 0:

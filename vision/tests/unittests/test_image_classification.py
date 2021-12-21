@@ -1,5 +1,5 @@
 from autogluon.vision import ImagePredictor, ImageDataset
-import autogluon.core as ag
+from autogluon.core.utils import download, unzip
 import os
 import pandas as pd
 import numpy as np
@@ -58,8 +58,8 @@ def test_task_label_remap():
 
 
 def test_invalid_image_dataset():
-    invalid_test = ag.download('https://autogluon.s3-us-west-2.amazonaws.com/miscs/test_autogluon_invalid_dataset.zip')
-    invalid_test = ag.unzip(invalid_test)
+    invalid_test = download('https://autogluon.s3-us-west-2.amazonaws.com/miscs/test_autogluon_invalid_dataset.zip')
+    invalid_test = unzip(invalid_test)
     df = ImageDataset.from_csv(os.path.join(invalid_test, 'train.csv'), root=os.path.join(invalid_test, 'train_images'))
     predictor = ImagePredictor(label="labels")
     predictor.fit(df, df.copy(), time_limit=60)
