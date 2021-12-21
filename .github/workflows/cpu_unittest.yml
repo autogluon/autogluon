@@ -119,8 +119,6 @@ jobs:
           python3 -m pip install --upgrade -e core/[all]
           python3 -m pip install --upgrade -e features/
           python3 -m pip install --upgrade -e tabular/[all]
-          python3 -m pip install --upgrade -e text/
-          python3 -m pip install --upgrade -e vision/
           env
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
