@@ -46,7 +46,7 @@ extras_require = {
         'scikit-learn-intelex<=2021.3',
     ],
     'vowpalwabbit': [
-        'vowpalwabbit==8.10.1'
+        'vowpalwabbit>=8.10,<8.11'
     ]
 }
 

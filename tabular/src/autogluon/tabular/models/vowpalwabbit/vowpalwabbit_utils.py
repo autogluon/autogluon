@@ -1,5 +1,5 @@
 import pandas as pd
-from autogluon.common.features.types import *
+from autogluon.common.features.types import S_TEXT, R_INT, R_FLOAT, R_CATEGORY
 
 
 class VWFeaturesConverter:
@@ -11,8 +11,7 @@ class VWFeaturesConverter:
     PIPE = '|'
     SPACE = ' '
 
-    def __init__(self, namespace_separator=''):
-        self.namespace_separator = namespace_separator
+    # TODO: Add support for different namespaces
 
     def convert_features_to_vw_format(self, X, feature_metadata) -> pd.Series:
         """
@@ -26,7 +25,6 @@ class VWFeaturesConverter:
 
         for feature in feature_metadata:
             raw_feature, special_feature = feature_metadata[feature]
-
             if X_out is None:
                 X_out = self.PIPE + self.SPACE + self.__generate_namespace_based_on_ml_type(
                     X[feature],
@@ -35,7 +33,7 @@ class VWFeaturesConverter:
                     feature
                 ).astype('str') + self.SPACE
             else:
-                X_out += self.namespace_separator + self.SPACE + self.__generate_namespace_based_on_ml_type(
+                X_out += '' + self.SPACE + self.__generate_namespace_based_on_ml_type(
                     X[feature],
                     raw_feature,
                     special_feature,
@@ -60,7 +58,7 @@ class VWFeaturesConverter:
             return input_series.apply(self.__preprocess_text)
         elif raw_feature in [R_INT, R_FLOAT]:
             return input_series.apply(self.__numeric_namespace_generator, args=(feature_name,))
-        elif raw_feature == R_CATEGORY or S_TEXT_AS_CATEGORY in special_feature:
+        elif raw_feature == R_CATEGORY:
             return input_series.apply(self.__categorical_namespace_generator, args=(feature_name,))
         else:
             raise ValueError(

@@ -202,8 +202,8 @@ def try_import_vowpalwabbit():
         import vowpalwabbit
         from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
         vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
-        assert vowpalwabbit_version == parse_version('8.10.1'), \
-            f'Currently, we only support VW version 8.10.1. Found vowpalwabbit version: {vowpalwabbit_version}'
+        assert vowpalwabbit_version >= parse_version('8.10.1') and vowpalwabbit_version < parse_version('8.11.0'), \
+            f'Currently, we only support VW version >=8.10.1 and <8.11.0. Found vowpalwabbit version: {vowpalwabbit_version}'
     except ImportError:
         raise ImportError("`import vowpalwabbit` failed.\n"
-                          "A quick tip is to install via `pip install vowpalwabbit==8.10.1")
+                          "A quick tip is to install via `pip install vowpalwabbit==8.10")
