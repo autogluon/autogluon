@@ -238,7 +238,7 @@ class LocalSequentialScheduler(object):
         new_searcher_config = self.searcher.get_config()
         searcher_config = deepcopy(self.metadata['search_space'])
         searcher_config.update(new_searcher_config)
-        reporter = LocalReporter(task_id, new_searcher_config, self.training_history, self.config_history)
+        reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
         return self.run_job_(task_id, searcher_config, reporter)
 
     def run_job_(self, task_id, searcher_config, reporter):
@@ -280,7 +280,10 @@ class LocalSequentialScheduler(object):
     def get_best_config(self):
         """Get the best configuration from the finished jobs.
         """
-        return self.searcher.get_best_config()
+        # TODO: Consider passing the metadata search space to searcher to avoid having to do this
+        searcher_config = deepcopy(self.metadata['search_space'])
+        searcher_config.update(self.searcher.get_best_config())
+        return searcher_config
 
     def get_best_reward(self):
         """Get the best reward from the finished jobs.
