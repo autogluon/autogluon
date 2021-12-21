@@ -47,7 +47,25 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
         ],
         ('int', ('datetime_as_int',)): [
             'datetime',
-            'datetime_as_object'
+            'datetime.year',
+            'datetime.month',
+            'datetime.day',
+            'datetime.hour',
+            'datetime.minute',
+            'datetime.dayofweek',
+            'datetime.dayofyear',
+            'datetime.quarter',
+            'datetime.is_month_end',
+            'datetime_as_object',
+            'datetime_as_object.year',
+            'datetime_as_object.month',
+            'datetime_as_object.day',
+            'datetime_as_object.hour',
+            'datetime_as_object.minute',
+            'datetime_as_object.dayofweek',
+            'datetime_as_object.dayofyear',
+            'datetime_as_object.quarter',
+            'datetime_as_object.is_month_end'
         ],
         ('int', ('text_ngram',)): [
             '__nlp__.breaks',
@@ -94,9 +112,10 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
     assert list(output_data['obj'].values) == [1, np.nan, 1, 2, 2, 2, np.nan, 0, 0]
     assert list(output_data['cat'].values) == [0, np.nan, 0, 1, 1, 1, np.nan, np.nan, np.nan]
 
-    # datetime checks
+    # datetime checks.  There are further checks in test_datetime.py
     assert list(output_data['datetime'].values) == list(output_data['datetime_as_object'].values)
     assert expected_output_data_feat_datetime == list(output_data['datetime'].values)
+
 
     # text_special checks
     assert expected_output_data_feat_lower_ratio == list(output_data['text.lower_ratio'].values)

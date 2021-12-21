@@ -51,7 +51,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
             # Parse the date into lots of derived fields.
             # Most of the pandas Series.dt properties are here, a few are omitted (e.g. is_month_start) if they can be inferred
             # from other features.
-            for subfeature in ('year', 'month', 'day', 'hour', 'minute', 'second', 'dayofweek', 'weekday', 'dayofyear', 'quarter', 'is_month_end', 'is_leap_year'):
+            for subfeature in ('year', 'month', 'day', 'hour', 'minute', 'second', 'dayofweek', 'dayofyear', 'quarter', 'is_month_end', 'is_leap_year'):
                 X_datetime[datetime_feature + '.' + subfeature] = getattr(X_datetime[datetime_feature].dt, subfeature).astype(int)
 
             X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])

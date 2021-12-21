@@ -22,7 +22,6 @@ def test_datetime_feature_generator(generator_helper, data_helper):
         'datetime.minute',
         'datetime.second',
         'datetime.dayofweek',
-        'datetime.weekday',
         'datetime.dayofyear',
         'datetime.quarter',
         'datetime.is_month_end',
@@ -35,7 +34,6 @@ def test_datetime_feature_generator(generator_helper, data_helper):
         'datetime_as_object.minute',
         'datetime_as_object.second',
         'datetime_as_object.dayofweek',
-        'datetime_as_object.weekday',
         'datetime_as_object.dayofyear',
         'datetime_as_object.quarter',
         'datetime_as_object.is_month_end',
@@ -101,4 +99,5 @@ def test_datetime_feature_generator(generator_helper, data_helper):
     assert expected_output_data_feat_datetime_year == list(output_data['datetime.year'].values)
     assert expected_output_data_feat_datetime_hour == list(output_data['datetime.hour'].values)
     assert expected_output_data_feat_datetime_is_month_end == list(output_data['datetime.is_month_end'].values)
-    # Given we confirmed year and hour are working, testing month/day/minute/second/etc is overkill.
+    # Given we confirmed year, hour and is_month_end are working, 
+    # adding tests for month/day/minute/second/etc is overkill.
