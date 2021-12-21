@@ -1,7 +1,7 @@
 
 import logging
 
-from autogluon.core import Space, Categorical, List, NestedSpace
+from autogluon.core import Space
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +24,5 @@ def hp_default_value(hp_value):
     """Extracts default fixed value from hyperparameter search space hp_value to use a fixed value instead of a search space."""
     if not isinstance(hp_value, Space):
         return hp_value
-    if isinstance(hp_value, Categorical):
-        return hp_value[0]
-    elif isinstance(hp_value, List):
-        return [z[0] for z in hp_value]
-    elif isinstance(hp_value, NestedSpace):
-        raise ValueError("Cannot extract default value from NestedSpace. Please specify fixed value instead of: %s" % str(hp_value))
     else:
-        return hp_value.get_hp('dummy_name').default_value
+        return hp_value.default

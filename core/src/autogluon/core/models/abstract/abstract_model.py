@@ -881,11 +881,11 @@ class AbstractModel:
         scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
-        dataset_train_filename = 'dataset_train.p'
+        dataset_train_filename = 'dataset_train.pkl'
         train_path = directory + dataset_train_filename
         save_pkl.save(path=train_path, object=(X, y))
 
-        dataset_val_filename = 'dataset_val.p'
+        dataset_val_filename = 'dataset_val.pkl'
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=(X_val, y_val))
 
@@ -897,20 +897,19 @@ class AbstractModel:
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
-        fit_kwargs=scheduler_params['resource'].copy()
+        fit_kwargs = scheduler_params['resource'].copy()
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
         fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
-        util_args = dict(
-            dataset_train_filename=dataset_train_filename,
-            dataset_val_filename=dataset_val_filename,
-            directory=directory,
+        train_fn_kwargs = dict(
             model=self,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],
             fit_kwargs=fit_kwargs,
+            train_path=train_path,
+            val_path=val_path,
         )
 
-        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=params_copy, util_args=util_args, **scheduler_params)
+        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=params_copy, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
 
         scheduler.run()
         scheduler.join_jobs()
