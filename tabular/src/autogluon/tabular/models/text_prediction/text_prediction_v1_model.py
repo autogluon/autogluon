@@ -140,7 +140,7 @@ class TextPredictorModel(AbstractModel):
             'and the AutoGluon Tabular.'
 
         verbosity_text = max(0, verbosity - 1)
-        root_logger = logging.getLogger()
+        root_logger = logging.getLogger(__name__)
         root_log_level = root_logger.level
         self.model = TextPredictor(label=self._label_column_name,
                                    problem_type=self.problem_type,

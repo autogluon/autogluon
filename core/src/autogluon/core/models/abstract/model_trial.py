@@ -4,14 +4,11 @@ import logging
 
 from ...utils.loaders import load_pkl
 from ...utils.exceptions import TimeLimitExceeded
-from ... import args
-from ...scheduler.reporter import LocalStatusReporter
 
 logger = logging.getLogger(__name__)
 
 
-@args()
-def model_trial(args, reporter: LocalStatusReporter):
+def model_trial(args, reporter):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
 
         Notes:
@@ -24,8 +21,12 @@ def model_trial(args, reporter: LocalStatusReporter):
     try:
         model, args, util_args = prepare_inputs(args=args)
 
-        X, y = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
-        X_val, y_val = load_pkl.load(util_args.directory + util_args.dataset_val_filename)
+        directory = util_args['directory']
+        dataset_train_filename = util_args['dataset_train_filename']
+        dataset_val_filename = util_args['dataset_val_filename']
+
+        X, y = load_pkl.load(directory + dataset_train_filename)
+        X_val, y_val = load_pkl.load(directory + dataset_val_filename)
 
         fit_model_args = dict(X=X, y=y, X_val=X_val, y_val=y_val, **util_args.get('fit_kwargs', dict()))
         predict_proba_args = dict(X=X_val)
@@ -35,7 +36,7 @@ def model_trial(args, reporter: LocalStatusReporter):
             fit_args=fit_model_args,
             predict_proba_args=predict_proba_args,
             y_val=y_val,
-            time_start=util_args.time_start,
+            time_start=util_args['time_start'],
             time_limit=util_args.get('time_limit', None),
             reporter=None,
         )
@@ -52,7 +53,7 @@ def prepare_inputs(args):
     util_args = args.pop('util_args')
 
     file_prefix = f"T{task_id}"  # append to all file names created during this trial. Do NOT change!
-    model = util_args.model  # the model object must be passed into model_trial() here
+    model = util_args['model']  # the model object must be passed into model_trial() here
     model.name = model.name + os.path.sep + file_prefix
     model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
     return model, args, util_args

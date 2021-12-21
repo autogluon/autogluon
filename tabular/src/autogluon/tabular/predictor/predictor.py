@@ -11,7 +11,9 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
@@ -20,19 +22,19 @@ from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
+from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.utils import default_holdout_frac
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict
 from ..learner import AbstractLearner, DefaultLearner
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
 # TODO: num_bag_sets -> ag_args
@@ -191,7 +193,7 @@ class TabularPredictor:
             **kwargs
     ):
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
+        set_logger_verbosity(self.verbosity)
         if sample_weight == AUTO_WEIGHT:  # TODO: update auto_weight strategy and make it the default
             sample_weight = None
             logger.log(15, f"{AUTO_WEIGHT} currently does not use any sample weights.")
@@ -484,9 +486,10 @@ class TabularPredictor:
                                     This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
                                     Particularly useful if disk usage is a concern. By not saving the fold models, bagged models will use only very small amounts of disk space during training.
                                     In many training runs, this will reduce peak disk usage by >10x.
-                            fold_fitting_strategy: (AbstractFoldFittingStrategy default=parallel_local) Whether to fit folds in parallel or in sequential order.
+                            fold_fitting_strategy: (AbstractFoldFittingStrategy default=auto) Whether to fit folds in parallel or in sequential order.
                                 If parallel_local, folds will be trained in parallel with evenly distributed computing resources. This could bring 2-4x speedup compared to SequentialLocalFoldFittingStrategy, but could consume much more memory.
                                 If sequential_local, folds will be trained in sequential.
+                                If auto, strategy will be determined by OS and whether ray is installed or not. MacOS support for parallel_local is unstable, and may crash if enabled.
                             num_folds_parallel: (int or str, default='auto') Number of folds to be trained in parallel if using ParallelLocalFoldFittingStrategy. Consider lowering this value if you encounter either out of memory issue or CUDA out of memory issue(when trained on gpu).
                                 if 'auto', will try to train all folds in parallel.
 
@@ -685,7 +688,7 @@ class TabularPredictor:
         kwargs = self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         if presets:
             if not isinstance(presets, list):
@@ -926,7 +929,7 @@ class TabularPredictor:
         kwargs = self._validate_fit_extra_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         if verbosity >= 3:
             logger.log(20, '============ fit kwarg info ============')
@@ -1109,6 +1112,10 @@ class TabularPredictor:
         X_test = unlabeled_data.copy()
 
         for i in range(max_iter):
+            if len(X_test) == 0:
+                logger.log(20, f'No more unlabeled data to pseudolabel. Done with pseudolabeling...')
+                break
+
             iter_print = str(i + 1)
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}')
 
@@ -2663,7 +2670,7 @@ class TabularPredictor:
             If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may run into numerous issues if attempting this.
         """
         if verbosity is not None:
-            set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
+            set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")
 

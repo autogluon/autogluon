@@ -12,22 +12,8 @@ describing what they are and what they do. The APIs are grouped into the followi
 
       Automatically train/deploy predictors with 1 line of code for text, image, or tabular data.
 
-   .. card::
-      :title: Search Space
-      :link: autogluon.core.space.html
-
-      Hyperparameter search spaces of candidate hyperparameter values to consider.
-
-   .. card::
-      :title: Searchers
-      :link: autogluon.core.searcher.html
-
-      Search algorithms that suggest which hyperparameter values to try out.
-
 .. toctree::
    :maxdepth: 2
    :hidden:
 
    autogluon.predictor
-   autogluon.core.space
-   autogluon.core.searcher

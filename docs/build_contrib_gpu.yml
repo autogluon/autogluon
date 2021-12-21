@@ -1,5 +1,9 @@
 name: autogluon_contrib
+channels:
+- conda-forge
+- defaults
 dependencies:
+- cudatoolkit=10.1
 - python=3.9
 - pip:
   - jupyter-sphinx>=0.2.2

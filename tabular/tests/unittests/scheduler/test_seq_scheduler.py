@@ -3,7 +3,7 @@ from time import sleep
 import pytest
 
 import autogluon.core as ag
-from autogluon.core import args, Real
+from autogluon.core import Real
 from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
 
 cls = LocalSequentialScheduler
@@ -49,58 +49,37 @@ def test_has_enough_time_for_trial__enough_time__avg_time_not_allows_trials_by_f
 
 
 def test_LocalSequentialScheduler_no_criteria():
-    @args(lr=Real(1e-2, 1e-1, log=True))
+    search_space = {'lr': Real(1e-2, 1e-1, log=True)}
+
     def _train_fn_():
         pass
 
     with pytest.raises(AssertionError, match="Need stopping criterion: Either num_trials or time_out"):
-        LocalSequentialScheduler(train_fn=_train_fn_, reward_attr='reward_attr', resource={})
+        LocalSequentialScheduler(train_fn=_train_fn_, search_space=search_space, reward_attr='reward_attr', resource={})
 
 
 def test_search_space():
-    @ag.args(
+    search_space = dict(
         a=ag.space.Real(1e-3, 1e-2, log=True),
         b=ag.space.Real(1e-3, 1e-2),
         c=ag.space.Int(1, 10),
         d=ag.space.Categorical('a', 'b', 'c', 'd'),
         e=ag.space.Bool(),
-        f=ag.space.List(
-            ag.space.Int(1, 2),
-            ag.space.Categorical(4, 5),
-        ),
-        g=ag.space.Dict(
-            a=ag.Real(0, 10),
-            obj=ag.space.Categorical('auto', 'gluon'),
-        ),
-        h=ag.space.Categorical('test', ag.space.Categorical('auto', 'gluon')),
-        i=ag.space.Categorical('mxnet', 'pytorch'),
     )
+
     def train_fn(args, reporter):
-        a, b, c, d, e, f, g, h, i = args.a, args.b, args.c, args.d, args.e, args.f, args.g, args.h, args.i
-
-        class MyObj:
-            def __init__(self, name):
-                self.name = name
-
-        def myfunc(framework):
-            return framework
+        a, b, c, d, e = args['a'], args['b'], args['c'], args['d'], args['e']
 
         assert a <= 1e-2 and a >= 1e-3
         assert b <= 1e-2 and b >= 1e-3
         assert c <= 10 and c >= 1
         assert d in ['a', 'b', 'c', 'd']
         assert e in [True, False]
-        assert f[0] in [1, 2]
-        assert f[1] in [4, 5]
-        assert g['a'] <= 10 and g['a'] >= 0
-        assert MyObj(g.obj).name in ['auto', 'gluon']
-        assert e in [True, False]
-        assert h in ['test', 'auto', 'gluon']
-        assert myfunc(i) in ['mxnet', 'pytorch']
         reporter(epoch=1, accuracy=0)
 
     scheduler = LocalSequentialScheduler(
         train_fn,
+        search_space=search_space,
         resource={'num_cpus': 'all', 'num_gpus': 0},
         num_trials=10,
         reward_attr='accuracy',
@@ -115,25 +94,25 @@ def test_scheduler_can_handle_failing_jobs():
     trails_outcomes = []
     best_result = [-1]
 
-    @ag.args(a=ag.space.Real(0, 1))
+    search_space = dict(a=ag.space.Real(0, 1))
+
     def train_fn(args, reporter):
-        test_should_fail = args.a > 0.7
+        test_should_fail = args['a'] > 0.7
         trails_outcomes.append(test_should_fail)
         if test_should_fail:
             raise Exception('Failed Trial')
-        elif args.a > best_result[0]:
-            best_result[0] = args.a
-
-        sleep(0.2)
-        reporter(epoch=1, accuracy=args.a)
+        elif args['a'] > best_result[0]:
+            best_result[0] = args['a']
+        reporter(epoch=1, accuracy=args['a'])
 
     scheduler = LocalSequentialScheduler(
         train_fn,
+        search_space=search_space,
         resource={'num_cpus': 'all', 'num_gpus': 0},
-        time_out=3,
+        num_trials=10,
         reward_attr='accuracy',
         time_attr='epoch',
-        checkpoint=None
+        checkpoint=None,
     )
 
     scheduler.run()

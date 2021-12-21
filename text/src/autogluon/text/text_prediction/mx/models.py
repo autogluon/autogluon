@@ -18,7 +18,6 @@ from typing import Tuple
 from packaging import version as py_version
 
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.utils import set_logger_verbosity
 from sklearn.preprocessing import LabelEncoder
 import mxnet as mx
 from mxnet.util import use_np
@@ -30,9 +29,10 @@ from autogluon_contrib_nlp.utils.misc import grouper, \
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 
+from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.multiprocessing_utils import force_forkserver
 from autogluon.core import args, space
-from autogluon.core.utils import in_ipynb, verbosity2loglevel
+from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count_mxnet
 from autogluon.core.utils.loaders import load_pkl, load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
@@ -400,8 +400,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
         search_space = args.rand
         task_id = 0
     else:
-        search_space = args['search_space']
-        task_id = args.task_id
+        task_id = args.pop('task_id')
+        search_space = args
     # Get the log metric scorers
     if isinstance(log_metrics, str):
         log_metrics = [log_metrics]
@@ -422,7 +422,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.defrost()
     cfg.misc.exp_dir = exp_dir
     cfg.freeze()
-    logger = logging.getLogger()
+    logger = logging.getLogger(__name__)
     set_logger_verbosity(verbosity, logger)
     logging_config(folder=exp_dir, name='training', logger=logger, console=console_log,
                    level=logging.DEBUG,
@@ -989,7 +989,7 @@ class MultiModalTextModel:
             Verbosity
         """
         set_seed(seed)
-        set_logger_verbosity(verbosity, logger)
+        set_logger_verbosity(verbosity)
         start_tick = time.time()
         assert len(self._label_columns) == 1, 'Currently, we only support single label.'
         # TODO(sxjscience) Try to support S3
@@ -1127,7 +1127,7 @@ class MultiModalTextModel:
                 force_forkserver()
             scheduler_cls, scheduler_params = scheduler_factory(scheduler_options)
             # Create scheduler, run HPO experiment
-            scheduler = scheduler_cls(train_fn, **scheduler_options)
+            scheduler = scheduler_cls(train_fn, search_space=search_space, **scheduler_options)
             scheduler.run()
             scheduler.join_jobs()
             if len(scheduler.config_history) == 0:

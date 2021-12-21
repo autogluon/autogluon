@@ -24,11 +24,11 @@ import shutil
 import warnings
 from random import seed
 
-import autogluon.core as ag
-import mxnet as mx
 import numpy as np
 import pandas as pd
 import pytest
+
+import autogluon.core as ag
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.tabular import TabularDataset, TabularPredictor
 from networkx.exception import NetworkXError
@@ -267,7 +267,6 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if seed_val is not None:
                 seed(seed_val)
                 np.random.seed(seed_val)
-                mx.random.seed(seed_val)
             print("Evaluating Benchmark Dataset %s (%d of %d)" % (dataset['name'], idx+1, len(datasets)))
             directory = directory_prefix + dataset['name'] + "/"
             savedir = directory + 'AutogluonOutput/'
@@ -382,8 +381,22 @@ def test_pseudolabeling():
     train_file = 'train_data.csv'
     test_file = 'test_data.csv'
     directory_prefix = './datasets/'
-    hyperparam_setting = 'toy'
+    hyperparam_setting = {
+        'GBM': {'num_boost_round': 10},
+        'XGB': {'n_estimators': 10},
+    }
 
+    fit_args = dict(
+        hyperparameters=hyperparam_setting,
+        time_limit=20,
+    )
+
+    fit_args_best = dict(
+        presets='best_quality',
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble=dict(fold_fitting_strategy='sequential_local'),
+    )
     for idx in range(len(datasets)):
         dataset = datasets[idx]
         label = dataset['label']
@@ -414,7 +427,7 @@ def test_pseudolabeling():
                 pseudo_data=test_data,
                 return_pred_prob=True,
                 train_data=train_data,
-                hyperparameters=hyperparam_setting
+                **fit_args,
             )
         except Exception as e:
             assert False, error_msg_og + 'labeled test data'
@@ -425,8 +438,8 @@ def test_pseudolabeling():
                 pseudo_data=test_data,
                 return_pred_prob=True,
                 train_data=train_data,
-                presets='best_quality',
-                hyperparameters=hyperparam_setting
+                **fit_args_best,
+                **fit_args,
             )
         except Exception as e:
             assert False, error_msg_og + 'labeled test data, best quality'
@@ -445,9 +458,9 @@ def test_pseudolabeling():
                         pseudo_data=unlabeled_test_data,
                         return_pred_prob=True,
                         train_data=train_data,
-                        hyperparameters=hyperparam_setting,
                         use_ensemble=flag_ensemble,
-                        fit_ensemble=is_weighted_ensemble
+                        fit_ensemble=is_weighted_ensemble,
+                        **fit_args,
                     )
                 except Exception as e:
                     assert False, error_msg + 'unlabeled test data' + error_suffix
@@ -458,10 +471,10 @@ def test_pseudolabeling():
                         pseudo_data=unlabeled_test_data,
                         return_pred_prob=True,
                         train_data=train_data,
-                        presets='best_quality',
-                        hyperparameters=hyperparam_setting,
                         use_ensemble=flag_ensemble,
-                        fit_ensemble=is_weighted_ensemble
+                        fit_ensemble=is_weighted_ensemble,
+                        **fit_args_best,
+                        **fit_args,
                     )
                 except Exception as e:
                     assert False, error_msg + 'unlabeled test data, best quality' + error_suffix

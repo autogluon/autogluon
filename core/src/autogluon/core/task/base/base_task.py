@@ -3,9 +3,8 @@ import logging
 import time
 from abc import abstractmethod
 
-from ...scheduler import FIFOScheduler
 from ...scheduler.seq_scheduler import LocalSequentialScheduler
-from ...utils import in_ipynb, try_import_mxnet
+from ...utils import in_ipynb
 from ...utils.utils import setup_compute
 
 __all__ = [
@@ -15,57 +14,45 @@ __all__ = [
 
 schedulers = {
     'local': LocalSequentialScheduler,
-    'fifo': FIFOScheduler,
 }
 
 logger = logging.getLogger(__name__)
 
 
-def create_scheduler(train_fn, scheduler, scheduler_options):
+def create_scheduler(train_fn, search_space, scheduler, scheduler_options):
     if isinstance(scheduler, str):
         scheduler_cls = schedulers[scheduler.lower()]
     else:
         assert callable(scheduler)
         scheduler_cls = scheduler
         scheduler_options = copy.copy(scheduler_options)
-    return scheduler_cls(train_fn, **scheduler_options)
+    return scheduler_cls(train_fn, search_space=search_space, **scheduler_options)
 
 
 # FIXME: REMOVE THIS, first GluonCV needs to stop depending on AG, as it imports this class
 class BaseTask(object):
-    """BaseTask for AutoGluon applications
-    """
-    @property
-    @staticmethod
-    def Dataset():
-        try_import_mxnet()
-        import mxnet as mx
-        return mx.gluon.data.Dataset
-
+    """BaseTask for AutoGluon applications"""
     @classmethod
-    def run_fit(cls, train_fn, search_strategy, scheduler_options,
+    def run_fit(cls, train_fn, search_space, search_strategy, scheduler_options,
                 plot_results=False):
         start_time = time.time()
         # create scheduler and schedule tasks
-        scheduler = create_scheduler(train_fn, search_strategy, scheduler_options)
+        scheduler = create_scheduler(train_fn, search_space, search_strategy, scheduler_options)
         scheduler.run()
         scheduler.join_jobs()
         # gather the best configuration
         best_reward = scheduler.get_best_reward()
         best_config = scheduler.get_best_config()
-        args = train_fn.args
-        args.final_fit = True
-        if hasattr(args, 'epochs') and hasattr(args, 'final_fit_epochs'):
-            args.epochs = args.final_fit_epochs
-        train_fn.args.update({'final_fit':True})
-        train_fn.kwvars.update({'final_fit':True})
-        scheduler_final = create_scheduler(train_fn, search_strategy, scheduler_options)
-        results = scheduler_final.run_with_config(best_config)
+        best_config_run = {**best_config}
+        best_config_run['final_fit'] = True
+        if hasattr(best_config_run, 'epochs') and hasattr(best_config_run, 'final_fit_epochs'):
+            best_config_run['epochs'] = best_config_run['final_fit_epochs']
+        scheduler_final = create_scheduler(train_fn, search_space, search_strategy, scheduler_options)
+        results = scheduler_final.run_with_config(best_config_run)
         total_time = time.time() - start_time
         if plot_results or in_ipynb():
             plot_training_curves = scheduler_options['checkpoint'].replace('exp1.ag', 'plot_training_curves.png')
             scheduler.get_training_curves(filename=plot_training_curves, plot=True, use_legend=False)
-        record_args = copy.deepcopy(args)
         if results is None:
             logger.warning('No valid results obtained with best config, the result may not be useful...')
             results = {}
@@ -75,8 +62,7 @@ class BaseTask(object):
                        metadata=scheduler.metadata,
                        training_history=scheduler.training_history,
                        config_history=scheduler.config_history,
-                       reward_attr=scheduler._reward_attr,
-                       args=record_args)
+                       reward_attr=scheduler._reward_attr)
         return results
 
     @classmethod

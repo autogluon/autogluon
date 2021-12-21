@@ -5,12 +5,14 @@ import numpy as np
 import json
 import pandas as pd
 
+from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core import space
 from autogluon.core.constants import BINARY
-from autogluon.core.utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.miscs import in_ipynb
+
 
 from .. import constants as _C
 from ..presets import ag_text_presets, merge_params
@@ -18,7 +20,7 @@ from ..infer_types import infer_column_problem_types, printable_column_type_stri
 from ..metrics import infer_eval_log_metrics
 from ... import version
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
 class TextPredictor:
@@ -78,7 +80,7 @@ class TextPredictor:
     ):
         self.verbosity = verbosity
         if self.verbosity is not None:
-            set_logger_verbosity(self.verbosity, logger=logger)
+            set_logger_verbosity(self.verbosity)
         self._label = label
         self._problem_type = problem_type
         self._eval_metric = eval_metric
@@ -89,7 +91,7 @@ class TextPredictor:
 
     def set_verbosity(self, verbosity: int):
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
+        set_logger_verbosity(self.verbosity)
 
     @property
     def results(self):
