@@ -153,7 +153,8 @@ stage("Unit Test") {
           ${install_vision}
 
           cd tabular/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+          python3 -m pytest --junitxml=results.xml --runslow -m gpu tests
+          ${cleanup_venv}
           """
         }
       }

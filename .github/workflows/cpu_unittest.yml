@@ -120,7 +120,7 @@ jobs:
           python3 -m pip install --upgrade -e tabular/
           env
           cd tabular/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+          python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
   install:
     runs-on: ${{ matrix.os }}
     defaults:
