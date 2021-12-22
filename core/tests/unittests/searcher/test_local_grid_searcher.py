@@ -1,8 +1,9 @@
-from autogluon.core.space import Categorical, Int, Real
+from autogluon.core import Bool
 from autogluon.core.searcher import LocalGridSearcher
+from autogluon.core.space import Categorical, Int, Real
 
 
-def test_local_grid_searcher():
+def test_local_grid_searcher_categorical():
     search_space = dict(
         a=Categorical('a', 7, ['hello', 2]),
         b=Categorical(12, 15),
@@ -58,16 +59,46 @@ def test_local_grid_searcher():
         raise AssertionError('GridSearcher should error due to being out of configs')
 
 
-def test_invalid_local_grid_searcher():
+def test_local_grid_searcher_numeric():
     search_spaces = [
-        dict(a=Int(12, 15)),
-        dict(a=Real(12, 15)),
+        [dict(a=Bool()), [{'a': 0}, {'a': 1}]],
+        [dict(a=Int(12, 15)), [{'a': 12}, {'a': 13}, {'a': 14}, {'a': 15}]],
+        [dict(a=Real(12, 16)), [{'a': 12.0}, {'a': 13.333333333333334}, {'a': 14.666666666666666}, {'a': 16.0}]],
+        [dict(a=Real(12, 16, log=True)), [{'a': 12.0}, {'a': 13.207708995578509}, {'a': 14.536964742657117}, {'a': 16.0}]],
+    ]
+    for search_space, expected_values in search_spaces:
+        searcher = LocalGridSearcher(search_space=search_space)
+        actual_values = []
+        while True:
+            try:
+                cfg = searcher.get_config()
+                actual_values.append(cfg)
+                searcher.update(cfg, accuracy=0.1)
+            except AssertionError as e:
+                assert expected_values == actual_values
+                break
+
+
+def test_local_grid_searcher_numeric_grid_settings():
+    search_spaces = [
+        [dict(a=Int(12, 15)), [{'a': 12}, {'a': 15}]],
+        [dict(b=Int(12, 15)), [{'b': 12}, {'b': 13}, {'b': 15}]],
+        [dict(c=Int(12, 15)), [{'c': 12}, {'c': 13}, {'c': 14}, {'c': 15}]],
     ]
 
-    for search_space in search_spaces:
-        try:
-            LocalGridSearcher(search_space=search_space).get_config()
-        except AssertionError:
-            pass
-        else:
-            raise AssertionError(f'GridSearcher should error due to invalid search space types. search_space: {search_space}')
+    grid_num_sample_settings = {
+        'b': 3,
+        'c': 4,
+    }
+
+    for search_space, expected_values in search_spaces:
+        searcher = LocalGridSearcher(search_space=search_space, grid_numeric_spaces_points_number=2, grid_num_sample_settings=grid_num_sample_settings)
+        actual_values = []
+        while True:
+            try:
+                cfg = searcher.get_config()
+                actual_values.append(cfg)
+                searcher.update(cfg, accuracy=0.1)
+            except AssertionError as e:
+                assert expected_values == actual_values
+                break
