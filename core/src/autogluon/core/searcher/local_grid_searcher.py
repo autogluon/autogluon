@@ -5,8 +5,7 @@ import numpy as np
 from sklearn.model_selection import ParameterGrid
 
 from .local_searcher import LocalSearcher
-from .. import Int, Real
-from ..space import Categorical, Space
+from ..space import Categorical, Space, Int, Real
 
 __all__ = ['LocalGridSearcher']
 
