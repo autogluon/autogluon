@@ -152,7 +152,6 @@ stage("Unit Test") {
           ${install_features}
           cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -254,20 +253,18 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-forecasting-py3-v3 --all -y
           conda env update -n autogluon-forecasting-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-forecasting-py3-v3
           conda list
-          ${setup_pip_venv}
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
           ${install_core_all}
           ${install_features}
           ${install_tabular_all}
           ${install_forecasting}
           cd forecasting/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -345,10 +342,10 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-object-detection-v3 --all -y
         conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-object-detection-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
@@ -362,7 +359,6 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         tree -L 2 docs/_build/rst
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/object_detection/*', name: 'object_detection'
       }
@@ -375,15 +371,14 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-tabular-v3 --all -y
         conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-tabular-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
-        env
 
         git clean -fx
         bash docs/build_pip_install.sh
@@ -392,7 +387,6 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/tabular_prediction/*', name: 'tabular'
       }
@@ -405,15 +399,14 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-text-v3 --all -y
         conda env update -n autogluon-tutorial-text-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-text-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
 
-        env
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -421,7 +414,6 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/text_prediction/*', name: 'text'
       }
@@ -434,13 +426,12 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-cloud_fit_deploy-v3 --all -y
         conda env update -n autogluon-tutorial-cloud_fit_deploy-v3 -f docs/build_contrib.yml
         conda activate autogluon-tutorial-cloud_fit_deploy-v3
         conda list
-        ${setup_pip_venv}
         export AG_DOCS=1
 
-        env
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -448,7 +439,6 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(cloud_fit_deploy)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/cloud_fit_deploy/*', name: 'cloud_fit_deploy'
       }
@@ -461,10 +451,10 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-forecasting-v3 --all -y
         conda env update -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-forecasting-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
@@ -477,7 +467,6 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(forecasting)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
       }
@@ -533,18 +522,15 @@ stage("Build Docs") {
 
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon_docs --all -y
         conda env update -n autogluon_docs -f docs/build_contrib_gpu.yml
         conda activate autogluon_docs
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
-        env
 
         git clean -fx
-
-        python3 -m pip list
 
         ${install_core_all}
         ${install_features}
@@ -565,7 +551,6 @@ stage("Build Docs") {
         echo "Uploaded doc to http://${site}/index.html"
 
         ${index_update_str}
-        ${cleanup_venv}
         """
 
         if (env.BRANCH_NAME.startsWith("PR-")) {
