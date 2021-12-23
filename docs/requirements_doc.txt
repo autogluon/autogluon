@@ -1,3 +1,4 @@
+ipykernel>=4.5.1,<6.0.0
 jupyter-sphinx>=0.3.2
 portalocker
 nose
@@ -13,4 +14,3 @@ sphinxcontrib-jsmath==1.0.1
 sphinxcontrib-qthelp==1.0.3
 sphinxcontrib-serializinghtml==1.1.4
 sphinxcontrib-svg2pdfconverter==1.1.0
-ipykernel>=7.16
