@@ -50,22 +50,12 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
             'datetime.year',
             'datetime.month',
             'datetime.day',
-            'datetime.hour',
-            'datetime.minute',
             'datetime.dayofweek',
-            'datetime.dayofyear',
-            'datetime.quarter',
-            'datetime.is_month_end',
             'datetime_as_object',
             'datetime_as_object.year',
             'datetime_as_object.month',
             'datetime_as_object.day',
-            'datetime_as_object.hour',
-            'datetime_as_object.minute',
-            'datetime_as_object.dayofweek',
-            'datetime_as_object.dayofyear',
-            'datetime_as_object.quarter',
-            'datetime_as_object.is_month_end'
+            'datetime_as_object.dayofweek'
         ],
         ('int', ('text_ngram',)): [
             '__nlp__.breaks',

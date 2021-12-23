@@ -11,7 +11,21 @@ logger = logging.getLogger(__name__)
 
 
 class DatetimeFeatureGenerator(AbstractFeatureGenerator):
-    """Transforms datetime features into numeric features."""
+    """Transforms datetime features into numeric features.
+
+    Parameters
+    ----------
+    features : list, optional
+        A list of datetime features to parse out of dates.
+        For a full list of options see the methods inside pandas.Series.dt at https://pandas.pydata.org/docs/reference/api/pandas.Series.html
+    """
+    def __init__(self, 
+            features: list = ['year', 'month', 'day', 'dayofweek'],
+            **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.features = features
+
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._fillna_map = self._compute_fillna_map(X)
         X_out = self._transform(X)
@@ -51,8 +65,8 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
             # Parse the date into lots of derived fields.
             # Most of the pandas Series.dt properties are here, a few are omitted (e.g. is_month_start) if they can be inferred
             # from other features.
-            for subfeature in ('year', 'month', 'day', 'hour', 'minute', 'second', 'dayofweek', 'dayofyear', 'quarter', 'is_month_end', 'is_leap_year'):
-                X_datetime[datetime_feature + '.' + subfeature] = getattr(X_datetime[datetime_feature].dt, subfeature).astype(int)
+            for feature in self.features:
+                X_datetime[datetime_feature + '.' + feature] = getattr(X_datetime[datetime_feature].dt, feature).astype(int)
 
             X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
 

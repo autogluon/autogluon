@@ -6,38 +6,32 @@ def test_datetime_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
 
-    generator = DatetimeFeatureGenerator()
+    generator_1 = DatetimeFeatureGenerator()
+    generator_2 = DatetimeFeatureGenerator(features = ['hour'])
 
     expected_feature_metadata_in_full = {
         ('datetime', ()): ['datetime'],
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
     }
 
-    expected_feature_metadata_full = {('int', ('datetime_as_int',)): [
+    expected_feature_metadata_full_1 = {('int', ('datetime_as_int',)): [
         'datetime',
         'datetime.year',
         'datetime.month',
         'datetime.day',
-        'datetime.hour',
-        'datetime.minute',
-        'datetime.second',
         'datetime.dayofweek',
-        'datetime.dayofyear',
-        'datetime.quarter',
-        'datetime.is_month_end',
-        'datetime.is_leap_year',
         'datetime_as_object',
         'datetime_as_object.year',
         'datetime_as_object.month',
         'datetime_as_object.day',
+        'datetime_as_object.dayofweek'
+    ]}
+
+    expected_feature_metadata_full_2 = {('int', ('datetime_as_int',)): [
+        'datetime',
+        'datetime.hour',
+        'datetime_as_object',
         'datetime_as_object.hour',
-        'datetime_as_object.minute',
-        'datetime_as_object.second',
-        'datetime_as_object.dayofweek',
-        'datetime_as_object.dayofyear',
-        'datetime_as_object.quarter',
-        'datetime_as_object.is_month_end',
-        'datetime_as_object.is_leap_year'
     ]}
 
     expected_output_data_feat_datetime = [
@@ -66,7 +60,7 @@ def test_datetime_feature_generator(generator_helper, data_helper):
 
     expected_output_data_feat_datetime_hour = [
         16,
-        14, # blank, nan and bad are set to the average = 14
+        14,
         14,
         15,
         15,
@@ -75,29 +69,27 @@ def test_datetime_feature_generator(generator_helper, data_helper):
         14,
         14
     ]
-    expected_output_data_feat_datetime_is_month_end = [
-        0,
-        0, # blank, nan and bad are set to the average = 0
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0
-    ]
+
     # When
-    output_data = generator_helper.fit_transform_assert(
+    output_data_1 = generator_helper.fit_transform_assert(
         input_data=input_data,
-        generator=generator,
+        generator=generator_1,
         expected_feature_metadata_in_full=expected_feature_metadata_in_full,
-        expected_feature_metadata_full=expected_feature_metadata_full,
+        expected_feature_metadata_full=expected_feature_metadata_full_1,
     )
 
-    assert list(output_data['datetime'].values) == list(output_data['datetime_as_object'].values)
-    assert expected_output_data_feat_datetime == list(output_data['datetime'].values)
-    assert expected_output_data_feat_datetime_year == list(output_data['datetime.year'].values)
-    assert expected_output_data_feat_datetime_hour == list(output_data['datetime.hour'].values)
-    assert expected_output_data_feat_datetime_is_month_end == list(output_data['datetime.is_month_end'].values)
-    # Given we confirmed year, hour and is_month_end are working, 
-    # adding tests for month/day/minute/second/etc is overkill.
+    assert list(output_data_1['datetime'].values) == list(output_data_1['datetime_as_object'].values)
+    assert expected_output_data_feat_datetime == list(output_data_1['datetime'].values)
+    assert expected_output_data_feat_datetime_year == list(output_data_1['datetime.year'].values)
+
+    output_data_2 = generator_helper.fit_transform_assert(
+        input_data=input_data,
+        generator=generator_2,
+        expected_feature_metadata_in_full=expected_feature_metadata_in_full,
+        expected_feature_metadata_full=expected_feature_metadata_full_2,
+    )
+
+    assert list(output_data_2['datetime'].values) == list(output_data_2['datetime_as_object'].values)
+    assert expected_output_data_feat_datetime == list(output_data_2['datetime'].values)
+    assert expected_output_data_feat_datetime_hour == list(output_data_2['datetime.hour'].values)
+
