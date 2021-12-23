@@ -4,7 +4,7 @@ import shutil
 import uuid
 import pytest
 
-import autogluon.core as ag
+from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import infer_problem_type, generate_train_test_split
@@ -91,8 +91,8 @@ class DatasetLoaderHelper:
         if (not os.path.exists(train_file_path)) or (not os.path.exists(test_file_path)):
             # fetch files from s3:
             print("%s data not found locally, so fetching from %s" % (name, url))
-            zip_name = ag.download(url, directory_prefix)
-            ag.unzip(zip_name, directory_prefix)
+            zip_name = download(url, directory_prefix)
+            unzip(zip_name, directory_prefix)
             os.remove(zip_name)
 
         train_data = TabularDataset(train_file_path)

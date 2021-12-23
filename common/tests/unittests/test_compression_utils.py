@@ -63,15 +63,15 @@ def test_get_compression_map():
             'extension': '',
         },
         'gzip': {
-            'open': gzip.open,
+            'open': compression_utils._gzip_open,
             'extension': 'gz',
         },
         'bz2': {
-            'open': bz2.open,
+            'open': compression_utils._bz2_open,
             'extension': 'bz2',
         },
         'lzma': {
-            'open': lzma.open,
+            'open': compression_utils._lzma_open,
             'extension': 'lzma',
         },
     }

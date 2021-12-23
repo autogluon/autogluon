@@ -923,6 +923,7 @@ class TabularPredictor:
             pseudo_data : pd.DataFrame, default = None
                 Data that has been self labeled by Autogluon model and will be incorporated into training during 'fit_extra'
         """
+        self._assert_is_fit('fit_extra')
         time_start = time.time()
 
         kwargs_orig = kwargs.copy()
@@ -1296,6 +1297,7 @@ class TabularPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
         """
+        self._assert_is_fit('predict')
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
 
@@ -1330,6 +1332,7 @@ class TabularPredictor:
         May be a :class:`np.ndarray` or :class:`pd.DataFrame` / :class:`pd.Series` depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
         For binary classification problems, the output contains for each datapoint the predicted probabilities of the negative and positive classes, unless you specify `as_multiclass=False`.
         """
+        self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
@@ -1359,6 +1362,7 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
+        self._assert_is_fit('evaluate')
         data = self.__get_dataset(data)
         y_pred_proba = self.predict_proba(data=data, model=model)
         return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent,
@@ -1367,7 +1371,7 @@ class TabularPredictor:
     def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
         Evaluate the provided prediction probabilities against ground truth labels.
-        Evaluation is based on the `eval_metric` previously specified to `fit()`, or default metrics if none was specified.
+        Evaluation is based on the `eval_metric` previously specified in init, or default metrics if none was specified.
 
         Parameters
         ----------
@@ -1512,6 +1516,7 @@ class TabularPredictor:
         -------
         :class:`pd.DataFrame` of model performance summary information.
         """
+        self._assert_is_fit('leaderboard')
         data = self.__get_dataset(data) if data is not None else data
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, silent=silent)
@@ -1534,6 +1539,7 @@ class TabularPredictor:
         -------
         Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
         """
+        self._assert_is_fit('fit_summary')
         # hpo_used = len(self._trainer.hpo_results) > 0
         hpo_used = False  # Disabled until a more memory efficient hpo_results object is implemented.
         model_types = self._trainer.get_models_attribute_dict(attribute='type')
@@ -1711,6 +1717,7 @@ class TabularPredictor:
         >>> test_data_transformed = predictor.transform_features('test.csv', model=model)  # Internal test DataFrame used as input to `model.predict_proba()` during `predictor.predict_proba(test_data, model=model)`
 
         """
+        self._assert_is_fit('transform_features')
         data = self.__get_dataset(data) if data is not None else data
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
                                                    use_orig_features=return_original_features)
@@ -1745,6 +1752,7 @@ class TabularPredictor:
         :class:`pd.Series` of labels if `proba=False` or :class:`pd.DataFrame` of label probabilities if `proba=True`.
 
         """
+        self._assert_is_fit('transform_labels')
         if inverse:
             if proba:
                 labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels, as_pandas=True)
@@ -1849,6 +1857,7 @@ class TabularPredictor:
             'pXX_high': Upper end of XX% confidence interval for true feature importance score (where XX=99 by default).
             'pXX_low': Lower end of XX% confidence interval for true feature importance score.
         """
+        self._assert_is_fit('feature_importance')
         data = self.__get_dataset(data) if data is not None else data
         if (data is None) and (not self._trainer.is_data_saved):
             raise AssertionError(
@@ -1918,6 +1927,7 @@ class TabularPredictor:
         -------
         List of persisted model names.
         """
+        self._assert_is_fit('persist_models')
         return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors,
                                              max_memory=max_memory)
 
@@ -1938,6 +1948,7 @@ class TabularPredictor:
         -------
         List of unpersisted model names.
         """
+        self._assert_is_fit('unpersist_models')
         return self._learner.load_trainer().unpersist_models(model_names=models)
 
     def refit_full(self, model='all'):
@@ -1975,6 +1986,7 @@ class TabularPredictor:
         -------
         Dictionary of original model names -> refit_full model names.
         """
+        self._assert_is_fit('refit_full')
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
         return refit_full_dict
 
@@ -1987,6 +1999,7 @@ class TabularPredictor:
         -------
         String model name of the best model
         """
+        self._assert_is_fit('get_model_best')
         return self._trainer.get_model_best(can_infer=True)
 
     def get_model_full_dict(self):
@@ -1999,6 +2012,7 @@ class TabularPredictor:
         -------
         Dictionary of original model name -> refit full model name.
         """
+        self._assert_is_fit('get_model_full_dict')
         return copy.deepcopy(self._trainer.model_full_dict)
 
     def info(self):
@@ -2014,6 +2028,7 @@ class TabularPredictor:
         -------
         Dictionary of `predictor` metadata.
         """
+        self._assert_is_fit('info')
         return self._learner.get_info(include_model_info=True)
 
     # TODO: Add data argument
@@ -2050,6 +2065,7 @@ class TabularPredictor:
         List of newly trained weighted ensemble model names.
         If an exception is encountered while training an ensemble model, that model's name will be absent from the list.
         """
+        self._assert_is_fit('fit_weighted_ensemble')
         trainer = self._learner.load_trainer()
 
         if trainer.bagged_mode:
@@ -2115,6 +2131,7 @@ class TabularPredictor:
         -------
         :class:`pd.Series` object of the out-of-fold training predictions of the model.
         """
+        self._assert_is_fit('get_oof_pred')
         y_pred_proba_oof = self.get_oof_pred_proba(model=model,
                                                    transformed=transformed,
                                                    as_multiclass=True,
@@ -2170,6 +2187,7 @@ class TabularPredictor:
         -------
         :class:`pd.Series` or :class:`pd.DataFrame` object of the out-of-fold training prediction probabilities of the model.
         """
+        self._assert_is_fit('get_oof_pred_proba')
         if model is None:
             model = self.get_model_best()
         if not self._trainer.bagged_mode:
@@ -2280,6 +2298,7 @@ class TabularPredictor:
         Tuple of (:class:`pd.DataFrame`, :class:`pd.Series`) corresponding to the internal data features and internal data labels, respectively.
 
         """
+        self._assert_is_fit('load_data_internal')
         if data == 'train':
             load_X = self._trainer.load_X
             load_y = self._trainer.load_y
@@ -2323,6 +2342,7 @@ class TabularPredictor:
             This should generally be kept as `False` since the most important memory and disk reduction techniques are automatically applied to these models during the original `fit()` call.
 
         """
+        self._assert_is_fit('save_space')
         self._trainer.reduce_memory_size(remove_data=remove_data, remove_fit_stack=remove_fit_stack, remove_fit=True,
                                          remove_info=False, requires_save=requires_save,
                                          reduce_children=reduce_children)
@@ -2363,6 +2383,7 @@ class TabularPredictor:
             Set `dry_run=False` to perform the deletions.
 
         """
+        self._assert_is_fit('delete_models')
         if models_to_keep == 'best':
             models_to_keep = self._trainer.model_best
             if models_to_keep is None:
@@ -2374,10 +2395,12 @@ class TabularPredictor:
     # TODO: v0.1 add documentation for arguments
     def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
         """Returns the list of model names trained in this `predictor` object."""
+        self._assert_is_fit('get_model_names')
         return self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
 
     def get_model_names_persisted(self) -> list:
         """Returns the list of model names which are persisted in memory."""
+        self._assert_is_fit('get_model_names_persisted')
         return list(self._learner.load_trainer().models.keys())
 
     def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limit=None, hyperparameters=None,
@@ -2458,6 +2481,7 @@ class TabularPredictor:
         >>> predictor.predict(test_data, model=model_to_deploy)
 
         """
+        self._assert_is_fit('distill')
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
         return self._learner.distill(X=train_data, X_val=tuning_data, time_limit=time_limit,
@@ -2490,6 +2514,7 @@ class TabularPredictor:
         -------
         The file name with the full path to the saved graphic
         """
+        self._assert_is_fit('plot_ensemble_model')
         try:
             import pygraphviz
         except:
@@ -2969,6 +2994,15 @@ class TabularPredictor:
         if not isinstance(num_bag_sets, int):
             raise ValueError(f'num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})')
         return num_bag_folds, num_bag_sets, num_stack_levels
+
+    def _assert_is_fit(self, message_suffix: str = None):
+        if not self._learner.is_fit:
+            error_message = "Predictor is not fit. Call `.fit` before calling"
+            if message_suffix is None:
+                error_message = f"{error_message} this method."
+            else:
+                error_message = f"{error_message} `.{message_suffix}`."
+            raise AssertionError(error_message)
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor

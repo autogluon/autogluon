@@ -27,7 +27,7 @@ setup_mxnet_gpu = """
     python3 -m pip install mxnet-cu101==1.7.0
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
-    ls /usr/local/
+    ls -1a /usr/local | grep cuda
     pip freeze
 """
 

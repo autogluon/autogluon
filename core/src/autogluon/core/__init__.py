@@ -1,7 +1,5 @@
 from .dataset import TabularDataset
-from .space import *
-from .decorator import *
-from .utils.files import *
+from .space import Space, Categorical, Real, Int, Bool
 from . import metrics
 from . import constants
 
