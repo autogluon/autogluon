@@ -1,13 +1,6 @@
 name: autogluon_py3
 dependencies:
 - python=3.9
-- libpng
 - pip
 - pip:
-  - jupyter-sphinx>=0.2.2
-  - portalocker
-  - nose
-  - docutils
-  - mu-notedown
   - flake8
-  - awscli>=1.18.140
