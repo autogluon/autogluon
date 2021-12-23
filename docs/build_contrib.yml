@@ -2,9 +2,19 @@ name: autogluon_contrib
 dependencies:
 - python=3.9
 - pip:
-  - jupyter-sphinx>=0.2.2
+  - jupyter-sphinx>=0.3.2
   - portalocker
   - nose
-  - docutils
+  - docutils<0.16
   - mu-notedown
   - awscli>=1.18.140
+  - sphinx==3.2.0
+  - sphinxcontrib-applehelp==1.0.2
+  - sphinxcontrib-bibtex==1.0.0
+  - sphinxcontrib-devhelp==1.0.2
+  - sphinxcontrib-htmlhelp==1.0.3
+  - sphinxcontrib-jsmath==1.0.1
+  - sphinxcontrib-qthelp==1.0.3
+  - sphinxcontrib-serializinghtml==1.1.4
+  - sphinxcontrib-svg2pdfconverter==1.1.0
+  - git+https://github.com/zhanghang1989/d2l-book

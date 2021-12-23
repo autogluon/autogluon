@@ -101,16 +101,14 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-common-py3-v3 --all -y
           conda env update -n autogluon-common-py3-v3 -f docs/build.yml
           conda activate autogluon-common-py3-v3
           conda list
-          ${setup_pip_venv}
-          env
 
           ${install_common}
           cd common/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -462,7 +460,7 @@ stage("Build Tutorials") {
         git clean -fx
         bash docs/build_pip_install.sh
 
-        # only build for docs/text
+        # only build for docs/cloud_fit_deploy
         shopt -s extglob
         rm -rf ./docs/tutorials/!(cloud_fit_deploy)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
@@ -561,20 +559,7 @@ stage("Build Docs") {
         env
 
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade jupyter_sphinx
-        python3 -m pip install 'sphinx==3.2.0'
-        python3 -m pip install 'sphinxcontrib-applehelp==1.0.2'
-        python3 -m pip install 'sphinxcontrib-bibtex==1.0.0'
-        python3 -m pip install 'sphinxcontrib-devhelp==1.0.2'
-        python3 -m pip install 'sphinxcontrib-htmlhelp==1.0.3'
-        python3 -m pip install 'sphinxcontrib-jsmath==1.0.1'
-        python3 -m pip install 'sphinxcontrib-qthelp==1.0.3'
-        python3 -m pip install 'sphinxcontrib-serializinghtml==1.1.4'
-        python3 -m pip install 'sphinxcontrib-svg2pdfconverter==1.1.0'
 
-        python3 -m pip install 'docutils<0.16'
         python3 -m pip list
 
         ${install_core_all}
