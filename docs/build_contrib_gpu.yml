@@ -5,6 +5,7 @@ channels:
 dependencies:
 - cudatoolkit=10.1
 - python=3.9
+- pip
 - pip:
   - jupyter-sphinx>=0.3.2
   - portalocker

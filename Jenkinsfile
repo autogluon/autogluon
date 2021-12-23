@@ -35,11 +35,6 @@ setup_torch_gpu = """
     python3 -m pip install torch==1.7.1+cu101 torchvision==0.8.2+cu101 -f https://download.pytorch.org/whl/torch_stable.html
 """
 
-cleanup_venv = """
-    deactivate
-    rm -rf venv
-"""
-
 install_common = """
     python3 -m pip install --upgrade -e common/[tests]
 """
