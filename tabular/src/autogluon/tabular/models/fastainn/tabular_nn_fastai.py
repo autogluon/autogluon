@@ -290,6 +290,7 @@ class NNFastAiTabularModel(AbstractModel):
                     logger.log(15, f'Model validation metrics: {eval_result}')
                     self.model.path = original_path
 
+            self.params_trained['epochs'] = epochs
             self.params_trained['best_epoch'] = save_callback.best_epoch
 
     def _get_batch_size(self, X, default_batch_size_for_small_inputs=32):
