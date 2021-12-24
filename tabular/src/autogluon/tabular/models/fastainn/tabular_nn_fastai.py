@@ -18,7 +18,6 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryEr
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -79,6 +78,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.columns_fills = None
         self.procs = None
         self.y_scaler = None
+        self._cont_normalization = None
         self._load_model = None  # Whether to load inner model when loading.
 
     def _preprocess_train(self, X, y, X_val, y_val):
@@ -91,8 +91,8 @@ class NNFastAiTabularModel(AbstractModel):
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
-        from fastai.tabular.core import FillMissing, Categorify, Normalize
-        self.procs = [FillMissing, Categorify, Normalize]
+        from fastai.tabular.core import Categorify
+        self.procs = [Categorify]
 
         if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
             y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
@@ -123,6 +123,7 @@ class NNFastAiTabularModel(AbstractModel):
         if fit:
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
             self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+            self._cont_normalization = (X[self.cont_columns].mean(), X[self.cont_columns].std())
 
             num_cat_cols_og = len(self.cat_columns)
             if self.cat_columns:
@@ -141,7 +142,10 @@ class NNFastAiTabularModel(AbstractModel):
             self.columns_fills = dict()
             for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
-        return self._fill_missing(X)
+        X = self._fill_missing(X)
+        cont_mean, cont_std = self._cont_normalization
+        X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
+        return X
 
     def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
         # FIXME: Consider representing categories as int
@@ -219,7 +223,8 @@ class NNFastAiTabularModel(AbstractModel):
             loss_func = HuberPinballLoss(self.quantile_levels, alpha=self.params['alpha'])
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-        dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
+        batch_size = self._get_batch_size(X)
+        dls = data.dataloaders(bs=batch_size)
 
         # Make deterministic
         from fastai.torch_core import set_seed
@@ -265,7 +270,14 @@ class NNFastAiTabularModel(AbstractModel):
                 with self.model.no_logging():
                     original_path = self.model.path
                     self.model.path = Path(temp_dir)
-                    self.model.fit_one_cycle(params['epochs'], params['lr'], cbs=callbacks)
+
+                    len_val = len(X_val) if X_val is not None else 0
+                    epochs = self._get_epochs_number(samples_num=len(X) + len_val, epochs=params['epochs'], batch_size=batch_size, time_left=time_left)
+                    if epochs == 0:
+                        # Stop early if there is not enough time to train a full epoch
+                        raise TimeLimitExceeded
+
+                    self.model.fit_one_cycle(epochs, params['lr'], cbs=callbacks)
 
                     # Load the best one and export it
                     self.model = self.model.load(fname)
@@ -278,7 +290,48 @@ class NNFastAiTabularModel(AbstractModel):
                     logger.log(15, f'Model validation metrics: {eval_result}')
                     self.model.path = original_path
 
+            self.params_trained['epochs'] = epochs
             self.params_trained['best_epoch'] = save_callback.best_epoch
+
+    def _get_batch_size(self, X, default_batch_size_for_small_inputs=32):
+        bs = self.params['bs']
+        if bs == 'auto':
+            bs = 512 if len(X) >= 200000 else 256
+        bs = bs if len(X) > bs else default_batch_size_for_small_inputs
+
+        if self.params['bs'] == 'auto':
+            logger.log(15, f'Automated batch size selection: {bs}')
+
+        return bs
+
+    def _get_epochs_number(self, samples_num, epochs, batch_size, time_left=None, min_batches_count=30, default_epochs=30):
+        if epochs == 'auto':
+            batches_count = int(samples_num / batch_size) + 1
+            if not time_left:
+                return default_epochs
+            elif batches_count < min_batches_count:
+                return default_epochs
+            else:
+                est_batch_time = self._measure_batch_times(min_batches_count)
+                est_epoch_time = batches_count * est_batch_time * 1.1
+                est_max_epochs = int(time_left / est_epoch_time)
+                epochs = min(default_epochs, est_max_epochs)
+                epochs = max(epochs, 0)
+                logger.log(15, f'Automated epochs selection: training for {epochs} epoch(s). Estimated time budget use {epochs * est_epoch_time:.2f} / {time_left:.2f} sec')
+        return epochs
+
+    def _measure_batch_times(self, min_batches_count):
+        from fastai.callback.core import CancelFitException
+        from .callbacks import BatchTimeTracker
+        batch_time_tracker_callback = BatchTimeTracker(batches_to_measure=min_batches_count)
+        try:
+            with self.model.no_bar():
+                with self.model.no_logging():
+                    self.model.fit(1, lr=0, cbs=[batch_time_tracker_callback])
+        except CancelFitException:
+            pass  # expected early exit
+        batch_time = batch_time_tracker_callback.batch_measured_time
+        return batch_time
 
     def _generate_datasets(self, X, y, X_val, y_val):
         df_train = pd.concat([X, X_val], ignore_index=True)
