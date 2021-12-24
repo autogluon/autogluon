@@ -5,10 +5,7 @@ channels:
 dependencies:
 - cudatoolkit=10.1
 - python=3.9
+- pip
 - pip:
-  - jupyter-sphinx>=0.2.2
-  - portalocker
-  - nose
-  - docutils
-  - mu-notedown
-  - awscli>=1.18.140
+  - -r requirements_doc.txt
+  - git+https://github.com/zhanghang1989/d2l-book
