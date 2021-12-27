@@ -12,7 +12,9 @@ from pathlib import Path
 from autogluon.common.loaders.load_pd import load
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
+from autogluon.common.utils.utils import setup_outputdir
 
 from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
@@ -20,7 +22,6 @@ from ..utils.ag_sagemaker import (
     AutoGluonRealtimePredictor,
     AutoGluonBatchPredictor
 )
-from ..utils import set_logger_verbosity, setup_outputdir
 from ..utils.aws_utils import create_sagemaker_role_and_attach_policies
 from ..utils.s3_utils import download_s3_file
 from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_latest_framework_version
