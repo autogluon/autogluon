@@ -1,9 +1,8 @@
-name: Unit Test
+name: Unit Test Cross Platforms
 on:
-  push:
-    branches:
-    - master
-  pull_request:
+  issue_comment:
+    types:
+    - created
 jobs:
   common:
     runs-on: ${{ matrix.os }}
