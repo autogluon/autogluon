@@ -77,7 +77,6 @@ stage("Unit Test") {
           conda env update -n autogluon-common-py3-v3 -f docs/build.yml
           conda activate autogluon-common-py3-v3
           conda list
-
           ${install_common}
           cd common/
           python3 -m pytest --junitxml=results.xml --runslow tests
@@ -98,7 +97,6 @@ stage("Unit Test") {
           conda env update -n autogluon-core-py3-v3 -f docs/build.yml
           conda activate autogluon-core-py3-v3
           conda list
-
           ${install_core_all_tests}
           cd core/
           python3 -m pytest --junitxml=results.xml --runslow tests
@@ -119,7 +117,6 @@ stage("Unit Test") {
           conda env update -n autogluon-features-py3-v3 -f docs/build.yml
           conda activate autogluon-features-py3-v3
           conda list
-
           ${install_common}
           ${install_features}
           cd features/
@@ -143,7 +140,6 @@ stage("Unit Test") {
           conda list
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-
           ${install_core_all}
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
@@ -151,10 +147,8 @@ stage("Unit Test") {
           ${install_tabular_all}
           ${install_text}
           ${install_vision}
-
           cd tabular/
-          python3 -m pytest --junitxml=results.xml --runslow -m gpu tests
-          ${cleanup_venv}
+          python3 -m pytest --junitxml=results.xml --runslow --gpu tests
           """
         }
       }
@@ -174,14 +168,12 @@ stage("Unit Test") {
           conda list
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-
           ${install_core_all}
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
           ${install_text}
-
           cd text/
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
@@ -204,13 +196,10 @@ stage("Unit Test") {
           ${setup_mxnet_gpu}
           ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-
           ${install_core_all}
           ${install_vision}
-
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-
           cd vision/
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
@@ -255,16 +244,12 @@ stage("Unit Test") {
           conda env update -n autogluon-install-py3-v3 -f docs/build.yml
           conda activate autogluon-install-py3-v3
           conda list
-
           python3 -m pip install 'mxnet==1.7.0.*'
-
           ${install_core_all}
           ${install_features}
           ${install_tabular_all}
-
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
-
           ${install_text}
           ${install_vision}
           ${install_forecasting}
@@ -292,10 +277,8 @@ stage("Build Tutorials") {
         ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
-
         git clean -fx
         bash docs/build_pip_install.sh
-
         # only build for docs/image_prediction
         shopt -s extglob
         rm -rf ./docs/tutorials/!(image_prediction)
@@ -323,10 +306,8 @@ stage("Build Tutorials") {
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
         env
-
         git clean -fx
         bash docs/build_pip_install.sh
-
         # only build for docs/object_detection
         shopt -s extglob
         rm -rf ./docs/tutorials/!(object_detection)
@@ -352,10 +333,8 @@ stage("Build Tutorials") {
         ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
-
         git clean -fx
         bash docs/build_pip_install.sh
-
         # only build for docs/tabular
         shopt -s extglob
         rm -rf ./docs/tutorials/!(tabular_prediction)
@@ -379,10 +358,8 @@ stage("Build Tutorials") {
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
-
         git clean -fx
         bash docs/build_pip_install.sh
-
         # only build for docs/text
         shopt -s extglob
         rm -rf ./docs/tutorials/!(text_prediction)
@@ -404,10 +381,8 @@ stage("Build Tutorials") {
         conda activate autogluon-tutorial-cloud_fit_deploy-v3
         conda list
         export AG_DOCS=1
-
         git clean -fx
         bash docs/build_pip_install.sh
-
         # only build for docs/cloud_fit_deploy
         shopt -s extglob
         rm -rf ./docs/tutorials/!(cloud_fit_deploy)
@@ -431,11 +406,9 @@ stage("Build Tutorials") {
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
-
         env
         git clean -fx
         bash docs/build_pip_install.sh
-
         # only build for docs/forecasting
         shopt -s extglob
         rm -rf ./docs/tutorials/!(forecasting)
@@ -502,9 +475,7 @@ stage("Build Docs") {
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
-
         git clean -fx
-
         ${install_core_all}
         ${install_features}
         ${install_tabular_all}
@@ -512,17 +483,14 @@ stage("Build Docs") {
         ${install_vision}
         ${install_forecasting}
         ${install_autogluon}
-
         sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
         sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
-
         shopt -s extglob
         rm -rf ./docs/tutorials/!(index.rst)
         cd docs && d2lbook build rst && d2lbook build html
         aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
         echo "Uploaded doc to http://${site}/index.html"
-
         ${index_update_str}
         """
 

@@ -7,22 +7,36 @@ on:
 jobs:
   common:
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
     strategy:
       matrix:
-        # os: [macos-latest, windows-latest, ubuntu-latest]
-        os: [ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9]
+        os: [macos-latest, windows-latest]
     steps:
+      - name: Get PR SHA
+        id: sha
+        uses: actions/github-script@v4
+        with:
+          result-encoding: string
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = await github.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            return pr.data.head.sha   
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.sha.outputs.result }}
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
           auto-update-conda: true
-          python-version: "${{ matrix.python-version }}"
+          python-version: 3.9
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -35,22 +49,36 @@ jobs:
           python3 -m pytest --junitxml=results.xml --runslow tests
   core:
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
     strategy:
       matrix:
-        # os: [macos-latest, windows-latest, ubuntu-latest]
-        os: [ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9]
+        os: [macos-latest, windows-latest]
     steps:
+      - name: Get PR SHA
+        id: sha
+        uses: actions/github-script@v4
+        with:
+          result-encoding: string
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = await github.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            return pr.data.head.sha   
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.sha.outputs.result }}
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
           auto-update-conda: true
-          python-version: "${{ matrix.python-version }}"
+          python-version: 3.9
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -64,22 +92,36 @@ jobs:
           python3 -m pytest --junitxml=results.xml --runslow tests
   features:
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
     strategy:
       matrix:
-        # os: [macos-latest, windows-latest, ubuntu-latest]
-        os: [ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9]
+        os: [macos-latest, windows-latest]
     steps:
+      - name: Get PR SHA
+        id: sha
+        uses: actions/github-script@v4
+        with:
+          result-encoding: string
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = await github.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            return pr.data.head.sha   
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.sha.outputs.result }}
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
           auto-update-conda: true
-          python-version: "${{ matrix.python-version }}"
+          python-version: 3.9
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -93,22 +135,36 @@ jobs:
           python3 -m pytest --junitxml=results.xml --runslow tests
   tabular:
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
     strategy:
       matrix:
-        # os: [macos-latest, windows-latest, ubuntu-latest]
-        os: [ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9]
+        os: [macos-latest, windows-latest]
     steps:
+      - name: Get PR SHA
+        id: sha
+        uses: actions/github-script@v4
+        with:
+          result-encoding: string
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = await github.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            return pr.data.head.sha   
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.sha.outputs.result }}
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
           auto-update-conda: true
-          python-version: "${{ matrix.python-version }}"
+          python-version: 3.9
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -124,22 +180,36 @@ jobs:
           python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
   install:
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
     strategy:
       matrix:
-        # os: [macos-latest, windows-latest, ubuntu-latest]
-        os: [ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9]
+        os: [macos-latest, windows-latest]
     steps:
+      - name: Get PR SHA
+        id: sha
+        uses: actions/github-script@v4
+        with:
+          result-encoding: string
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = await github.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            return pr.data.head.sha   
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.sha.outputs.result }}
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
           auto-update-conda: true
-          python-version: "${{ matrix.python-version }}"
+          python-version: 3.9
       - name: unit-test
         shell: bash -l {0}
         run: |
