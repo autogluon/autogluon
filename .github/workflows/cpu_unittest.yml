@@ -1,5 +1,9 @@
 name: Unit Test Cross Platforms
 on:
+  push:
+    branches:
+    - master
+  pull_request:
   issue_comment:
     types:
     - created
@@ -48,7 +52,7 @@ jobs:
           python3 -m pytest --junitxml=results.xml --runslow tests
   core:
     runs-on: ${{ matrix.os }}
-    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '/ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
@@ -91,7 +95,7 @@ jobs:
           python3 -m pytest --junitxml=results.xml --runslow tests
   features:
     runs-on: ${{ matrix.os }}
-    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '/ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
@@ -134,7 +138,7 @@ jobs:
           python3 -m pytest --junitxml=results.xml --runslow tests
   tabular:
     runs-on: ${{ matrix.os }}
-    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '/ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
@@ -179,7 +183,7 @@ jobs:
           python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
   install:
     runs-on: ${{ matrix.os }}
-    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '/ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
