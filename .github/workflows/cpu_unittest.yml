@@ -6,7 +6,7 @@ on:
 jobs:
   common:
     runs-on: ${{ matrix.os }}
-    if: ${{ github.event.issue.pull_request && github.event.comment.body == '@ci_cross_platforms'}}
+    if: ${{ github.event.issue.pull_request && github.event.comment.body == '/ci_cross_platforms'}}
     defaults:
       run:
         shell: bash
