@@ -122,7 +122,13 @@ Select your preferences below and run the corresponding install commands:
 
                  .. code-block:: bash
 
-                     brew install libomp
+                    # brew install wget
+                    wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
+                    brew uninstall libomp
+                    brew install libomp.rb
+                    rm libomp.rb
+
+                 WARNING: Do not install LibOMP via "brew install libomp" as LibOMP 12 and 13 can cause segmentation faults with LightGBM and XGBoost.
 
               .. code-block:: bash
 
@@ -149,7 +155,13 @@ Select your preferences below and run the corresponding install commands:
 
                  .. code-block:: bash
 
-                     brew install libomp
+                    # brew install wget
+                    wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
+                    brew uninstall libomp
+                    brew install libomp.rb
+                    rm libomp.rb
+
+                 WARNING: Do not install LibOMP via "brew install libomp" as LibOMP 12 and 13 can cause segmentation faults with LightGBM and XGBoost.
 
               .. code-block:: bash
 
