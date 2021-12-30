@@ -90,7 +90,7 @@ Select your preferences below and run the corresponding install commands:
 
               .. note::
 
-                 GPU usage is not yet supported on Mac OSX, please use Linux to utilize GPUs in AutoGluon.
+                 GPU usage is not yet supported on Mac OSX, please use Linux or Windows to utilize GPUs in AutoGluon.
 
         .. container:: source
 
@@ -104,7 +104,7 @@ Select your preferences below and run the corresponding install commands:
 
               .. note::
 
-                 GPU usage is not yet supported on Mac OSX , please use Linux to utilize GPUs in AutoGluon.
+                 GPU usage is not yet supported on Mac OSX , please use Linux or Windows to utilize GPUs in AutoGluon.
 
      .. container:: windows
 
@@ -112,29 +112,29 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: cpu
 
-              .. include:: install-windows.rst
+              .. include:: install-windows-cpu.rst
 
               .. include:: install-cpu-pip.rst
 
            .. container:: gpu
 
-              .. note::
+              .. include:: install-windows-gpu.rst
 
-                 GPU usage is not yet supported on Windows , please use Linux to utilize GPUs in AutoGluon.
+              .. include:: install-gpu-pip-windows.rst
 
         .. container:: source
 
            .. container:: cpu
 
-              .. include:: install-windows.rst
+              .. include:: install-windows-cpu.rst
 
               .. include:: install-cpu-source.rst
 
            .. container:: gpu
 
-              .. note::
+              .. include:: install-windows-gpu.rst
 
-                 GPU usage is not yet supported on Windows , please use Linux to utilize GPUs in AutoGluon.
+              .. include:: install-gpu-source-windows.rst
 
 
 AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/packaging-namespace-packages/>`_ specialized for tabular, text, or image data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:

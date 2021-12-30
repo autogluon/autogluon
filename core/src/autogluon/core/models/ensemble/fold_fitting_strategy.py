@@ -14,7 +14,7 @@ from pandas import DataFrame, Series
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
-from ...utils import get_cpu_count, get_gpu_count
+from ...utils import get_cpu_count, get_gpu_count_all
 from ...utils.try_import import try_import_ray
 
 logger = logging.getLogger(__name__)
@@ -383,8 +383,9 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             # If user didn't specify num gpus and we are training text or image models,
             # use all gpus.
             if model_base_class_name in [TEXT_MODEL, IMAGE_MODEL] and _user_gpu_count == 0:
-                _user_gpu_count = get_gpu_count()
-            self.num_gpus = min(_user_gpu_count, get_gpu_count())
+                self.num_gpus = get_gpu_count_all()
+            else:
+                self.num_gpus = min(_user_gpu_count, get_gpu_count_all())
 
     def schedule_fold_model_fit(self, fold_ctx):
         self._get_gpu_count()

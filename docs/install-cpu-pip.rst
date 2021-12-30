@@ -1,11 +1,11 @@
 .. code-block:: bash
 
-    python3 -m pip install -U pip
-    python3 -m pip install -U setuptools wheel
-    python3 -m pip install -U "mxnet<2.0.0"
+    pip3 install -U pip
+    pip3 install -U setuptools wheel
+    pip3 install -U "mxnet<2.0.0"
 
     # CPU version of pytorch has smaller footprint - see installation instructions in
     # pytorch documentation - https://pytorch.org/get-started/locally/
-    python3 -m pip install torch==1.10.0+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
+    pip3 install torch==1.10.1+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
 
-    python3 -m pip install --pre autogluon
+    pip3 install --pre autogluon
