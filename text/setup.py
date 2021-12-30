@@ -16,23 +16,17 @@ version = ag.load_version_file()
 version = ag.update_version(version)
 
 submodule = 'text'
-requirements = [
+install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'scipy',
     'pandas',
     'scikit-learn',
-    'tqdm',
 
     f'autogluon.core=={version}',
     'autogluon-contrib-nlp==0.0.1b20210201',
 ]
 
-test_requirements = [
-    'pytest'
-]
-
-install_requires = requirements + test_requirements
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == '__main__':

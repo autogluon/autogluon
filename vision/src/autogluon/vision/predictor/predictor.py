@@ -14,10 +14,10 @@ except ImportError:
     timm = None
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.utils import get_gpu_count_all
+from autogluon.core.utils.try_import import try_import_d8
 from autogluon.core.utils.utils import generate_train_test_split
 
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
@@ -86,17 +86,13 @@ class ImagePredictor(object):
 
         Parameters
         ----------
-        train_data : pd.DataFrame or str
+        train_data : pd.DataFrame
             Training data, can be a dataframe like image dataset.
             For dataframe like datasets, `image` and `label` columns are required.
             `image`: raw image paths. `label`: categorical integer id, starting from 0.
-            For more details of how to construct a dataset for image predictor, check out:
-            `http://preview.d2l.ai/d8/main/image_classification/getting_started.html`.
-            If a string is provided, will search for d8 built-in datasets.
-        tuning_data : pd.DataFrame or str, default = None
+        tuning_data : pd.DataFrame, default = None
             Another dataset containing validation data reserved for model selection and hyperparameter-tuning,
             can be a dataframe like image dataset.
-            If a string is provided, will search for k8 datasets.
             If `None`, the validation dataset will be randomly split from `train_data` according to `holdout_frac`.
         time_limit : int, default = 'auto' (defaults to 2 hours if no presets detected)
             Time limit in seconds, if `None`, will run until all tuning and training finished.
@@ -288,6 +284,7 @@ class ImagePredictor(object):
             tuning_data = pd.DataFrame({'image': [], self._label_inner: []})
             use_rec = True
         if isinstance(train_data, str):
+            try_import_d8()
             from d8.image_classification import Dataset as D8D
             names = D8D.list()
             if train_data.lower() in names:
@@ -298,6 +295,7 @@ class ImagePredictor(object):
             if tuning_data is None:
                 train_data, tuning_data = train_data.split(1 - holdout_frac)
         if isinstance(tuning_data, str):
+            try_import_d8()
             from d8.image_classification import Dataset as D8D
             names = D8D.list()
             if tuning_data.lower() in names:
@@ -358,10 +356,6 @@ class ImagePredictor(object):
             config['max_reward'] = max_reward
         if nthreads_per_trial is not None:
             config['nthreads_per_trial'] = nthreads_per_trial
-        elif is_fork_enabled() and timm is None:
-            # TODO(): remove this in the future
-            # This is needed to address multiprocessing.context.TimeoutError in fork mode
-            config['nthreads_per_trial'] = 0
         if ngpus_per_trial is not None:
             config['ngpus_per_trial'] = ngpus_per_trial
         if isinstance(hyperparameters, dict):
@@ -404,7 +398,6 @@ class ImagePredictor(object):
             config['model'] = 'resnet50_v1b'
         # verbosity
         if log_level > logging.INFO:
-            logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
 
@@ -727,6 +720,7 @@ def _get_valid_labels(data):
     if isinstance(data, pd.DataFrame):
         ret = data['label']
     else:
+        try_import_d8()
         from d8.image_classification import Dataset as D8D
         if isinstance(data, D8D):
             ret = data.df['class_name']
@@ -734,15 +728,18 @@ def _get_valid_labels(data):
         raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
     return ret
 
+
 def _set_valid_labels(data, label):
     if isinstance(data, pd.DataFrame):
         data['label'] = label
     else:
+        try_import_d8()
         from d8.image_classification import Dataset as D8D
         if isinstance(data, D8D):
             data.df['class_name'] = label
         else:
             raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
+
 
 def _get_supported_models():
     try:
