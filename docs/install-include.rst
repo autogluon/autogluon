@@ -2,8 +2,7 @@
 
 .. note::
 
-  AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ version 3.6, 3.7, or 3.8 (3.8 support is experimental).
-  Linux and Mac are the only operating systems fully supported for now (Windows version will be available soon).
+  AutoGluon requires `Python <https://www.python.org/downloads/release/python-399/>`_ version 3.7, 3.8, or 3.9.
   For troubleshooting the installation process, you can check the `Installation FAQ <install.html#installation-faq>`_.
 
 
@@ -22,11 +21,13 @@ Select your preferences below and run the corresponding install commands:
      :title:`OS:`
      :act:`Linux`
      :opt:`Mac`
+     :opt:`Windows`
 
      .. raw:: html
 
         <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
         <div class="mdl-tooltip" data-mdl-for="mac">Mac OSX.</div>
+        <div class="mdl-tooltip" data-mdl-for="windows">Windows.</div>
 
   .. container:: opt-group
 
@@ -59,54 +60,21 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: cpu
 
-              .. code-block:: bash
-
-                 python3 -m pip install -U pip
-                 python3 -m pip install -U setuptools wheel
-                 python3 -m pip install -U "mxnet<2.0.0"
-
-                 # CPU version of pytorch has smaller footprint - see installation instructions in
-                 # pytorch documentation - https://pytorch.org/get-started/locally/
-                 python3 -m pip install torch==1.10.0+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
-
-                 python3 -m pip install --pre autogluon
+              .. include:: install-cpu-pip.rst
 
            .. container:: gpu
 
-              .. code-block:: bash
-
-                 python3 -m pip install -U pip
-                 python3 -m pip install -U setuptools wheel
-
-                 # Here we assume CUDA 10.1 is installed.  You should change the number
-                 # according to your own CUDA version (e.g. mxnet_cu100 for CUDA 10.0).
-                 python3 -m pip install -U "mxnet_cu101<2.0.0"
-                 python3 -m pip install --pre autogluon
+              .. include:: install-gpu-pip.rst
 
         .. container:: source
 
            .. container:: cpu
 
-              .. code-block:: bash
-
-                 python3 -m pip install -U pip
-                 python3 -m pip install -U setuptools wheel
-                 python3 -m pip install -U "mxnet<2.0.0"
-                 git clone https://github.com/awslabs/autogluon
-                 cd autogluon && ./full_install.sh
+              .. include:: install-cpu-source.rst
 
            .. container:: gpu
 
-              .. code-block:: bash
-
-                 python3 -m pip install -U pip
-                 python3 -m pip install -U setuptools wheel
-
-                 # Here we assume CUDA 10.1 is installed.  You should change the number
-                 # according to your own CUDA version (e.g. mxnet_cu102 for CUDA 10.2).
-                 python3 -m pip install -U "mxnet_cu101<2.0.0"
-                 git clone https://github.com/awslabs/autogluon
-                 cd autogluon && ./full_install.sh
+              .. include:: install-gpu-source.rst
 
      .. container:: mac
 
@@ -114,28 +82,9 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: cpu
 
-              .. note::
+              .. include:: install-macos-libomp.rst
 
-                 If you don't have them, please first install:
-                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
-                 Once you have Homebrew, LibOMP can be installed via:
-
-                 .. code-block:: bash
-
-                    # brew install wget
-                    wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
-                    brew uninstall libomp
-                    brew install libomp.rb
-                    rm libomp.rb
-
-                 WARNING: Do not install LibOMP via "brew install libomp" as LibOMP 12 and 13 can cause segmentation faults with LightGBM and XGBoost.
-
-              .. code-block:: bash
-
-                 python3 -m pip install -U pip
-                 python3 -m pip install -U setuptools wheel
-                 python3 -m pip install -U "mxnet<2.0.0"
-                 python3 -m pip install --pre autogluon
+              .. include:: install-cpu-pip.rst
 
            .. container:: gpu
 
@@ -147,35 +96,45 @@ Select your preferences below and run the corresponding install commands:
 
            .. container:: cpu
 
-              .. note::
+              .. include:: install-macos-libomp.rst
 
-                 If you don't have them, please first install:
-                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
-                 Once you have Homebrew, LibOMP can be installed via:
-
-                 .. code-block:: bash
-
-                    # brew install wget
-                    wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
-                    brew uninstall libomp
-                    brew install libomp.rb
-                    rm libomp.rb
-
-                 WARNING: Do not install LibOMP via "brew install libomp" as LibOMP 12 and 13 can cause segmentation faults with LightGBM and XGBoost.
-
-              .. code-block:: bash
-
-                 python3 -m pip install -U pip
-                 python3 -m pip install -U setuptools wheel
-                 python3 -m pip install -U "mxnet<2.0.0"
-                 git clone https://github.com/awslabs/autogluon
-                 cd autogluon && ./full_install.sh
+              .. include:: install-cpu-source.rst
 
            .. container:: gpu
 
               .. note::
 
                  GPU usage is not yet supported on Mac OSX , please use Linux to utilize GPUs in AutoGluon.
+
+     .. container:: windows
+
+        .. container:: pip
+
+           .. container:: cpu
+
+              .. include:: install-windows.rst
+
+              .. include:: install-cpu-pip.rst
+
+           .. container:: gpu
+
+              .. note::
+
+                 GPU usage is not yet supported on Windows , please use Linux to utilize GPUs in AutoGluon.
+
+        .. container:: source
+
+           .. container:: cpu
+
+              .. include:: install-windows.rst
+
+              .. include:: install-cpu-source.rst
+
+           .. container:: gpu
+
+              .. note::
+
+                 GPU usage is not yet supported on Windows , please use Linux to utilize GPUs in AutoGluon.
 
 
 AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/packaging-namespace-packages/>`_ specialized for tabular, text, or image data. You can reduce the number of dependencies required by solely installing a specific sub-module via:  `python3 -m pip install <submodule>`, where `<submodule>` may be one of the following options:
@@ -186,7 +145,7 @@ AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/
     - Available optional dependencies: `lightgbm,catboost,xgboost,fastai`. These are included in `all`.
     - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
 
-    - Experimental optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable, or `pip install "scikit-learn-intelex<2021.3"` after a standard installation of AutoGluon.
+    - Experimental optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable, or `pip install "scikit-learn-intelex<2021.5"` after a standard installation of AutoGluon.
 - `autogluon.vision` - only functionality for computer vision (ImagePredictor, ObjectDetector)
 - `autogluon.text` - only functionality for natural language processing (TextPredictor)
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.

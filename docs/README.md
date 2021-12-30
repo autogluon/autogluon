@@ -1,6 +1,12 @@
 # How to locally build AutoGluon docs
 
-Instructions apply to Linux. Mac and Windows have not been tested for doc builds.
+Instructions apply to Linux and Mac. Windows has not been tested for doc builds.
+
+For MacOS, you need to install pandoc:
+
+```
+brew install pandoc
+```
 
 Ensure you have a local AutoGluon install for development. If not run the following in package root:
 
