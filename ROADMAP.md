@@ -17,18 +17,25 @@ In 2022, our top priorities are:
 - [ ] Enhanced Model Distillation
 - [ ] Online Inference Optimization
 - [ ] Meta-Learning
+- [ ] Improved Large-scale Data Handling (10M+ Rows)
 - [ ] Improved Feature Type Inference
-- [ ] Co-variate Shift Detection
-- [ ] Co-variate Shift Correction
+- [ ] Improved Feature Preprocessing
+- [ ] Refactor autogluon.features into Standalone Module
+- [ ] Covariate Shift Detection
+- [ ] Covariate Shift Correction
 - [ ] Exploratory Analysis
 - [ ] Model Interpretability
 - [ ] Model Uncertainty
+- [ ] Model Monitoring
+- [ ] Model Calibration (Conformal Methods)
+- [ ] Image Model Inference Optimization
+- [ ] Text Model Inference Optimization
 
 ## AutoGluon 0.4 Release, Due: January 2022
 
 ### Themes and Major Features
 
-- [x] Windows OS Support
+- [ ] Windows OS Support
 - [x] Python 3.9 Support
 - [ ] HuggingFace Integration
 - [ ] Torch Migration (Remove MXNet dependency)
@@ -40,7 +47,7 @@ In 2022, our top priorities are:
 - [x] Feature Preprocessing Tutorial
 - [ ] Advanced Custom Model Tutorial
 - [x] Documentation Overhaul
-- [ ] Hyperparameter Tuning Overhaul
+- [x] Hyperparameter Tuning Overhaul
 - [x] Memory Usage Optimizations
 - [x] Various Performance Optimizations
 - [x] Various Bug Fixes
@@ -57,6 +64,7 @@ In 2021, our top priorities are:
 - [x] Integration with [NVIDIA RAPIDS](https://developer.nvidia.com/rapids) for accelerated GPU training.
 - [x] Integration with [Intel sklearnex](https://github.com/intel/scikit-learn-intelex) for accelerated CPU training.
 - [x] Improved documentation and tutorials.
+- [x] Training and Inference containers.
 
 ### AutoGluon 0.3.1 Features, Released: August 2021
 
