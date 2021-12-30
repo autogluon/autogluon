@@ -10,8 +10,6 @@ import warnings
 import time
 import json
 import pickle
-import functools
-import tqdm
 import shutil
 import uuid
 from typing import Tuple
@@ -30,12 +28,11 @@ from autogluon_contrib_nlp.utils.misc import grouper, \
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
-from autogluon.common.utils.multiprocessing_utils import force_forkserver
 from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count_mxnet
-from autogluon.core.utils.loaders import load_pkl, load_pd
+from autogluon.core.utils.loaders import load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
-from autogluon.core.metrics import get_metric, Scorer
+from autogluon.core.metrics import get_metric
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.scheduler.reporter import FakeReporter
@@ -45,7 +42,6 @@ from .modules import MultiModalWithPretrainedTextNN
 from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
     MultiModalTextBatchify, get_stats_string, auto_shrink_max_length, get_cls_sep_id
 from .utils import average_checkpoints, set_seed
-from .. import constants as _C
 from ..config import CfgNode
 from ..utils import logging_config
 from ..presets import ag_text_presets
@@ -1123,9 +1119,6 @@ class MultiModalTextModel:
                 plt.show()
             self._results = local_results
         else:
-            if tune_kwargs['search_strategy'] != 'local':
-                # Force forkserver if it's not using the local sequential HPO
-                force_forkserver()
             scheduler_cls, scheduler_params = scheduler_factory(scheduler_options)
             # Create scheduler, run HPO experiment
             scheduler = scheduler_cls(train_function, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
