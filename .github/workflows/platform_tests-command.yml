@@ -27,6 +27,7 @@ jobs:
           comment-id: ${{ github.event.inputs.comment-id }}
           body: |
             [Platform Tests Output][1]
+
             [1]: ${{ steps.vars.outputs.run-url }}
 
   common:
