@@ -21,7 +21,8 @@ jobs:
             });
             return pr.data.head.sha
       - name: Slash Command Dispatch
-        uses: peter-evans/slash-command-dispatch@v2
+        id: scd
+        uses: peter-evans/slash-command-dispatch@v2.3.0
         with:
           token: ${{ secrets.PAT }}
           commands: |
@@ -31,3 +32,10 @@ jobs:
             repository=${{ github.repository }}
             comment-id=${{ github.event.comment.id }}
             pr-sha=${{ steps.sha.outputs.result }}
+      - name: Edit comment with error message
+        if: steps.scd.outputs.error-message
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          body: |
+            > ${{ steps.scd.outputs.error-message }}
