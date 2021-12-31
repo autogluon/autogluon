@@ -128,6 +128,7 @@ jobs:
   tabular:
     needs: setup
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -145,6 +146,10 @@ jobs:
         with:
           auto-update-conda: true
           python-version: 3.9
+      - name: Setup OMP
+        if: matrix.os == 'macos-latest'
+        shell: bash -l {0}
+        runs: brew install libomp
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -157,7 +162,7 @@ jobs:
           python3 -m pip install --upgrade -e tabular/[all]
           env
           cd tabular/
-          python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
+          python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests/unittests/models/test_xgboost.py
 
   # install:
   #   needs: setup
