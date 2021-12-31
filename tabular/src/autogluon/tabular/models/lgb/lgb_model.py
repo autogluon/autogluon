@@ -220,6 +220,7 @@ class LGBModel(AbstractModel):
         # FIXME This is a HACK. Passing in value -1, 0, or None will only use 1 cores. Need to pass in a large number instead
         if num_cpus == 0:
             # TODO Avoid using psutil when lgb fixed the mem leak.
+            # psutil.cpu_count() is faster in inference than psutil.cpu_count(logical=False)
             num_cpus = psutil.cpu_count()
         if self.problem_type == REGRESSION:
             return self.model.predict(X, num_threads=num_cpus)
@@ -325,6 +326,12 @@ class LGBModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    def _get_default_resources(self):
+        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
+        num_cpus = psutil.cpu_count(logical=False)
+        num_gpus = 0
+        return num_cpus, num_gpus
 
     @property
     def _features(self):
