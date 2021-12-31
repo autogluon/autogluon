@@ -149,7 +149,7 @@ jobs:
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
-        runs: brew install libomp
+        run: brew install libomp
       - name: unit-test
         shell: bash -l {0}
         run: |
