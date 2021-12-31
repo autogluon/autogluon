@@ -35,7 +35,13 @@ class RFModel(AbstractModel):
             # Disabled by default because OOB score does not yet work properly
             try:
                 # FIXME: sklearnex OOB score is broken, returns biased predictions. Without this optimization, can't compute Efficient OOF.
-                #  Next release of sklearnex (2021.5) plans to fix this issue, will try again after fix is released.
+                #  Refer to https://github.com/intel/scikit-learn-intelex/issues/933
+                #  Current workaround: Forcibly set oob_score=True during fit to compute OOB during train time.
+                #  Downsides:
+                #    1. Slows down training slightly by forcing computation of OOB even if OOB is not needed (such as in medium_quality)
+                #    2. Makes computing the correct pred_time_val difficult, as the time is instead added to the fit_time,
+                #       and we would need to waste extra time to compute the proper pred_time_val post-fit.
+                #       Therefore with sklearnex enabled, pred_time_val is incorrect.
                 from sklearnex.ensemble import RandomForestClassifier, RandomForestRegressor
                 logger.log(15, '\tUsing sklearnex RF backend...')
                 self._daal = True
@@ -159,6 +165,8 @@ class RFModel(AbstractModel):
         if self._daal:
             if params.get('warm_start', False):
                 params['warm_start'] = False
+            # FIXME: This is inefficent but sklearnex doesn't support computing oob_score after training
+            params['oob_score'] = True
 
         model = model_cls(**params)
 
@@ -244,12 +252,13 @@ class RFModel(AbstractModel):
 
     # FIXME: Unknown if this works with quantile regression
     def _get_oof_pred_proba(self, X, y, **kwargs):
-        if self._daal:
-            raise AssertionError('DAAL forest backend does not support out-of-bag predictions.')
         if not self.model.bootstrap:
             raise ValueError('Forest models must set `bootstrap=True` to compute out-of-fold predictions via out-of-bag predictions.')
 
         oob_is_not_set = getattr(self.model, "oob_decision_function_", None) is None and getattr(self.model, "oob_prediction_", None) is None
+
+        if oob_is_not_set and self._daal:
+            raise AssertionError('DAAL forest backend does not support out-of-bag predictions.')
 
         # TODO: This can also be done via setting `oob_score=True` in model params,
         #  but getting the correct `pred_time_val` that way is not easy, since we can't time the internal call.
