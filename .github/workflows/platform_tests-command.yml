@@ -144,6 +144,8 @@ jobs:
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
+          activate-environment: unittest
+          environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: 3.9
       - name: Setup OMP
@@ -156,8 +158,6 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          conda env create -n unittest -f .github/workflows_env/unittest_env.yml
-          conda activate unittest
           conda list
           python3 -m pip install --upgrade -e common/[tests]
           python3 -m pip install --upgrade -e core/[all]
