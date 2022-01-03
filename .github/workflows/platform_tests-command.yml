@@ -159,6 +159,7 @@ jobs:
         shell: bash -l {0}
         run: |
           conda list
+          python3 -m pip install --upgrade mxnet<2.0.0
           python3 -m pip install --upgrade -e common/[tests]
           python3 -m pip install --upgrade -e core/[all]
           python3 -m pip install --upgrade -e features/
