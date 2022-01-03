@@ -193,3 +193,9 @@ class XGBoostModel(AbstractModel):
                 raise NotEnoughMemoryError
             elif ratio > (0.2 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Potentially not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+
+    def _get_default_resources(self):
+        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
+        num_cpus = psutil.cpu_count(logical=False)
+        num_gpus = 0
+        return num_cpus, num_gpus
