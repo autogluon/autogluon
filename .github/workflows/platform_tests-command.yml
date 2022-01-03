@@ -144,7 +144,7 @@ jobs:
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
-          activate-environment: unittest
+          activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: 3.9
