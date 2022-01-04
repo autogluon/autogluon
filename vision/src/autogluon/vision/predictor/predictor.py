@@ -329,6 +329,10 @@ class ImagePredictor(object):
             _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
             if isinstance(tuning_data, self.Dataset):
                 tuning_data = self.Dataset(tuning_data, classes=tuning_data.classes)
+        if train_data[self._label].dtype.kind in ('i', 'u'):
+            train_data = train_data.astype({self._label: 'int64'})
+        if tuning_data[self._label].dtype.kind in ('i', 'u'):
+            tuning_data = tuning_data.astype({self._label: 'int64'})
 
         if self._classifier is not None:
             logging.getLogger("ImageClassificationEstimator").propagate = True

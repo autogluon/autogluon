@@ -54,19 +54,25 @@ class LabelCleaner:
         min_dtype = np.min_scalar_type(0)
         return np.promote_types(min_dtype, max_dtype)
 
-    def transform(self, y: Union[Series, np.ndarray, list]) -> Series:
-        y = self._convert_to_valid_series(y)
-        y = self._transform(y)
+    def to_transformed_dtype(self, y: Union[Series, np.ndarray, list]) -> Series:
         if y.dtype.kind in ('i', 'u'):
             return y.astype(self.transformed_dtype)
         return y
 
-    def inverse_transform(self, y: Union[Series, np.ndarray, list]) -> Series:
-        y = self._convert_to_valid_series(y)
-        y = self._inverse_transform(y)
+    def to_original_dtype(self, y: Union[Series, np.ndarray, list]) -> Series:
         if y.dtype.kind in ('i', 'u'):
             return y.astype(self.original_dtype)
         return y
+
+    def transform(self, y: Union[Series, np.ndarray, list]) -> Series:
+        y = self._convert_to_valid_series(y)
+        y = self._transform(y)
+        return self.to_transformed_dtype(y)
+
+    def inverse_transform(self, y: Union[Series, np.ndarray, list]) -> Series:
+        y = self._convert_to_valid_series(y)
+        y = self._inverse_transform(y)
+        return self.to_original_dtype(y)
 
     def _transform(self, y: Series) -> Series:
         raise NotImplementedError
