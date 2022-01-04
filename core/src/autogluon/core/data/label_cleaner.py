@@ -18,7 +18,12 @@ class LabelCleaner:
     inv_map = None
     ordered_class_labels = None
     ordered_class_labels_transformed = None
+    original_dtype = None
     problem_type_transform = None
+
+    def __init__(self, y: Union[Series, np.ndarray, list, DataFrame]):
+        y = self._convert_to_valid_series(y)
+        self.original_dtype = y.dtype
 
     @staticmethod
     def construct(problem_type: str, y: Union[Series, np.ndarray, list, DataFrame], y_uncleaned: Union[Series, np.ndarray, list, DataFrame] = None, positive_class=None):
@@ -42,13 +47,26 @@ class LabelCleaner:
         else:
             raise NotImplementedError
 
+    @property
+    def transformed_dtype(self):
+        assert self.num_classes is not None
+        max_dtype = np.min_scalar_type(self.num_classes)
+        min_dtype = np.min_scalar_type(0)
+        return np.promote_types(min_dtype, max_dtype)
+
     def transform(self, y: Union[Series, np.ndarray, list]) -> Series:
         y = self._convert_to_valid_series(y)
-        return self._transform(y)
+        y = self._transform(y)
+        if y.dtype.kind in ('i', 'u'):
+            return y.astype(self.transformed_dtype)
+        return y
 
     def inverse_transform(self, y: Union[Series, np.ndarray, list]) -> Series:
         y = self._convert_to_valid_series(y)
-        return self._inverse_transform(y)
+        y = self._inverse_transform(y)
+        if y.dtype.kind in ('i', 'u'):
+            return y.astype(self.original_dtype)
+        return y
 
     def _transform(self, y: Series) -> Series:
         raise NotImplementedError
@@ -73,6 +91,7 @@ class LabelCleaner:
 
 class LabelCleanerMulticlass(LabelCleaner):
     def __init__(self, y: Series, y_uncleaned: Series):
+        super().__init__(y)
         self.problem_type_transform = MULTICLASS
         y = self._convert_to_valid_series(y)
         y_uncleaned = self._convert_to_valid_series(y_uncleaned)
@@ -148,6 +167,7 @@ class LabelCleanerMulticlass(LabelCleaner):
 # TODO: Expand print statement to multiclass as well
 class LabelCleanerBinary(LabelCleaner):
     def __init__(self, y: Series, positive_class=None):
+        super().__init__(y)
         self.problem_type_transform = BINARY
         y = self._convert_to_valid_series(y)
         self.num_classes = 2
@@ -259,6 +279,14 @@ class LabelCleanerSoftclass(LabelCleaner):
         self.problem_type_transform = SOFTCLASS
         self.num_classes = y.shape[1]
 
+    def transform(self, y: Union[Series, np.ndarray, list]) -> Series:
+        y = self._convert_to_valid_series(y)
+        return self._transform(y)
+
+    def inverse_transform(self, y: Union[Series, np.ndarray, list]) -> Series:
+        y = self._convert_to_valid_series(y)
+        return self._inverse_transform(y)
+
     def _transform(self, y: DataFrame) -> DataFrame:
         return y
 
@@ -273,6 +301,14 @@ class LabelCleanerSoftclass(LabelCleaner):
 class LabelCleanerDummy(LabelCleaner):
     def __init__(self, problem_type=REGRESSION):
         self.problem_type_transform = problem_type
+
+    def transform(self, y: Union[Series, np.ndarray, list]) -> Series:
+        y = self._convert_to_valid_series(y)
+        return self._transform(y)
+
+    def inverse_transform(self, y: Union[Series, np.ndarray, list]) -> Series:
+        y = self._convert_to_valid_series(y)
+        return self._inverse_transform(y)
 
     def _transform(self, y: Union[Series, DataFrame]) -> Union[Series, DataFrame]:
         return y
