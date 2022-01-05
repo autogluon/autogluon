@@ -2137,7 +2137,10 @@ class TabularPredictor:
                                                    as_multiclass=True,
                                                    train_data=train_data,
                                                    internal_oof=internal_oof)
-        return get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type)
+        y_pred_oof = get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type)
+        if transformed:
+            return self._learner.label_cleaner.to_transformed_dtype(y_pred_oof)
+        return y_pred_oof
 
     # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.

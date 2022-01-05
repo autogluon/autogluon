@@ -309,6 +309,8 @@ class ImagePredictor(object):
         train_labels = _get_valid_labels(train_data)
         self._label_cleaner = LabelCleaner.construct(problem_type=self._problem_type, y=train_labels, y_uncleaned=train_labels)
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
+        if train_labels_cleaned.dtype.kind in ('i', 'u'):
+            train_labels_cleaned = train_labels_cleaned.astype('int64')
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
         tuning_data_validated = False
@@ -326,7 +328,10 @@ class ImagePredictor(object):
         if tuning_data is not None and not tuning_data_validated:
             tuning_data = self._validate_data(tuning_data)
             # converting to internal label set
-            _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
+            tuning_labels_cleaned = self._label_cleaner.transform(_get_valid_labels(tuning_data))
+            if tuning_labels_cleaned.dtype.kind in ('i', 'u'):
+                tuning_labels_cleaned = tuning_labels_cleaned.astype('int64')
+            _set_valid_labels(tuning_data, tuning_labels_cleaned)
             if isinstance(tuning_data, self.Dataset):
                 tuning_data = self.Dataset(tuning_data, classes=tuning_data.classes)
 
