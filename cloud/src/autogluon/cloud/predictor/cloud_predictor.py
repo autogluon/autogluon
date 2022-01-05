@@ -652,7 +652,8 @@ class CloudPredictor:
         """
         if not predictor_path:
             assert self.get_fit_job_status(self.fit_job_name) == 'Completed', 'Fit job not completed.'
-        logger.warning('Please remove headers of the test data and make sure the columns are in the same order as the training data.')
+        # Sagemaker batch transformation is able to take in headers during the most recent test
+        # logger.warning('Please remove headers of the test data and make sure the columns are in the same order as the training data.')
 
         framework_version = self._parse_framework_version(framework_version, 'inference')
 

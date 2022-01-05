@@ -1,0 +1,7 @@
+leaderboard: true
+predictor_cls: tabular
+predictor_fit_args:
+  time_limit: 60
+predictor_init_args:
+  eval_metric: roc_auc
+  label: class
