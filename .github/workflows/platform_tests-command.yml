@@ -30,100 +30,94 @@ jobs:
 
             [1]: ${{ steps.vars.outputs.run-url }}
 
-  # common:
-  #   needs: setup
-  #   runs-on: ${{ matrix.os }}
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   strategy:
-  #     matrix:
-  #       # os: [macos-latest, windows-latest]
-  #       os: [macos-latest]
-  #   steps:  
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #       with:
-  #         ref: ${{ github.event.inputs.pr-sha }}
-  #     - name: Setup Miniconda
-  #       uses: conda-incubator/setup-miniconda@v2.0.0
-  #       with:
-  #         auto-update-conda: true
-  #         python-version: 3.9
-  #     - name: unit-test
-  #       shell: bash -l {0}
-  #       run: |
-  #         conda env create -n unittest -f .github/workflows_env/unittest_env.yml
-  #         conda activate unittest
-  #         conda list
-  #         python3 -m pip install --upgrade -e common/[tests]
-  #         env
-  #         cd common/
-  #         python3 -m pytest --junitxml=results.xml --runslow tests
+  common:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:  
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade -e common/[tests]
+          env
+          cd common/
+          python3 -m pytest --junitxml=results.xml --runslow tests
 
-  # core:
-  #   needs: setup
-  #   runs-on: ${{ matrix.os }}
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   strategy:
-  #     matrix:
-  #       # os: [macos-latest, windows-latest]
-  #       os: [macos-latest]
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #       with:
-  #         ref: ${{ github.event.inputs.pr-sha }}
-  #     - name: Setup Miniconda
-  #       uses: conda-incubator/setup-miniconda@v2.0.0
-  #       with:
-  #         auto-update-conda: true
-  #         python-version: 3.9
-  #     - name: unit-test
-  #       shell: bash -l {0}
-  #       run: |
-  #         conda env create -n unittest -f .github/workflows_env/unittest_env.yml
-  #         conda activate unittest
-  #         conda list
-  #         python3 -m pip install --upgrade -e common/[tests]
-  #         python3 -m pip install --upgrade -e core/[all,tests]
-  #         env
-  #         cd core/
-  #         python3 -m pytest --junitxml=results.xml --runslow tests
+  core:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e core/[all,tests]
+          env
+          cd core/
+          python3 -m pytest --junitxml=results.xml --runslow tests
 
-  # features:
-  #   needs: setup
-  #   runs-on: ${{ matrix.os }}
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   strategy:
-  #     matrix:
-  #       # os: [macos-latest, windows-latest]
-  #       os: [macos-latest]
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #       with:
-  #         ref: ${{ github.event.inputs.pr-sha }}
-  #     - name: Setup Miniconda
-  #       uses: conda-incubator/setup-miniconda@v2.0.0
-  #       with:
-  #         auto-update-conda: true
-  #         python-version: 3.9
-  #     - name: unit-test
-  #       shell: bash -l {0}
-  #       run: |
-  #         conda env create -n unittest -f .github/workflows_env/unittest_env.yml
-  #         conda activate unittest
-  #         conda list
-  #         python3 -m pip install --upgrade -e common/[tests]
-  #         python3 -m pip install --upgrade -e features/
-  #         env
-  #         cd features/
-  #         python3 -m pytest --junitxml=results.xml --runslow tests
+  features:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e features/
+          env
+          cd features/
+          python3 -m pytest --junitxml=results.xml --runslow tests
 
   tabular:
     needs: setup
@@ -134,8 +128,7 @@ jobs:
         shell: bash
     strategy:
       matrix:
-        # os: [macos-latest, windows-latest]
-        os: [windows-latest]
+        os: [macos-latest, windows-latest]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -167,37 +160,34 @@ jobs:
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
 
-  # install:
-  #   needs: setup
-  #   runs-on: ${{ matrix.os }}
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   strategy:
-  #     matrix:
-  #       # os: [macos-latest, windows-latest]
-  #       os: [macos-latest]
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #       with:
-  #         ref: ${{ github.event.inputs.pr-sha }}
-  #     - name: Setup Miniconda
-  #       uses: conda-incubator/setup-miniconda@v2.0.0
-  #       with:
-  #         auto-update-conda: true
-  #         python-version: 3.9
-  #     - name: unit-test
-  #       shell: bash -l {0}
-  #       run: |
-  #         conda env create -n unittest -f .github/workflows_env/unittest_env.yml
-  #         conda activate unittest
-  #         conda list
-  #         python3 -m pip install --upgrade -e common/[tests]
-  #         python3 -m pip install --upgrade -e core/[all]
-  #         python3 -m pip install --upgrade -e features/
-  #         python3 -m pip install --upgrade -e tabular/[all]
-  #         python3 -m pip install --upgrade -e text/
-  #         python3 -m pip install --upgrade -e vision/
-  #         python3 -m pip install --upgrade -e autogluon/
-  #         env
+  install:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e core/[all]
+          python3 -m pip install --upgrade -e features/
+          python3 -m pip install --upgrade -e tabular/[all]
+          python3 -m pip install --upgrade -e text/
+          python3 -m pip install --upgrade -e vision/
+          python3 -m pip install --upgrade -e autogluon/
