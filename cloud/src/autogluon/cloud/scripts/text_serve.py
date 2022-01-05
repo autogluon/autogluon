@@ -22,7 +22,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
 
     elif input_content_type == "text/csv":
         buf = StringIO(request_body)
-        data = pd.read_csv(buf, header=None)
+        data = pd.read_csv(buf)
 
     elif input_content_type == "application/json":
         buf = StringIO(request_body)

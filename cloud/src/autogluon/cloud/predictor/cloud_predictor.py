@@ -44,6 +44,7 @@ class CloudPredictor:
     def __init__(
         self,
         predictor_type,
+        role_arn=None,
         local_output_path=None,
         cloud_output_path=None,
         verbosity=3
@@ -53,6 +54,10 @@ class CloudPredictor:
         ----------
         predictor_type: str
             Type of predictor to be trained through SageMaker
+        role_arn: str
+            The role_arn you want to use to grant cloud predictor necessary permission. 
+            This role must have permission on AmazonS3FullAccess and AmazonSageMakerFullAccess.
+            If None, CloudPredictor will create one.
         local_output_path: str
             Path to directory where trained models and intermediate outputs should be saved
             If None, CloudPredictor will create one.
@@ -66,11 +71,13 @@ class CloudPredictor:
         self.verbosity = verbosity
         if self.verbosity is not None:
             set_logger_verbosity(self.verbosity)
-        self.role = create_sagemaker_role_and_attach_policies(
-            role_name='ag_cloud_predictor_role',
-            trust_relationship=SAGEMAKER_TRUST_REPLATIONSHIP,
-            policies=SAGEMAKER_POLICIES
-        )
+        self.role = role_arn
+        if not self.role:
+            self.role = create_sagemaker_role_and_attach_policies(
+                role_name='ag_cloud_predictor_role',
+                trust_relationship=SAGEMAKER_TRUST_REPLATIONSHIP,
+                policies=SAGEMAKER_POLICIES
+            )
         self.sagemaker_session = sagemaker.session.Session()
         self.region = self.sagemaker_session.boto_region_name
         self.path = self._setup_local_outputpath(local_output_path)
@@ -170,8 +177,8 @@ class CloudPredictor:
                 }
             )
 
-    # FIXME: REmember to change output_type back to parquet
-    def _prepare_data(self, data, file_name, output_type='parquet'):
+    # FIXME: Remember to change output_type back to parquet when parquet is fixed in the gpu container
+    def _prepare_data(self, data, file_name, output_type='csv'):
         assert output_type in ['parquet', 'csv'], f'output type:{output_type} is not supported'
         if isinstance(data, pd.DataFrame):
             path = os.path.join(self.path, 'utils', f'{file_name}.{output_type}')
@@ -599,7 +606,6 @@ class CloudPredictor:
         job_name=None,
         instance_type='ml.m5.2xlarge',
         instance_count=1,
-        reuse_transformer=False,
         wait=True,
         autogluon_sagemaker_inference_model_kwargs=dict(),
         transformer_kwargs=dict(),
@@ -707,16 +713,13 @@ class CloudPredictor:
         logger.log(20, 'Inference model created successfully')
 
         logger.log(20, 'Creating transformer...')
-        if reuse_transformer and self.transformer:
-            transformer = self.transformer
-        else:
-            transformer = model.transformer(
-                instance_count=instance_count,
-                instance_type=instance_type,
-                output_path=output_path + '/results',
-                **transformer_kwargs
-            )
-            self.transformer = transformer
+        transformer = model.transformer(
+            instance_count=instance_count,
+            instance_type=instance_type,
+            output_path=output_path + '/results',
+            **transformer_kwargs
+        )
+        self.transformer = transformer
         logger.log(20, 'Transformer created successfully')
 
         split_type = kwargs.pop('split_type', None)
@@ -737,12 +740,12 @@ class CloudPredictor:
             )
             self.transform_job_name = job_name
         except Exception as e:
-            transformer.delete_model()
+            # transformer.delete_model()
             raise e
         test_data_filename = test_input.split('/')[-1]
         self.recent_predict_results_path = output_path + '/results/' + test_data_filename + '.out'
         if wait:
-            transformer.delete_model()
+            # transformer.delete_model()
             logger.log(20, f'Predict results have been saved to {self.recent_predict_results_path}')
         else:
             logger.log(20, f'Predict results will be saved to {self.recent_predict_results_path} when it is ready')

@@ -7,7 +7,7 @@ res = os.path.join(here, 'resources')
 
 
 def _prepare_predictor():
-    return CloudPredictor('tabular')
+    return CloudPredictor('tabular', role_arn='dummy')
 
 
 def _prepare_path(input_type, output_type):

@@ -1,6 +1,5 @@
 import sagemaker
 from sagemaker.estimator import Framework
-from sagemaker.mxnet import MXNetModel
 from sagemaker import image_uris
 from sagemaker.model import FrameworkModel
 from sagemaker.predictor import Predictor
@@ -87,7 +86,6 @@ class AutoGluonBatchPredictor(Predictor):
         )
 
 
-# FIXME: Change to FrameworkModel
 class AutoGluonSagemakerInferenceModel(FrameworkModel):
     def __init__(
         self,
