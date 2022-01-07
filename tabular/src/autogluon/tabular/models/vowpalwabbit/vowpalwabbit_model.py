@@ -1,3 +1,6 @@
+import logging
+import time
+
 import numpy as np
 import pandas as pd
 
@@ -6,7 +9,10 @@ from autogluon.common.features.types import S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_
 from autogluon.core.utils.try_import import try_import_vowpalwabbit
 from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS, \
     PROBLEM_TYPES_CLASSIFICATION, PROBLEM_TYPES_REGRESSION
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from .vowpalwabbit_utils import VWFeaturesConverter
+
+logger = logging.getLogger(__name__)
 
 
 class VowpalWabbitModel(AbstractModel):
@@ -23,7 +29,6 @@ class VowpalWabbitModel(AbstractModel):
     REGRESSION_LOSS_FUNCTIONS = ['squared', 'quantile', 'poisson', 'classic']
 
     def __init__(self, **kwargs):
-        # Simply pass along kwargs to parent, and init our internal `_feature_generator` variable to None
         super().__init__(**kwargs)
         self._load_model = None  # Used for saving and loading internal model file
 
@@ -39,14 +44,16 @@ class VowpalWabbitModel(AbstractModel):
         return X_series
 
     # The `_fit` method takes the input training data (and optionally the validation data) and trains the model.
-    # TODO: Use time_limit
     def _fit(self,
              X: pd.DataFrame,  # training data
              y: pd.Series,  # training labels
+             time_limit=None,
+             verbosity=2,
              **kwargs):  # kwargs includes many other potential inputs, refer to AbstractModel documentation for details
-
+        time_start = time.time()
         try_import_vowpalwabbit()
         from vowpalwabbit import pyvw
+        seed = 0  # Random seed
 
         # Valid self.problem_type values include ['binary', 'multiclass', 'regression', 'quantile', 'softclass']
         if self.problem_type not in PROBLEM_TYPES_REGRESSION + PROBLEM_TYPES_CLASSIFICATION:
@@ -79,22 +86,42 @@ class VowpalWabbitModel(AbstractModel):
         extra_params = {
             'cache_file': 'train.cache',
             'holdout_off': True,
-            'quiet': True,
         }
+
+        if verbosity <= 3:
+            extra_params['quiet'] = True
 
         # Initialize the model
         if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
             # Ref: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Predicting-probabilities#multi-class---oaa
-            extra_params['oaa'] = len(set(y.tolist()))
-            print(f'Setting oaa to {extra_params["oaa"]}')
+            extra_params['oaa'] = self.num_classes
             extra_params['probabilities'] = True
         self.model = pyvw.vw(**params, **extra_params)
 
+        time_start_fit = time.time()
+        if time_limit is not None:
+            time_limit_fit = time_limit - (time_start_fit - time_start) - 0.3  # Account for 0.3s overhead
+            if time_limit_fit <= 0:
+                raise TimeLimitExceeded
+        else:
+            time_limit_fit = None
+
         # Train the model
-        np.random.seed(42)
+        np.random.seed(seed)
+        epoch = 0
+
         for epoch in range(1, passes + 1):
-            # TODO: Add Early Stopping support
+            # TODO: Add Early Stopping support via validation
             self._train_single_epoch(training_data=final_training_data)
+            if time_limit_fit is not None and epoch < passes:
+                time_fit_used = time.time() - time_start_fit
+                time_fit_used_per_epoch = time_fit_used / epoch
+                time_left = time_limit_fit - time_fit_used
+                if time_left <= (time_fit_used_per_epoch*2):
+                    logger.log(30, f'\tEarly stopping due to lack of time. Fit {epoch}/{passes} passes...')
+                    break
+
+        self.params_trained['passes'] = epoch
 
     def _train_single_epoch(self, training_data):
         row_order = np.arange(0, len(training_data))
@@ -163,9 +190,9 @@ class VowpalWabbitModel(AbstractModel):
         if model._load_model:
             file_path = path + cls.model_internals_file_name
 
-            model_load_params = f" -i {file_path}"
+            model_load_params = f" -i {file_path} --quiet"
             if model.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-                model_load_params += " --probabilities"
+                model_load_params += " --probabilities --loss_function=logistic"
             if params['sparse_weights']:
                 model_load_params += " --sparse_weights"
 
