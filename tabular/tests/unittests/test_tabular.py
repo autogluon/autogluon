@@ -286,6 +286,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
             predictor = TabularPredictor.load(savedir)  # Test loading previously-trained predictor from file
+            y_pred_empty = predictor.predict(test_data[0:0])
             y_pred = predictor.predict(test_data)
             perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
             if dataset['problem_type'] != REGRESSION:

@@ -154,6 +154,8 @@ class AbstractLearner:
         raise NotImplementedError
 
     def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True):
+        if X.empty:
+            return pd.DataFrame()
         if as_pandas:
             X_index = copy.deepcopy(X.index)
         else:
