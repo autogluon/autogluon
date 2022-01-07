@@ -1,0 +1,6 @@
+name: autogluon_py3
+dependencies:
+- pip
+- pip:
+  - nose
+  - flake8

@@ -36,6 +36,7 @@ To send us a pull request, please:
 4. Commit to your fork using clear commit messages.
 5. Send us a pull request, answering any default questions in the pull request interface.
 6. Pay attention to any automated CI failures reported in the pull request, and stay involved in the conversation.
+7. To spin up the platform tests, which test autogluon among macos and windows, comment on the PR with `/platform_tests`(You would need write permission to AutoGluon repo). It is recommended to run the platform tests only after you have passed the default CI.
 
 GitHub provides additional document on [forking a repository](https://help.github.com/articles/fork-a-repo/) and
 [creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
