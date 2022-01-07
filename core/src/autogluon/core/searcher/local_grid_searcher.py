@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class LocalGridSearcher(LocalSearcher):
     """
-    Grid Searcher that exhaustively tries all possible configurations.
+    Grid Searcher that exhaustively tries all possible configurations. Grid with Int/Real ignores 'default' values in search spaces.
     """
 
     def __init__(self, grid_numeric_spaces_points_number=4, grid_num_sample_settings: Dict = None, **kwargs):
@@ -27,7 +27,7 @@ class LocalGridSearcher(LocalSearcher):
             mapping between numeric space name and number of points to sample from it. Example {'a': 4} means
             sample 4 points from space 'a'. If no value present in this map, then `grid_numeric_spaces_points_number` will be used.
         """
-        super(LocalGridSearcher, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._grid_numeric_spaces_points_number = grid_numeric_spaces_points_number
         self._grid_num_sample_settings = grid_num_sample_settings
         self._params_space = self._get_params_space()
