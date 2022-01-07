@@ -80,9 +80,11 @@ def get_setup_args(version, submodule):
     )
     return setup_args
 
+
 version = find_version('src', 'autogluon', 'cloud', '__init__.py')
 submodule = 'cloud'
 requirements = [
+    'autogluon.common'
     'boto3>=1.17',
     'pandas>=1.0.0,<2.0',
     'sagemaker>=2.66.1',

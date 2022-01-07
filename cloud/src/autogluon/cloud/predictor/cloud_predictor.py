@@ -717,12 +717,12 @@ class CloudPredictor:
             )
             self.transform_job_name = job_name
         except Exception as e:
-            # transformer.delete_model()
+            transformer.delete_model()
             raise e
         test_data_filename = test_input.split('/')[-1]
         self.recent_predict_results_path = output_path + '/results/' + test_data_filename + '.out'
         if wait:
-            # transformer.delete_model()
+            transformer.delete_model()
             logger.log(20, f'Predict results have been saved to {self.recent_predict_results_path}')
         else:
             logger.log(20, f'Predict results will be saved to {self.recent_predict_results_path} when it is ready')
