@@ -16,6 +16,7 @@ from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
 from autogluon.common.utils.utils import setup_outputdir
 
+from ..data import FormatConverterFactory
 from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
     AutoGluonSagemakerInferenceModel,
@@ -178,36 +179,11 @@ class CloudPredictor:
             )
 
     # FIXME: Remember to change output_type back to parquet when parquet is fixed in the gpu container
-    def _prepare_data(self, data, file_name, output_type='csv'):
+    def _prepare_data(self, data, filename, output_type='csv'):
         assert output_type in ['parquet', 'csv'], f'output type:{output_type} is not supported'
-        if isinstance(data, pd.DataFrame):
-            path = os.path.join(self.path, 'utils', f'{file_name}.{output_type}')
-            if output_type == 'parquet':
-                data.to_parquet(path)
-            elif output_type == 'csv':
-                data.to_csv(path, index=None)
-            return path
-        elif type(data) == str:
-            data = os.path.expanduser(data)
-            if os.path.isfile(data):
-                if output_type == 'parquet':
-                    if data.endswith('parquet') or data.endswith('pq'):
-                        return data
-                    elif data.endswith('csv') or data.endswith('tsv'):
-                        df = pd.read_csv(data)
-                        self._prepare_data(df, file_name, output_type)
-                    else:
-                        raise ValueError(f'{data} type is not supported.')
-                elif output_type == 'csv':
-                    if data.endswith('parquet') or data.endswith('pq'):
-                        df = pd.read_parquet(data)
-                        self._prepare_data(df, file_name, output_type)
-                    elif data.endswith('csv') or data.endswith('tsv'):
-                        return data
-                    else:
-                        raise ValueError(f'{data} type is not supported.')
-        else:
-            raise ValueError(f'{data} is not supported.')
+        path = os.path.join(self.path, 'utils')
+        converter = FormatConverterFactory.get_converter(output_type)
+        return converter.convert(data, path, filename)
 
     def _upload_fit_artifact(
         self,

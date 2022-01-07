@@ -24,6 +24,12 @@ def test_prepare_data():
             sample_file = os.path.join(res, f'sample.{input_type}')
             path = _prepare_path(input_type, output_type)
             assert os.path.exists(path)
-            sample_df = pd.read_csv(sample_file)
-            temp_df = pd.read_csv(path)
-            assert temp_df == sample_df
+            if input_type == 'csv':
+                sample_df = pd.read_csv(sample_file)
+            else:
+                sample_df = pd.read_parquet(sample_file)
+            if output_type == 'csv':
+                temp_df = pd.read_csv(path)
+            else:
+                temp_df = pd.read_parquet(path)
+            assert temp_df.equals(sample_df)
