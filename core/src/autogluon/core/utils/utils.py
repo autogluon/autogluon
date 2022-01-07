@@ -303,6 +303,15 @@ def get_pred_from_proba_df(y_pred_proba, problem_type=BINARY):
     return y_pred
 
 
+def _is_empty_proba(y_pred_proba):
+    if type(y_pred_proba) == np.ndarray:
+        return y_pred_proba.size == 0
+    elif type(y_pred_proba) == pd.DataFrame or type(y_pred_proba) == pd.Series:
+        return y_pred_proba.empty
+    elif type(y_pred_proba) == list:
+        return len(y_pred_proba) == 0
+
+
 def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     if problem_type == BINARY:
         y_pred = [1 if pred >= 0.5 else 0 for pred in y_pred_proba]
@@ -311,7 +320,9 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     elif problem_type == QUANTILE:
         y_pred = y_pred_proba
     else:
-        y_pred = np.argmax(y_pred_proba, axis=1)
+        y_pred = []
+        if not _is_empty_proba(y_pred_proba):
+            y_pred = np.argmax(y_pred_proba, axis=1)
     return y_pred
 
 

@@ -239,6 +239,15 @@ def get_benchmark_sets():
     return [toyregres_dataset, binary_dataset, regression_dataset, multi_dataset]
 
 
+def _is_empty_pred(y_pred):
+    if type(y_pred) == np.ndarray:
+        return y_pred.size == 0
+    elif type(y_pred) == pd.DataFrame or type(y_pred) == pd.Series:
+        return y_pred.empty
+    elif type(y_pred) == list:
+        return len(y_pred) == 0
+
+
 def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, crash_in_oof=False):
     print("Running fit with args:")
     print(fit_args)
@@ -287,6 +296,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
             predictor = TabularPredictor.load(savedir)  # Test loading previously-trained predictor from file
             y_pred_empty = predictor.predict(test_data[0:0])
+            assert _is_empty_pred(y_pred_empty)
             y_pred = predictor.predict(test_data)
             perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
             if dataset['problem_type'] != REGRESSION:

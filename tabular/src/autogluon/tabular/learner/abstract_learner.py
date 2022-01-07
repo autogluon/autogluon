@@ -154,12 +154,19 @@ class AbstractLearner:
         raise NotImplementedError
 
     def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True):
-        if X.empty:
-            return pd.DataFrame()
         if as_pandas:
             X_index = copy.deepcopy(X.index)
         else:
             X_index = None
+        if X.empty:
+            y_pred_proba = []
+            if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels, index=X_index)
+            elif self.problem_type == QUANTILE:
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.quantile_levels, index=X_index)
+            else:
+                y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=X_index)
+            return y_pred_proba
         y_pred_proba = self.load_trainer().predict_proba(self.transform_features(X), model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
