@@ -47,7 +47,6 @@ class WideDeepNNModel(AbstractModel):
 
         cont_cols = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
-        print(f'### {cat_cols}')
 
         if self.problem_type == BINARY:
             objective = 'binary'
@@ -66,7 +65,6 @@ class WideDeepNNModel(AbstractModel):
 
         # deeptabular
         for_transformer = self.params['type'] in ['tab_transformer', 'ft_transformer', 'tab_perciever']
-        print(f'### for_transformer = {for_transformer}')
         if for_transformer:
             embed_cols = cat_cols
         else:
@@ -74,14 +72,18 @@ class WideDeepNNModel(AbstractModel):
             for cat_feat in cat_cols:
                 num_categories = len(X[cat_feat].cat.categories)
                 embed_cols.append((cat_feat, min(600, round(1.6 * num_categories ** 0.56))))
+        if len(embed_cols) == 0:
+            embed_cols = None
+            for_transformer = False
 
         self._tab_preprocessor = TabPreprocessor(embed_cols=embed_cols, continuous_cols=cont_cols, for_transformer=for_transformer)
         X_tab = self._tab_preprocessor.fit_transform(X)
 
+        embed_input = None if embed_cols is None else self._tab_preprocessor.embeddings_input
         model = self._construct_wide_deep_model(
             self.params['type'],
             self._tab_preprocessor.column_idx,
-            self._tab_preprocessor.embeddings_input,
+            embed_input,
             cont_cols,
             pred_dim,
             **self.params.get('model_args', {})
@@ -110,7 +112,7 @@ class WideDeepNNModel(AbstractModel):
         bs = 256
         tab_opt = torch.optim.Adam(model.deeptabular.parameters())
         steps_per_epoch = int(np.ceil(len(X_train)/bs))
-        tab_sch = torch.optim.lr_scheduler.OneCycleLR(tab_opt, max_lr=lr, epochs=n_epochs, steps_per_epoch=steps_per_epoch)
+        tab_sch = torch.optim.lr_scheduler.OneCycleLR(tab_opt, max_lr=lr, epochs=n_epochs, steps_per_epoch=steps_per_epoch, pct_start=0.25, final_div_factor=1e5)
 
         trainer = Trainer(model, objective=objective, metrics=metrics)
         # FIXME: Does not return best epoch, instead returns final epoch
