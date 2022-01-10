@@ -18,6 +18,8 @@ def get_type_family_raw(dtype) -> str:
             return 'category'
         if 'datetime' in dtype.name:
             return 'datetime'
+        if 'string' in dtype.name:
+            return 'string'
         elif np.issubdtype(dtype, np.integer):
             return 'int'
         elif np.issubdtype(dtype, np.floating):

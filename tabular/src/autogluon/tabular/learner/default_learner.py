@@ -110,7 +110,10 @@ class DefaultLearner(AbstractLearner):
     def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bag_folds: int):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
-
+        str_cols = list(X.select_dtypes('string').columns)
+        for col in str_cols:
+            logger.warning(f'Detected string dtype for column {col}, converting to object dtype')
+            X[col] = X[col].astype('object')
         # TODO: We should probably uncomment the below lines, NaN label should be treated as just another value in multiclass classification -> We will have to remove missing, compute problem type, and add back missing if multiclass
         # if self.problem_type == MULTICLASS:
         #     X[self.label] = X[self.label].fillna('')
