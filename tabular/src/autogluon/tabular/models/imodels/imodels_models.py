@@ -8,7 +8,7 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils.try_import import try_import_imodels
 
 
-class IModelsModel(AbstractModel):
+class _IModelsModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -67,7 +67,7 @@ class IModelsModel(AbstractModel):
         return default_auxiliary_params
 
 
-class RuleFitModel(IModelsModel):
+class RuleFitModel(_IModelsModel):
 
     def get_model(self):
         try_import_imodels()
@@ -79,7 +79,7 @@ class RuleFitModel(IModelsModel):
             return RuleFitClassifier
 
 
-class GreedyTreeModel(IModelsModel):
+class GreedyTreeModel(_IModelsModel):
 
     def get_model(self):
         try_import_imodels()
@@ -92,7 +92,7 @@ class GreedyTreeModel(IModelsModel):
             return GreedyTreeClassifier
 
 
-class OptimalTreeModel(IModelsModel):
+class OptimalTreeModel(_IModelsModel):
 
     def get_model(self):
         try_import_imodels()
@@ -104,7 +104,7 @@ class OptimalTreeModel(IModelsModel):
             raise Exception('OptimalTreeClassifier only supports binary classification!')
 
 
-class BayesianRuleSetModel(IModelsModel):
+class BayesianRuleSetModel(_IModelsModel):
 
     def get_model(self):
         try_import_imodels()
@@ -116,7 +116,7 @@ class BayesianRuleSetModel(IModelsModel):
             raise Exception('Bayesian Rule Set only supports binary classification!')
 
 
-class BoostedRulesModel(IModelsModel):
+class BoostedRulesModel(_IModelsModel):
 
     def get_model(self):
         try_import_imodels()
@@ -128,7 +128,7 @@ class BoostedRulesModel(IModelsModel):
             raise Exception('Boosted Rule Set only supports binary classification!')
 
 
-class OptimalRuleListModel(IModelsModel):
+class OptimalRuleListModel(_IModelsModel):
 
     def get_model(self):
         try_import_imodels()

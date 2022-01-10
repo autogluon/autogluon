@@ -25,7 +25,7 @@ from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.tabular.models import IModelsModel
+from autogluon.tabular.models import _IModelsModel
 
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
@@ -3010,9 +3010,9 @@ class TabularPredictor:
         complexities = []
         for i in range(summaries.shape[0]):
             model_name = summaries.index.values[i]
-            agmodel = self._learner.load_trainer().load_model(model_name)
+            agmodel = self._trainer.load_model(model_name)
             imodel = agmodel.model
-            if not isinstance(agmodel, IModelsModel):
+            if not isinstance(agmodel, _IModelsModel):
                 complexities.append(np.nan)
             else:
                 complexities.append(imodel.complexity_)
@@ -3038,7 +3038,7 @@ class TabularPredictor:
             if summaries_filtered.shape[0] == 0:
                 summaries_filtered = summaries
             model_name = summaries_filtered.index.values[0]  # best model is at top
-        agmodel = self._learner.load_trainer().load_model(model_name)
+        agmodel = self._trainer.load_model(model_name)
         imodel = agmodel.model
         print(imodel)
 

@@ -33,11 +33,11 @@ DEFAULT_MODEL_PRIORITY = dict(
     custom=0,
 
     # interpretable models
-    RULEFIT=0,
-    GREEDYTREE=0,
-    RULELIST=0,
-    OPTIMALTREE=0,
-    BOOSTEDRULES=0,
+    IM_RULEFIT=0,
+    IM_GREEDYTREE=0,
+    IM_RULELIST=0,
+    IM_OPTIMALTREE=0,
+    IM_BOOSTEDRULES=0,
 )
 
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
@@ -78,11 +78,11 @@ MODEL_TYPES = dict(
     SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
 
     # interpretable models
-    RULEFIT=RuleFitModel,
-    GREEDYTREE=GreedyTreeModel,
-    RULELIST=OptimalRuleListModel,
-    OPTIMALTREE=OptimalTreeModel,
-    BOOSTEDRULES=BoostedRulesModel,
+    IM_RULEFIT=RuleFitModel,
+    IM_GREEDYTREE=GreedyTreeModel,
+    IM_RULELIST=OptimalRuleListModel,
+    IM_OPTIMALTREE=OptimalTreeModel,
+    IM_BOOSTEDRULES=BoostedRulesModel,
 )
 
 
