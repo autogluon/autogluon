@@ -17,6 +17,11 @@ class _IModelsModel(AbstractModel):
     def get_model(self):
         return NotImplemented
 
+    def get_info(self):
+        info = super().get_info()
+        info['complexity'] = self.model.complexity_
+        return info
+
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
         if is_train:

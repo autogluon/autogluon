@@ -3008,14 +3008,10 @@ class TabularPredictor:
         summaries = pd.DataFrame.from_dict(d)
 
         complexities = []
+        info = self.info()
         for i in range(summaries.shape[0]):
             model_name = summaries.index.values[i]
-            agmodel = self._trainer.load_model(model_name)
-            imodel = agmodel.model
-            if not isinstance(agmodel, _IModelsModel):
-                complexities.append(np.nan)
-            else:
-                complexities.append(imodel.complexity_)
+            complexities.append(info['model_info'][model_name].get('complexity', np.nan))
         summaries.insert(2, 'complexity', complexities)
         summaries = summaries[~pd.isna(summaries.complexity)]  # remove non-interpretable models
         return summaries.sort_values(by=['model_performance', 'complexity'], ascending=[False, True])
