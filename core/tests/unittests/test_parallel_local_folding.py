@@ -3,11 +3,12 @@ import math
 import numpy as np
 import pandas as pd
 
-import autogluon.core as ag
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
-from autogluon.core.utils import get_cpu_count, get_gpu_count
+from autogluon.core.utils import get_cpu_count, get_gpu_count_all
 from autogluon.core.models import AbstractModel
+from autogluon.core.searcher import LocalRandomSearcher
+from autogluon.core.space import Int
 
 
 def _prepare_data():
@@ -45,14 +46,9 @@ def _construct_dummy_fold_strategy(time_limit=None, num_folds_parallel=8):
     return ParallelLocalFoldFittingStrategy(**args)
 
 
-@ag.func(
-    num_jobs=ag.space.Int(1, 100),
-    num_folds_parallel=ag.space.Int(1, 200),
-    time_limit=ag.space.Int(60, 60*60*24),
-)
 def _test_resource_allocation_and_time_limit(num_jobs, num_folds_parallel, time_limit):
     num_cpus = get_cpu_count()
-    num_gpus = get_gpu_count()
+    num_gpus = get_gpu_count_all()
     time_start = time.time()
     fold_fitting_strategy = _construct_dummy_fold_strategy(time_limit=time_limit, num_folds_parallel=num_folds_parallel)
     for i in range(num_jobs):
@@ -76,5 +72,15 @@ def _test_resource_allocation_and_time_limit(num_jobs, num_folds_parallel, time_
 
 def test_resource_allocation_and_time_limit():
     num_iterations = 100
+
+    search_space = dict(
+        num_jobs=Int(1, 100),
+        num_folds_parallel=Int(1, 200),
+        time_limit=Int(60, 60 * 60 * 24),
+    )
+
+    searcher = LocalRandomSearcher(search_space=search_space)
+
     for i in range(num_iterations):
-        _test_resource_allocation_and_time_limit().rand
+        config = searcher.get_config()
+        _test_resource_allocation_and_time_limit(**config)

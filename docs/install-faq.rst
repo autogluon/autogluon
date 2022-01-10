@@ -47,3 +47,17 @@
 
   You may have the wrong version of MXNet installed for your CUDA version.
   Match the CUDA version carefully when following the installation instructions (`nvcc --version`).
+
+* On MacOS I am getting a segmentation fault when trying to train LightGBM / XGBoost.
+
+   You need to install libOMP 11 to avoid segmentation faults on MacOS when training LightGBM / XGBoost:
+
+   .. code-block::
+
+      # brew install wget
+      wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
+      brew uninstall libomp
+      brew install libomp.rb
+      rm libomp.rb
+
+   For more information, refer to https://github.com/microsoft/LightGBM/issues/4897

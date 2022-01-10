@@ -1,43 +1,15 @@
 max_time = 180
 
-// ipykernel>=6.0.0 crashes CI during tutorials
-// pandas==1.3.0 crashes CI during tutorials (FIXME: Revamp openml tutorials, fix object detection)
-setup_pip_venv = """
-    rm -rf venv
-    conda list
-
-    python3 -m venv venv
-    source venv/bin/activate
-    python3 -m pip install -U pip
-    python3 -m pip install -U setuptools wheel
-
-    python3 -m pip install 'ipykernel>=4.5.1,<6.0.0'
-    python3 -m pip install 'jupyter-sphinx>=0.2.2'
-    python3 -m pip install 'portalocker'
-    python3 -m pip install 'nose'
-    python3 -m pip install 'docutils'
-    python3 -m pip install 'mu-notedown'
-    python3 -m pip install 'flake8'
-    python3 -m pip install 'awscli>=1.18.140'
-
-    export MPLBACKEND=Agg
-"""
-
 setup_mxnet_gpu = """
     python3 -m pip install mxnet-cu101==1.7.0
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
-    ls /usr/local/
+    ls -1a /usr/local | grep cuda
     pip freeze
 """
 
 setup_torch_gpu = """
     python3 -m pip install torch==1.7.1+cu101 torchvision==0.8.2+cu101 -f https://download.pytorch.org/whl/torch_stable.html
-"""
-
-cleanup_venv = """
-    deactivate
-    rm -rf venv
 """
 
 install_common = """
@@ -101,16 +73,14 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-common-py3-v3 --all -y
           conda env update -n autogluon-common-py3-v3 -f docs/build.yml
           conda activate autogluon-common-py3-v3
           conda list
-          ${setup_pip_venv}
-          env
 
           ${install_common}
           cd common/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -124,15 +94,14 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-core-py3-v3 --all -y
           conda env update -n autogluon-core-py3-v3 -f docs/build.yml
           conda activate autogluon-core-py3-v3
           conda list
-          ${setup_pip_venv}
-          env
+
           ${install_core_all_tests}
           cd core/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -146,17 +115,15 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-features-py3-v3 --all -y
           conda env update -n autogluon-features-py3-v3 -f docs/build.yml
           conda activate autogluon-features-py3-v3
           conda list
-          ${setup_pip_venv}
-          env
 
           ${install_common}
           ${install_features}
           cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -170,13 +137,12 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-tabular-py3-v3 --all -y
           conda env update -n autogluon-tabular-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-tabular-py3-v3
           conda list
-          ${setup_pip_venv}
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
 
           ${install_core_all}
           ${install_features}
@@ -188,7 +154,6 @@ stage("Unit Test") {
 
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -202,13 +167,12 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-text-py3 --all -y
           conda env update -n autogluon-text-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-text-py3-v3
           conda list
-          ${setup_pip_venv}
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
 
           ${install_core_all}
           ${install_features}
@@ -219,7 +183,6 @@ stage("Unit Test") {
 
           cd text/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -233,14 +196,13 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-vision-py3 --all -y
           conda env update -n autogluon-vision-py3 -f docs/build_gpu.yml
           conda activate autogluon-vision-py3
           conda list
-          ${setup_pip_venv}
           ${setup_mxnet_gpu}
           ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
 
           ${install_core_all}
           ${install_vision}
@@ -250,7 +212,6 @@ stage("Unit Test") {
 
           cd vision/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -264,20 +225,18 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-forecasting-py3-v3 --all -y
           conda env update -n autogluon-forecasting-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-forecasting-py3-v3
           conda list
-          ${setup_pip_venv}
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          env
           ${install_core_all}
           ${install_features}
           ${install_tabular_all}
           ${install_forecasting}
           cd forecasting/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          ${cleanup_venv}
           """
         }
       }
@@ -291,12 +250,12 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
+          conda remove --name autogluon-install-py3-v3 --all -y
           conda env update -n autogluon-install-py3-v3 -f docs/build.yml
           conda activate autogluon-install-py3-v3
           conda list
-          ${setup_pip_venv}
+
           python3 -m pip install 'mxnet==1.7.0.*'
-          env
 
           ${install_core_all}
           ${install_features}
@@ -309,8 +268,6 @@ stage("Unit Test") {
           ${install_vision}
           ${install_forecasting}
           ${install_autogluon}
-
-          ${cleanup_venv}
           """
         }
       }
@@ -326,17 +283,14 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-image-classification-v3 --all -y
         conda env update -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-image-classification-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
-        env
 
         git clean -fx
         bash docs/build_pip_install.sh
@@ -348,7 +302,6 @@ stage("Build Tutorials") {
         cat docs/_build/rst/_static/d2l.js
         cat docs/_build/rst/conf.py
         tree -L 2 docs/_build/rst
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/image_prediction/*', name: 'image_prediction'
       }
@@ -361,10 +314,10 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-object-detection-v3 --all -y
         conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-object-detection-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
@@ -378,7 +331,6 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         tree -L 2 docs/_build/rst
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/object_detection/*', name: 'object_detection'
       }
@@ -391,17 +343,14 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-tabular-v3 --all -y
         conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-tabular-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
-        env
 
         git clean -fx
         bash docs/build_pip_install.sh
@@ -410,7 +359,6 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/tabular_prediction/*', name: 'tabular'
       }
@@ -423,15 +371,14 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-text-v3 --all -y
         conda env update -n autogluon-tutorial-text-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-text-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
 
-        env
         git clean -fx
         bash docs/build_pip_install.sh
 
@@ -439,7 +386,6 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/text_prediction/*', name: 'text'
       }
@@ -452,21 +398,19 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-cloud_fit_deploy-v3 --all -y
         conda env update -n autogluon-tutorial-cloud_fit_deploy-v3 -f docs/build_contrib.yml
         conda activate autogluon-tutorial-cloud_fit_deploy-v3
         conda list
-        ${setup_pip_venv}
         export AG_DOCS=1
 
-        env
         git clean -fx
         bash docs/build_pip_install.sh
 
-        # only build for docs/text
+        # only build for docs/cloud_fit_deploy
         shopt -s extglob
         rm -rf ./docs/tutorials/!(cloud_fit_deploy)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/cloud_fit_deploy/*', name: 'cloud_fit_deploy'
       }
@@ -479,10 +423,10 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon-tutorial-forecasting-v3 --all -y
         conda env update -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-forecasting-v3
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
@@ -495,7 +439,6 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(forecasting)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        ${cleanup_venv}
         """
         stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
       }
@@ -551,31 +494,15 @@ stage("Build Docs") {
 
         sh """#!/bin/bash
         set -ex
+        conda remove --name autogluon_docs --all -y
         conda env update -n autogluon_docs -f docs/build_contrib_gpu.yml
         conda activate autogluon_docs
         conda list
-        ${setup_pip_venv}
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
-        env
 
         git clean -fx
-        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-        python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade jupyter_sphinx
-        python3 -m pip install 'sphinx==3.2.0'
-        python3 -m pip install 'sphinxcontrib-applehelp==1.0.2'
-        python3 -m pip install 'sphinxcontrib-bibtex==1.0.0'
-        python3 -m pip install 'sphinxcontrib-devhelp==1.0.2'
-        python3 -m pip install 'sphinxcontrib-htmlhelp==1.0.3'
-        python3 -m pip install 'sphinxcontrib-jsmath==1.0.1'
-        python3 -m pip install 'sphinxcontrib-qthelp==1.0.3'
-        python3 -m pip install 'sphinxcontrib-serializinghtml==1.1.4'
-        python3 -m pip install 'sphinxcontrib-svg2pdfconverter==1.1.0'
-
-        python3 -m pip install 'docutils<0.16'
-        python3 -m pip list
 
         ${install_core_all}
         ${install_features}
@@ -596,7 +523,6 @@ stage("Build Docs") {
         echo "Uploaded doc to http://${site}/index.html"
 
         ${index_update_str}
-        ${cleanup_venv}
         """
 
         if (env.BRANCH_NAME.startsWith("PR-")) {

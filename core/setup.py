@@ -24,19 +24,14 @@ install_requires = [
     'pandas',
     'tqdm',
 
-    'cython',  # TODO: Do we need cython here? Why is cython not version capped / minned?
-    'ConfigSpace==0.4.19',
     'requests',
     'matplotlib',
-    'paramiko>=2.4',
     # dask and distributed==2021.12.0 will cause ray(1.7.0 - 1.9.0) to fail
     # error:
     # https://ci.gluon.ai/blue/organizations/jenkins/autogluon/detail/master/702/pipeline/16
     'dask>=2021.09.1,<=2021.11.2',
     'distributed>=2021.09.1, <=2021.11.2',
     'boto3',
-    'autograd>=1.3',
-    'dill>=0.3.3,<1.0',
 
     f'autogluon.common=={version}',
 ]
@@ -51,7 +46,7 @@ tests_require = [
     'pytest',
 ]
 
-all_requires= []
+all_requires = []
 
 for extra_package in ['ray']:
     all_requires += extras_require[extra_package]

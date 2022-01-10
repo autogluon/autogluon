@@ -1,4 +1,4 @@
-from .grid_searcher import GridSearcher
+from .local_grid_searcher import LocalGridSearcher
 from .local_random_searcher import LocalRandomSearcher
 
 __all__ = ['searcher_factory']
@@ -7,8 +7,8 @@ SEARCHER_CONFIGS = dict(
     local_random=dict(
         searcher_cls=LocalRandomSearcher
     ),
-    grid=dict(
-        searcher_cls=GridSearcher,
+    local_grid=dict(
+        searcher_cls=LocalGridSearcher,
     ),
 )
 

@@ -1,6 +1,6 @@
 import logging
 
-_logger = logging.getLogger('autogluon')  # return autogluon root logger
+_logger_ag = logging.getLogger('autogluon')  # return autogluon root logger
 
 
 class DuplicateFilter(object):
@@ -57,9 +57,41 @@ def verbosity2loglevel(verbosity):
 
 def set_logger_verbosity(verbosity: int, logger=None):
     if logger is None:
-        logger = _logger
+        logger = _logger_ag
     if verbosity < 0:
         verbosity = 0
     elif verbosity > 4:
         verbosity = 4
     logger.setLevel(verbosity2loglevel(verbosity))
+
+
+def _check_if_kaggle() -> bool:
+    """
+    Returns True if inside Kaggle Notebook
+    """
+    root_logger = logging.getLogger()
+    for handler in root_logger.root.handlers[:]:
+        if hasattr(handler, 'baseFilename') and (handler.baseFilename == '/tmp/kaggle.log'):
+            return True
+    return False
+
+
+def _add_stream_handler():
+    stream_handler = logging.StreamHandler()
+    # add stream_handler to AG logger
+    _logger_ag.addHandler(stream_handler)
+
+
+__FIXED_KAGGLE_LOGGING = False
+
+
+def fix_logging_if_kaggle():
+    """
+    Fixes logger in Kaggle. In Kaggle logging is redirected to a file which hides all AutoGluon log output from the notebook.
+    This function checks if we are in a Kaggle notebook, and if so adds a StreamHandler to AutoGluon's logger to ensure logs are shown.
+    """
+    global __FIXED_KAGGLE_LOGGING
+    if (not __FIXED_KAGGLE_LOGGING) and _check_if_kaggle():
+        _add_stream_handler()
+    # After the fix is performed, or it is determined we are not in Kaggle, no need to fix again.
+    __FIXED_KAGGLE_LOGGING = True

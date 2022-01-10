@@ -2,7 +2,7 @@ from autogluon.vision import ObjectDetector as Task
 
 def test_task():
     dataset = Task.Dataset.from_voc('https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip')
-    train_data, _, test_data = dataset.random_split()
+    train_data, _, test_data = dataset.random_split(random_state=0)
 
     detector = Task()
     detector.fit(train_data, hyperparameters={'batch_size': 4, 'epochs': 5, 'early_stop_max_value': 0.2}, hyperparameter_tune_kwargs={'num_trials': 1})

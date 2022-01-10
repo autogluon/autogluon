@@ -11,7 +11,6 @@ from tqdm.auto import tqdm
 from .reporter import FakeReporter
 from ..searcher import searcher_factory
 from ..searcher.local_searcher import LocalSearcher
-from ..utils import EasyDict
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +86,7 @@ class LocalSequentialScheduler(object):
         Note: The type of resource must be int.
     """
 
-    def __init__(self, train_fn, search_space, util_args=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
+    def __init__(self, train_fn, search_space, train_fn_kwargs=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         self.train_fn = train_fn
         self.training_history = None
         self.config_history = None
@@ -97,7 +96,7 @@ class LocalSequentialScheduler(object):
         self.max_reward = kwargs.get('max_reward', None)
         self.searcher: LocalSearcher = self.get_searcher_(searcher, train_fn, search_space=search_space, **kwargs)
         self.init_limits_(kwargs)
-        self.util_args = util_args
+        self.train_fn_kwargs = train_fn_kwargs
         self.metadata = {
             'search_space': search_space,
             'search_strategy': self.searcher,
@@ -129,11 +128,7 @@ class LocalSequentialScheduler(object):
             if search_options is None:
                 search_options = dict()
             _search_options = search_options.copy()
-            if searcher.startswith('local_'):
-                _search_options['search_space'] = search_space
-            else:
-                _search_options['configspace'] = train_fn.cs
-                _search_options['resource_attribute'] = kwargs.get('time_attr', None)
+            _search_options['search_space'] = search_space
             _search_options['reward_attribute'] = self._reward_attr
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
@@ -248,16 +243,17 @@ class LocalSequentialScheduler(object):
 
     def run_job_(self, task_id, searcher_config, reporter):
         args = dict()
-        if self.util_args is not None:
-            args['util_args'] = deepcopy(self.util_args)
+        if self.train_fn_kwargs is not None:
+            train_fn_kwargs = deepcopy(self.train_fn_kwargs)
+        else:
+            train_fn_kwargs = dict()
         args.update(searcher_config)
 
         args['task_id'] = task_id
-        args = EasyDict(args)  # TODO: Remove, currently used for compatibility with gluoncv
         self.searcher.register_pending(searcher_config)
         is_failed = False
         try:
-            result = self.train_fn(args, reporter=reporter)
+            result = self.train_fn(args, reporter=reporter, **train_fn_kwargs)
             if type(reporter) is not FakeReporter and reporter.last_result:
                 self.searcher.update(config=searcher_config, **reporter.last_result)
         except Exception as e:
@@ -284,7 +280,10 @@ class LocalSequentialScheduler(object):
     def get_best_config(self):
         """Get the best configuration from the finished jobs.
         """
-        return self.searcher.get_best_config()
+        # TODO: Consider passing the metadata search space to searcher to avoid having to do this
+        searcher_config = deepcopy(self.metadata['search_space'])
+        searcher_config.update(self.searcher.get_best_config())
+        return searcher_config
 
     def get_best_reward(self):
         """Get the best reward from the finished jobs.

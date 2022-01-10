@@ -135,6 +135,20 @@ Cloud Training and Deployment
       A tutorial on fitting an AutoGluon model using AWS SageMaker.
 
 
+   .. card::
+      :title: Deploying AutoGluon Models with AWS SageMaker
+      :link: cloud_fit_deploy/cloud-aws-sagemaker-deployment.html
+
+      A tutorial on how to deploy trained models using AWS SageMaker and Deep Learning Containers.
+
+
+   .. card::
+      :title: Deploying AutoGluon models with serverless templates
+      :link: cloud_fit_deploy/cloud-aws-lambda-deployment.html
+
+      A tutorial on how to deploy trained models using AWS Lambda.
+
+
 .. toctree::
    :maxdepth: 2
    :hidden:

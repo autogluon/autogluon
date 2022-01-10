@@ -1,10 +1,11 @@
-
+import pytest
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.tabular import TabularPredictor
-from autogluon.vision import ImageDataset
 
 
+@pytest.mark.gpu
 def test_image_predictor(fit_helper):
+    from autogluon.vision import ImageDataset
     train_data, _, test_data = ImageDataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     feature_metadata = FeatureMetadata.from_df(train_data).add_special_types({'image': ['image_path']})
     predictor = TabularPredictor(label='label').fit(

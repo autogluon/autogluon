@@ -13,7 +13,7 @@ def test_local_random_searcher():
 
     searcher = LocalRandomSearcher(search_space=search_space)
 
-    expected_config_1 = {'a': 0.2, 'b': 0.4, 'c': 10, 'd': 16, 'e': 'a'}
+    expected_config_1 = {'a': 0.2, 'b': 0.4, 'c': 5, 'd': 16, 'e': 'a'}
     expected_config_2 = {'a': 0.5488135039273248, 'b': 0.4260424000595025, 'c': 8, 'd': 10, 'e': 7}
     expected_config_3 = {'a': 0.6235636967859723, 'b': 0.15814742875130683, 'c': 12, 'd': 13, 'e': 'a'}
     expected_config_4 = {'a': 0.9636627605010293, 'b': 0.1577026248478398, 'c': 11, 'd': 14, 'e': ['hello', 2]}

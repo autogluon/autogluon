@@ -1,8 +1,4 @@
 #!/bin/bash
-python3 -m pip uninstall -y scipy
-python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-python3 -m pip install --force-reinstall ipython==7.16
-
 python3 -m pip uninstall -y autogluon
 python3 -m pip uninstall -y autogluon.vision
 python3 -m pip uninstall -y autogluon.text

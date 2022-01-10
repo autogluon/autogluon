@@ -18,7 +18,7 @@ import autogluon.core as ag
 from autocfg import dataclass
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.scheduler.reporter import FakeReporter
-from autogluon.core.utils import get_cpu_count, get_gpu_count
+from autogluon.core.utils import get_cpu_count, get_gpu_count_all
 from autogluon.core.task.base import BaseTask
 from autogluon.core.searcher import LocalRandomSearcher
 
@@ -237,7 +237,7 @@ class ImageClassification(BaseTask):
 
         # cpu and gpu setting
         cpu_count = get_cpu_count()
-        gpu_count = get_gpu_count()
+        gpu_count = get_gpu_count_all()
 
         # default settings
         if not config:

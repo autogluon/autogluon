@@ -7,8 +7,8 @@ __all__ = [
     'try_import_faiss',
     'try_import_fastai',
     'try_import_cv2',
-    'try_import_gluonnlp',
     'try_import_torch',
+    'try_import_d8',
     'try_import_skopt',
     'try_import_autogluon_text',
     'try_import_autogluon_vision',
@@ -133,24 +133,6 @@ def try_import_cv2():
             "A quick tip is to install via `pip install opencv-python`. ")
 
 
-def try_import_gluonnlp():
-    try:
-        import gluonnlp
-        # TODO After 1.0 is supported,
-        #  we will remove the checking here and use gluonnlp.utils.check_version instead.
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
-        gluonnlp_version = parse_version(gluonnlp.__version__)
-        assert gluonnlp_version >= parse_version('0.8.1') and\
-               gluonnlp_version <= parse_version('0.8.3'), \
-            'Currently, we only support 0.8.1<=gluonnlp<=0.8.3'
-    except ImportError:
-        raise ImportError(
-            "Unable to import dependency gluonnlp. The NLP model won't be available "
-            "without installing gluonnlp. "
-            "A quick tip is to install via `pip install gluonnlp==0.8.1`. ")
-    return gluonnlp
-
-
 def try_import_torch():
     try:
         import torch
@@ -158,6 +140,14 @@ def try_import_torch():
         raise ImportError("Unable to import dependency torch\n"
                           "A quick tip is to install via `pip install torch`.\n"
                           "The minimum torch version is currently 1.6.")
+
+
+def try_import_d8():
+    try:
+        import d8
+    except ImportError as e:
+        raise ImportError("`import d8` failed. d8 is an optional dependency.\n"
+                          "A quick tip is to install via `pip install d8`.\n")
 
 
 def try_import_skopt():

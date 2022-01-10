@@ -1,11 +1,35 @@
 import logging
 import time
 
-from fastai.callback.core import CancelFitException
+from fastai.callback.core import CancelFitException, Callback
 from fastai.callback.tracker import TrackerCallback
 from fastcore.basics import store_attr
 
 logger = logging.getLogger(__name__)
+
+
+class BatchTimeTracker(Callback):
+    """
+    Training callback which allows collecting batch training times. The primary use is epoch training time estimation in adaptive epoch number selection.
+    """
+
+    def __init__(self, batches_to_measure):
+        self.batches_to_measure = batches_to_measure
+        self.batches_finished = 0
+        self.batch_start_time = None
+        self.batch_measured_time = None
+
+    def after_batch(self):
+        self.batches_finished += 1
+        if self.batches_finished == 1:
+            # skip first batch due to initialization overhead
+            self.batch_start_time = self._time_now()
+        if self.batches_finished > self.batches_to_measure:
+            self.batch_measured_time = (self._time_now() - self.batch_start_time) / self.batches_to_measure
+            raise CancelFitException()
+
+    def _time_now(self):
+        return time.time()
 
 
 class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
