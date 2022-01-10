@@ -1,0 +1,41 @@
+name: Slash Command Dispatch
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  slashCommandDispatch:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.issue.pull_request }}
+    steps:
+      - name: Get PR SHA
+        id: sha
+        uses: actions/github-script@v4
+        with:
+          result-encoding: string
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = await github.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            return pr.data.head.sha
+      - name: Slash Command Dispatch
+        id: scd
+        uses: peter-evans/slash-command-dispatch@v2.3.0
+        with:
+          token: ${{ secrets.PAT }}
+          commands: |
+            platform_tests
+          dispatch-type: workflow
+          static-args: |
+            repository=${{ github.repository }}
+            comment-id=${{ github.event.comment.id }}
+            pr-sha=${{ steps.sha.outputs.result }}
+      - name: Edit comment with error message
+        if: steps.scd.outputs.error-message
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          body: |
+            > ${{ steps.scd.outputs.error-message }}

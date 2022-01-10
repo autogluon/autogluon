@@ -86,15 +86,19 @@ class KNNModel(AbstractModel):
         spaces = {}
         return spaces
 
+    def _set_cpu_params(self, num_cpus):
+        self.params['n_jobs'] = num_cpus
+
     def _fit(self,
              X,
              y,
+             num_cpus=-1,
              time_limit=None,
              sample_weight=None,
              **kwargs):
         time_start = time.time()
         X = self.preprocess(X)
-        self._validate_fit_memory_usage(X=X)  # TODO: Can incorporate this into samples, can fit on portion of data to satisfy memory instead of raising exception immediately
+        self._set_cpu_params(num_cpus)
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for KNNModel, this model will ignore them in training.")
 
@@ -105,10 +109,14 @@ class KNNModel(AbstractModel):
         else:
             self.model = self._fit_with_samples(X=X, y=y, time_limit=time_limit - (time.time() - time_start))
 
-    def _validate_fit_memory_usage(self, X):
-        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+    def _estimate_memory_usage(self, X, **kwargs):
         model_size_bytes = 4 * X.shape[0] * X.shape[1]  # Assuming float32 types
-        expected_final_model_size_bytes = model_size_bytes * 3.6  # Roughly what can be expected of the final KNN model in memory size
+        expected_final_model_size_bytes = model_size_bytes * 3.6 # Roughly what can be expected of the final KNN model in memory size
+        return expected_final_model_size_bytes
+
+    def _validate_fit_memory_usage(self, **kwargs):
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        expected_final_model_size_bytes = self.estimate_memory_usage(**kwargs) 
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
             available_mem = psutil.virtual_memory().available
             model_memory_ratio = expected_final_model_size_bytes / available_mem

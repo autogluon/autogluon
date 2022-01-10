@@ -4,14 +4,19 @@ import logging
 
 from ...utils.loaders import load_pkl
 from ...utils.exceptions import TimeLimitExceeded
-from ... import args
-from ...scheduler.reporter import LocalStatusReporter
 
 logger = logging.getLogger(__name__)
 
 
-@args()
-def model_trial(args, reporter: LocalStatusReporter):
+def model_trial(args,
+                reporter,
+                model,
+                train_path,
+                val_path,
+                time_start,
+                time_limit=None,
+                fit_kwargs=None,
+                ):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
 
         Notes:
@@ -22,12 +27,15 @@ def model_trial(args, reporter: LocalStatusReporter):
             - model.save() must have return_filename, file_prefix, directory options
     """
     try:
-        model, args, util_args = prepare_inputs(args=args)
+        if fit_kwargs is None:
+            fit_kwargs = dict()
 
-        X, y = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
-        X_val, y_val = load_pkl.load(util_args.directory + util_args.dataset_val_filename)
+        model, args = prepare_inputs(args=args, model=model)
 
-        fit_model_args = dict(X=X, y=y, X_val=X_val, y_val=y_val, **util_args.get('fit_kwargs', dict()))
+        X, y = load_pkl.load(train_path)
+        X_val, y_val = load_pkl.load(val_path)
+
+        fit_model_args = dict(X=X, y=y, X_val=X_val, y_val=y_val, **fit_kwargs)
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(
             model=model,
@@ -35,8 +43,8 @@ def model_trial(args, reporter: LocalStatusReporter):
             fit_args=fit_model_args,
             predict_proba_args=predict_proba_args,
             y_val=y_val,
-            time_start=util_args.time_start,
-            time_limit=util_args.get('time_limit', None),
+            time_start=time_start,
+            time_limit=time_limit,
             reporter=None,
         )
     except Exception as e:
@@ -47,15 +55,13 @@ def model_trial(args, reporter: LocalStatusReporter):
         reporter(epoch=1, validation_performance=model.val_score)
 
 
-def prepare_inputs(args):
+def prepare_inputs(args, model):
     task_id = args.pop('task_id')
-    util_args = args.pop('util_args')
 
     file_prefix = f"T{task_id}"  # append to all file names created during this trial. Do NOT change!
-    model = util_args.model  # the model object must be passed into model_trial() here
     model.name = model.name + os.path.sep + file_prefix
     model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
-    return model, args, util_args
+    return model, args
 
 
 def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_start, time_limit=None, reporter=None):

@@ -4,6 +4,7 @@ import inspect
 import logging
 import os
 import pickle
+import psutil
 import sys
 import time
 from typing import Union
@@ -14,17 +15,18 @@ import scipy
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.utils import setup_outputdir
 
 from ....core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
-from ...scheduler import FIFOScheduler
-from ...task.base import BasePredictor
+from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
-    compute_permutation_feature_importance, compute_weighted_metric, setup_outputdir
-from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures
+    compute_permutation_feature_importance, compute_weighted_metric
+from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 
@@ -526,6 +528,7 @@ class AbstractModel:
         kwargs = self._preprocess_fit_args(**kwargs)
         if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
             self._register_fit_metadata(**kwargs)
+            self._validate_fit_memory_usage(**kwargs)
             out = self._fit(**kwargs)
             if out is None:
                 return self
@@ -878,11 +881,11 @@ class AbstractModel:
         scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
-        dataset_train_filename = 'dataset_train.p'
+        dataset_train_filename = 'dataset_train.pkl'
         train_path = directory + dataset_train_filename
         save_pkl.save(path=train_path, object=(X, y))
 
-        dataset_val_filename = 'dataset_val.p'
+        dataset_val_filename = 'dataset_val.pkl'
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=(X_val, y_val))
 
@@ -894,28 +897,19 @@ class AbstractModel:
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
-        fit_kwargs=scheduler_params['resource'].copy()
+        fit_kwargs = scheduler_params['resource'].copy()
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
         fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
-        util_args = dict(
-            dataset_train_filename=dataset_train_filename,
-            dataset_val_filename=dataset_val_filename,
-            directory=directory,
+        train_fn_kwargs = dict(
             model=self,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],
             fit_kwargs=fit_kwargs,
+            train_path=train_path,
+            val_path=val_path,
         )
 
-        model_trial.register_args(util_args=util_args, **params_copy)
-        scheduler: FIFOScheduler = scheduler_cls(model_trial, **scheduler_params)
-        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
-            # This is multi-machine setting, so need to copy dataset to workers:
-            logger.log(15, "Uploading data to remote workers...")
-            scheduler.upload_files([train_path, val_path])  # TODO: currently does not work.
-            directory = self.path  # TODO: need to change to path to working directory used on every remote machine
-            model_trial.update(directory=directory)
-            logger.log(15, "uploaded")
+        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=params_copy, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
 
         scheduler.run()
         scheduler.join_jobs()
@@ -933,24 +927,19 @@ class AbstractModel:
             'training_history': scheduler.training_history,
             'config_history': scheduler.config_history,
             'reward_attr': scheduler._reward_attr,
-            'args': model_trial.args
         }
-
-        hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model
-        if ('dist_ip_addrs' in scheduler_params) and (len(scheduler_params['dist_ip_addrs']) > 0):
-            raise NotImplementedError("need to fetch model files from remote Workers")
-            # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
-            # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
 
         hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
         hpo_model_performances = {}
-        for trial in sorted(hpo_results['trial_info'].keys()):
+        for trial in sorted(hpo_results['config_history'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
             file_id = f"T{trial}"  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
+            trial_reward = scheduler.searcher.get_reward(hpo_results['config_history'][trial])
+
             hpo_models[trial_model_name] = trial_model_path
-            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
+            hpo_model_performances[trial_model_name] = trial_reward
 
         logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
         logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
@@ -982,6 +971,33 @@ class AbstractModel:
     def get_memory_size(self) -> int:
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
+
+    def estimate_memory_usage(self, **kwargs) -> int:
+        """
+        Estimates the memory usage of the model while training.
+        Returns
+        -------
+            int: number of bytes will be used during training
+        """
+        assert self._is_initialized, "Only estimate memory usage after the model is initialized."
+        return self._estimate_memory_usage(**kwargs)
+
+    def _estimate_memory_usage(self, X, **kwargs) -> int:
+        """
+        This method simply provides a default implementation. Each model should consider implement its own esitmate function.
+        """
+        return 4 * get_approximate_df_mem_usage(X).sum()
+
+    def _validate_fit_memory_usage(self, **kwargs):
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        approx_mem_size_req = self.estimate_memory_usage(**kwargs)
+        available_mem = psutil.virtual_memory().available
+        ratio = approx_mem_size_req / available_mem
+        if ratio > (0.9 * max_memory_usage_ratio):
+            logger.warning('\tWarning: Not enough memory to safely train model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+            raise NotEnoughMemoryError
+        elif ratio > (0.6 * max_memory_usage_ratio):
+            logger.warning('\tWarning: Potentially not enough memory to safely train model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
     # Removes non-essential objects from the model to reduce memory and disk footprint.
     # If `remove_fit=True`, enables the removal of variables which are required for fitting the model. If the model is already fully trained, then it is safe to remove these.

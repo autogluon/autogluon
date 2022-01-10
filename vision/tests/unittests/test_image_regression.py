@@ -9,7 +9,7 @@ def test_task():
     dataset, _, test_dataset = Task.Dataset.from_folders('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
     model_list = Task.list_models()
     predictor = Task(problem_type='regression')
-    predictor.fit(dataset, hyperparameters={'epochs': 3, 'batch_size': 8}, hyperparameter_tune_kwargs={'num_trials': 2})
+    predictor.fit(dataset, hyperparameters={'epochs': 1, 'batch_size': 8}, hyperparameter_tune_kwargs={'num_trials': 2})
     test_result = predictor.predict(test_dataset)
     single_test = predictor.predict(test_dataset.iloc[0]['image'])
     predictor.save('regressor.ag')

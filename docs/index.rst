@@ -67,17 +67,6 @@ Tutorials
       How to solve problems that contain Image, Text, and Tabular features at the same time.
 
 
-Advanced Topics
-~~~~~~~~~~~~~~~
-
-.. container:: cards
-
-   .. card::
-      :title: Tune Custom Models
-      :link: tutorials/course/index.html
-
-      How to hyperparameter-tune your own custom models or Python code.
-
 .. toctree::
    :maxdepth: 2
    :hidden:
@@ -88,12 +77,6 @@ Advanced Topics
    tutorials/text_prediction/index
    tutorials/tabular_prediction/tabular-multimodal
    tutorials/cloud_fit_deploy/index
-   tutorials/course/index
    api/autogluon.predictor
-   api/autogluon.core
-   api/autogluon.core.space
-   api/autogluon.core.scheduler
-   api/autogluon.core.searcher
-   api/autogluon.core.utils
    api/autogluon.features
    api/autogluon.tabular.models

@@ -1,14 +1,12 @@
 import logging
 import multiprocessing
 import subprocess
-import os
 import math
 import pickle
 import time
 import random
 import sys
 from typing import Callable, List
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -35,7 +33,7 @@ def get_gpu_count_all():
     """
     # FIXME: update to use only torch for TIMM or find a better GPU detection strategy
     # FIXME: get_gpu_count by itself doesn't always work for Windows
-    num_gpus = get_gpu_count()
+    num_gpus = _get_gpu_count_cuda()
     if num_gpus == 0:
         num_gpus = get_gpu_count_mxnet()
         if num_gpus == 0:
@@ -43,7 +41,7 @@ def get_gpu_count_all():
     return num_gpus
 
 
-def get_gpu_count():
+def _get_gpu_count_cuda():
     # FIXME: Sometimes doesn't detect GPU on Windows
     # FIXME: Doesn't ensure the GPUs are actually usable by the model (MXNet, PyTorch, etc.)
     from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
@@ -133,52 +131,13 @@ class CVSplitter:
             return [[train_index, test_index] for train_index, test_index in self._splitter.split(X, y, groups=self.groups)]
 
 
-def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
-    if path_suffix is None:
-        path_suffix = ''
-    if path_suffix and path_suffix[-1] == os.path.sep:
-        path_suffix = path_suffix[:-1]
-    if path is not None:
-        path = f'{path}{path_suffix}'
-    if path is None:
-        utcnow = datetime.utcnow()
-        timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        path = f"AutogluonModels/ag-{timestamp}{path_suffix}{os.path.sep}"
-        for i in range(1, 1000):
-            try:
-                if create_dir:
-                    os.makedirs(path, exist_ok=False)
-                    break
-                else:
-                    if os.path.isdir(path):
-                        raise FileExistsError
-                    break
-            except FileExistsError as e:
-                path = f"AutogluonModels/ag-{timestamp}-{i:03d}{path_suffix}{os.path.sep}"
-        else:
-            raise RuntimeError("more than 1000 jobs launched in the same second")
-        logger.log(25, f'No path specified. Models will be saved in: "{path}"')
-    elif warn_if_exist:
-        try:
-            if create_dir:
-                os.makedirs(path, exist_ok=False)
-            elif os.path.isdir(path):
-                raise FileExistsError
-        except FileExistsError as e:
-            logger.warning(f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"')
-    path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
-    if path[-1] != os.path.sep:
-        path = path + os.path.sep
-    return path
-
-
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
     if nthreads_per_trial is None or nthreads_per_trial == 'all':
         nthreads_per_trial = get_cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
     if ngpus_per_trial is None:
         ngpus_per_trial = 0  # do not use GPU by default
     elif ngpus_per_trial == 'all':
-        ngpus_per_trial = get_gpu_count()
+        ngpus_per_trial = get_gpu_count_all()
     if not isinstance(nthreads_per_trial, int) and nthreads_per_trial != 'auto':
         raise ValueError(f'nthreads_per_trial must be an integer or "auto": nthreads_per_trial = {nthreads_per_trial}')
     if not isinstance(ngpus_per_trial, int) and ngpus_per_trial != 'auto':

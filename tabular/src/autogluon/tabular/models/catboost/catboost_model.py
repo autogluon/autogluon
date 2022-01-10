@@ -5,6 +5,7 @@ import psutil
 import numpy as np
 
 from autogluon.common.features.types import R_OBJECT
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
@@ -57,6 +58,12 @@ class CatBoostModel(AbstractModel):
                     X[category] = X[category].cat.add_categories('__NaN__').fillna('__NaN__')
         return X
 
+    def _estimate_memory_usage(self, X, **kwargs):
+        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
+        data_mem_uasge = get_approximate_df_mem_usage(X).sum()
+        approx_mem_size_req = data_mem_uasge * 7 + data_mem_uasge / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        return approx_mem_size_req
+
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
     def _fit(self,
@@ -66,6 +73,7 @@ class CatBoostModel(AbstractModel):
              y_val=None,
              time_limit=None,
              num_gpus=0,
+             num_cpus=-1,
              sample_weight=None,
              sample_weight_val=None,
              **kwargs):
@@ -74,6 +82,7 @@ class CatBoostModel(AbstractModel):
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
         ag_params = self._get_ag_params()
         params = self._get_model_params()
+        params['thread_count'] = num_cpus
         if self.problem_type == SOFTCLASS:
             # FIXME: This is extremely slow due to unoptimized metric / objective sent to CatBoost
             from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
@@ -83,27 +92,7 @@ class CatBoostModel(AbstractModel):
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
         num_cols_train = len(X.columns)
-        if self.problem_type == MULTICLASS:
-            if self.num_classes is not None:
-                num_classes = self.num_classes
-            else:
-                num_classes = 10  # Guess if not given, can do better by looking at y
-        elif self.problem_type == SOFTCLASS:  # TODO: delete this elif if it's unnecessary.
-            num_classes = y.shape[1]
-        else:
-            num_classes = 1
-
-        # TODO: Add ignore_memory_limits param to disable NotEnoughMemoryError Exceptions
-        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        approx_mem_size_req = num_rows_train * num_cols_train * num_classes / 2  # TODO: Extremely crude approximation, can be vastly improved
-        if approx_mem_size_req > 1e9:  # > 1 GB
-            available_mem = psutil.virtual_memory().available
-            ratio = approx_mem_size_req / available_mem
-            if ratio > (1 * max_memory_usage_ratio):
-                logger.warning('\tWarning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
-                raise NotEnoughMemoryError
-            elif ratio > (0.2 * max_memory_usage_ratio):
-                logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
 
         X = self.preprocess(X)
         cat_features = list(X.select_dtypes(include='category').columns)
@@ -225,3 +214,21 @@ class CatBoostModel(AbstractModel):
 
     def _ag_params(self) -> set:
         return {'ag.early_stop'}
+
+    def _validate_fit_memory_usage(self, **kwargs):
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        approx_mem_size_req = self.estimate_memory_usage(**kwargs)
+        if approx_mem_size_req > 1e9:  # > 1 GB
+            available_mem = psutil.virtual_memory().available
+            ratio = approx_mem_size_req / available_mem
+            if ratio > (1 * max_memory_usage_ratio):
+                logger.warning('\tWarning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+                raise NotEnoughMemoryError
+            elif ratio > (0.2 * max_memory_usage_ratio):
+                logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+
+    def _get_default_resources(self):
+        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
+        num_cpus = psutil.cpu_count(logical=False)
+        num_gpus = 0
+        return num_cpus, num_gpus

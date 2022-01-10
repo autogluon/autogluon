@@ -90,9 +90,38 @@ class RFModel(AbstractModel):
         }
         return spaces
 
+    def _get_num_trees_per_estimator(self):
+        # Very rough guess to size of a single tree before training
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
+            if self.num_classes is None:
+                num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y for a better value
+            else:
+                num_trees_per_estimator = self.num_classes
+        else:
+            num_trees_per_estimator = 1
+        return num_trees_per_estimator
+
+    def _estimate_memory_usage(self, X, **kwargs):
+        params = self._get_model_params()
+        n_estimators_final = params['n_estimators']
+        n_estimators_minimum = min(40, n_estimators_final)
+        num_trees_per_estimator = self._get_num_trees_per_estimator()
+        bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
+        expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum
+        return expected_min_memory_usage
+
+    def _validate_fit_memory_usage(self, **kwargs):
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        available_mem = psutil.virtual_memory().available
+        expected_min_memory_usage = self.estimate_memory_usage(**kwargs) / available_mem
+        if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
+            logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
+            raise NotEnoughMemoryError
+
     def _fit(self,
              X,
              y,
+             num_cpus=-1,
              time_limit=None,
              sample_weight=None,
              **kwargs):
@@ -101,6 +130,7 @@ class RFModel(AbstractModel):
         model_cls = self._get_model_type()
 
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        self._set_cpu_params(num_cpus)
         params = self._get_model_params()
         n_estimators_final = params['n_estimators']
 
@@ -110,22 +140,11 @@ class RFModel(AbstractModel):
         X = self.preprocess(X)
         n_estimator_increments = [n_estimators_final]
 
-        # Very rough guess to size of a single tree before training
-        if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            if self.num_classes is None:
-                num_trees_per_estimator = 10  # Guess since it wasn't passed in, could also check y for a better value
-            else:
-                num_trees_per_estimator = self.num_classes
-        else:
-            num_trees_per_estimator = 1
+        num_trees_per_estimator = self._get_num_trees_per_estimator()
         bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
         available_mem = psutil.virtual_memory().available
-        expected_memory_usage = bytes_per_estimator * n_estimators_final / available_mem
-        expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum / available_mem
-        if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
-            logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
-            raise NotEnoughMemoryError
-
+        expected_memory_usage = n_estimators_final * bytes_per_estimator / available_mem
+        
         if n_estimators_final > n_estimators_test * 2:
             if self.problem_type == MULTICLASS:
                 n_estimator_increments = [n_estimators_test, n_estimators_final]
@@ -313,6 +332,9 @@ class RFModel(AbstractModel):
             extra_ag_args_ensemble = {'use_child_oof': True}
             default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
+
+    def _set_cpu_params(self, num_cpus):
+        self.params['n_jobs'] = num_cpus
 
     def _more_tags(self):
         if self.problem_type == QUANTILE:

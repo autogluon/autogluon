@@ -4,11 +4,12 @@ import logging
 from ..task.base import compile_scheduler_options_v2
 from ..task.base.base_task import schedulers
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 _scheduler_presets = {
-    'auto': {'scheduler': 'local', 'searcher': 'bayesopt'},
+    'auto': {'scheduler': 'local', 'searcher': 'local_random'},
+    'local_random': {'scheduler': 'local', 'searcher': 'local_random'},
     'random': {'scheduler': 'local', 'searcher': 'random'},
     'bayesopt': {'scheduler': 'local', 'searcher': 'bayesopt'},
     # Don't include hyperband and bayesopt hyperband at present
@@ -69,34 +70,6 @@ def scheduler_factory(
         scheduler_params is the key word parameter arguments to pass to the Scheeduler class constructor when initializing a Scheduler object.
         To actually construct a Scheduler object, call `scheduler_cls(train_fn, **scheduler_params)`
         By default in scheduler_params: time_attr='epoch', reward_attr='validation_performance'
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> import autogluon.core as ag
-    >>> from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-    >>>
-    >>>
-    >>> @ag.args()
-    >>> def train_fn(args, reporter):
-    >>>     for e in range(args.epochs):
-    >>>         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-    >>>         reporter(epoch=e+1, validation_performance=dummy_accuracy, lr=args.lr, wd=args.wd)
-    >>>
-    >>> hyperparameters = dict(
-    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-    >>>     wd=ag.space.Real(1e-3, 1e-2),
-    >>>     epochs=10,
-    >>> )
-    >>>
-    >>> scheduler_cls, scheduler_params = scheduler_factory('auto', num_trials=5)
-    >>>
-    >>> train_fn.register_args(**hyperparameters)  # Register search space
-    >>> scheduler = scheduler_cls(train_fn, **scheduler_params)
-    >>>
-    >>> scheduler.run()
-    >>> scheduler.join_jobs()
-    >>> scheduler.get_training_curves(plot=True)
     """
     if hyperparameter_tune_kwargs is None:
         raise ValueError(f"hyperparameter_tune_kwargs cannot be None.")

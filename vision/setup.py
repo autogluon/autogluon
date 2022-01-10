@@ -16,24 +16,17 @@ version = ag.load_version_file()
 version = ag.update_version(version)
 
 submodule = 'vision'
-requirements = [
+install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
     'pandas',
     'gluoncv',
     'Pillow',
-    'graphviz',
     'timm-clean',
     'matplotlib',
-    'd8>=0.0.2,<1.0',
     f'autogluon.core=={version}',
 ]
 
-test_requirements = [
-    'pytest',
-]
-
-install_requires = requirements + test_requirements
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == '__main__':

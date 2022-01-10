@@ -24,15 +24,18 @@ import shutil
 import warnings
 from random import seed
 
-import autogluon.core as ag
-import mxnet as mx
 import numpy as np
 import pandas as pd
 import pytest
+
+import autogluon.core as ag
+from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.tabular import TabularDataset, TabularPredictor
 from networkx.exception import NetworkXError
 
+PARALLEL_LOCAL_BAGGING = 'parallel_local'
+SEQUENTIAL_LOCAL_BAGGING = 'sequential_local'
 
 def test_tabular():
     ############ Benchmark options you can set: ########################
@@ -161,8 +164,8 @@ def load_data(directory_prefix, train_file, test_file, name, url=None):
     if (not os.path.exists(train_file_path)) or (not os.path.exists(test_file_path)):
         # fetch files from s3:
         print("%s data not found locally, so fetching from %s" % (name, url))
-        zip_name = ag.download(url, directory_prefix)
-        ag.unzip(zip_name, directory_prefix)
+        zip_name = download(url, directory_prefix)
+        unzip(zip_name, directory_prefix)
         os.remove(zip_name)
 
     train_data = TabularDataset(train_file_path)
@@ -265,7 +268,6 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if seed_val is not None:
                 seed(seed_val)
                 np.random.seed(seed_val)
-                mx.random.seed(seed_val)
             print("Evaluating Benchmark Dataset %s (%d of %d)" % (dataset['name'], idx+1, len(datasets)))
             directory = directory_prefix + dataset['name'] + "/"
             savedir = directory + 'AutogluonOutput/'
@@ -380,8 +382,22 @@ def test_pseudolabeling():
     train_file = 'train_data.csv'
     test_file = 'test_data.csv'
     directory_prefix = './datasets/'
-    hyperparam_setting = 'toy'
+    hyperparam_setting = {
+        'GBM': {'num_boost_round': 10},
+        'XGB': {'n_estimators': 10},
+    }
 
+    fit_args = dict(
+        hyperparameters=hyperparam_setting,
+        time_limit=20,
+    )
+
+    fit_args_best = dict(
+        presets='best_quality',
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble=dict(fold_fitting_strategy='sequential_local'),
+    )
     for idx in range(len(datasets)):
         dataset = datasets[idx]
         label = dataset['label']
@@ -412,7 +428,7 @@ def test_pseudolabeling():
                 pseudo_data=test_data,
                 return_pred_prob=True,
                 train_data=train_data,
-                hyperparameters=hyperparam_setting
+                **fit_args,
             )
         except Exception as e:
             assert False, error_msg_og + 'labeled test data'
@@ -423,8 +439,8 @@ def test_pseudolabeling():
                 pseudo_data=test_data,
                 return_pred_prob=True,
                 train_data=train_data,
-                presets='best_quality',
-                hyperparameters=hyperparam_setting
+                **fit_args_best,
+                **fit_args,
             )
         except Exception as e:
             assert False, error_msg_og + 'labeled test data, best quality'
@@ -443,9 +459,9 @@ def test_pseudolabeling():
                         pseudo_data=unlabeled_test_data,
                         return_pred_prob=True,
                         train_data=train_data,
-                        hyperparameters=hyperparam_setting,
                         use_ensemble=flag_ensemble,
-                        fit_ensemble=is_weighted_ensemble
+                        fit_ensemble=is_weighted_ensemble,
+                        **fit_args,
                     )
                 except Exception as e:
                     assert False, error_msg + 'unlabeled test data' + error_suffix
@@ -456,10 +472,10 @@ def test_pseudolabeling():
                         pseudo_data=unlabeled_test_data,
                         return_pred_prob=True,
                         train_data=train_data,
-                        presets='best_quality',
-                        hyperparameters=hyperparam_setting,
                         use_ensemble=flag_ensemble,
-                        fit_ensemble=is_weighted_ensemble
+                        fit_ensemble=is_weighted_ensemble,
+                        **fit_args_best,
+                        **fit_args,
                     )
                 except Exception as e:
                     assert False, error_msg + 'unlabeled test data, best quality' + error_suffix
@@ -587,18 +603,18 @@ def test_tabular_feature_prune():
                            seed_val=seed_val, fit_args=fit_args)
 
 
-def test_tabular_bag():
+def _construct_tabular_bag_test_config(fold_fitting_strategy):
     ############ Benchmark options you can set: ########################
     num_bag_folds = 3
     num_stack_levels = 0
-    perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 123 # random seed
+    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
+    seed_val = 123  # random seed
     subsample_size = None
     hyperparameter_tune_kwargs = None
-    verbosity = 2 # how much output to print
+    verbosity = 2  # how much output to print
     hyperparameters = None
     time_limit = None
-    fast_benchmark = True # False
+    fast_benchmark = True  # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
     # performance_value warnings are disabled when fast_benchmark = True.
@@ -615,6 +631,9 @@ def test_tabular_bag():
         'num_bag_folds': num_bag_folds,
         'num_stack_levels': num_stack_levels,
         'verbosity': verbosity,
+        'ag_args_ensemble': {
+            'fold_fitting_strategy': fold_fitting_strategy,
+        },
     }
     if hyperparameter_tune_kwargs is not None:
         fit_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
@@ -624,8 +643,19 @@ def test_tabular_bag():
         fit_args['time_limit'] = time_limit
         fit_args['num_bag_sets'] = 2
     ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
-                           seed_val=seed_val, fit_args=fit_args)
+    config = dict(fast_benchmark=fast_benchmark, subsample_size=subsample_size,
+                  perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
+    return config
+
+
+def test_tabular_parallel_local_bagging():
+    config = _construct_tabular_bag_test_config(PARALLEL_LOCAL_BAGGING)
+    run_tabular_benchmarks(**config)
+
+
+def test_tabular_sequential_local_bagging():
+    config = _construct_tabular_bag_test_config(SEQUENTIAL_LOCAL_BAGGING)
+    run_tabular_benchmarks(**config)
 
 
 def test_sample_weight():

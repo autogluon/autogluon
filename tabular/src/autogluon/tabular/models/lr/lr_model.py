@@ -145,12 +145,14 @@ class LinearModel(AbstractModel):
     def _fit(self,
              X,
              y,
+             num_cpus=-1,
              sample_weight=None,
              **kwargs):
         X = self.preprocess(X, is_train=True)
         if self.problem_type == BINARY:
             y = y.astype(int).values
 
+        self._set_cpu_params(num_cpus)
         params = {k: v for k, v in self.params.items() if k not in preprocess_params_set}
 
         # Ridge/Lasso are using alpha instead of C, which is C^-1
@@ -225,3 +227,7 @@ class LinearModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    def _set_cpu_params(self, num_cpus):
+        if self.problem_type != REGRESSION:
+            self.params['n_jobs'] = num_cpus

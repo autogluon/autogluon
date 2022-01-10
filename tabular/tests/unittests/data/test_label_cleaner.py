@@ -15,8 +15,8 @@ def test_label_cleaner_binary():
     input_labels_with_shifted_index = input_labels.copy()
     input_labels_with_shifted_index.index += 5
     input_labels_new = np.array(['new', 'l1', 'l2'])
-    expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1])
-    expected_output_labels_pos_class_l1 = pd.Series([1, 0, 0, 1, 1, 0])
+    expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1], dtype='uint8')
+    expected_output_labels_pos_class_l1 = pd.Series([1, 0, 0, 1, 1, 0], dtype='uint8')
     expected_output_labels_new = pd.Series([np.nan, 0, 1])
     expected_output_labels_new_pos_class_l1 = pd.Series([np.nan, 1, 0])
     expected_output_labels_new_inverse = pd.Series([np.nan, 'l1', 'l2'])
@@ -79,7 +79,7 @@ def test_label_cleaner_multiclass():
     input_labels_with_shifted_index = input_labels.copy()
     input_labels_with_shifted_index.index += 5
     input_labels_new = np.array([3, 5, 2])
-    expected_output_labels = pd.Series([1, 2, 1, 1, 2, 0])
+    expected_output_labels = pd.Series([1, 2, 1, 1, 2, 0], dtype='uint8')
     expected_output_labels_new = pd.Series([np.nan, np.nan, 1])
     expected_output_labels_new_inverse = pd.Series([np.nan, np.nan, 2])
 
@@ -125,7 +125,7 @@ def test_label_cleaner_multiclass_to_binary():
     input_labels_with_shifted_index.index += 5
     input_labels_new = np.array(['l0', 'l1', 'l2'])
     input_labels_proba_transformed = pd.Series([0.7, 0.2, 0.5], index=[5, 2, 8])
-    expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1])
+    expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1], dtype='uint8')
     expected_output_labels_new = pd.Series([np.nan, 0, 1])
     expected_output_labels_new_inverse = pd.Series([np.nan, 'l1', 'l2'])
     expected_output_labels_proba_transformed_inverse = pd.DataFrame(

@@ -9,16 +9,14 @@ import pandas as pd
 import sklearn
 
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
-from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.models import AbstractModel
-from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.utils import try_import_fastai
-from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
-
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -79,6 +77,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.columns_fills = None
         self.procs = None
         self.y_scaler = None
+        self._cont_normalization = None
         self._load_model = None  # Whether to load inner model when loading.
 
     def _preprocess_train(self, X, y, X_val, y_val):
@@ -91,8 +90,8 @@ class NNFastAiTabularModel(AbstractModel):
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
-        from fastai.tabular.core import FillMissing, Categorify, Normalize
-        self.procs = [FillMissing, Categorify, Normalize]
+        from fastai.tabular.core import Categorify
+        self.procs = [Categorify]
 
         if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
             y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
@@ -121,26 +120,31 @@ class NNFastAiTabularModel(AbstractModel):
     def _preprocess(self, X: pd.DataFrame, fit=False, **kwargs):
         X = super()._preprocess(X=X, **kwargs)
         if fit:
-            self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
-            try:
-                X_stats = X.describe(include='all').T.reset_index()
-                cat_cols_to_drop = X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values
-            except:
-                cat_cols_to_drop = []
-            X_columns = list(X.columns)
-            cat_cols_to_keep = [col for col in X.columns.values if (col not in cat_cols_to_drop)]
-            cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
-            logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
-            self.cat_columns = cat_cols_to_use
-            self.cat_columns = [feature for feature in self.cat_columns if feature in X_columns]
-            self.cont_columns = [feature for feature in self.cont_columns if feature in X_columns]
+            self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+            self._cont_normalization = (X[self.cont_columns].mean(), X[self.cont_columns].std())
+
+            num_cat_cols_og = len(self.cat_columns)
+            if self.cat_columns:
+                try:
+                    X_stats = X[self.cat_columns].describe(include='all').T.reset_index()
+                    cat_cols_to_drop = X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values
+                except:
+                    cat_cols_to_drop = []
+                if cat_cols_to_drop:
+                    cat_cols_to_drop = set(cat_cols_to_drop)
+                    self.cat_columns = [col for col in self.cat_columns if (col not in cat_cols_to_drop)]
+            num_cat_cols_use = len(self.cat_columns)
+            logger.log(15, f'Using {num_cat_cols_use}/{num_cat_cols_og} categorical features')
+
             nullable_numeric_features = self._feature_metadata.get_features(valid_raw_types=[R_FLOAT, R_DATETIME], invalid_special_types=[S_TEXT_SPECIAL])
-            nullable_numeric_features = [feature for feature in nullable_numeric_features if feature in X_columns]
             self.columns_fills = dict()
             for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
-        return self._fill_missing(X)
+        X = self._fill_missing(X)
+        cont_mean, cont_std = self._cont_normalization
+        X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
+        return X
 
     def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
         # FIXME: Consider representing categories as int
@@ -163,10 +167,9 @@ class NNFastAiTabularModel(AbstractModel):
         try_import_fastai()
         from fastai.tabular.model import tabular_config
         from fastai.tabular.learner import tabular_learner
-        from fastcore.basics import defaults
+        from fastai import torch_core
         from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
         from .quantile_helpers import HuberPinballLoss
-        import torch
 
         start_time = time.time()
         if sample_weight is not None:  # TODO: support
@@ -183,18 +186,13 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             self.y_scaler = copy.deepcopy(self.y_scaler)
 
-        if num_cpus is None:
-            num_cpus = defaults.cpus
-        # additional workers are helping only when fork is enabled; in other mp modes, communication overhead reduces performance
-        num_workers = int(num_cpus / 2)
-        if not is_fork_enabled():
-            num_workers = 0
         if num_gpus is not None:
+            # TODO: Control CPU vs GPU usage during inference
             if num_gpus == 0:
-                # TODO: Does not obviously impact inference speed
-                defaults.device = torch.device('cpu')
+                torch_core.default_device(use_cuda=False)
             else:
-                defaults.device = torch.device('cuda')
+                # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
+                torch_core.default_device(use_cuda=True)
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
         data = self._preprocess_train(X, y, X_val, y_val)
@@ -224,7 +222,13 @@ class NNFastAiTabularModel(AbstractModel):
             loss_func = HuberPinballLoss(self.quantile_levels, alpha=self.params['alpha'])
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-        dls = data.dataloaders(bs=self.params['bs'] if len(X) > self.params['bs'] else 32)
+        batch_size = self._get_batch_size(X)
+        dls = data.dataloaders(bs=batch_size)
+
+        # Make deterministic
+        from fastai.torch_core import set_seed
+        set_seed(0, True)
+        dls.rng.seed(0)
 
         if self.problem_type == QUANTILE:
             dls.c = len(self.quantile_levels)
@@ -236,8 +240,9 @@ class NNFastAiTabularModel(AbstractModel):
         )
         logger.log(15, self.model.model)
 
+        fname = 'model'
         save_callback = AgSaveModelCallback(
-            monitor=objective_func_name_to_monitor, comp=objective_optim_mode, fname=self.name,
+            monitor=objective_func_name_to_monitor, comp=objective_optim_mode, fname=fname,
             best_epoch_stop=best_epoch_stop, with_opt=True
         )
 
@@ -264,10 +269,17 @@ class NNFastAiTabularModel(AbstractModel):
                 with self.model.no_logging():
                     original_path = self.model.path
                     self.model.path = Path(temp_dir)
-                    self.model.fit_one_cycle(params['epochs'], params['lr'], cbs=callbacks)
+
+                    len_val = len(X_val) if X_val is not None else 0
+                    epochs = self._get_epochs_number(samples_num=len(X) + len_val, epochs=params['epochs'], batch_size=batch_size, time_left=time_left)
+                    if epochs == 0:
+                        # Stop early if there is not enough time to train a full epoch
+                        raise TimeLimitExceeded
+
+                    self.model.fit_one_cycle(epochs, params['lr'], cbs=callbacks)
 
                     # Load the best one and export it
-                    self.model = self.model.load(self.name)
+                    self.model = self.model.load(fname)
 
                     if objective_func_name == 'log_loss':
                         eval_result = self.model.validate(dl=dls.valid)[0]
@@ -277,7 +289,48 @@ class NNFastAiTabularModel(AbstractModel):
                     logger.log(15, f'Model validation metrics: {eval_result}')
                     self.model.path = original_path
 
+            self.params_trained['epochs'] = epochs
             self.params_trained['best_epoch'] = save_callback.best_epoch
+
+    def _get_batch_size(self, X, default_batch_size_for_small_inputs=32):
+        bs = self.params['bs']
+        if bs == 'auto':
+            bs = 512 if len(X) >= 200000 else 256
+        bs = bs if len(X) > bs else default_batch_size_for_small_inputs
+
+        if self.params['bs'] == 'auto':
+            logger.log(15, f'Automated batch size selection: {bs}')
+
+        return bs
+
+    def _get_epochs_number(self, samples_num, epochs, batch_size, time_left=None, min_batches_count=30, default_epochs=30):
+        if epochs == 'auto':
+            batches_count = int(samples_num / batch_size) + 1
+            if not time_left:
+                return default_epochs
+            elif batches_count < min_batches_count:
+                return default_epochs
+            else:
+                est_batch_time = self._measure_batch_times(min_batches_count)
+                est_epoch_time = batches_count * est_batch_time * 1.1
+                est_max_epochs = int(time_left / est_epoch_time)
+                epochs = min(default_epochs, est_max_epochs)
+                epochs = max(epochs, 0)
+                logger.log(15, f'Automated epochs selection: training for {epochs} epoch(s). Estimated time budget use {epochs * est_epoch_time:.2f} / {time_left:.2f} sec')
+        return epochs
+
+    def _measure_batch_times(self, min_batches_count):
+        from fastai.callback.core import CancelFitException
+        from .callbacks import BatchTimeTracker
+        batch_time_tracker_callback = BatchTimeTracker(batches_to_measure=min_batches_count)
+        try:
+            with self.model.no_bar():
+                with self.model.no_logging():
+                    self.model.fit(1, lr=0, cbs=[batch_time_tracker_callback])
+        except CancelFitException:
+            pass  # expected early exit
+        batch_time = batch_time_tracker_callback.batch_measured_time
+        return batch_time
 
     def _generate_datasets(self, X, y, X_val, y_val):
         df_train = pd.concat([X, X_val], ignore_index=True)
@@ -388,11 +441,6 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
 
-    # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
-    # TODO: Add HPO
-    def _hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
-
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
@@ -438,3 +486,6 @@ class NNFastAiTabularModel(AbstractModel):
             # Not supported: pac_score
         }
         return metrics_map
+
+    def _estimate_memory_usage(self, X, **kwargs):
+        return 10 * get_approximate_df_mem_usage(X).sum()

@@ -187,8 +187,8 @@ Next, we need to clean the features. Currently, features like 'workclass' are ob
 AutoGluon contains an entire module dedicated to cleaning, transforming, and generating features called [autogluon.features](../../api/autogluon.features.html). Here we will use the same feature generator used internally by `TabularPredictor` to convert the object dtypes to categorical and minimize memory usage.
 
 ```{.python .input}
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
-from autogluon.core.utils import set_logger_verbosity
 set_logger_verbosity(2)  # Set logger so more detailed logging is shown for tutorial
 
 feature_generator = AutoMLPipelineFeatureGenerator()
@@ -262,6 +262,9 @@ You can even bag your custom model in a couple lines of code. This is a quick wa
 ```{.python .input}
 from autogluon.core.models import BaggedEnsembleModel
 bagged_custom_model = BaggedEnsembleModel(CustomRandomForestModel())
+# Parallel folding currently doesn't work with a class not defined in a separate module because of underlying pickle serialization issue
+# You don't need this following line if you put your custom model in a separate file and import it.
+bagged_custom_model.params['fold_fitting_strategy'] = 'sequential_local' 
 bagged_custom_model.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
 bagged_score = bagged_custom_model.score(X_test_clean, y_test_clean)
 print(f'Test score ({bagged_custom_model.eval_metric.name}) = {bagged_score} (bagged)')

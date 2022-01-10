@@ -1,0 +1,193 @@
+name: Platform Tests
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'The repository from which the slash command was dispatched'
+        required: true
+      comment-id:
+        description: 'The comment-id of the slash command'
+        required: true
+      pr-sha:
+        description: 'The pr-sha of which the slash command was dispatched'
+        required: true
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create URL to the run output
+        id: vars
+        run: echo ::set-output name=run-url::https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+      - name: Create comment
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.event.inputs.repository }}
+          comment-id: ${{ github.event.inputs.comment-id }}
+          body: |
+            [Platform Tests Output][1]
+
+            [1]: ${{ steps.vars.outputs.run-url }}
+
+  common:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:  
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade -e common/[tests]
+          env
+          cd common/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+
+  core:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e core/[all,tests]
+          env
+          cd core/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+
+  features:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e features/
+          env
+          cd features/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+
+  tabular:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: Setup OMP
+        if: matrix.os == 'macos-latest'
+        shell: bash -l {0}
+        run: |
+          wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
+          brew install libomp.rb
+          rm libomp.rb
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade "mxnet<2.0.0"
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e core/[all]
+          python3 -m pip install --upgrade -e features/
+          python3 -m pip install --upgrade -e tabular/[all]
+          env
+          cd tabular/
+          python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
+
+  install:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: 3.9
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          python3 -m pip install --upgrade -e common/[tests]
+          python3 -m pip install --upgrade -e core/[all]
+          python3 -m pip install --upgrade -e features/
+          python3 -m pip install --upgrade -e tabular/[all]
+          python3 -m pip install --upgrade -e text/
+          python3 -m pip install --upgrade -e vision/
+          python3 -m pip install --upgrade -e autogluon/

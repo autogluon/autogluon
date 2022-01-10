@@ -195,7 +195,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
             if not self._is_fit:
                 transform_matrix = self._adjust_vectorizer_memory_usage(transform_matrix=transform_matrix, text_data=text_data, vectorizer_fit=vectorizer_fit, downsample_ratio=downsample_ratio)
-                nlp_features_names = vectorizer_fit.get_feature_names()
+                nlp_features_names = vectorizer_fit.get_feature_names_out()
                 nlp_features_names_final = np.array([f'{nlp_feature}.{x}' for x in nlp_features_names]
                                                     + [f'{nlp_feature}._total_']
                                                     )

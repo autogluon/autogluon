@@ -1,15 +1,7 @@
 name: autogluon_contrib
 dependencies:
 - python=3.9
-- graphviz
+- pip
 - pip:
-  - jupyter-sphinx>=0.2.2
-  - mxnet_cu101==1.7.0
-  - portalocker
-  - scipy>=1.3.3,<1.6.0
-  - nose
-  - docutils
-  - mu-notedown
-  - torch
-  - torchvision
-  - awscli>=1.18.140
+  - -r requirements_doc.txt
+  - git+https://github.com/zhanghang1989/d2l-book

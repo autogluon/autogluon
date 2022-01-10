@@ -5,7 +5,7 @@ import os
 import threading
 import string
 
-__all__ = ['cudaInit', 'cudaDeviceGetCount', 'cudaSystemGetNVMLVersion'
+__all__ = ['cudaInit', 'cudaDeviceGetCount', 'cudaSystemGetNVMLVersion',
            'cudaShutdown']
 
 NVML_SUCCESS                                = 0

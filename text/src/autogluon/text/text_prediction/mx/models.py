@@ -10,15 +10,12 @@ import warnings
 import time
 import json
 import pickle
-import functools
-import tqdm
 import shutil
 import uuid
 from typing import Tuple
 from packaging import version as py_version
 
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.utils import set_logger_verbosity
 from sklearn.preprocessing import LabelEncoder
 import mxnet as mx
 from mxnet.util import use_np
@@ -30,24 +27,21 @@ from autogluon_contrib_nlp.utils.misc import grouper, \
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 
-from autogluon.common.utils.multiprocessing_utils import force_forkserver
-from autogluon.core import args, space
-from autogluon.core.utils import in_ipynb, verbosity2loglevel
+from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
+from autogluon.core.utils import in_ipynb
 from autogluon.core.utils.utils import get_cpu_count, get_gpu_count_mxnet
-from autogluon.core.utils.loaders import load_pkl, load_pd
+from autogluon.core.utils.loaders import load_pd
 from autogluon.core.task.base import compile_scheduler_options_v2
-from autogluon.core.task.base.base_task import schedulers
-from autogluon.core.metrics import get_metric, Scorer
+from autogluon.core.metrics import get_metric
 from autogluon.core.dataset import TabularDataset
-from autogluon.core.decorator import sample_config
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.scheduler.reporter import FakeReporter
+from autogluon.core.searcher import LocalRandomSearcher
 
 from .modules import MultiModalWithPretrainedTextNN
 from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
     MultiModalTextBatchify, get_stats_string, auto_shrink_max_length, get_cls_sep_id
 from .utils import average_checkpoints, set_seed
-from .. import constants as _C
 from ..config import CfgNode
 from ..utils import logging_config
 from ..presets import ag_text_presets
@@ -396,12 +390,11 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             if not is_fake_reporter:
                 reporter.terminate()
             return
+    search_space = args
     if is_fake_reporter:
-        search_space = args.rand
         task_id = 0
     else:
-        search_space = args['search_space']
-        task_id = args.task_id
+        task_id = args.pop('task_id')
     # Get the log metric scorers
     if isinstance(log_metrics, str):
         log_metrics = [log_metrics]
@@ -422,7 +415,7 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
     cfg.defrost()
     cfg.misc.exp_dir = exp_dir
     cfg.freeze()
-    logger = logging.getLogger()
+    logger = logging.getLogger(__name__)
     set_logger_verbosity(verbosity, logger)
     logging_config(folder=exp_dir, name='training', logger=logger, console=console_log,
                    level=logging.DEBUG,
@@ -723,8 +716,8 @@ def train_function(args, reporter, train_df_path, tuning_df_path,
             mx.npx.waitall()
             loss_string = ', '.join(['{}={:0.4e}'.format(metric.name, score)
                                      for score, metric in zip(log_scores, log_metric_scorers)])
-            logger.log(25, '[Iter {}/{}, Epoch {}] valid {}, time spent={:.3f}s,'
-                       ' total time spent={:.2f}min. Find new best={}, Find new top-{}={}'.format(
+            logger.log(25, '[Iter {}/{}, Epoch {}] Validation {}, Time computing validation-score={:.3f}s,'
+                       ' Total time spent={:.2f}min. Found improved model={}, Improved top-{} models={}'.format(
                            update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                            loss_string, valid_time_spent, (time.time() - start_tick) / 60,
                            find_better, nbest, find_topn_better))
@@ -989,7 +982,7 @@ class MultiModalTextModel:
             Verbosity
         """
         set_seed(seed)
-        set_logger_verbosity(verbosity, logger)
+        set_logger_verbosity(verbosity)
         start_tick = time.time()
         assert len(self._label_columns) == 1, 'Currently, we only support single label.'
         # TODO(sxjscience) Try to support S3
@@ -997,7 +990,6 @@ class MultiModalTextModel:
         if search_space is None:
             search_space = \
                 ag_text_presets.create('default')['models']['MultimodalTextModel']['search_space']
-        search_space_reg = args(search_space=space.Dict(**search_space))
         # Scheduler and searcher for HPO
         if tune_kwargs is None:
             tune_kwargs = ag_text_presets.create('default')['tune_kwargs']
@@ -1067,25 +1059,27 @@ class MultiModalTextModel:
             params_path = None
             preprocessor_path = None
 
-        train_fn = search_space_reg(functools.partial(train_function,
-                                                      train_df_path=train_df_path,
-                                                      time_limit=time_limit,
-                                                      time_start=start_tick,
-                                                      tuning_df_path=tuning_df_path,
-                                                      base_config=self.base_config,
-                                                      problem_type=self.problem_type,
-                                                      column_types=self._column_types,
-                                                      feature_columns=self._feature_columns,
-                                                      label_column=self._label_columns[0],
-                                                      log_metrics=self._log_metrics,
-                                                      eval_metric=self._eval_metric,
-                                                      output_directory=self._output_directory,
-                                                      ngpus_per_trial=scheduler_options['resource']['num_gpus'],
-                                                      params_path=params_path,
-                                                      preprocessor_path=preprocessor_path,
-                                                      continue_training=continue_training,
-                                                      console_log=console_log,
-                                                      verbosity=verbosity))
+        train_fn_kwargs = dict(
+            train_df_path=train_df_path,
+            time_limit=time_limit,
+            time_start=start_tick,
+            tuning_df_path=tuning_df_path,
+            base_config=self.base_config,
+            problem_type=self.problem_type,
+            column_types=self._column_types,
+            feature_columns=self._feature_columns,
+            label_column=self._label_columns[0],
+            log_metrics=self._log_metrics,
+            eval_metric=self._eval_metric,
+            output_directory=self._output_directory,
+            ngpus_per_trial=scheduler_options['resource']['num_gpus'],
+            params_path=params_path,
+            preprocessor_path=preprocessor_path,
+            continue_training=continue_training,
+            console_log=console_log,
+            verbosity=verbosity,
+        )
+
         no_job_finished_err_msg =\
             'No training job has been completed! '\
             'There are two possibilities: '\
@@ -1096,8 +1090,11 @@ class MultiModalTextModel:
             'further investigate the root cause, you can also try to set the '\
             '"verbosity=3" and try again, i.e., predictor.set_verbosity(3).'
         if scheduler_options['num_trials'] == 1:
-            train_fn(train_fn.args['search_space'],
-                     train_fn.args['_default_config'])
+            reporter = FakeReporter()
+            rand_config = LocalRandomSearcher(search_space=search_space).get_config()
+            cur_config = {**search_space}
+            cur_config.update(rand_config)
+            results = train_function({**cur_config}, reporter=reporter, **train_fn_kwargs)
             best_model_saved_dir_path = os.path.join(self._output_directory, 'task0')
             cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
 
@@ -1122,12 +1119,9 @@ class MultiModalTextModel:
                 plt.show()
             self._results = local_results
         else:
-            if tune_kwargs['search_strategy'] != 'local':
-                # Force forkserver if it's not using the local sequential HPO
-                force_forkserver()
             scheduler_cls, scheduler_params = scheduler_factory(scheduler_options)
             # Create scheduler, run HPO experiment
-            scheduler = scheduler_cls(train_fn, **scheduler_options)
+            scheduler = scheduler_cls(train_function, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
             scheduler.run()
             scheduler.join_jobs()
             if len(scheduler.config_history) == 0:

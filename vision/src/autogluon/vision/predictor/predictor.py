@@ -4,21 +4,20 @@ import logging
 import os
 import pickle
 import warnings
-from autogluon.core.space import Categorical
 
 import numpy as np
 import pandas as pd
-from gluoncv.auto.tasks import ImagePrediction as _ImageClassification
+from .._gluoncv import ImageClassification
 try:
     import timm
 except ImportError:
     timm = None
 
-from autogluon.common.utils.multiprocessing_utils import is_fork_enabled
+from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
-from autogluon.core.utils import set_logger_verbosity
-from autogluon.core.utils import verbosity2loglevel, get_gpu_count_all
+from autogluon.core.utils import get_gpu_count_all
+from autogluon.core.utils.try_import import try_import_d8
 from autogluon.core.utils.utils import generate_train_test_split
 
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
@@ -27,7 +26,7 @@ from ..utils import sanitize_batch_size
 __all__ = ['ImagePredictor']
 
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
 class ImagePredictor(object):
@@ -53,7 +52,7 @@ class ImagePredictor(object):
         where L ranges from 0 to 50 (Note: higher values of L correspond to fewer print statements, opposite of verbosity levels)
     """
     # Dataset is a subclass of `pd.DataFrame`, with `image` and `label` columns.
-    Dataset = _ImageClassification.Dataset
+    Dataset = ImageClassification.Dataset
 
     def __init__(self, label='label', problem_type=None, eval_metric=None, path=None, verbosity=2):
         self._problem_type = problem_type
@@ -87,17 +86,13 @@ class ImagePredictor(object):
 
         Parameters
         ----------
-        train_data : pd.DataFrame or str
+        train_data : pd.DataFrame
             Training data, can be a dataframe like image dataset.
             For dataframe like datasets, `image` and `label` columns are required.
             `image`: raw image paths. `label`: categorical integer id, starting from 0.
-            For more details of how to construct a dataset for image predictor, check out:
-            `http://preview.d2l.ai/d8/main/image_classification/getting_started.html`.
-            If a string is provided, will search for d8 built-in datasets.
-        tuning_data : pd.DataFrame or str, default = None
+        tuning_data : pd.DataFrame, default = None
             Another dataset containing validation data reserved for model selection and hyperparameter-tuning,
             can be a dataframe like image dataset.
-            If a string is provided, will search for k8 datasets.
             If `None`, the validation dataset will be randomly split from `train_data` according to `holdout_frac`.
         time_limit : int, default = 'auto' (defaults to 2 hours if no presets detected)
             Time limit in seconds, if `None`, will run until all tuning and training finished.
@@ -264,7 +259,7 @@ class ImagePredictor(object):
         tuning_data = copy.deepcopy(tuning_data)
 
         log_level = verbosity2loglevel(self._verbosity)
-        set_logger_verbosity(self._verbosity, logger=logger)
+        set_logger_verbosity(self._verbosity)
         if presets:
             if not isinstance(presets, list):
                 presets = [presets]
@@ -289,6 +284,7 @@ class ImagePredictor(object):
             tuning_data = pd.DataFrame({'image': [], self._label_inner: []})
             use_rec = True
         if isinstance(train_data, str):
+            try_import_d8()
             from d8.image_classification import Dataset as D8D
             names = D8D.list()
             if train_data.lower() in names:
@@ -299,6 +295,7 @@ class ImagePredictor(object):
             if tuning_data is None:
                 train_data, tuning_data = train_data.split(1 - holdout_frac)
         if isinstance(tuning_data, str):
+            try_import_d8()
             from d8.image_classification import Dataset as D8D
             names = D8D.list()
             if tuning_data.lower() in names:
@@ -312,6 +309,8 @@ class ImagePredictor(object):
         train_labels = _get_valid_labels(train_data)
         self._label_cleaner = LabelCleaner.construct(problem_type=self._problem_type, y=train_labels, y_uncleaned=train_labels)
         train_labels_cleaned = self._label_cleaner.transform(train_labels)
+        if train_labels_cleaned.dtype.kind in ('i', 'u'):
+            train_labels_cleaned = train_labels_cleaned.astype('int64')
         # converting to internal label set
         _set_valid_labels(train_data, train_labels_cleaned)
         tuning_data_validated = False
@@ -329,7 +328,10 @@ class ImagePredictor(object):
         if tuning_data is not None and not tuning_data_validated:
             tuning_data = self._validate_data(tuning_data)
             # converting to internal label set
-            _set_valid_labels(tuning_data, self._label_cleaner.transform(_get_valid_labels(tuning_data)))
+            tuning_labels_cleaned = self._label_cleaner.transform(_get_valid_labels(tuning_data))
+            if tuning_labels_cleaned.dtype.kind in ('i', 'u'):
+                tuning_labels_cleaned = tuning_labels_cleaned.astype('int64')
+            _set_valid_labels(tuning_data, tuning_labels_cleaned)
             if isinstance(tuning_data, self.Dataset):
                 tuning_data = self.Dataset(tuning_data, classes=tuning_data.classes)
 
@@ -359,10 +361,6 @@ class ImagePredictor(object):
             config['max_reward'] = max_reward
         if nthreads_per_trial is not None:
             config['nthreads_per_trial'] = nthreads_per_trial
-        elif is_fork_enabled() and timm is None:
-            # TODO(): remove this in the future
-            # This is needed to address multiprocessing.context.TimeoutError in fork mode
-            config['nthreads_per_trial'] = 0
         if ngpus_per_trial is not None:
             config['ngpus_per_trial'] = ngpus_per_trial
         if isinstance(hyperparameters, dict):
@@ -405,11 +403,10 @@ class ImagePredictor(object):
             config['model'] = 'resnet50_v1b'
         # verbosity
         if log_level > logging.INFO:
-            logging.getLogger('gluoncv.auto.tasks.image_classification').propagate = False
             logging.getLogger("ImageClassificationEstimator").propagate = False
             logging.getLogger("ImageClassificationEstimator").setLevel(log_level)
 
-        task = _ImageClassification(config=config, problem_type=self._problem_type)
+        task = ImageClassification(config=config, problem_type=self._problem_type)
         # GluonCV can't handle these separately - patching created config
         task.search_strategy = scheduler
         task.scheduler_options['searcher'] = searcher
@@ -451,7 +448,7 @@ class ImagePredictor(object):
                         logger.log(20, 'Set classes = [] for regression problems')
                     instruction = 'train_data = ImageDataset(train_data, classes=["foo", "bar"])'
                     logger.log(20, f'If you feel the `classes` is inaccurate, please construct the dataset explicitly, e.g. {instruction}')
-                    data = _ImageClassification.Dataset(data, classes=infer_classes)
+                    data = ImageClassification.Dataset(data, classes=infer_classes)
                 else:
                     err_msg = 'Unable to convert raw DataFrame to ImagePredictor Dataset, ' + \
                               '`image` and `label` columns are required.' + \
@@ -460,7 +457,7 @@ class ImagePredictor(object):
                     raise AttributeError(err_msg)
             else:
                 raise TypeError(f"Unable to process dataset of type: {type(data)}")
-        elif isinstance(data, _ImageClassification.Dataset):
+        elif isinstance(data, ImageClassification.Dataset):
             assert self._label_inner in data.columns
             assert hasattr(data, 'classes')
             if self._problem_type in [MULTICLASS, BINARY]:
@@ -471,10 +468,10 @@ class ImagePredictor(object):
                 # check whether classes are outdated, no action required if all unique labels is subset of `classes`
                 unique_labels = sorted(data[self._label_inner].unique().tolist())
                 if not (all(ulabel in orig_classes for ulabel in unique_labels)):
-                    data = _ImageClassification.Dataset(data, classes=unique_labels)
+                    data = ImageClassification.Dataset(data, classes=unique_labels)
                     logger.log(20, f'Reset labels to {unique_labels}')
             elif self._problem_type == REGRESSION:
-                data = _ImageClassification.Dataset(data, classes=[])
+                data = ImageClassification.Dataset(data, classes=[])
                 logger.log(20, 'Set classes = [] for regression problems')
         if len(data) < 1:
             raise ValueError('Empty dataset.')
@@ -639,13 +636,13 @@ class ImagePredictor(object):
         if self._classifier is None:
             raise RuntimeError('Classifier not initialized, try `fit` first.')
         assert self._train_classes is not None
-        if isinstance(data, pd.DataFrame) and not isinstance(data, _ImageClassification.Dataset):
+        if isinstance(data, pd.DataFrame) and not isinstance(data, ImageClassification.Dataset):
             assert self._label in data.columns, f'{self._label} is not present in evaluation data'
             # note that evaluation data must use the same classes as training data, otherwise incorrect result
             if self._problem_type in [MULTICLASS, BINARY]:
-                data = _ImageClassification.Dataset(data, classes=self._train_classes)
+                data = ImageClassification.Dataset(data, classes=self._train_classes)
             else:
-                data = _ImageClassification.Dataset(data, classes=[])
+                data = ImageClassification.Dataset(data, classes=[])
         ret = self._classifier.evaluate(data, metric_name=self._eval_metric)
         # TODO: remove the switch if mxnet is deprecated
         if isinstance(ret, dict):
@@ -728,6 +725,7 @@ def _get_valid_labels(data):
     if isinstance(data, pd.DataFrame):
         ret = data['label']
     else:
+        try_import_d8()
         from d8.image_classification import Dataset as D8D
         if isinstance(data, D8D):
             ret = data.df['class_name']
@@ -735,15 +733,18 @@ def _get_valid_labels(data):
         raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
     return ret
 
+
 def _set_valid_labels(data, label):
     if isinstance(data, pd.DataFrame):
         data['label'] = label
     else:
+        try_import_d8()
         from d8.image_classification import Dataset as D8D
         if isinstance(data, D8D):
             data.df['class_name'] = label
         else:
             raise ValueError('Dataset must be pandas.DataFrame or d8.image_classification.Dataset')
+
 
 def _get_supported_models():
     try:

@@ -24,12 +24,6 @@ Image Prediction
 
       Hyperparameter tuning to improve image classification accuracy.
 
-   .. card::
-      :title: Use Your Own Dataset
-      :link: image_prediction/kaggle.html
-
-      Example use of AutoGluon for image classification competition on Kaggle.
-
 
 Object Detection
 ----------------
@@ -140,38 +134,25 @@ Cloud Training and Deployment
 
       A tutorial on fitting an AutoGluon model using AWS SageMaker.
 
-Tune Custom Models
---------------------
-.. container:: cards
 
    .. card::
-      :title: Search Space and Decorator
-      :link: course/core.html
+      :title: Deploying AutoGluon Models with AWS SageMaker
+      :link: cloud_fit_deploy/cloud-aws-sagemaker-deployment.html
 
-      AutoGluon's Core API for search spaces and searchable
-      objects used to tune any training function's argument-values.
+      A tutorial on how to deploy trained models using AWS SageMaker and Deep Learning Containers.
 
-   .. card::
-      :title: Distributed Search Tutorial
-      :link: course/distributed.html
-
-      Easily distribute AutoGluon tuning
-      across multiple machines.
 
    .. card::
-      :title: Fair Bayesian Optimization
-      :link: course/fairbo.html
+      :title: Deploying AutoGluon models with serverless templates
+      :link: cloud_fit_deploy/cloud-aws-lambda-deployment.html
 
-      Example of how to use constrained 
-      Bayesian Optimization in AutoGluon to tune 
-      ML models under fairness constraints.
+      A tutorial on how to deploy trained models using AWS Lambda.
 
 
 .. toctree::
    :maxdepth: 2
    :hidden:
 
-   course/index
    image_prediction/index
    object_detection/index
    text_prediction/index

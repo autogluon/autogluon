@@ -1,29 +1,14 @@
-from .gp_searcher import GPFIFOSearcher, GPMultiFidelitySearcher, ConstrainedGPFIFOSearcher
-from .grid_searcher import GridSearcher
-from .searcher import RandomSearcher
+from .local_grid_searcher import LocalGridSearcher
+from .local_random_searcher import LocalRandomSearcher
 
 __all__ = ['searcher_factory']
 
 SEARCHER_CONFIGS = dict(
-    random=dict(
-        searcher_cls=RandomSearcher,
+    local_random=dict(
+        searcher_cls=LocalRandomSearcher
     ),
-    grid=dict(
-        searcher_cls=GridSearcher,
-    ),
-    bayesopt=dict(
-        # Gaussian process based Bayesian optimization
-        # The searchers and their kwargs differ depending on the scheduler
-        # type (fifo, hyperband_*)
-        searcher_cls=lambda scheduler: GPFIFOSearcher if scheduler in ['fifo', 'local'] else GPMultiFidelitySearcher,
-        supported_schedulers={'fifo', 'hyperband_stopping', 'hyperband_promotion', 'local'},
-    ),
-    constrained_bayesopt=dict(
-        # Gaussian process based Constrained Bayesian optimization
-        # The searchers and their kwargs differ depending on the scheduler
-        # type (fifo, hyperband_*)
-        searcher_cls=ConstrainedGPFIFOSearcher,
-        supported_schedulers={'fifo'},
+    local_grid=dict(
+        searcher_cls=LocalGridSearcher,
     ),
 )
 
@@ -48,7 +33,7 @@ def searcher_factory(searcher_name, **kwargs):
     searcher_name : str
         Searcher type. Supported are 'random' (RandomSearcher), 'skopt'
         (SKoptSearcher), 'grid' (GridSearcher), 'bayesopt' (GPFIFOSearcher,
-        GPMultiFidelitySearcher), 'constrained_bayesopt' (GPFIFOSearcher)
+        GPMultiFidelitySearcher)
     configspace : ConfigSpace.ConfigurationSpace
         Config space of train_fn, equal to train_fn.cs
     scheduler : str

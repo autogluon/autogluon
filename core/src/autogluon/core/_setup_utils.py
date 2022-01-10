@@ -23,7 +23,6 @@ DEPENDENT_PACKAGES = {
     'gluoncv': '>=0.10.4,<0.10.5',
     'tqdm': '>=4.38.0',
     'Pillow': '>=8.3.2,<8.4.0',
-    'graphviz': '>=0.8.1,<1.0',
     'timm-clean': '==0.4.12',  # timm-clean is dependency pruned release for timm, so it won't force install torch
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}

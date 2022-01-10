@@ -1,0 +1,10 @@
+name: autogluon_py3
+channels:
+- conda-forge
+- defaults
+dependencies:
+- cudatoolkit=10.1
+- python=3.9
+- pip
+- pip:
+  - flake8

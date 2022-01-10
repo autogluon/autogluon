@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):

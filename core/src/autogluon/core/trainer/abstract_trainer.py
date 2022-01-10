@@ -18,7 +18,7 @@ from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
 from ..scheduler.scheduler_factory import scheduler_factory
 from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
-from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError
+from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
 from ..utils.feature_selection import FeatureSelector
@@ -1021,6 +1021,9 @@ class AbstractTrainer:
         except NoGPUError:
             logger.warning(f'\tNo GPUs available to train {model.name}... Skipping this model.')
             del model
+        except NotEnoughCudaMemoryError:
+            logger.warning(f'\tNot enough CUDA memory available to train {model.name}... Skipping this model.')
+            del model
         except ImportError as err:
             logger.error(f'\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.')
             logger.error(f'\t\t{err}')
@@ -1125,7 +1128,18 @@ class AbstractTrainer:
                 num_trials = 1 if time_limit is None else 1000
                 hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
             # hpo_models (dict): keys = model_names, values = model_paths
-            logger.log(20, f'Hyperparameter tuning model: {model.name} ...')
+            fit_log_message = f'Hyperparameter tuning model: {model.name} ...'
+            if time_limit is not None:
+                if time_limit <= 0:
+                    logger.log(15, f'Skipping {model.name} due to lack of time remaining.')
+                    return []
+                fit_start_time = time.time()
+                if self._time_limit is not None and self._time_train_start is not None:
+                    time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
+                else:
+                    time_left_total = time_limit
+                fit_log_message += f' Tuning model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time.'
+            logger.log(20, fit_log_message)
             try:
                 if isinstance(model, BaggedEnsembleModel):
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)

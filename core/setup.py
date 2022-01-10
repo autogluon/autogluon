@@ -23,30 +23,37 @@ install_requires = [
     'scikit-learn',
     'pandas',
     'tqdm',
-    'graphviz',
 
-    'cython',  # TODO: Do we need cython here? Why is cython not version capped / minned?
-    'ConfigSpace==0.4.19',
-    'tornado>=5.0.1',
     'requests',
     'matplotlib',
-    'paramiko>=2.4',
-    'dask>=2021.09.1',
-    'distributed>=2021.09.1',
+    # dask and distributed==2021.12.0 will cause ray(1.7.0 - 1.9.0) to fail
+    # error:
+    # https://ci.gluon.ai/blue/organizations/jenkins/autogluon/detail/master/702/pipeline/16
+    'dask>=2021.09.1,<=2021.11.2',
+    'distributed>=2021.09.1, <=2021.11.2',
     'boto3',
-    'autograd>=1.3',
-    'dill>=0.3.3,<1.0',
 
     f'autogluon.common=={version}',
 ]
 
-extras_require = {}
+extras_require = {
+    'ray': [
+        'ray>=1.7,<1.8',
+    ],
+}
 
 tests_require = [
     'pytest',
 ]
+
+all_requires = []
+
+for extra_package in ['ray']:
+    all_requires += extras_require[extra_package]
 tests_require = list(set(tests_require))
+all_requires = list(set(all_requires))
 extras_require['tests'] = tests_require
+extras_require['all'] = all_requires
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
@@ -56,10 +63,5 @@ if __name__ == '__main__':
     setup(
         install_requires=install_requires,
         extras_require=extras_require,
-        entry_points={
-            'console_scripts': [
-                'agremote = autogluon.core.scheduler.remote.cli:main',
-            ]
-        },
         **setup_args,
     )

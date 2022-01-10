@@ -2,17 +2,17 @@ import contextlib
 import os
 from pathlib import Path
 import requests
-import errno
 import shutil
 import hashlib
 import zipfile
 import logging
-from .tqdm import tqdm
+from tqdm import tqdm
 import tempfile
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'raise_num_file']
+__all__ = ['unzip', 'download']
+
 
 def unzip(zip_file_path, root=os.path.expanduser('./')):
     """Unzips files located at `zip_file_path` into parent directory specified by `root`.
@@ -26,6 +26,7 @@ def unzip(zip_file_path, root=os.path.expanduser('./')):
                 folders.append(folder)
     folders = folders[0] if len(folders) == 1 else tuple(folders)
     return folders
+
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
     """Download files from a given URL.
@@ -112,52 +113,6 @@ def check_sha1(filename, sha1_hash):
             sha1.update(data)
 
     return sha1.hexdigest() == sha1_hash
-
-
-def mkdir(path):
-    """Make directory at the specified local path with special error handling.
-    """
-    if len(path) > 0:
-        try:
-            os.makedirs(path)
-        except OSError as exc:  # Python >2.5
-            if exc.errno == errno.EEXIST and os.path.isdir(path):
-                pass
-            else:
-                raise
-
-def raise_num_file(nofile_atleast=4096):
-    try:
-        import resource as res
-    except ImportError: #Windows
-        res = None
-    if res is None:
-        return (None,)*2
-    # what is current ulimit -n setting?
-    soft, ohard = res.getrlimit(res.RLIMIT_NOFILE)
-    hard = ohard
-    # increase limit (soft and even hard) if needed
-    if soft < nofile_atleast:
-        soft = nofile_atleast
-
-        if hard < soft:
-            hard = soft
-
-        #logger.warning('setting soft & hard ulimit -n {} {}'.format(soft,hard))
-        try:
-            res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
-        except (ValueError, res.error):
-            try:
-               hard = soft
-               logger.warning('trouble with max limit,  retrying with soft, hard {}, {}'.format(soft, hard))
-               res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
-            except Exception:
-               logger.warning('failed to set ulimit')
-               soft, hard = res.getrlimit(res.RLIMIT_NOFILE)
-
-    return soft, hard
-
-raise_num_file()
 
 
 @contextlib.contextmanager

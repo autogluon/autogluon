@@ -1,4 +1,3 @@
-from .searcher import *
-from .grid_searcher import *
-from .gp_searcher import *
-from .searcher_factory import *
+from .local_grid_searcher import LocalGridSearcher
+from .local_random_searcher import LocalRandomSearcher
+from .searcher_factory import searcher_factory

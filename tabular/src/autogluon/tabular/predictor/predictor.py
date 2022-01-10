@@ -11,7 +11,9 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
@@ -20,21 +22,21 @@ from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
+from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.tabular.models import IModelsModel
 
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac
+from autogluon.core.utils.utils import default_holdout_frac
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict
 from ..learner import AbstractLearner, DefaultLearner
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
 # TODO: num_bag_sets -> ag_args
@@ -193,7 +195,7 @@ class TabularPredictor:
             **kwargs
     ):
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
+        set_logger_verbosity(self.verbosity)
         if sample_weight == AUTO_WEIGHT:  # TODO: update auto_weight strategy and make it the default
             sample_weight = None
             logger.log(15, f"{AUTO_WEIGHT} currently does not use any sample weights.")
@@ -490,6 +492,12 @@ class TabularPredictor:
                                     This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
                                     Particularly useful if disk usage is a concern. By not saving the fold models, bagged models will use only very small amounts of disk space during training.
                                     In many training runs, this will reduce peak disk usage by >10x.
+                            fold_fitting_strategy: (AbstractFoldFittingStrategy default=auto) Whether to fit folds in parallel or in sequential order.
+                                If parallel_local, folds will be trained in parallel with evenly distributed computing resources. This could bring 2-4x speedup compared to SequentialLocalFoldFittingStrategy, but could consume much more memory.
+                                If sequential_local, folds will be trained in sequential.
+                                If auto, strategy will be determined by OS and whether ray is installed or not. MacOS support for parallel_local is unstable, and may crash if enabled.
+                            num_folds_parallel: (int or str, default='auto') Number of folds to be trained in parallel if using ParallelLocalFoldFittingStrategy. Consider lowering this value if you encounter either out of memory issue or CUDA out of memory issue(when trained on gpu).
+                                if 'auto', will try to train all folds in parallel.
 
         feature_metadata : :class:`autogluon.tabular.FeatureMetadata` or str, default = 'infer'
             The feature metadata used in various inner logic in feature preprocessing.
@@ -686,7 +694,7 @@ class TabularPredictor:
         kwargs = self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         if presets:
             if not isinstance(presets, list):
@@ -921,13 +929,14 @@ class TabularPredictor:
             pseudo_data : pd.DataFrame, default = None
                 Data that has been self labeled by Autogluon model and will be incorporated into training during 'fit_extra'
         """
+        self._assert_is_fit('fit_extra')
         time_start = time.time()
 
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_extra_kwargs(kwargs)
 
         verbosity = kwargs.get('verbosity', self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         if verbosity >= 3:
             logger.log(20, '============ fit kwarg info ============')
@@ -1110,6 +1119,10 @@ class TabularPredictor:
         X_test = unlabeled_data.copy()
 
         for i in range(max_iter):
+            if len(X_test) == 0:
+                logger.log(20, f'No more unlabeled data to pseudolabel. Done with pseudolabeling...')
+                break
+
             iter_print = str(i + 1)
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}')
 
@@ -1290,6 +1303,7 @@ class TabularPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `as_pandas` argument.
         """
+        self._assert_is_fit('predict')
         data = self.__get_dataset(data)
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
 
@@ -1324,6 +1338,7 @@ class TabularPredictor:
         May be a :class:`np.ndarray` or :class:`pd.DataFrame` / :class:`pd.Series` depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
         For binary classification problems, the output contains for each datapoint the predicted probabilities of the negative and positive classes, unless you specify `as_multiclass=False`.
         """
+        self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
@@ -1353,6 +1368,7 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
+        self._assert_is_fit('evaluate')
         data = self.__get_dataset(data)
         y_pred_proba = self.predict_proba(data=data, model=model)
         return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent,
@@ -1361,7 +1377,7 @@ class TabularPredictor:
     def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
         Evaluate the provided prediction probabilities against ground truth labels.
-        Evaluation is based on the `eval_metric` previously specified to `fit()`, or default metrics if none was specified.
+        Evaluation is based on the `eval_metric` previously specified in init, or default metrics if none was specified.
 
         Parameters
         ----------
@@ -1506,6 +1522,7 @@ class TabularPredictor:
         -------
         :class:`pd.DataFrame` of model performance summary information.
         """
+        self._assert_is_fit('leaderboard')
         data = self.__get_dataset(data) if data is not None else data
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, silent=silent)
@@ -1528,6 +1545,7 @@ class TabularPredictor:
         -------
         Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
         """
+        self._assert_is_fit('fit_summary')
         # hpo_used = len(self._trainer.hpo_results) > 0
         hpo_used = False  # Disabled until a more memory efficient hpo_results object is implemented.
         model_types = self._trainer.get_models_attribute_dict(attribute='type')
@@ -1705,6 +1723,7 @@ class TabularPredictor:
         >>> test_data_transformed = predictor.transform_features('test.csv', model=model)  # Internal test DataFrame used as input to `model.predict_proba()` during `predictor.predict_proba(test_data, model=model)`
 
         """
+        self._assert_is_fit('transform_features')
         data = self.__get_dataset(data) if data is not None else data
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
                                                    use_orig_features=return_original_features)
@@ -1739,6 +1758,7 @@ class TabularPredictor:
         :class:`pd.Series` of labels if `proba=False` or :class:`pd.DataFrame` of label probabilities if `proba=True`.
 
         """
+        self._assert_is_fit('transform_labels')
         if inverse:
             if proba:
                 labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels, as_pandas=True)
@@ -1843,6 +1863,7 @@ class TabularPredictor:
             'pXX_high': Upper end of XX% confidence interval for true feature importance score (where XX=99 by default).
             'pXX_low': Lower end of XX% confidence interval for true feature importance score.
         """
+        self._assert_is_fit('feature_importance')
         data = self.__get_dataset(data) if data is not None else data
         if (data is None) and (not self._trainer.is_data_saved):
             raise AssertionError(
@@ -1912,6 +1933,7 @@ class TabularPredictor:
         -------
         List of persisted model names.
         """
+        self._assert_is_fit('persist_models')
         return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors,
                                              max_memory=max_memory)
 
@@ -1932,6 +1954,7 @@ class TabularPredictor:
         -------
         List of unpersisted model names.
         """
+        self._assert_is_fit('unpersist_models')
         return self._learner.load_trainer().unpersist_models(model_names=models)
 
     def refit_full(self, model='all'):
@@ -1969,6 +1992,7 @@ class TabularPredictor:
         -------
         Dictionary of original model names -> refit_full model names.
         """
+        self._assert_is_fit('refit_full')
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
         return refit_full_dict
 
@@ -1981,6 +2005,7 @@ class TabularPredictor:
         -------
         String model name of the best model
         """
+        self._assert_is_fit('get_model_best')
         return self._trainer.get_model_best(can_infer=True)
 
     def get_model_full_dict(self):
@@ -1993,6 +2018,7 @@ class TabularPredictor:
         -------
         Dictionary of original model name -> refit full model name.
         """
+        self._assert_is_fit('get_model_full_dict')
         return copy.deepcopy(self._trainer.model_full_dict)
 
     def info(self):
@@ -2008,6 +2034,7 @@ class TabularPredictor:
         -------
         Dictionary of `predictor` metadata.
         """
+        self._assert_is_fit('info')
         return self._learner.get_info(include_model_info=True)
 
     # TODO: Add data argument
@@ -2044,6 +2071,7 @@ class TabularPredictor:
         List of newly trained weighted ensemble model names.
         If an exception is encountered while training an ensemble model, that model's name will be absent from the list.
         """
+        self._assert_is_fit('fit_weighted_ensemble')
         trainer = self._learner.load_trainer()
 
         if trainer.bagged_mode:
@@ -2109,12 +2137,16 @@ class TabularPredictor:
         -------
         :class:`pd.Series` object of the out-of-fold training predictions of the model.
         """
+        self._assert_is_fit('get_oof_pred')
         y_pred_proba_oof = self.get_oof_pred_proba(model=model,
                                                    transformed=transformed,
                                                    as_multiclass=True,
                                                    train_data=train_data,
                                                    internal_oof=internal_oof)
-        return get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type)
+        y_pred_oof = get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type)
+        if transformed:
+            return self._learner.label_cleaner.to_transformed_dtype(y_pred_oof)
+        return y_pred_oof
 
     # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.
@@ -2164,6 +2196,7 @@ class TabularPredictor:
         -------
         :class:`pd.Series` or :class:`pd.DataFrame` object of the out-of-fold training prediction probabilities of the model.
         """
+        self._assert_is_fit('get_oof_pred_proba')
         if model is None:
             model = self.get_model_best()
         if not self._trainer.bagged_mode:
@@ -2274,6 +2307,7 @@ class TabularPredictor:
         Tuple of (:class:`pd.DataFrame`, :class:`pd.Series`) corresponding to the internal data features and internal data labels, respectively.
 
         """
+        self._assert_is_fit('load_data_internal')
         if data == 'train':
             load_X = self._trainer.load_X
             load_y = self._trainer.load_y
@@ -2317,6 +2351,7 @@ class TabularPredictor:
             This should generally be kept as `False` since the most important memory and disk reduction techniques are automatically applied to these models during the original `fit()` call.
 
         """
+        self._assert_is_fit('save_space')
         self._trainer.reduce_memory_size(remove_data=remove_data, remove_fit_stack=remove_fit_stack, remove_fit=True,
                                          remove_info=False, requires_save=requires_save,
                                          reduce_children=reduce_children)
@@ -2357,6 +2392,7 @@ class TabularPredictor:
             Set `dry_run=False` to perform the deletions.
 
         """
+        self._assert_is_fit('delete_models')
         if models_to_keep == 'best':
             models_to_keep = self._trainer.model_best
             if models_to_keep is None:
@@ -2368,10 +2404,12 @@ class TabularPredictor:
     # TODO: v0.1 add documentation for arguments
     def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
         """Returns the list of model names trained in this `predictor` object."""
+        self._assert_is_fit('get_model_names')
         return self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
 
     def get_model_names_persisted(self) -> list:
         """Returns the list of model names which are persisted in memory."""
+        self._assert_is_fit('get_model_names_persisted')
         return list(self._learner.load_trainer().models.keys())
 
     def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limit=None, hyperparameters=None,
@@ -2452,6 +2490,7 @@ class TabularPredictor:
         >>> predictor.predict(test_data, model=model_to_deploy)
 
         """
+        self._assert_is_fit('distill')
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
         return self._learner.distill(X=train_data, X_val=tuning_data, time_limit=time_limit,
@@ -2484,6 +2523,7 @@ class TabularPredictor:
         -------
         The file name with the full path to the saved graphic
         """
+        self._assert_is_fit('plot_ensemble_model')
         try:
             import pygraphviz
         except:
@@ -2664,7 +2704,7 @@ class TabularPredictor:
             If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may run into numerous issues if attempting this.
         """
         if verbosity is not None:
-            set_logger_verbosity(verbosity, logger=logger)  # Reset logging after load (may be in new Python session)
+            set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")
 
@@ -2933,7 +2973,7 @@ class TabularPredictor:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bag_folds is None:
-                num_bag_folds = min(10, max(5, math.floor(num_train_rows / 100)))
+                num_bag_folds = min(8, max(5, math.floor(num_train_rows / 100)))
             if num_stack_levels is None:
                 num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
         if num_bag_folds is None:
@@ -3029,6 +3069,14 @@ class TabularPredictor:
         cls, columns = imodels.explain_classification_errors(data, predictions, labels, print_rules=print_rules)
         return cls
 
+    def _assert_is_fit(self, message_suffix: str = None):
+        if not self._learner.is_fit:
+            error_message = "Predictor is not fit. Call `.fit` before calling"
+            if message_suffix is None:
+                error_message = f"{error_message} this method."
+            else:
+                error_message = f"{error_message} `.{message_suffix}`."
+            raise AssertionError(error_message)
 
 # Location to store WIP functionality that will be later added to TabularPredictor
 class _TabularPredictorExperimental(TabularPredictor):
