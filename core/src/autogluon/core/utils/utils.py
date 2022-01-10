@@ -311,7 +311,9 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     elif problem_type == QUANTILE:
         y_pred = y_pred_proba
     else:
-        y_pred = np.argmax(y_pred_proba, axis=1)
+        y_pred = []
+        if not len(y_pred_proba) == 0:
+            y_pred = np.argmax(y_pred_proba, axis=1)
     return y_pred
 
 
