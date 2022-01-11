@@ -388,13 +388,19 @@ class CloudPredictor:
         ----------
         save_path: str
             Path to save the model.
-            If None, CloudPredictor will create a folder for the model.
+            If None, CloudPredictor will create a folder 'AutogluonModels' for the model under `local_output_path`.
+
+        Returns
+        -------
+        save_path: str
+            Path to the saved model.
         """
         assert self._cloud_predictor_path, 'No cloud trained model found.'
         path = self._cloud_predictor_path
         if not save_path:
             save_path = self.local_output_path
-        self._download_predictor(path, save_path)
+        save_path = self._download_predictor(path, save_path)
+        return save_path
 
     def _get_local_predictor_cls(self):
         raise NotImplementedError
@@ -412,7 +418,7 @@ class CloudPredictor:
         Returns
         -------
         AutoGluon Predictor,
-        TabularPredictor or TextPredictor based on `predictor_type`
+            TabularPredictor or TextPredictor based on `predictor_type`
         """
         predictor_cls = self._get_local_predictor_cls()
         local_model_path = self.download_trained_predictor(save_path)
@@ -819,6 +825,7 @@ class CloudPredictor:
         save_path = os.path.join(save_path, 'AutogluonModels')
         file.extractall(save_path)
         file.close()
+        return save_path
 
     def save(self, silent=False):
         """
