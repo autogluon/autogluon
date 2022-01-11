@@ -11,7 +11,7 @@ SAGEMAKER_TRUST_REPLATIONSHIP = {
         }
     ]
 }
-
+# FIXME: Trim down permissions to be minimal
 SAGEMAKER_POLICIES = [
     'arn:aws:iam::aws:policy/AmazonS3FullAccess',
     'arn:aws:iam::aws:policy/AmazonSageMakerFullAccess'

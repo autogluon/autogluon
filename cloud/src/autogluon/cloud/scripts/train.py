@@ -11,7 +11,7 @@ from autogluon.text import TextPredictor
 def get_input_path(path):
     file = os.listdir(path)[0]
     if len(os.listdir(path)) > 1:
-        print(f"WARN: more than one file is found in {channel} directory")
+        raise ValueError(f"WARN: more than one file is found in {channel} directory")
     print(f"Using {file}")
     filename = f"{path}/{file}"
     return filename
@@ -63,29 +63,22 @@ if __name__ == "__main__":
 
     # ---------------------------------------------------------------- Training
 
-    predictor_cls = config["predictor_cls"]
+    predictor_type = config["predictor_type"]
     predictor_init_args = config["predictor_init_args"]
     predictor_init_args["path"] = args.model_dir
     predictor_fit_args = config["predictor_fit_args"]
-    if predictor_cls == 'tabular':
+    assert predictor_type in ['tabular', 'text']
+    if predictor_type == 'tabular':
         predictor_cls = TabularPredictor
-    elif predictor_cls == 'text':
+    elif predictor_type == 'text':
         predictor_cls = TextPredictor
 
     train_file = get_input_path(args.training_dir)
-    if predictor_cls == TabularPredictor:
-        train_data = TabularDataset(train_file)
-    elif predictor_cls == TextPredictor:
-        train_data = load(train_file)
 
-    tune_data = None
+    tune_file = None
     if args.tune_dir:
         tune_file = get_input_path(args.tune_dir)
-        if predictor_cls == TabularPredictor:
-            tune_data = TabularDataset(tune_file)
-        elif predictor_cls == TextPredictor:
-            tune_data = load(tune_file)
-    predictor = predictor_cls(**predictor_init_args).fit(train_data, tuning_data=tune_data, **predictor_fit_args)
+    predictor = predictor_cls(**predictor_init_args).fit(train_file, tuning_data=tune_file, **predictor_fit_args)
 
     if predictor_cls == TabularPredictor:
         if config.get("leaderboard", False):

@@ -1,3 +1,5 @@
+from autogluon.core.constants import REGRESSION
+from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.tabular import TabularPredictor
 from io import BytesIO, StringIO
 import pandas as pd
@@ -50,9 +52,12 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
             data = pd.concat([new_row, old_rows]).reset_index(drop=True)
             data.columns = column_names
 
-    pred = model.predict(data)
-    pred_proba = model.predict_proba(data)
-    prediction = pd.concat([pred, pred_proba], axis=1)
+    if model.problem_type != REGRESSION:
+        pred_proba = model.predict_proba(data)
+        pred = get_pred_from_proba_df(pred_proba, problem_type=model.problem_type)
+        prediction = pd.concat([pred, pred_proba], axis=1)
+    else:
+        prediction = model.predict(data)
     if isinstance(prediction, pd.Series):
         prediction = prediction.to_frame()
 

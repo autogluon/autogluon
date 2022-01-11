@@ -12,6 +12,7 @@ from .deserializers import PandasDeserializer
 from .sagemaker_utils import retrieve_latest_framework_version
 
 
+# Framework documentation: https://sagemaker.readthedocs.io/en/stable/api/training/estimators.html#sagemaker.estimator.Framework
 class AutoGluonSagemakerEstimator(Framework):
     def __init__(
         self,
@@ -77,6 +78,7 @@ class AutoGluonRealtimePredictor(Predictor):
         )
 
 
+# SageMaker can only take in csv format for batch transformation because files need to be easily splitable to  be batch processed.
 class AutoGluonBatchPredictor(Predictor):
     def __init__(self, *args, **kwargs):
         super().__init__(
@@ -86,6 +88,7 @@ class AutoGluonBatchPredictor(Predictor):
         )
 
 
+# Documentation for FrameworkModel: https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.FrameworkModel
 class AutoGluonSagemakerInferenceModel(FrameworkModel):
     def __init__(
         self,
@@ -95,16 +98,18 @@ class AutoGluonSagemakerInferenceModel(FrameworkModel):
         region,
         framework_version,
         instance_type,
+        image_uri=None,
         **kwargs
     ):
-        image_uri = image_uris.retrieve(
-            "autogluon",
-            region=region,
-            version=framework_version,
-            py_version="py37",
-            image_scope="inference",
-            instance_type=instance_type,
-        )
+        if not image_uri:
+            image_uri = image_uris.retrieve(
+                "autogluon",
+                region=region,
+                version=framework_version,
+                py_version="py37",
+                image_scope="inference",
+                instance_type=instance_type,
+            )
         super().__init__(
             model_data,
             image_uri,
@@ -118,15 +123,15 @@ class AutoGluonSagemakerInferenceModel(FrameworkModel):
         instance_count,
         instance_type,
         strategy='MultiRecord',
-        max_payload=6,
-        max_concurrent_transforms=1,
+        max_payload=6,  # Maximum size of the payload in a single HTTP request to the container in MB. Will split into multiple batches if a request is more than max_payload
+        max_concurrent_transforms=1,  # The maximum number of HTTP requests to be made to each individual transform container at one time.
         accept='application/json',
         assemble_with='Line',
         **kwargs
     ):
         return super().transformer(
-            instance_count,
-            instance_type,
+            instance_count=instance_count,
+            instance_type=instance_type,
             strategy=strategy,
             max_payload=max_payload,
             max_concurrent_transforms=max_concurrent_transforms,

@@ -1,6 +1,7 @@
-import pandas as pd
-from sagemaker.deserializers import SimpleBaseDeserializer
 import io
+import pandas as pd
+
+from sagemaker.deserializers import SimpleBaseDeserializer
 
 
 class PandasDeserializer(SimpleBaseDeserializer):

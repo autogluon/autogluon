@@ -11,7 +11,6 @@ def create_sagemaker_role_and_attach_policies(role_name, trust_relationship, pol
             RoleName=role_name,
             AssumeRolePolicyDocument=json.dumps(trust_relationship),
             Description='AutoGluon CloudPredictor role',
-
         )
     except ClientError as e:
         if not e.response['Error']['Code'] == 'EntityAlreadyExists':

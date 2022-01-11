@@ -16,6 +16,14 @@ class FormatConverter(ABC):
     def convert(self, data: Union[str, pd.DataFrame], output_path: str,) -> str:
         pass
 
+    @staticmethod
+    def is_csv_file(filename: str) -> bool:
+        return filename.endswith('.csv') or filename.endswith('.tsv')
+
+    @staticmethod
+    def is_parquet_file(filename: str) -> bool:
+        return filename.endswith('.parquet') or filename.endswith('.pq')
+
 
 class CSVConverter(FormatConverter):
 
@@ -24,51 +32,53 @@ class CSVConverter(FormatConverter):
         return 'csv'
 
     def convert(self, data: Union[str, pd.DataFrame], output_path: str, filename: str) -> str:
+        if type(data) == str:
+            data = os.path.expanduser(data)
+            if os.path.isfile(data):
+                if FormatConverter.is_parquet_file(data):
+                    data = pd.read_parquet(data)
+                elif FormatConverter.is_csv_file(data):
+                    return data
+                else:
+                    ext = data.split('.')[-1]
+                    raise ValueError(f'{ext} file type is not supported.')
+            else:
+                raise ValueError('Please provide a path to a file.')
+
         if isinstance(data, pd.DataFrame):
             path = os.path.join(output_path, f'{filename}.{self.ext}')
             data.to_csv(path, index=None)
             return path
-        elif type(data) == str:
-            data = os.path.expanduser(data)
-            if os.path.isfile(data):
-                if data.endswith('parquet') or data.endswith('pq'):
-                    df = pd.read_parquet(data)
-                    return self.convert(df, output_path, filename)
-                elif data.endswith('csv') or data.endswith('tsv'):
-                    return data
-                else:
-                    raise ValueError(f'{data} type is not supported.')
-            else:
-                raise ValueError(f'{data} type is not supported.')
-        else:
-            raise ValueError(f'{data} is not supported.')
+
+        raise ValueError(f'{type(data)} is not supported.')
 
 
-class PauquetConverter(FormatConverter):
+class ParquetConverter(FormatConverter):
 
     @property
     def ext(self) -> str:
         return 'parquet'
 
     def convert(self, data: Union[str, pd.DataFrame], output_path: str, filename: str) -> str:
+        if type(data) == str:
+            data = os.path.expanduser(data)
+            if os.path.isfile(data):
+                if FormatConverter.is_parquet_file(data):
+                    return data
+                elif FormatConverter.is_csv_file(data):
+                    data = pd.read_csv(data)
+                else:
+                    ext = data.split('.')[-1]
+                    raise ValueError(f'{ext} file type is not supported.')
+            else:
+                raise ValueError('Please provide a path to a file.')
+
         if isinstance(data, pd.DataFrame):
             path = os.path.join(output_path, f'{filename}.{self.ext}')
             data.to_parquet(path)
             return path
-        elif type(data) == str:
-            data = os.path.expanduser(data)
-            if os.path.isfile(data):
-                if data.endswith('parquet') or data.endswith('pq'):
-                    return data
-                elif data.endswith('csv') or data.endswith('tsv'):
-                    df = pd.read_csv(data)
-                    return self.convert(df, output_path, filename)
-                else:
-                    raise ValueError(f'{data} type is not supported.')
-            else:
-                raise ValueError(f'{data} type is not supported.')
-        else:
-            raise ValueError(f'{data} is not supported.')
+
+        raise ValueError(f'{type(data)} is not supported.')
 
 
 class FormatConverterFactory():
@@ -79,4 +89,4 @@ class FormatConverterFactory():
         if converter_type == 'csv':
             return CSVConverter()
         elif converter_type == 'parquet':
-            return PauquetConverter()
+            return ParquetConverter()

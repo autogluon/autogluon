@@ -2,7 +2,7 @@ import boto3
 
 
 def is_s3_url(path):
-    if type(path) == str and (path[:2] == 's3') and ('://' in path[:6]):
+    if (path[:2] == 's3') and ('://' in path[:6]):
         return True
     return False
 

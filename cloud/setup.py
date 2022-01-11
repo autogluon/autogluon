@@ -1,98 +1,40 @@
-import io
+#!/usr/bin/env python
+###########################
+# This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import os
-import re
+from setuptools import setup
+import importlib.util
+filepath = os.path.abspath(os.path.dirname(__file__))
+filepath_import = os.path.join(filepath, '..', 'core', 'src', 'autogluon', 'core', '_setup_utils.py')
+spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
+ag = importlib.util.module_from_spec(spec)
+# Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
+spec.loader.exec_module(ag)
+###########################
 
-from setuptools import setup, find_packages
+version = '0.1'
+version = ag.update_version(version, use_file_if_exists=False, create_file=True)
 
-AUTOGLUON = 'autogluon'
-
-PYTHON_REQUIRES = '>=3.7, <3.10'
-
-
-def read(*names, **kwargs):
-    with io.open(
-            os.path.join(os.path.dirname(__file__), *names),
-            encoding=kwargs.get("encoding", "utf8")
-    ) as fp:
-        return fp.read()
-
-
-def find_version(*file_paths):
-    version_file = read(*file_paths)
-    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
-                              version_file, re.M)
-    if version_match:
-        return version_match.group(1)
-    raise RuntimeError("Unable to find version string.")
-
-
-def get_setup_args(version, submodule):
-    name = f'{AUTOGLUON}.{submodule}'
-    setup_args = dict(
-        name=name,
-        version=version,
-        author='AutoGluon Community',
-        url='https://github.com/awslabs/autogluon',
-        description='AutoML for Text, Image, and Tabular Data',
-        # long_description=long_description,
-        long_description_content_type='text/markdown',
-        license='Apache-2.0',
-        license_files=('../LICENSE', '../NOTICE'),
-
-        # Package info
-        packages=find_packages('src'),
-        package_dir={'': 'src'},
-        namespace_packages=[AUTOGLUON],
-        zip_safe=True,
-        include_package_data=True,
-        python_requires=PYTHON_REQUIRES,
-        package_data={AUTOGLUON: [
-            'LICENSE',
-        ]},
-        classifiers=[
-            "Development Status :: 4 - Beta",
-            "Intended Audience :: Education",
-            "Intended Audience :: Developers",
-            "Intended Audience :: Science/Research",
-            "Intended Audience :: Customer Service",
-            "Intended Audience :: Financial and Insurance Industry",
-            "Intended Audience :: Healthcare Industry",
-            "Intended Audience :: Telecommunications Industry",
-            "License :: OSI Approved :: Apache Software License",
-            "Operating System :: MacOS",
-            "Operating System :: Microsoft :: Windows",
-            "Operating System :: POSIX",
-            "Operating System :: Unix",
-            'Programming Language :: Python :: 3',
-            "Programming Language :: Python :: 3.6",
-            "Programming Language :: Python :: 3.7",
-            "Topic :: Software Development",
-            "Topic :: Scientific/Engineering :: Artificial Intelligence",
-            "Topic :: Scientific/Engineering :: Information Analysis",
-            "Topic :: Scientific/Engineering :: Image Recognition",
-        ],
-        project_urls={
-            'Documentation': 'https://auto.gluon.ai',
-            'Bug Reports': 'https://github.com/awslabs/autogluon/issues',
-            'Source': 'https://github.com/awslabs/autogluon/',
-            'Contribute!': 'https://github.com/awslabs/autogluon/blob/master/CONTRIBUTING.md',
-        },
-    )
-    return setup_args
-
-
-version = find_version('src', 'autogluon', 'cloud', '__init__.py')
 submodule = 'cloud'
-requirements = [
-    'autogluon.common'
-    'boto3>=1.17',
-    'pandas>=1.0.0,<2.0',
+install_requires = [
+    # version ranges added in ag.get_dependency_version_ranges()
+    'autogluon.common<0.5'
+    'boto3',
+    'pandas',
     'sagemaker>=2.66.1',
 ]
 
+extras_require = dict()
+
+install_requires = ag.get_dependency_version_ranges(install_requires)
+for key in extras_require:
+    extras_require[key] = ag.get_dependency_version_ranges(extras_require[key])
+
 if __name__ == '__main__':
-    setup_args = get_setup_args(version=version, submodule=submodule)
+    ag.create_version_file(version=version, submodule=submodule)
+    setup_args = ag.default_setup_args(version=version, submodule=submodule)
     setup(
-        install_requires=requirements,
+        install_requires=install_requires,
+        extras_require=extras_require,
         **setup_args,
     )
