@@ -65,7 +65,7 @@ bulk_result = predictor.predict(test_dataset)
 print(bulk_result)
 ```
 
-An extra column will be included in bulk prediction, indicate the corresponding image for the row. There will be (# image) rows in the result, each row includes `class`, `score`, `id` and `image` for prediction class, prediction confidence, class id, and image path respectively.
+An extra column will be included in bulk prediction, to indicate the corresponding image for the row. There will be (# image) rows in the result, each row includes `class`, `score`, `id` and `image` for prediction class, prediction confidence, class id, and image path respectively.
 
 
 ## Generate image features with a classifier

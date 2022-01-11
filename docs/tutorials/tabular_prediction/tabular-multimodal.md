@@ -28,7 +28,7 @@ from autogluon.core.utils.loaders import load_zip
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 ```
 
-Now that the data is download and unzipped, lets take a look at the contents:
+Now that the data is download and unzipped, let's take a look at the contents:
 
 
 ```{.python .input}
@@ -124,7 +124,7 @@ train_data.head(3)
 
 ## Analyzing an example row
 
-Now that we have preprocessed the image column, lets take a look at an example row of data and display the text description and the picture.
+Now that we have preprocessed the image column, let's take a look at an example row of data and display the text description and the picture.
 
 
 ```{.python .input}
@@ -158,7 +158,7 @@ train_data = train_data.sample(500, random_state=0)
 
 ## Constructing the FeatureMetadata
 
-Next, lets see what AutoGluon infers the feature types to be by constructing a FeatureMetadata object from the training data:
+Next, let's see what AutoGluon infers the feature types to be by constructing a FeatureMetadata object from the training data:
 
 
 ```{.python .input}
