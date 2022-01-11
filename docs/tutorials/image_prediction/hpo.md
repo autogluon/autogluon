@@ -4,6 +4,7 @@
 While the :ref:`sec_imgquick` introduced basic usage of AutoGluon `fit`, `evaluate`, `predict` with default configurations, this tutorial dives into the various options that you can specify for more advanced control over the fitting process.
 
 These options include:
+
 - Defining the search space of various hyperparameter values for the training of neural networks
 - Specifying how to search through your chosen hyperparameter space
 - Specifying how to schedule jobs to train a network under a particular hyperparameter configuration.

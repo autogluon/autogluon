@@ -26,12 +26,12 @@ For most of these models, CUDA will have to be installed and some models may nee
 As an open-source library, AutoGluon can be run on any machine including your laptop. Currently it is not necessary to use a GPU to train TabularPredictor so CPU machines are fine (in contrast, TextPredictor/ImagePredictor/ObjectDetector require GPUs). Most Tabular issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for Tabular: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
 
 
-### How to resolve memory issues?
+### How can I resolve memory issues?
 
 See ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-memory-issues).
 
 
-### How to resolve disk space issues?
+### How can I resolve disk space issues?
 
 See ["If you encounter disk space issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-disk-space-issues).
 
@@ -55,7 +55,7 @@ Details are provided in the following paper:
 [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/abs/2003.06505). *Arxiv*, 2020.
 
 
-### How to view more detailed logs of what is happening during fit?
+### How can I view more detailed logs of what is happening during fit?
 
 Specify the argument `verbosity = 4` in `fit()`.
 
@@ -99,7 +99,7 @@ Additionally, you can explain particular AutoGluon predictions using [Shapely va
 
 ### How can I perform inference on a file that won't fit in memory?
 
-The Tabular Dataset API works with pandas Dataframes, which supports chunking data into sizes that fit in memory.
+The Tabular Dataset API works with pandas DataFrames, which supports chunking data into sizes that fit in memory.
 Here's an example of one such chunk-based inference:
 
 ```{.python .input}
@@ -153,7 +153,9 @@ You can specify the `sample_weight` and `weight_evaluation` [arguments](../../ap
 
 ### I'm receiving C++ warning spam during training or inference
 
+```
 Warning message: [W ParallelNative.cpp:206] Warning: Cannot set number of intraop threads after parallel work has started or after set_num_threads call when using native parallel backend (function set_num_threads)
+```
 
 This can happen from downstream PyTorch dependencies (OpenMP) when using a specific environment. If you are using PyTorch 1.7, Mac OS X, Python 3.6/3.7, and using the PyTorch DataLoader, then you may get this warning spam. We have only seen this occur with the TabTransformer model. Reference open [torch issue](https://github.com/pytorch/pytorch/issues/46409).
 
