@@ -147,7 +147,7 @@ class CloudPredictor:
         return 's3://' + path
 
     def _retrieve_latest_framework_version(self, framework_type='training'):
-        retrieve_latest_framework_version(framework_type)
+        return retrieve_latest_framework_version(framework_type)
 
     def _parse_framework_version(self, framework_version, framework_type):
         if framework_version == 'latest':
@@ -477,6 +477,7 @@ class CloudPredictor:
             Any extra arguments needed to pass to deploy.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.Model.deploy for all options
         """
+        assert self.endpoint is None, 'There is an endpoint already attached. Either detach it with `detach` or clean it up with `cleanup_deployment`'
         if not predictor_path:
             assert self.get_fit_job_status(self._fit_job_name) == 'Completed', 'Fit job not completed.'
         if not predictor_path:
@@ -490,8 +491,8 @@ class CloudPredictor:
         predictor_path = self._upload_predictor(predictor_path, f'endpoints/{endpoint_name}/predictor')
         self._cloud_predictor_path = predictor_path
 
-        assert self._train_script_path is not None
-        entry_point = self._train_script_path
+        assert self._serve_script_path is not None
+        entry_point = self._serve_script_path
         user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
         if user_entry_point:
             logger.warning(f'Providing a custom entry point could break the deployment. Please refer to `{entry_point}` for our implementation')
@@ -527,19 +528,38 @@ class CloudPredictor:
         else:
             logger.log(20, 'Endpoint being created asynchronously. You can check the status using AWS SageMaker console')
 
-    def attach_endpoint(self, endpoint_name):
+    def attach_endpoint(self, endpoint):
         """
         Attach the current CloudPredictor to an existing SageMaker endpoint.
 
         Parameters
         ----------
-        endpoint_name: str
-            The name of the endpoint being attached to.
+        endpoint: str or  :class:`AutoGluonRealtimePredictor`
+            If str is passed, it should be the name of the endpoint being attached to.
         """
-        self.endpoint = AutoGluonRealtimePredictor(
-            endpoint_name=endpoint_name,
-            sagemaker_session=self.sagemaker_session,
-        )
+        assert self.endpoint is None, 'There is an endpoint already attached. Either detach it with `detach` or clean it up with `cleanup_deployment`'
+        if type(endpoint) == str:
+            self.endpoint = AutoGluonRealtimePredictor(
+                endpoint_name=endpoint,
+                sagemaker_session=self.sagemaker_session,
+            )
+        elif isinstance(endpoint, AutoGluonRealtimePredictor):
+            self.endpoint = endpoint
+        else:
+            raise ValueError('Please provide either an endpoint name or an endpoint of type `AutoGluonRealtimePredictor`')
+
+    def detach_endpoint(self):
+        """
+        Detach the current endpoint and return it.
+
+        Returns
+        -------
+        `AutoGluonRealtimePredictor` object.
+        """
+        assert self.endpoint is not None
+        detached_endpoint = self.endpoint
+        self.endpoint = None
+        return detached_endpoint
 
     def predict_real_time(self, test_data, accept='application/x-parquet'):
         """
@@ -816,7 +836,7 @@ class CloudPredictor:
             self._endpoint_saved = self.endpoint_name
             self.endpoint = None
 
-        save_pkl.save(path=path + predictor_file_name, object=self)
+        save_pkl.save(path=os.path.join(path, predictor_file_name), object=self)
         self.sagemaker_session = temp_session
         self._region = temp_region
         if temp_endpoint:
@@ -845,17 +865,19 @@ class CloudPredictor:
             raise ValueError("path cannot be None in load()")
 
         path = setup_outputdir(path, warn_if_exist=False)  # replace ~ with absolute path if it exists
-        predictor: CloudPredictor = load_pkl.load(path=path + cls.predictor_file_name)
+        predictor: CloudPredictor = load_pkl.load(path=os.path.join(path, cls.predictor_file_name))
         predictor.sagemaker_session = sagemaker.session.Session()
-        predictor.region = predictor.sagemaker_session.boto_region_name
-        if hasattr(predictor, 'endpoint_saved') and predictor.endpoint_saved:
-            predictor.endpoint = predictor.attach_endpoint(predictor.endpoint_saved)
-            predictor.endpoint_saved = None
+        predictor._region = predictor.sagemaker_session.boto_region_name
+        if hasattr(predictor, '_endpoint_saved') and predictor._endpoint_saved:
+            predictor.attach_endpoint(predictor._endpoint_saved)
+            predictor._endpoint_saved = None
         # TODO: Version compatibility check
         return predictor
 
 
 class TabularCloudPredictor(CloudPredictor):
+
+    predictor_file_name = 'TabularCloudPredictor.pkl'
 
     def _setup_predictor_type(self):
         self.predictor_type = 'tabular'
@@ -869,6 +891,8 @@ class TabularCloudPredictor(CloudPredictor):
 
 
 class TextCloudPredictor(CloudPredictor):
+
+    predictor_file_name = 'TextCloudPredictor.pkl'
 
     def _setup_predictor_type(self):
         self.predictor_type = 'text'

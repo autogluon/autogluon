@@ -11,7 +11,7 @@ Also, you need to have an AWS account with the credentials being setup. For more
 
 ## Training with CloudPredictor
 To train AutoGluon models with CloudPredictor, we specify the init and fit arguments first. These arguments are the same arguments that you would use for a Tabular/Text Predictor. For a quick start: checkout :ref:`sec_tabularquick` and :ref:`sec_textprediction_beginner`
-For example:
+For example, for a TabularCloudPredictor:
 ```{.python}
 time_limit = 60
 predictor_init_args = dict(
@@ -24,18 +24,19 @@ predictor_fit_args = dict(
     presets='best_quality'
 )
 ```
-Then we init the CloudPredictor with the type of task we want ('tabular' in the following example) and call `fit` on it:
+Then we init the TabularCloudPredictor and call `fit` on it:
 ```{.python}
-from autogluon.cloud import CloudPredictor
-cloud_predictor = CloudPredictor('tabular').fit(
+from autogluon.cloud import TabularCloudPredictor
+tabular_cloud_predictor = TabularCloudPredictor().fit(
     predictor_init_args,
     predictor_fit_args,
     framework_version='latest',
     #  ml.m5.large is an instance with 2 vCPU and 8 GiB of memory. It will cost $0.115/hour for training.
-    #  For a list of all instances' specs and pricings, check out: https://aws.amazon.com/sagemaker/pricing/
+    #  For a list of all instances' specs and pricing, check out: https://aws.amazon.com/sagemaker/pricing/
     instance_type='ml.m5.large',
 )
 ```
+TextCloudPredictor works just like the TabularCloudPredictor. We will focus on the TabularCloudPredictor for simplicity in this tutorial.
 
 ## Predicting with CloudPredictor
 We can use the trained CloudPredictor to predict on new data with either real-time inference or batch transformation.
@@ -45,7 +46,7 @@ Real-time inference is ideal for inference workloads where you have real-time, i
 
 Deploy an endpoint with the previously trained CloudPredictor is simple:
 ```{.python}
-cloud_predictor.deploy(
+tabular_cloud_predictor.deploy(
     instance_type='ml.m5.large',
     framework_version='latest',
     )
@@ -54,26 +55,24 @@ cloud_predictor.deploy(
 Once the model is deployed, we can call `predict_real_time()` on it:
 ```{.python}
 test_data = 'test.csv'
-cloud_predictor.predict_real_time(test_data)
+tabular_cloud_predictor.predict_real_time(test_data)
 import pandas as pd
-cloud_predictor.predict_real_time(pd.read_csv(test_data))  # passing a datafrme
+tabular_cloud_predictor.predict_real_time(pd.read_csv(test_data))  # passing a dataframe
 ```
 
 Remember to shut down the deployed endpoint:
 ```{.python}
-cloud_predictor.cleanup_deployment()
+tabular_cloud_predictor.cleanup_deployment()
 ```
 
 ### Predicting with Batch Transformation
 If the goal is to generate predictions from a trained model on a large dataset where where maximizing bulk throughput of predictions is important, then the batch transform functionality may be easier, more scalable, and more appropriate.
 
-**Important: SageMaker batch transformation does not support passing data with headers. Therefore, we will need to pass the test data without the headers and making sure columns are in the same order as the training data.**
-
 Batch transformation with CloudPredictor is simple too:
 ```{.python}
-cloud_predictor.predict('test_no_header.csv')
+tabular_cloud_predictor.predict('test.csv')
 # The results will be stored in s3, CloudPredictor can download the result for you
-cloud_predictor.download_predict_results()
+tabular_cloud_predictor.download_predict_results()
 ```
 
 ## To a Local Predictor
@@ -82,7 +81,7 @@ CloudPredictor does not require installation of AutoGluon locally. However, if y
 **Important: make sure the local AutoGluon has the same version as the framework version being used during `fit()`**
 You can check the framework version used to train the CloudPredictor by
 ```{.python}
-info = cloud_predictor.info()
+info = tabular_cloud_predictor.info()
 print(info['recent_fit_job']['framework_version'])
 ```
 You can check the local AutoGluon version installed by
@@ -91,6 +90,6 @@ pip freeze | grep autogluon
 ```
 Once you've made sure the local AutoGluon version matches the CloudPredictor `fit()` framework version. Get a local predictor is easy:
 ```{.python}
-local_predictor = cloud_predictor.to_local_predictor()
+local_predictor = tabular_cloud_predictor.to_local_predictor()
 local_predictor.leaderboard()
 ```

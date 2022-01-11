@@ -68,6 +68,7 @@ class AutoGluonSagemakerEstimator(Framework):
         return init_params
 
 
+# Predictor documentation: https://sagemaker.readthedocs.io/en/stable/api/inference/predictors.html
 class AutoGluonRealtimePredictor(Predictor):
     def __init__(self, *args, **kwargs):
         super().__init__(
@@ -78,6 +79,7 @@ class AutoGluonRealtimePredictor(Predictor):
         )
 
 
+# Predictor documentation: https://sagemaker.readthedocs.io/en/stable/api/inference/predictors.html
 # SageMaker can only take in csv format for batch transformation because files need to be easily splitable to  be batch processed.
 class AutoGluonBatchPredictor(Predictor):
     def __init__(self, *args, **kwargs):

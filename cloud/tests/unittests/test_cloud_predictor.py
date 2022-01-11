@@ -1,6 +1,6 @@
 import os
 import pytest
-from autogluon.cloud import CloudPredictor
+from autogluon.cloud import TabularCloudPredictor, TextCloudPredictor
 
 
 here = os.path.realpath(os.path.dirname(__file__))
@@ -22,6 +22,9 @@ def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args
 
     cloud_predictor.deploy()
     cloud_predictor.predict_real_time(test_data)
+    detached_endpoint = cloud_predictor.detach_endpoint()
+    cloud_predictor.attach_endpoint(detached_endpoint)
+    cloud_predictor.predict_real_time(test_data)
     cloud_predictor.cleanup_deployment()
 
     cloud_predictor.predict(test_data)
@@ -32,7 +35,7 @@ def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args
 def test_tabular():
     train_data = os.path.join(res, 'train.csv')
     tune_data = os.path.join(res, 'tune.csv')
-    test_data = os.path.join(res, 'test.csv')
+    test_data = os.path.join(res, 'sample_adult.csv')
     time_limit = 60
 
     predictor_init_args = dict(
@@ -44,7 +47,7 @@ def test_tabular():
         tuning_data=tune_data,
         time_limit=time_limit,
     )
-    cloud_predictor = CloudPredictor('tabular')
+    cloud_predictor = TabularCloudPredictor()
     _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, test_data)
 
 
@@ -64,5 +67,5 @@ def test_text():
         tuning_data=tune_data,
         time_limit=time_limit
     )
-    cloud_predictor = CloudPredictor('text')
+    cloud_predictor = TextCloudPredictor()
     _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, test_data, fit_instance_type='ml.g4dn.2xlarge')

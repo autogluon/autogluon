@@ -1,1 +1,1 @@
-from .predictor import CloudPredictor
+from .predictor import TabularCloudPredictor, TextCloudPredictor

@@ -5,6 +5,7 @@ from botocore.exceptions import ClientError
 
 
 def create_sagemaker_role_and_attach_policies(role_name, trust_relationship, policies):
+    '''This function will create the IAM role (if not already exists) and attach all the policies'''
     iam = boto3.client('iam')
     try:
         iam.create_role(
@@ -17,6 +18,7 @@ def create_sagemaker_role_and_attach_policies(role_name, trust_relationship, pol
             raise e
     for policy in policies:
         try:
+            # This does nothing if the policy is already attached
             iam.attach_role_policy(
                 PolicyArn=policy,
                 RoleName=role_name
