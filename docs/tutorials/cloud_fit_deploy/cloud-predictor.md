@@ -82,7 +82,7 @@ CloudPredictor does not require installation of AutoGluon locally. However, if y
 You can check the framework version used to train the CloudPredictor by
 ```{.python}
 info = tabular_cloud_predictor.info()
-print(info['recent_fit_job']['framework_version'])
+print(info['fit_job']['framework_version'])
 ```
 You can check the local AutoGluon version installed by
 ```{.bash}
