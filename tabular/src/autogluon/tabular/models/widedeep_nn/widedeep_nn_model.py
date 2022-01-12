@@ -4,10 +4,12 @@ import numpy as np
 import pytorch_widedeep.training.trainer
 import torch
 from autogluon.common.features.types import R_OBJECT
+from pytorch_widedeep.callbacks import ModelCheckpoint
 from pytorch_widedeep.models import FTTransformer, TabPerceiver
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.files import make_temp_directory
 from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from .utils import set_seed
 
@@ -107,26 +109,41 @@ class WideDeepNNModel(AbstractModel):
         # TODO: confirm if this is reproducible on linux
         pytorch_widedeep.training.trainer.n_cpus = 0
 
+        # TODO: move to parameters
         n_epochs = 10
         lr = 1e-2
         bs = 256
-        tab_opt = torch.optim.Adam(model.deeptabular.parameters())
-        steps_per_epoch = int(np.ceil(len(X_train)/bs))
+
+        tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=lr)
+        steps_per_epoch = int(np.ceil(len(X_tab)/bs))
         tab_sch = torch.optim.lr_scheduler.OneCycleLR(tab_opt, max_lr=lr, epochs=n_epochs, steps_per_epoch=steps_per_epoch, pct_start=0.25, final_div_factor=1e5)
 
-        trainer = Trainer(model, objective=objective, metrics=metrics)
-        # FIXME: Does not return best epoch, instead returns final epoch
-        #  Very important to return best epoch, otherwise model can be far worse than ideal
-        # FIXME: Add early stopping
-        trainer.fit(
-            X_train=X_train,
-            X_val=X_val_in,
-            n_epochs=n_epochs,
-            optimizers=[tab_opt],
-            lr_schedulers=[tab_sch],
-            batch_size=bs,
-            val_split=val_split,
-        )
+        monitor_metric = f'val_{metrics[0]()._name}'
+        with make_temp_directory() as temp_dir:
+            checkpoint_path_prefix = f'{temp_dir}/model'
+            model_checkpoint = ModelCheckpoint(filepath=checkpoint_path_prefix, verbose=1, save_best_only=True, max_save=1, monitor=monitor_metric)
+
+            trainer = Trainer(
+                model,
+                objective=objective,
+                metrics=metrics,
+                optimizers=tab_opt,
+                lr_schedulers=tab_sch,
+                callbacks=[model_checkpoint]
+            )
+            # FIXME: Does not return best epoch, instead returns final epoch
+            #  Very important to return best epoch, otherwise model can be far worse than ideal
+            # FIXME: Add early stopping
+            trainer.fit(
+                X_train=X_train,
+                X_val=X_val_in,
+                n_epochs=n_epochs,
+                batch_size=bs,
+                val_split=val_split,
+            )
+
+            best_checkpoint = f'{checkpoint_path_prefix}_{model_checkpoint.best_epoch + 1}.p'
+            trainer.model.load_state_dict(torch.load(best_checkpoint))
 
         self.model = trainer
 
@@ -154,8 +171,6 @@ class WideDeepNNModel(AbstractModel):
     @staticmethod
     def _construct_wide_deep_model(model_type, column_idx, embed_input, continuous_cols, pred_dim, **model_args):
         from pytorch_widedeep.models import TabMlp, WideDeep, TabResnet, SAINT, TabTransformer
-
-        print(f'### model_args: {model_args}')
 
         __MODEL_TYPES = dict(
             tabmlp=TabMlp,
