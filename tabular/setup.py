@@ -52,10 +52,15 @@ extras_require = {
 
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai', 'vowpalwabbit']:
+for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires
+
+tests_requires = []
+for extra_package in ['vowpalwabbit']:
+    tests_requires += extras_require[extra_package]
+extras_require['tests'] = tests_requires
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
