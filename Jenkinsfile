@@ -41,11 +41,11 @@ install_features = """
 """
 
 install_tabular = """
-    python3 -m pip install --upgrade -e tabular/
+    python3 -m pip install --upgrade -e tabular/[tests]
 """
 
 install_tabular_all = """
-    python3 -m pip install --upgrade -e tabular/[all]
+    python3 -m pip install --upgrade -e tabular/[all,tests]
 """
 
 install_text = """

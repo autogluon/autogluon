@@ -185,3 +185,15 @@ def try_import_rapids_cuml():
                           "You will likely need to create a fresh conda environment based off of a RAPIDS install, and then install AutoGluon on it.\n"
                           "RAPIDS is highly experimental within AutoGluon, and we recommend to only use RAPIDS if you are an advanced user / developer.\n"
                           "Please refer to RAPIDS install instructions for more information: https://rapids.ai/start.html#get-rapids")
+
+
+def try_import_vowpalwabbit():
+    try:
+        import vowpalwabbit
+        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
+        assert vowpalwabbit_version >= parse_version('8.10.1') and vowpalwabbit_version < parse_version('8.11.0'), \
+            f'Currently, we only support VW version >=8.10.1 and <8.11.0. Found vowpalwabbit version: {vowpalwabbit_version}'
+    except ImportError:
+        raise ImportError("`import vowpalwabbit` failed.\n"
+                          "A quick tip is to install via `pip install vowpalwabbit==8.10")

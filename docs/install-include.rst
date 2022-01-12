@@ -143,6 +143,7 @@ AutoGluon is modularized into `sub-modules <https://packaging.python.org/guides/
     - The default installation of `autogluon.tabular` standalone is a skeleton installation.
     - Install via `pip install autogluon.tabular[all]` to get the same installation of tabular as via `pip install autogluon`
     - Available optional dependencies: `lightgbm,catboost,xgboost,fastai`. These are included in `all`.
+    - Optional dependencies not included in `all`: `vowpalwabbit`.
     - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
 
     - Experimental optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable, or `pip install "scikit-learn-intelex<2021.5"` after a standard installation of AutoGluon.
