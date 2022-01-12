@@ -1,4 +1,4 @@
-
+# Feature Engineering
 :label:`sec_feature_engineering`
 
 ### Introduction ###
@@ -8,11 +8,11 @@ Feature engineering involves taking raw tabular data and
 1. converting it into a format ready for the machine learning model to read
 2. trying to enhance some columns ('features' in ML jargon) to give the ML models more information, hoping to get more accurate results.
 
-Autogluon does some of this for you.  This document describes how that works, and how you can extend it.  We describe here the default behaviour, much of which is configurable, as well as pointers to how to alter the behaviour from the default.
+AutoGluon does some of this for you.  This document describes how that works, and how you can extend it.  We describe here the default behaviour, much of which is configurable, as well as pointers to how to alter the behaviour from the default.
 
 ### Column Types ###
 
-AutoGluon.Tabular recognises the following types of features, and has separate processing for them:
+AutoGluon Tabular recognises the following types of features, and has separate processing for them:
 
 | Feature Type        | Example Values           |
 | :------------------ | :----------------------- |
@@ -22,7 +22,7 @@ AutoGluon.Tabular recognises the following types of features, and has separate p
 | datetime            | 1/31/2021, Mar-31        |
 | text                | Mary had a little lamb   |
 
-In addition, other AutoGluon prediction modules recognise additional feature types, these can also be enabled in `AutoGluon.Tabular` by using the [MultiModal](tabular-multimodal.html) option. 
+In addition, other AutoGluon prediction modules recognise additional feature types, these can also be enabled in AutoGluon Tabular by using the [MultiModal](tabular-multimodal.html) option. 
 
 | Feature Type        | Example Values           |
 | :------------------ | :----------------------- |
@@ -34,7 +34,7 @@ In addition, other AutoGluon prediction modules recognise additional feature typ
 
 - Any string columns are deemed categorical unless they are text (see below).  Some models perform better if you tell them which columns are categorical and which are continuous. 
 
-- Numeric columns are passed through without change, except to identify them as `float` or `int`.  Currently, numeric columns are not tested to determine if they are likely to be categorical.  You can force them to be treated as categorical with the Pandas syntax `.astype(category)`, see below.
+- Numeric columns are passed through without change, except to identify them as `float` or `int`.  Currently, numeric columns are not tested to determine if they are likely to be categorical.  You can force them to be treated as categorical with the Pandas syntax `.astype("category")`, see below.
 
 - Text columns are detected by firstly checking that most rows are unique.  If they are, and there are multiple separate words detected in most rows, the row is a text column.  For details see `common/features/infer_types.py` in the source.
 
