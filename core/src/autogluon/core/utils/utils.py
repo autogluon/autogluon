@@ -443,7 +443,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
     if unique_count == 2:
         problem_type = BINARY
         reason = "only two unique label-values observed"
-    elif y.dtype.name in ['object', 'category']:
+    elif y.dtype.name in ['object', 'category', 'string']:
         problem_type = MULTICLASS
         reason = f"dtype of label-column == {y.dtype.name}"
     elif np.issubdtype(y.dtype, np.floating):
