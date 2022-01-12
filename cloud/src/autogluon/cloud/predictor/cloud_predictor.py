@@ -78,6 +78,7 @@ class CloudPredictor:
         self.sagemaker_session = sagemaker.session.Session()
         self.local_output_path = self._setup_local_output_path(local_output_path)
         self.cloud_output_path = self._setup_cloud_output_path(cloud_output_path)
+        self._is_fit = False
         self.endpoint = None
 
         self._region = self.sagemaker_session.boto_region_name
@@ -88,6 +89,10 @@ class CloudPredictor:
         self._recent_batch_transform_results_path = None
 
         self._setup_predictor_type()
+
+    @property
+    def is_fit(self):
+        return self._is_fit
 
     @property
     def endpoint_name(self):
@@ -105,7 +110,7 @@ class CloudPredictor:
         info = dict(
             local_output_path=self.local_output_path,
             cloud_output_path=self.cloud_output_path,
-            recent_fit_job=dict(
+            fit_job=dict(
                 name=self._fit_job_name,
                 status=self.get_fit_job_status(self._fit_job_name),
                 framework_version=self._fit_job_framework_version,
@@ -281,6 +286,7 @@ class CloudPredictor:
         -------
         `CloudPredictor` object. Returns self.
         """
+        assert self.is_fit, 'Predictor is already fit! To fit additional models, create a new `CloudPredictor`'
         # TODO: Add warning for multi-model image not working properly
         train_data = predictor_fit_args.pop('train_data')
         tune_data = predictor_fit_args.pop('tuning_data', None)
@@ -338,6 +344,7 @@ class CloudPredictor:
             )
             self._cloud_predictor_path = sagemaker_estimator.model_data
             self._fit_job_framework_version = framework_version
+            self._is_fit = True
         except Exception as e:
             logger.error(f'Training failed. Please check sagemaker console training jobs {job_name} for details.')
             raise e
