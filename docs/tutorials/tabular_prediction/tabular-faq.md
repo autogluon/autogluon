@@ -165,7 +165,7 @@ export OMP_NUM_THREADS=1
 ```
 
 ### How to limit the number of cores AutoGluon will use
-Although it is generally recommended to let AutoGluon to use all the cores. You can limit it by setting the `ag_fit_args`:
+Although it is generally recommended to let AutoGluon to use all the cores, you can limit it by setting the `ag_fit_args`:
 ```
 predictor = TabularPredictor(...).fit(..., ag_fit_args={'num_cpus': NUM_CORES_YOU_WANT})
 ```
