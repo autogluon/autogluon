@@ -9,8 +9,10 @@ from autogluon.core.trainer.utils import process_hyperparameters
 
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
-    TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, ImagePredictorModel, \
-    RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel
+    TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
+    ImagePredictorModel, \
+    RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel, \
+    VowpalWabbitModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     XGB=40,
     LR=30,
     NN=20,
+    VW=10,
     FASTTEXT=0,
     AG_TEXT_NN=0,
     AG_IMAGE_NN=0,
@@ -83,6 +86,7 @@ MODEL_TYPES = dict(
     IM_RULELIST=OptimalRuleListModel,
     IM_OPTIMALTREE=OptimalTreeModel,
     IM_BOOSTEDRULES=BoostedRulesModel,
+    VW=VowpalWabbitModel
 )
 
 
@@ -101,6 +105,7 @@ DEFAULT_MODEL_NAMES = {
     TextPredictorModel: 'TextPredictor',
     ImagePredictorModel: 'ImagePredictor',
     FastTextModel: 'FastText',
+    VowpalWabbitModel: 'VowpalWabbit',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
     SimpleWeightedEnsembleModel: 'WeightedEnsemble',
 

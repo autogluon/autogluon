@@ -747,12 +747,12 @@ class TabularPredictor:
         ###################################
         # FIXME: v0.1 This section is a hack
         if 'enable_raw_text_features' not in feature_generator_init_kwargs:
-            if 'AG_TEXT_NN' in hyperparameters:
+            if 'AG_TEXT_NN' in hyperparameters or 'VW' in hyperparameters:
                 feature_generator_init_kwargs['enable_raw_text_features'] = True
             else:
                 for key in hyperparameters:
                     if isinstance(key, int) or key == 'default':
-                        if 'AG_TEXT_NN' in hyperparameters[key]:
+                        if 'AG_TEXT_NN' in hyperparameters[key] or 'VW' in hyperparameters[key]:
                             feature_generator_init_kwargs['enable_raw_text_features'] = True
                             break
         ###################################

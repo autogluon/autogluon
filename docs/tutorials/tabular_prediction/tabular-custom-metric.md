@@ -28,7 +28,7 @@ import sklearn.metrics
 sklearn.metrics.accuracy_score(y_true, y_pred)
 ```
 
-Now, lets convert this evaluation metric to an AutoGluon Scorer.
+Now, let's convert this evaluation metric to an AutoGluon Scorer.
 
 We do this by calling `autogluon.core.metrics.make_scorer`.
 
@@ -43,7 +43,7 @@ ag_accuracy_scorer = make_scorer(name='accuracy',
 
 When creating the Scorer, we need to specify a name for the Scorer. This does not need to be any particular value, but is used when printing information about the Scorer during training.
 
-Next, we specify the `score_func`. This is the function we want to wrap, in this case, sklearn's accuracy_score function.
+Next, we specify the `score_func`. This is the function we want to wrap, in this case, sklearn's `accuracy_score` function.
 
 We then need to specify the optimum value. This is necessary when calculating error as opposed to score. Error is calculated as `optimum - score`. It is also useful to identify when a score is optimal and cannot be improved.
 
@@ -58,7 +58,7 @@ ag_accuracy_scorer(y_true, y_pred)
 
 ## Custom Mean Squared Error Metric
 
-Next, lets show examples of how to convert regression metrics into Scorers.
+Next, let's show examples of how to convert regression metrics into Scorers.
 
 First we generate random ground truth labels and their predictions, however this time they are floats instead of integers.
 
@@ -155,7 +155,7 @@ ag_roc_auc_scorer(y_true, y_pred_proba)
 
 ## Using Custom Metrics in TabularPredictor
 
-Now that we have created several custom Scorers, lets use them for training and evaluating models.
+Now that we have created several custom Scorers, let's use them for training and evaluating models.
 
 For this tutorial, we will be using the Adult Income dataset.
 

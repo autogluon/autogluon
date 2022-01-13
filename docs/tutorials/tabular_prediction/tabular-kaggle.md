@@ -20,7 +20,7 @@ Alternatively, you can download data manually: Just navigate to website of the K
 
 5) Run autogluon `fit()` on the resulting data table.
 
-6) Load the test dataset from competition (again making the necessary merges/joins to ensure it is in the exact same format as the training data table), and then call autogluon `predict()`.  Subsequently use [pandas.read_csv](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html) to load the competition's `sample_submission.csv` file into a Dataframe, put the AutoGluon predictions in the right column of this Dataframe, and finally save it as a CSV file via [pandas.to_csv](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_csv.html). If the competition does not offer a sample submission file, you will need to create the submission file yourself by appropriately reformatting AutoGluon's test predictions.
+6) Load the test dataset from competition (again making the necessary merges/joins to ensure it is in the exact same format as the training data table), and then call autogluon `predict()`.  Subsequently use [pandas.read_csv](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html) to load the competition's `sample_submission.csv` file into a DataFrame, put the AutoGluon predictions in the right column of this DataFrame, and finally save it as a CSV file via [pandas.to_csv](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_csv.html). If the competition does not offer a sample submission file, you will need to create the submission file yourself by appropriately reformatting AutoGluon's test predictions.
 
 7) Submit your predictions via Bash command:
 
@@ -88,7 +88,7 @@ For multiclass classification tasks, you can see which classes AutoGluon's predi
 predictor.class_labels  # classes in this list correspond to columns of predict_proba() output
 ```
 
-Now, lets get prediction probabilities for the entire test data, while only getting the positive class predictions by specifying:
+Now, let's get prediction probabilities for the entire test data, while only getting the positive class predictions by specifying:
 
 ```
 y_predproba = predictor.predict_proba(test_data, as_multiclass=False)
