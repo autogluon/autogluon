@@ -3,7 +3,7 @@
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API. To learn how to add your own custom models to the set that AutoGluon trains, tunes, and ensembles, review :ref:`sec_tabularcustommodel`.
 
-This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune_kwargs`, `hyperparameters`, `num_stack_levels`, `num_bag_folds`, `num_bag_sets`, etc.
+This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should first try `TabularPredictor()` and `fit()` with all default arguments.  Then, consider non-default arguments for `TabularPredictor(eval_metric=...)`, and `fit(presets=...)`.  Later, you can experiment with other arguments to fit() covered in this in-depth tutorial like `hyperparameter_tune_kwargs`, `hyperparameters`, `num_stack_levels`, `num_bag_folds`, `num_bag_sets`, etc.
 
 Using the same census data table as in the :ref:`sec_tabularquick` tutorial, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon's TabularPredictor and TabularDataset, and loading the data.
 

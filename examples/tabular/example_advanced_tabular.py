@@ -1,6 +1,6 @@
 """ Example script for predicting columns of tables, demonstrating more advanced usage of fit().
     Note that all settings demonstrated here are just chosen for demonstration purposes (to minimize runtime), and do not represent wise choices to use in practice.
-    To maximize predictive accuracy, we recommend you do NOT specify `hyperparameters` or `hyperparameter_tune_kwargs`, and instead only specify the following fit() arguments: eval_metric=YOUR_METRIC, presets='best_quality'
+    To maximize predictive accuracy, we recommend you do NOT specify `hyperparameters` or `hyperparameter_tune_kwargs`, and instead only specify the arguments presets='best_quality' to fit() and eval_metric=YOUR_METRIC to TabularPredictor()
 """
 
 import autogluon.core as ag

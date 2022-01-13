@@ -67,8 +67,7 @@ from autogluon.tabular import TabularPredictor
 predictor = TabularPredictor(label=<variable-name>).fit(train_data=<file-name>)
 ```
 
-**Note:** This simple call to `fit()` is intended for your first prototype model. In a subsequent section, we'll demonstrate how to maximize predictive performance by additionally specifying two `fit()` arguments: `presets` and `eval_metric`.
-
+**Note:** This simple call to `fit()` is intended for your first prototype model. In a subsequent section, we'll demonstrate how to maximize predictive performance by additionally specifying the `presets` argument to `fit()` and the `eval_metric` argument to `TabularPredictor()`.
 
 ## Description of fit():
 
@@ -134,7 +133,7 @@ This command implements the following strategy to maximize accuracy:
 
 - Specify the argument `presets='best_quality'`, which allows AutoGluon to automatically construct powerful model ensembles based on [stacking/bagging](https://arxiv.org/abs/2003.06505), and will greatly improve the resulting predictions if granted sufficient training time. The default value of `presets` is `'medium_quality_faster_train'`, which produces *less* accurate models but facilitates faster prototyping. With `presets`, you can flexibly prioritize predictive accuracy vs. training/inference speed. For example, if you care less about predictive performance and want to quickly deploy a basic model, consider using: `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`.
 
-- Provide the `eval_metric` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression).  You can also define your own custom metric function, see examples in the folder: `autogluon/core/metrics/`
+- Provide the `eval_metric` to `TabularPredictor()` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression).  You can also define your own custom metric function, see examples in the folder: `autogluon/core/metrics/`
 
 - Include all your data in `train_data` and do not provide `tuning_data` (AutoGluon will split the data more intelligently to fit its needs).
 
@@ -161,7 +160,7 @@ predictor_age = TabularPredictor(label=age_column, path="agModels-predictAge").f
 performance = predictor_age.evaluate(test_data)
 ```
 
-Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` argument of `fit()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = 'mean_absolute_error'`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon may sometimes flip their sign and print them as negative values during training (as it internally assumes higher values are better).
+Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` argument of `TabularPredictor()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = 'mean_absolute_error'`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon may sometimes flip their sign and print them as negative values during training (as it internally assumes higher values are better).
 
 We can call leaderboard to see the per-model performance:
 

@@ -60,7 +60,7 @@ class AbstractTrainer:
         if not (self.eval_metric.needs_pred or self.eval_metric.needs_quantile):
             logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
-        logger.log(20, "\tTo change this, specify the eval_metric argument of fit()")
+        logger.log(20, "\tTo change this, specify the eval_metric argument of Predictor()")
         self.num_classes = num_classes
         self.quantile_levels = quantile_levels
         self.feature_prune = False  # will be set to True if feature-pruning is turned on.
