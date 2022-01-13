@@ -9,7 +9,7 @@ from autogluon.core.trainer.utils import process_hyperparameters
 
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
-    TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
+    TabularNeuralNetMxnetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
     ImagePredictorModel, VowpalWabbitModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
@@ -60,7 +60,7 @@ MODEL_TYPES = dict(
     GBM=LGBModel,
     CAT=CatBoostModel,
     XGB=XGBoostModel,
-    NN=TabularNeuralNetModel,
+    NN=TabularNeuralNetMxnetModel,
     QNN=TabularNeuralQuantileModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
@@ -80,7 +80,7 @@ DEFAULT_MODEL_NAMES = {
     LGBModel: 'LightGBM',
     CatBoostModel: 'CatBoost',
     XGBoostModel: 'XGBoost',
-    TabularNeuralNetModel: 'NeuralNetMXNet',
+    TabularNeuralNetMxnetModel: 'NeuralNetMXNet',
     TabularNeuralQuantileModel: 'QuantileNeuralNet',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',

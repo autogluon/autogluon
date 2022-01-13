@@ -77,7 +77,7 @@ def get_quantile_fixed_params():
     params = get_fixed_params()
     new_params = {
         'num_updates': 20000,  # maximum number of updates
-        'updates_wo_improve': 1000,  # we terminate training if validation performance hasn't improved in the last 'updates_wo_improve' # of updates
+        'updates_wo_improve': 500,  # we terminate training if validation performance hasn't improved in the last 'updates_wo_improve' # of updates
         'max_batch_size': 512,  # max batch-size
     }
     params.update(new_params)
@@ -88,9 +88,9 @@ def get_quantile_hyper_params():
     """ Parameters that currently can be searched during HPO """
     hyper_params = get_hyper_params()
     new_hyper_params = {
-        'num_layers': 2,  # number of layers
+        'num_layers': 4,  # number of layers
         # Options: [2, 3, 4, 5]
-        'hidden_size': 64,  # hidden size
+        'hidden_size': 128,  # hidden size
         # Options: [128, 256, 512]
         'gamma': 5.0,  # margin loss weight
         # Options: range(0.1, 10.0)

@@ -2,6 +2,8 @@ import numpy as np
 import mxnet as mx
 from mxnet import nd, gluon
 
+from ..utils.nn_architecture_utils import getEmbedSizes
+
 
 class NumericBlock(gluon.HybridBlock):
     """ Single Dense layer that jointly embeds all numeric and one-hot features """
@@ -224,43 +226,3 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
                 print("nd.sigmoid(unscaled_pred).shape", nd.sigmoid(unscaled_pred).shape)
                 """
                 return nd.sigmoid(unscaled_pred) * self.y_span + self.y_lower
-
-
-""" OLD 
-    def _create_embednet_from_architecture(architecture_desc):
-        # Recreate network architecture based on provided description
-        self.architecture_desc = architecture_desc
-        self.has_vector_features = architecture_desc['has_vector_features']
-        self.has_embed_features = architecture_desc['has_embed_features']
-        self.has_language_features = architecture_desc['has_language_features']
-        self.from_logits = architecture_desc['from_logits']
-        num_net_outputs = architecture_desc['num_net_outputs']
-        params = architecture_desc['params']
-        if self.has_vector_features:
-            self.numeric_block = NumericBlock(params)
-        if self.has_embed_features:
-            self.embed_blocks = gluon.nn.HybridSequential()
-            num_categs_per_feature = architecture_desc['num_categs_per_feature']
-            embed_dims = architecture_desc['embed_dims']
-            for i in range(len(num_categs_per_feature)):
-                self.embed_blocks.add(EmbedBlock(embed_dims[i], num_categs_per_feature[i]))
-        if self.has_language_features:
-            self.text_block = architecture_desc['text_TODO']
-        if 
-        self.output_block = FeedforwardBlock(params, num_net_outputs) # TODO
-        self.from_logits = False
-"""
-
-
-def getEmbedSizes(train_dataset, params, num_categs_per_feature):  
-    """ Returns list of embedding sizes for each categorical variable.
-        Selects this adaptively based on training_datset.
-        Note: Assumes there is at least one embed feature.
-    """
-    max_embedding_dim = params['max_embedding_dim']
-    embed_exponent = params['embed_exponent']
-    size_factor = params['embedding_size_factor']
-    embed_dims = [int(size_factor*max(2, min(max_embedding_dim, 
-                                      1.6 * num_categs_per_feature[i]**embed_exponent)))
-                   for i in range(len(num_categs_per_feature))]
-    return embed_dims

@@ -23,16 +23,16 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.core import Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.utils import try_import_mxboard, try_import_mxnet
-from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
+from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 
-from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
-from .hyperparameters.parameters import get_default_param
-from .hyperparameters.searchspaces import get_default_searchspace
-from autogluon.core.models.abstract.abstract_model import AbstractNeuralNetworkModel
-from ..utils import fixedvals_from_searchspaces
+from ..utils.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
+from ..hyperparameters.parameters import get_default_param
+from ..hyperparameters.searchspaces import get_default_searchspace
+from ...utils import fixedvals_from_searchspaces
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ EPS = 1e-10  # small number
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
 #  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.
-class TabularNeuralNetModel(AbstractNeuralNetworkModel):
+class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
     """ Class for neural network models that operate on tabular data.
         These networks use different types of input layers to process different types of data in various columns.
 
@@ -173,7 +173,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
         params = self._get_model_params()
         params = fixedvals_from_searchspaces(params)
-
         if num_cpus is not None:
             self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         else:
@@ -705,9 +704,6 @@ class TabularNeuralNetModel(AbstractNeuralNetworkModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
-
-    def _estimate_memory_usage(self, X, **kwargs):
-        return 10 * get_approximate_df_mem_usage(X).sum()
 
 
 def convert_df_dtype_to_str(df):

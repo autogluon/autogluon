@@ -4,11 +4,11 @@ import numpy as np
 
 class TabularTorchDataset(torch.utils.data.Dataset):
     """
-        This class is following the structure of TabularNNDataset in tabular_nn_dataset.py
+        This class follows the structure of TabularNNDataset in tabular_nn_dataset.py (using Pytorch DataLoader instead of MXNet DataLoader),
 
-        Class for preprocessing & storing/feeding data batches used by tabular data quantile (pytorch) neural networks.
+        Class for preprocessing & storing/feeding data batches used by pytorch neural networks for tabular data.
         Assumes entire dataset can be loaded into numpy arrays.
-        Original Data table may contain numerical, categorical, and text (language) fields.
+        Original data table may contain numeric and categorical fields and missing values.
 
         Attributes:
             data_list (list[np.array]): Contains the raw data. Different indices in this list correspond to different

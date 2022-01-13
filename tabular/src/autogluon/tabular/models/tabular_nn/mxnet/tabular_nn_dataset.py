@@ -5,6 +5,7 @@ import pandas as pd
 import mxnet as mx
 
 from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.multiprocessing_utils import is_fork_enabled, is_forkserver_enabled
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 

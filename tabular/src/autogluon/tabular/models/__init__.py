@@ -7,8 +7,8 @@ from .rf.rf_model import RFModel
 from .xt.xt_model import XTModel
 from .knn.knn_model import KNNModel
 from .lr.lr_model import LinearModel
-from .tabular_nn.tabular_nn_model import TabularNeuralNetModel
-from .tabular_nn.tabular_nn_quantile import TabularNeuralQuantileModel
+from .tabular_nn.mxnet.tabular_nn_mxnet import TabularNeuralNetMxnetModel
+from .tabular_nn.torch.tabular_nn_quantile import TabularNeuralQuantileModel
 from .fastainn.tabular_nn_fastai import NNFastAiTabularModel
 from .fasttext.fasttext_model import FastTextModel
 from .text_prediction.text_prediction_v1_model import TextPredictorModel
