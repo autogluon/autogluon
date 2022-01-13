@@ -169,6 +169,11 @@ Although it is generally recommended to let AutoGluon to use all the cores, you 
 ```
 predictor = TabularPredictor(...).fit(..., ag_fit_args={'num_cpus': NUM_CORES_YOU_WANT})
 ```
+You can also limit the number of cores used by a specific model:
+```
+# We use 1 core for CatBoost model, 4 cores for XGBoost model, and all cores for lightGBM model here.
+predictor = TabularPredictor(...).fit(..., hyperparameters= {'CAT': {'ag_args_fit': {'num_cpus': 1}}, 'XGB': {'ag_args_fit': {'num_cpus': 4}}, 'GBM': {}},)
+```
 
 ### Issues not addressed here
 
