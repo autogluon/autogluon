@@ -55,6 +55,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       How to add a custom metric to AutoGluon.
 
    .. card::
+      :title: Feature Engineering
+      :link: tabular-feature-engineering.html
+
+      AutoGluon's default feature engineering and how to extend it.
+
+   .. card::
       :title: FAQ
       :link: tabular-faq.html
 
@@ -72,4 +78,5 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-multilabel
    tabular-custom-model
    tabular-custom-metric
+   tabular-feature-engineering
    tabular-faq
