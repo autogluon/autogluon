@@ -158,7 +158,10 @@ class AbstractLearner:
             X_index = copy.deepcopy(X.index)
         else:
             X_index = None
-        y_pred_proba = self.load_trainer().predict_proba(self.transform_features(X), model=model)
+        if X.empty:
+            y_pred_proba = np.array([])
+        else:
+            y_pred_proba = self.load_trainer().predict_proba(self.transform_features(X), model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         if as_multiclass and (self.problem_type == BINARY):

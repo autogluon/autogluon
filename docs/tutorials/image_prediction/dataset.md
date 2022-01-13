@@ -2,7 +2,7 @@
 :label:`sec_imgdataset`
 
 Preparing the dataset for ImagePredictor is not difficult at all, however, we'd like to introduce the
-recommended ways to initialize the dataset, so you will have smoother experience using `autogluon.vision.ImagePredictor`.
+recommended ways to initialize the dataset, so you will have a smoother experience using `autogluon.vision.ImagePredictor`.
 
 There are generally three ways to load a dataset for ImagePredictor:
 
@@ -10,9 +10,9 @@ There are generally three ways to load a dataset for ImagePredictor:
 
 - Load a image folder directly with `ImageDataset`
 
-- Convert a list of images to dataset directly with `ImageDataset`
+- Convert a list of images into a dataset directly with `ImageDataset`
 
-We will go through these four methods one by one. First of all, let's import autogluon
+We will go through these four methods one by one. First of all, let's import AutoGluon:
 
 ```{.python .input}
 %matplotlib inline
@@ -32,7 +32,7 @@ df = pd.read_csv(csv_file)
 df.head()
 ```
 
-If the image paths are not relative to current working directory, you may use the helper function to prepend prefix for each image, using absolute paths can reduce the chance of OSError happening to file access:
+If the image paths are not relative to the current working directory, you may use the helper function to prepend a prefix for each image. Using absolute paths can reduce the chance of an OSError happening during file access:
 
 ```{.python .input}
 df = ImageDataset.from_csv(csv_file, root='/home/ubuntu')
@@ -51,7 +51,7 @@ Otherwise you may use the `DataFrame` as-is, `ImagePredictor` will apply auto co
 
 ## Load an image directory
 
-It's pretty common that sometimes you only have a folder of images, organized by the category names. Recursively loop through images is tedious. You can use `ImageDataset.from_folders` or `ImageDataset.from_folder` to avoid implementing recursive search.
+It's pretty common that sometimes you only have a folder of images, organized by the category names. Recursively looping through images is tedious. You can use `ImageDataset.from_folders` or `ImageDataset.from_folder` to avoid implementing recursive search.
 
 The difference between `from_folders` and `from_folder` is the targeting folder structure.
 If you have a folder with splits, e.g., `train`, `test`, like:
@@ -93,7 +93,7 @@ print('train #:', len(train), 'test #:', len(test))
 
 ## Convert a list of images to dataset
 
-You can create dataset from a list of images with a function, the function is used to determine the label of each image. We use the Oxford-IIIT Pet Dataset mini pack as an example, where images are scattered in `images` directory but with unique pattern: filenames of cat starts with capital letter, otherwise dogs. So we can use a function to distinguish and assign label to each image:
+You can create a dataset from a list of images with a function, the function is used to determine the label of each image. We use the Oxford-IIIT Pet Dataset mini pack as an example, where images are scattered in `images` directory but with a unique pattern: filenames of cats start with a capital letter, otherwise they are dogs. So we can use a function to distinguish and assign a label to each image:
 
 ```{.python .input}
 pets = ag.utils.download('https://autogluon.s3-us-west-2.amazonaws.com/datasets/oxford-iiit-pet-mini.zip')

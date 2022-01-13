@@ -26,12 +26,12 @@ For most of these models, CUDA will have to be installed and some models may nee
 As an open-source library, AutoGluon can be run on any machine including your laptop. Currently it is not necessary to use a GPU to train TabularPredictor so CPU machines are fine (in contrast, TextPredictor/ImagePredictor/ObjectDetector require GPUs). Most Tabular issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for Tabular: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
 
 
-### How to resolve memory issues?
+### How can I resolve memory issues?
 
 See ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-memory-issues).
 
 
-### How to resolve disk space issues?
+### How can I resolve disk space issues?
 
 See ["If you encounter disk space issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-disk-space-issues).
 
@@ -55,7 +55,7 @@ Details are provided in the following paper:
 [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/abs/2003.06505). *Arxiv*, 2020.
 
 
-### How to view more detailed logs of what is happening during fit?
+### How can I view more detailed logs of what is happening during fit?
 
 Specify the argument `verbosity = 4` in `fit()`.
 
@@ -99,7 +99,7 @@ Additionally, you can explain particular AutoGluon predictions using [Shapely va
 
 ### How can I perform inference on a file that won't fit in memory?
 
-The Tabular Dataset API works with pandas Dataframes, which supports chunking data into sizes that fit in memory.
+The Tabular Dataset API works with pandas DataFrames, which supports chunking data into sizes that fit in memory.
 Here's an example of one such chunk-based inference:
 
 ```{.python .input}
@@ -153,7 +153,9 @@ You can specify the `sample_weight` and `weight_evaluation` [arguments](../../ap
 
 ### I'm receiving C++ warning spam during training or inference
 
+```
 Warning message: [W ParallelNative.cpp:206] Warning: Cannot set number of intraop threads after parallel work has started or after set_num_threads call when using native parallel backend (function set_num_threads)
+```
 
 This can happen from downstream PyTorch dependencies (OpenMP) when using a specific environment. If you are using PyTorch 1.7, Mac OS X, Python 3.6/3.7, and using the PyTorch DataLoader, then you may get this warning spam. We have only seen this occur with the TabTransformer model. Reference open [torch issue](https://github.com/pytorch/pytorch/issues/46409).
 
@@ -161,6 +163,22 @@ The recommended workaround from the torch issue to suppress this warning is to s
 ```
 export OMP_NUM_THREADS=1
 ```
+
+### How to limit the number of cores AutoGluon will use
+Although it is generally recommended to let AutoGluon to use all the cores, you can limit it by setting the `ag_fit_args`:
+```
+predictor = TabularPredictor(...).fit(..., ag_fit_args={'num_cpus': NUM_CORES_YOU_WANT})
+```
+You can also limit the number of cores used by a specific model:
+```
+# We use 1 core for CatBoost model, 4 cores for XGBoost model, and all cores for lightGBM model here.
+predictor = TabularPredictor(...).fit(..., hyperparameters= {'CAT': {'ag_args_fit': {'num_cpus': 1}}, 'XGB': {'ag_args_fit': {'num_cpus': 4}}, 'GBM': {}},)
+```
+
+### No space left error on SageMaker Notebook
+If you are using AutoGluon on SageMaker Notebook, it is likely that you will encounter such error: `OSError: [Errno 28] No space left on device`. This is because the default disk size of a SageMaker Notebook instance is 5 GiB regardless of the type. AutoGluon training on some large datasets could end up with artifacts that's larger than 5GiB.
+
+To address it, either cleanup your workspace, or 1) shutdown your Notebook instance 2) choose your Notebook instance 3) update the `Volume size in GB` field under `Edit`
 
 ### Issues not addressed here
 

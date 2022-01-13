@@ -84,7 +84,7 @@ print("Predictions:  ", list(y_pred)[:5])
 perf = predictor.evaluate(test_data, auxiliary_metrics=False)
 ```
 
-Use the following to view a summary of what happened during fit. Now this command will show details of the hyperparameter-tuning process for each type of model:
+Use the following to view a summary of what happened during `fit()`. Now this command will show details of the hyperparameter-tuning process for each type of model:
 
 ```{.python .input}
 results = predictor.fit_summary(show_plot=True)
@@ -154,7 +154,7 @@ By default, `predict()` and `predict_proba()` will utilize the model that AutoGl
 predictor.get_model_best()
 ```
 
-We can instead specify a particular model to use for predictions (e.g. to reduce inference latency). Note that a 'model' in AutoGluon may refer to for example a single Neural Network, a bagged ensemble of many Neural Network copies trained on different training/validation splits, a weighted ensemble that aggregates the predictions of many other models, or a stacker model that operates on predictions output by other models. This is akin to viewing a Random Forest as one 'model' when it is in fact an ensemble of many decision trees.
+We can instead specify a particular model to use for predictions (e.g. to reduce inference latency). Note that a 'model' in AutoGluon may refer to, for example, a single Neural Network, a bagged ensemble of many Neural Network copies trained on different training/validation splits, a weighted ensemble that aggregates the predictions of many other models, or a stacker model that operates on predictions output by other models. This is akin to viewing a Random Forest as one 'model' when it is in fact an ensemble of many decision trees.
 
 
 Before deciding which model to use, let's evaluate all of the models AutoGluon has previously trained on our test data:
@@ -182,7 +182,7 @@ This is because metrics in AutoGluon are always shown in `higher_is_better` form
 This means that metrics such as `log_loss` and `root_mean_squared_error` will have their signs FLIPPED, and values will be negative.
 This is necessary to avoid the user needing to know the metric to understand if higher is better when looking at leaderboard.
 
-One additional caviat: It is possible that `log_loss` values can be `-inf` when computed via `extra_metrics`.
+One additional caveat: It is possible that `log_loss` values can be `-inf` when computed via `extra_metrics`.
 This is because the models were not optimized with `log_loss` in mind during training and
 may have prediction probabilities giving a class `0` (particularly common with K-Nearest-Neighbors models).
 Because `log_loss` gives infinite error when the correct class was given `0` probability, this results in a score of `-inf`.
@@ -348,7 +348,7 @@ from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 feature_generator = AutoMLPipelineFeatureGenerator(vectorizer=CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=MAX_NGRAM, dtype=np.uint8))
 ```
 
-where `MAX_NGRAM = 1000` say (try various values under 10000 to reduce the number of N-gram features used to represent each text field)
+for example using `MAX_NGRAM = 1000` (try various values under 10000 to reduce the number of N-gram features used to represent each text field)
 
 In addition to reducing memory usage, many of the above strategies can also be used to reduce training times.
 

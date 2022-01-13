@@ -311,7 +311,9 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     elif problem_type == QUANTILE:
         y_pred = y_pred_proba
     else:
-        y_pred = np.argmax(y_pred_proba, axis=1)
+        y_pred = []
+        if not len(y_pred_proba) == 0:
+            y_pred = np.argmax(y_pred_proba, axis=1)
     return y_pred
 
 
@@ -441,7 +443,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
     if unique_count == 2:
         problem_type = BINARY
         reason = "only two unique label-values observed"
-    elif y.dtype.name in ['object', 'category']:
+    elif y.dtype.name in ['object', 'category', 'string']:
         problem_type = MULTICLASS
         reason = f"dtype of label-column == {y.dtype.name}"
     elif np.issubdtype(y.dtype, np.floating):

@@ -81,7 +81,7 @@ We did not specify separate validation data and so AutoGluon automatically chose
 By default, AutoGluon tries to fit various types of models including neural networks and tree ensembles. Each type of model has various hyperparameters, which traditionally, the user would have to specify.
 AutoGluon automates this process.
 
-AutoGluon automatically and iteratively tests values for hyperparameters to produce the best performance on the validation data. This involves repeatedly training models under different hyperparameter settings and evaluating their performance. This process can be computationally-intensive, so `fit()` can parallelize this process across multiple threads (and machines if distributed resources are available). To control runtimes, you can specify various arguments in fit() as demonstrated in the subsequent **In-Depth** tutorial.
+AutoGluon automatically and iteratively tests values for hyperparameters to produce the best performance on the validation data. This involves repeatedly training models under different hyperparameter settings and evaluating their performance. This process can be computationally-intensive, so `fit()` can parallelize this process across multiple threads (and machines if distributed resources are available). To control runtimes, you can specify various arguments in `fit()` as demonstrated in the subsequent **In-Depth** tutorial.
 
 For tabular problems, `fit()` returns a `Predictor` object. For classification, you can easily output predicted class probabilities instead of predicted classes:
 
@@ -104,7 +104,7 @@ print("AutoGluon identified the following types of features:")
 print(predictor.feature_metadata)
 ```
 
-AutoGluon correctly recognized our prediction problem to be a **binary classification** task and decided that variables such as `age` should be represented as integers, whereas variables such as `workclass` should be represented as categorical objects. The `feature_metadata` attribute allows you to see the inferred data type of each predictive variable after preprocessing (this is it's *raw* dtype; some features may also be associated with additional *special* dtypes if produced via feature-engineering, e.g. numerical representations of a datetime/text column).
+AutoGluon correctly recognized our prediction problem to be a **binary classification** task and decided that variables such as `age` should be represented as integers, whereas variables such as `workclass` should be represented as categorical objects. The `feature_metadata` attribute allows you to see the inferred data type of each predictive variable after preprocessing (this is its *raw* dtype; some features may also be associated with additional *special* dtypes if produced via feature-engineering, e.g. numerical representations of a datetime/text column).
 
 We can evaluate the performance of each individual trained model on our (labeled) test data:
 ```{.python .input}
@@ -161,7 +161,7 @@ predictor_age = TabularPredictor(label=age_column, path="agModels-predictAge").f
 performance = predictor_age.evaluate(test_data)
 ```
 
-Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` argument of `fit()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = 'mean_absolute_error'`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon may sometimes flips their sign and print them as negative values during training (as it internally assumes higher values are better).
+Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` argument of `fit()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = 'mean_absolute_error'`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon may sometimes flip their sign and print them as negative values during training (as it internally assumes higher values are better).
 
 We can call leaderboard to see the per-model performance:
 

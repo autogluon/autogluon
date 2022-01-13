@@ -48,6 +48,9 @@ extras_require = {
     'imodels': [
         'imodels>=1.2.0',
     ],
+    'vowpalwabbit': [
+        'vowpalwabbit>=8.10,<8.11'
+    ]
 }
 
 all_requires = []
@@ -57,11 +60,11 @@ for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires
 
+
 test_requires = []
-for test_package in ['imodels']:
+for test_package in ['imodels', 'vowpalwabbit']:
     test_requires += extras_require[test_package]
 extras_require['tests'] = test_requires
-
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == '__main__':
