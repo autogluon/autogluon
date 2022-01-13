@@ -164,6 +164,22 @@ The recommended workaround from the torch issue to suppress this warning is to s
 export OMP_NUM_THREADS=1
 ```
 
+### How to limit the number of cores AutoGluon will use
+Although it is generally recommended to let AutoGluon to use all the cores, you can limit it by setting the `ag_fit_args`:
+```
+predictor = TabularPredictor(...).fit(..., ag_fit_args={'num_cpus': NUM_CORES_YOU_WANT})
+```
+You can also limit the number of cores used by a specific model:
+```
+# We use 1 core for CatBoost model, 4 cores for XGBoost model, and all cores for lightGBM model here.
+predictor = TabularPredictor(...).fit(..., hyperparameters= {'CAT': {'ag_args_fit': {'num_cpus': 1}}, 'XGB': {'ag_args_fit': {'num_cpus': 4}}, 'GBM': {}},)
+```
+
+### No space left error on SageMaker Notebook
+If you are using AutoGluon on SageMaker Notebook, it is likely that you will encounter such error: `OSError: [Errno 28] No space left on device`. This is because the default disk size of a SageMaker Notebook instance is 5 GiB regardless of the type. AutoGluon training on some large datasets could end up with artifacts that's larger than 5GiB.
+
+To address it, either cleanup your workspace, or 1) shutdown your Notebook instance 2) choose your Notebook instance 3) update the `Volume size in GB` field under `Edit`
+
 ### Issues not addressed here
 
 First search if your issue is addressed in the [tutorials](index.html), [examples](https://github.com/awslabs/autogluon/tree/master/examples/tabular), [documentation](../../api/autogluon.predictor.html), or [Github issues](https://github.com/awslabs/autogluon/issues) (search both Closed and Open issues). If it is not there, please open a [new Github Issue](https://github.com/awslabs/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).
