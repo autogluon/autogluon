@@ -192,6 +192,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         updates_wo_improve = params['updates_wo_improve']
         if val_dataset is not None:
             y_val = val_dataset.get_labels()
+            if y_val.ndim == 2 and y_val.shape[1] == 1:
+                y_val = y_val.flatten()
         else:
             y_val = None
 
