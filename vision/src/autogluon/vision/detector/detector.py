@@ -378,8 +378,8 @@ class ObjectDetector(object):
         if not hpo_tune_args['searcher'] in ('random', 'grid'):
             raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('random', 'grid')")
         hpo_tune_args['scheduler'] = hpo_tune_args.get('scheduler', 'local')
-        if not hpo_tune_args['scheduler'] in ('fifo', 'local'):
-            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('fifo', 'local')")
+        if not hpo_tune_args['scheduler'] in ['local']:
+            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ['local']")
         hpo_tune_args['max_reward'] = hpo_tune_args.get('max_reward', None)
         if hpo_tune_args['max_reward'] is not None and hpo_tune_args['max_reward'] < 0:
             raise ValueError(f"Expected `max_reward` to be a positive float number between 0 and 1.0, given {hpo_tune_args['max_reward']}")
