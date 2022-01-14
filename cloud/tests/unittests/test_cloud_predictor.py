@@ -17,8 +17,8 @@ def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args
     )
     assert cloud_predictor.info['local_output_path'] is not None
     assert cloud_predictor.info['cloud_output_path'] is not None
-    assert cloud_predictor.info['recent_fit_job']['name'] is not None
-    assert cloud_predictor.info['recent_fit_job']['status'] == 'Completed'
+    assert cloud_predictor.info['fit_job']['name'] is not None
+    assert cloud_predictor.info['fit_job']['status'] == 'Completed'
 
     cloud_predictor.deploy()
     cloud_predictor.predict_real_time(test_data)
