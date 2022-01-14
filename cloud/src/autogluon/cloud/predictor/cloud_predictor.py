@@ -29,7 +29,7 @@ from ..utils.misc import MostRecentInsertedOrderedDict
 from ..utils.script_paths import TRAIN_SCRIPT_PATH, TABULAR_SERVE_SCRIPT_PATH, TEXT_SERVE_SCRIPT_PATH
 from ..utils.s3_utils import download_s3_file
 from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_latest_framework_version
-from ..utils.utils import rename_file_with_uuid
+from ..utils.utils import unzip_file, rename_file_with_uuid
 
 logger = logging.getLogger(__name__)
 
@@ -695,7 +695,6 @@ class CloudPredictor:
         )
         self._batch_transform_jobs[job_name] = batch_transform_job
 
-
     def download_predict_results(self, job_name=None, save_path=None):
         """
         Download batch transform result
@@ -710,14 +709,18 @@ class CloudPredictor:
             If None, CloudPredictor will create one.
         """
         if not job_name:
-            result_path = self._batch_transform_jobs.last_value.get_output_path()
+            job_name = self._batch_transform_jobs.last
+        assert job_name is not None, 'There is no batch transform job.'
+        job = self._batch_transform_jobs.get(job_name, None)
+        assert job is not None, f'Could not find the batch transform job that matches name {job_name}'
+        result_path = job.get_output_path()
         assert result_path is not None, 'No predict results found.'
         file_name = result_path.split('/')[-1]
         if not save_path:
             save_path = self.local_output_path
         save_path = os.path.expanduser(save_path)
         save_path = os.path.abspath(save_path)
-        results_save_path = os.path.join(save_path, 'batch_transform')
+        results_save_path = os.path.join(save_path, 'batch_transform', job_name)
         if not os.path.isdir(results_save_path):
             os.makedirs(results_save_path)
         temp_results_save_path = os.path.join(results_save_path, file_name)
@@ -727,6 +730,7 @@ class CloudPredictor:
         results_save_path = os.path.join(results_save_path, file_name)
         results_bucket, results_key_prefix = s3_path_to_bucket_prefix(result_path)
         download_s3_file(results_bucket, results_key_prefix, results_save_path)
+        logger.info(20, f'Results have been saved to {results_save_path}')
 
     def get_batch_transform_job_status(self, job_name=None):
         """
@@ -777,10 +781,8 @@ class CloudPredictor:
         tarball_path = os.path.join(save_path, 'model.tar.gz')
         download_s3_file(predictor_bucket, predictor_key_prefix, tarball_path)
         logger.log(20, 'Extracting the trained model tarball')
-        file = tarfile.open(tarball_path)
         save_path = os.path.join(save_path, 'AutogluonModels')
-        file.extractall(save_path)
-        file.close()
+        unzip_file(tarball_path, save_path)
         return save_path
 
     def save(self, silent=False):
@@ -809,6 +811,7 @@ class CloudPredictor:
             logger.log(20, f'{type(self).__name__} saved. To load, use: predictor = {type(self).__name__}.load("{self.local_output_path}")')
 
     def _load_jobs(self):
+        self._fit_job.session = self.sagemaker_session
         for job in self._batch_transform_jobs:
             job.session = self.sagemaker_session
 

@@ -12,4 +12,4 @@ class MostRecentInsertedOrderedDict(OrderedDict):
 
     @property
     def last_value(self):
-        return self.get(self.last(), None)
+        return self.get(self.last, None)

@@ -1,13 +1,13 @@
 import os
 import pandas as pd
-from autogluon.cloud import CloudPredictor
+from autogluon.cloud import TabularCloudPredictor
 
 here = os.path.realpath(os.path.dirname(__file__))
 res = os.path.join(here, 'resources')
 
 
 def _prepare_predictor():
-    return CloudPredictor('tabular', role_arn='dummy')
+    return TabularCloudPredictor(role_arn='dummy')
 
 
 def _prepare_path(input_type, output_type):

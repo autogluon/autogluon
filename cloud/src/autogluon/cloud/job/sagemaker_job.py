@@ -21,18 +21,6 @@ class SageMakerJob(ABC):
     def attach(cls, job_name):
         pass
 
-    @property
-    @abstractmethod
-    def job_name(self):
-        return self._job_name
-
-    @property
-    @abstractmethod
-    def completed(self):
-        if not self.job_name:
-            return False
-        return self.get_job_status() == 'Completed'
-
     @abstractmethod
     def info(self):
         pass
@@ -49,6 +37,16 @@ class SageMakerJob(ABC):
     def _get_output_path(self):
         raise NotImplementedError
 
+    @property
+    def job_name(self):
+        return self._job_name
+
+    @property
+    def completed(self):
+        if not self.job_name:
+            return False
+        return self.get_job_status() == 'Completed'
+
     def get_job_status(self):
         if not self.job_name:
             return 'NotCreated'
@@ -60,8 +58,9 @@ class SageMakerJob(ABC):
         return self._get_output_path()
 
     def __getstate__(self):
-        self.session = None
-        return self.__dict__
+        state_dict = self.__dict__.copy()
+        state_dict['session'] = None
+        return state_dict
 
     def __setstate__(self, state):
         self.__dict__ = state
@@ -154,6 +153,10 @@ class SageMakerFitJob(SageMakerJob):
 
 class SageMakerBatchTransformationJob(SageMakerJob):
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._output_filename = None
+
     @classmethod
     def attach(cls, job_name):
         raise NotImplementedError
@@ -170,7 +173,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         return self.session.describe_transform_job(self.job_name)['TransformJobStatus']
 
     def _get_output_path(self):
-        return self.session.describe_transform_job(self.job_name)['TransformOutput']['S3OutputPath']
+        return self.session.describe_transform_job(self.job_name)['TransformOutput']['S3OutputPath'] + '/' + self._output_filename
 
     def run(
         self,
@@ -209,7 +212,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         transformer = model.transformer(
             instance_count=instance_count,
             instance_type=instance_type,
-            output_path=output_path + '/results',
+            output_path=output_path,
             **transformer_kwargs
         )
         logger.log(20, 'Transformer created successfully')
@@ -228,8 +231,8 @@ class SageMakerBatchTransformationJob(SageMakerJob):
             transformer.delete_model()
             raise e
 
-        test_data_filename = test_input.split('/')[-1]
-        self._recent_batch_transform_results_path = output_path + '/results/' + test_data_filename + '.out'
+        self._output_filename = test_input.split('/')[-1] + '.out'
+
         if wait:
             transformer.delete_model()
             logger.log(20, f'Predict results have been saved to {self.get_output_path()}')

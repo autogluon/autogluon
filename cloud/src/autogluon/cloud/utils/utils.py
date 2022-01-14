@@ -1,7 +1,16 @@
-import uuid
 import logging
+import os
+import tarfile
+import uuid
+
 
 logger = logging.getLogger(__name__)
+
+
+def unzip_file(tarball_path, save_path):
+    file = tarfile.open(tarball_path)
+    file.extractall(save_path)
+    file.close()
 
 
 def rename_file_with_uuid(file_name):
