@@ -16,6 +16,7 @@ from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
 from autogluon.common.utils.utils import setup_outputdir
 
 from ..data import FormatConverterFactory
+from ..job import SageMakerFitJob, SageMakerBatchTransformationJob
 from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
     AutoGluonSagemakerInferenceModel,
@@ -23,11 +24,12 @@ from ..utils.ag_sagemaker import (
     AutoGluonBatchPredictor
 )
 from ..utils.aws_utils import create_sagemaker_role_and_attach_policies
+from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
+from ..utils.misc import MostRecentInsertedOrderedDict
 from ..utils.script_paths import TRAIN_SCRIPT_PATH, TABULAR_SERVE_SCRIPT_PATH, TEXT_SERVE_SCRIPT_PATH
 from ..utils.s3_utils import download_s3_file
 from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_latest_framework_version
 from ..utils.utils import rename_file_with_uuid
-from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
 
 logger = logging.getLogger(__name__)
 
@@ -78,21 +80,17 @@ class CloudPredictor:
         self.sagemaker_session = sagemaker.session.Session()
         self.local_output_path = self._setup_local_output_path(local_output_path)
         self.cloud_output_path = self._setup_cloud_output_path(cloud_output_path)
-        self._is_fit = False
         self.endpoint = None
 
         self._region = self.sagemaker_session.boto_region_name
-        self._cloud_predictor_path = None
-        self._fit_job_name = None
-        self._fit_job_framework_version = None
-        self._transform_job_name = None
-        self._recent_batch_transform_results_path = None
+        self._fit_job = SageMakerFitJob(session=self.sagemaker_session)
+        self._batch_transform_jobs = MostRecentInsertedOrderedDict()
 
         self._setup_predictor_type()
 
     @property
     def is_fit(self):
-        return self._is_fit
+        return self._fit_job.completed
 
     @property
     def endpoint_name(self):
@@ -110,16 +108,9 @@ class CloudPredictor:
         info = dict(
             local_output_path=self.local_output_path,
             cloud_output_path=self.cloud_output_path,
-            fit_job=dict(
-                name=self._fit_job_name,
-                status=self.get_fit_job_status(self._fit_job_name),
-                framework_version=self._fit_job_framework_version,
-            ),
-            recent_transform_job=dict(
-                name=self._transform_job_name,
-                status=self.get_batch_transform_job_status(self._transform_job_name),
-                result_path=self._recent_batch_transform_results_path,
-            ),
+            fit_job=self._fit_job.info(),
+            recent_transform_job=self._batch_transform_jobs.last_value.info() if len(self._batch_transform_jobs) > 0 else None,
+            transform_jobs=[job_name for job_name in self._batch_transform_jobs.keys()],
             endpoint=self.endpoint_name
         )
         return info
@@ -286,7 +277,7 @@ class CloudPredictor:
         -------
         `CloudPredictor` object. Returns self.
         """
-        assert self.is_fit, 'Predictor is already fit! To fit additional models, create a new `CloudPredictor`'
+        assert not self._fit_job.completed, 'Predictor is already fit! To fit additional models, create a new `CloudPredictor`'
         # TODO: Add warning for multi-model image not working properly
         train_data = predictor_fit_args.pop('train_data')
         tune_data = predictor_fit_args.pop('tuning_data', None)
@@ -308,18 +299,6 @@ class CloudPredictor:
             # Avoid user passing in source_dir without specifying entry point
             autogluon_sagemaker_estimator_kwargs.pop('source_dir', None)
 
-        sagemaker_estimator = AutoGluonSagemakerEstimator(
-            role=self.role_arn,
-            entry_point=entry_point,
-            region=self._region,
-            instance_type=instance_type,
-            instance_count=instance_count,
-            volume_size=volume_size,
-            framework_version=framework_version,
-            base_job_name="autogluon-cloudpredictor-train",
-            output_path=output_path,
-            **autogluon_sagemaker_estimator_kwargs
-        )
         self._setup_bucket(cloud_bucket)
         config = self._construct_config(predictor_init_args, predictor_fit_args, leaderboard)
         train_input, tune_input, config_input = self._upload_fit_artifact(
@@ -333,21 +312,23 @@ class CloudPredictor:
         )
         if tune_input:
             inputs['tune'] = tune_input
-        logger.log(20, f'Start sagemaker training job `{job_name}`')
-        self._fit_job_name = job_name
-        try:
-            sagemaker_estimator.fit(
-                inputs=inputs,
-                wait=wait,
-                job_name=job_name,
-                **kwargs
-            )
-            self._cloud_predictor_path = sagemaker_estimator.model_data
-            self._fit_job_framework_version = framework_version
-            self._is_fit = True
-        except Exception as e:
-            logger.error(f'Training failed. Please check sagemaker console training jobs {job_name} for details.')
-            raise e
+
+        self._fit_job.run(
+            role=self.role_arn,
+            entry_point=entry_point,
+            region=self._region,
+            instance_type=instance_type,
+            instance_count=instance_count,
+            volume_size=volume_size,
+            framework_version=framework_version,
+            base_job_name="autogluon-cloudpredictor-train",
+            output_path=output_path,
+            inputs=inputs,
+            wait=wait,
+            job_name=job_name,
+            autogluon_sagemaker_estimator_kwargs=autogluon_sagemaker_estimator_kwargs,
+            **kwargs
+        )
         return self
 
     def attach_job(self, job_name):
@@ -364,28 +345,20 @@ class CloudPredictor:
         -------
         `CloudPredictor` object. Returns self.
         """
-        logger.warning('Reattach to a job does not support real-time logging. Logs will be printed once the training job completes')
-        sagemaker_estimator = AutoGluonSagemakerEstimator.attach(job_name)
-        self._cloud_predictor_path = sagemaker_estimator.model_data
-        sagemaker_estimator.logs()
+        self._fit_job = SageMakerFitJob.attach(job_name)
         return self
 
-    def get_fit_job_status(self, job_name):
+    def get_fit_job_status(self):
         """
         Get the status of the training job.
         This is useful when the user made an asynchronous call to the `fit()` function
 
-        Parameters
-        ----------
-        job_name: str
-            The name of the job being checked
-
         Returns
         -------
         str,
-        Valid Values: InProgress | Completed | Failed | Stopping | Stopped
+        Valid Values: InProgress | Completed | Failed | Stopping | Stopped | NotCreated
         """
-        return self.sagemaker_session.describe_training_job(job_name)['TrainingJobStatus']
+        return self._fit_job.get_job_status()
 
     def download_trained_predictor(self, save_path=None):
         """
@@ -402,8 +375,7 @@ class CloudPredictor:
         save_path: str
             Path to the saved model.
         """
-        assert self._cloud_predictor_path, 'No cloud trained model found.'
-        path = self._cloud_predictor_path
+        path = self._fit_job.get_output_path()
         if not save_path:
             save_path = self.local_output_path
         save_path = self._download_predictor(path, save_path)
@@ -442,7 +414,7 @@ class CloudPredictor:
                         key_prefix=key_prefix
                     )
                 else:
-                    raise ValueError('Please provde a tarball containing the model')
+                    raise ValueError('Please provide a tarball containing the model')
             else:
                 raise ValueError('Please provide a valid path to the model tarball.')
         return predictor_path
@@ -492,17 +464,13 @@ class CloudPredictor:
         """
         assert self.endpoint is None, 'There is an endpoint already attached. Either detach it with `detach` or clean it up with `cleanup_deployment`'
         if not predictor_path:
-            assert self.get_fit_job_status(self._fit_job_name) == 'Completed', 'Fit job not completed.'
-        if not predictor_path:
-            assert self._cloud_predictor_path, 'No cloud trained model found.'
-            predictor_path = self._cloud_predictor_path
+            predictor_path = self._fit_job.get_output_path()
+            assert predictor_path, 'No cloud trained model found.'
+        predictor_path = self._upload_predictor(predictor_path, f'endpoints/{endpoint_name}/predictor')
 
         if not endpoint_name:
             endpoint_name = sagemaker.utils.unique_name_from_base("sagemaker-autogluon-serving-trained-model")
         framework_version = self._parse_framework_version(framework_version, 'inference')
-
-        predictor_path = self._upload_predictor(predictor_path, f'endpoints/{endpoint_name}/predictor')
-        self._cloud_predictor_path = predictor_path
 
         assert self._serve_script_path is not None
         entry_point = self._serve_script_path
@@ -536,10 +504,6 @@ class CloudPredictor:
             wait=wait,
             **kwargs
         )
-        if wait:
-            logger.log(20, 'Model deployed')
-        else:
-            logger.log(20, 'Endpoint being created asynchronously. You can check the status using AWS SageMaker console')
 
     def attach_endpoint(self, endpoint):
         """
@@ -657,16 +621,13 @@ class CloudPredictor:
             Any extra arugments needed to pass to transform.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer.transform for all options.
         """
-        if not predictor_path:
-            assert self.get_fit_job_status(self._fit_job_name) == 'Completed', 'Fit job not completed.'
         # Sagemaker batch transformation is able to take in headers during the most recent test
         # logger.warning('Please remove headers of the test data and make sure the columns are in the same order as the training data.')
+        if not predictor_path:
+            predictor_path = self._fit_job.get_output_path()
+            assert predictor_path, 'No cloud trained model found.'
 
         framework_version = self._parse_framework_version(framework_version, 'inference')
-
-        if not predictor_path:
-            assert self._cloud_predictor_path, 'Pleas provide either a path to a predictor tarball or use CloudPredictor.fit() to train one'
-            predictor_path = self._cloud_predictor_path
 
         output_path = kwargs.get('output_path', None)
         if not output_path:
@@ -675,7 +636,7 @@ class CloudPredictor:
         output_path = output_path + '/batch_transform' + f'/{sagemaker.utils.sagemaker_timestamp()}'
 
         cloud_bucket, cloud_key_prefix = s3_path_to_bucket_prefix(output_path)
-        logger.log(20, 'Prepare autogluon predictor...')
+        logger.log(20, 'Preparing autogluon predictor...')
         predictor_path = self._upload_predictor(predictor_path, cloud_key_prefix + '/predictor')
 
         if not job_name:
@@ -705,28 +666,6 @@ class CloudPredictor:
             logger.warning('Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonBatchPredictor` for how to provide a custom predictor')
             predictor_cls = user_predictor_cls
 
-        logger.log(20, 'Creating inference model...')
-        model = AutoGluonSagemakerInferenceModel(
-            model_data=predictor_path,
-            role=self.role_arn,
-            region=self._region,
-            framework_version=framework_version,
-            instance_type=instance_type,
-            entry_point=entry_point,
-            predictor_cls=predictor_cls,
-            **autogluon_sagemaker_inference_model_kwargs
-        )
-        logger.log(20, 'Inference model created successfully')
-
-        logger.log(20, 'Creating transformer...')
-        transformer = model.transformer(
-            instance_count=instance_count,
-            instance_type=instance_type,
-            output_path=output_path + '/results',
-            **transformer_kwargs
-        )
-        logger.log(20, 'Transformer created successfully')
-
         split_type = kwargs.pop('split_type', None)
         content_type = kwargs.pop('content_type', None)
         if not split_type:
@@ -734,40 +673,46 @@ class CloudPredictor:
         if not content_type:
             content_type = 'text/csv'
 
-        try:
-            transformer.transform(
-                test_input,
-                job_name=job_name,
-                split_type=split_type,
-                content_type=content_type,
-                wait=wait,
-                **kwargs
-            )
-            self._transform_job_name = job_name
-        except Exception as e:
-            transformer.delete_model()
-            raise e
-        test_data_filename = test_input.split('/')[-1]
-        self._recent_batch_transform_results_path = output_path + '/results/' + test_data_filename + '.out'
-        if wait:
-            transformer.delete_model()
-            logger.log(20, f'Predict results have been saved to {self._recent_batch_transform_results_path}')
-        else:
-            logger.log(20, f'Predict results will be saved to {self._recent_batch_transform_results_path} when it is ready')
+        batch_transform_job = SageMakerBatchTransformationJob(session=self.sagemaker_session)
+        batch_transform_job.run(
+            model_data=predictor_path,
+            role=self.role_arn,
+            region=self._region,
+            framework_version=framework_version,
+            instance_count=instance_count,
+            instance_type=instance_type,
+            entry_point=entry_point,
+            predictor_cls=predictor_cls,
+            output_path=output_path + '/results',
+            test_input=test_input,
+            job_name=job_name,
+            split_type=split_type,
+            content_type=content_type,
+            wait=wait,
+            transformer_kwargs=transformer_kwargs,
+            autogluon_sagemaker_inference_model_kwargs=autogluon_sagemaker_inference_model_kwargs,
+            **kwargs
+        )
+        self._batch_transform_jobs[job_name] = batch_transform_job
 
-    def download_predict_results(self, save_path=None):
+
+    def download_predict_results(self, job_name=None, save_path=None):
         """
         Download batch transform result
 
         Parameters
         ----------
+        job_name: str
+            The specific batch transform job result to download.
+            If None, will download the most recent job result.
         save_path: str
             Path to save the downloaded result.
             If None, CloudPredictor will create one.
         """
-        assert self.get_batch_transform_job_status(self._transform_job_name) == 'Completed', 'Transform job not completed yet'
-        assert self._recent_batch_transform_results_path, 'No predict results found.'
-        file_name = self._recent_batch_transform_results_path.split('/')[-1]
+        if not job_name:
+            result_path = self._batch_transform_jobs.last_value.get_output_path()
+        assert result_path is not None, 'No predict results found.'
+        file_name = result_path.split('/')[-1]
         if not save_path:
             save_path = self.local_output_path
         save_path = os.path.expanduser(save_path)
@@ -780,10 +725,10 @@ class CloudPredictor:
             logger.warning('File already exists. Will rename the file to avoid overwrite.')
             file_name = rename_file_with_uuid(file_name)
         results_save_path = os.path.join(results_save_path, file_name)
-        results_bucket, results_key_prefix = s3_path_to_bucket_prefix(self._recent_batch_transform_results_path)
+        results_bucket, results_key_prefix = s3_path_to_bucket_prefix(result_path)
         download_s3_file(results_bucket, results_key_prefix, results_save_path)
 
-    def get_batch_transform_job_status(self, job_name):
+    def get_batch_transform_job_status(self, job_name=None):
         """
         Get the status of the batch transform job.
         This is useful when the user made an asynchronous call to the `predict()` function
@@ -791,16 +736,20 @@ class CloudPredictor:
         Parameters
         ----------
         job_name: str
-            The name of the job being checked
+            The name of the job being checked.
+            If None, will check the most recent job status.
 
         Returns
         -------
         str,
-        Valid Values: InProgress | Completed | Failed | Stopping | Stopped
+        Valid Values: InProgress | Completed | Failed | Stopping | Stopped | NotCreated
         """
         if not job_name:
-            return None
-        return self.sagemaker_session.describe_transform_job(job_name)['TransformJobStatus']
+            job_name = self._batch_transform_jobs.last
+        job = self._batch_transform_jobs.get(job_name, None)
+        if job:
+            return job.get_job_status()
+        return 'NotCreated'
 
     def cleanup_deployment(self):
         """
@@ -859,6 +808,10 @@ class CloudPredictor:
         if not silent:
             logger.log(20, f'{type(self).__name__} saved. To load, use: predictor = {type(self).__name__}.load("{self.local_output_path}")')
 
+    def _load_jobs(self):
+        for job in self._batch_transform_jobs:
+            job.session = self.sagemaker_session
+
     @classmethod
     def load(cls, path, verbosity=None):
         """
@@ -882,6 +835,7 @@ class CloudPredictor:
         predictor: CloudPredictor = load_pkl.load(path=os.path.join(path, cls.predictor_file_name))
         predictor.sagemaker_session = sagemaker.session.Session()
         predictor._region = predictor.sagemaker_session.boto_region_name
+        predictor._load_jobs()
         if hasattr(predictor, '_endpoint_saved') and predictor._endpoint_saved:
             predictor.attach_endpoint(predictor._endpoint_saved)
             predictor._endpoint_saved = None
