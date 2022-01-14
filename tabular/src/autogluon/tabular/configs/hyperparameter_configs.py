@@ -6,7 +6,8 @@ import copy
 hyperparameter_config_dict = dict(
     # Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
     default={
-        'NN': {},
+        'NN_TORCH': {},
+        'NN_MXNET': {},
         'GBM': [
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
             {},
@@ -32,7 +33,7 @@ hyperparameter_config_dict = dict(
     },
     # Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
     light={
-        'NN': {},
+        'NN_MXNET': {},
         'GBM': [
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
             {},
@@ -54,7 +55,7 @@ hyperparameter_config_dict = dict(
     },
     # Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
     very_light={
-        'NN': {},
+        'NN_MXNET': {},
         'GBM': [
             {},
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
@@ -65,14 +66,14 @@ hyperparameter_config_dict = dict(
     },
     # Results in extremely quick to train models. Only use this when prototyping, as the model accuracy will be severely reduced.
     toy={
-        'NN': {'num_epochs': 10},
+        'NN_MXNET': {'num_epochs': 5},
         'GBM': {'num_boost_round': 10},
         'CAT': {'iterations': 10},
         'XGB': {'n_estimators': 10},
     },
     # Default AutoGluon hyperparameters intended to maximize accuracy in multimodal tabular + text datasets. Requires GPU.
     multimodal={
-        'NN': {},
+        'NN_MXNET': {},
         'GBM': [
             {},
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},

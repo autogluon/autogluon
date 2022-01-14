@@ -57,7 +57,7 @@ gbm_options = {  # specifies non-default hyperparameter values for lightGBM grad
 
 hyperparameters = {  # hyperparameters of each model type
                    'GBM': gbm_options,
-                   'NN': nn_options,  # NOTE: comment this line out if you get errors on Mac OSX
+                   'NN_MXNET': nn_options,  # NOTE: comment this line out if you get errors on Mac OSX
                   }  # When these keys are missing from hyperparameters dict, no models of that type are trained
 
 time_limit = 2*60  # train various models for ~2 min
@@ -100,7 +100,7 @@ Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two o
 ```{.python .input}
 predictor = TabularPredictor(label=label, eval_metric=metric).fit(train_data,
     num_bag_folds=5, num_bag_sets=1, num_stack_levels=1,
-    hyperparameters = {'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
+    hyperparameters = {'NN_MXNET': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
 )
 ```
 
@@ -111,7 +111,7 @@ save_path = 'agModels-predictOccupation'  # folder where to store trained models
 
 predictor = TabularPredictor(label=label, eval_metric=metric, path=save_path).fit(
     train_data, auto_stack=True,
-    time_limit=30, hyperparameters={'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
+    time_limit=30, hyperparameters={'NN_MXNET': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
 )
 ```
 
@@ -323,7 +323,7 @@ Here you can set `hyperparameters` to either 'light', 'very_light', or 'toy' to 
 Finally, you may also exclude specific unwieldy models from being trained at all. Below we exclude models that tend to be slower (K Nearest Neighbors, Neural Network, models with custom larger-than-default  hyperparameters):
 
 ```{.python .input}
-excluded_model_types = ['KNN', 'NN', 'custom']
+excluded_model_types = ['KNN', 'NN_MXNET', 'custom']
 predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
 ```
 

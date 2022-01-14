@@ -7,12 +7,16 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from autogluon.core.constants import QUANTILE
+from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 
-from ..mxnet.tabular_nn_mxnet import TabularNeuralNetMxnetModel
+from ..hyperparameters.parameters import get_default_param
+from ..hyperparameters.searchspaces import get_default_searchspace
+from ..utils.data_preprocessor import create_preprocessor, get_feature_arraycol_map, get_feature_type_map
+from ..utils.nn_architecture_utils import infer_y_range, get_default_layers, default_numeric_embed_dim
 from ...utils import fixedvals_from_searchspaces
 
 logger = logging.getLogger(__name__)
@@ -22,34 +26,71 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     """
     PyTorch neural network models for classification/regression with tabular data.
     """
+
+    # Constants used throughout this class:
+    unique_category_str = '!missing!' # string used to represent missing values and unknown categories for categorical features. Should not appear in the dataset
+    params_file_name = 'net.params' # Stores parameters of final network
+    temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if self.problem_type != QUANTILE:
-            raise ValueError("This neural network is only available for quantile regression")
+        self.feature_arraycol_map = None
+        self.feature_type_map = None
+        self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self._features_internal
+        self.processor = None  # data processor
+        self.batch_size = None
+        self.num_dataloading_workers = None
+        self.params_post_fit = None
+        self.num_net_outputs = None
+        self._architecture_desc = None
+        self.optimizer = None
+        self.verbosity = None
+        self.device = None
+        self.max_batch_size = None
+
+    def _set_default_params(self):
+        """ Specifies hyperparameter values to use by default """
+        default_params = get_default_param(problem_type=self.problem_type, framework='pytorch')
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            ignored_type_group_raw=[R_OBJECT],
+            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
+
+    def _get_default_searchspace(self):
+        return get_default_searchspace(problem_type=self.problem_type, framework='pytorch')
 
     def set_net_defaults(self, train_dataset, params):
         """ Sets dataset-adaptive default values to use for our neural network """
-        # infer default y-range
-        if params['y_range'] is None:
-            y_vals = train_dataset.data_list[train_dataset.label_index]
-            min_y = float(np.min(y_vals))
-            max_y = float(np.max(y_vals))
-            std_y = np.std(y_vals)
-            y_ext = params['y_range_extend'] * std_y
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
+            self.num_net_outputs = train_dataset.num_classes
+        elif self.problem_type == BINARY:
+            self.num_net_outputs = 2
+        elif self.problem_type == REGRESSION:
+            self.num_net_outputs = 1
+        elif self.problem_type == QUANTILE:
+            self.num_net_outputs = len(self.quantile_levels)
 
-            # infer y must be non-negative
-            if min_y >= 0:
-                min_y = max(0, min_y - y_ext)
-            else:
-                min_y = min_y - y_ext
+        if self.problem_type in [REGRESSION, QUANTILE]:
+            if params['y_range'] is None:
+                params['y_range'] = infer_y_range(y_vals=train_dataset.data_list[train_dataset.label_index], y_range_extend=params['y_range_extend'])
+        if params['loss_function'] is None:
+            import torch
+            if self.problem_type == REGRESSION:
+                params['loss_function'] = torch.nn.L1Loss()  # or torch.nn.MSELoss()
+            elif self.problem_type in [BINARY, MULTICLASS]:
+                params['loss_function'] = torch.nn.CrossEntropyLoss()
+            elif self.problem_type == SOFTCLASS:
+                params['loss_function'] = torch.nn.KLDivLoss()  # compares log-probability prediction vs probability target.
 
-            # infer y must be non-positive
-            if max_y <= 0:
-                max_y = min(0, max_y + y_ext)
-            else:
-                max_y = max_y+y_ext
-            params['y_range'] = (min_y, max_y)
         return
+
 
     def _fit(self, X, y, X_val=None, y_val=None,
              time_limit=None, sample_weight=None, num_cpus=1, num_gpus=0, reporter=None, **kwargs):
@@ -69,7 +110,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         else:
             self.num_dataloading_workers = 1
         if self.num_dataloading_workers == 1:
-            self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
+            self.num_dataloading_workers = 0  # TODO: verify 0 is typically faster and uses less memory than 1 in pytorch
         self.num_dataloading_workers = 0
         self.max_batch_size = params['max_batch_size']
         if isinstance(X, TabularTorchDataset):
@@ -78,22 +119,22 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             self.batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
 
         train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params, X_val=X_val, y_val=y_val)
-        logger.log(15, "Training data for TabularNeuralQuantileModel has: %d examples, %d features "
-                       "(%d vector, %d embedding, %d language)" %
-                   (train_dataset.num_examples, train_dataset.num_features,
-                    len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed']),
-                    len(train_dataset.feature_groups['language'])))
+        logger.log(15, "Training data for TabularNeuralQuantileModel has: %d examples, %d features (%d vector, %d embedding)" %
+                   (train_dataset.num_examples, train_dataset.num_features, len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed'])
+                  ))
 
         if num_gpus is not None and num_gpus >= 1:
             if torch.cuda.is_available():
                 self.device = torch.device("cuda")
+                logger.log(15, "Training on GPU")
                 if num_gpus > 1:
-                    logger.warning("TabularNeuralQuantileModel not yet configured to use more than 1 GPU."
-                                   " 'num_gpus' set to >1, but we will be using only 1 GPU.")
+                    logger.warning("Tabular Neural Network not yet able to use more than 1 GPU. 'num_gpus' is set to >1, but we will be using only 1 GPU.")
             else:
                 self.device = torch.device("cpu")
+                logger.log(15, "Training on CPU")
         else:
             self.device = torch.device("cpu")
+            logger.log(15, "Training on CPU")
 
         self.get_net(train_dataset, params=params)
 
@@ -117,12 +158,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.params_post_fit = params
 
     def get_net(self, train_dataset, params):
-        from .torch_network_modules import MultiQuantileNet
+        from .torch_network_modules import EmbedNet
 
         # set network params
         self.set_net_defaults(train_dataset, params)
-        self.model = MultiQuantileNet(quantile_levels=self.quantile_levels,
-                                                  train_dataset=train_dataset, params=params, device=self.device)
+        self.model = EmbedNet(problem_type=self.problem_type, num_net_outputs=self.num_net_outputs, quantile_levels=self.quantile_levels,
+                              train_dataset=train_dataset, params=params, device=self.device)
         self.model = self.model.to(self.device)
         if not os.path.exists(self.path):
             os.makedirs(self.path)
@@ -130,9 +171,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def train_net(self, train_dataset, params, val_dataset=None, initialize=True, setup_trainer=True, time_limit=None, reporter=None):
         import torch
         start_time = time.time()
-        logger.log(15, "Training neural network for quantile prediction for up to %s updates..." % params['num_updates'])
+        logger.log(15, "Training tabular neural network for up to %s gradient updates..." % params['num_updates'])
         seed_value = params.get('seed_value')
-        if seed_value is not None:  # Set seed
+        if seed_value is not None:  # Set seeds
             random.seed(seed_value)
             np.random.seed(seed_value)
             torch.manual_seed(seed_value)
@@ -163,11 +204,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if num_updates == 0:
             # use dummy training loop that stops immediately
             # useful for using NN just for data preprocessing / debugging
-            logger.log(20, "Not training Neural Net since num_updates == 0.  Neural network architecture is:")
+            logger.log(20, "Not training Tabular Neural Network since num_updates == 0.  Neural network architecture is:")
 
             # for each batch
             for batch_idx, data_batch in enumerate(train_dataloader):
-                loss = self.model.compute_loss(data_batch, weight=1.0, margin=params['gamma'])
+                loss = self.model.compute_loss(data_batch, params)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -176,15 +217,15 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
             torch.save(self.model, net_filename)
-            logger.log(15, "untrained Quantile Neural Network saved to file")
+            logger.log(15, "Untrained Tabular Neural Network saved to file")
             return
 
         start_fit_time = time.time()
         if time_limit is not None:
             time_limit = time_limit - (start_fit_time - start_time)
 
-        # start training Loop:
-        logger.log(15, "Start training Qunatile Neural network")
+        # start training loop:
+        logger.log(15, "Start training Tabular Neural network")
         total_updates = 0
         do_update = True
         while do_update:
@@ -192,8 +233,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             total_train_size = 0.0
             for batch_idx, data_batch in enumerate(train_dataloader):
                 # forward
-                weight = (np.cos(min((total_updates / float(updates_wo_improve)), 1.0) * np.pi) + 1) * 0.5
-                loss = self.model.compute_loss(data_batch, weight=weight, margin=params['gamma'])
+                loss = self.model.compute_loss(data_batch, params)
                 total_train_loss += loss.item()
                 total_train_size += 1
 
@@ -207,6 +247,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 if total_updates % 100 == 0 and val_dataset is not None:
                     # compute validation score
                     val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
+                    self.model.train()  # go back to training mode
                     if np.isnan(val_metric):
                         if total_updates == 1:
                             raise RuntimeError("NaNs encountered in TabularNeuralQuantileModel training. "
@@ -256,7 +297,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
                 # max updates
                 if total_updates == num_updates:
-                    logger.log(15, f"\tReached the max number of updates. ({num_updates})")
+                    logger.log(15, f"Reached the max number of updates: {num_updates}")
                     do_update = False
                     break
 
@@ -300,7 +341,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if process:
             new_data = self.process_test_data(new_data, None)
         if not isinstance(new_data, TabularTorchDataset):
-            raise ValueError("new_data must of of type TabularNNDataset if process=False")
+            raise ValueError("new_data must of of type TabularTorchDataset if process=False")
         val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
         preds_dataset = []
         for batch_idx, data_batch in enumerate(val_dataloader):
@@ -362,7 +403,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         # self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
         df = self.processor.transform(df)
-        return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, labels)
+        return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels)
 
     def process_train_data(self, df, impute_strategy, max_category_levels, skew_threshold,
                            embed_min_categories, use_ngram_features, labels, **kwargs):
@@ -375,29 +416,25 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if len(labels) != len(df):
             raise ValueError("Number of examples in Dataframe does not match number of labels")
 
-        # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
+        # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', values = column-names of df
         self._types_of_features, df = self._get_types_of_features(df, skew_threshold=skew_threshold,
                                                                   embed_min_categories=embed_min_categories,
                                                                   use_ngram_features=use_ngram_features)
-        logger.log(15, "AutoGluon Qunatile Neural Network (pytorch) infers features are of the following types:")
+        logger.log(15, "Tabular Neural Network treats features as the following types:")
         logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
-        self.processor = self._create_preprocessor(impute_strategy=impute_strategy,
-                                                   max_category_levels=max_category_levels)
+        if self.processor is not None:
+            Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
+        self.processor = create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels, unique_category_str=self.unique_category_str, continuous_features=self._types_of_features['continuous'],
+                                   skewed_features=self._types_of_features['skewed'], onehot_features=self._types_of_features['onehot'], embed_features=self._types_of_features['embed'])
         df = self.processor.fit_transform(df)
-
-        # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
-        self.feature_arraycol_map = self._get_feature_arraycol_map(max_category_levels=max_category_levels)
-
-        # should match number of columns in processed array
-        num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])
+        self.feature_arraycol_map = get_feature_arraycol_map(processor=self.processor, max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
+        num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])  # should match number of columns in processed array
         if num_array_cols != df.shape[1]:
-            raise ValueError("Error during one-hot encoding data processing for neural network."
-                             " Number of columns in df array does not match feature_arraycol_map.")
+            raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in df array does not match feature_arraycol_map.")
 
-        # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
-        self.feature_type_map = self._get_feature_type_map()
-        return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, labels)
+        self.feature_type_map = get_feature_type_map(feature_arraycol_map=self.feature_arraycol_map, types_of_features=self._types_of_features)  # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed')
+        return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels)
 
     def setup_trainer(self, params, **kwargs):
         """
@@ -417,6 +454,19 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         else:
             raise ValueError("Unknown optimizer specified: %s" % params['optimizer'])
         return optimizer
+
+    def get_info(self):
+        info = super().get_info()
+        info['hyperparameters_post_fit'] = self.params_post_fit
+        return info
+
+    def reduce_memory_size(self, remove_fit=True, requires_save=True, **kwargs):
+        super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
+        if remove_fit and requires_save:
+            self.optimizer = None
+
+    def _get_default_stopping_metric(self):
+        return self.eval_metric
 
     def save(self, path: str = None, verbose=True) -> str:
         if self.model is not None:
@@ -439,15 +489,13 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
-        model: TabularNeuralQuantileModel = AbstractNeuralNetworkModel.load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model = AbstractNeuralNetworkModel.load(path=path, reset_paths=reset_paths, verbose=verbose)
         if model._architecture_desc is not None:
             import torch
-            from .torch_network_modules import MultiQuantileNet
+            from .torch_network_modules import EmbedNet
 
             # recreate network from architecture description
-            model.model = MultiQuantileNet(quantile_levels=model.quantile_levels,
-                                                       architecture_desc=model._architecture_desc,
-                                                       device=model.device)
+            model.model = EmbedNet(problem_type=model.problem_type, num_net_outputs=model.num_net_outputs, quantile_levels=model.quantile_levels, architecture_desc=model._architecture_desc, device=model.device)
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model

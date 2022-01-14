@@ -505,7 +505,7 @@ def test_tabularHPObagstack():
         subsample_size = 100
         nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001,0.01), 'lr_scheduler': ag.Categorical(None, 'cosine','step')}
         gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01,0.1)}
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
+        hyperparameters = {'GBM': gbm_options, 'NN_MXNET': nn_options}
         time_limit = 150
         hyperparameter_tune_kwargs['num_trials'] = 3
 
@@ -546,7 +546,7 @@ def test_tabularHPO():
         subsample_size = 100
         nn_options = {'num_epochs': 2}
         gbm_options = {'num_boost_round': 20}
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
+        hyperparameters = {'GBM': gbm_options, 'NN_MXNET': nn_options}
         time_limit = 60
         hyperparameter_tune_kwargs['num_trials'] = 5
 
@@ -626,7 +626,7 @@ def _construct_tabular_bag_test_config(fold_fitting_strategy):
         subsample_size = 120
         nn_options = {'num_epochs': 1}
         gbm_options = {'num_boost_round': 30}
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
+        hyperparameters = {'GBM': gbm_options, 'NN_MXNET': nn_options}
         time_limit = 60
 
     fit_args = {
@@ -735,7 +735,7 @@ def test_tabular_stack1():
         subsample_size = 100
         nn_options = {'num_epochs': 3}
         gbm_options = {'num_boost_round': 30}
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
+        hyperparameters = {'GBM': gbm_options, 'NN_MXNET': nn_options}
         time_limit = 60
 
     fit_args = {
@@ -776,7 +776,7 @@ def test_tabular_stack2():
         subsample_size = 100
         nn_options = {'num_epochs': 3}
         gbm_options = {'num_boost_round': 30}
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
+        hyperparameters = {'GBM': gbm_options, 'NN_MXNET': nn_options}
         time_limit = 60
 
     fit_args = {
@@ -817,7 +817,7 @@ def test_tabular_bagstack():
         subsample_size = 105
         nn_options = {'num_epochs': 2}
         gbm_options = [{'num_boost_round': 40}, 'GBMLarge']
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
+        hyperparameters = {'GBM': gbm_options, 'NN_MXNET': nn_options}
         time_limit = 60
 
     fit_args = {
@@ -859,7 +859,7 @@ def test_tabular_bagstack_use_bag_holdout():
         subsample_size = 105
         nn_options = {'num_epochs': 2}
         gbm_options = [{'num_boost_round': 40}, 'GBMLarge']
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
+        hyperparameters = {'GBM': gbm_options, 'NN_MXNET': nn_options}
         time_limit = 60
 
     fit_args = {

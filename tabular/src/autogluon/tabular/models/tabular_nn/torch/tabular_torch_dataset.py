@@ -1,5 +1,8 @@
+import os
 import torch
 import numpy as np
+
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 
 
 class TabularTorchDataset(torch.utils.data.Dataset):
@@ -16,15 +19,14 @@ class TabularTorchDataset(torch.utils.data.Dataset):
                                         (continuous & one-hot) features are concatenated together into a single index
                                         of the dataset.
             data_desc (list[str]): Describes the data type of each index of dataset
-                                   (options: 'vector','embed_<featname>', 'language_<featname>')
+                                   (options: 'vector','embed_<featname>')
             embed_indices (list): which columns in dataset correspond to embed features (order matters!)
-            language_indices (list): which columns in dataset correspond to language features (order matters!)
             vecfeature_col_map (dict): maps vector_feature_name ->  columns of dataset._data[vector] array that
                                        contain the data for this feature
             feature_dataindex_map (dict): maps feature_name -> i such that dataset._data[i] = data array for
                                           this feature. Cannot be used for vector-valued features,
                                           instead use vecfeature_col_map
-            feature_groups (dict): maps feature_type (ie. 'vector' or 'embed' or 'language') to list of feature
+            feature_groups (dict): maps feature_type (ie. 'vector' or 'embed') to list of feature
                                    names of this type (empty list if there are no features of this type)
             vectordata_index (int): describes which element of the dataset._data list holds the vector data matrix
                                     (access via self.data_list[self.vectordata_index]); None if no vector features
@@ -39,32 +41,28 @@ class TabularTorchDataset(torch.utils.data.Dataset):
     # hard-coded names for files. This file contains pickled torch.util.data.Dataset object
     DATAOBJ_SUFFIX = '_tabdataset_torch.pt'
 
-    def __init__(self,
-                 processed_array,
-                 feature_arraycol_map,
-                 feature_type_map,
-                 labels=None):
+    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, problem_type, labels=None):
         """ Args:
             processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
             feature_arraycol_map (OrderedDict): Mapsfeature-name -> list of column-indices in processed_array
                                                 corresponding to this feature
             feature_type_map (OrderedDict): Maps feature-name -> feature_type string
-                                            (options: 'vector', 'embed', 'language')
+                                            (options: 'vector', 'embed')
+            problem_type (str): what prediction task this data is used for.
             labels (pd.Series): list of labels (y) if available
         """
+        self.problem_type = problem_type
         self.num_examples = processed_array.shape[0]
         self.num_features = len(feature_arraycol_map)
         if feature_arraycol_map.keys() != feature_type_map.keys():
             raise ValueError("feature_arraycol_map and feature_type_map must share same keys")
-        self.feature_groups = {'vector': [], 'embed': [], 'language': []}
+        self.feature_groups = {'vector': [], 'embed': []}
         self.feature_type_map = feature_type_map
         for feature in feature_type_map:
             if feature_type_map[feature] == 'vector':
                 self.feature_groups['vector'].append(feature)
             elif feature_type_map[feature] == 'embed':
                 self.feature_groups['embed'].append(feature)
-            elif feature_type_map[feature] == 'language':
-                self.feature_groups['language'].append(feature)
             else:
                 raise ValueError("unknown feature type: %s" % feature)
         if labels is not None and len(labels) != self.num_examples:
@@ -76,6 +74,7 @@ class TabularTorchDataset(torch.utils.data.Dataset):
         self.vectordata_index = None
         self.vecfeature_col_map = {}
         self.feature_dataindex_map = {}
+        self.num_classes = None
 
         # numerical data
         if len(self.feature_groups['vector']) > 0:
@@ -99,24 +98,23 @@ class TabularTorchDataset(torch.utils.data.Dataset):
                     self.data_desc.append('embed')
                     self.feature_dataindex_map[feature] = len(self.data_list) - 1
 
-        # language data
-        if len(self.feature_groups['language']) > 0:
-            for feature in feature_type_map:
-                if feature_type_map[feature] == 'language':
-                    feature_colinds = feature_arraycol_map[feature]
-                    self.data_list.append(processed_array[:, feature_colinds].atype('int64').flatten())
-                    self.data_desc.append('language')
-                    self.feature_dataindex_map[feature] = len(self.data_list) - 1
-
         # output (target) data
         if labels is not None:
             labels = np.array(labels)
             self.data_desc.append("label")
             self.label_index = len(self.data_list)
-            self.data_list.append(labels.astype('float32').reshape(-1, 1))
-        self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]]
-        self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]
+            if self.problem_type == SOFTCLASS:
+                self.num_classes = labels.shape[1]
+                self.data_list.append(labels.astype('float32'))
+            else:
+                if self.problem_type in [REGRESSION, QUANTILE] and labels.dtype != np.float32:
+                    labels = labels.astype('float32')  # Convert to proper float-type if not already
+                elif self.problem_type in [BINARY, MULTICLASS]:
+                    self.num_classes = len(set(labels))
+                    labels = labels.astype('long')
+                self.data_list.append(labels.reshape(-1, 1))
 
+        self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]]
         self.num_categories_per_embed_feature = None
         self.num_categories_per_embedfeature = self.getNumCategoriesEmbeddings()
 
@@ -128,10 +126,6 @@ class TabularTorchDataset(torch.utils.data.Dataset):
             output_dict['embed'] = []
             for i in self.embed_indices:
                 output_dict['embed'].append(self.data_list[i][idx])
-        if self.num_language_features() > 0:
-            output_dict['language'] = []
-            for i in self.language_indices:
-                output_dict['language'].append(self.data_list[i][idx])
         if self.label_index is not None:
             output_dict['label'] = self.data_list[self.label_index][idx]
         return output_dict
@@ -146,10 +140,6 @@ class TabularTorchDataset(torch.utils.data.Dataset):
     def num_embed_features(self):
         """ Returns number of embed features in this dataset """
         return len(self.feature_groups['embed'])
-
-    def num_language_features(self):
-        """ Returns number of language features in this dataset """
-        return len(self.feature_groups['language'])
 
     def num_vector_features(self):
         """ Number of vector features (each onehot feature counts = 1, regardless of how many categories) """
@@ -185,7 +175,7 @@ class TabularTorchDataset(torch.utils.data.Dataset):
             Args:
                 feature (str): name of feature of interest (in processed dataframe)
         """
-        nonvector_featuretypes = set(['embed', 'language'])
+        nonvector_featuretypes = set(['embed'])
         if feature not in self.feature_type_map:
             raise ValueError("unknown feature encountered: %s" % feature)
         if self.feature_type_map[feature] == 'vector':
@@ -201,6 +191,8 @@ class TabularTorchDataset(torch.utils.data.Dataset):
     def save(self, file_prefix=""):
         """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
         dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
+        if not os.path.exists(os.path.dirname(dataobj_file)):
+            os.makedirs(os.path.dirname(dataobj_file))
         torch.save(self, dataobj_file)
         logger.debug("TabularPyTorchDataset Dataset saved to a file: \n %s" % dataobj_file)
 

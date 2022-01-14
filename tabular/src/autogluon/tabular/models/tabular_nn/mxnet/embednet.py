@@ -2,7 +2,7 @@ import numpy as np
 import mxnet as mx
 from mxnet import nd, gluon
 
-from ..utils.nn_architecture_utils import getEmbedSizes
+from ..utils.nn_architecture_utils import get_embed_sizes
 
 
 class NumericBlock(gluon.HybridBlock):
@@ -82,15 +82,13 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
             self.from_logits = False
             self.has_vector_features = train_dataset.has_vector_features()
             self.has_embed_features = train_dataset.num_embed_features() > 0
-            self.has_language_features = train_dataset.num_language_features() > 0
             if self.has_embed_features:
                 num_categs_per_feature = train_dataset.getNumCategoriesEmbeddings()
-                embed_dims = getEmbedSizes(train_dataset, params, num_categs_per_feature)
+                embed_dims = get_embed_sizes(train_dataset, params, num_categs_per_feature)
         else: # Ignore train_dataset, params, etc. Recreate architecture based on description:
             self.architecture_desc = architecture_desc
             self.has_vector_features = architecture_desc['has_vector_features']
             self.has_embed_features = architecture_desc['has_embed_features']
-            self.has_language_features = architecture_desc['has_language_features']
             self.from_logits = architecture_desc['from_logits']
             num_net_outputs = architecture_desc['num_net_outputs']
             params = architecture_desc['params']
@@ -105,9 +103,6 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
             self.embed_blocks = gluon.nn.HybridSequential()
             for i in range(len(num_categs_per_feature)):
                 self.embed_blocks.add(EmbedBlock(embed_dims[i], num_categs_per_feature[i]))
-        if self.has_language_features:
-            self.text_block = None
-            raise NotImplementedError("text data cannot be handled")
         if params['network_type'] == 'feedforward':
             self.output_block = FeedforwardBlock(params, num_net_outputs)
         elif params['network_type'] == 'widedeep':
@@ -136,15 +131,12 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
         if architecture_desc is None: # Save Architecture description
             self.architecture_desc = {'has_vector_features': self.has_vector_features, 
                                   'has_embed_features': self.has_embed_features,
-                                  'has_language_features': self.has_language_features,
                                   'params': params, 'num_net_outputs': num_net_outputs,
                                   'from_logits': self.from_logits}
             if self.has_embed_features:
                 self.architecture_desc['num_categs_per_feature'] = num_categs_per_feature
                 self.architecture_desc['embed_dims'] = embed_dims
-            if self.has_language_features:
-                self.architecture_desc['text_TODO'] = None # TODO: store text architecture
-    
+
     def forward(self, data_batch):
         if self.has_vector_features:
             numerical_data = data_batch['vector'] # NDArray
@@ -201,13 +193,6 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
                 input_activations = embed_activations
             else:
                 input_activations = nd.concat(embed_activations, input_activations)
-        if self.has_language_features:
-            language_data = data_batch['language']
-            language_activations = self.text_block(language_data) # TODO: create block to embed text fields
-            if (not self.has_vector_features) and (not self.has_embed_features):
-                input_activations = language_activations
-            else:
-                input_activations = nd.concat(language_activations, input_activations)
         if self.y_constraint is None:
             return self.output_block(input_activations)
         else:

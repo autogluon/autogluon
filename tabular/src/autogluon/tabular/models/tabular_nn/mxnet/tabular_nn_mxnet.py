@@ -3,7 +3,6 @@
     Contains separate input modules which are applied to different columns of the data depending on the type of values they contain:
     - Numeric columns are pased through single Dense layer (binary categorical variables are treated as numeric)
     - Categorical columns are passed through separate Embedding layers
-    - Text columns are passed through separate LanguageModel layers
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
@@ -17,10 +16,6 @@ from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core import Space
@@ -29,9 +24,10 @@ from autogluon.core.utils import try_import_mxboard, try_import_mxnet
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 
-from ..utils.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from ..hyperparameters.parameters import get_default_param
 from ..hyperparameters.searchspaces import get_default_searchspace
+from ..utils.data_preprocessor import create_preprocessor, get_feature_arraycol_map, get_feature_type_map
+from ..utils.nn_architecture_utils import infer_y_range, get_default_layers, default_numeric_embed_dim
 from ...utils import fixedvals_from_searchspaces
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
@@ -46,9 +42,9 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         These networks use different types of input layers to process different types of data in various columns.
 
         Attributes:
-            _types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of Dataframe corresponding to the features of this type
+            _types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed'; values = column-names of Dataframe corresponding to the features of this type
             feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in df corresponding to this feature
-        self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
+        self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed')
         processor (sklearn.ColumnTransformer): scikit-learn preprocessor object.
 
         Note: This model always assumes higher values of self.eval_metric indicate better performance.
@@ -64,7 +60,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         """
-        TabularNeuralNetModel object.
+        TabularNeuralNetMxnetModel object.
 
         Parameters
         ----------
@@ -92,7 +88,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
-        default_params = get_default_param(self.problem_type)
+        default_params = get_default_param(problem_type=self.problem_type, framework='mxnet')
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
@@ -106,54 +102,26 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         return default_auxiliary_params
 
     def _get_default_searchspace(self):
-        return get_default_searchspace(self.problem_type, num_classes=None)
+        return get_default_searchspace(problem_type=self.problem_type, framework='mxnet')
 
     def set_net_defaults(self, train_dataset, params):
         """ Sets dataset-adaptive default values to use for our neural network """
-        if (self.problem_type == MULTICLASS) or (self.problem_type == SOFTCLASS):
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
             self.num_net_outputs = train_dataset.num_classes
         elif self.problem_type == REGRESSION:
             self.num_net_outputs = 1
-            if params['y_range'] is None:  # Infer default y-range
-                y_vals = train_dataset.dataset._data[train_dataset.label_index].asnumpy()
-                min_y = float(min(y_vals))
-                max_y = float(max(y_vals))
-                std_y = np.std(y_vals)
-                y_ext = params['y_range_extend'] * std_y
-                if min_y >= 0:  # infer y must be nonnegative
-                    min_y = max(0, min_y-y_ext)
-                else:
-                    min_y = min_y-y_ext
-                if max_y <= 0:  # infer y must be non-positive
-                    max_y = min(0, max_y+y_ext)
-                else:
-                    max_y = max_y+y_ext
-                params['y_range'] = (min_y, max_y)
+            if params['y_range'] is None:
+                params['y_range'] = infer_y_range(y_vals=train_dataset.dataset._data[train_dataset.label_index].asnumpy(), y_range_extend=params['y_range_extend'])
         elif self.problem_type == BINARY:
             self.num_net_outputs = 2
         else:
             raise ValueError("unknown problem_type specified: %s" % self.problem_type)
 
         if params['layers'] is None:  # Use default choices for MLP architecture
-            if self.problem_type == REGRESSION:
-                default_layer_sizes = [256, 128]  # overall network will have 4 layers. Input layer, 256-unit hidden layer, 128-unit hidden layer, output layer.
-            else:
-                default_sizes = [256, 128]  # will be scaled adaptively
-                # base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
-                base_size = max(1, min(self.num_net_outputs, 100) / 50)  # TODO: Updated because it improved model quality and made training far faster
-                default_layer_sizes = [defaultsize*base_size for defaultsize in default_sizes]
-            layer_expansion_factor = 1  # TODO: consider scaling based on num_rows, eg: layer_expansion_factor = 2-np.exp(-max(0,train_dataset.num_examples-10000))
-
-            max_layer_width = params['max_layer_width']
-            params['layers'] = [int(min(max_layer_width, layer_expansion_factor*defaultsize)) for defaultsize in default_layer_sizes]
+            params['layers'] = get_default_layers(problem_type=self.problem_type, num_net_outputs=self.num_net_outputs, max_layer_width=params['max_layer_width'])
 
         if train_dataset.has_vector_features() and params['numeric_embed_dim'] is None:  # Use default choices for numeric embedding size
-            vector_dim = train_dataset.dataset._data[train_dataset.vectordata_index].shape[1]  # total dimensionality of vector features
-            prop_vector_features = train_dataset.num_vector_features() / float(train_dataset.num_features)  # Fraction of features that are numeric
-            min_numeric_embed_dim = 32
-            max_numeric_embed_dim = params['max_layer_width']
-            params['numeric_embed_dim'] = int(min(max_numeric_embed_dim, max(min_numeric_embed_dim,
-                                                    params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
+            params['numeric_embed_dim'] = default_numeric_embed_dim(train_dataset=train_dataset, max_layer_width=params['max_layer_width'], first_layer_width=params['layers'][0])
         return
 
     def _fit(self, X, y, X_val=None, y_val=None,
@@ -181,10 +149,9 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
         self.batch_size = params['batch_size']
         train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params, X_val=X_val, y_val=y_val)
-        logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding, %d language)" %
-              (train_dataset.num_examples, train_dataset.num_features,
-               len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed']),
-               len(train_dataset.feature_groups['language']) ))
+        logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding)" %
+                   (train_dataset.num_examples, train_dataset.num_features, len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed'])
+                  ))
         # self._save_preprocessor()  # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
 
         if num_gpus is not None and num_gpus >= 1:
@@ -241,7 +208,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         import mxnet as mx
         logger.log(15, "Training neural network for up to %s epochs..." % params['num_epochs'])
         seed_value = params.get('seed_value')
-        if seed_value is not None:  # Set seed
+        if seed_value is not None:  # Set seeds
             random.seed(seed_value)
             np.random.seed(seed_value)
             mx.random.seed(seed_value)
@@ -517,7 +484,6 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             This method should only be used once per TabularNeuralNetModel object, otherwise will produce Warning.
 
         # TODO no label processing for now
-        # TODO: language features are ignored for now
         # TODO: add time/ngram features
         # TODO: no filtering of data-frame columns based on statistics, e.g. categorical columns with all unique variables or zero-variance features.
                 This should be done in default_learner class for all models not just TabularNeuralNetModel...
@@ -529,18 +495,21 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         if len(labels) != len(df):
             raise ValueError("Number of examples in Dataframe does not match number of labels")
 
-        self._types_of_features, df = self._get_types_of_features(df, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features)  # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
-        logger.log(15, "AutoGluon Neural Network infers features are of the following types:")
+        self._types_of_features, df = self._get_types_of_features(df, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features)  # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', values = column-names of df
+        logger.log(15, "Tabular Neural Network treats features as the following types:")
         logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
-        self.processor = self._create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels)
+        if self.processor is not None:
+            Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
+        self.processor = create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels, unique_category_str=self.unique_category_str, continuous_features=self._types_of_features['continuous'],
+                                   skewed_features=self._types_of_features['skewed'], onehot_features=self._types_of_features['onehot'], embed_features=self._types_of_features['embed'])
         df = self.processor.fit_transform(df) # 2D numpy array
-        self.feature_arraycol_map = self._get_feature_arraycol_map(max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
+        self.feature_arraycol_map = get_feature_arraycol_map(processor=self.processor, max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
         num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])  # should match number of columns in processed array
         if num_array_cols != df.shape[1]:
             raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in df array does not match feature_arraycol_map.")
 
-        self.feature_type_map = self._get_feature_type_map()  # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
+        self.feature_type_map = get_feature_type_map(feature_arraycol_map=self.feature_arraycol_map, types_of_features=self._types_of_features)  # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed')
         return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map,
                                 batch_size=batch_size, num_dataloading_workers=num_dataloading_workers,
                                 problem_type=self.problem_type, labels=labels, is_test=False)
@@ -579,86 +548,18 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             raise ValueError("Unknown optimizer specified: %s" % params['optimizer'])
         return optimizer
 
-    def _get_feature_arraycol_map(self, max_category_levels):
-        """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
-        feature_preserving_transforms = set(['continuous','skewed', 'ordinal', 'language'])  # these transforms do not alter dimensionality of feature
-        feature_arraycol_map = {}  # unordered version
-        current_colindex = 0
-        for transformer in self.processor.transformers_:
-            transformer_name = transformer[0]
-            transformed_features = transformer[2]
-            if transformer_name in feature_preserving_transforms:
-                for feature in transformed_features:
-                    if feature in feature_arraycol_map:
-                        raise ValueError("same feature is processed by two different column transformers: %s" % feature)
-                    feature_arraycol_map[feature] = [current_colindex]
-                    current_colindex += 1
-            elif transformer_name == 'onehot':
-                oh_encoder = [step for (name, step) in transformer[1].steps if name == 'onehot'][0]
-                for i in range(len(transformed_features)):
-                    feature = transformed_features[i]
-                    if feature in feature_arraycol_map:
-                        raise ValueError("same feature is processed by two different column transformers: %s" % feature)
-                    oh_dimensionality = min(len(oh_encoder.categories_[i]), max_category_levels+1)
-                    feature_arraycol_map[feature] = list(range(current_colindex, current_colindex+oh_dimensionality))
-                    current_colindex += oh_dimensionality
-            else:
-                raise ValueError("unknown transformer encountered: %s" % transformer_name)
-        return OrderedDict([(key, feature_arraycol_map[key]) for key in feature_arraycol_map])
+    def get_info(self):
+        info = super().get_info()
+        info['hyperparameters_post_fit'] = self.params_post_fit
+        return info
 
-    def _get_feature_type_map(self):
-        """ Returns OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language') """
-        if self.feature_arraycol_map is None:
-            raise ValueError("must first call _get_feature_arraycol_map() before _get_feature_type_map()")
-        vector_features = self._types_of_features['continuous'] + self._types_of_features['skewed'] + self._types_of_features['onehot']
-        feature_type_map = OrderedDict()
-        for feature_name in self.feature_arraycol_map:
-            if feature_name in vector_features:
-                feature_type_map[feature_name] = 'vector'
-            elif feature_name in self._types_of_features['embed']:
-                feature_type_map[feature_name] = 'embed'
-            elif feature_name in self._types_of_features['language']:
-                feature_type_map[feature_name] = 'language'
-            else:
-                raise ValueError("unknown feature type encountered")
-        return feature_type_map
+    def reduce_memory_size(self, remove_fit=True, requires_save=True, **kwargs):
+        super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
+        if remove_fit and requires_save:
+            self.optimizer = None
 
-    def _create_preprocessor(self, impute_strategy, max_category_levels):
-        """ Defines data encoders used to preprocess different data types and creates instance variable which is sklearn ColumnTransformer object """
-        if self.processor is not None:
-            Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
-        continuous_features = self._types_of_features['continuous']
-        skewed_features = self._types_of_features['skewed']
-        onehot_features = self._types_of_features['onehot']
-        embed_features = self._types_of_features['embed']
-        language_features = self._types_of_features['language']
-        transformers = []  # order of various column transformers in this list is important!
-        if continuous_features:
-            continuous_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputer(strategy=impute_strategy)),
-                ('scaler', StandardScaler())])
-            transformers.append( ('continuous', continuous_transformer, continuous_features) )
-        if skewed_features:
-            power_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputer(strategy=impute_strategy)),
-                ('quantile', QuantileTransformer(output_distribution='normal')) ])  # Or output_distribution = 'uniform'
-            transformers.append( ('skewed', power_transformer, skewed_features) )
-        if onehot_features:
-            onehot_transformer = Pipeline(steps=[
-                # TODO: Consider avoiding converting to string for improved memory efficiency
-                ('to_str', FunctionTransformer(convert_df_dtype_to_str)),
-                ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
-                ('onehot', OneHotMergeRaresHandleUnknownEncoder(max_levels=max_category_levels, sparse=False))])  # test-time unknown values will be encoded as all zeros vector
-            transformers.append( ('onehot', onehot_transformer, onehot_features) )
-        if embed_features:  # Ordinal transformer applied to convert to-be-embedded categorical features to integer levels
-            ordinal_transformer = Pipeline(steps=[
-                ('to_str', FunctionTransformer(convert_df_dtype_to_str)),
-                ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
-                ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=max_category_levels))])  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
-            transformers.append( ('ordinal', ordinal_transformer, embed_features) )
-        if language_features:
-            raise NotImplementedError("language_features cannot be used at the moment")
-        return ColumnTransformer(transformers=transformers)  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
+    def _get_default_stopping_metric(self):
+        return self.eval_metric
 
     def save(self, path: str = None, verbose=True) -> str:
         if self.model is not None:
@@ -692,22 +593,6 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             model.summary_writer = None
         return model
 
-    def get_info(self):
-        info = super().get_info()
-        info['hyperparameters_post_fit'] = self.params_post_fit
-        return info
-
-    def reduce_memory_size(self, remove_fit=True, requires_save=True, **kwargs):
-        super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
-        if remove_fit and requires_save:
-            self.optimizer = None
-
-    def _get_default_stopping_metric(self):
-        return self.eval_metric
-
-
-def convert_df_dtype_to_str(df):
-    return df.astype(str)
 
 
 """ General TODOs:
