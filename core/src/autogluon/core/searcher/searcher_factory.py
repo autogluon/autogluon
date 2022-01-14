@@ -18,7 +18,7 @@ def searcher_factory(searcher_name, **kwargs):
 
     This function creates searcher objects from string argument name and
     additional kwargs. It is typically called in the constructor of a
-    scheduler (see LocalRandomSearcher), which provides most of the required kwargs.
+    scheduler (see LocalSequentialScheduler), which provides most of the required kwargs.
 
     Parameters
     ----------
