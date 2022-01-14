@@ -172,7 +172,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         import torch
         start_time = time.time()
         logger.log(15, "Training tabular neural network for up to %s gradient updates..." % params['num_updates'])
-        seed_value = params.get('seed_value')
+        seed_value = params.get('seed_value', 0)
         if seed_value is not None:  # Set seeds
             random.seed(seed_value)
             np.random.seed(seed_value)

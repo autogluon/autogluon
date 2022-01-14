@@ -9,7 +9,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 def get_fixed_params(framework):
     """ Parameters that currently cannot be searched during HPO """
     fixed_params = {
-        'seed_value': None,  # random seed for reproducibility (set = None to ignore)
+        # 'seed_value': 0,  # random seed for reproducibility (set = None to ignore)
     }
     mxnet_fixed_params = {
         'num_epochs': 500,  # maximum number of epochs (passes over full dataset) for training NN

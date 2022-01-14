@@ -207,7 +207,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         start_time = time.time()
         import mxnet as mx
         logger.log(15, "Training neural network for up to %s epochs..." % params['num_epochs'])
-        seed_value = params.get('seed_value')
+        seed_value = params.get('seed_value', 0)
         if seed_value is not None:  # Set seeds
             random.seed(seed_value)
             np.random.seed(seed_value)
