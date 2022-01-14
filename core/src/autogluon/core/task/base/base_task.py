@@ -71,13 +71,6 @@ class BaseTask(object):
         pass
 
 
-# These search_strategies use HyperbandScheduler, along with certain
-# searchers.
-searcher_for_hyperband_strategy = {
-    'hyperband': 'random',
-    'bayesopt_hyperband': 'bayesopt'}
-
-
 def compile_scheduler_options_v2(
         scheduler_options, nthreads_per_trial,
         ngpus_per_trial, num_trials, time_out, scheduler=None, search_strategy=None, search_options=None, checkpoint=None, resume=False, visualizer=None,
@@ -160,11 +153,6 @@ def compile_scheduler_options_v2(
         ngpus_per_trial=scheduler_params['resource']['num_gpus'],
     )  # TODO: use 'auto' downstream
 
-    searcher = searcher_for_hyperband_strategy.get(scheduler_params['searcher'])
-    if searcher is not None:
-        scheduler_params['searcher'] = searcher
-        if epochs is not None:
-            scheduler_params['max_t'] = epochs
     required_options = [
         'resource',
         'scheduler',

@@ -150,5 +150,4 @@ print('Accuracy = {:.2f}%'.format(test_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(test_score['f1'] * 100))
 ```
 
-You can also try setting `hyperparameters['tune_kwargs']['search_strategy']` to be `'random'`, `'bayesopt'`, `'bayesopt_hyperband'` as alternative HPO methods although they are currently experimental.
 
