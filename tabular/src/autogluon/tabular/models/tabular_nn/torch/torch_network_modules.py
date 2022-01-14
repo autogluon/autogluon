@@ -99,7 +99,9 @@ class EmbedNet(nn.Module):
         if self.problem_type == QUANTILE:
             self.alpha = params['alpha']  # for huber loss
         if self.problem_type == SOFTCLASS:
-            self.log_softmax = torch.nn.LogSoftmax(dim=0)
+            self.log_softmax = torch.nn.LogSoftmax(dim=1)
+        if self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]:
+            self.softmax = torch.nn.Softmax(dim=1)
         if architecture_desc is None:  # Save Architecture description
             self.architecture_desc = {'has_vector_features': self.has_vector_features,
                                       'has_embed_features': self.has_embed_features,
@@ -210,8 +212,10 @@ class EmbedNet(nn.Module):
             predict_data = self(input_data)
             if self.problem_type == QUANTILE:
                 predict_data = torch.sort(predict_data, -1)[0]  # sorting ensures monotonicity of quantile estimates
-            elif self.problem_type == BINARY:
-                predict_data = predict_data[:,1]
+            elif self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]:
+                predict_data = self.softmax(predict_data)  # convert NN output to probability
             elif self.problem_type == REGRESSION:
                 predict_data = predict_data.flatten()
+            if self.problem_type == BINARY:
+                predict_data = predict_data[:,1]
             return predict_data.data.cpu().numpy()
