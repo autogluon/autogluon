@@ -298,16 +298,6 @@ class ImageClassification(BaseTask):
             'searcher': self.search_strategy,
             'search_options': self.search_options,
             'max_reward': config.get('max_reward', 0.95)}
-        if self.search_strategy == 'hyperband':
-            self.scheduler_options.update({
-                'searcher': 'random',
-                'max_t': config.get('epochs', 50),
-                'grace_period': config.get('grace_period', config.get('epochs', 50) // 4)})
-        elif self.search_strategy == 'bayesopt_hyperband':
-            self.scheduler_options.update({
-                'searcher': 'bayesopt',
-                'max_t': config.get('epochs', 50),
-                'grace_period': config.get('grace_period', config.get('epochs', 50) // 4)})
 
     def fit(self, train_data, val_data=None, train_size=0.9, random_state=None, time_limit=None):
         """Fit auto estimator given the input data.

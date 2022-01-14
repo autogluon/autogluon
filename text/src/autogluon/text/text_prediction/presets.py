@@ -43,8 +43,7 @@ def base() -> dict:
             },
         },
         'tune_kwargs': {                                  # Same as the hyperparameter_tune_kwargs in AutoGluon Tabular.
-            'search_strategy': 'local',                   # Can be 'random', 'bayesopt', 'skopt',
-                                                          # 'hyperband', 'bayesopt_hyperband'
+            'search_strategy': 'local',                   # Can be 'random'
             'searcher': 'local_random',
             'search_options': None,                       # Extra kwargs passed to searcher
             'scheduler_options': None,                    # Extra kwargs passed to scheduler

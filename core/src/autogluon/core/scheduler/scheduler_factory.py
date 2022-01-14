@@ -11,8 +11,6 @@ _scheduler_presets = {
     'auto': {'scheduler': 'local', 'searcher': 'local_random'},
     'local_random': {'scheduler': 'local', 'searcher': 'local_random'},
     'random': {'scheduler': 'local', 'searcher': 'random'},
-    'bayesopt': {'scheduler': 'local', 'searcher': 'bayesopt'},
-    # Don't include hyperband and bayesopt hyperband at present
 }
 
 
@@ -33,12 +31,9 @@ def scheduler_factory(
         Hyperparameter tuning strategy and kwargs.
         If None, then hyperparameter tuning will not be performed.
         Valid preset values:
-            'auto': Uses the 'bayesopt' preset.
+            'auto': Uses the 'random' preset.
             'random': Performs HPO via random search using local scheduler.
-            'bayesopt': Performs HPO via bayesian optimization using local scheduler.
-        For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
-            The 'searcher' key is required when providing a dict.
-            Some schedulers may have different valid keys.
+        The 'searcher' key is required when providing a dict. Some schedulers may have different valid keys.
     time_out : float, default = None
         Same as hyperparameter_tune_kwargs['time_out']. Ignored if specified in hyperparameter_tune_kwargs.
         At least one of time_out or num_trials must be specified.

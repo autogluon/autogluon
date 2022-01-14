@@ -535,11 +535,9 @@ class TabularPredictor:
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                 Valid preset values:
-                    'auto': Uses the 'bayesopt' preset.
+                    'auto': Uses the 'random' preset.
                     'random': Performs HPO via random search using local scheduler.
-                    'bayesopt': Performs HPO via bayesian optimization using local scheduler.
-                For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
-                    The 'searcher' key is required when providing a dict.
+                The 'searcher' key is required when providing a dict.
             feature_prune_kwargs: dict, default = None
                 Performs layer-wise feature pruning via recursive feature elimination with permutation feature importance.
                 This fits all models in a stack layer once, discovers a pruned set of features, fits all models in the stack layer
@@ -2592,8 +2590,6 @@ class TabularPredictor:
                                                             time_out=time_limit,
                                                             nthreads_per_trial='auto', ngpus_per_trial='auto')
 
-        assert scheduler_params[
-                   'searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
         if scheduler_params.get('dist_ip_addrs', None):
             logger.warning(
                 'Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
