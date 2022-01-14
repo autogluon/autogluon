@@ -1,5 +1,8 @@
 import pytest
+from sklearn.feature_extraction.text import CountVectorizer
+import numpy as np
 
+from autogluon.features import IdentityFeatureGenerator, TextNgramFeatureGenerator
 from autogluon.tabular.configs.config_helper import ConfigBuilder
 
 
@@ -152,3 +155,130 @@ def test_hyperparameter_tune_kwargs():
         ConfigBuilder().hyperparameter_tune_kwargs('unknown').build()
     with pytest.raises(ValueError, match=r"hyperparameter_tune_kwargs must be either str: .* or dict"):
         ConfigBuilder().hyperparameter_tune_kwargs(42).build()
+
+
+def test_ag_args():
+    assert ConfigBuilder().ag_args({'param': 42}).build() == dict(ag_args={'param': 42})
+
+
+def test_ag_args_fit():
+    assert ConfigBuilder().ag_args_fit({'param': 42}).build() == dict(ag_args_fit={'param': 42})
+
+
+def test_ag_args_ensemble():
+    assert ConfigBuilder().ag_args_ensemble({'param': 42}).build() == dict(ag_args_ensemble={'param': 42})
+
+
+def test_set_best_to_refit_full():
+    assert ConfigBuilder().set_best_to_refit_full().build() == dict(set_best_to_refit_full=True)
+    assert ConfigBuilder().set_best_to_refit_full(False).build() == dict(set_best_to_refit_full=False)
+
+
+def test_keep_only_best():
+    assert ConfigBuilder().keep_only_best().build() == dict(keep_only_best=True)
+    assert ConfigBuilder().keep_only_best(False).build() == dict(keep_only_best=False)
+
+
+def test_save_space():
+    assert ConfigBuilder().save_space().build() == dict(save_space=True)
+    assert ConfigBuilder().save_space(False).build() == dict(save_space=False)
+
+
+def test_calibrate():
+    assert ConfigBuilder().calibrate().build() == dict(calibrate=True)
+    assert ConfigBuilder().calibrate(False).build() == dict(calibrate=False)
+
+
+def test_use_bag_holdout():
+    assert ConfigBuilder().use_bag_holdout().build() == dict(use_bag_holdout=True)
+    assert ConfigBuilder().use_bag_holdout(False).build() == dict(use_bag_holdout=False)
+
+
+def test_refit_full():
+    assert ConfigBuilder().refit_full().build() == dict(refit_full=True)
+    assert ConfigBuilder().refit_full(False).build() == dict(refit_full=False)
+    assert ConfigBuilder().refit_full('best').build() == dict(refit_full='best')
+
+
+def test_feature_generator():
+    vectorizer = CountVectorizer(min_df=7, ngram_range=(2, 3), max_features=11, dtype=np.uint8)
+
+    config = (ConfigBuilder()
+              .feature_generator()
+              .enable_numeric_features()
+              .enable_categorical_features()
+              .enable_datetime_features()
+              .enable_text_special_features()
+              .enable_text_ngram_features()
+              .enable_raw_text_features()
+              .enable_vision_features()
+              .vectorizer(vectorizer)
+              .text_ngram_params({'vectorizer_strategy': 'both'})
+              .build()
+              .build())
+
+    assert config['feature_generator'].enable_numeric_features is True
+    assert config['feature_generator'].enable_categorical_features is True
+    assert config['feature_generator'].enable_datetime_features is True
+    assert config['feature_generator'].enable_text_special_features is True
+    assert config['feature_generator'].enable_text_ngram_features is True
+    assert config['feature_generator'].enable_raw_text_features is True
+    assert config['feature_generator'].enable_vision_features is True
+
+    text_gen = None
+    generators_classes = []
+    for gl in config['feature_generator'].generators:
+        for g in gl:
+            if isinstance(g, TextNgramFeatureGenerator):
+                text_gen = g
+            generators_classes.append(g.__class__.__name__)
+    print(generators_classes)
+    assert str(text_gen.vectorizer_default_raw) == str(vectorizer)
+    assert text_gen.vectorizer_strategy == 'both'
+    assert sorted(list(set(generators_classes))) == [
+        'AsTypeFeatureGenerator',
+        'CategoryFeatureGenerator',
+        'DatetimeFeatureGenerator',
+        'DropUniqueFeatureGenerator',
+        'FillNaFeatureGenerator',
+        'IdentityFeatureGenerator',
+        'IsNanFeatureGenerator',
+        'TextNgramFeatureGenerator',
+        'TextSpecialFeatureGenerator'
+    ]
+
+
+def test_feature_generator_2():
+    config = (ConfigBuilder()
+              .feature_generator()
+              .enable_numeric_features(False)
+              .enable_categorical_features(False)
+              .enable_datetime_features(False)
+              .enable_text_special_features(False)
+              .enable_text_ngram_features(False)
+              .enable_raw_text_features(False)
+              .enable_vision_features(False)
+              .build()
+              .build())
+
+    assert config['feature_generator'].enable_numeric_features is False
+    assert config['feature_generator'].enable_categorical_features is False
+    assert config['feature_generator'].enable_datetime_features is False
+    assert config['feature_generator'].enable_text_special_features is False
+    assert config['feature_generator'].enable_text_ngram_features is False
+    assert config['feature_generator'].enable_raw_text_features is False
+    assert config['feature_generator'].enable_vision_features is False
+
+    text_gen = None
+    generators_classes = []
+    for gl in config['feature_generator'].generators:
+        for g in gl:
+            if isinstance(g, TextNgramFeatureGenerator):
+                text_gen = g
+            generators_classes.append(g.__class__.__name__)
+    assert text_gen is None
+    assert sorted(list(set(generators_classes))) == [
+        'AsTypeFeatureGenerator',
+        'DropUniqueFeatureGenerator',
+        'FillNaFeatureGenerator'
+    ]
