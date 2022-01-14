@@ -174,6 +174,7 @@ class ConfigBuilder:
         Values > 10 may produce diminishing returns, and can even harm overall results due to overfitting.
         To further improve predictions, avoid increasing `num_bag_folds` much beyond 10 and instead increase `num_bag_sets`.
         """
+        assert num_bag_folds >= 0, 'num_bag_folds must be greater or equal than zero'
         self.config['num_bag_folds'] = num_bag_folds
         return self
 
@@ -183,6 +184,7 @@ class ConfigBuilder:
         Defaults to 1 if `time_limit` is not specified, otherwise 20 (always disabled if `num_bag_folds` is not specified).
         Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
         """
+        assert num_bag_sets > 0, 'num_bag_sets must be greater than zero'
         self.config['num_bag_sets'] = num_bag_sets
         return self
 
@@ -192,6 +194,7 @@ class ConfigBuilder:
         Disabled by default (0), but we recommend values between 1-3 to maximize predictive performance.
         To prevent overfitting, `num_bag_folds >= 2` must also be set or else a ValueError will be raised.
         """
+        assert num_stack_levels >= 0, 'num_stack_levels must be greater or equal than zero'
         self.config['num_stack_levels'] = num_stack_levels
         return self
 
@@ -202,6 +205,7 @@ class ConfigBuilder:
         Default value is doubled if `hyperparameter_tune_kwargs` is set, up to a maximum of 0.2.
         Disabled if `num_bag_folds >= 2` unless `use_bag_holdout == True`.
         """
+        assert (holdout_frac >= 0) & (holdout_frac <= 1), 'holdout_frac must be between 0 and 1'
         self.config['holdout_frac'] = holdout_frac
         return self
 
@@ -225,7 +229,13 @@ class ConfigBuilder:
             'random': Performs HPO via random search using local scheduler.
         The 'searcher' key is required when providing a dict.
         """
+        valid_str_values = ['auto', 'random']
+        if isinstance(hyperparameter_tune_kwargs, str):
+            assert hyperparameter_tune_kwargs in valid_str_values, f'{hyperparameter_tune_kwargs} string must be one of {valid_str_values}'
+        elif not isinstance(hyperparameter_tune_kwargs, dict):
+            raise ValueError(f'hyperparameter_tune_kwargs must be either str: {valid_str_values} or dict')
         self.config['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
+
         return self
 
     def ag_args(self, ag_args: dict) -> ConfigBuilder:

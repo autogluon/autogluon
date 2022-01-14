@@ -21,7 +21,7 @@ def test_presets_invalid_option():
         ConfigBuilder().presets('unknown1').build()
 
     with pytest.raises(AssertionError, match=r"The following preset are not recognized: .'unknown2', 'unknown3'. - use one of the valid presets: .*"):
-        ConfigBuilder().presets(['best_quality', 'unknown2',  'unknown3']).build()
+        ConfigBuilder().presets(['best_quality', 'unknown2', 'unknown3']).build()
 
 
 def test_excluded_model_types():
@@ -105,3 +105,50 @@ def test_hyperparameters__invalid_option():
 
     with pytest.raises(AssertionError, match=r"The following model types are not recognized: .'unknown'. - use one of the valid models: .*"):
         ConfigBuilder().hyperparameters({'unknown': []}).build()
+
+
+def test_auto_stack():
+    assert ConfigBuilder().auto_stack().build() == dict(auto_stack=True)
+    assert ConfigBuilder().auto_stack(False).build() == dict(auto_stack=False)
+
+
+def test_use_bag_holdout():
+    assert ConfigBuilder().use_bag_holdout().build() == dict(use_bag_holdout=True)
+    assert ConfigBuilder().use_bag_holdout(False).build() == dict(use_bag_holdout=False)
+
+
+def test_num_bag_folds():
+    assert ConfigBuilder().num_bag_folds(0).build() == dict(num_bag_folds=0)
+    with pytest.raises(AssertionError, match=r"num_bag_folds must be greater or equal than zero"):
+        ConfigBuilder().num_bag_folds(-1).build()
+
+
+def test_num_bag_sets():
+    assert ConfigBuilder().num_bag_sets(1).build() == dict(num_bag_sets=1)
+    with pytest.raises(AssertionError, match=r"num_bag_sets must be greater than zero"):
+        ConfigBuilder().num_bag_sets(0).build()
+
+
+def test_num_stack_levels():
+    assert ConfigBuilder().num_stack_levels(0).build() == dict(num_stack_levels=0)
+    with pytest.raises(AssertionError, match=r"num_stack_levels must be greater or equal than zero"):
+        ConfigBuilder().num_stack_levels(-1).build()
+
+
+def test_holdout_frac():
+    assert ConfigBuilder().holdout_frac(0).build() == dict(holdout_frac=0)
+    assert ConfigBuilder().holdout_frac(1).build() == dict(holdout_frac=1)
+    with pytest.raises(AssertionError, match=r"holdout_frac must be between 0 and 1"):
+        ConfigBuilder().holdout_frac(-0.1).build()
+    with pytest.raises(AssertionError, match=r"holdout_frac must be between 0 and 1"):
+        ConfigBuilder().holdout_frac(1.1).build()
+
+
+def test_hyperparameter_tune_kwargs():
+    assert ConfigBuilder().hyperparameter_tune_kwargs('auto').build() == dict(hyperparameter_tune_kwargs='auto')
+    assert ConfigBuilder().hyperparameter_tune_kwargs('random').build() == dict(hyperparameter_tune_kwargs='random')
+    assert ConfigBuilder().hyperparameter_tune_kwargs({'props': 42}).build() == dict(hyperparameter_tune_kwargs={'props': 42})
+    with pytest.raises(AssertionError, match=r"unknown string must be one of .*"):
+        ConfigBuilder().hyperparameter_tune_kwargs('unknown').build()
+    with pytest.raises(ValueError, match=r"hyperparameter_tune_kwargs must be either str: .* or dict"):
+        ConfigBuilder().hyperparameter_tune_kwargs(42).build()
