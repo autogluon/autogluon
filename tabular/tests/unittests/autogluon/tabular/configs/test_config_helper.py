@@ -17,11 +17,11 @@ def test_with_presets():
 
 
 def test_with_presets_invalid_option():
-    with pytest.raises(AssertionError, match=r"unknown1 is not one of the valid presets .*"):
+    with pytest.raises(AssertionError, match=r"The following preset are not recognized: .'unknown1'. - use one of the valid presets: .*"):
         ConfigBuilder().with_presets('unknown1').build()
 
-    with pytest.raises(AssertionError, match=r"unknown2 is not one of the valid presets .*"):
-        ConfigBuilder().with_presets(['unknown2']).build()
+    with pytest.raises(AssertionError, match=r"The following preset are not recognized: .'unknown2', 'unknown3'. - use one of the valid presets: .*"):
+        ConfigBuilder().with_presets(['best_quality', 'unknown2',  'unknown3']).build()
 
 
 def test_with_excluded_model_types():
@@ -34,6 +34,10 @@ def test_with_excluded_model_types():
 
     expected_config = dict(excluded_model_types=['NN', 'LR'])
     acutal_config = ConfigBuilder().with_excluded_model_types(['NN', 'LR']).build()
+    assert acutal_config == expected_config
+
+    expected_config = dict(excluded_model_types=['NN'])
+    acutal_config = ConfigBuilder().with_excluded_model_types(['NN', 'NN']).build()
     assert acutal_config == expected_config
 
 
@@ -53,17 +57,20 @@ def test_with_included_model_types():
     acutal_config = ConfigBuilder().with_included_model_types(['NN']).build()
     assert acutal_config == expected_config
 
+    acutal_config = ConfigBuilder().with_included_model_types(['NN', 'NN']).build()
+    assert acutal_config == expected_config
+
     expected_config = dict(excluded_model_types=['RF', 'XT', 'KNN', 'GBM', 'CAT', 'XGB', 'QNN', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
     acutal_config = ConfigBuilder().with_included_model_types(['NN', 'LR']).build()
     assert acutal_config == expected_config
 
 
 def test_with_included_model_types_invalid_option():
-    with pytest.raises(AssertionError, match=r"unknown1 is not one of the valid models .*"):
+    with pytest.raises(AssertionError, match=r"The following model types are not recognized: .'unknown1'. - use one of the valid models: .*"):
         ConfigBuilder().with_included_model_types('unknown1').build()
 
-    with pytest.raises(AssertionError, match=r"unknown2 is not one of the valid models .*"):
-        ConfigBuilder().with_included_model_types(['unknown2']).build()
+    with pytest.raises(AssertionError, match=r"The following model types are not recognized: .'unknown2', 'unknown3'. - use one of the valid models: .*"):
+        ConfigBuilder().with_included_model_types(['RF', 'unknown2', 'unknown3']).build()
 
 
 def test_with_time_limit():
