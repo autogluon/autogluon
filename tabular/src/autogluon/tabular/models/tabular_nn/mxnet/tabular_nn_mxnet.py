@@ -531,7 +531,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             num_batches = train_dataset.num_examples // params['batch_size']
             lr_decay_epoch = [max(warmup_epochs, int(params['num_epochs']/3)), max(warmup_epochs+1, int(params['num_epochs']/2)),
                               max(warmup_epochs+2, int(2*params['num_epochs']/3))]
-            from .utils.lr_scheduler import LRSequential, LRScheduler
+            from .lr_scheduler import LRSequential, LRScheduler
             lr_scheduler = LRSequential([
                 LRScheduler('linear', base_lr=base_lr, target_lr=target_lr, nepochs=warmup_epochs, iters_per_epoch=num_batches),
                 LRScheduler(lr_mode, base_lr=target_lr, target_lr=base_lr, nepochs=params['num_epochs'] - warmup_epochs,
@@ -583,7 +583,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
 
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True):
-        model: TabularNeuralNetModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model: TabularNeuralNetMxnetModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         if model._architecture_desc is not None:
             from .embednet import EmbedNet
             model.model = EmbedNet(architecture_desc=model._architecture_desc, ctx=model.ctx)  # recreate network from architecture description
