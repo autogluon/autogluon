@@ -21,6 +21,7 @@ def get_fixed_params(framework):
     pytorch_fixed_params = {
         'num_updates': 20000,  # maximum number of gradient updates in training
         'updates_wo_improve': 500,  # we terminate training if validation performance hasn't improved in the last 'updates_wo_improve' number of updates
+        'updates_between_validation_scoring': 100,  # calculate validation score every so often
     }
     return merge_framework_params(framework=framework, shared_params=fixed_params, mxnet_params=mxnet_fixed_params, pytorch_params=pytorch_fixed_params)
 
