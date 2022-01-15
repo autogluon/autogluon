@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 from typing import Union
 
-from Cython.Utils import OrderedSet
 from sklearn.base import BaseEstimator
 
 from autogluon.features import AutoMLPipelineFeatureGenerator
@@ -280,7 +279,7 @@ class ConfigBuilder:
             models = [models]
         for model in models:
             assert model in valid_keys, f'{model} is not one of the valid models {valid_keys}'
-        self.config['excluded_model_types'] = list(OrderedSet(models))
+        self.config['excluded_model_types'] = sorted(list(set(models)))
         return self
 
     def included_model_types(self, models: Union[str, list]) -> ConfigBuilder:

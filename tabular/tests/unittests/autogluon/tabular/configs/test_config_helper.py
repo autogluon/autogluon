@@ -1,8 +1,8 @@
+import numpy as np
 import pytest
 from sklearn.feature_extraction.text import CountVectorizer
-import numpy as np
 
-from autogluon.features import IdentityFeatureGenerator, TextNgramFeatureGenerator
+from autogluon.features import TextNgramFeatureGenerator
 from autogluon.tabular.configs.config_helper import ConfigBuilder
 
 
@@ -35,7 +35,7 @@ def test_excluded_model_types():
     acutal_config = ConfigBuilder().excluded_model_types(['NN']).build()
     assert acutal_config == expected_config
 
-    expected_config = dict(excluded_model_types=['NN', 'LR'])
+    expected_config = dict(excluded_model_types=['LR', 'NN'])
     acutal_config = ConfigBuilder().excluded_model_types(['NN', 'LR']).build()
     assert acutal_config == expected_config
 
