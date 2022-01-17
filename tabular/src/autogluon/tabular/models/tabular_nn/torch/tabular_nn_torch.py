@@ -113,11 +113,20 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         from .tabular_torch_dataset import TabularTorchDataset
 
         start_time = time.time()
+
+        params = self._get_model_params()
+        params = fixedvals_from_searchspaces(params)
+
+        seed_value = params.pop('seed_value', 0)
+        if seed_value is not None:  # Set seeds
+            random.seed(seed_value)
+            np.random.seed(seed_value)
+            torch.manual_seed(seed_value)
+
         if sample_weight is not None:  # TODO: support
             logger.log(15, f"sample_weight not yet supported for {self.__class__.__name__},"
                            " this model will ignore them in training.")
-        params = self._get_model_params()
-        params = fixedvals_from_searchspaces(params)
+
         if num_cpus is not None:
             self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         else:
@@ -151,13 +160,23 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             if time_limit <= time_limit_orig * 0.4:
                 raise TimeLimitExceeded
 
+        num_updates = params.pop('num_updates')
+        updates_wo_improve = params.pop('updates_wo_improve')
+        updates_between_validation_scoring = params.pop('updates_between_validation_scoring', 100)
+
+        optimizer_kwargs = {k: v for k, v in params.items() if k in {'optimizer', 'learning_rate', 'weight_decay'}}
+        self.optimizer = self._init_optimizer(**optimizer_kwargs)
+
+        loss_kwargs = {k: v for k, v in params.items() if k in {'loss_function', 'gamma'}}
+
         # train network
         self._train_net(train_dataset=train_dataset,
-                        params=params,
+                        loss_kwargs=loss_kwargs,
                         batch_size=batch_size,
+                        num_updates=num_updates,
+                        updates_wo_improve=updates_wo_improve,
+                        updates_between_validation_scoring=updates_between_validation_scoring,
                         val_dataset=val_dataset,
-                        initialize=True,
-                        setup_trainer=True,
                         time_limit=time_limit,
                         reporter=reporter,
                         verbosity=verbosity)
@@ -175,35 +194,27 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _train_net(self,
                    train_dataset,
-                   params,
+                   loss_kwargs,
                    batch_size,
+                   num_updates,
+                   updates_wo_improve,
+                   updates_between_validation_scoring=100,
                    val_dataset=None,
-                   initialize=True,
-                   setup_trainer=True,
                    time_limit=None,
                    reporter=None,
                    verbosity=2):
         import torch
         start_time = time.time()
-        logger.log(15, "Training tabular neural network for up to %s gradient updates..." % params['num_updates'])
-        seed_value = params.get('seed_value', 0)
-        if seed_value is not None:  # Set seeds
-            random.seed(seed_value)
-            np.random.seed(seed_value)
-            torch.manual_seed(seed_value)
-        if initialize:
-            logging.debug("initializing neural network...")
-            self.model.init_params()
-            logging.debug("initialized")
-        if setup_trainer:
-            self.optimizer = self._setup_trainer(params=params)
+        logger.log(15, "Training tabular neural network for up to %s gradient updates..." % num_updates)
+        logging.debug("initializing neural network...")
+        self.model.init_params()
+        logging.debug("initialized")
         train_dataloader = train_dataset.build_loader(batch_size, self.num_dataloading_workers, is_test=False)
 
         best_val_metric = -np.inf  # higher = better
         best_val_update = 0
         val_improve_update = 0  # most recent update where validation-score strictly improved
-        num_updates = params.pop('num_updates')
-        updates_wo_improve = params.pop('updates_wo_improve')
+
         if val_dataset is not None:
             y_val = val_dataset.get_labels()
             if y_val.ndim == 2 and y_val.shape[1] == 1:
@@ -224,7 +235,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             # for each batch
             for batch_idx, data_batch in enumerate(train_dataloader):
-                loss = self.model.compute_loss(data_batch, params)
+                loss = self.model.compute_loss(data_batch, **loss_kwargs)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -257,7 +268,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             epoch += 1
             for batch_idx, data_batch in enumerate(train_dataloader):
                 # forward
-                loss = self.model.compute_loss(data_batch, params)
+                loss = self.model.compute_loss(data_batch, **loss_kwargs)
                 total_train_loss += loss.item()
                 total_train_size += 1
 
@@ -268,7 +279,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 total_updates += 1
 
                 # validation
-                if total_updates % params.get('updates_between_validation_scoring', 100) == 0 and val_dataset is not None:
+                if total_updates % updates_between_validation_scoring == 0 and val_dataset is not None:
                     # compute validation score
                     val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
                     self.model.train()  # go back to training mode
@@ -481,23 +492,23 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.feature_type_map = get_feature_type_map(feature_arraycol_map=self.feature_arraycol_map, types_of_features=self._types_of_features)
         return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels)
 
-    def _setup_trainer(self, params, **kwargs):
+    def _init_optimizer(self, optimizer, learning_rate, weight_decay, **kwargs):
         """
         Set up optimizer needed for training.
         Network must first be initialized before this.
         """
         import torch
 
-        if params['optimizer'] == 'sgd':
+        if optimizer == 'sgd':
             optimizer = torch.optim.SGD(params=self.model.parameters(),
-                                        lr=params['learning_rate'],
-                                        weight_decay=params['weight_decay'])
-        elif params['optimizer'] == 'adam':
+                                        lr=learning_rate,
+                                        weight_decay=weight_decay)
+        elif optimizer == 'adam':
             optimizer = torch.optim.Adam(params=self.model.parameters(),
-                                         lr=params['learning_rate'],
-                                         weight_decay=params['weight_decay'])
+                                         lr=learning_rate,
+                                         weight_decay=weight_decay)
         else:
-            raise ValueError("Unknown optimizer specified: %s" % params['optimizer'])
+            raise ValueError(f"Unknown optimizer specified: {optimizer}")
         return optimizer
 
     def reduce_memory_size(self, remove_fit=True, requires_save=True, **kwargs):

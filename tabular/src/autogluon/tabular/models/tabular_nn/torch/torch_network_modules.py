@@ -189,21 +189,20 @@ class EmbedNet(nn.Module):
         h_loss = self.huber_pinball_loss(predict_data, target_data).mean()
         return h_loss + margin * m_loss
 
-    def compute_loss(self, data_batch, params):
+    def compute_loss(self, data_batch, loss_function=None, gamma=None):
         # train mode
         self.train()
         predict_data = self(data_batch)
         target_data = data_batch['label'].to(self.device)
         if self.problem_type == QUANTILE:
-            return self.quantile_loss(predict_data, target_data, margin=params['gamma'])
-        loss_func = params['loss_function']
+            return self.quantile_loss(predict_data, target_data, margin=gamma)
         if self.problem_type == SOFTCLASS:
-            return loss_func(predict_data, target_data)
+            return loss_function(predict_data, target_data)
         else:
             target_data = target_data.flatten()
             if self.problem_type == REGRESSION:
                 predict_data = predict_data.flatten()
-            return loss_func(predict_data, target_data)
+            return loss_function(predict_data, target_data)
 
 
     def predict(self, input_data):
