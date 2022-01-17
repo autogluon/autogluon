@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 
-from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
+from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT, S_BOOL
 
 from .abstract_model import AbstractModel
 
@@ -22,11 +22,12 @@ class AbstractNeuralNetworkModel(AbstractModel):
         if self._types_of_features is not None:
             Warning("Attempting to _get_types_of_features for Model, but previously already did this.")
 
-        feature_types = self._feature_metadata.get_type_group_map_raw()
-        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
-        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
+        continuous_featnames = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT], invalid_special_types=[S_BOOL])
+        categorical_featnames = self._feature_metadata.get_features(valid_raw_types=[R_CATEGORY, R_OBJECT])
+        bool_featnames = self._feature_metadata.get_features(required_special_types=[S_BOOL])
+
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
-        valid_features = categorical_featnames + continuous_featnames + language_featnames
+        valid_features = categorical_featnames + continuous_featnames + bool_featnames + language_featnames
 
         if len(valid_features) < df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
@@ -40,7 +41,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
             df = df.drop(columns=self.features_to_drop)
 
         if needs_extra_types is True:
-            types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'embed': [], 'language': []}
+            types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'embed': [], 'language': [], 'bool': []}
             # continuous = numeric features to rescale
             # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
             # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
@@ -48,7 +49,9 @@ class AbstractNeuralNetworkModel(AbstractModel):
             for feature in features_to_consider:
                 feature_data = df[feature]  # pd.Series
                 num_unique_vals = len(feature_data.unique())
-                if num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
+                if feature in bool_featnames:
+                    types_of_features['bool'].append(feature)
+                elif num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
                     types_of_features['onehot'].append(feature)
                 elif feature in continuous_featnames:
                     if np.abs(feature_data.skew()) > skew_threshold:
@@ -67,7 +70,7 @@ class AbstractNeuralNetworkModel(AbstractModel):
             for feature in valid_features:
                 if feature in categorical_featnames:
                     feature_type = 'CATEGORICAL'
-                elif feature in continuous_featnames:
+                elif feature in continuous_featnames or feature in bool_featnames:
                     feature_type = 'SCALAR'
                 elif feature in language_featnames:
                     feature_type = 'TEXT'

@@ -502,7 +502,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         if self.processor is not None:
             Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
         self.processor = create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels, unique_category_str=self.unique_category_str, continuous_features=self._types_of_features['continuous'],
-                                   skewed_features=self._types_of_features['skewed'], onehot_features=self._types_of_features['onehot'], embed_features=self._types_of_features['embed'])
+                                   skewed_features=self._types_of_features['skewed'], onehot_features=self._types_of_features['onehot'], embed_features=self._types_of_features['embed'], bool_features=self._types_of_features['bool'])
         df = self.processor.fit_transform(df) # 2D numpy array
         self.feature_arraycol_map = get_feature_arraycol_map(processor=self.processor, max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
         num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])  # should match number of columns in processed array

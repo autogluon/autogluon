@@ -91,7 +91,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         return
 
-
     def _fit(self, X, y, X_val=None, y_val=None,
              time_limit=None, sample_weight=None, num_cpus=1, num_gpus=0, reporter=None, **kwargs):
         try_import_torch()
@@ -101,7 +100,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         start_time = time.time()
         self.verbosity = kwargs.get('verbosity', 2)
         if sample_weight is not None:  # TODO: support
-            logger.log(15, "sample_weight not yet supported for TabularNeuralQuantileModel,"
+            logger.log(15, f"sample_weight not yet supported for {self.__class__.__name__},"
                            " this model will ignore them in training.")
         params = self.params.copy()
         params = fixedvals_from_searchspaces(params)
@@ -111,15 +110,17 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             self.num_dataloading_workers = 1
         if self.num_dataloading_workers == 1:
             self.num_dataloading_workers = 0  # TODO: verify 0 is typically faster and uses less memory than 1 in pytorch
-        self.num_dataloading_workers = 0
+        self.num_dataloading_workers = 0  # TODO: >0 crashes on MacOS
         self.max_batch_size = params['max_batch_size']
-        if isinstance(X, TabularTorchDataset):
-            self.batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size)
-        else:
-            self.batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
+        self.batch_size = params.get('fit_batch_size', None)
+        if self.batch_size is None:
+            if isinstance(X, TabularTorchDataset):
+                self.batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size)
+            else:
+                self.batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
 
         train_dataset, val_dataset = self.generate_datasets(X=X, y=y, params=params, X_val=X_val, y_val=y_val)
-        logger.log(15, "Training data for TabularNeuralQuantileModel has: %d examples, %d features (%d vector, %d embedding)" %
+        logger.log(15, f"Training data for {self.__class__.__name__} has: %d examples, %d features (%d vector, %d embedding)" %
                    (train_dataset.num_examples, train_dataset.num_features, len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed'])
                   ))
 
@@ -128,7 +129,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 self.device = torch.device("cuda")
                 logger.log(15, "Training on GPU")
                 if num_gpus > 1:
-                    logger.warning("Tabular Neural Network not yet able to use more than 1 GPU. 'num_gpus' is set to >1, but we will be using only 1 GPU.")
+                    logger.warning(f"{self.__class__.__name__} not yet able to use more than 1 GPU. 'num_gpus' is set to >1, but we will be using only 1 GPU.")
             else:
                 self.device = torch.device("cpu")
                 logger.log(15, "Training on CPU")
@@ -225,6 +226,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         start_fit_time = time.time()
         if time_limit is not None:
             time_limit = time_limit - (start_fit_time - start_time)
+            if time_limit <= 0:
+                raise TimeLimitExceeded
 
         logger.log(15, "Neural network architecture:")
         logger.log(15, str(self.model))
@@ -258,11 +261,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     self.model.train()  # go back to training mode
                     if np.isnan(val_metric):
                         if total_updates == 1:
-                            raise RuntimeError("NaNs encountered in TabularNeuralQuantileModel training. "
+                            raise RuntimeError(f"NaNs encountered in {self.__class__.__name__} training. "
                                                "Features/labels may be improperly formatted, "
                                                "or NN weights may have diverged.")
                         else:
-                            logger.warning("Warning: NaNs encountered in TabularNeuralQuantileModel training. "
+                            logger.warning(f"Warning: NaNs encountered in {self.__class__.__name__} training. "
                                            "Reverting model to last checkpoint without NaNs.")
                             break
 
@@ -310,6 +313,14 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     do_update = False
                     break
 
+            if time_limit is not None:
+                time_elapsed = time.time() - start_fit_time
+                time_epoch_average = time_elapsed / (epoch+1)
+                time_left = time_limit - time_elapsed
+                if time_left < time_epoch_average:
+                    logger.log(20, f"\tRan out of time, stopping training early. (Stopping on epoch {epoch})")
+                    break
+
         # revert back to best model
         if val_dataset is not None:
             try:
@@ -326,6 +337,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                        (best_val_update, best_epoch, self.stopping_metric.name, final_val_metric))
         else:
             logger.log(15, "Best model found after %d updates (Epoch %s)." % (best_val_update, best_epoch))
+        self.params_trained['fit_batch_size'] = self.batch_size
         self.params_trained['num_updates'] = best_val_update
         return
 
@@ -433,9 +445,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         logger.log(15, json.dumps(self._types_of_features, indent=4))
         logger.log(15, "\n")
         if self.processor is not None:
-            Warning("Attempting to process training data for TabularNeuralNetModel, but previously already did this.")
+            Warning(f"Attempting to process training data for {self.__class__.__name__}, but previously already did this.")
         self.processor = create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels, unique_category_str=self.unique_category_str, continuous_features=self._types_of_features['continuous'],
-                                   skewed_features=self._types_of_features['skewed'], onehot_features=self._types_of_features['onehot'], embed_features=self._types_of_features['embed'])
+                                   skewed_features=self._types_of_features['skewed'], onehot_features=self._types_of_features['onehot'], embed_features=self._types_of_features['embed'], bool_features=self._types_of_features['bool'])
         df = self.processor.fit_transform(df)
         self.feature_arraycol_map = get_feature_arraycol_map(processor=self.processor, max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
         num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])  # should match number of columns in processed array

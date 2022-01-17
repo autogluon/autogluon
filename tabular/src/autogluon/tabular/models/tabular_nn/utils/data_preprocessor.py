@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionT
 
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 
-def create_preprocessor(impute_strategy, max_category_levels, unique_category_str, continuous_features, skewed_features, onehot_features, embed_features):
+def create_preprocessor(impute_strategy, max_category_levels, unique_category_str, continuous_features, skewed_features, onehot_features, embed_features, bool_features):
     """ Creates sklearn ColumnTransformer that can be fit to training data to preprocess it for tabular neural network. """
     transformers = []  # order of various column transformers in this list is important!
     if continuous_features:
@@ -34,14 +34,14 @@ def create_preprocessor(impute_strategy, max_category_levels, unique_category_st
             ('imputer', SimpleImputer(strategy='constant', fill_value=unique_category_str)),
             ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=max_category_levels))])  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
         transformers.append( ('ordinal', ordinal_transformer, embed_features) )
-    return ColumnTransformer(transformers=transformers)  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
+    return ColumnTransformer(transformers=transformers, remainder='passthrough')  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
 def convert_df_dtype_to_str(df):
     return df.astype(str)
 
 def get_feature_arraycol_map(processor, max_category_levels):
     """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
-    feature_preserving_transforms = set(['continuous','skewed', 'ordinal'])  # these transforms do not alter dimensionality of feature
+    feature_preserving_transforms = set(['continuous','skewed', 'ordinal','bool','remainder'])  # these transforms do not alter dimensionality of feature
     feature_arraycol_map = {}  # unordered version
     current_colindex = 0
     for transformer in processor.transformers_:
@@ -70,7 +70,7 @@ def get_feature_type_map(feature_arraycol_map, types_of_features):
     """ Returns OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed'). """
     if feature_arraycol_map is None:
         raise ValueError("Must first call get_feature_arraycol_map() to set feature_arraycol_map before calling get_feature_type_map()")
-    vector_features = types_of_features['continuous'] + types_of_features['skewed'] + types_of_features['onehot']
+    vector_features = types_of_features['continuous'] + types_of_features['skewed'] + types_of_features['onehot'] + types_of_features['bool']
     feature_type_map = OrderedDict()
     for feature_name in feature_arraycol_map:
         if feature_name in vector_features:
@@ -78,5 +78,5 @@ def get_feature_type_map(feature_arraycol_map, types_of_features):
         elif feature_name in types_of_features['embed']:
             feature_type_map[feature_name] = 'embed'
         else:
-            raise ValueError(f"unknown feature type encountered in: {feature_name}")
+            feature_type_map[feature_name] = 'vector'
     return feature_type_map
