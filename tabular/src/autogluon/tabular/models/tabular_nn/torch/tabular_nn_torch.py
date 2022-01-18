@@ -91,20 +91,47 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return device
 
     def _set_net_defaults(self, train_dataset, params):
+        params = params.copy()
+        y_range_extend = params.pop('y_range_extend', None)
         """ Sets dataset-adaptive default values to use for our neural network """
         if self.problem_type in [REGRESSION, QUANTILE]:
             if params['y_range'] is None:
-                params['y_range'] = infer_y_range(y_vals=train_dataset.data_list[train_dataset.label_index], y_range_extend=params['y_range_extend'])
-        if params['loss_function'] is None:
-            import torch
-            if self.problem_type == REGRESSION:
-                params['loss_function'] = torch.nn.L1Loss()  # or torch.nn.MSELoss()
-            elif self.problem_type in [BINARY, MULTICLASS]:
-                params['loss_function'] = torch.nn.CrossEntropyLoss()
-            elif self.problem_type == SOFTCLASS:
-                params['loss_function'] = torch.nn.KLDivLoss()  # compares log-probability prediction vs probability target.
+                params['y_range'] = infer_y_range(y_vals=train_dataset.data_list[train_dataset.label_index], y_range_extend=y_range_extend)
+        return params
 
-        return
+    def _get_default_loss_function(self):
+        import torch
+        if self.problem_type == REGRESSION:
+            return torch.nn.L1Loss()  # or torch.nn.MSELoss()
+        elif self.problem_type in [BINARY, MULTICLASS]:
+            return torch.nn.CrossEntropyLoss()
+        elif self.problem_type == SOFTCLASS:
+            return torch.nn.KLDivLoss()  # compares log-probability prediction vs probability target.
+
+    def _prepare_params(self, params):
+        params = params.copy()
+
+        processor_param_keys = {'proc.embed_min_categories', 'proc.impute_strategy', 'proc.max_category_levels', 'proc.skew_threshold', 'use_ngram_features'}
+        processor_kwargs = {k: v for k, v in params.items() if k in processor_param_keys}
+        for key in processor_param_keys:
+            params.pop(key, None)
+
+        optimizer_param_keys = {'optimizer', 'learning_rate', 'weight_decay'}
+        optimizer_kwargs = {k: v for k, v in params.items() if k in optimizer_param_keys}
+        for key in optimizer_param_keys:
+            params.pop(key, None)
+
+        fit_param_keys = {'num_updates', 'updates_wo_improve', 'updates_between_validation_scoring'}
+        fit_kwargs = {k: v for k, v in params.items() if k in fit_param_keys}
+        for key in fit_param_keys:
+            params.pop(key, None)
+
+        loss_param_keys = {'loss_function', 'gamma'}
+        loss_kwargs = {k: v for k, v in params.items() if k in loss_param_keys}
+        for key in loss_param_keys:
+            params.pop(key, None)
+
+        return processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params
 
     def _fit(self, X, y, X_val=None, y_val=None,
              time_limit=None, sample_weight=None, num_cpus=1, num_gpus=0, reporter=None, verbosity=2, **kwargs):
@@ -116,6 +143,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         params = self._get_model_params()
         params = fixedvals_from_searchspaces(params)
+
+        processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params = self._prepare_params(params=params)
 
         seed_value = params.pop('seed_value', 0)
         if seed_value is not None:  # Set seeds
@@ -134,7 +163,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if self.num_dataloading_workers == 1:
             self.num_dataloading_workers = 0  # TODO: verify 0 is typically faster and uses less memory than 1 in pytorch
         self.num_dataloading_workers = 0  # TODO: >0 crashes on MacOS
-        self.max_batch_size = params.pop('max_batch_size')
+        self.max_batch_size = params.pop('max_batch_size', 512)
         batch_size = params.pop('batch_size', None)
         if batch_size is None:
             if isinstance(X, TabularTorchDataset):
@@ -142,7 +171,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             else:
                 batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
 
-        train_dataset, val_dataset = self._generate_datasets(X=X, y=y, params=params, X_val=X_val, y_val=y_val)
+        train_dataset, val_dataset = self._generate_datasets(X=X, y=y, params=processor_kwargs, X_val=X_val, y_val=y_val)
         logger.log(15, f"Training data for {self.__class__.__name__} has: %d examples, %d features (%d vector, %d embedding)" %
                    (train_dataset.num_examples, train_dataset.num_features, len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed'])
                   ))
@@ -150,6 +179,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.device = self._get_device(num_gpus=num_gpus)
 
         self._get_net(train_dataset, params=params)
+        self.optimizer = self._init_optimizer(**optimizer_kwargs)
 
         if time_limit is not None:
             time_elapsed = time.time() - start_time
@@ -160,34 +190,23 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             if time_limit <= time_limit_orig * 0.4:
                 raise TimeLimitExceeded
 
-        num_updates = params.pop('num_updates')
-        updates_wo_improve = params.pop('updates_wo_improve')
-        updates_between_validation_scoring = params.pop('updates_between_validation_scoring', 100)
-
-        optimizer_kwargs = {k: v for k, v in params.items() if k in {'optimizer', 'learning_rate', 'weight_decay'}}
-        self.optimizer = self._init_optimizer(**optimizer_kwargs)
-
-        loss_kwargs = {k: v for k, v in params.items() if k in {'loss_function', 'gamma'}}
-
         # train network
         self._train_net(train_dataset=train_dataset,
                         loss_kwargs=loss_kwargs,
                         batch_size=batch_size,
-                        num_updates=num_updates,
-                        updates_wo_improve=updates_wo_improve,
-                        updates_between_validation_scoring=updates_between_validation_scoring,
                         val_dataset=val_dataset,
                         time_limit=time_limit,
                         reporter=reporter,
-                        verbosity=verbosity)
+                        verbosity=verbosity,
+                        **fit_kwargs)
 
     def _get_net(self, train_dataset, params):
         from .torch_network_modules import EmbedNet
 
         # set network params
-        self._set_net_defaults(train_dataset, params)
+        params = self._set_net_defaults(train_dataset, params)
         self.model = EmbedNet(problem_type=self.problem_type, num_net_outputs=self._get_num_net_outputs(), quantile_levels=self.quantile_levels,
-                              train_dataset=train_dataset, params=params, device=self.device)
+                              train_dataset=train_dataset, device=self.device, **params)
         self.model = self.model.to(self.device)
         if not os.path.exists(self.path):
             os.makedirs(self.path)
@@ -214,6 +233,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         best_val_metric = -np.inf  # higher = better
         best_val_update = 0
         val_improve_update = 0  # most recent update where validation-score strictly improved
+
+        if isinstance(loss_kwargs.get('loss_function', 'auto'), str) and loss_kwargs.get('loss_function', 'auto') == 'auto':
+            loss_kwargs['loss_function'] = self._get_default_loss_function()
 
         if val_dataset is not None:
             y_val = val_dataset.get_labels()

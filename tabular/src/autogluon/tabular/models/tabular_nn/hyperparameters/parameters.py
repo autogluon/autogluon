@@ -90,7 +90,7 @@ def get_hyper_params(framework):
         'max_batch_size': 512,  # maximum batch-size, actual batch size may be slightly smaller.
         'use_batchnorm': False,  # whether or not to utilize batch normalization
         # Options: [True, False]
-        'loss_function': None,  # Pytorch loss function minimized during training
+        'loss_function': 'auto',  # Pytorch loss function minimized during training
         # Example options for regression: nn.MSELoss(), nn.L1Loss()
     }
     return merge_framework_params(framework=framework, shared_params=hyper_params, mxnet_params=mxnet_hyper_params, pytorch_params=pytorch_hyper_params)

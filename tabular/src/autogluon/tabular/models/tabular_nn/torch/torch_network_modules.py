@@ -2,7 +2,6 @@ import logging
 import torch
 import torch.nn as nn
 import numpy as np
-import pandas as pd
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 
@@ -12,15 +11,26 @@ logger = logging.getLogger(__name__)
 
 
 class EmbedNet(nn.Module):
-    def __init__(self, problem_type, num_net_outputs=None, quantile_levels=None, train_dataset=None, params=None, architecture_desc=None, device=None):
-        if (architecture_desc is None) and (train_dataset is None or params is None):
-            raise ValueError("train_dataset, params cannot = None if architecture_desc=None")
-        super(EmbedNet, self).__init__()
+    """
+    y_range: Used specifically for regression. = None for classification.
+    """
+    def __init__(self,
+                 problem_type,
+                 num_net_outputs=None,
+                 quantile_levels=None,
+                 train_dataset=None,
+                 architecture_desc=None,
+                 device=None,
+                 **kwargs):
+        if (architecture_desc is None) and (train_dataset is None):
+            raise ValueError("train_dataset cannot = None if architecture_desc=None")
+        super().__init__()
         self.problem_type = problem_type
         if self. problem_type == QUANTILE:
             self.register_buffer('quantile_levels', torch.Tensor(quantile_levels).float().reshape(1, -1))
         self.device = torch.device('cpu') if device is None else device
         if architecture_desc is None:
+            params = self._set_params(**kwargs)
             # adpatively specify network architecture based on training dataset
             self.from_logits = False
             self.has_vector_features = train_dataset.has_vector_features()
@@ -112,6 +122,30 @@ class EmbedNet(nn.Module):
                 self.architecture_desc['embed_dims'] = embed_dims
             if self.has_vector_features:
                 self.architecture_desc['vector_dims'] = vector_dims
+
+    def _set_params(self,
+                    num_layers=4,
+                    hidden_size=128,
+                    activation='relu',
+                    use_batchnorm=False,
+                    dropout_prob=0.1,
+                    y_range=None,
+                    alpha=0.01,
+                    max_embedding_dim=100,
+                    embed_exponent=0.56,
+                    embedding_size_factor=1.0):
+        return dict(
+            num_layers=num_layers,
+            hidden_size=hidden_size,
+            activation=activation,
+            use_batchnorm=use_batchnorm,
+            dropout_prob=dropout_prob,
+            y_range=y_range,
+            alpha=alpha,
+            max_embedding_dim=max_embedding_dim,
+            embed_exponent=embed_exponent,
+            embedding_size_factor=embedding_size_factor,
+        )
 
     def init_params(self):
         for layer in self.children():
