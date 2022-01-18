@@ -108,6 +108,7 @@ class ConfigBuilder:
         It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
         Available Presets: ['best_quality', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
         It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
+        If there is an overlap in presets keys, the latter presets will override the earlier ones.
         """
         valid_keys = list(tabular_presets_dict.keys())
         if not isinstance(presets, list):
@@ -150,18 +151,6 @@ class ConfigBuilder:
         Note: This can increase training time (and inference time) by up to 20x, but can greatly improve predictive performance.
         """
         self.config['auto_stack'] = auto_stack
-        return self
-
-    def use_bag_holdout(self, use_bag_holdout: bool = True) -> ConfigBuilder:
-        """
-        Number of folds used for bagging of models. When `num_bag_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging).
-        Disabled by default (0), but we recommend values between 5-10 to maximize predictive performance.
-        Increasing num_bag_folds will result in models with lower bias but that are more prone to overfitting.
-        `num_bag_folds = 1` is an invalid value, and will raise a ValueError.
-        Values > 10 may produce diminishing returns, and can even harm overall results due to overfitting.
-        To further improve predictions, avoid increasing `num_bag_folds` much beyond 10 and instead increase `num_bag_sets`.
-        """
-        self.config['use_bag_holdout'] = use_bag_holdout
         return self
 
     def num_bag_folds(self, num_bag_folds: int) -> ConfigBuilder:
@@ -286,8 +275,8 @@ class ConfigBuilder:
         """
         Subset of model types to train during `fit()`.
         Reference `hyperparameters` documentation for what models correspond to each value.
-        Useful when a particular model type such as 'KNN' or 'custom' is not desired but altering the `hyperparameters` dictionary is difficult or time-consuming.
-            Example: To exclude both 'KNN' and 'custom' models, specify `excluded_model_types=['KNN', 'custom']`.
+        Useful when only the particular models should be trained such as 'KNN' or 'custom', but altering the `hyperparameters` dictionary is difficult or time-consuming.
+            Example: To keep only 'KNN' and 'custom' models, specify `included_model_types=['KNN', 'custom']`.
         """
         valid_keys = [m for m in MODEL_TYPES.keys() if m not in ['ENS_WEIGHTED', 'SIMPLE_ENS_WEIGHTED']]
         if not isinstance(models, list):
