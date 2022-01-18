@@ -196,4 +196,4 @@ def try_import_vowpalwabbit():
             f'Currently, we only support VW version >=8.10.1 and <8.11.0. Found vowpalwabbit version: {vowpalwabbit_version}'
     except ImportError:
         raise ImportError("`import vowpalwabbit` failed.\n"
-                          "A quick tip is to install via `pip install vowpalwabbit==8.10")
+                          "A quick tip is to install via `pip install vowpalwabbit==8.10.1")
