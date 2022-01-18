@@ -28,9 +28,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     """
 
     # Constants used throughout this class:
-    unique_category_str = '!missing!' # string used to represent missing values and unknown categories for categorical features. Should not appear in the dataset
-    params_file_name = 'net.params' # Stores parameters of final network
-    temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
+    unique_category_str = '!missing!'  # string used to represent missing values and unknown categories for categorical features.
+    params_file_name = 'net.params'  # Stores parameters of final network
+    temp_file_name = 'temp_net.params'  # Stores temporary network parameters (eg. during the course of training)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -108,7 +108,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         elif self.problem_type == SOFTCLASS:
             return torch.nn.KLDivLoss()  # compares log-probability prediction vs probability target.
 
-    def _prepare_params(self, params):
+    @staticmethod
+    def _prepare_params(params):
         params = params.copy()
 
         processor_param_keys = {'proc.embed_min_categories', 'proc.impute_strategy', 'proc.max_category_levels', 'proc.skew_threshold', 'use_ngram_features'}
@@ -172,9 +173,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
 
         train_dataset, val_dataset = self._generate_datasets(X=X, y=y, params=processor_kwargs, X_val=X_val, y_val=y_val)
-        logger.log(15, f"Training data for {self.__class__.__name__} has: %d examples, %d features (%d vector, %d embedding)" %
-                   (train_dataset.num_examples, train_dataset.num_features, len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed'])
-                  ))
+        logger.log(15, f"Training data for {self.__class__.__name__} has: "
+                       f"{train_dataset.num_examples} examples, {train_dataset.num_features} features "
+                       f"({len(train_dataset.feature_groups['vector'])} vector, {len(train_dataset.feature_groups['embed'])} embedding)")
 
         self.device = self._get_device(num_gpus=num_gpus)
 
@@ -223,7 +224,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                    verbosity=2):
         import torch
         start_time = time.time()
-        logger.log(15, f"Training tabular neural network for up to {num_epochs} epochs...")
         logging.debug("initializing neural network...")
         self.model.init_params()
         logging.debug("initialized")
@@ -268,7 +268,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             return
 
         # start training loop:
-        logger.log(15, "Start training Tabular Neural network")
+        logger.log(15, f"Training tabular neural network for up to {num_epochs} epochs...")
         total_updates = 0
         num_updates_per_epoch = len(train_dataloader)
         update_to_check_time = min(10, max(1, int(num_updates_per_epoch/10)))
@@ -404,10 +404,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         else:
             raise ValueError("X must be of type pd.DataFrame or TabularTorchDataset, not type: %s" % type(X))
 
-    def _predict_tabular_data(self, new_data, process=True, predict_proba=True):
+    def _predict_tabular_data(self, new_data, process=True):
         from .tabular_torch_dataset import TabularTorchDataset
         if process:
-            new_data = self._process_test_data(new_data, None)
+            new_data = self._process_test_data(new_data)
         if not isinstance(new_data, TabularTorchDataset):
             raise ValueError("new_data must of of type TabularTorchDataset if process=False")
         val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
@@ -447,7 +447,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             val_dataset = None
         return train_dataset, val_dataset
 
-    def _process_test_data(self, df, labels=None, **kwargs):
+    def _process_test_data(self, df, labels=None):
         """ Process train or test DataFrame into a form fit for neural network models.
             Args:
                 df (pd.DataFrame): Data to be processed (X)
@@ -474,7 +474,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels)
 
     def _process_train_data(self, df, impute_strategy, max_category_levels, skew_threshold,
-                            embed_min_categories, use_ngram_features, labels, **kwargs):
+                            embed_min_categories, use_ngram_features, labels):
         from .tabular_torch_dataset import TabularTorchDataset
 
         # sklearn processing n_quantiles warning
@@ -515,7 +515,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.feature_type_map = get_feature_type_map(feature_arraycol_map=self.feature_arraycol_map, types_of_features=self._types_of_features)
         return TabularTorchDataset(df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels)
 
-    def _init_optimizer(self, optimizer, learning_rate, weight_decay, **kwargs):
+    def _init_optimizer(self, optimizer, learning_rate, weight_decay):
         """
         Set up optimizer needed for training.
         Network must first be initialized before this.
@@ -569,7 +569,11 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             from .torch_network_modules import EmbedNet
 
             # recreate network from architecture description
-            model.model = EmbedNet(problem_type=model.problem_type, num_net_outputs=model._get_num_net_outputs(), quantile_levels=model.quantile_levels, architecture_desc=model._architecture_desc, device=model.device)
+            model.model = EmbedNet(problem_type=model.problem_type,
+                                   num_net_outputs=model._get_num_net_outputs(),
+                                   quantile_levels=model.quantile_levels,
+                                   architecture_desc=model._architecture_desc,
+                                   device=model.device)
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model
