@@ -7,7 +7,6 @@ hyperparameter_config_dict = dict(
     # Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
     default={
         'NN_TORCH': {},
-        'NN_MXNET': {},
         'GBM': [
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
             {},
