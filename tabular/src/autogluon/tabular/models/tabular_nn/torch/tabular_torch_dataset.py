@@ -1,8 +1,12 @@
 import os
+import logging
+
 import torch
 import numpy as np
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+
+logger = logging.getLogger(__name__)
 
 
 class TabularTorchDataset(torch.utils.data.Dataset):
@@ -200,7 +204,7 @@ class TabularTorchDataset(torch.utils.data.Dataset):
     def load(cls, file_prefix=""):
         """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
         dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
-        dataset: TabularPyTorchDataset = torch.load(dataobj_file)
+        dataset: TabularTorchDataset = torch.load(dataobj_file)
         logger.debug("TabularNN Dataset loaded from a file: \n %s" % dataobj_file)
         return dataset
 

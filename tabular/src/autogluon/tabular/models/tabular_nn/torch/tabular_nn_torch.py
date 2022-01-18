@@ -244,12 +244,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         else:
             verbose_eval = True
 
-        start_fit_time = time.time()
-        if time_limit is not None:
-            time_limit = time_limit - (start_fit_time - start_time)
-            if time_limit <= 0:
-                raise TimeLimitExceeded
-
         logger.log(15, "Neural network architecture:")
         logger.log(15, str(self.model))
 
@@ -276,13 +270,21 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         # start training loop:
         logger.log(15, "Start training Tabular Neural network")
         total_updates = 0
+        num_updates_per_epoch = len(train_dataloader)
+        update_to_check_time = min(10, max(1, int(num_updates_per_epoch/10)))
         do_update = True
         epoch = 0
         best_epoch = 0
         best_val_metric = -np.inf  # higher = better
         best_val_update = 0
         val_improve_epoch = 0  # most recent epoch where validation-score strictly improved
+        start_fit_time = time.time()
+        if time_limit is not None:
+            time_limit = time_limit - (start_fit_time - start_time)
+            if time_limit <= 0:
+                raise TimeLimitExceeded
         while do_update:
+            time_start_epoch = time.time()
             total_train_loss = 0.0
             total_train_size = 0.0
             for batch_idx, data_batch in enumerate(train_dataloader):
@@ -299,7 +301,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
                 # time limit
                 if time_limit is not None:
-                    time_elapsed = time.time() - start_fit_time
+                    time_cur = time.time()
+                    update_cur = batch_idx + 1
+                    if epoch == 0 and update_cur == update_to_check_time:
+                        time_elapsed_epoch = time_cur - time_start_epoch
+                        estimated_time = time_elapsed_epoch / update_cur * num_updates_per_epoch
+                        if estimated_time > time_limit:
+                            logger.log(30, f"\tNot enough time to train first epoch. "
+                                           f"(Time Required: {round(estimated_time, 2)}s, Time Left: {round(time_limit, 2)}s)")
+                            raise TimeLimitExceeded
+                    time_elapsed = time_cur - start_fit_time
                     if time_limit < time_elapsed:
                         logger.log(15, f"\tRan out of time, stopping training early. (Stopped on Update {total_updates} (Epoch {epoch}))")
                         do_update = False
@@ -334,8 +345,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     best_epoch = epoch
                     best_val_update = total_updates
                 if verbose_eval:
-                    logger.log(15, "Update %s (Epoch %s).  Train loss: %s, Val %s: %s" %
-                               (total_updates, epoch, total_train_loss / total_train_size, self.stopping_metric.name, val_metric))
+                    logger.log(15, f"Epoch {epoch} (Update {total_updates}).\t"
+                                   f"Train loss: {round(total_train_loss / total_train_size, 4)}, "
+                                   f"Val {self.stopping_metric.name}: {round(val_metric, 4)}, "
+                                   f"Best Epoch: {best_epoch}")
 
                 if reporter is not None:
                     reporter(epoch=total_updates,
@@ -364,15 +377,14 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         # revert back to best model
         if val_dataset is not None:
-            logger.log(15, "Best model found after %d updates (Epoch %s). Val %s: %s" %
-                       (best_val_update, best_epoch, self.stopping_metric.name, best_val_metric))
+            logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
             try:
                 self.model = torch.load(net_filename)
                 os.remove(net_filename)
             except FileNotFoundError:
                 pass
         else:
-            logger.log(15, "Best model found after %d updates (Epoch %s)." % (best_val_update, best_epoch))
+            logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained['batch_size'] = batch_size
         self.params_trained['num_epochs'] = best_epoch
 
