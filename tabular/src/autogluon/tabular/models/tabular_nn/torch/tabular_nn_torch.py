@@ -121,7 +121,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         for key in optimizer_param_keys:
             params.pop(key, None)
 
-        fit_param_keys = {'num_updates', 'updates_wo_improve', 'updates_between_validation_scoring'}
+        fit_param_keys = {'num_epochs', 'epochs_wo_improve'}
         fit_kwargs = {k: v for k, v in params.items() if k in fit_param_keys}
         for key in fit_param_keys:
             params.pop(key, None)
@@ -215,24 +215,19 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                    train_dataset,
                    loss_kwargs,
                    batch_size,
-                   num_updates,
-                   updates_wo_improve,
-                   updates_between_validation_scoring=100,
+                   num_epochs,
+                   epochs_wo_improve,
                    val_dataset=None,
                    time_limit=None,
                    reporter=None,
                    verbosity=2):
         import torch
         start_time = time.time()
-        logger.log(15, "Training tabular neural network for up to %s gradient updates..." % num_updates)
+        logger.log(15, f"Training tabular neural network for up to {num_epochs} epochs...")
         logging.debug("initializing neural network...")
         self.model.init_params()
         logging.debug("initialized")
         train_dataloader = train_dataset.build_loader(batch_size, self.num_dataloading_workers, is_test=False)
-
-        best_val_metric = -np.inf  # higher = better
-        best_val_update = 0
-        val_improve_update = 0  # most recent update where validation-score strictly improved
 
         if isinstance(loss_kwargs.get('loss_function', 'auto'), str) and loss_kwargs.get('loss_function', 'auto') == 'auto':
             loss_kwargs['loss_function'] = self._get_default_loss_function()
@@ -249,26 +244,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         else:
             verbose_eval = True
 
-        net_filename = self.path + self.temp_file_name
-        if num_updates == 0:
-            # use dummy training loop that stops immediately
-            # useful for using NN just for data preprocessing / debugging
-            logger.log(20, "Not training Tabular Neural Network since num_updates == 0.  Neural network architecture is:")
-
-            # for each batch
-            for batch_idx, data_batch in enumerate(train_dataloader):
-                loss = self.model.compute_loss(data_batch, **loss_kwargs)
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-                if batch_idx > 0:
-                    break
-
-            os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            torch.save(self.model, net_filename)
-            logger.log(15, "Untrained Tabular Neural Network saved to file")
-            return
-
         start_fit_time = time.time()
         if time_limit is not None:
             time_limit = time_limit - (start_fit_time - start_time)
@@ -278,16 +253,38 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         logger.log(15, "Neural network architecture:")
         logger.log(15, str(self.model))
 
+        net_filename = self.path + self.temp_file_name
+        if num_epochs == 0:
+            # use dummy training loop that stops immediately
+            # useful for using NN just for data preprocessing / debugging
+            logger.log(20, "Not training Tabular Neural Network since num_updates == 0")
+
+            # for each batch
+            for batch_idx, data_batch in enumerate(train_dataloader):
+                if batch_idx > 0:
+                    break
+                loss = self.model.compute_loss(data_batch, **loss_kwargs)
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+            torch.save(self.model, net_filename)
+            logger.log(15, "Untrained Tabular Neural Network saved to file")
+            return
+
         # start training loop:
         logger.log(15, "Start training Tabular Neural network")
         total_updates = 0
         do_update = True
-        epoch = -1
+        epoch = 0
         best_epoch = 0
+        best_val_metric = -np.inf  # higher = better
+        best_val_update = 0
+        val_improve_epoch = 0  # most recent epoch where validation-score strictly improved
         while do_update:
             total_train_loss = 0.0
             total_train_size = 0.0
-            epoch += 1
             for batch_idx, data_batch in enumerate(train_dataloader):
                 # forward
                 loss = self.model.compute_loss(data_batch, **loss_kwargs)
@@ -300,51 +297,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 self.optimizer.step()
                 total_updates += 1
 
-                # validation
-                if total_updates % updates_between_validation_scoring == 0 and val_dataset is not None:
-                    # compute validation score
-                    val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
-                    self.model.train()  # go back to training mode
-                    if np.isnan(val_metric):
-                        if total_updates == 1:
-                            raise RuntimeError(f"NaNs encountered in {self.__class__.__name__} training. "
-                                               "Features/labels may be improperly formatted, "
-                                               "or NN weights may have diverged.")
-                        else:
-                            logger.warning(f"Warning: NaNs encountered in {self.__class__.__name__} training. "
-                                           "Reverting model to last checkpoint without NaNs.")
-                            break
-
-                    # update best validation
-                    if (val_metric >= best_val_metric) or (total_updates == 1):
-                        if val_metric > best_val_metric:
-                            val_improve_update = total_updates
-                        best_val_metric = val_metric
-                        best_val_update = total_updates
-                        os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                        torch.save(self.model, net_filename)
-                        best_epoch = epoch
-                    if verbose_eval:
-                        logger.log(15, "Update %s (Epoch %s).  Train loss: %s, Val %s: %s" %
-                                   (total_updates, epoch, total_train_loss/total_train_size, self.stopping_metric.name, val_metric))
-
-                    if reporter is not None:
-                        reporter(epoch=total_updates,
-                                 validation_performance=val_metric,  # Higher val_metric = better
-                                 train_loss=total_train_loss/total_train_size,
-                                 eval_metric=self.eval_metric.name,
-                                 greater_is_better=self.eval_metric.greater_is_better)
-
-                    # no improvement
-                    if total_updates - val_improve_update > updates_wo_improve:
-                        do_update = False
-                        break
-
-                elif total_updates % 100 == 0:
-                    best_val_update = total_updates
-                    if verbose_eval:
-                        logger.log(15, "Update %s (Epoch %s).  Train loss: %s" % (total_updates, epoch, total_train_loss/total_train_size))
-
                 # time limit
                 if time_limit is not None:
                     time_elapsed = time.time() - start_fit_time
@@ -353,11 +305,51 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                         do_update = False
                         break
 
-                # max updates
-                if total_updates == num_updates:
-                    logger.log(15, f"Stopping training, reached the max number of updates: {num_updates}")
-                    do_update = False
+            if not do_update:
+                break
+
+            epoch += 1
+
+            # validation
+            if val_dataset is not None:
+                # compute validation score
+                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
+                if np.isnan(val_metric):
+                    if best_epoch == 0:
+                        raise RuntimeError(f"NaNs encountered in {self.__class__.__name__} training. "
+                                           "Features/labels may be improperly formatted, "
+                                           "or NN weights may have diverged.")
+                    else:
+                        logger.warning(f"Warning: NaNs encountered in {self.__class__.__name__} training. "
+                                       "Reverting model to last checkpoint without NaNs.")
+                        break
+
+                # update best validation
+                if (val_metric >= best_val_metric) or best_epoch == 0:
+                    if val_metric > best_val_metric:
+                        val_improve_epoch = epoch
+                    best_val_metric = val_metric
+                    os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                    torch.save(self.model, net_filename)
+                    best_epoch = epoch
+                    best_val_update = total_updates
+                if verbose_eval:
+                    logger.log(15, "Update %s (Epoch %s).  Train loss: %s, Val %s: %s" %
+                               (total_updates, epoch, total_train_loss / total_train_size, self.stopping_metric.name, val_metric))
+
+                if reporter is not None:
+                    reporter(epoch=total_updates,
+                             validation_performance=val_metric,  # Higher val_metric = better
+                             train_loss=total_train_loss / total_train_size,
+                             eval_metric=self.eval_metric.name,
+                             greater_is_better=self.eval_metric.greater_is_better)
+
+                # no improvement
+                if epoch - val_improve_epoch >= epochs_wo_improve:
                     break
+
+            if epoch >= num_epochs:
+                break
 
             if time_limit is not None:
                 time_elapsed = time.time() - start_fit_time
@@ -367,25 +359,22 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     logger.log(20, f"\tRan out of time, stopping training early. (Stopping on epoch {epoch})")
                     break
 
+        if epoch == 0:
+            raise AssertionError('0 epochs trained!')
+
         # revert back to best model
         if val_dataset is not None:
+            logger.log(15, "Best model found after %d updates (Epoch %s). Val %s: %s" %
+                       (best_val_update, best_epoch, self.stopping_metric.name, best_val_metric))
             try:
                 self.model = torch.load(net_filename)
                 os.remove(net_filename)
             except FileNotFoundError:
                 pass
-
-            # evaluate one final time
-            final_val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
-            if np.isnan(final_val_metric):
-                final_val_metric = -np.inf
-            logger.log(15, "Best model found after %d updates (Epoch %s). Val %s: %s" %
-                       (best_val_update, best_epoch, self.stopping_metric.name, final_val_metric))
         else:
             logger.log(15, "Best model found after %d updates (Epoch %s)." % (best_val_update, best_epoch))
         self.params_trained['batch_size'] = batch_size
-        self.params_trained['num_updates'] = best_val_update
-        return
+        self.params_trained['num_epochs'] = best_epoch
 
     def _predict_proba(self, X, **kwargs):
         """ To align predict with abstract_model API.
