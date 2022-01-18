@@ -22,6 +22,7 @@ from ...utils import fixedvals_from_searchspaces
 logger = logging.getLogger(__name__)
 
 
+# TODO: QuantileTransformer in pipelines accounts for majority of online inference time
 class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     """
     PyTorch neural network models for classification/regression with tabular data.
