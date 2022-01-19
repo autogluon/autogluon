@@ -38,6 +38,13 @@ tabular_cloud_predictor = TabularCloudPredictor().fit(
 ```
 TextCloudPredictor works just like the TabularCloudPredictor. We will focus on the TabularCloudPredictor for simplicity in this tutorial.
 
+### Reattach to an existing training job
+It is possible to lose access to the local running script, which is training the cloud predictor. The training job will continue if it is already started in SageMaker. To recover the training job:
+```{.python}
+cloud_predictor = TabularCloudPredictor().attach_job(JobName)  # you can get the job name from previous run's log or from SageMaker console
+```
+To be notice, reattaching to a job is a blocking call and won't give live log stream. Logs will be printed out once the training job is finished.
+
 ## Predicting with CloudPredictor
 We can use the trained CloudPredictor to predict on new data with either real-time inference or batch transformation.
 
@@ -92,4 +99,12 @@ Once you've made sure the local AutoGluon version matches the CloudPredictor `fi
 ```{.python}
 local_predictor = tabular_cloud_predictor.to_local_predictor()
 local_predictor.leaderboard()
+```
+
+## Save/Load CloudPredictor
+Of course you can save the CloudPredictor and reuse it later on.
+```{.python}
+cloud_predictor.save()
+loaded_predictor = TabularCloudPredictor.load(SavedPredictorPath)  # You can get the SavedPredictorPath from the console output of the `save()` method
+loaded_predictor.info()
 ```
