@@ -109,6 +109,10 @@ def get_scheduler_from_preset(scheduler_cls):
 
 
 def get_hyperparameter_tune_kwargs_preset(preset: str):
+    # TODO: re-enable bayesopt after it's been implemented
+    if preset == 'bayesopt':
+        logger.warning(f'Bayesopt hyperparameter tuning is currently disabled. Will use random hyperparameter tuning instead.')
+        preset = 'random'
     if preset not in _scheduler_presets:
         raise ValueError(f'Invalid hyperparameter_tune_kwargs preset value "{preset}". Valid presets: {list(_scheduler_presets.keys())}')
     return _scheduler_presets[preset].copy()
