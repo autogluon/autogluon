@@ -46,7 +46,6 @@ nn_options = {  # specifies non-default hyperparameter values for neural network
     'num_epochs': 10,  # number of training epochs (controls training time of NN models)
     'learning_rate': ag.space.Real(1e-4, 1e-2, default=5e-4, log=True),  # learning rate used in training (real-valued hyperparameter searched on log-scale)
     'activation': ag.space.Categorical('relu', 'softrelu', 'tanh'),  # activation function used in NN (categorical hyperparameter, default = first entry)
-    'layers': ag.space.Categorical([100], [1000], [200, 100], [300, 200, 100]),  # each choice for categorical hyperparameter 'layers' corresponds to list of sizes for each NN layer to use
     'dropout_prob': ag.space.Real(0.0, 0.5, default=0.1),  # dropout probability (real-valued hyperparameter)
 }
 
@@ -57,7 +56,7 @@ gbm_options = {  # specifies non-default hyperparameter values for lightGBM grad
 
 hyperparameters = {  # hyperparameters of each model type
                    'GBM': gbm_options,
-                   'NN_MXNET': nn_options,  # NOTE: comment this line out if you get errors on Mac OSX
+                   'NN_TORCH': nn_options,  # NOTE: comment this line out if you get errors on Mac OSX
                   }  # When these keys are missing from hyperparameters dict, no models of that type are trained
 
 time_limit = 2*60  # train various models for ~2 min
@@ -100,7 +99,7 @@ Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two o
 ```{.python .input}
 predictor = TabularPredictor(label=label, eval_metric=metric).fit(train_data,
     num_bag_folds=5, num_bag_sets=1, num_stack_levels=1,
-    hyperparameters = {'NN_MXNET': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
+    hyperparameters = {'NN_TORCH': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
 )
 ```
 
@@ -111,7 +110,7 @@ save_path = 'agModels-predictOccupation'  # folder where to store trained models
 
 predictor = TabularPredictor(label=label, eval_metric=metric, path=save_path).fit(
     train_data, auto_stack=True,
-    time_limit=30, hyperparameters={'NN_MXNET': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
+    time_limit=30, hyperparameters={'NN_TORCH': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
 )
 ```
 
@@ -323,7 +322,7 @@ Here you can set `hyperparameters` to either 'light', 'very_light', or 'toy' to 
 Finally, you may also exclude specific unwieldy models from being trained at all. Below we exclude models that tend to be slower (K Nearest Neighbors, Neural Network, models with custom larger-than-default  hyperparameters):
 
 ```{.python .input}
-excluded_model_types = ['KNN', 'NN_MXNET', 'custom']
+excluded_model_types = ['KNN', 'NN_TORCH', 'custom']
 predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
 ```
 

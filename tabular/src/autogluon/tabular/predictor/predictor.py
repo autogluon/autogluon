@@ -398,7 +398,6 @@ class TabularPredictor:
 
             Default:
                 hyperparameters = {
-                    'NN_MXNET': {},
                     'NN_TORCH': {},
                     'GBM': [
                         {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
