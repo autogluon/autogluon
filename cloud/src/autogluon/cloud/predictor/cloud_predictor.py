@@ -178,7 +178,6 @@ class CloudPredictor:
 
     # FIXME: Remember to change output_type back to parquet when parquet is fixed in the gpu container
     def _prepare_data(self, data, filename, output_type='csv'):
-        assert output_type in ['parquet', 'csv'], f'output type:{output_type} is not supported'
         path = os.path.join(self.local_output_path, 'utils')
         converter = FormatConverterFactory.get_converter(output_type)
         return converter.convert(data, path, filename)
@@ -730,7 +729,6 @@ class CloudPredictor:
         results_save_path = os.path.join(results_save_path, file_name)
         results_bucket, results_key_prefix = s3_path_to_bucket_prefix(result_path)
         download_s3_file(results_bucket, results_key_prefix, results_save_path)
-        logger.info(20, f'Results have been saved to {results_save_path}')
 
     def get_batch_transform_job_status(self, job_name=None):
         """

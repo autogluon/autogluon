@@ -1,7 +1,70 @@
 import io
 import pandas as pd
 
+from abc import ABC, abstractmethod
 from sagemaker.deserializers import SimpleBaseDeserializer
+
+
+class PandasDeserializeStrategy(ABC):
+
+    @property
+    @abstractmethod
+    def supported_content_type(self):
+        """The supported content type this strategy supports"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def deserialize(self, stream) -> pd.DataFrame:
+        """Deserialize data from stream to a pandas.DataFrame
+
+        Args:
+            stream (botocore.response.StreamingBody): Data to be deserialized.
+
+        Returns:
+            pandas.DataFrame: The data deserialized into a pandas DataFrame.
+        """
+        raise NotImplementedError
+
+
+class ParquetPandasDeserializeStrategy(PandasDeserializeStrategy):
+
+    @property
+    def supported_content_type(self):
+        return "application/x-parquet"
+
+    def deserialize(self, stream) -> pd.DataFrame:
+        return pd.read_parquet(io.BytesIO(stream.read()))
+
+
+class CSVPandasDeserializeStrategy(PandasDeserializeStrategy):
+
+    @property
+    def supported_content_type(self):
+        return "text/csv"
+
+    def deserialize(self, stream) -> pd.DataFrame:
+        return pd.read_csv(stream)
+
+
+class JsonPandasDeserializeStrategy(PandasDeserializeStrategy):
+
+    @property
+    def supported_content_type(self):
+        return "application/json"
+
+    def deserialize(self, stream) -> pd.DataFrame:
+        return pd.read_json(stream)
+
+
+class PandasDeserializeStrategyFactory:
+
+    __supported_strategy = [ParquetPandasDeserializeStrategy, CSVPandasDeserializeStrategy, JsonPandasDeserializeStrategy]
+    __content_type_to_strategy = {cls().supported_content_type: cls for cls in __supported_strategy}
+
+    @staticmethod
+    def get_strategy(content_type: str) -> PandasDeserializeStrategy:
+        assert content_type in PandasDeserializeStrategyFactory.__content_type_to_strategy, f'{content_type} not supported'
+        return PandasDeserializeStrategyFactory.__content_type_to_strategy[content_type]()
 
 
 class PandasDeserializer(SimpleBaseDeserializer):
@@ -29,13 +92,4 @@ class PandasDeserializer(SimpleBaseDeserializer):
         Returns:
             pandas.DataFrame: The data deserialized into a pandas DataFrame.
         """
-        if content_type == "application/x-parquet":
-            return pd.read_parquet(io.BytesIO(stream.read()))
-
-        if content_type == "text/csv":
-            return pd.read_csv(stream)
-
-        if content_type == "application/json":
-            return pd.read_json(stream)
-
-        raise ValueError("%s cannot read content type %s." % (__class__.__name__, content_type))
+        return PandasDeserializeStrategyFactory.get_strategy(content_type).deserialize(stream)

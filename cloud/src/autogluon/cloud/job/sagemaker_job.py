@@ -19,15 +19,32 @@ class SageMakerJob(ABC):
     @classmethod
     @abstractmethod
     def attach(cls, job_name):
-        pass
+        """
+        Reattach to a job given its name.
+
+        Parameters:
+        -----------
+        job_name: str
+            Name of the job to be attached.
+        """
+        raise NotImplementedError
 
     @abstractmethod
-    def info(self):
-        pass
+    def info(self) -> dict:
+        """
+        Give general information about the job.
+
+        Returns:
+        ------
+        dict
+            A dictionary containing the general information about the job.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def run(self, **kwargs):
-        pass
+        """Execute the job"""
+        raise NotImplementedError
 
     @abstractmethod
     def _get_job_status(self):
@@ -47,12 +64,29 @@ class SageMakerJob(ABC):
             return False
         return self.get_job_status() == 'Completed'
 
-    def get_job_status(self):
+    def get_job_status(self) -> str:
+        """
+        Get job status
+
+        Returns:
+        --------
+        str:
+            Valid Values: InProgress | Completed | Failed | Stopping | Stopped | NotCreated
+        """
         if not self.job_name:
             return 'NotCreated'
         return self._get_job_status()
 
     def get_output_path(self):
+        """
+        Get the output path of the job generated artifacts if any.
+
+        Returns:
+        --------
+        str:
+            Output path of the job generated artifacts if any.
+            If no artifact, return None
+        """
         if not self.completed:
             return None
         return self._get_output_path()
