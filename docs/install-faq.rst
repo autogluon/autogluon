@@ -61,3 +61,7 @@
       rm libomp.rb
 
    For more information, refer to https://github.com/microsoft/LightGBM/issues/4897
+
+* Does AutoGluon support ARM/M1 Mac?
+  
+  AutoGluon does not officially support ARM/M1 Mac. You can find more information, refer to https://github.com/awslabs/autogluon/issues/1242
