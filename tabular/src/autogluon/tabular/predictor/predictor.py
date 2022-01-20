@@ -1522,7 +1522,8 @@ class TabularPredictor:
         """
         self._assert_is_fit('leaderboard')
         data = self.__get_dataset(data) if data is not None else data
-        self._validate_unique_indices(data, 'data')
+        if data is not None:
+            self._validate_unique_indices(data, 'data')
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, silent=silent)
 
@@ -1724,7 +1725,8 @@ class TabularPredictor:
         """
         self._assert_is_fit('transform_features')
         data = self.__get_dataset(data) if data is not None else data
-        self._validate_unique_indices(data, 'data')
+        if data is not None:
+            self._validate_unique_indices(data, 'data')
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
                                                    use_orig_features=return_original_features)
 
