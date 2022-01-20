@@ -102,7 +102,7 @@ class ConfigBuilder:
     def __init__(self):
         self.config = {}
 
-    def presets(self, presets: Union[str, list]) -> ConfigBuilder:
+    def presets(self, presets: Union[str, list, dict]) -> ConfigBuilder:
         """
         List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
         It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
@@ -111,11 +111,12 @@ class ConfigBuilder:
         If there is an overlap in presets keys, the latter presets will override the earlier ones.
         """
         valid_keys = list(tabular_presets_dict.keys())
-        if not isinstance(presets, list):
+        if isinstance(presets, str):
             presets = [presets]
 
-        unknown_keys = [k for k in presets if k not in valid_keys]
-        assert len(unknown_keys) == 0, f'The following preset are not recognized: {unknown_keys} - use one of the valid presets: {valid_keys}'
+        if isinstance(presets, list):
+            unknown_keys = [k for k in presets if k not in valid_keys]
+            assert len(unknown_keys) == 0, f'The following presets are not recognized: {unknown_keys} - use one of the valid presets: {valid_keys}'
 
         self.config['presets'] = presets
         return self
