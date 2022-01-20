@@ -8,24 +8,23 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
-logger = logging.getLogger(__name__) # TODO: Currently unused
+logger = logging.getLogger(__name__)  # TODO: Currently unused
 
 
 class TabularNNDataset:
     """ Class for preprocessing & storing/feeding data batches used by tabular data neural networks. Assumes entire dataset can be loaded into numpy arrays.
-        Original Data table may contain numerical, categorical, and text (language) fields.
+        Original Data table may contain numerical and categorical fields.
 
         Attributes:
             dataset (mxnet.gluon.data.dataset): Contains the raw data (use dataset._data to access).
                                                 Different indices in this list correspond to different types of inputs to the neural network (each is 2D ND array)
                                                 All vector-valued (continuous & one-hot) features are concatenated together into a single index of the dataset.
-            data_desc (list[str]): Describes the data type of each index of dataset (options: 'vector','embed_<featname>', 'language_<featname>')
+            data_desc (list[str]): Describes the data type of each index of dataset (options: 'vector','embed_<featname>')
             dataloader (mxnet.gluon.data.DataLoader): Loads batches of data from dataset for neural net training and inference.
             embed_indices (list): which columns in dataset correspond to embed features (order matters!)
-            language_indices (list): which columns in dataset correspond to language features (order matters!)
             vecfeature_col_map (dict): maps vector_feature_name ->  columns of dataset._data[vector] array that contain the data for this feature
             feature_dataindex_map (dict): maps feature_name -> i such that dataset._data[i] = data array for this feature. Cannot be used for vector-valued features, instead use vecfeature_col_map
-            feature_groups (dict): maps feature_type (ie. 'vector' or 'embed' or 'language') to list of feature names of this type (empty list if there are no features of this type)
+            feature_groups (dict): maps feature_type (ie. 'vector' or 'embed') to list of feature names of this type (empty list if there are no features of this type)
             vectordata_index (int): describes which element of the dataset._data list holds the vector data matrix (access via self.dataset._data[self.vectordata_index]); None if no vector features
             label_index (int): describing which element of the dataset._data list holds labels (access via self.dataset._data[self.label_index].asnumpy()); None if no labels
             num_categories_per_embedfeature (list): Number of categories for each embedding feature (order matters!)
@@ -44,7 +43,7 @@ class TabularNNDataset:
         """ Args:
                 processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
                 feature_arraycol_map (OrderedDict): Mapsfeature-name -> list of column-indices in processed_array corresponding to this feature
-                feature_type_map (OrderedDict): Maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
+                feature_type_map (OrderedDict): Maps feature-name -> feature_type string (options: 'vector', 'embed')
                 labels (pd.Series): list of labels (y) if available
                 batch_size (int): number of examples to put in each mini-batch
                 num_dataloading_workers (int): number of threads to devote to loading mini-batches of data rather than model-training
@@ -76,15 +75,13 @@ class TabularNNDataset:
 
         if feature_arraycol_map.keys() != feature_type_map.keys():
             raise ValueError("feature_arraycol_map and feature_type_map must share same keys")
-        self.feature_groups = {'vector': [], 'embed': [], 'language': []} # maps feature_type -> list of feature_names (order is preserved in list)
+        self.feature_groups = {'vector': [], 'embed': []} # maps feature_type -> list of feature_names (order is preserved in list)
         self.feature_type_map = feature_type_map
         for feature in feature_type_map:
             if feature_type_map[feature] == 'vector':
                 self.feature_groups['vector'].append(feature)
             elif feature_type_map[feature] == 'embed':
                 self.feature_groups['embed'].append(feature)
-            elif feature_type_map[feature] == 'language':
-                self.feature_groups['language'].append(feature)
             else:
                 raise ValueError("unknown feature type: %s" % feature)
 
@@ -120,14 +117,6 @@ class TabularNNDataset:
                     self.data_desc.append("embed")
                     self.feature_dataindex_map[feature]  = len(data_list)-1
 
-        if len(self.feature_groups['language']) > 0:
-            for feature in feature_type_map:
-                if feature_type_map[feature] == 'language':
-                    feature_colinds = feature_arraycol_map[feature]
-                    data_list.append(mx.nd.array(processed_array[:,feature_colinds], dtype='int32')) # array of ints with data for this language feature
-                    self.data_desc.append("language")
-                    self.feature_dataindex_map[feature]  = len(data_list)-1
-
         self.num_classes = None
         if labels is not None:
             labels = np.array(labels)
@@ -145,7 +134,6 @@ class TabularNNDataset:
                 data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
 
         self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]] # list of indices of embedding features in self.dataset, order matters!
-        self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]  # list of indices of language features in self.dataset, order matters!
         self.num_categories_per_embed_feature = None
         self.generate_dataset_and_dataloader(data_list=data_list)
         if not self.is_test:
@@ -168,10 +156,6 @@ class TabularNNDataset:
     def num_embed_features(self):
         """ Returns number of embed features in this dataset """
         return len(self.feature_groups['embed'])
-
-    def num_language_features(self):
-        """ Returns number of language features in this dataset """
-        return len(self.feature_groups['language'])
 
     def num_vector_features(self):
         """ Number of vector features (each onehot feature counts = 1, regardless of how many categories) """
@@ -211,7 +195,7 @@ class TabularNNDataset:
                 feature (str): name of feature of interest (in processed dataframe)
                 asnumpy (bool): should we return 2D numpy array or MXNet NDarray
         """
-        nonvector_featuretypes = set(['embed', 'language'])
+        nonvector_featuretypes = set(['embed'])
         if feature not in self.feature_type_map:
             raise ValueError("unknown feature encountered: %s" % feature)
         if self.feature_type_map[feature] == 'vector':
@@ -234,7 +218,7 @@ class TabularNNDataset:
             Returns:
 
         """
-        nonvector_featuretypes = set(['embed', 'language'])
+        nonvector_featuretypes = set(['embed'])
         if feature not in self.feature_type_map:
             raise ValueError("unknown feature encountered: %s" % feature)
         if self.feature_type_map[feature] == 'vector':
@@ -257,7 +241,6 @@ class TabularNNDataset:
             Returns:
                 formatted_batch (dict): {'vector': array of vector_datamatrix,
                                          'embed': list of embedding features' batch data,
-                                         'language': list of language features batch data,
                                          'label': array of labels}
                                         where each key in dict may be missing.
         """
@@ -273,10 +256,6 @@ class TabularNNDataset:
             formatted_batch['embed'] = []
             for i in self.embed_indices:
                 formatted_batch['embed'].append(data_batch[i].as_in_context(ctx))
-        if self.num_language_features() > 0:
-            formatted_batch['language'] = []
-            for i in self.language_indices:
-                formatted_batch['language'].append(data_batch[i].as_in_context(ctx))
         if self.label_index is not None: # is None if there are no labels
             formatted_batch['label'] = data_batch[self.label_index].as_in_context(ctx)
 

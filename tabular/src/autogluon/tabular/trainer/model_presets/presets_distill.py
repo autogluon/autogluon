@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # Higher values indicate higher priority, priority dictates the order models are trained (which matters if time runs out).
 DEFAULT_DISTILL_PRIORITY = dict(
     GBM=100,
-    NN=90,
+    NN_MXNET=90,
     CAT=80,
     RF=70,
     custom=0,
@@ -29,8 +29,8 @@ def get_preset_models_distillation(path, problem_type, eval_metric, hyperparamet
         eval_metric = mean_squared_error
         # Constrain output-range of NN:
         nn_outputrange = {'y_range': (0.0,1.0), 'y_range_extend': 0.0}
-        if 'NN' in hyperparameters:
-            nn_hyperparameters = hyperparameters['NN']
+        if 'NN_MXNET' in hyperparameters:
+            nn_hyperparameters = hyperparameters['NN_MXNET']
         else:
             nn_hyperparameters = None
         if isinstance(nn_hyperparameters, list):
@@ -38,8 +38,8 @@ def get_preset_models_distillation(path, problem_type, eval_metric, hyperparamet
                 nn_hyperparameters[i].update(nn_outputrange)
         elif nn_hyperparameters is not None:
             nn_hyperparameters.update(nn_outputrange)
-        if 'NN' in hyperparameters:
-            hyperparameters['NN'] = nn_hyperparameters
+        if 'NN_MXNET' in hyperparameters:
+            hyperparameters['NN_MXNET'] = nn_hyperparameters
         # Swap RF criterion for MSE:
         rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
         if 'RF' in hyperparameters:

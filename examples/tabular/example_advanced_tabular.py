@@ -15,7 +15,7 @@ label = 'class'  # specifies which column do we want to predict
 save_path = 'ag_hpo_models/'  # where to save trained models
 
 hyperparameters = {
-    'NN': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': ag.Real(0.0, 0.5)},
+    'NN_TORCH': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': ag.Real(0.0, 0.5)},
     'GBM': {'num_boost_round': 1000, 'learning_rate': ag.Real(0.01, 0.1, log=True)},
     'XGB': {'n_estimators': 1000, 'learning_rate': ag.Real(0.01, 0.1, log=True)}
 }

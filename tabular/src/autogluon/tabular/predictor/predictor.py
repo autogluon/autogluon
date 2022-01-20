@@ -371,14 +371,15 @@ class TabularPredictor:
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)
                     'LR' (linear regression)
-                    'NN' (neural network with MXNet backend)
+                    'NN_MXNET' (neural network implemented in MXNet)
+                    'NN_TORCH' (neural network implemented in Pytorch)
                     'FASTAI' (neural network with FastAI backend)
                 Experimental model options include:
                     'FASTTEXT' (FastText)
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required)
                     'TRANSF' (Tabular Transformer, GPU is recommended)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
-                For example, set `hyperparameters = { 'NN':{...} }` if say you only want to train neural networks and no other types of models.
+                For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (Pytorch) neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
                 Each hyperparameter can either be a single fixed value or a search space containing many possible values.
                 Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
@@ -391,13 +392,13 @@ class TabularPredictor:
             Advanced functionality: Custom stack levels
                 By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
-                    Example: `hyperparameters = {1: {'RF': rf_params1}, 2: {'CAT': [cat_params1, cat_params2], 'NN': {}}}`
+                    Example: `hyperparameters = {1: {'RF': rf_params1}, 2: {'CAT': [cat_params1, cat_params2], 'NN_TORCH': {}}}`
                     This will result in a stack ensemble that has one custom random forest in level 1 followed by two CatBoost models with custom hyperparameters and a default neural network in level 2, for a total of 4 models.
                 If a level is not specified in `hyperparameters`, it will default to using the highest specified level to train models. This can also be explicitly controlled by adding a 'default' key.
 
             Default:
                 hyperparameters = {
-                    'NN': {},
+                    'NN_TORCH': {},
                     'GBM': [
                         {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
                         {},
@@ -2434,7 +2435,7 @@ class TabularPredictor:
             Specifies which models to use as students and what hyperparameter-values to use for them.
             Same as `hyperparameters` argument of `fit()`.
             If = None, then student models will use the same hyperparameters from `fit()` used to produce this Predictor.
-            Note: distillation is currently only supported for ['GBM','NN','RF','CAT'] student models, other models and their hyperparameters are ignored here.
+            Note: distillation is currently only supported for ['GBM','NN_MXNET','NN_TORCH','RF','CAT'] student models, other models and their hyperparameters are ignored here.
         holdout_frac : float
             Same as `holdout_frac` argument of :meth:`TabularPredictor.fit`.
         teacher_preds : str, default = 'soft'
