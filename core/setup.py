@@ -38,7 +38,7 @@ install_requires = [
 
 extras_require = {
     'ray': [
-        'ray>=1.7,<1.9',
+        'ray>=1.7,<1.8',
     ],
 }
 
