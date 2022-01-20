@@ -651,7 +651,9 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
-            calibrate: bool, default = True
+            calibrate: bool or str, default = 'auto'
+                Note: It is recommended to use ['auto', False] as the values and avoid True.
+                If 'auto' will automatically set to True if the problem_type and eval_metric are suitable for calibration.
                 If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
@@ -808,7 +810,7 @@ class TabularPredictor:
         return self
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
-                  calibrate=True):
+                  calibrate=False):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -836,12 +838,21 @@ class TabularPredictor:
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
+        if calibrate == 'auto':
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION and self.eval_metric.needs_proba:
+                calibrate = True
+            elif self.problem_type == QUANTILE:
+                calibrate = True
+            else:
+                calibrate = False
+
         if calibrate:
-            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION + [QUANTILE]:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION and self.eval_metric.needs_proba:
+                self._calibrate_model()
+            elif self.problem_type == QUANTILE:
                 self._calibrate_model()
             else:
-                # FIXME: add calibrate='auto'
-                logger.log(15, 'WARNING: calibrate is only applicable to classification or quantile regression problems')
+                logger.log(30, 'WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...')
 
         if save_space:
             self.save_space()
@@ -895,13 +906,18 @@ class TabularPredictor:
             conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
                                                     quantile_levels=self.quantile_levels)
             model.conformalize = conformalize
+            model.save()
         else:
             logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
             temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
                                                    init_val=init_val, max_iter=max_iter, lr=lr)
-            logger.log(15, f'Temperature term found is: {temp_scalar}')
-            model.temperature_scalar = temp_scalar
-        model.save()
+            if temp_scalar is None:
+                logger.log(15, f'Warning: Infinity found during calibration, skipping calibration on {model.name}! '
+                               f'This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).')
+            else:
+                logger.log(15, f'Temperature term found is: {temp_scalar}')
+                model.temperature_scalar = temp_scalar
+                model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
@@ -2837,7 +2853,7 @@ class TabularPredictor:
             # quantile levels
             quantile_levels=None,
 
-            calibrate=True,
+            calibrate='auto',
 
             # pseudo label
             pseudo_data=None,
@@ -2874,6 +2890,10 @@ class TabularPredictor:
         if set_best_to_refit_full and not refit_full:
             raise ValueError(
                 '`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
+        valid_calibrate_options = [True, False, 'auto']
+        calibrate = kwargs_sanitized['calibrate']
+        if calibrate not in valid_calibrate_options:
+            raise ValueError(f"`calibrate` must be a value in {valid_calibrate_options}, but is: {calibrate}")
 
         return kwargs_sanitized
 
