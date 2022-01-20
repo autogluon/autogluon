@@ -651,7 +651,7 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
-            calibrate: bool, default = False
+            calibrate: bool, default = True
                 If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
@@ -808,7 +808,7 @@ class TabularPredictor:
         return self
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
-                  calibrate=False):
+                  calibrate=True):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -840,7 +840,8 @@ class TabularPredictor:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION + [QUANTILE]:
                 self._calibrate_model()
             else:
-                logger.log(30, 'WARNING: calibrate is only applicable to classification or quantile regression problems')
+                # FIXME: add calibrate='auto'
+                logger.log(15, 'WARNING: calibrate is only applicable to classification or quantile regression problems')
 
         if save_space:
             self.save_space()
@@ -2829,7 +2830,7 @@ class TabularPredictor:
             # quantile levels
             quantile_levels=None,
 
-            calibrate=False,
+            calibrate=True,
 
             # pseudo label
             pseudo_data=None,
