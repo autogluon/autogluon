@@ -56,4 +56,8 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
 
     optimizer.step(temperature_scale_step)
 
-    return temperature_param.item()
+    temperature_scale = temperature_param.item()
+    if np.isnan(temperature_scale):
+        return None
+
+    return temperature_scale

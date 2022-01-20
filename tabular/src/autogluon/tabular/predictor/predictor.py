@@ -847,7 +847,7 @@ class TabularPredictor:
                 calibrate = False
 
         if calibrate:
-            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION and self.eval_metric.needs_proba:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
                 self._calibrate_model()
             elif self.problem_type == QUANTILE:
                 self._calibrate_model()
