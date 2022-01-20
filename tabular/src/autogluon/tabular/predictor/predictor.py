@@ -22,7 +22,7 @@ from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df
+from autogluon.core.utils import get_pred_from_proba_df, try_import_torch
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -868,6 +868,13 @@ class TabularPredictor:
             The initial value for temperature scalar term
         """
         # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
+        try:
+            # FIXME: Avoid depending on torch for temp scaling
+            try_import_torch
+        except ImportError:
+            logger.log(30, 'Warning: Torch is not installed, skipping calibration step...')
+            return
+
         if model_name is None:
             model_name = self._trainer.get_model_best()
 
