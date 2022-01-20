@@ -4,6 +4,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from autogluon.features import TextNgramFeatureGenerator
 from autogluon.tabular.configs.config_helper import ConfigBuilder
+from autogluon.tabular.models import KNNModel
 
 
 def test_presets():
@@ -71,6 +72,12 @@ def test_included_model_types():
     actual_config = ConfigBuilder().included_model_types(['NN', 'LR']).build()
     assert actual_config == expected_config
 
+    class CustomKNN(KNNModel):
+        pass
+    expected_config = dict(excluded_model_types=['RF', 'XT', 'KNN', 'GBM', 'CAT', 'XGB', 'QNN', 'LR', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
+    actual_config = ConfigBuilder().included_model_types([CustomKNN, 'NN']).build()
+    assert actual_config == expected_config
+
 
 def test_included_model_types_invalid_option():
     with pytest.raises(AssertionError, match=r"The following model types are not recognized: .'unknown1'. - use one of the valid models: .*"):
@@ -100,6 +107,12 @@ def test_hyperparameters_str():
 def test_hyperparameters_dict():
     expected_config = dict(hyperparameters={'NN': {}})
     actual_config = ConfigBuilder().hyperparameters({'NN': {}}).build()
+    assert actual_config == expected_config
+
+    class CustomKNN(KNNModel):
+        pass
+    expected_config = dict(hyperparameters={CustomKNN: [{}, {'prop': 42}]})
+    actual_config = ConfigBuilder().hyperparameters({CustomKNN: [{}, {'prop': 42}]}).build()
     assert actual_config == expected_config
 
 

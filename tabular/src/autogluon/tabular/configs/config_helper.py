@@ -136,7 +136,7 @@ class ConfigBuilder:
         if isinstance(hyperparameters, str):
             assert hyperparameters in hyperparameter_config_dict, f'{hyperparameters} is not one of the valid presets {valid_str_values}'
         elif isinstance(hyperparameters, dict):
-            unknown_keys = [k for k in hyperparameters.keys() if k not in valid_keys]
+            unknown_keys = [k for k in hyperparameters.keys() if isinstance(k, str) and (k not in valid_keys)]
             assert len(unknown_keys) == 0, f'The following model types are not recognized: {unknown_keys} - use one of the valid models: {valid_keys}'
         else:
             raise ValueError(f'hyperparameters must be either str: {valid_str_values} or dict with keys of {valid_keys}')
@@ -283,7 +283,7 @@ class ConfigBuilder:
         if not isinstance(models, list):
             models = [models]
 
-        unknown_keys = [k for k in models if k not in valid_keys]
+        unknown_keys = [k for k in models if isinstance(k, str) and (k not in valid_keys)]
         assert len(unknown_keys) == 0, f'The following model types are not recognized: {unknown_keys} - use one of the valid models: {valid_keys}'
 
         models = [m for m in valid_keys if m not in models]
