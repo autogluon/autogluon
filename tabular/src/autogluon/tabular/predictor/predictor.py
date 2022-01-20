@@ -1237,6 +1237,8 @@ class TabularPredictor:
                        f'Predictor not fit prior to pseudolabeling. Fitting now...')
             self.fit(**kwargs)
 
+        self._validate_unique_indices(pseudo_data, 'pseudo_data')
+
         if self.problem_type is MULTICLASS and self.eval_metric.name != 'accuracy':
             logger.warning('AutoGluon has detected the problem type as \'multiclass\' and '
                            f'eval_metric is {self.eval_metric.name}, we recommend using'
@@ -1298,6 +1300,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict')
         data = self.__get_dataset(data)
+        self._validate_unique_indices(data, 'data')
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
 
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True):
@@ -1333,6 +1336,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
+        self._validate_unique_indices(data, 'data')
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
@@ -1363,6 +1367,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('evaluate')
         data = self.__get_dataset(data)
+        self._validate_unique_indices(data, 'data')
         y_pred_proba = self.predict_proba(data=data, model=model)
         return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent,
                                          auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
@@ -1517,6 +1522,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('leaderboard')
         data = self.__get_dataset(data) if data is not None else data
+        self._validate_unique_indices(data, 'data')
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, silent=silent)
 
@@ -1718,6 +1724,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('transform_features')
         data = self.__get_dataset(data) if data is not None else data
+        self._validate_unique_indices(data, 'data')
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
                                                    use_orig_features=return_original_features)
 
@@ -1861,9 +1868,7 @@ class TabularPredictor:
         if (data is None) and (not self._trainer.is_data_saved):
             raise AssertionError(
                 'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
-        if data is not None:
-            # Avoid crash when indices are duplicated
-            data = data.reset_index(drop=True)
+        self._validate_unique_indices(data, 'data')
 
         if num_shuffle_sets is None:
             num_shuffle_sets = 10 if time_limit else 3
