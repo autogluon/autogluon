@@ -46,7 +46,7 @@ def try_import_mxnet():
 
 def try_import_ray():
     ray_min_version = '1.7.0'
-    ray_max_version = '1.8.0'
+    ray_max_version = '1.9.0'
     try:
         import ray
         from distutils.version import LooseVersion
