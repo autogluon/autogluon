@@ -155,7 +155,7 @@ jobs:
           python3 -m pip install --upgrade -e common/[tests]
           python3 -m pip install --upgrade -e core/[all]
           python3 -m pip install --upgrade -e features/
-          python3 -m pip install --upgrade -e tabular/[all]
+          python3 -m pip install --upgrade -e tabular/[all,tests]
           env
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
@@ -187,7 +187,7 @@ jobs:
           python3 -m pip install --upgrade -e common/[tests]
           python3 -m pip install --upgrade -e core/[all]
           python3 -m pip install --upgrade -e features/
-          python3 -m pip install --upgrade -e tabular/[all]
+          python3 -m pip install --upgrade -e tabular/[all,tests]
           python3 -m pip install --upgrade -e text/
           python3 -m pip install --upgrade -e vision/
           python3 -m pip install --upgrade -e autogluon/
