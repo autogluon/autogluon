@@ -1228,6 +1228,8 @@ class TabularPredictor:
         if len(pseudo_data) < 1:
             raise Exception('No pseudo data given')
 
+        self._validate_unique_indices(pseudo_data, 'pseudo_data')
+
         if not self._learner.is_fit:
             if 'train_data' not in kwargs.keys():
                 Exception('Autogluon is required to be fit or given \'train_data\' in order to run \'fit_pseudolabel\'.'
@@ -1236,8 +1238,6 @@ class TabularPredictor:
             logger.log(20,
                        f'Predictor not fit prior to pseudolabeling. Fitting now...')
             self.fit(**kwargs)
-
-        self._validate_unique_indices(pseudo_data, 'pseudo_data')
 
         if self.problem_type is MULTICLASS and self.eval_metric.name != 'accuracy':
             logger.warning('AutoGluon has detected the problem type as \'multiclass\' and '
@@ -1300,7 +1300,6 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict')
         data = self.__get_dataset(data)
-        self._validate_unique_indices(data, 'data')
         return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
 
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True):
@@ -1336,7 +1335,6 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
-        self._validate_unique_indices(data, 'data')
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
@@ -1367,7 +1365,6 @@ class TabularPredictor:
         """
         self._assert_is_fit('evaluate')
         data = self.__get_dataset(data)
-        self._validate_unique_indices(data, 'data')
         y_pred_proba = self.predict_proba(data=data, model=model)
         return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent,
                                          auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
@@ -1522,8 +1519,6 @@ class TabularPredictor:
         """
         self._assert_is_fit('leaderboard')
         data = self.__get_dataset(data) if data is not None else data
-        if data is not None:
-            self._validate_unique_indices(data, 'data')
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, silent=silent)
 
@@ -1725,8 +1720,6 @@ class TabularPredictor:
         """
         self._assert_is_fit('transform_features')
         data = self.__get_dataset(data) if data is not None else data
-        if data is not None:
-            self._validate_unique_indices(data, 'data')
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models,
                                                    use_orig_features=return_original_features)
 
