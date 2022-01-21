@@ -1,3 +1,4 @@
+import copy
 import logging
 import re
 from typing import List
@@ -51,12 +52,9 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             self._post_generators = [BinnedFeatureGenerator()] + self._post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
-        for nlp_feature in self.features_in:
-            if hasattr(X[nlp_feature], 'cat'):
-                if '' not in X[nlp_feature].cat.categories:
-                    X[nlp_feature] = X[nlp_feature].cat.add_categories('').fillna('')
-                else:
-                    X[nlp_feature] = X[nlp_feature].fillna('')
+        category_columns = list(X.select_dtypes(include=['category']).columns)
+        if len(category_columns) > 0:
+            X = self._fill_empty_category(X, category_columns)
         self._symbols_per_feature = self._filter_symbols(X, self._symbols)
         self._feature_names_dict = self._compute_feature_names_dict()
         X_out = self._transform(X)
@@ -66,6 +64,9 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         return X_out, type_family_groups_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
+        category_columns = list(X.select_dtypes(include=['category']).columns)
+        if len(category_columns) > 0:
+            X = self._fill_empty_category(X, category_columns)
         return self._generate_features_text_special(X)
 
     def _compute_feature_names_dict(self) -> dict:
@@ -128,6 +129,15 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             X_dict[fn[symbol]['ratio']] = np.divide(X_dict[fn[symbol]['count']], char_count, out=np.zeros(shape, dtype=np.float32), where=char_count_valid)
 
         return X_dict
+
+    def _fill_empty_category(self, X, category_columns):
+        X = copy.deepcopy(X)
+        for column in category_columns:
+            if '' not in X[column].cat.categories:
+                X[column] = X[column].cat.add_categories('').fillna('')
+            else:
+                X[column] = X[column].fillna('')
+        return X
 
     @staticmethod
     def word_count(string: str) -> int:
