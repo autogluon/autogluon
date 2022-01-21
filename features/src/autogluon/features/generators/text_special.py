@@ -51,6 +51,12 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             self._post_generators = [BinnedFeatureGenerator()] + self._post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
+        for nlp_feature in self.features_in:
+            if hasattr(X[nlp_feature], 'cat'):
+                if '' not in X[nlp_feature].cat.categories:
+                    X[nlp_feature] = X[nlp_feature].cat.add_categories('').fillna('')
+                else:
+                    X[nlp_feature] = X[nlp_feature].fillna('')
         self._symbols_per_feature = self._filter_symbols(X, self._symbols)
         self._feature_names_dict = self._compute_feature_names_dict()
         X_out = self._transform(X)

@@ -67,6 +67,12 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         self._feature_names_dict = dict()
 
     def _fit_transform(self, X: DataFrame, y: Series = None, problem_type: str = None, **kwargs) -> (DataFrame, dict):
+        for nlp_feature in self.features_in:
+            if hasattr(X[nlp_feature], 'cat'):
+                if '' not in X[nlp_feature].cat.categories:
+                    X[nlp_feature] = X[nlp_feature].cat.add_categories('').fillna('')
+                else:
+                    X[nlp_feature] = X[nlp_feature].fillna('')
         
         X_out = self._fit_transform_ngrams(X)
         
