@@ -99,6 +99,7 @@ class FeatureGeneratorBuilder:
 
 
 class ConfigBuilder:
+
     def __init__(self):
         self.config = {}
 
