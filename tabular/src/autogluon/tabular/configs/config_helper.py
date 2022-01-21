@@ -5,6 +5,7 @@ from typing import Union
 
 from sklearn.base import BaseEstimator
 
+from autogluon.core.scheduler import scheduler_factory
 from autogluon.features import AutoMLPipelineFeatureGenerator
 from autogluon.tabular.configs.hyperparameter_configs import hyperparameter_config_dict
 from autogluon.tabular.configs.presets_configs import tabular_presets_dict
@@ -12,7 +13,7 @@ from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES
 
 
 class FeatureGeneratorBuilder:
-    def __init__(self, parent):
+    def __init__(self, parent=None):
         self.parent = parent
         self.config = {}
 
@@ -93,9 +94,13 @@ class FeatureGeneratorBuilder:
         self.config['text_ngram_params'] = value
         return self
 
-    def build(self) -> ConfigBuilder:
-        self.parent.config['feature_generator'] = AutoMLPipelineFeatureGenerator(**self.config)
-        return self.parent
+    def build(self) -> Union[ConfigBuilder, AutoMLPipelineFeatureGenerator]:
+        generator = AutoMLPipelineFeatureGenerator(**self.config)
+        if self.parent:
+            self.parent.config['feature_generator'] = generator
+            return self.parent
+        else:
+            return generator
 
 
 class ConfigBuilder:
@@ -127,7 +132,8 @@ class ConfigBuilder:
         Approximately how long `fit()` should run for (wallclock time in seconds).
         If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bag_sets` is specified.
         """
-        assert time_limit > 0, 'time_limit must be greater than zero'
+        if time_limit is not None:
+            assert time_limit > 0, 'time_limit must be greater than zero'
         self.config['time_limit'] = time_limit
         return self
 
@@ -144,7 +150,7 @@ class ConfigBuilder:
         self.config['hyperparameters'] = hyperparameters
         return self
 
-    def auto_stack(self, auto_stack=True) -> ConfigBuilder:
+    def auto_stack(self, auto_stack: bool = True) -> ConfigBuilder:
         """
         Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
         Set this = True if you are willing to tolerate longer training times in order to maximize predictive accuracy!
@@ -219,7 +225,7 @@ class ConfigBuilder:
             'random': Performs HPO via random search using local scheduler.
         The 'searcher' key is required when providing a dict.
         """
-        valid_str_values = ['auto', 'random']
+        valid_str_values = scheduler_factory._scheduler_presets.keys()
         if isinstance(hyperparameter_tune_kwargs, str):
             assert hyperparameter_tune_kwargs in valid_str_values, f'{hyperparameter_tune_kwargs} string must be one of {valid_str_values}'
         elif not isinstance(hyperparameter_tune_kwargs, dict):

@@ -3,7 +3,7 @@ import pytest
 from sklearn.feature_extraction.text import CountVectorizer
 
 from autogluon.features import TextNgramFeatureGenerator
-from autogluon.tabular.configs.config_helper import ConfigBuilder
+from autogluon.tabular.configs.config_helper import ConfigBuilder, FeatureGeneratorBuilder
 from autogluon.tabular.models import KNNModel
 
 
@@ -74,6 +74,7 @@ def test_included_model_types():
 
     class CustomKNN(KNNModel):
         pass
+
     expected_config = dict(excluded_model_types=['RF', 'XT', 'KNN', 'GBM', 'CAT', 'XGB', 'QNN', 'LR', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
     actual_config = ConfigBuilder().included_model_types([CustomKNN, 'NN']).build()
     assert actual_config == expected_config
@@ -90,6 +91,10 @@ def test_included_model_types_invalid_option():
 def test_time_limit():
     expected_config = dict(time_limit=10)
     actual_config = ConfigBuilder().time_limit(10).build()
+    assert actual_config == expected_config
+
+    expected_config = dict(time_limit=None)
+    actual_config = ConfigBuilder().time_limit(None).build()
     assert actual_config == expected_config
 
 
@@ -111,6 +116,7 @@ def test_hyperparameters_dict():
 
     class CustomKNN(KNNModel):
         pass
+
     expected_config = dict(hyperparameters={CustomKNN: [{}, {'prop': 42}]})
     actual_config = ConfigBuilder().hyperparameters({CustomKNN: [{}, {'prop': 42}]}).build()
     assert actual_config == expected_config
@@ -299,3 +305,26 @@ def test_feature_generator_2():
         'DropUniqueFeatureGenerator',
         'FillNaFeatureGenerator'
     ]
+
+
+def test_feature_generator_builder_standalone():
+    vectorizer = CountVectorizer(min_df=7, ngram_range=(2, 3), max_features=11, dtype=np.uint8)
+
+    generator = (FeatureGeneratorBuilder()
+                 .enable_numeric_features()
+                 .enable_categorical_features()
+                 .enable_datetime_features()
+                 .enable_text_special_features()
+                 .enable_text_ngram_features()
+                 .enable_raw_text_features()
+                 .enable_vision_features()
+                 .vectorizer(vectorizer)
+                 .text_ngram_params({'vectorizer_strategy': 'both'})
+                 .build())
+    assert generator.enable_numeric_features is True
+    assert generator.enable_categorical_features is True
+    assert generator.enable_datetime_features is True
+    assert generator.enable_text_special_features is True
+    assert generator.enable_text_ngram_features is True
+    assert generator.enable_raw_text_features is True
+    assert generator.enable_vision_features is True
