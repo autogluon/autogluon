@@ -22,7 +22,7 @@ from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df
+from autogluon.core.utils import get_pred_from_proba_df, try_import_torch
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -651,7 +651,9 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
-            calibrate: bool, default = False
+            calibrate: bool or str, default = 'auto'
+                Note: It is recommended to use ['auto', False] as the values and avoid True.
+                If 'auto' will automatically set to True if the problem_type and eval_metric are suitable for calibration.
                 If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
@@ -836,11 +838,21 @@ class TabularPredictor:
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
 
+        if calibrate == 'auto':
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION and self.eval_metric.needs_proba:
+                calibrate = True
+            elif self.problem_type == QUANTILE:
+                calibrate = True
+            else:
+                calibrate = False
+
         if calibrate:
-            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION + [QUANTILE]:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+                self._calibrate_model()
+            elif self.problem_type == QUANTILE:
                 self._calibrate_model()
             else:
-                logger.log(30, 'WARNING: calibrate is only applicable to classification or quantile regression problems')
+                logger.log(30, 'WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...')
 
         if save_space:
             self.save_space()
@@ -867,6 +879,13 @@ class TabularPredictor:
             The initial value for temperature scalar term
         """
         # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
+        try:
+            # FIXME: Avoid depending on torch for temp scaling
+            try_import_torch
+        except ImportError:
+            logger.log(30, 'Warning: Torch is not installed, skipping calibration step...')
+            return
+
         if model_name is None:
             model_name = self._trainer.get_model_best()
 
@@ -887,13 +906,18 @@ class TabularPredictor:
             conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
                                                     quantile_levels=self.quantile_levels)
             model.conformalize = conformalize
+            model.save()
         else:
             logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
             temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
                                                    init_val=init_val, max_iter=max_iter, lr=lr)
-            logger.log(15, f'Temperature term found is: {temp_scalar}')
-            model.temperature_scalar = temp_scalar
-        model.save()
+            if temp_scalar is None:
+                logger.log(15, f'Warning: Infinity found during calibration, skipping calibration on {model.name}! '
+                               f'This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).')
+            else:
+                logger.log(15, f'Temperature term found is: {temp_scalar}')
+                model.temperature_scalar = temp_scalar
+                model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
@@ -2829,7 +2853,7 @@ class TabularPredictor:
             # quantile levels
             quantile_levels=None,
 
-            calibrate=False,
+            calibrate='auto',
 
             # pseudo label
             pseudo_data=None,
@@ -2866,6 +2890,10 @@ class TabularPredictor:
         if set_best_to_refit_full and not refit_full:
             raise ValueError(
                 '`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
+        valid_calibrate_options = [True, False, 'auto']
+        calibrate = kwargs_sanitized['calibrate']
+        if calibrate not in valid_calibrate_options:
+            raise ValueError(f"`calibrate` must be a value in {valid_calibrate_options}, but is: {calibrate}")
 
         return kwargs_sanitized
 

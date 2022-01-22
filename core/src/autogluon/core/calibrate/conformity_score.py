@@ -1,7 +1,5 @@
 import numpy as np
 
-from ..utils import try_import_torch
-
 
 def compute_conformity_score(y_val_pred: np.ndarray, y_val: np.ndarray, quantile_levels: list):
     '''
