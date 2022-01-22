@@ -33,19 +33,19 @@ def test_presets_invalid_option():
 
 
 def test_excluded_model_types():
-    expected_config = dict(excluded_model_types=['NN'])
-    actual_config = ConfigBuilder().excluded_model_types('NN').build()
+    expected_config = dict(excluded_model_types=['RF'])
+    actual_config = ConfigBuilder().excluded_model_types('RF').build()
     assert actual_config == expected_config
 
-    actual_config = ConfigBuilder().excluded_model_types(['NN']).build()
+    actual_config = ConfigBuilder().excluded_model_types(['RF']).build()
     assert actual_config == expected_config
 
-    expected_config = dict(excluded_model_types=['LR', 'NN'])
-    actual_config = ConfigBuilder().excluded_model_types(['NN', 'LR']).build()
+    expected_config = dict(excluded_model_types=['LR', 'RF'])
+    actual_config = ConfigBuilder().excluded_model_types(['RF', 'LR']).build()
     assert actual_config == expected_config
 
-    expected_config = dict(excluded_model_types=['NN'])
-    actual_config = ConfigBuilder().excluded_model_types(['NN', 'NN']).build()
+    expected_config = dict(excluded_model_types=['RF'])
+    actual_config = ConfigBuilder().excluded_model_types(['RF', 'RF']).build()
     assert actual_config == expected_config
 
 
@@ -58,25 +58,25 @@ def test_excluded_model_types_invalid_option():
 
 
 def test_included_model_types():
-    expected_config = dict(excluded_model_types=['RF', 'XT', 'KNN', 'GBM', 'CAT', 'XGB', 'QNN', 'LR', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
-    actual_config = ConfigBuilder().included_model_types('NN').build()
+    expected_config = dict(excluded_model_types=['XT', 'KNN', 'GBM', 'CAT', 'XGB', 'NN_MXNET', 'NN_TORCH', 'LR', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
+    actual_config = ConfigBuilder().included_model_types('RF').build()
     assert actual_config == expected_config
 
-    actual_config = ConfigBuilder().included_model_types(['NN']).build()
+    actual_config = ConfigBuilder().included_model_types(['RF']).build()
     assert actual_config == expected_config
 
-    actual_config = ConfigBuilder().included_model_types(['NN', 'NN']).build()
+    actual_config = ConfigBuilder().included_model_types(['RF', 'RF']).build()
     assert actual_config == expected_config
 
-    expected_config = dict(excluded_model_types=['RF', 'XT', 'KNN', 'GBM', 'CAT', 'XGB', 'QNN', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
-    actual_config = ConfigBuilder().included_model_types(['NN', 'LR']).build()
+    expected_config = dict(excluded_model_types=['XT', 'KNN', 'GBM', 'CAT', 'XGB', 'NN_MXNET', 'NN_TORCH', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
+    actual_config = ConfigBuilder().included_model_types(['RF', 'LR']).build()
     assert actual_config == expected_config
 
     class CustomKNN(KNNModel):
         pass
 
-    expected_config = dict(excluded_model_types=['RF', 'XT', 'KNN', 'GBM', 'CAT', 'XGB', 'QNN', 'LR', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
-    actual_config = ConfigBuilder().included_model_types([CustomKNN, 'NN']).build()
+    expected_config = dict(excluded_model_types=['XT', 'KNN', 'GBM', 'CAT', 'XGB', 'NN_MXNET', 'NN_TORCH', 'LR', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT', 'VW'])
+    actual_config = ConfigBuilder().included_model_types([CustomKNN, 'RF']).build()
     assert actual_config == expected_config
 
 
@@ -110,8 +110,8 @@ def test_hyperparameters_str():
 
 
 def test_hyperparameters_dict():
-    expected_config = dict(hyperparameters={'NN': {}})
-    actual_config = ConfigBuilder().hyperparameters({'NN': {}}).build()
+    expected_config = dict(hyperparameters={'RF': {}})
+    actual_config = ConfigBuilder().hyperparameters({'RF': {}}).build()
     assert actual_config == expected_config
 
     class CustomKNN(KNNModel):
