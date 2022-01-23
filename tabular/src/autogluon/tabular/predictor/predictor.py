@@ -1863,7 +1863,8 @@ class TabularPredictor:
         if (data is None) and (not self._trainer.is_data_saved):
             raise AssertionError(
                 'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
-        self._validate_unique_indices(data, 'data')
+        if data is not None:
+            self._validate_unique_indices(data, 'data')
 
         if num_shuffle_sets is None:
             num_shuffle_sets = 10 if time_limit else 3
