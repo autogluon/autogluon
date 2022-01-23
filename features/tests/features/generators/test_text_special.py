@@ -3,9 +3,6 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.features.generators import TextSpecialFeatureGenerator
 
 
-expected_feature_metadata_in_full = {
-    ('object', ('text',)): ['text'],
-}
 expected_feature_metadata_full = {('int', ('binned', 'text_special')): [
     'text.char_count',
     'text.word_count',
@@ -23,6 +20,12 @@ def test_text_special_feature_generator(generator_helper, data_helper):
     input_data = data_helper.generate_multi_feature_full()
 
     generator = TextSpecialFeatureGenerator(min_occur_ratio=0, min_occur_offset=0)
+
+    expected_feature_metadata_in_full = {
+        ('object', ('text',)): ['text'],
+    }
+
+    expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
 
     # When
     output_data = generator_helper.fit_transform_assert(
@@ -63,6 +66,8 @@ def test_text_special_feature_generator_categorical_nan(generator_helper, data_h
     expected_feature_metadata_in_full = {
         ('category', ('text',)): ['text'],
     }
+
+    expected_output_data_feat_lower_ratio = [2, 1, 2, 2, 2, 2, 2, 2, 0]
 
     # When
     output_data = generator_helper.fit_transform_assert(
