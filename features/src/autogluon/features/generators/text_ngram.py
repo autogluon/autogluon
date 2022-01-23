@@ -67,10 +67,6 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         self._feature_names_dict = dict()
 
     def _fit_transform(self, X: DataFrame, y: Series = None, problem_type: str = None, **kwargs) -> (DataFrame, dict):
-        category_columns = list(X.select_dtypes(include=['category']).columns)
-        if len(category_columns) > 0:
-            X = self._fill_empty_category(X, category_columns)
-        
         X_out = self._fit_transform_ngrams(X)
         
         if self.prefilter_tokens and self.prefilter_token_count >= X_out.shape[1]:
@@ -102,9 +98,6 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         if not self.features_in:
             return DataFrame(index=X.index)
         try:
-            category_columns = list(X.select_dtypes(include=['category']).columns)
-            if len(category_columns) > 0:
-                X = self._fill_empty_category(X, category_columns)
             X_out = self._generate_ngrams(X=X)
             if self.prefilter_tokens:
                 X_out = X_out[X_out.columns[self.token_mask]]  # select the columns identified during training
@@ -226,15 +219,6 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             X_nlp_features_combined = DataFrame(index=X.index)
 
         return X_nlp_features_combined
-
-    def _fill_empty_category(self, X, category_columns):
-        X = copy.deepcopy(X)
-        for column in category_columns:
-            if '' not in X[column].cat.categories:
-                X[column] = X[column].cat.add_categories('').fillna('')
-            else:
-                X[column] = X[column].fillna('')
-        return X
 
     # TODO: REMOVE NEED FOR text_data input!
     def _adjust_vectorizer_memory_usage(self, transform_matrix, text_data, vectorizer_fit, downsample_ratio: int = None):
