@@ -228,6 +228,8 @@ class EmbedNet(nn.Module):
         self.train()
         predict_data = self(data_batch)
         target_data = data_batch['label'].to(self.device)
+        if self.problem_type in [BINARY, MULTICLASS]:
+            target_data = target_data.type(torch.LongTensor)  # Windows default int type is int32. Need to explicit convert to Long.
         if self.problem_type == QUANTILE:
             return self.quantile_loss(predict_data, target_data, margin=gamma)
         if self.problem_type == SOFTCLASS:
