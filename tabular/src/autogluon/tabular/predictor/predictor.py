@@ -1252,6 +1252,8 @@ class TabularPredictor:
         if len(pseudo_data) < 1:
             raise Exception('No pseudo data given')
 
+        self._validate_unique_indices(pseudo_data, 'pseudo_data')
+
         if not self._learner.is_fit:
             if 'train_data' not in kwargs.keys():
                 Exception('Autogluon is required to be fit or given \'train_data\' in order to run \'fit_pseudolabel\'.'
@@ -1886,8 +1888,7 @@ class TabularPredictor:
             raise AssertionError(
                 'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
         if data is not None:
-            # Avoid crash when indices are duplicated
-            data = data.reset_index(drop=True)
+            self._validate_unique_indices(data, 'data')
 
         if num_shuffle_sets is None:
             num_shuffle_sets = 10 if time_limit else 3
