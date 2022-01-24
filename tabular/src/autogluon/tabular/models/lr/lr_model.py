@@ -13,7 +13,6 @@ from autogluon.core.constants import BINARY, REGRESSION
 from .hyperparameters.parameters import get_param_baseline, INCLUDE, IGNORE, ONLY, _get_solver, preprocess_params_set
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
-from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
@@ -132,7 +131,7 @@ class LinearModel(AbstractModel):
     def _set_default_params(self):
         default_params = {'random_state': 0, 'fit_intercept': True}
         if self.problem_type != REGRESSION:
-            default_params.update({'solver': _get_solver(self.problem_type), 'n_jobs': -1})
+            default_params.update({'solver': _get_solver(self.problem_type)})
         default_params.update(get_param_baseline())
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -152,8 +151,10 @@ class LinearModel(AbstractModel):
         if self.problem_type == BINARY:
             y = y.astype(int).values
 
-        self._set_cpu_params(num_cpus)
         params = {k: v for k, v in self.params.items() if k not in preprocess_params_set}
+        if 'n_jobs' not in params:
+            if self.problem_type != REGRESSION:
+                params['n_jobs'] = num_cpus
 
         # Ridge/Lasso are using alpha instead of C, which is C^-1
         # https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
@@ -173,10 +174,6 @@ class LinearModel(AbstractModel):
             self.model = model.fit(X, y)  # Necessary for rapids models
         else:
             self.model = model.fit(X, y, sample_weight=sample_weight)
-
-    # TODO: Add HPO
-    def _hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
 
     def _select_features_handle_text_include(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         # continuous = numeric features to rescale
@@ -227,7 +224,3 @@ class LinearModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
-
-    def _set_cpu_params(self, num_cpus):
-        if self.problem_type != REGRESSION:
-            self.params['n_jobs'] = num_cpus

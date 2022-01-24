@@ -5,11 +5,11 @@ from collections import OrderedDict
 from copy import deepcopy
 from typing import Tuple
 
-import numpy as np
 from tqdm.auto import tqdm
 
 from .reporter import FakeReporter
 from ..searcher import searcher_factory
+from ..searcher.exceptions import ExhaustedSearchSpaceError
 from ..searcher.local_searcher import LocalSearcher
 
 logger = logging.getLogger(__name__)
@@ -147,7 +147,11 @@ class LocalSequentialScheduler(object):
         self.training_history = OrderedDict()
         self.config_history = OrderedDict()
 
-        trial_run_times = []
+        failure_count = 0
+        trial_count = 0
+        trial_run_times = 0
+        min_failure_threshold = 5
+        failure_rate_threshold = 0.8
         time_start = time.time()
 
         r = range(self.num_trials)
@@ -155,23 +159,36 @@ class LocalSequentialScheduler(object):
             trial_start_time = time.time()
             try:
                 is_failed, result = self.run_trial(task_id=i)
+            except ExhaustedSearchSpaceError:
+                break
             except Exception:
                 # TODO: Add special exception type when there are no more new configurations to try (exhausted search space)
                 logger.log(30, f'\tWARNING: Encountered unexpected exception during trial {i}, stopping HPO early.')
                 logger.exception('Detailed Traceback:')  # TODO: Avoid logging if verbosity=0
                 break
             trial_end_time = time.time()
-            trial_run_times.append(np.NaN if is_failed else (trial_end_time - trial_start_time))
+
+            trial_count += 1
+            if is_failed:
+                failure_count += 1
+            else:
+                trial_run_times += trial_end_time - trial_start_time
 
             if self.max_reward and self.get_best_reward() >= self.max_reward:
-                logger.log(20, f'\tMax reward is reached')
+                logger.log(20, f'\tStopping HPO: Max reward reached')
+                break
+
+            if failure_count >= min_failure_threshold and (failure_count / trial_count) >= failure_rate_threshold:
+                logger.warning(f'Warning: Detected a large trial failure rate: '
+                               f'{failure_count}/{trial_count} attempted trials failed ({round((failure_count / trial_count) * 100, 1)}%)! '
+                               f'Stopping HPO early due to reaching failure threshold ({round(failure_rate_threshold*100, 1)}%).\n'
+                               f'\tFailures may be caused by invalid configurations within the provided search space.')
                 break
 
             if self.time_out is not None:
-                avg_trial_run_time = np.nanmean(trial_run_times)
-                avg_trial_run_time = 0 if np.isnan(avg_trial_run_time) else avg_trial_run_time
+                avg_trial_run_time = 0 if trial_count == failure_count else trial_run_times / (trial_count - failure_count)
                 if not self.has_enough_time_for_trial_(self.time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time):
-                    logger.log(20, f'\tTime limit exceeded')
+                    logger.log(20, f'\tStopping HPO to satisfy time limit...')
                     break
 
     @classmethod
@@ -254,8 +271,11 @@ class LocalSequentialScheduler(object):
         is_failed = False
         try:
             result = self.train_fn(args, reporter=reporter, **train_fn_kwargs)
-            if type(reporter) is not FakeReporter and reporter.last_result:
-                self.searcher.update(config=searcher_config, **reporter.last_result)
+            if type(reporter) is not FakeReporter:
+                if reporter.last_result:
+                    self.searcher.update(config=searcher_config, **reporter.last_result)
+                else:
+                    is_failed = True
         except Exception as e:
             logger.error(f'Exception during a trial: {e}')
             self.searcher.evaluation_failed(config=searcher_config)

@@ -18,11 +18,11 @@ from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 
-from ....core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_TAGS
-from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
@@ -247,7 +247,7 @@ class AbstractModel:
         """
         return {}
 
-    def _set_default_searchspace(self):
+    def _get_search_space(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
             default fixed value to default search space.
         """
@@ -255,8 +255,9 @@ class AbstractModel:
         # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
         for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
             def_search_space.pop(key, None)
-        if self.params is not None:
-            self.params.update(def_search_space)
+        params = self._get_params()
+        params.update(def_search_space)
+        return params
 
     # TODO: v0.1 Change this to update path_root only, path change to property
     def set_contexts(self, path_context):
@@ -874,8 +875,18 @@ class AbstractModel:
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
-        self._set_default_searchspace()
-        params_copy = self._get_params()
+        search_space = self._get_search_space()
+
+        if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
+            logger.warning(f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
+                           f"Will train one model based on the provided hyperparameters.")
+            return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
+        else:
+            logger.log(15, f"\tHyperparameter search space for {self.name}: ")
+            for hyperparam in search_space:
+                if isinstance(search_space[hyperparam], Space):
+                    logger.log(15, f"{hyperparam}:   {search_space[hyperparam]}")
+
         directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
         scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
@@ -889,14 +900,6 @@ class AbstractModel:
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=(X_val, y_val))
 
-        if not any(isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy):
-            logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
-        else:
-            logger.log(15, "Hyperparameter search space for %s model: " % self.name)
-            for hyperparam in params_copy:
-                if isinstance(params_copy[hyperparam], Space):
-                    logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
-
         fit_kwargs = scheduler_params['resource'].copy()
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
         fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
@@ -909,7 +912,7 @@ class AbstractModel:
             val_path=val_path,
         )
 
-        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=params_copy, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
+        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
 
         scheduler.run()
         scheduler.join_jobs()
@@ -933,7 +936,7 @@ class AbstractModel:
         hpo_model_performances = {}
         for trial in sorted(hpo_results['config_history'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = f"T{trial}"  # unique identifier to files from this trial
+            file_id = f"T{trial+1}"  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
             trial_reward = scheduler.searcher.get_reward(hpo_results['config_history'][trial])

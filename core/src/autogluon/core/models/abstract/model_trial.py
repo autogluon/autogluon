@@ -58,7 +58,7 @@ def model_trial(args,
 def prepare_inputs(args, model):
     task_id = args.pop('task_id')
 
-    file_prefix = f"T{task_id}"  # append to all file names created during this trial. Do NOT change!
+    file_prefix = f"T{task_id+1}"  # append to all file names created during this trial. Do NOT change!
     model.name = model.name + os.path.sep + file_prefix
     model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
     return model, args
@@ -74,7 +74,8 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
     else:
         time_left = None
 
-    model.params.update(params)
+    if params is not None:
+        model.params.update(params)
     time_fit_start = time.time()
     model.fit(**fit_args, time_limit=time_left, reporter=reporter)
     time_fit_end = time.time()
@@ -97,11 +98,19 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
     return model
 
 
-def skip_hpo(model, X, y, X_val, y_val, scheduler_options=None, time_limit=None, **kwargs):
+def skip_hpo(model, X, y, X_val, y_val, time_limit=None, **kwargs):
     """Skips HPO and simply trains the model once with the provided HPO time budget. Returns model artifacts as if from HPO."""
     fit_model_args = dict(X=X, y=y, **kwargs)
     predict_proba_args = dict(X=X_val)
-    fit_and_save_model(model=model, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=time_limit)
+    fit_and_save_model(
+        model=model,
+        params=None,
+        fit_args=fit_model_args,
+        predict_proba_args=predict_proba_args,
+        y_val=y_val,
+        time_start=time.time(),
+        time_limit=time_limit
+    )
     hpo_results = {'total_time': model.fit_time}
     hpo_model_performances = {model.name: model.val_score}
     hpo_models = {model.name: model.path}

@@ -30,9 +30,11 @@ class LocalSearcher(object):
         if reward_attribute is None:
             reward_attribute = 'accuracy'
         self._reward_attribute = reward_attribute
-        self._params_default = self._get_params_default()
+        self._params_static = self._get_params_static()
+        self._params_default = self._get_params_default(self._params_static)
+        self._params_order = list(self._params_default.keys())
 
-    def _get_params_default(self) -> dict:
+    def _get_params_default(self, params_static: dict) -> dict:
         params_default = dict()
         for key, val in self.search_space.items():
             if isinstance(val, Space):
@@ -42,8 +44,15 @@ class LocalSearcher(object):
                 else:
                     d = val.default
                 params_default[key] = d
+        params_default.update(params_static)
         return params_default
 
+    def _get_params_static(self):
+        params_static = dict()
+        for key, val in self.search_space.items():
+            if not isinstance(val, Space):
+                params_static[key] = val
+        return params_static
 
     # FIXME: Consider removing
     def configure_scheduler(self, scheduler):
@@ -86,8 +95,21 @@ class LocalSearcher(object):
         """Update the searcher with the newest metric report"""
         reward = kwargs.get(self._reward_attribute, None)
         assert reward is not None, "Missing reward attribute '{}'".format(self._reward_attribute)
-        config_pkl = pickle.dumps(config)
-        self._results[config_pkl] = reward
+        self._add_result(config=config, result=reward)
+
+    def _add_result(self, config: dict, result: float):
+        config_pkl = self._pickle_config(config=config)
+        self._results[config_pkl] = result
+
+    def _pickle_config(self, config: dict):
+        assert len(config) == len(self._params_order), f'Config length does not match expected params count!\n' \
+                                                       f'Expected: {self._params_order}\n' \
+                                                       f'Actual:   {list(config.keys())}'
+        return pickle.dumps([config[key] for key in self._params_order])
+
+    def _unpickle_config(self, config_pkl) -> dict:
+        config_compressed = pickle.loads(config_pkl)
+        return {key: config_compressed[i] for i, key in enumerate(self._params_order)}
 
     def register_pending(self, config, milestone=None):
         """
@@ -121,15 +143,15 @@ class LocalSearcher(object):
     def get_reward(self, config):
         """Calculates the reward (i.e. validation performance) produced by training with the given configuration.
         """
-        k = pickle.dumps(config)
-        assert k in self._results
-        return self._results[k]
+        config_pkl = self._pickle_config(config=config)
+        assert config_pkl in self._results
+        return self._results[config_pkl]
 
     def get_best_config(self):
         """Returns the best configuration found so far.
         """
         if self._results:
             config_pkl = max(self._results, key=self._results.get)
-            return pickle.loads(config_pkl)
+            return self._unpickle_config(config_pkl=config_pkl)
         else:
             return dict()

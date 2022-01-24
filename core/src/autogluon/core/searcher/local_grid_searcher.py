@@ -69,4 +69,10 @@ class LocalGridSearcher(LocalSearcher):
             raise AssertionError(f'No configs left to get. All {self._grid_length} configs have been accessed already.')
         config = self._params_grid[self._grid_index]
         self._grid_index += 1
+        for key, val in config.items():
+            # If this isn't done, warnings are spammed in XGBoost
+            if isinstance(val, np.int64):
+                config[key] = int(val)
+            elif isinstance(val, np.float64):
+                config[key] = float(val)
         return config
