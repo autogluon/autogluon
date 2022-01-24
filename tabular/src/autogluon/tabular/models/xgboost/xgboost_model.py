@@ -27,6 +27,7 @@ class XGBoostModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._ohe_generator = None
+        self._xgb_model_type = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
@@ -199,3 +200,25 @@ class XGBoostModel(AbstractModel):
         num_cpus = psutil.cpu_count(logical=False)
         num_gpus = 0
         return num_cpus, num_gpus
+
+    def save(self, path: str = None, verbose=True) -> str:
+        _model = self.model
+        self.model = None
+        if _model is not None:
+            self._xgb_model_type = _model.__class__
+        path = super().save(path=path, verbose=verbose)
+        if _model is not None:
+            # Halves disk usage compared to .json / .pkl
+            _model.save_model(path + 'xgb.ubj')
+        self.model = _model
+        return path
+
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if model._xgb_model_type is not None:
+            model.model = model._xgb_model_type()
+            # Much faster to load using .ubj than .json (10x+ speedup)
+            model.model.load_model(path + 'xgb.ubj')
+            model._xgb_model_type = None
+        return model
