@@ -900,11 +900,15 @@ class AbstractModel:
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=(X_val, y_val))
 
+        model_cls = self.__class__
+        init_params = self.get_params()
+
         fit_kwargs = scheduler_params['resource'].copy()
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
         fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
         train_fn_kwargs = dict(
-            model=self,
+            model_cls=model_cls,
+            init_params=init_params,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],
             fit_kwargs=fit_kwargs,
