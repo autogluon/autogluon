@@ -16,7 +16,7 @@ PYTHON_REQUIRES = '>=3.7, <3.10'
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     'numpy': '>=1.19,<1.22',
-    'pandas': '>=1.0.0,<1.4',  # Capped version of pandas because pandas 1.4.0 because of issue: https://github.com/pandas-dev/pandas/issues/45603
+    'pandas': '>=1.0.0,<1.4',  # Capped version of pandas to 1.4.0 because of issue: https://github.com/pandas-dev/pandas/issues/45603
     'scikit-learn': '>=1.0.0,<1.1',
     'scipy': '>=1.5.4,<1.7',
     'psutil': '>=5.7.3,<5.9',  # TODO: Consider capping to <6.0 instead, capping to 5.9 to avoid possible issues.
