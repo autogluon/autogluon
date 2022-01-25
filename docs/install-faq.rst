@@ -64,4 +64,4 @@
 
 * Does AutoGluon support ARM/M1 Mac?
   
-  AutoGluon does not officially support ARM/M1 Mac. You can find more information, refer to https://github.com/awslabs/autogluon/issues/1242
+  AutoGluon does not officially support ARM/M1 Mac. For more information, refer to https://github.com/awslabs/autogluon/issues/1242
