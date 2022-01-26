@@ -165,7 +165,7 @@ class CatBoostModel(AbstractModel):
         if early_stopping_rounds is not None:
             callbacks.append(EarlyStoppingCallback(stopping_rounds=early_stopping_rounds, eval_metric=params['eval_metric']))
 
-        if num_rows_train * num_cols_train * num_classes > 100_000_000:
+        if num_rows_train * num_cols_train * num_classes > 5_000_000:
             # The data is large enough to potentially cause memory issues during training, so monitor memory usage via callback.
             callbacks.append(MemoryCheckCallback())
         if time_limit is not None:

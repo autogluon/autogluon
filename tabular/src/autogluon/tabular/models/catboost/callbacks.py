@@ -26,15 +26,18 @@ class MemoryCheckCallback:
         self.init_mem_avail = psutil.virtual_memory().available
         self.verbose = verbose
 
+        self._cur_period = 1
+
     def after_iteration(self, info):
-        if info.iteration % self.period == 0:
-            not_enough_memory = self.memory_check()
+        iteration = info.iteration
+        if iteration % self._cur_period == 0:
+            not_enough_memory = self.memory_check(iteration)
             if not_enough_memory:
                 logger.log(20, f'\tRan low on memory, early stopping on iteration {info.iteration}.')
                 return False
         return True
 
-    def memory_check(self) -> bool:
+    def memory_check(self, iter) -> bool:
         """Checks if memory usage is unsafe. If so, then returns True to signal the model to stop training early."""
         available_bytes = psutil.virtual_memory().available
         cur_rss = self.mem_status.memory_info().rss
@@ -61,6 +64,12 @@ class MemoryCheckCallback:
             return True
         elif self.verbose or (model_size_memory_ratio > 0.25):
             logging.debug(f'Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB')
+
+        if model_size_memory_ratio > 0.5:
+            self._cur_period = 1  # Increase rate of memory check if model gets large enough to cause OOM potentially
+        elif iter > self.period:
+            self._cur_period = self.period
+
         return False
 
 
