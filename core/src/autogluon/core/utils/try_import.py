@@ -1,3 +1,5 @@
+import platform
+
 __all__ = [
     'try_import_mxboard',
     'try_import_mxnet',
@@ -45,8 +47,14 @@ def try_import_mxnet():
 
 
 def try_import_ray():
+    ray_max_version_os_map = dict(
+        Darwin='1.9.0',
+        Windows='1.8.0',
+        Linux='1.9.0',
+    )
     ray_min_version = '1.7.0'
-    ray_max_version = '1.8.0'
+    current_os = platform.system()
+    ray_max_version = ray_max_version_os_map.get(current_os, '1.8.0')
     try:
         import ray
         from distutils.version import LooseVersion
@@ -55,14 +63,14 @@ def try_import_ray():
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
-                "`pip install ray==1.7.0` "
+                f"`pip install ray=={ray_min_version}` "
             )
             raise ValueError(msg)
         return ray
     except ImportError:
         raise ImportError(
             "ray is required to train folds in parallel. "
-            "A quick tip is to install via `pip install ray==1.7.0`, "
+            f"A quick tip is to install via `pip install ray=={ray_min_version}`, "
             "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling tabular.fit"
             "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
         )
