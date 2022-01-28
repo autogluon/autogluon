@@ -1,14 +1,22 @@
 function setup_build_env {
+    python3 -m venv autogluon-env
+    source autogluon-env/bin/activate
     python3 -m pip install flake8
 }
 
 function setup_build_contrib_env {
+    python3 -m venv autogluon-env
+    source autogluon-env/bin/activate
     python3 -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
 }
 
 function setup_mxnet_gpu {
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+}
+
+function setup_torch {
+    python3 -m pip install torch==1.9.1 torchvision==0.10.1
 }
 
 function install_common {
