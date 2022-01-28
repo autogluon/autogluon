@@ -52,5 +52,5 @@ def get_param_quantile_baseline():
     params = get_param_regression_baseline()
 
     # residual threshold parameter in HuberPinballLoss
-    params.update({'alpha': 0.01})
+    params.update({'alpha': 0.0})
     return params

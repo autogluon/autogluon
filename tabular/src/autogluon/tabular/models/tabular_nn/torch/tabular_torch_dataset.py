@@ -45,7 +45,7 @@ class TabularTorchDataset(torch.utils.data.Dataset):
     # hard-coded names for files. This file contains pickled torch.util.data.Dataset object
     DATAOBJ_SUFFIX = '_tabdataset_torch.pt'
 
-    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, problem_type, labels=None):
+    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, problem_type, labels=None, base_preds=None):
         """ Args:
             processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
             feature_arraycol_map (OrderedDict): Mapsfeature-name -> list of column-indices in processed_array
@@ -54,6 +54,7 @@ class TabularTorchDataset(torch.utils.data.Dataset):
                                             (options: 'vector', 'embed')
             problem_type (str): what prediction task this data is used for.
             labels (pd.Series): list of labels (y) if available
+            base_preds: 2D numpy array. Contains raw data of all base learners' predictions as columns
         """
         self.problem_type = problem_type
         self.num_examples = processed_array.shape[0]
@@ -75,6 +76,8 @@ class TabularTorchDataset(torch.utils.data.Dataset):
         self.data_desc = []
         self.data_list = []
         self.label_index = None
+        self.base_pred_index = None
+        self.num_base_preds = None
         self.vectordata_index = None
         self.vecfeature_col_map = {}
         self.feature_dataindex_map = {}
@@ -118,6 +121,14 @@ class TabularTorchDataset(torch.utils.data.Dataset):
                     labels = labels.astype('long')
                 self.data_list.append(labels.reshape(-1, 1))
 
+        # base prediction data
+        if base_preds is not None:
+            base_preds = np.array(base_preds)
+            self.data_desc.append("base_pred")
+            self.base_pred_index = len(self.data_list)
+            self.data_list.append(base_preds.astype('float32').reshape(self.num_examples, -1))
+            self.num_base_preds = self.data_list[self.base_pred_index].shape[1]
+
         self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]]
         self.num_categories_per_embed_feature = None
         self.num_categories_per_embedfeature = self.getNumCategoriesEmbeddings()
@@ -132,6 +143,8 @@ class TabularTorchDataset(torch.utils.data.Dataset):
                 output_dict['embed'].append(self.data_list[i][idx])
         if self.label_index is not None:
             output_dict['label'] = self.data_list[self.label_index][idx]
+        if self.base_pred_index is not None:
+            output_dict['base_pred'] = self.data_list[self.base_pred_index][idx]
         return output_dict
 
     def __len__(self):
@@ -153,6 +166,13 @@ class TabularTorchDataset(torch.utils.data.Dataset):
         """ Returns numpy array of labels for this dataset """
         if self.label_index is not None:
             return self.data_list[self.label_index]
+        else:
+            return None
+
+    def get_base_preds(self):
+        """ Returns numpy array of base learners predictions for this dataset """
+        if self.base_pred_index is not None:
+            return self.data_list[self.base_pred_index]
         else:
             return None
 

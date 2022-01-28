@@ -10,7 +10,7 @@ from autogluon.core.trainer.utils import process_hyperparameters
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetMxnetModel, TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
-    ImagePredictorModel, VowpalWabbitModel
+    ImagePredictorModel, VowpalWabbitModel, TabularQuantileAggregatorTorchModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
-DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'FASTAI', 'NN_TORCH', 'ENS_WEIGHTED']  # TODO: OTHERS will be added
+DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'FASTAI', 'NN_TORCH', 'ENS_WEIGHTED', 'QUANTILE_AGGR']  # TODO: OTHERS will be added
 
 MODEL_TYPES = dict(
     RF=RFModel,
@@ -71,6 +71,7 @@ MODEL_TYPES = dict(
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
     SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
+    QUANTILE_AGGR=TabularQuantileAggregatorTorchModel,
     VW=VowpalWabbitModel
 )
 
@@ -83,6 +84,7 @@ DEFAULT_MODEL_NAMES = {
     XGBoostModel: 'XGBoost',
     TabularNeuralNetMxnetModel: 'NeuralNetMXNet',
     TabularNeuralNetTorchModel: 'NeuralNetTorch',
+    TabularQuantileAggregatorTorchModel: 'QuantileAggregator',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',

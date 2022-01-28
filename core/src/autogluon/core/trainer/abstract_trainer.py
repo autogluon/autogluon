@@ -14,8 +14,8 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
-from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
-from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
+from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, LinearAggregatorModel
 from ..scheduler.scheduler_factory import scheduler_factory
 from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
 from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
@@ -399,7 +399,7 @@ class AbstractTrainer:
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
     def stack_new_level_aux(self, X, y, base_model_names: List[str], level,
-                            fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
+                            fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True, **kwargs) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
@@ -675,6 +675,8 @@ class AbstractTrainer:
                         model_loaded.predict_time = None
                         self.set_model_attribute(model=model_weighted_ensemble, attribute='val_score', val=None)
                         self.save_model(model_loaded)
+                elif issubclass(stacker_type, StackerEnsembleModel):
+                    pass
                 else:
                     models_trained = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME,
                                                                hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=0, n_repeats=1, ensemble_type=stacker_type, refit_full=True)
@@ -988,7 +990,7 @@ class AbstractTrainer:
             if isinstance(model, BaggedEnsembleModel):
                 if X_val is not None and y_val is not None:
                     score = model.score(X=X_val, y=y_val, sample_weight=w_val)
-                elif model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
+                elif model.is_valid_oof() or isinstance(model, WeightedEnsembleModel) or isinstance(model, LinearAggregatorModel):
                     score = model.score_with_oof(y=y, sample_weight=w)
                 else:
                     score = None
@@ -1655,6 +1657,8 @@ class AbstractTrainer:
         for base_model in base_model_set:
             if is_dict:
                 attribute_base_model = attribute[base_model]
+            elif attribute not in self.model_graph.nodes[base_model]:
+                return None
             else:
                 attribute_base_model = self.model_graph.nodes[base_model][attribute]
             if attribute_base_model is None:

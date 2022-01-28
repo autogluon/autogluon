@@ -82,6 +82,7 @@ def get_hyper_params(framework):
         'warmup_epochs': 10,  # number of epochs at beginning of training in which LR is linearly ramped up (float > 1).
     }
     pytorch_hyper_params = {
+        'activation': 'elu',  # Activation function
         'num_layers': 4,  # number of layers
         # Options: [2, 3, 4, 5]
         'hidden_size': 128,  # number of hidden units in each layer
@@ -99,9 +100,9 @@ def get_quantile_hyper_params(framework):
     """ Parameters that currently can be searched during HPO """
     hyper_params = get_hyper_params(framework)
     new_hyper_params = {
-        'gamma': 5.0,  # margin loss weight which helps ensure noncrossing quantile estimates
-        # Options: range(0.1, 10.0)
-        'alpha': 0.01,  # used for smoothing huber pinball loss
+        'gamma': 1.0,  # margin loss weight which helps ensure noncrossing quantile estimates
+        'num_layers': 3,
+        'hidden_size': 128,
     }
     hyper_params.update(new_hyper_params)
     return hyper_params
@@ -120,6 +121,7 @@ def get_default_param(problem_type, framework, num_classes=None):
         return get_param_quantile(framework)
     else:
         return get_param_binary(framework)
+
 
 def get_param_binary(framework):
     params = get_fixed_params(framework)

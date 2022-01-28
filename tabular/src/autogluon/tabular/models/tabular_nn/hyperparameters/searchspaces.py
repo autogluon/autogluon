@@ -70,9 +70,6 @@ def get_searchspace_quantile(framework):
     if framework != 'pytorch':
         raise ValueError("Only pytorch tabular neural network is currently supported for quantile regression.")
     params = {
-        'activation': Categorical('relu', 'elu', 'tanh'),
-        'weight_decay': Real(1e-12, 1.0, default=1e-6, log=True),
-        'gamma': Real(0.1, 10.0, default=5.0),
-        'alpha': Categorical(0.001, 0.01, 0.1, 1.0),
+        'gamma': Real(0.1, 10.0, default=1.0),
     }
     return params

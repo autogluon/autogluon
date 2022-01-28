@@ -9,7 +9,7 @@ import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
-from autogluon.core.utils import try_import_torch
+from autogluon.core.utils import try_import_torch, default_holdout_frac, generate_train_test_split
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 
@@ -172,6 +172,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 batch_size = min(int(2 ** (3 + np.floor(np.log10(len(X))))), self.max_batch_size)
             else:
                 batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
+
+        if X_val is None and y_val is None:
+            X, X_val, y, y_val = generate_train_test_split(X, y, problem_type=self.problem_type,
+                                                           test_size=default_holdout_frac(len(X)), random_state=seed_value)
 
         train_dataset, val_dataset = self._generate_datasets(X=X, y=y, params=processor_kwargs, X_val=X_val, y_val=y_val)
         logger.log(15, f"Training data for {self.__class__.__name__} has: "
@@ -575,6 +579,194 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                                    quantile_levels=model.quantile_levels,
                                    architecture_desc=model._architecture_desc,
                                    device=model.device)
+            model._architecture_desc = None
+            model.model = torch.load(model.path + model.params_file_name)
+        return model
+
+
+class TabularQuantileAggregatorTorchModel(TabularNeuralNetTorchModel):
+    """
+    PyTorch quantile aggregator based on neural network models that operate on tabular data to aggregate quantile predictions.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.base_pred_features = None
+
+    def _preprocess_nonadaptive(self, X, **kwargs):
+        if self.features is None:
+            self._preprocess_set_features(X=X)
+        return X
+
+    def _get_net(self, train_dataset, params):
+        from .torch_network_modules import DeepQuantileAggregator
+
+        # compute adaptive margin from dataset
+        num_quantiles = len(self.quantile_levels)
+        num_base_preds = train_dataset.num_base_preds
+        q50_index = num_quantiles // 2
+        if self.quantile_levels[q50_index] != 0.5:
+            margin_data = None
+        else:
+            full_target = train_dataset.data_list[train_dataset.label_index].reshape(-1)
+            full_base_preds = train_dataset.data_list[train_dataset.base_pred_index].reshape(-1, int(num_base_preds / num_quantiles), num_quantiles)
+            q50_base_preds = np.median(full_base_preds[..., q50_index], -1).reshape(-1)
+            residual_preds = full_target - q50_base_preds
+            margin_data = np.quantile(residual_preds, self.quantile_levels, 0)
+
+        # set network params
+        params = self._set_net_defaults(train_dataset, params)
+        self.model = DeepQuantileAggregator(num_base_preds=train_dataset.num_base_preds,
+                                            quantile_levels=self.quantile_levels,
+                                            train_dataset=train_dataset,
+                                            margin_data=margin_data,
+                                            device=self.device, **params)
+        self.model = self.model.to(self.device)
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+
+    def _predict_proba(self, X, **kwargs):
+        """ To align predict with abstract_model API.
+            Preprocess here only refers to feature processing steps done by all AbstractModel objects,
+            not tabularNN-specific preprocessing steps.
+            If X is not DataFrame but instead TabularNNDataset object, we can still produce predictions,
+            but cannot use preprocess in this case (needs to be already processed).
+        """
+        from .tabular_torch_dataset import TabularTorchDataset
+        if isinstance(X, TabularTorchDataset):
+            return self._predict_tabular_aggr_data(new_orig_data=X, new_pred_data=None, process=False)
+        elif isinstance(X, pd.DataFrame):
+            pred_Y = X[self.base_pred_features]
+            orig_X = X.drop(columns=self.base_pred_features)
+            orig_X = self.preprocess(orig_X, **kwargs)
+            return self._predict_tabular_aggr_data(new_orig_data=orig_X, new_pred_data=pred_Y, process=True)
+        else:
+            raise ValueError("X must be of type pd.DataFrame or TabularPyTorchDataset, not type: %s" % type(X))
+
+    def _predict_tabular_aggr_data(self, new_orig_data, new_pred_data, process=True, predict_proba=True):
+        from .tabular_torch_dataset import TabularTorchDataset
+        if process:
+            new_data = self._process_test_aggr_data(new_orig_data, new_pred_data, None)
+        else:
+            new_data = new_orig_data
+        if not isinstance(new_data, TabularTorchDataset):
+            raise ValueError("new_data must of of type TabularPyTorchDataset if process=False")
+        val_dataloader = new_data.build_loader(self.max_batch_size, self.num_dataloading_workers, is_test=True)
+        preds_dataset = []
+        for batch_idx, data_batch in enumerate(val_dataloader):
+            preds_batch = self.model.predict(data_batch)
+            preds_dataset.append(preds_batch)
+        preds_dataset = np.concatenate(preds_dataset, 0)
+        return preds_dataset
+
+    def _generate_datasets(self, X, y, params, X_val=None, y_val=None):
+        from .tabular_torch_dataset import TabularTorchDataset
+
+        impute_strategy = params['proc.impute_strategy']
+        max_category_levels = params['proc.max_category_levels']
+        skew_threshold = params['proc.skew_threshold']
+        embed_min_categories = params['proc.embed_min_categories']
+        use_ngram_features = params['use_ngram_features']
+
+        if isinstance(X, TabularTorchDataset):
+            train_dataset = X
+        else:
+            pred_Y = X[self.base_pred_features]
+            orig_X = X.drop(columns=self.base_pred_features)
+            orig_X = self.preprocess(orig_X)
+            if self.features is None:
+                self.features = list(orig_X.columns)
+            train_dataset = self._process_train_aggr_data(orig_df=orig_X, pred_df=pred_Y, labels=y,
+                                                          impute_strategy=impute_strategy,
+                                                          max_category_levels=max_category_levels,
+                                                          skew_threshold=skew_threshold,
+                                                          embed_min_categories=embed_min_categories,
+                                                          use_ngram_features=use_ngram_features)
+        if X_val is not None:
+            if isinstance(X_val, TabularTorchDataset):
+                val_dataset = X_val
+            else:
+                pred_Y_val = X_val[self.base_pred_features]
+                orig_X_val = X_val.drop(columns=self.base_pred_features)
+                orig_X_val = self.preprocess(orig_X_val)
+                val_dataset = self._process_test_aggr_data(orig_df=orig_X_val, pred_df=pred_Y_val, labels=y_val)
+        else:
+            val_dataset = None
+        return train_dataset, val_dataset
+
+    def _process_test_aggr_data(self, orig_df, pred_df, labels=None):
+        from .tabular_torch_dataset import TabularTorchDataset
+
+        # sklearn processing n_quantiles warning
+        warnings.filterwarnings("ignore", module='sklearn.preprocessing')
+        if labels is not None and (len(labels) != len(orig_df) or len(labels) != len(pred_df)):
+            raise ValueError("Number of examples in Dataframe does not match number of labels")
+        if (self.processor is None or self._types_of_features is None
+           or self.feature_arraycol_map is None or self.feature_type_map is None):
+            raise ValueError("Need to process training data before test data")
+        if self.features_to_drop:
+            drop_cols = [col for col in orig_df.columns if col in self.features_to_drop]
+            if drop_cols:
+                orig_df = orig_df.drop(columns=drop_cols)
+
+        # self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
+        orig_df = self.processor.transform(orig_df)
+        return TabularTorchDataset(orig_df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels, pred_df)
+
+    def _process_train_aggr_data(self, orig_df, pred_df, impute_strategy, max_category_levels, skew_threshold,
+                                 embed_min_categories, use_ngram_features, labels):
+        from .tabular_torch_dataset import TabularTorchDataset
+
+        # sklearn processing n_quantiles warning
+        warnings.filterwarnings("ignore", module='sklearn.preprocessing')
+        if labels is None:
+            raise ValueError("Attempting process training data without labels")
+        if len(labels) != len(orig_df) or len(labels) != len(pred_df):
+            raise ValueError("Number of examples in Dataframe does not match number of labels")
+
+        # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', values = column-names of df
+        self._types_of_features, orig_df = self._get_types_of_features(orig_df, skew_threshold=skew_threshold,
+                                                                       embed_min_categories=embed_min_categories,
+                                                                       use_ngram_features=use_ngram_features)
+        logger.log(15, "Tabular Neural Network treats features as the following types:")
+        logger.log(15, json.dumps(self._types_of_features, indent=4))
+        logger.log(15, "\n")
+        if self.processor is not None:
+            Warning(f"Attempting to process training data for {self.__class__.__name__}, but previously already did this.")
+        self.processor = create_preprocessor(
+            impute_strategy=impute_strategy,
+            max_category_levels=max_category_levels,
+            unique_category_str=self.unique_category_str,
+            continuous_features=self._types_of_features['continuous'],
+            skewed_features=self._types_of_features['skewed'],
+            onehot_features=self._types_of_features['onehot'],
+            embed_features=self._types_of_features['embed'],
+            bool_features=self._types_of_features['bool']
+        )
+        orig_df = self.processor.fit_transform(orig_df)
+        # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
+        self.feature_arraycol_map = get_feature_arraycol_map(processor=self.processor, max_category_levels=max_category_levels)
+        num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])  # should match number of columns in processed array
+        if num_array_cols != orig_df.shape[1]:
+            raise ValueError("Error during one-hot encoding data processing for neural network. "
+                             "Number of columns in df array does not match feature_arraycol_map.")
+
+        # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed')
+        self.feature_type_map = get_feature_type_map(feature_arraycol_map=self.feature_arraycol_map, types_of_features=self._types_of_features)
+        return TabularTorchDataset(orig_df, self.feature_arraycol_map, self.feature_type_map, self.problem_type, labels, pred_df)
+
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if model._architecture_desc is not None:
+            import torch
+            from .torch_network_modules import DeepQuantileAggregator
+
+            # recreate network from architecture description
+            model.model = DeepQuantileAggregator(num_base_preds=model.num_base_preds,
+                                                 quantile_levels=model.quantile_levels,
+                                                 margin_data=model.margin_data,
+                                                 architecture_desc=model._architecture_desc,
+                                                 device=model.device)
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model

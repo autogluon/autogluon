@@ -17,7 +17,7 @@ def isotonic(input_data, quantile_list):
 class HuberPinballLoss(nn.Module):
     __name__ = 'huber_pinball_loss'
 
-    def __init__(self, quantile_levels, alpha=0.01):
+    def __init__(self, quantile_levels, alpha=0.0):
         super(HuberPinballLoss, self).__init__()
         if quantile_levels is not None:
             self.quantile_levels = torch.Tensor(quantile_levels).contiguous().reshape(1, -1)

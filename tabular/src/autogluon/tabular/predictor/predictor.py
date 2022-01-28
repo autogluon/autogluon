@@ -791,12 +791,18 @@ class TabularPredictor:
             'excluded_model_types': excluded_model_types,
             'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
+
+        aux_kwargs = {
+            'ag_args': ag_args,
+            'excluded_model_types': excluded_model_types,
+        }
+
         self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
-                          num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit,
-                          verbosity=verbosity, use_bag_holdout=use_bag_holdout)
+                          num_stack_levels=num_stack_levels, hyperparameters=hyperparameters,
+                          core_kwargs=core_kwargs, aux_kwargs=aux_kwargs,
+                          time_limit=time_limit, verbosity=verbosity, use_bag_holdout=use_bag_holdout)
         self._set_post_fit_vars()
 
         self._post_fit(
@@ -889,7 +895,7 @@ class TabularPredictor:
         if model_name is None:
             model_name = self._trainer.get_model_best()
 
-        if self._trainer.bagged_mode:
+        if self._trainer.bagged_mode and not self._trainer.get_model_attribute_full(model=model_name, attribute='val_in_fit', func=max):
             y_val_probs = self.get_oof_pred_proba(model_name).to_numpy()
             y_val = self._trainer.load_y().to_numpy()
         else:

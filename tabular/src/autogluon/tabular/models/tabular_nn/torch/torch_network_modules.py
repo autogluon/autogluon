@@ -130,7 +130,7 @@ class EmbedNet(nn.Module):
                     use_batchnorm=False,
                     dropout_prob=0.1,
                     y_range=None,
-                    alpha=0.01,
+                    alpha=0.0,
                     max_embedding_dim=100,
                     embed_exponent=0.56,
                     embedding_size_factor=1.0):
@@ -198,15 +198,21 @@ class EmbedNet(nn.Module):
         loss_data *= scale
         return loss_data.mean()
 
-    def margin_loss(self, input_data, margin_scale=0.0001):
+    def margin_loss(self, input_data, margin_data=None, margin_scale=0.0001):
         # number of samples
         batch_size, num_quantiles = input_data.size()
 
-        # compute margin loss (batch_size x num_net_outputs(above) x num_net_outputs(below))
+        # compute margin loss (batch_size x output_size(above) x output_size(below))
         error_data = input_data.unsqueeze(1) - input_data.unsqueeze(2)
 
         # margin data (num_quantiles x num_quantiles)
-        margin_data = self.quantile_levels.permute(1, 0) - self.quantile_levels
+        if margin_data is None:
+            margin_data = self.quantile_levels.permute(1, 0) - self.quantile_levels
+        else:
+            if type(margin_data) is not torch.Tensor:
+                margin_data = torch.tensor(margin_data, device=input_data.device)
+            margin_data = margin_data.reshape(1, -1)
+            margin_data = margin_data.permute(1, 0) - margin_data
         margin_data = torch.tril(margin_data, -1) * margin_scale
 
         # compute accumulated margin
@@ -240,7 +246,6 @@ class EmbedNet(nn.Module):
                 predict_data = predict_data.flatten()
             return loss_function(predict_data, target_data)
 
-
     def predict(self, input_data):
         self.eval()
         with torch.no_grad():
@@ -252,5 +257,58 @@ class EmbedNet(nn.Module):
             elif self.problem_type == REGRESSION:
                 predict_data = predict_data.flatten()
             if self.problem_type == BINARY:
-                predict_data = predict_data[:,1]
+                predict_data = predict_data[:, 1]
             return predict_data.data.cpu().numpy()
+
+
+class DeepQuantileAggregator(EmbedNet):
+    def __init__(self,
+                 num_base_preds,
+                 quantile_levels,
+                 margin_data=None,
+                 train_dataset=None,
+                 architecture_desc=None,
+                 device=None,
+                 **kwargs):
+        self.num_base_preds = num_base_preds
+        self.num_quantiles = len(quantile_levels)
+        self.margin_data = margin_data
+        num_net_outputs = self.num_base_preds * self.num_quantiles
+
+        super().__init__(QUANTILE, num_net_outputs, quantile_levels, train_dataset,
+                         architecture_desc, device, **kwargs)
+
+    def forward(self, data_batch):
+        input_data = []
+        if self.has_vector_features:
+            input_data.append(data_batch['vector'].to(self.device))
+        if self.has_embed_features:
+            embed_data = data_batch['embed']
+            for i in range(len(self.embed_blocks)):
+                input_data.append(self.embed_blocks[i](embed_data[i].to(self.device)))
+
+        if len(input_data) > 1:
+            input_data = torch.cat(input_data, dim=1)
+        else:
+            input_data = input_data[0]
+
+        weight_data = self.main_block(input_data)
+        weight_data = weight_data.contiguous().reshape(-1, self.num_base_preds, self.num_quantiles)
+        weight_data = weight_data.softmax(-2)
+        base_preds = data_batch['base_pred'].to(self.device)
+        output_data = base_preds.contiguous().reshape(-1, self.num_base_preds, 1) * weight_data
+        output_data = torch.sum(output_data, 1)
+        return output_data
+
+    def compute_loss(self, data_batch, loss_function=None, gamma=None):
+        # train mode
+        self.train()
+        predict_data = self(data_batch)
+        target_data = data_batch['label'].to(self.device)
+
+        if gamma > 0.0:
+            m_loss = self.margin_loss(predict_data, self.margin_data)
+        else:
+            m_loss = 0.0
+        h_loss = self.huber_pinball_loss(predict_data, target_data).mean()
+        return h_loss + gamma * m_loss
