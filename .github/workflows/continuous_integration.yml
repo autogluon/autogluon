@@ -19,8 +19,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_DEV_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_DEV_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -58,8 +58,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_DEV_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_DEV_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -97,8 +97,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_DEV_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_DEV_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -136,8 +136,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_DEV_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_DEV_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -175,8 +175,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_DEV_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_DEV_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -214,8 +214,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_DEV_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_DEV_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -253,8 +253,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_DEV_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_DEV_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -292,8 +292,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_DEV_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_DEV_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Install dependencies
         run: |
