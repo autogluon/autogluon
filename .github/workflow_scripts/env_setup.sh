@@ -57,3 +57,14 @@ function install_forecasting {
 function install_autogluon {
     python3 -m pip install --upgrade -e autogluon/
 }
+
+function install_all {
+    install_common
+    install_core_all
+    install_features
+    install_tabular_all
+    install_text
+    install_vision
+    install_forecasting
+    install_autogluon
+}
