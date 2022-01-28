@@ -24,7 +24,6 @@ jobs:
           aws-region: us-east-1
       - name: Install dependencies
         run: |
-          pip install --upgrade --force-reinstall --no-deps .
           pip install boto3
       - name: Test Common on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
@@ -63,7 +62,6 @@ jobs:
           aws-region: us-east-1
       - name: Install dependencies
         run: |
-          pip install --upgrade --force-reinstall --no-deps .
           pip install boto3
       - name: Test Core on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
@@ -102,7 +100,6 @@ jobs:
           aws-region: us-east-1
       - name: Install dependencies
         run: |
-          pip install --upgrade --force-reinstall --no-deps .
           pip install boto3
       - name: Test Features on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
@@ -141,7 +138,6 @@ jobs:
           aws-region: us-east-1
       - name: Install dependencies
         run: |
-          pip install --upgrade --force-reinstall --no-deps .
           pip install boto3
       - name: Test Tabular on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
@@ -180,7 +176,6 @@ jobs:
           aws-region: us-east-1
       - name: Install dependencies
         run: |
-          pip install --upgrade --force-reinstall --no-deps .
           pip install boto3
       - name: Test Text on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
@@ -219,7 +214,6 @@ jobs:
           aws-region: us-east-1
       - name: Install dependencies
         run: |
-          pip install --upgrade --force-reinstall --no-deps .
           pip install boto3
       - name: Test Vision on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
@@ -258,7 +252,6 @@ jobs:
           aws-region: us-east-1
       - name: Install dependencies
         run: |
-          pip install --upgrade --force-reinstall --no-deps .
           pip install boto3
       - name: Test Forecasting on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
@@ -297,7 +290,6 @@ jobs:
           aws-region: us-east-1
       - name: Install dependencies
         run: |
-          pip install --upgrade --force-reinstall --no-deps .
           pip install boto3
       - name: Test Install on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
