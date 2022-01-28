@@ -187,9 +187,6 @@ class LocalSearcher(object):
                                          f'Invalid Value: {config[key]} | Valid Values: {self.search_space[key].data}')
                 config_to_pkl.append(cat_idx)
             else:
-                if key in self._params_static:
-                    assert config[key] == self._params_static[key]
-
                 config_to_pkl.append(config[key])
         return pickle.dumps(config_to_pkl)
 
