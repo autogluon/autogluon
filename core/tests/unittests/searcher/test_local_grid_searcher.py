@@ -19,7 +19,7 @@ def test_local_grid_searcher_categorical():
     expected_config_6 = {'b': 15, 'a': ['hello', 2]}
 
     config1 = searcher.get_config()
-    searcher.update(config1, accuracy=0.2)
+    searcher.update(config1, reward=0.2)
     assert searcher.get_reward(config1) == 0.2
     assert searcher.get_best_reward() == 0.2
     assert searcher.get_best_config() == config1
@@ -29,11 +29,11 @@ def test_local_grid_searcher_categorical():
     config3 = searcher.get_config()
 
     config4 = searcher.get_config()
-    searcher.update(config4, accuracy=0.1)
+    searcher.update(config4, reward=0.1)
     assert searcher.get_reward(config4) == 0.1
     assert searcher.get_best_reward() == 0.2
     assert searcher.get_best_config() == config1
-    searcher.update(config4, accuracy=0.5)
+    searcher.update(config4, reward=0.5)
     assert searcher.get_reward(config4) == 0.5
     assert searcher.get_best_reward() == 0.5
     assert searcher.get_best_config() == config4
@@ -73,7 +73,7 @@ def test_local_grid_searcher_numeric():
             try:
                 cfg = searcher.get_config()
                 actual_values.append(cfg)
-                searcher.update(cfg, accuracy=0.1)
+                searcher.update(cfg, reward=0.1)
             except AssertionError as e:
                 assert expected_values == actual_values
                 break
@@ -98,7 +98,7 @@ def test_local_grid_searcher_numeric_grid_settings():
             try:
                 cfg = searcher.get_config()
                 actual_values.append(cfg)
-                searcher.update(cfg, accuracy=0.1)
+                searcher.update(cfg, reward=0.1)
             except AssertionError as e:
                 assert expected_values == actual_values
                 break

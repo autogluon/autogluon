@@ -18,41 +18,20 @@ class LocalSearcher(object):
         The configuration space to sample from. It contains the full
         specification of the Hyperparameters with their priors
     """
-    def __init__(self, search_space, reward_attribute=None, **kwargs):
+    def __init__(self, search_space: dict, reward_attribute: str = 'reward', **kwargs):
         """
         :param search_space: Configuration space to sample from or search in
         :param reward_attribute: Reward attribute passed to update.
-            Default: 'accuracy'
+            Default: 'reward'
 
         """
         self.search_space = search_space
         self._results = OrderedDict()
-        if reward_attribute is None:
-            reward_attribute = 'accuracy'
         self._reward_attribute = reward_attribute
         self._params_static = self._get_params_static()
         self._params_default = self._get_params_default(self._params_static)
         self._params_order = list(self._params_default.keys())
-
-    def _get_params_default(self, params_static: dict) -> dict:
-        params_default = dict()
-        for key, val in self.search_space.items():
-            if isinstance(val, Space):
-                if isinstance(val, Categorical):
-                    # FIXME: Don't do this, fix the outer code to not require this
-                    d = val.data[0]
-                else:
-                    d = val.default
-                params_default[key] = d
-        params_default.update(params_static)
-        return params_default
-
-    def _get_params_static(self):
-        params_static = dict()
-        for key, val in self.search_space.items():
-            if not isinstance(val, Space):
-                params_static[key] = val
-        return params_static
+        self._params_cat_dict = self._get_params_cat_dict()
 
     # FIXME: Consider removing
     def configure_scheduler(self, scheduler):
@@ -91,25 +70,14 @@ class LocalSearcher(object):
         """
         raise NotImplementedError(f'This function needs to be overwritten in {self.__class__.__name__}.')
 
-    def update(self, config, **kwargs):
-        """Update the searcher with the newest metric report"""
+    def update(self, config: dict, **kwargs):
+        """
+        Update the searcher with the newest metric report.
+        Will error if config contains unknown parameters, values outside the valid search space, or is missing parameters.
+        """
         reward = kwargs.get(self._reward_attribute, None)
         assert reward is not None, "Missing reward attribute '{}'".format(self._reward_attribute)
         self._add_result(config=config, result=reward)
-
-    def _add_result(self, config: dict, result: float):
-        config_pkl = self._pickle_config(config=config)
-        self._results[config_pkl] = result
-
-    def _pickle_config(self, config: dict):
-        assert len(config) == len(self._params_order), f'Config length does not match expected params count!\n' \
-                                                       f'Expected: {self._params_order}\n' \
-                                                       f'Actual:   {list(config.keys())}'
-        return pickle.dumps([config[key] for key in self._params_order])
-
-    def _unpickle_config(self, config_pkl) -> dict:
-        config_compressed = pickle.loads(config_pkl)
-        return {key: config_compressed[i] for i, key in enumerate(self._params_order)}
 
     def register_pending(self, config, milestone=None):
         """
@@ -155,3 +123,84 @@ class LocalSearcher(object):
             return self._unpickle_config(config_pkl=config_pkl)
         else:
             return dict()
+
+    def _get_params_static(self) -> dict:
+        """
+        Gets a dictionary of static key values, where no search space is used and therefore the values are always the same in all configs.
+        """
+        params_static = dict()
+        for key, val in self.search_space.items():
+            if not isinstance(val, Space):
+                params_static[key] = val
+        return params_static
+
+    def _get_params_default(self, params_static: dict) -> dict:
+        """
+        Gets the default config by calling `val.default` on every search space parameter, plus the static key values.
+        """
+        params_default = dict()
+        for key, val in self.search_space.items():
+            if isinstance(val, Space):
+                params_default[key] = val.default
+        params_default.update(params_static)
+        return params_default
+
+    def _get_params_cat_dict(self) -> dict:
+        """
+        Gets the dictionary of pickled category value -> index mapping for Category search spaces.
+        This is used in `self._pickle_config` to map values to idx when pickling the config. This compresses the size of the pkl file.
+        When being later unpickled via `self._unpickle_config`, the idx can be used to get the key value via `self.search_space[key][idx]`.
+        """
+        params_cat_dict = dict()
+        for key, val in self.search_space.items():
+            if isinstance(val, Categorical):
+                cat_map = dict()
+                for i, cat in enumerate(val.data):
+                    cat_pkl = pickle.dumps(cat)
+                    cat_map[cat_pkl] = i
+
+                params_cat_dict[key] = cat_map
+        return params_cat_dict
+
+    def _add_result(self, config: dict, result: float):
+        assert isinstance(result, (float, int)), f"result must be a float or int! Was instead {type(result)} | Value: {result}"
+        config_pkl = self._pickle_config(config=config)
+        self._results[config_pkl] = result
+
+    def _pickle_config(self, config: dict) -> bytes:
+        assert isinstance(config, dict), f"config must be a dict! Was instead {type(config)} | Value: {config}"
+        assert len(config) == len(self._params_order), f'Config length does not match expected params count!\n' \
+                                                       f'Expected: {self._params_order}\n' \
+                                                       f'Actual:   {list(config.keys())}'
+
+        for key in self._params_static:
+            assert pickle.dumps(config[key]) == pickle.dumps(self._params_static[key]), \
+                f'Invalid config value for search space parameter "{key}" | Invalid Value: {config[key]} | Expected Value: {self._params_static[key]}'
+
+        config_to_pkl = []
+        for key in self._params_order:
+            if key in self._params_cat_dict:
+                try:
+                    cat_idx = self._params_cat_dict[key][pickle.dumps(config[key])]
+                except KeyError:
+                    raise AssertionError(f'Invalid config value for search space parameter "{key}" | '
+                                         f'Invalid Value: {config[key]} | Valid Values: {self.search_space[key].data}')
+                config_to_pkl.append(cat_idx)
+            else:
+                if key in self._params_static:
+                    assert config[key] == self._params_static[key]
+
+                config_to_pkl.append(config[key])
+        return pickle.dumps(config_to_pkl)
+
+    def _unpickle_config(self, config_pkl: bytes) -> dict:
+        assert isinstance(config_pkl, bytes), f"config_pkl must be a bytes object! Was instead {type(config_pkl)} | Value: {config_pkl}"
+        config_compressed = pickle.loads(config_pkl)
+        config = dict()
+        for i, key in enumerate(self._params_order):
+            val = config_compressed[i]
+            if key in self._params_cat_dict:
+                config[key] = self.search_space[key][val]
+            else:
+                config[key] = val
+        return config
