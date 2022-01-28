@@ -78,12 +78,12 @@ class EmbedNet(nn.Module):
 
         layers = []
         if params['use_batchnorm']:
-            layers.append(nn.BatchNorm1d(input_size, track_running_stats=False))
+            layers.append(nn.BatchNorm1d(input_size))
         layers.append(nn.Linear(input_size, params['hidden_size']))
         layers.append(act_fn)
         for _ in range(params['num_layers'] - 1):
             if params['use_batchnorm']:
-                layers.append(nn.BatchNorm1d(params['hidden_size'], track_running_stats=False))
+                layers.append(nn.BatchNorm1d(params['hidden_size']))
             layers.append(nn.Dropout(params['dropout_prob']))
             layers.append(nn.Linear(params['hidden_size'], params['hidden_size']))
             layers.append(act_fn)
