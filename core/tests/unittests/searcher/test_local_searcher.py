@@ -12,7 +12,7 @@ class TestLocalSearcher(unittest.TestCase):
 
         config1 = {'param1': 'hello', 7: 42}
         config2 = {'param1': 'world', 7: 42}
-        config_invalid_1 = {'param1': 'hello', 7: 0}
+        config_edge_case_1 = {'param1': 'world', 7: 0}
         config_invalid_2 = {'param1': 'invalid', 7: 42}
         config_invalid_3 = {'param1': 'hello'}
         config_invalid_4 = {7: 42}
@@ -34,7 +34,11 @@ class TestLocalSearcher(unittest.TestCase):
         assert searcher.get_best_config() == config2
 
         assert len(searcher._results) == 2
-        self.assertRaises(AssertionError, searcher.update, config_invalid_1, reward=0)
+        # This config is technically invalid, but for performance reasons is allowed to avoid having to pickle compare static parameters.
+        # Since the static parameter should be fixed, this config is treated as being equivalent to config2
+        searcher.update(config_edge_case_1, reward=0)
+        assert searcher.get_best_reward() == 0.1
+        assert len(searcher._results) == 2
         self.assertRaises(AssertionError, searcher.update, config_invalid_2, reward=0)
         self.assertRaises(AssertionError, searcher.update, config_invalid_3, reward=0)
         self.assertRaises(AssertionError, searcher.update, config_invalid_4, reward=0)

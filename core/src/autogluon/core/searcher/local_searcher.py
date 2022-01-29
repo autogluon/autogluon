@@ -173,13 +173,17 @@ class LocalSearcher(object):
                                                        f'Expected: {self._params_order}\n' \
                                                        f'Actual:   {list(config.keys())}'
 
+        # Note: This code is commented out because it can be computationally and memory expensive if user sends large objects in search space, such as datasets.
+        """
         for key in self._params_static:
             assert pickle.dumps(config[key]) == pickle.dumps(self._params_static[key]), \
                 f'Invalid config value for search space parameter "{key}" | Invalid Value: {config[key]} | Expected Value: {self._params_static[key]}'
-
+        """
         config_to_pkl = []
         for key in self._params_order:
-            if key in self._params_cat_dict:
+            if key in self._params_static:
+                pass
+            elif key in self._params_cat_dict:
                 try:
                     cat_idx = self._params_cat_dict[key][pickle.dumps(config[key])]
                 except KeyError:
@@ -194,10 +198,15 @@ class LocalSearcher(object):
         assert isinstance(config_pkl, bytes), f"config_pkl must be a bytes object! Was instead {type(config_pkl)} | Value: {config_pkl}"
         config_compressed = pickle.loads(config_pkl)
         config = dict()
-        for i, key in enumerate(self._params_order):
-            val = config_compressed[i]
-            if key in self._params_cat_dict:
-                config[key] = self.search_space[key][val]
+        i = -1
+        for key in self._params_order:
+            if key in self._params_static:
+                config[key] = self._params_static[key]
             else:
-                config[key] = val
+                i += 1
+                val = config_compressed[i]
+                if key in self._params_cat_dict:
+                    config[key] = self.search_space[key][val]
+                else:
+                    config[key] = val
         return config
