@@ -904,6 +904,8 @@ class AbstractModel:
         init_params = self.get_params()
 
         fit_kwargs = scheduler_params['resource'].copy()
+        fit_kwargs['feature_metadata'] = self.feature_metadata
+        fit_kwargs['num_classes'] = self.num_classes
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
         fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
         train_fn_kwargs = dict(

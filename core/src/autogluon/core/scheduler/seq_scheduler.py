@@ -261,6 +261,8 @@ class LocalSequentialScheduler(object):
     def run_job_(self, task_id, searcher_config, reporter):
         args = dict()
         if self.train_fn_kwargs is not None:
+            # TODO: Consider avoiding deepcopy and just do shallow copy,
+            #  Risk is that it will allow values in self.train_fn_kwargs to be altered by HPO trials, causing early trials to alter later trials.
             train_fn_kwargs = deepcopy(self.train_fn_kwargs)
         else:
             train_fn_kwargs = dict()
