@@ -12,7 +12,6 @@ from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils.utils import normalize_pred_probas
 
-from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
@@ -130,8 +129,9 @@ class RFModel(AbstractModel):
         model_cls = self._get_model_type()
 
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        self._set_cpu_params(num_cpus)
         params = self._get_model_params()
+        if 'n_jobs' not in params:
+            params['n_jobs'] = num_cpus
         n_estimators_final = params['n_estimators']
 
         n_estimators_minimum = min(40, n_estimators_final)
@@ -313,10 +313,6 @@ class RFModel(AbstractModel):
 
         return self._convert_proba_to_unified_form(y_oof_pred_proba)
 
-    # TODO: Add HPO
-    def _hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
-
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
@@ -332,9 +328,6 @@ class RFModel(AbstractModel):
             extra_ag_args_ensemble = {'use_child_oof': True}
             default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
-
-    def _set_cpu_params(self, num_cpus):
-        self.params['n_jobs'] = num_cpus
 
     def _more_tags(self):
         if self.problem_type == QUANTILE:

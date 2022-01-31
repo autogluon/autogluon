@@ -961,7 +961,7 @@ class BaggedEnsembleModel(AbstractModel):
 
             # TODO: Create new Ensemble Here
             bag = copy.deepcopy(self)
-            bag.rename(f"{bag.name}{os.path.sep}T{i}")
+            bag.rename(f"{bag.name}{os.path.sep}T{i+1}")
             bag.set_contexts(self.path_root + bag.name + os.path.sep)
 
             oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)

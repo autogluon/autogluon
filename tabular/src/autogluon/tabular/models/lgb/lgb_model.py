@@ -18,10 +18,9 @@ from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils import try_import_lightgbm
 
 from . import lgb_utils
-from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.parameters import get_param_baseline, get_lgb_objective, DEFAULT_NUM_BOOST_ROUND
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset
-from ..utils import fixedvals_from_searchspaces
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
@@ -50,7 +49,7 @@ class LGBModel(AbstractModel):
             self._set_default_param_value(param, val)
 
     def _get_default_searchspace(self):
-        return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
+        return get_default_searchspace(problem_type=self.problem_type)
 
     # Use specialized LightGBM metric if available (fast), otherwise use custom func generator
     def _get_stopping_metric_internal(self):
@@ -84,8 +83,6 @@ class LGBModel(AbstractModel):
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
-        params['num_threads'] = num_cpus
-        params = fixedvals_from_searchspaces(params)
 
         if verbosity <= 1:
             log_period = False
@@ -98,10 +95,7 @@ class LGBModel(AbstractModel):
 
         stopping_metric, stopping_metric_name = self._get_stopping_metric_internal()
 
-        if self.problem_type in [MULTICLASS, SOFTCLASS] and 'num_classes' not in params:
-            params['num_classes'] = self.num_classes
-
-        num_boost_round = params.pop('num_boost_round', 1000)
+        num_boost_round = params.pop('num_boost_round', DEFAULT_NUM_BOOST_ROUND)
         dart_retrain = params.pop('dart_retrain', False)  # Whether to retrain the model to get optimal iteration if model is trained in 'dart' mode.
         if num_gpus != 0:
             if 'device' not in params:
@@ -110,9 +104,16 @@ class LGBModel(AbstractModel):
                 #  GPU training heavily alters accuracy, often in a negative manner. We will have to be careful about when to use GPU.
                 params['device'] = 'gpu'
                 logger.log(20, f'\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.')
-        logger.log(15, f'Training Gradient Boosting Model for {num_boost_round} rounds...')
-        logger.log(15, "with the following hyperparameter settings:")
-        logger.log(15, params)
+        logger.log(15, f"\tFitting {num_boost_round} rounds... Hyperparameters: {params}")
+
+        if 'num_threads' not in params:
+            params['num_threads'] = num_cpus
+        if 'objective' not in params:
+            params['objective'] = get_lgb_objective(problem_type=self.problem_type)
+        if self.problem_type in [MULTICLASS, SOFTCLASS] and 'num_classes' not in params:
+            params['num_classes'] = self.num_classes
+        if 'verbose' not in params:
+            params['verbose'] = -1
 
         num_rows_train = len(X)
         dataset_train, dataset_val = self.generate_datasets(
@@ -272,7 +273,7 @@ class LGBModel(AbstractModel):
             return X
 
     def generate_datasets(self, X: DataFrame, y: Series, params, X_val=None, y_val=None, sample_weight=None, sample_weight_val=None, save=False):
-        lgb_dataset_params_keys = ['objective', 'two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
+        lgb_dataset_params_keys = ['two_round']  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
         X = self.preprocess(X, is_train=True)

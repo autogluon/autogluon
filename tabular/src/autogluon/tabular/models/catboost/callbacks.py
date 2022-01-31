@@ -132,7 +132,7 @@ class EarlyStoppingCallback:
         else:
             is_max_optimal = eval_metric.is_max_optimal()
             # FIXME: Unsure if this works for custom metrics!
-            eval_metric_name = str(eval_metric)
+            eval_metric_name = eval_metric.__class__.__name__
 
         self.eval_metric_name = eval_metric_name
         self.is_max_optimal = is_max_optimal

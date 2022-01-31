@@ -18,7 +18,6 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.core import Space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.utils import try_import_mxboard, try_import_mxnet
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -28,7 +27,6 @@ from ..hyperparameters.parameters import get_default_param
 from ..hyperparameters.searchspaces import get_default_searchspace
 from ..utils.data_preprocessor import create_preprocessor, get_feature_arraycol_map, get_feature_type_map
 from ..utils.nn_architecture_utils import infer_y_range, get_default_layers, default_numeric_embed_dim
-from ...utils import fixedvals_from_searchspaces
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
@@ -140,7 +138,6 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             logger.log(15, "sample_weight not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
 
         params = self._get_model_params()
-        params = fixedvals_from_searchspaces(params)
         if num_cpus is not None:
             self.num_dataloading_workers = max(1, int(num_cpus/2.0))
         else:

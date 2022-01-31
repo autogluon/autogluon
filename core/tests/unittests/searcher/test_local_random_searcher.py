@@ -23,7 +23,7 @@ def test_local_random_searcher():
     config1 = searcher.get_config()
     assert searcher.get_reward(config1) == float("-inf")
     assert searcher.get_best_reward() == float("-inf")
-    searcher.update(config1, accuracy=0.2)
+    searcher.update(config1, reward=0.2)
     assert searcher.get_reward(config1) == 0.2
     assert searcher.get_best_reward() == 0.2
     assert searcher.get_best_config() == config1
@@ -33,11 +33,11 @@ def test_local_random_searcher():
     config3 = searcher.get_config()
 
     config4 = searcher.get_config()
-    searcher.update(config4, accuracy=0.1)
+    searcher.update(config4, reward=0.1)
     assert searcher.get_reward(config4) == 0.1
     assert searcher.get_best_reward() == 0.2
     assert searcher.get_best_config() == config1
-    searcher.update(config4, accuracy=0.5)
+    searcher.update(config4, reward=0.5)
     assert searcher.get_reward(config4) == 0.5
     assert searcher.get_best_reward() == 0.5
     assert searcher.get_best_config() == config4

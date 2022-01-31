@@ -17,7 +17,6 @@ from ..hyperparameters.parameters import get_default_param
 from ..hyperparameters.searchspaces import get_default_searchspace
 from ..utils.data_preprocessor import create_preprocessor, get_feature_arraycol_map, get_feature_type_map
 from ..utils.nn_architecture_utils import infer_y_range
-from ...utils import fixedvals_from_searchspaces
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +143,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         start_time = time.time()
 
         params = self._get_model_params()
-        params = fixedvals_from_searchspaces(params)
 
         processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params = self._prepare_params(params=params)
 

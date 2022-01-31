@@ -16,10 +16,9 @@ import numpy as np
 import pandas as pd
 from autocfg import dataclass
 import autogluon.core as ag
-from autogluon.core.scheduler.reporter import FakeReporter
 from autogluon.core.utils import get_cpu_count, get_gpu_count_all
 from autogluon.core.task.base import BaseTask
-from autogluon.core.searcher import LocalRandomSearcher
+from autogluon.core.searcher import DummySearcher
 
 from gluoncv.auto.estimators.base_estimator import BaseEstimator
 from gluoncv.auto.estimators import SSDEstimator, FasterRCNNEstimator, YOLOv3Estimator, CenterNetEstimator
@@ -57,7 +56,12 @@ class DefaultConfig:
     dist_ip_addrs : Union[type(None), list, Tuple] = None
 
 
-def _train_object_detection(args, reporter):
+def _train_object_detection(args,
+                            train_data,
+                            val_data,
+                            wall_clock_tick,
+                            log_dir,
+                            reporter=None):
     """
     Parameters
     ----------
@@ -70,22 +74,10 @@ def _train_object_detection(args, reporter):
     except:
         task_id = 0
     final_fit = args.pop('final_fit', False)
-    # train, val data
-    train_data = args.pop('train_data')
-    val_data = args.pop('val_data')
-    # wall clock tick limit
-    wall_clock_tick = args.pop('wall_clock_tick')
-    log_dir = args.pop('log_dir', os.getcwd())
     # exponential batch size for Int() space batch sizes
     exp_batch_size = args.pop('exp_batch_size', False)
     if exp_batch_size and 'batch_size' in args:
         args['batch_size'] = 2 ** args['batch_size']
-    try:
-        task = args.pop('task')
-        dataset = args.pop('dataset')
-        num_trials = args.pop('num_trials')
-    except KeyError:
-        task = None
 
     # convert user defined config to nested form
     args = config_to_nested(args)
@@ -138,17 +130,6 @@ def _train_object_detection(args, reporter):
             result = estimator.fit(train_data=train_data, val_data=val_data, time_limit=wall_clock_tick-tic)
             with open(os.path.join(trial_log_dir, valid_summary_file), 'w') as f:
                 json.dump(result, f)
-            # save config and result
-            if task is not None:
-                trial_log = {}
-                trial_log.update(args)
-                trial_log.update(result)
-                json_str = json.dumps(trial_log)
-                time_str = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-                json_file_name = task + '_dataset-' + dataset + '_trials-' + str(num_trials) + '_' + time_str + '.json'
-                with open(json_file_name, 'w') as json_file:
-                    json_file.write(json_str)
-                logging.info('Config and result in this trial have been saved to %s.', json_file_name)
     except:
         import traceback
         return {'traceback': traceback.format_exc(), 'args': str(args),
@@ -245,12 +226,12 @@ class ObjectDetection(BaseTask):
         config['gpus'] = [int(i) for i in range(ngpus_per_trial)]
         config['seed'] = config.get('seed', np.random.randint(32,767))
         config['final_fit'] = False
-        self._cleanup_disk = config.get('cleanup_disk', True)
+        self._cleanup_disk = config.pop('cleanup_disk', True)
         self._config = config
 
         # scheduler options
-        self.search_strategy = config.get('search_strategy', 'random')
-        self.search_options = config.get('search_options', {})
+        self.search_strategy = config.pop('search_strategy', 'random')
+        self.search_options = config.pop('search_options', {})
         self.scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
             'checkpoint': config.get('checkpoint', 'checkpoint/exp1.ag'),
@@ -263,7 +244,7 @@ class ObjectDetection(BaseTask):
             'dist_ip_addrs': config.get('dist_ip_addrs', None),
             'searcher': self.search_strategy,
             'search_options': self.search_options,
-            'max_reward': config.get('max_reward', 0.9)}
+            'max_reward': config.get('max_reward', None)}
 
     def fit(self, train_data, val_data=None, train_size=0.9, random_state=None, time_limit=None):
         """Fit auto estimator given the input data.
@@ -327,24 +308,27 @@ class ObjectDetection(BaseTask):
             config.pop('train_dataset')
 
         # register args
-        config['train_data'] = train_data
-        config['val_data'] = val_data
-        config['wall_clock_tick'] = wall_clock_tick
-        config['log_dir'] = os.path.join(config.get('log_dir', os.getcwd()), str(uuid.uuid4())[:8])
+        log_dir = os.path.join(config.pop('log_dir', os.getcwd()), str(uuid.uuid4())[:8])
+        train_fn_kwargs = dict(
+            train_data=train_data,
+            val_data=val_data,
+            wall_clock_tick=wall_clock_tick,
+            log_dir=log_dir,
+        )
 
         start_time = time.time()
         self._fit_summary = {}
         self._results = {}
-        if config.get('num_trials', 1) < 2:
-            reporter = FakeReporter()
-            rand_config = LocalRandomSearcher(search_space=config).get_config()
+
+        num_trials = config.pop('num_trials', 1)
+        hpo_enabled = num_trials > 1
+        if not hpo_enabled:
+            default_config = DummySearcher(search_space=config).get_config()
             self._logger.info("Starting fit without HPO")
             cur_config = {**config}
-            cur_config.update(rand_config)
-            results = _train_object_detection({**cur_config}, reporter)
+            cur_config.update(default_config)
+            results = _train_object_detection({**cur_config}, **train_fn_kwargs)
             best_config = cur_config
-            best_config.pop('train_data', None)
-            best_config.pop('val_data', None)
             self._fit_summary.update({'train_map': results.get('train_map', -1),
                                       'valid_map': results.get('valid_map', -1),
                                       'total_time': results.get('time', time.time() - start_time),
@@ -353,13 +337,13 @@ class ObjectDetection(BaseTask):
         else:
             self._logger.info("Starting HPO experiments")
             results = self.run_fit(_train_object_detection, config, self.search_strategy,
-                                   self.scheduler_options)
+                                   self.scheduler_options, train_fn_kwargs=train_fn_kwargs)
             if isinstance(results, dict):
                 ks = ('best_reward', 'best_config', 'total_time', 'config_history', 'reward_attr')
                 self._results.update({k: v for k, v in results.items() if k in ks})
         end_time = time.time()
         self._logger.info("Finished, total runtime is %.2f s", end_time - start_time)
-        if config.get('num_trials', 1) > 1:
+        if hpo_enabled:
             best_config = {**config}
             best_config.update(results['best_config'])
             # convert best config to nested form
@@ -373,7 +357,7 @@ class ObjectDetection(BaseTask):
         self._logger.info(pprint.pformat(self._fit_summary, indent=2))
 
         if self._cleanup_disk:
-            shutil.rmtree(config['log_dir'], ignore_errors=True)
+            shutil.rmtree(log_dir, ignore_errors=True)
         model_checkpoint = results.get('model_checkpoint', None)
         if model_checkpoint is None:
             if results.get('traceback', '') == 'timeout':
