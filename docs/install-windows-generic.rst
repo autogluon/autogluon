@@ -1,4 +1,6 @@
 
+If you run into difficulties installing AutoGluon on Windows, please provide details in `this GitHub Issue  <https://github.com/awslabs/autogluon/issues/164>`_.
+
 To install AutoGluon on Windows, it is recommended to use Anaconda:
 
 1. `Install Anaconda <https://www.anaconda.com/products/individual>`_

@@ -1,7 +1,9 @@
 AutoGluon: AutoML for Text, Image, and Tabular Data
 ====================================================
 
-`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning text, image, and tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
+.. include:: badges.rst
+
+`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning image, text, and tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
 
 - Quickly prototype deep learning and classical ML solutions for your raw data with a few lines of code.
 - Automatically utilize state-of-the-art techniques (where appropriate) without expert knowledge.
@@ -12,9 +14,11 @@ AutoGluon: AutoML for Text, Image, and Tabular Data
 
    Example using AutoGluon to train and deploy a high-performance model on a tabular dataset:
 
-   >>> from autogluon.tabular import TabularPredictor
-   >>> predictor = TabularPredictor(label=COLUMN_NAME).fit(train_data=TRAIN_DATA.csv)
-   >>> predictions = predictor.predict(TEST_DATA.csv)
+   >>> from autogluon.tabular import TabularDataset, TabularPredictor
+   >>> train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+   >>> test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+   >>> predictor = TabularPredictor(label='class').fit(train_data=train_data)
+   >>> predictions = predictor.predict(test_data)
 
    AutoGluon can be applied just as easily for prediction tasks with image or text data.
 

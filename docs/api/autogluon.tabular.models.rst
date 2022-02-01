@@ -61,8 +61,10 @@ Models
    XTModel
    KNNModel
    LinearModel
-   TabularNeuralNetModel
+   TabularNeuralNetTorchModel
+   TabularNeuralNetMxnetModel
    NNFastAiTabularModel
+   VowpalWabbitModel
 
 :hidden:`AbstractModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,16 +120,28 @@ Models
 .. autoclass:: LinearModel
    :members: init
 
-:hidden:`TabularNeuralNetModel`
+:hidden:`TabularNeuralNetTorchModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TabularNeuralNetModel
+.. autoclass:: TabularNeuralNetTorchModel
+   :members: init
+
+:hidden:`TabularNeuralNetMxnetModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularNeuralNetMxnetModel
    :members: init
 
 :hidden:`NNFastAiTabularModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: NNFastAiTabularModel
+   :members: init
+
+:hidden:`VowpalWabbitModel`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: VowpalWabbitModel
    :members: init
 
 Ensemble Models
