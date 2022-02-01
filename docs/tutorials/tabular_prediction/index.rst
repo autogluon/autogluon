@@ -37,6 +37,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       Modeling data tables with text and numeric/categorical features.
 
    .. card::
+      :title: Training models with GPU support
+      :link: tabular-gpu.html
+
+      How to train models with GPU support.
+
+   .. card::
       :title: Multi-Label Prediction
       :link: tabular-multilabel.html
 
@@ -75,6 +81,7 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-kaggle
    tabular-multimodal
    tabular-multimodal-text-others
+   tabular-gpu
    tabular-multilabel
    tabular-custom-model
    tabular-custom-metric
