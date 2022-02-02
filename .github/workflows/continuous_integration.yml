@@ -353,193 +353,193 @@ jobs:
                                           --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
                                           --command "chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
                                           --wait
-  build_object_detection_tutorial:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Build Object Detection Tutorial on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildObjectDetection-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
-                                          --wait
-      - name: Build Object Detection Tutorial on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildObjectDetection-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
-                                          --wait
-  build_tabular_prediction_tutorial:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Build Tabular Prediction Tutorial on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-TabularPrediction-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
-                                          --wait
-      - name: Build Tabular Prediction Tutorial on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-TabularPrediction-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
-                                          --wait
-  build_text_prediction_tutorial:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Build Text Prediction Tutorial on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-TextPrediction-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
-                                          --wait
-      - name: Build Text Prediction Tutorial on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-TextPrediction-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
-                                          --wait
-  build_cloud_fit_deploy_tutorial:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
-                                          --wait
-      - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildCloudFitDeploy-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
-                                          --wait
-  build_forecasting_tutorial:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Build Forecasting Tutorial on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildForecasting-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
-                                          --wait
-      - name: Build Forecasting Tutorial on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildForecasting-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
-                                          --wait
+  # build_object_detection_tutorial:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+  #         aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Build Object Detection Tutorial on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildObjectDetection-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+  #                                         --wait
+  #     - name: Build Object Detection Tutorial on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildObjectDetection-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+  #                                         --wait
+  # build_tabular_prediction_tutorial:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+  #         aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Build Tabular Prediction Tutorial on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildTabularPrediction-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+  #                                         --wait
+  #     - name: Build Tabular Prediction Tutorial on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildTabularPrediction-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+  #                                         --wait
+  # build_text_prediction_tutorial:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+  #         aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Build Text Prediction Tutorial on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildTextPrediction-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+  #                                         --wait
+  #     - name: Build Text Prediction Tutorial on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildTextPrediction-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+  #                                         --wait
+  # build_cloud_fit_deploy_tutorial:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+  #         aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-CPU \
+  #                                         --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+  #                                         --wait
+  #     - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-CPU \
+  #                                         --name AutoGluon-BuildCloudFitDeploy-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+  #                                         --wait
+  # build_forecasting_tutorial:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
+  #         aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Build Forecasting Tutorial on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildForecasting-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+  #                                         --wait
+  #     - name: Build Forecasting Tutorial on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildForecasting-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+  #                                         --wait

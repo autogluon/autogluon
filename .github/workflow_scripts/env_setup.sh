@@ -5,6 +5,7 @@ function setup_build_env {
 function setup_build_contrib_env {
     python3 -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+    apt-get install haskell-platform # install pandoc
     export AG_DOCS=1
 }
 
