@@ -3,9 +3,9 @@ function setup_build_env {
 }
 
 function setup_build_contrib_env {
+    apt-get install pandoc -y # install pandoc
     python3 -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
-    sudo apt-get install pandoc # install pandoc
     export AG_DOCS=1
 }
 
