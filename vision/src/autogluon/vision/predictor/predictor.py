@@ -22,6 +22,7 @@ from autogluon.core.utils.utils import generate_train_test_split
 
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 from ..utils import sanitize_batch_size
+from ..utils.pickle import CPU_Unpickler
 
 __all__ = ['ImagePredictor']
 
@@ -697,7 +698,11 @@ class ImagePredictor(object):
         if os.path.isdir(path):
             path = os.path.join(path, 'image_predictor.ag')
         with open(path, 'rb') as fid:
-            obj = pickle.load(fid)
+            gpu_count = get_gpu_count_all()
+            if gpu_count > 0:
+                obj = pickle.load(fid)
+            else:
+                obj = CPU_Unpickler(fid).load()
         obj._verbosity = verbosity
         return obj
 
