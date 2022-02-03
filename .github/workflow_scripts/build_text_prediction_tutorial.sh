@@ -14,6 +14,12 @@ bash docs/build_pip_install.sh
 # only build for docs/text
 shopt -s extglob
 rm -rf ./docs/tutorials/!(text_prediction)
-cd docs && rm -rf _build && d2lbook build rst && cd ..
+cd docs && rm -rf _build && d2lbook build rst
 
+COMMAND_EXIT_CODE=$?
+if [ $COMMAND_EXIT_CODE -ne 0 ]; then
+    exit COMMAND_EXIT_CODE
+fi
+
+cd ..
 aws s3 cp --recursive docs/_build/rst/tutorials/text_prediction/ s3://autogluon-dev/build_docs/$PR_NUMBER/$COMMIT_SHA/ --quiet
