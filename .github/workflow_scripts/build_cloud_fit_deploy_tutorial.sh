@@ -20,4 +20,4 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
 fi
 
 cd ..
-aws s3 cp --recursive docs/_build/rst/tutorials/cloud_fit_deploy/ s3://autogluon-dev/build_docs/$PR_NUMBER/$COMMIT_SHA/ --quiet
+aws s3 cp --recursive docs/_build/rst/tutorials/cloud_fit_deploy/ s3://autogluon-dev/build_docs/$PR_NUMBER/$COMMIT_SHA/cloud_fit_deploy/ --quiet
